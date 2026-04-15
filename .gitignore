@@ -276,3 +276,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project
+#   File lock
+.idea-number.lock
