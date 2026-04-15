@@ -1,4 +1,4 @@
-# Decisions
+# ADRs
 
 This directory stores ADRs.
 
@@ -14,7 +14,3 @@ This directory stores ADRs.
 - normal implementation details
 - test reports
 
-## Naming
-
-- `ADR-001-xxx.md`
-- `ADR-002-xxx.md`
