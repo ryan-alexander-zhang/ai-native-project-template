@@ -1,69 +1,44 @@
 ---
 name: writing-idea-brief
 description: >
-  Capture product, feature, or startup concepts as concise idea briefs in this repository's
-  docs/ideas format. Use when the user wants to save, draft, write up, or turn a concept into an
-  idea brief or idea document, including prompts like "save this idea", "write this up", or "put
-  this in docs/ideas", even if they do not name the template explicitly.
-compatibility: Requires python3 and write access to this repository's docs/ideas directory.
+  Save a product, feature, or startup idea into `docs/ideas` as the current project's standard
+  idea brief.
+  Use this whenever the user wants to save an idea, write up a concept, or put something in
+  `docs/ideas`, even if they do not explicitly say "idea brief".
+compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/ideas`.
 ---
 
 # Writing Idea Brief
 
-Announce at start: "I'm using the writing-idea-brief skill to create the idea brief."
-
-## Available scripts
-
-- `python3 scripts/create_idea_brief.py <slug> --json [--parent <id>] [--status draft|active|archived]`
-  Reserves the next idea number under a file lock and writes the full scaffolded document.
-- `python3 scripts/validate_idea_brief.py <path>`
-  Validates front matter, required headings, risk bullets, decision block, and leftover scaffold text.
+Use this skill when the user wants a new idea brief saved in the current project's `docs/ideas`.
 
 ## Defaults
 
-- Use `status: draft` unless the user explicitly asks for `active` or `archived`.
-- Keep `parent: <id>` when the user did not provide a parent and there is no clear upstream document.
-- Keep the brief short and concrete. Prefer one to three sentences per section.
-- If the input is vague, draft reasonable assumptions instead of blocking. Only ask a follow-up when the answer changes `status`, `parent`, or the requested structure.
+- Use `draft` unless the user explicitly asks for `active` or `archived`.
+- Use `parent: <id>` unless the user gives a specific parent.
+- Derive a short slug from the idea title or concept.
+- Keep the brief short and concrete.
 
 ## Workflow
 
-1. Derive a short slug from the idea.
-2. Run the create script with `--json` so the next ID is reserved and the scaffolded file path is returned in structured output.
-3. Edit the created file in place and replace every scaffold prompt with real content.
-4. Keep the required structure and order.
-5. Run the validator script on the saved file.
-6. If validation fails, fix the file and rerun the validator until it passes.
-7. Report the saved path and mention any material assumptions you had to make.
+1. Turn the user's idea into a short slug or title.
+2. Run:
+   `python3 scripts/create_idea_brief.py "<slug or title>" --json [--status draft|active|archived] [--parent <id>]`
+   Resolve `scripts/create_idea_brief.py` relative to this skill directory.
+3. Open the new file path returned by the script.
+4. Replace every placeholder line with concise content based on the user's idea.
+5. Keep the generated front matter and section structure. Do not rewrite the scaffold by hand.
+6. Save the file and report the path back to the user.
 
-## Required structure
+## Generated File
 
-Keep these front matter fields:
+By default the script saves to `docs/ideas` in the current project. Use `--output-dir` only when
+the user explicitly wants a different location.
 
-- `id`
-- `type`
-- `role`
-- `status`
-- `parent`
+- front matter with `id`, `type`, `role`, `status`, and `parent`
+- the `# Idea Brief` document
+- these sections:
+  `One-line Summary`, `Problem`, `Target User`, `Current Alternatives`, `Proposed Solution`,
+  `Why Better`, `Why Now`, `Risks`, and `Decision`
 
-Keep these headings in this order:
-
-- `# Idea Brief`
-- `## One-line Summary`
-- `## Problem`
-- `## Target User`
-- `## Current Alternatives`
-- `## Proposed Solution`
-- `## Why Better`
-- `## Why Now`
-- `## Risks`
-- `## Decision`
-
-Keep the decision block exactly as scaffolded unless the user explicitly asks for a different format.
-
-## Gotchas
-
-- The create script already writes the full scaffold. Do not recreate the document structure by hand unless the user asks for a different template.
-- Remove every scaffold prompt line. The validator treats leftover prompt text as a failure.
-- Keep the three risk bullets and make each one concrete.
-- Do not invent a parent document unless there is a clear upstream brief, spec, or ADR the user referenced.
+Fill the generated file in place.

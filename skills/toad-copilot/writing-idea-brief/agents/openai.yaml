@@ -1,7 +1,7 @@
 interface:
   display_name: "Idea Brief"
-  short_description: "Capture and save concise idea briefs"
-  default_prompt: "Use $writing-idea-brief to turn this concept into the repo's idea brief format and save it in docs/ideas."
+  short_description: "Save a short idea brief in docs/ideas"
+  default_prompt: "Use $writing-idea-brief to save this idea in docs/ideas as the standard idea brief."
 
 policy:
   allow_implicit_invocation: true

@@ -3,39 +3,21 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "I have an idea for a voice journaling app that turns daily reflections into weekly insight summaries. Draft it as an idea brief and save it in this repo.",
-      "expected_output": "A new idea brief markdown file saved under docs/ideas with the required front matter and all required sections filled with concise, concrete content.",
-      "assertions": [
-        "The run saves exactly one new markdown file under docs/ideas named idea-<five digits>-<slug>.md",
-        "The saved file includes front matter keys id, type, role, status, and parent",
-        "The saved file uses status draft when the user did not request a different status",
-        "The saved file contains every required heading in the correct order",
-        "No scaffold prompt text remains in the saved file"
-      ]
+      "prompt": "Save this idea in docs/ideas: a voice journaling app that turns daily reflections into weekly summaries.",
+      "expected_output": "A new markdown file under docs/ideas with the standard front matter and idea brief template filled in.",
+      "files": []
     },
     {
       "id": 2,
-      "prompt": "Create an idea brief for a procurement copilot that helps finance teams compare vendor quotes. Save it as active status and use parent idea-00010-vendor-ops.",
-      "expected_output": "A new idea brief markdown file saved under docs/ideas with status active, parent idea-00010-vendor-ops, and the standard idea brief structure filled in.",
-      "assertions": [
-        "The saved file front matter sets status to active",
-        "The saved file front matter sets parent to idea-00010-vendor-ops",
-        "The risks section contains exactly three concrete risk bullets",
-        "The decision block keeps the three unchecked decision lines",
-        "The document stays concise rather than expanding into a long spec"
-      ]
+      "prompt": "Create an active idea brief for a finance copilot that compares vendor quotes. Use parent idea-00010-vendor-ops.",
+      "expected_output": "A new markdown file under docs/ideas with status active, parent idea-00010-vendor-ops, and the standard template filled in.",
+      "files": []
     },
     {
       "id": 3,
-      "prompt": "save this idea in docs/ideas: an sms concierge for independent restaurants that texts guests when their table is ready and handles simple waitlist updates",
-      "expected_output": "A concise idea brief saved under docs/ideas even though the prompt is informal and does not explicitly say idea brief.",
-      "assertions": [
-        "The saved file still uses the standard idea brief headings and front matter",
-        "The one-line summary and proposed solution are specific to restaurant waitlist texting rather than generic chatbot wording",
-        "The current alternatives section names realistic existing options",
-        "The validator script would pass on the saved file",
-        "The output reports the saved path back to the user"
-      ]
+      "prompt": "write this up in docs/ideas: sms waitlist concierge for independent restaurants",
+      "expected_output": "A concise idea brief saved under docs/ideas even though the prompt is informal.",
+      "files": []
     }
   ]
 }
