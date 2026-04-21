@@ -1,0 +1,7 @@
+interface:
+  display_name: "ADR"
+  short_description: "Write an ADR in docs/adrs"
+  default_prompt: "Use $writing-adr to save this request in docs/adrs as the standard ADR."
+
+policy:
+  allow_implicit_invocation: true

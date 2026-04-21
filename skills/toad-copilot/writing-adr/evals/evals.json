@@ -1,0 +1,49 @@
+{
+  "skill_name": "writing-adr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write a draft ADR in docs/adrs for adopting a guided repository bootstrap workflow for new projects. Use parent idea-00001-project-bootstrap-copilot.",
+      "expected_output": "A new main ADR saved under docs/adrs with parent idea-00001-project-bootstrap-copilot and the standard ADR sections filled in.",
+      "files": [
+        "evals/files/AGENTS.md",
+        "evals/files/docs/ideas/idea-00001-project-bootstrap-copilot.md"
+      ],
+      "expectations": [
+        "The run creates exactly one new markdown file under docs/adrs.",
+        "The new file front matter has type adr, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
+        "The new file includes Context, Decision, and Consequences sections with concrete content.",
+        "The Context names decision drivers or options considered, and the Consequences include at least one downside."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create an active ADR in docs/adrs for using ADRs to record major technical decisions in this repo. Use parent <id>.",
+      "expected_output": "A new main ADR saved under docs/adrs with status active, parent <id>, and the standard ADR sections filled in.",
+      "files": [
+        "evals/files/AGENTS.md"
+      ],
+      "expectations": [
+        "The run creates exactly one new markdown file under docs/adrs.",
+        "The new file front matter has type adr, role main, status active, and parent <id>.",
+        "The new file includes Context, Decision, and Consequences sections with concrete content.",
+        "The Decision explains why the chosen option won, and the Consequences include at least one downside."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add a patch ADR in docs/adrs to adr-00020-checkout-risk-review that clarifies when suspicious guest checkout orders require manual review.",
+      "expected_output": "A new patch ADR saved under docs/adrs with parent adr-00020-checkout-risk-review and the standard ADR structure.",
+      "files": [
+        "evals/files/AGENTS.md",
+        "evals/files/docs/adrs/adr-00020-checkout-risk-review.md"
+      ],
+      "expectations": [
+        "The run creates exactly one new markdown file under docs/adrs.",
+        "The new file front matter has type adr, role patch, status draft, and parent adr-00020-checkout-risk-review.",
+        "The new file includes Context, Decision, and Consequences sections with concrete content.",
+        "The Context names the existing decision being clarified, and the Consequences include at least one downside."
+      ]
+    }
+  ]
+}
