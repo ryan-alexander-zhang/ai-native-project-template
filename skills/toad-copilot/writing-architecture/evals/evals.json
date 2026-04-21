@@ -1,0 +1,23 @@
+{
+  "skill_name": "writing-architecture",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a repo-root ARCHITECTURE.md for this project from the active ADRs, docs, manifests, and code layout. Use the skill template, but do not copy irrelevant sections verbatim. If the repo does not justify a section, leave it out and tell me what ADR is missing.",
+      "expected_output": "A repo-specific ARCHITECTURE.md that reflects the actual project structure, omits unsupported sections, and names missing ADRs instead of inventing architecture.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Refresh the existing ARCHITECTURE.md in place. Keep anything inside <!-- manual-notes:start --> and <!-- manual-notes:end --> untouched, update the rest from active ADRs plus the current repo, and tell me which sections were preserved versus rewritten.",
+      "expected_output": "An in-place update that preserves protected manual notes, rewrites supported sections, and reports what changed.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Reconcile ARCHITECTURE.md with the repo. If a required section depends on an architectural decision that is missing or conflicts with the implementation, stop and tell me exactly which ADR I need to write or update before you can finish.",
+      "expected_output": "A partial or blocked update that uses the defined escalation format instead of smoothing over ADR drift or missing decisions.",
+      "files": []
+    }
+  ]
+}
