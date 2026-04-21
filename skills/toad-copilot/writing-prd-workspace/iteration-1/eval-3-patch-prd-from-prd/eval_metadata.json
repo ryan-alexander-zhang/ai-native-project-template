@@ -1,0 +1,10 @@
+{
+  "eval_id": 3,
+  "eval_name": "eval-3-patch-prd-from-prd",
+  "prompt": "Add a patch PRD in docs/prds to prd-00020-checkout-redesign for manual review of high-risk guest checkout orders.",
+  "assertions": [
+    "The run creates exactly one new markdown file under docs/prds.",
+    "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",
+    "The new file includes the standard PRD sections and at least two FR-xx checklist items."
+  ]
+}

@@ -1,0 +1,5 @@
+Added the patch user story at [story-00020-fr-03-guest-checkout-confirmation-email-patch.md](/Users/ryan/GitHubProjects/ryan-alexander-zhang/toad-copilot/skills/toad-copilot/writing-user-story-workspace/iteration-1/eval-3-patch-user-story/without_skill/run-1/project/docs/user-stories/story-00020-fr-03-guest-checkout-confirmation-email-patch.md:1).
+
+It clarifies the `FR-02`/`FR-03` handoff: approved guest orders get the standard confirmation email immediately, review-routed orders get an immediate pending-review email instead, the confirmation email is sent only after review approval, and declined reviewed orders do not receive the confirmation email.
+
+Assumption I made explicitly: there was no existing `docs/user-stories` template in this project root, so I used PRD-style frontmatter plus a minimal patch-story structure. Verified the new file exists under `docs/user-stories`; no tests were needed for this docs-only change.

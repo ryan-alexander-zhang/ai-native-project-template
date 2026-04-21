@@ -1,0 +1,3 @@
+Added a new patch PRD at [prd-00020-patch-01-high-risk-guest-checkout-manual-review.md](/Users/ryan/GitHubProjects/ryan-alexander-zhang/toad-copilot/skills/toad-copilot/writing-prd-workspace/iteration-1/eval-3-patch-prd-from-prd/without_skill/run-1/project/docs/prds/prd-00020-patch-01-high-risk-guest-checkout-manual-review.md). It is linked to `prd-00020-checkout-redesign` via `parent: prd-00020-checkout-redesign` and narrows scope to the manual-review workflow for high-risk guest checkout orders.
+
+The patch expands `FR-02` into explicit requirements for flagging, capture/fulfillment hold behavior, analyst review data, approve/reject decisioning, post-decision communication, and SLA escalation. Verification: only one new file was added in `docs/prds`.

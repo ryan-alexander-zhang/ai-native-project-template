@@ -1,0 +1,48 @@
+{
+  "expectations": [
+    {
+      "text": "The run creates exactly one new markdown file under docs/user-stories.",
+      "passed": true,
+      "evidence": "Created docs/user-stories/story-00020-fr-03-guest-checkout-confirmation-email-patch.md"
+    },
+    {
+      "text": "The new file front matter has type us, role patch, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-03.",
+      "passed": false,
+      "evidence": "type='user-story' (expected 'us'); status='active' (expected 'draft'); function_requirement_id=None (expected 'FR-03')"
+    },
+    {
+      "text": "The new file includes the User Story, Acceptance Criteria, and Definition of Done sections with at least three AC-xx checklist items.",
+      "passed": false,
+      "evidence": "missing one or more standard user story headings; found 0 AC items"
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 2,
+    "total": 3,
+    "pass_rate": 0.33
+  },
+  "execution_metrics": {
+    "tool_calls": {},
+    "total_tool_calls": 0,
+    "errors_encountered": 0,
+    "output_chars": 1308,
+    "transcript_chars": 11205
+  },
+  "timing": {
+    "total_tokens": 353661,
+    "duration_ms": 161044,
+    "total_duration_seconds": 161.0,
+    "executor_start": "2026-04-17T10:18:51.123745+00:00"
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No suggestions, evals look solid."
+  }
+}

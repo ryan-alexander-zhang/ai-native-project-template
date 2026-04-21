@@ -1,0 +1,8 @@
+Created the active FR-02 user story at [story-00020-fr-02-manual-review-routing.md](/Users/ryan/GitHubProjects/ryan-alexander-zhang/toad-copilot/skills/toad-copilot/writing-user-story-workspace/iteration-1/eval-2-active-user-story/without_skill/run-1/project/docs/user-stories/story-00020-fr-02-manual-review-routing.md).
+
+It includes active frontmatter with `parent: prd-00020-checkout-redesign`, a focused user story for manual review routing, and acceptance criteria covering:
+- routing high-risk guest orders into manual review before capture
+- analyst visibility into the queued order and triggering risk outcome
+- preserving the normal flow for low-risk guest checkout orders
+
+No tests were run because this was a docs-only change.

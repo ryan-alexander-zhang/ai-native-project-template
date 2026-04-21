@@ -1,0 +1,10 @@
+{
+  "eval_id": 2,
+  "eval_name": "eval-2-active-prd-from-idea",
+  "prompt": "Create an active PRD in docs/prds for a vendor quote comparison copilot. Use parent idea-00010-vendor-ops.",
+  "assertions": [
+    "The run creates exactly one new markdown file under docs/prds.",
+    "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",
+    "The new file includes the standard PRD sections and at least two FR-xx checklist items."
+  ]
+}

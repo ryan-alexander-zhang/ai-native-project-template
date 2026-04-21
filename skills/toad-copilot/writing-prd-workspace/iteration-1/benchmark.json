@@ -1,0 +1,263 @@
+{
+  "metadata": {
+    "skill_name": "writing-prd",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-04-17T10:03:49Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 113.1,
+        "tokens": 4626,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "passed": true,
+          "evidence": "Created docs/prds/prd-00001-guided-repository-setup-flow.md"
+        },
+        {
+          "text": "The new file front matter has type prd, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
+          "passed": true,
+          "evidence": "Front matter matches expected values."
+        },
+        {
+          "text": "The new file includes the standard PRD sections and at least two FR-xx checklist items.",
+          "passed": true,
+          "evidence": "Standard PRD headings present and FR checklist count is >= 2."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 164.4,
+        "tokens": 4012,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "passed": true,
+          "evidence": "Created docs/prds/prd-00001-vendor-quote-comparison-copilot.md"
+        },
+        {
+          "text": "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",
+          "passed": true,
+          "evidence": "Front matter matches expected values."
+        },
+        {
+          "text": "The new file includes the standard PRD sections and at least two FR-xx checklist items.",
+          "passed": true,
+          "evidence": "Standard PRD headings present and FR checklist count is >= 2."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 128.7,
+        "tokens": 3847,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "passed": true,
+          "evidence": "Created docs/prds/prd-00021-manual-review-high-risk-guest-checkout-orders.md"
+        },
+        {
+          "text": "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",
+          "passed": true,
+          "evidence": "Front matter matches expected values."
+        },
+        {
+          "text": "The new file includes the standard PRD sections and at least two FR-xx checklist items.",
+          "passed": true,
+          "evidence": "Standard PRD headings present and FR checklist count is >= 2."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.67,
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "time_seconds": 99.1,
+        "tokens": 6270,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "passed": true,
+          "evidence": "Created docs/prds/prd-00001-guided-repository-setup-flow.md"
+        },
+        {
+          "text": "The new file front matter has type prd, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
+          "passed": true,
+          "evidence": "Front matter matches expected values."
+        },
+        {
+          "text": "The new file includes the standard PRD sections and at least two FR-xx checklist items.",
+          "passed": false,
+          "evidence": "missing one or more standard PRD headings; found 0 FR items"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.67,
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "time_seconds": 113.8,
+        "tokens": 4593,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "passed": true,
+          "evidence": "Created docs/prds/prd-00010-vendor-quote-comparison-copilot.md"
+        },
+        {
+          "text": "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",
+          "passed": true,
+          "evidence": "Front matter matches expected values."
+        },
+        {
+          "text": "The new file includes the standard PRD sections and at least two FR-xx checklist items.",
+          "passed": false,
+          "evidence": "missing one or more standard PRD headings; found 0 FR items"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.33,
+        "passed": 1,
+        "failed": 2,
+        "total": 3,
+        "time_seconds": 105.9,
+        "tokens": 2157,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "passed": true,
+          "evidence": "Created docs/prds/prd-00020-patch-01-high-risk-guest-checkout-manual-review.md"
+        },
+        {
+          "text": "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",
+          "passed": false,
+          "evidence": "status='active' (expected 'draft')"
+        },
+        {
+          "text": "The new file includes the standard PRD sections and at least two FR-xx checklist items.",
+          "passed": false,
+          "evidence": "found 0 FR items"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 135.4,
+        "stddev": 26.2981,
+        "min": 113.1,
+        "max": 164.4
+      },
+      "tokens": {
+        "mean": 4161.6667,
+        "stddev": 410.5001,
+        "min": 3847,
+        "max": 4626
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.5567,
+        "stddev": 0.1963,
+        "min": 0.33,
+        "max": 0.67
+      },
+      "time_seconds": {
+        "mean": 106.2667,
+        "stddev": 7.3569,
+        "min": 99.1,
+        "max": 113.8
+      },
+      "tokens": {
+        "mean": 4340.0,
+        "stddev": 2068.139,
+        "min": 2157,
+        "max": 6270
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.44",
+      "time_seconds": "+29.1",
+      "tokens": "-178"
+    }
+  },
+  "notes": []
+}

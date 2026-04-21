@@ -9,7 +9,7 @@ Every main doc and patch doc should start with:
 ```md
 ---
 id: spec-00001-doc-front-matter
-type: adr|idea|integration|memory|operation|plan|prd|record|spec|task
+type: adr|idea|integration|memory|operation|plan|prd|record|spec|task|us
 role: main|patch
 status: draft|active|archived
 parent: <id>
@@ -17,6 +17,12 @@ parent: <id>
 ```
 
 Write the document description or comment after the front matter.
+
+`us` docs also include:
+
+```md
+function_requirement_id: <FR-id>
+```
 
 ## Front Matter Rules
 
@@ -32,11 +38,13 @@ Write the document description or comment after the front matter.
   - `records/` -> `record`
   - `specs/` -> `spec`
   - `tasks/` -> `task`
+  - `user-stories/` -> `us`
 - `role: main` is the canonical document for a topic. `role: patch` extends that main document.
 - `status: draft` is work in progress. `status: active` is the current live version. `status: archived` is kept for history and is no longer the current live version.
 - `role: patch` means `parent` is the id of the main document.
 - Main document flow is `idea -> prd -> spec -> plan -> task` when the later stage exists.
 - A main document in that flow should use the upstream main document id as `parent`. For example, a main `spec` should use the related `prd` id.
+- `us` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
 
 ## Folders
 
@@ -50,6 +58,7 @@ Write the document description or comment after the front matter.
 - `operations/`: runbooks and operations docs
 - `memory/`: reusable long-term knowledge
 - `records/`: reports and process records
+- `user-stories/`: user stories attached to PRD functional requirements
 - `references/`: external references
 
 ## Read Order
@@ -64,8 +73,9 @@ Write the document description or comment after the front matter.
 8. `integrations/`
 9. `records/`
 10. `prds/`
-11. `ideas/`
-12. `references/`
+11. `user-stories/`
+12. `ideas/`
+13. `references/`
 
 ## Rules
 
