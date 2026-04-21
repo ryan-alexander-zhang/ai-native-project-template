@@ -19,6 +19,19 @@ PROJECT_ROOT_MARKERS = (
 )
 VALID_ROLES = {"main", "patch"}
 VALID_STATUSES = {"draft", "active", "archived"}
+REQUIRED_HEADINGS = (
+    "One-line Summary",
+    "Vision & Goals",
+    "Actor",
+    "In Scope",
+    "Out of Scope",
+    "Functional Requirements",
+    "User Experience",
+    "Risks",
+    "Dependencies",
+)
+PLACEHOLDER_RE = re.compile(r"^<[^>\n]+>$", flags=re.MULTILINE)
+FR_RE = re.compile(r"^- \[ \] (FR-\d{2}): .+$", flags=re.MULTILINE)
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,6 +69,14 @@ def read_front_matter(doc_path: Path) -> dict[str, str]:
     return front_matter
 
 
+def read_body(doc_path: Path) -> str:
+    content = doc_path.read_text(encoding="utf-8")
+    match = re.match(r"^---\n.*?\n---\n?(?P<body>.*)$", content, flags=re.DOTALL)
+    if not match:
+        raise SystemExit(f"document body not found in {doc_path}")
+    return match.group("body")
+
+
 def require_fields(doc_path: Path, front_matter: dict[str, str], *fields: str) -> None:
     missing = [field for field in fields if not front_matter.get(field)]
     if missing:
@@ -70,6 +91,49 @@ def validate_existing_doc(project_root: Path, folder: str, doc_id: str) -> None:
         raise SystemExit(f"parent does not exist: {doc_path}")
 
 
+def validate_sections(doc_path: Path, body: str) -> None:
+    heading_matches: list[re.Match[str]] = []
+    for heading in REQUIRED_HEADINGS:
+        match = re.search(rf"^# {re.escape(heading)}\s*$", body, flags=re.MULTILINE)
+        if not match:
+            raise SystemExit(f"{doc_path} is missing required section: {heading}")
+        heading_matches.append(match)
+
+    if heading_matches != sorted(heading_matches, key=lambda match: match.start()):
+        raise SystemExit(f"{doc_path} has required sections out of order")
+
+    for index, match in enumerate(heading_matches):
+        content_start = match.end()
+        content_end = (
+            heading_matches[index + 1].start()
+            if index + 1 < len(heading_matches)
+            else len(body)
+        )
+        section_body = body[content_start:content_end].strip()
+        if not section_body:
+            raise SystemExit(
+                f"{doc_path} has an empty required section: {match.group(0)[2:]}"
+            )
+
+
+def validate_placeholders(doc_path: Path, body: str) -> None:
+    placeholders = PLACEHOLDER_RE.findall(body)
+    if placeholders:
+        raise SystemExit(
+            f"{doc_path} still has unresolved placeholder lines: {', '.join(placeholders)}"
+        )
+
+
+def validate_functional_requirements(doc_path: Path, body: str) -> None:
+    fr_ids = FR_RE.findall(body)
+    if len(fr_ids) < 2:
+        raise SystemExit(
+            f"{doc_path} must include at least two FR-xx checklist items"
+        )
+    if len(set(fr_ids)) != len(fr_ids):
+        raise SystemExit(f"{doc_path} has duplicate functional requirement ids")
+
+
 def main() -> int:
     args = parse_args()
     doc_path = args.doc_path.resolve()
@@ -77,6 +141,7 @@ def main() -> int:
         raise SystemExit(f"document not found: {doc_path}")
 
     project_root = find_project_root(doc_path.parent)
+    body = read_body(doc_path)
     front_matter = read_front_matter(doc_path)
     require_fields(doc_path, front_matter, "id", "type", "role", "status", "parent")
 
@@ -107,6 +172,10 @@ def main() -> int:
                 f"{doc_path} has invalid parent for role=patch: {parent}"
             )
         validate_existing_doc(project_root, "prds", parent)
+
+    validate_sections(doc_path, body)
+    validate_placeholders(doc_path, body)
+    validate_functional_requirements(doc_path, body)
 
     print(f"validated {doc_path}")
     return 0

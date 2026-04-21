@@ -35,12 +35,34 @@ Use this skill when the user wants a PRD saved in the current project's `docs/pr
 5. Open the new file path returned by the script.
 6. Replace every placeholder line with concise content based on the user's request.
 7. Keep the generated front matter and section structure. Do not rewrite the scaffold by hand.
-8. Save the file.
-9. Run:
+8. Run the validation loop below until it passes.
+9. Report the path back to the user.
+
+## Validation Loop
+
+1. Save the edited PRD.
+2. Run:
    `python3 scripts/validate_doc.py "<file path>"`
    Resolve `scripts/validate_doc.py` relative to this skill directory.
-10. If validation fails, fix the document and rerun the validator before reporting success.
-11. Report the path back to the user.
+3. If validation fails:
+   - read the error message
+   - fix the PRD in place
+   - run the validator again
+4. Do a final self-check against the user request:
+   - confirm every placeholder line is gone
+   - confirm the required sections are still present in the original order
+   - confirm there are at least two unique `FR-xx` checklist items
+   - confirm the PRD actually reflects the requested scope, not just the scaffold
+5. Only report success after the validator passes and the self-check passes.
+
+## Gotchas
+
+- Do not invent the file name or front matter by hand. Always start with `scripts/create_prd.py`.
+- `parent` must match `role`: `main` uses an `idea-xxxxx-...` id, while `patch` uses a `prd-xxxxx-...` id.
+- Keep the scaffold's exact top-level headings. Renaming or reordering them can break downstream validation.
+- Replace every angle-bracket placeholder line like `<...>`. A PRD with scaffold placeholders still present is invalid.
+- Keep `Functional Requirements` as checklist items using unique `FR-xx` ids. Do not switch to prose paragraphs.
+- Use `--output-dir` only when the user explicitly asks for a different destination.
 
 ## Generated File
 

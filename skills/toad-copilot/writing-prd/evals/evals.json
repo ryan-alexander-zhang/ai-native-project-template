@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Turn the project bootstrap copilot idea into a PRD in docs/prds. Use parent idea-00001-project-bootstrap-copilot and focus on a guided repository setup flow for new projects.",
-      "expected_output": "A new main PRD saved under docs/prds with parent idea-00001-project-bootstrap-copilot, the standard PRD template filled in, and functional requirements using FR-xx ids.",
+      "expected_output": "A new main PRD saved under docs/prds with parent idea-00001-project-bootstrap-copilot, the standard PRD template filled in, no scaffold placeholders remaining, and functional requirements using FR-xx ids.",
       "files": [
         "evals/files/AGENTS.md",
         "evals/files/docs/ideas/idea-00001-project-bootstrap-copilot.md"
@@ -12,13 +12,13 @@
       "expectations": [
         "The run creates exactly one new markdown file under docs/prds.",
         "The new file front matter has type prd, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
-        "The new file includes the standard PRD sections and at least two FR-xx checklist items."
+        "The new file includes the standard PRD sections in the expected order, contains no unresolved scaffold placeholders, and includes at least two FR-xx checklist items."
       ]
     },
     {
       "id": 2,
       "prompt": "Create an active PRD in docs/prds for a vendor quote comparison copilot. Use parent idea-00010-vendor-ops.",
-      "expected_output": "A new main PRD saved under docs/prds with status active, parent idea-00010-vendor-ops, and the standard PRD sections filled in.",
+      "expected_output": "A new main PRD saved under docs/prds with status active, parent idea-00010-vendor-ops, the standard PRD sections filled in, and no scaffold placeholders remaining.",
       "files": [
         "evals/files/AGENTS.md",
         "evals/files/docs/ideas/idea-00010-vendor-ops.md"
@@ -26,13 +26,13 @@
       "expectations": [
         "The run creates exactly one new markdown file under docs/prds.",
         "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",
-        "The new file includes the standard PRD sections and at least two FR-xx checklist items."
+        "The new file includes the standard PRD sections in the expected order, contains no unresolved scaffold placeholders, and includes at least two FR-xx checklist items."
       ]
     },
     {
       "id": 3,
       "prompt": "Add a patch PRD in docs/prds to prd-00020-checkout-redesign for manual review of high-risk guest checkout orders.",
-      "expected_output": "A new patch PRD saved under docs/prds with parent prd-00020-checkout-redesign and the standard PRD template filled in.",
+      "expected_output": "A new patch PRD saved under docs/prds with parent prd-00020-checkout-redesign, the standard PRD template filled in, and no scaffold placeholders remaining.",
       "files": [
         "evals/files/AGENTS.md",
         "evals/files/docs/prds/prd-00020-checkout-redesign.md"
@@ -40,7 +40,7 @@
       "expectations": [
         "The run creates exactly one new markdown file under docs/prds.",
         "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",
-        "The new file includes the standard PRD sections and at least two FR-xx checklist items."
+        "The new file includes the standard PRD sections in the expected order, contains no unresolved scaffold placeholders, and includes at least two FR-xx checklist items."
       ]
     }
   ]
