@@ -5,7 +5,8 @@ description: >
   Use this whenever the user wants a PRD, product requirements doc, wants to turn an idea into
   scoped requirements, wants to define `FR-xx` functional requirements, or wants to add a patch to
   an existing PRD, even if they do not explicitly say "PRD".
-compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/prds`.
+compatibility: >
+  Requires python3, a POSIX environment, and write access to the target project's `docs/prds`.
 ---
 
 # Writing PRD
@@ -33,12 +34,19 @@ Use this skill when the user wants a PRD saved in the current project's `docs/pr
    `python3 scripts/create_prd.py "<slug or title>" --json [--role main|patch] [--status draft|active|archived] --parent <id>`
    Resolve `scripts/create_prd.py` relative to this skill directory.
 5. Open the new file path returned by the script.
-6. Replace every placeholder line with concise content based on the user's request.
-7. Keep the generated front matter and section structure. Do not rewrite the scaffold by hand.
-8. Run the validation loop below until it passes.
-9. Report the path back to the user.
+6. Re-open the source material that defines the request:
+   - the user's request
+   - any extra constraints from the conversation
+   - for `main`, the parent idea brief when available
+   - for `patch`, the parent PRD and the patch request itself
+7. Replace every placeholder line with concise content based on the user's request.
+8. Keep the generated front matter and section structure. Do not rewrite the scaffold by hand.
+9. Run the format validation loop below until it passes.
+10. Run the self-review below and fix any issues inline.
+11. If the self-review changed the file, run `validate_doc.py` again before reporting success.
+12. Report the path back to the user.
 
-## Validation Loop
+## Format Validation Loop
 
 1. Save the edited PRD.
 2. Run:
@@ -47,13 +55,25 @@ Use this skill when the user wants a PRD saved in the current project's `docs/pr
 3. If validation fails:
    - read the error message
    - fix the PRD in place
+   - save the file
    - run the validator again
-4. Do a final self-check against the user request:
-   - confirm every placeholder line is gone
-   - confirm the required sections are still present in the original order
-   - confirm there are at least two unique `FR-xx` checklist items
-   - confirm the PRD actually reflects the requested scope, not just the scaffold
-5. Only report success after the validator passes and the self-check passes.
+4. Only move to self-review after the validator passes.
+
+## Self-Review
+
+After the PRD passes `validate_doc.py`, read it again with fresh eyes and check it against the user request and source material. This is a checklist you run yourself, not a separate reviewer or an extra pass you offer to the user.
+
+**1. Scope coverage:** Skim the user's request, conversation constraints, and parent idea brief or parent PRD. Can you point to where each important requirement or constraint is represented in the PRD? Add anything important that is missing.
+
+**2. Section consistency:** Do `Vision & Goals`, `In Scope`, `Out of Scope`, and `User Experience` all describe the same product surface without contradiction or scope drift? Fix any mismatch.
+
+**3. Requirement quality:** Is each `FR-xx` concrete, distinct, implementable, and testable? Replace vague filler with specific behaviors.
+
+**4. Patch correctness:** For `patch` PRDs, is the document clearly incremental to the parent PRD rather than a rewrite of the whole feature? If not, tighten it.
+
+**5. Boilerplate scan:** Are `Risks` and `Dependencies` specific to this request rather than generic prose that could fit any PRD? Make them specific.
+
+If you find issues, fix them inline and rerun `validate_doc.py` before reporting success. No need to announce a separate review pass to the user. Fix the document and move on.
 
 ## Gotchas
 
@@ -63,6 +83,7 @@ Use this skill when the user wants a PRD saved in the current project's `docs/pr
 - Replace every angle-bracket placeholder line like `<...>`. A PRD with scaffold placeholders still present is invalid.
 - Keep `Functional Requirements` as checklist items using unique `FR-xx` ids. Do not switch to prose paragraphs.
 - Use `--output-dir` only when the user explicitly asks for a different destination.
+- Do not tell the user you can do an extra stricter review pass later. Self-review is already part of the default workflow.
 
 ## Generated File
 
