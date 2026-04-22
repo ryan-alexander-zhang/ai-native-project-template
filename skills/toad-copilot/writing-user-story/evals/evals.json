@@ -31,16 +31,59 @@
     },
     {
       "id": 3,
-      "prompt": "Add a patch user story in docs/user-stories for FR-03 in prd-00020-checkout-redesign to clarify the guest checkout confirmation email flow.",
-      "expected_output": "A new patch user story saved under docs/user-stories with role patch, parent prd-00020-checkout-redesign, function_requirement_id FR-03, and the standard user story structure.",
+      "prompt": "Write a user story in docs/user-stories for the guest checkout redesign. I did not include the parent PRD yet, so ask me for it and stop.",
+      "expected_output": "A reply that asks for the parent PRD id and creates no user story file.",
       "files": [
         "evals/files/AGENTS.md",
         "evals/files/docs/prds/prd-00020-checkout-redesign.md"
       ],
       "expectations": [
-        "The run creates exactly one new markdown file under docs/user-stories.",
-        "The new file front matter has type us, role patch, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-03.",
-        "The new file includes the User Story, Acceptance Criteria, and Definition of Done sections with at least three AC-xx checklist items."
+        "The run does not create any markdown files under docs/user-stories.",
+        "The final reply asks the user to provide the parent PRD id.",
+        "The final reply does not guess a functional requirement from feature text."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Use prd-00020-checkout-redesign to write user stories, but I have not picked any FR ids yet. List the available FR ids and ask me to choose all or a subset.",
+      "expected_output": "A reply that lists FR-01 through FR-03, asks the user to choose all or a subset, and creates no user story file.",
+      "files": [
+        "evals/files/AGENTS.md",
+        "evals/files/docs/prds/prd-00020-checkout-redesign.md"
+      ],
+      "expectations": [
+        "The run does not create any markdown files under docs/user-stories.",
+        "The final reply lists FR-01, FR-02, and FR-03 from the parent PRD.",
+        "The final reply asks the user to choose all or an explicit subset of FR ids."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Use prd-00020-checkout-redesign to write user stories for all FRs. Do not create files yet; ask me whether to run sequential or parallel.",
+      "expected_output": "A reply that asks the user to choose sequential or parallel and creates no user story file.",
+      "files": [
+        "evals/files/AGENTS.md",
+        "evals/files/docs/prds/prd-00020-checkout-redesign.md"
+      ],
+      "expectations": [
+        "The run does not create any markdown files under docs/user-stories.",
+        "The final reply asks whether to run sequential or parallel.",
+        "The final reply does not skip directly to file generation."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Use prd-00020-checkout-redesign and FR-01. Show me the execution plan and tell me what role it will use before you create anything.",
+      "expected_output": "A reply that shows an execution plan with FR-01 planned as patch because an existing FR-01 story is already present.",
+      "files": [
+        "evals/files/AGENTS.md",
+        "evals/files/docs/prds/prd-00020-checkout-redesign.md",
+        "evals/files/docs/user-stories/us-00001-existing-guest-checkout-without-account.md"
+      ],
+      "expectations": [
+        "The run does not create any markdown files under docs/user-stories beyond the existing fixture file.",
+        "The final reply shows an execution plan for FR-01.",
+        "The execution plan marks FR-01 with role patch."
       ]
     }
   ]
