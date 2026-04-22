@@ -14,30 +14,37 @@ Use this skill when the user wants a user story saved in the current project's `
 
 ## Defaults
 
-- Use `main` unless the user explicitly asks for a patch.
-- Use the related PRD id as `parent`, including when the role is `patch`.
-- Use a `function_requirement_id` that matches a unique `FR-xx` item in the parent PRD.
+- Require an explicit parent PRD id before generating any user story.
+- Do not infer an FR from feature text or a plain-language description.
+- When explicit FR ids are missing, list the parent PRD's FRs and ask the user to choose `all` or an explicit subset such as `FR-01, FR-03`.
+- When the user chooses `all`, ask whether to run `sequential` or `parallel`.
+- Use a planning pass to compute `FR -> role` before generating any files.
+- Treat any existing story with the same `parent + function_requirement_id` as a duplicate and create the new story with `role: patch`.
 - Use `status: draft` unless the user explicitly asks for `active` or `archived`.
-- Derive a short slug from the story request.
-- Keep the user story short and concrete.
+- Keep each user story short and concrete.
 
 ## Workflow
 
 1. Identify the parent PRD id.
-2. Identify the matching `function_requirement_id` from that PRD.
-3. If either is unclear, ask the user before writing the file.
-4. Run:
-   `python3 scripts/create_user_story.py "<slug or title>" --json --parent <prd-id> --function-requirement-id <FR-id> [--role main|patch] [--status draft|active|archived]`
-   Resolve `scripts/create_user_story.py` relative to this skill directory.
-5. Open the new file path returned by the script.
-6. Replace every placeholder line with concise content based on the user's request.
-7. Keep the generated front matter and section structure. Do not rewrite the scaffold by hand.
-8. Save the file.
-9. Run:
-   `python3 scripts/validate_doc.py "<file path>"`
-   Resolve `scripts/validate_doc.py` relative to this skill directory.
-10. If validation fails, fix the document and rerun the validator before reporting success.
-11. Report the path back to the user.
+2. If the parent PRD id is missing, ask the user to provide it before doing any other work.
+3. Run:
+   `python3 scripts/plan_user_stories.py --parent <prd-id>`
+   Resolve `scripts/plan_user_stories.py` relative to this skill directory.
+4. If the user did not provide explicit FR ids, list the available FR ids from the planner output and ask the user to choose `all` or an explicit subset like `FR-01, FR-03`.
+5. If the user chooses `all`, ask whether to run `sequential` or `parallel`.
+6. If the user provides an explicit subset, rerun:
+   `python3 scripts/plan_user_stories.py --parent <prd-id> --select <comma-separated-fr-ids>`
+7. If the user chooses `all`, rerun:
+   `python3 scripts/plan_user_stories.py --parent <prd-id> --all`
+8. If the planner reports any invalid FR ids, reject the whole selection and ask the user to choose again.
+9. Show a short terminal-only execution plan such as `FR-01 -> main` and `FR-03 -> patch`.
+10. Ask for confirmation before generating any files.
+11. In sequential mode, generate each planned story one by one by running:
+    `python3 scripts/create_user_story.py "<slug or title>" --json --parent <prd-id> --function-requirement-id <FR-id> --role <main|patch> [--status draft|active|archived]`
+12. In parallel mode, spawn one worker sub-agent per planned FR. Each worker owns a single FR, uses the planned role from the execution plan, runs `create_user_story.py`, fills the scaffold, validates the result, and reports success or failure without reverting other workers' changes.
+13. If one story fails, retry that story exactly once.
+14. After the retry, continue processing the remaining planned FRs.
+15. Report which stories succeeded and which stories still failed.
 
 ## Generated File
 
@@ -49,4 +56,4 @@ when the user explicitly wants a different location.
 - these sections:
   `User Story`, `Acceptance Criteria`, and `Definition of Done`
 
-Fill the generated file in place.
+Use the planner to decide which FR ids to generate and which role each story should use before invoking the single-story scaffold generator.
