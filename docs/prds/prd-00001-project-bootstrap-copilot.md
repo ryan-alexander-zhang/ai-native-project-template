@@ -7,56 +7,44 @@ parent: idea-00001-project-bootstrap-copilot
 ---
 
 # One-line Summary
-Project Bootstrap Copilot is a CLI-first project bootstrap and management product for AI-heavy developers and small teams that creates and maintains consistent project structure, context files, and reusable resources.
+A CLI-first project bootstrap copilot that helps AI-heavy developers create and maintain consistent local project structure, context files, and reusable resources.
 
 # Vision & Goals
-Teams using AI coding tools repeatedly rebuild the same project scaffolding by hand: repository setup, context files, docs folders, and reusable project resources. That manual process is slow, inconsistent, and easy to let drift over time, which weakens both human onboarding and agent context quality.
-
-This product exists to turn that repeated setup work into a reusable, repeatable workflow. The MVP goal is to make it easy to initialize or normalize a project through a CLI while keeping the product logic independent from the interface so the same core can later support other frontends. Success means a user can point the product at a new or existing project, apply a standard structure and resource set, and reliably understand what was created, skipped, or needs follow-up.
+Reduce the manual, inconsistent work of preparing a project for AI coding by turning bootstrap and maintenance into a repeatable local workflow. Success means users can initialize or upgrade a project with consistent docs, agent context, and reusable resources without piecing together ad hoc scripts and templates.
 
 # Actor
-- Independent developers who frequently start or reshape projects for AI coding workflows
-- Small engineering teams and technical leads who want a repeatable project standard
-- The local project workspace that receives managed folders, files, and project-level resources
+Independent developers, small engineering teams, and technical leads who set up or maintain repositories for AI coding workflows.
 
 # In Scope
-- A CLI MVP that users can run locally against a new or existing project directory
-- Project bootstrap flows that create a standard folder and document skeleton for AI-oriented workspaces
-- Management of key project resources such as preset files like `AGENTS.md`, documentation directories, and project-level skills
-- A headless application core that owns project bootstrap and management logic independently from the CLI surface
-- Status and feedback that tell the user what was added, skipped, updated, or blocked during a run
+- Bootstrapping a new local project with a standard folder and document structure for AI coding work.
+- Applying the same bootstrap workflow to an existing local project that needs missing or standardized resources.
+- Managing preset project files such as `AGENTS.md`, `DESIGN.md`, and related project docs defined by the product.
+- Adding and maintaining project-level skills and reusable resources stored with the project.
+- Shipping the MVP through a CLI backed by a reusable headless core.
 
 # Out of Scope
-- Desktop, web, or IDE-native frontends in the MVP
-- Hosted sync, cloud accounts, or multi-user collaboration features
-- Broad project lifecycle management beyond bootstrap and resource maintenance
-- Automatic code generation for the product being bootstrapped
-- Solving every possible project template or workflow before the core bootstrap flow is proven
+- Desktop, web, or hosted interfaces in this release.
+- General project management, issue tracking, or broader "project OS" features beyond bootstrap and project resource management.
+- Replacing a team's build, package, or runtime toolchain.
+- Low-level implementation design for storage, sync, or execution internals.
 
 # Functional Requirements
-The product must satisfy the following MVP requirements:
-- [ ] FR-01: The product must let a user initialize a target project with a standard project structure and starter resources through a CLI command.
-- [ ] FR-02: The product must support both new-project setup and existing-project normalization so users can apply the workflow without starting from scratch.
-- [ ] FR-03: The product must create and manage core project resources, including preset context files, documentation locations, and project-level skills defined by the selected bootstrap flow.
-- [ ] FR-04: The product must avoid silently overwriting existing user files; when a managed resource already exists, it must report the conflict and either skip it or require an explicit overwrite action.
-- [ ] FR-05: The product must expose a way to inspect or report the current managed project state so users can see which expected resources are present, missing, or changed.
-- [ ] FR-06: The product must keep bootstrap and resource-management rules in a headless core that the CLI calls, rather than embedding the product logic directly in the CLI layer.
-- [ ] FR-07: The CLI must provide deterministic, human-readable output that summarizes actions taken, no-op cases, and failures with actionable next steps.
+- [ ] FR-01: The product must let a user bootstrap a new local project with the standard directory and document structure defined by the tool.
+- [ ] FR-02: The product must let a user run the bootstrap workflow against an existing local project to add or standardize managed resources.
+- [ ] FR-03: The product must create and manage preset project files, including agent-context files such as `AGENTS.md` and other reusable project docs selected by the workflow.
+- [ ] FR-04: The product must let a user add, inspect, and update project-level skills and reusable resources that are stored with the project.
+- [ ] FR-05: The MVP must expose project bootstrap and resource-management workflows through a CLI.
+- [ ] FR-06: The core project and resource-management workflows must remain usable independently of the CLI interface so additional frontends can be added later.
 
 # User Experience
-The MVP experience is command-line first. A user chooses a target directory and runs a bootstrap or manage command. The CLI makes clear what it is about to do, applies the selected project setup or maintenance action, and finishes with a concise summary of created, skipped, updated, or blocked resources.
-
-For new projects, the experience should feel like a fast guided setup that produces a usable project skeleton immediately. For existing projects, the experience should feel safe and audit-friendly: the user can apply missing pieces without losing local work and can understand where manual decisions are still required. The product should feel like a reliable workspace standardizer, not an opaque script bundle.
+The user works locally from a CLI, chooses whether they are creating a new project or adapting an existing one, and gets a consistent project skeleton plus managed resource files without hunting through manual setup steps. The flow should feel deterministic, fast to rerun, and clear about what the tool manages.
 
 # Risks
-- The product can expand too quickly from bootstrap and resource management into a much broader "project operating system," which would weaken MVP focus.
-- A headless-core requirement is valuable for portability, but it can introduce avoidable complexity if the interface boundary is over-designed before real usage validates it.
-- Local filesystem behavior, permissions, and cross-platform differences may create reliability gaps that directly affect user trust.
-- If the managed resource set is too rigid, teams may reject the product as another template generator that does not fit real project variation.
+- Scope creep could pull the product from a focused bootstrap tool into a broad platform before the core workflow is proven.
+- Cross-platform filesystem, permissions, and shell behavior may make bootstrap and update actions unreliable.
+- If the managed files drift too far from what teams actually use, users may fall back to manual setup and stop trusting the tool.
 
 # Dependencies
-- A defined starter resource set for the MVP, including which files, folders, and project-level skills count as managed assets
-- A clear CLI command model and invocation environment for local development workflows
-- Access to local filesystem operations with enough permissions to read, create, and update project resources
-- Product decisions about how conflicts, skips, and explicit overwrites should be presented to the user
-- Validation from target users that the initial bootstrap standard is useful enough to justify repeated use
+- A maintained library of project templates, preset files, and skill/resource definitions that the product can apply locally.
+- Reliable local filesystem and shell access in the environments the CLI supports.
+- Clear product decisions about which files and resources are managed in the MVP versus left to the user.
