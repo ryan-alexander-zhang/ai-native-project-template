@@ -1,0 +1,5 @@
+I need the parent PRD before I can write the user story.
+
+Please provide the PRD id/path and the specific `FR-xx` this guest checkout redesign story should map to. If you want to use the checkout redesign PRD already in the project copy, confirm `prd-00020-checkout-redesign` and tell me whether this story is for `FR-01`, `FR-02`, or `FR-03`.
+
+I’m stopping here until you confirm.

@@ -1,0 +1,45 @@
+{
+  "expectations": [
+    {
+      "text": "The run does not create any markdown files under docs/user-stories beyond the existing fixture file.",
+      "passed": true,
+      "evidence": "Found 0 markdown output file(s): []"
+    },
+    {
+      "text": "The final reply shows an execution plan for FR-01.",
+      "passed": true,
+      "evidence": "last_message.txt: 'Execution plan for `prd-00020-checkout-redesign` / `FR-01`:\\n\\n1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.\\n2. Check `docs/user-stories` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-'"
+    },
+    {
+      "text": "The execution plan marks FR-01 with role patch.",
+      "passed": true,
+      "evidence": "last_message.txt: 'Execution plan for `prd-00020-checkout-redesign` / `FR-01`:\\n\\n1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.\\n2. Check `docs/user-stories` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-'"
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {},
+    "total_tool_calls": 0,
+    "errors_encountered": 0,
+    "output_chars": 716,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "total_duration_seconds": 0.0
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No suggestions, evals look solid."
+  }
+}

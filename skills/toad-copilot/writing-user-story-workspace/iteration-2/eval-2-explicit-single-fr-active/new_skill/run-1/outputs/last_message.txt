@@ -1,0 +1,5 @@
+Created an active user story for `FR-02` under `project/docs/user-stories/us-00001-high-risk-guest-checkout-manual-review.md`. It stays within the PRD scope: high-risk guest orders are routed to manual review before capture, low-risk orders continue normally, and the review queue exposes the details operations needs to decide.
+
+Output files saved:
+- `outputs/us-00001-high-risk-guest-checkout-manual-review.md`
+- `outputs/last_message.txt`

@@ -1,0 +1,10 @@
+Execution plan for `prd-00020-checkout-redesign` / `FR-01`:
+
+1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.
+2. Check `docs/user-stories` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-01`.
+3. Because that requirement already has an existing main user story, use role `patch` for the next story instead of creating another `main` entry.
+4. If you want me to proceed after this review step, generate the new scaffold with `--parent prd-00020-checkout-redesign --function-requirement-id FR-01 --role patch`, then fill it in and validate it.
+
+Role it will use: `patch`.
+
+I have not created anything yet.

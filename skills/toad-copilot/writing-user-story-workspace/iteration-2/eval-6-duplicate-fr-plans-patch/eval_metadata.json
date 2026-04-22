@@ -1,0 +1,10 @@
+{
+  "eval_id": 6,
+  "eval_name": "duplicate-fr-plans-patch",
+  "prompt": "Use prd-00020-checkout-redesign and FR-01. Show me the execution plan and tell me what role it will use before you create anything.",
+  "assertions": [
+    "The run does not create any markdown files under docs/user-stories beyond the existing fixture file.",
+    "The final reply shows an execution plan for FR-01.",
+    "The execution plan marks FR-01 with role patch."
+  ]
+}

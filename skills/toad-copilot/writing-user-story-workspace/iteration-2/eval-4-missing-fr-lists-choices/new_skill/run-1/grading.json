@@ -1,0 +1,45 @@
+{
+  "expectations": [
+    {
+      "text": "The run does not create any markdown files under docs/user-stories.",
+      "passed": true,
+      "evidence": "Found 0 markdown output file(s): []"
+    },
+    {
+      "text": "The final reply lists FR-01, FR-02, and FR-03 from the parent PRD.",
+      "passed": true,
+      "evidence": "last_message.txt: 'Available FR ids for `prd-00020-checkout-redesign`:\\n- `FR-01`\\n- `FR-02`\\n- `FR-03`\\n\\nChoose `all` or an explicit subset such as `FR-01, FR-03`.\\n'"
+    },
+    {
+      "text": "The final reply asks the user to choose all or an explicit subset of FR ids.",
+      "passed": true,
+      "evidence": "last_message.txt: 'Available FR ids for `prd-00020-checkout-redesign`:\\n- `FR-01`\\n- `FR-02`\\n- `FR-03`\\n\\nChoose `all` or an explicit subset such as `FR-01, FR-03`.\\n'"
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {},
+    "total_tool_calls": 0,
+    "errors_encountered": 0,
+    "output_chars": 142,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "total_duration_seconds": 0.0
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No suggestions, evals look solid."
+  }
+}

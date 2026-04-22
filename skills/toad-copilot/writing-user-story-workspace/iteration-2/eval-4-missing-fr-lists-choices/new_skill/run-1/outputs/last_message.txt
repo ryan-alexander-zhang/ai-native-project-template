@@ -1,0 +1,6 @@
+Available FR ids for `prd-00020-checkout-redesign`:
+- `FR-01`
+- `FR-02`
+- `FR-03`
+
+Choose `all` or an explicit subset such as `FR-01, FR-03`.

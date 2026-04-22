@@ -1,0 +1,10 @@
+{
+  "eval_id": 5,
+  "eval_name": "all-selection-asks-for-mode",
+  "prompt": "Use prd-00020-checkout-redesign to write user stories for all FRs. Do not create files yet; ask me whether to run sequential or parallel.",
+  "assertions": [
+    "The run does not create any markdown files under docs/user-stories.",
+    "The final reply asks whether to run sequential or parallel.",
+    "The final reply does not skip directly to file generation."
+  ]
+}
