@@ -44,6 +44,8 @@ function_requirement_id: <FR-id>
 - `role: patch` means `parent` is the id of the main document.
 - Main document flow is `idea -> prd -> spec -> plan -> task` when the later stage exists.
 - A main document in that flow should use the upstream main document id as `parent`. For example, a main `spec` should use the related `prd` id.
+- A main `adr` is a child of a `prd`. Its `parent` must be the related PRD id.
+- A patch `adr` is a child of a main `adr`. Its `parent` must be the ADR id it extends.
 - `us` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
 
 ## Folders
