@@ -3,20 +3,20 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Create repo-root ARCHITECTURE.md for this project for the first time. Before drafting, read the repo docs in docs/README.md order so you pick up active ADRs, PRDs, user stories, ideas, and any other durable docs that define repo scope. Then synthesize that with manifests and code layout. Use the skill template, but do not copy irrelevant sections verbatim. If the repo does not justify a section, leave it out and tell me what ADR is missing.",
-      "expected_output": "A first-time, repo-scoped ARCHITECTURE.md that reflects requirement docs plus the actual project structure, omits unsupported sections, and names missing ADRs instead of inventing architecture.",
+      "prompt": "Create repo-root ARCHITECTURE.md for this project for the first time. Start from ADRs, PRDs, specs, plans, user stories, ideas, and any other durable docs that define the intended architecture. Use the repo tree and manifests only after that, to confirm names and implementation status. Do not turn the document into a repo inventory. If a section has enough durable-doc evidence but no ADR yet, still write the architecture section instead of blocking.",
+      "expected_output": "A first-time ARCHITECTURE.md that synthesizes the intended architecture from durable docs first, uses repo evidence only as supporting implementation context, and does not block solely because an ADR is missing.",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "Refresh the existing ARCHITECTURE.md in place. Keep anything inside <!-- manual-notes:start --> and <!-- manual-notes:end --> untouched, update the rest from active ADRs plus the current repo, and tell me which sections were preserved versus rewritten. Do not re-scan the whole requirement history when the change is already captured by active ADRs.",
-      "expected_output": "An in-place update that preserves protected manual notes, rewrites supported sections from ADRs plus current repo evidence, and reports what changed.",
+      "prompt": "Refresh the existing ARCHITECTURE.md in place. Keep anything inside <!-- manual-notes:start --> and <!-- manual-notes:end --> untouched. Re-synthesize the changed sections from the latest durable architecture docs first, then use the repo only to anchor implementation status or detect drift. Tell me which sections were preserved, rewritten, or omitted.",
+      "expected_output": "An in-place update that preserves protected manual notes, rewrites architecture sections from durable docs first, uses repo evidence second, and reports preserved versus rewritten versus omitted sections.",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "Reconcile ARCHITECTURE.md with the repo. If a required section depends on an architectural decision that is missing or conflicts with the implementation, stop and tell me exactly which ADR I need to write or update before you can finish.",
-      "expected_output": "A partial or blocked update that uses the defined escalation format instead of smoothing over ADR drift or missing decisions.",
+      "prompt": "Reconcile ARCHITECTURE.md with the repo. If the docs define an architectural section one way but the current implementation contradicts it, do not rewrite the architecture around the repo scan result. Block that section and report the documented architecture, the observed implementation, the issue type, and the required follow-up. Do not block merely because an ADR is missing if PRDs, specs, plans, or user stories already define the section.",
+      "expected_output": "A partial or blocked update that surfaces architecture drift in the required escalation format, keeps docs as the architecture source of truth, and avoids ADR-only blocking when other durable docs are sufficient.",
       "files": []
     }
   ]
