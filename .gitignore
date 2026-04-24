@@ -132,6 +132,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/**/.*-number.lock
 
 # PyBuilder
 .pybuilder/
