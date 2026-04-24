@@ -30,6 +30,7 @@ an architectural section, stop and escalate instead of inventing a story.
 ## Defaults
 
 - Update repo-root `ARCHITECTURE.md` in place when it exists.
+- When creating `ARCHITECTURE.md` for the first time, treat it as a repo-scoped synthesis and read durable repo docs broadly before writing.
 - Preserve manual-note regions exactly as written.
 - Treat the bundled template as a section library, not a rigid schema.
 - Omit sections that do not fit the repo or are unsupported by evidence.
@@ -51,28 +52,37 @@ protected markers for future safe updates.
 
 ## Workflow
 
-1. Read repo-root `ARCHITECTURE.md` first when it exists.
-2. Read `docs/README.md` to understand repo documentation order and conventions.
-3. Read active ADRs in `docs/adrs` before inferring architecture from code. Focus on `status: active`.
-4. Inspect repo structure and manifests. Prefer:
+1. Determine mode before reading deeply:
+   - `create`: repo-root `ARCHITECTURE.md` does not exist and the user asked to create it
+   - `update`: `ARCHITECTURE.md` already exists, or the user asked to refresh, sync, reconcile, or review it
+2. In `update` mode, read repo-root `ARCHITECTURE.md` first.
+3. Read `docs/README.md` to understand repo documentation order and conventions.
+4. In `create` mode, read durable repo docs broadly before inferring architecture from code:
+   - follow the `docs/README.md` read order
+   - make sure active `docs/adrs`, `docs/prds`, `docs/user-stories`, and `docs/ideas` are read
+   - read other active repo docs in `docs/` when they materially define repo scope, workflows, or boundaries
+5. In `update` mode, read active ADRs in `docs/adrs` before inferring architecture from code. Focus on `status: active`.
+6. Inspect repo structure and manifests. Prefer:
    - `rg --files`
    - top-level directories
    - `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`
    - Docker files
    - `.github/`
-5. Open the bundled template at `assets/architecture_template.md.tmpl` only after the repo context is clear.
-6. Build an evidence map for each candidate section:
+7. Open the bundled template at `assets/architecture_template.md.tmpl` only after the repo context is clear.
+8. Build an evidence map for each candidate section:
    - `ADR + code`: safe to write with rationale
+   - `repo docs + code`: safe to write for first-time repo-scoped synthesis
    - `code only`: safe to describe as current implementation
    - `missing decision`: block and escalate
    - `conflict`: block and escalate
-7. Update `ARCHITECTURE.md` in place:
+9. Write or update `ARCHITECTURE.md`:
    - preserve protected manual-note regions
    - rewrite sections to match the repo
    - remove irrelevant template examples and placeholders
    - omit unsupported sections rather than leaving filler
-8. If the file does not exist and the user asked to create it, start from the bundled template and immediately adapt it to the repo. Do not copy the template literally.
-9. Report what changed and what was blocked.
+   - in `create` mode, start from the bundled template and immediately adapt it to the repo; do not copy the template literally
+   - in `update` mode, keep the refresh narrow: ADRs plus current repo evidence should drive architecture changes
+10. Report what changed and what was blocked.
 
 ## Conflict And Missing-Decision Policy
 
@@ -124,6 +134,7 @@ When blocked, also report:
 ## Gotchas
 
 - `ARCHITECTURE.md` is first in the repo read order for agents, so weak guesses here create broad downstream errors.
+- First-time creation is repo-scoped, so do not skip requirement docs such as PRDs, user stories, and ideas when they exist.
 - Active ADRs outrank template convenience.
 - Code alone can describe implementation reality, but it cannot justify intent when a section clearly depends on an architectural choice.
 - If the repo has no ADRs, keep the file narrow and factual. Escalate any section that needs a missing decision.

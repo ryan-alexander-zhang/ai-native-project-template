@@ -3,14 +3,14 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Create a repo-root ARCHITECTURE.md for this project from the active ADRs, docs, manifests, and code layout. Use the skill template, but do not copy irrelevant sections verbatim. If the repo does not justify a section, leave it out and tell me what ADR is missing.",
-      "expected_output": "A repo-specific ARCHITECTURE.md that reflects the actual project structure, omits unsupported sections, and names missing ADRs instead of inventing architecture.",
+      "prompt": "Create repo-root ARCHITECTURE.md for this project for the first time. Before drafting, read the repo docs in docs/README.md order so you pick up active ADRs, PRDs, user stories, ideas, and any other durable docs that define repo scope. Then synthesize that with manifests and code layout. Use the skill template, but do not copy irrelevant sections verbatim. If the repo does not justify a section, leave it out and tell me what ADR is missing.",
+      "expected_output": "A first-time, repo-scoped ARCHITECTURE.md that reflects requirement docs plus the actual project structure, omits unsupported sections, and names missing ADRs instead of inventing architecture.",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "Refresh the existing ARCHITECTURE.md in place. Keep anything inside <!-- manual-notes:start --> and <!-- manual-notes:end --> untouched, update the rest from active ADRs plus the current repo, and tell me which sections were preserved versus rewritten.",
-      "expected_output": "An in-place update that preserves protected manual notes, rewrites supported sections, and reports what changed.",
+      "prompt": "Refresh the existing ARCHITECTURE.md in place. Keep anything inside <!-- manual-notes:start --> and <!-- manual-notes:end --> untouched, update the rest from active ADRs plus the current repo, and tell me which sections were preserved versus rewritten. Do not re-scan the whole requirement history when the change is already captured by active ADRs.",
+      "expected_output": "An in-place update that preserves protected manual notes, rewrites supported sections from ADRs plus current repo evidence, and reports what changed.",
       "files": []
     },
     {
