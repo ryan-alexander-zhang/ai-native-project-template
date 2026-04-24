@@ -7,7 +7,7 @@ import fcntl
 import json
 from pathlib import Path
 
-from common import ADR_ID_RE, DOC_RE, GENERIC_DOC_ID_RE, doc_path_for_id, find_project_root, slugify
+from common import ADR_ID_RE, DOC_RE, PRD_ID_RE, doc_path_for_id, find_project_root, slugify
 
 
 def default_output_dir() -> Path:
@@ -49,8 +49,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--parent",
-        default="<id>",
-        help="Parent id for the front matter",
+        help="Parent id for the front matter. For role=main this must be a PRD id; for role=patch this must be an ADR id.",
     )
     parser.add_argument(
         "--status",
@@ -72,7 +71,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def validate_parent(project_root: Path, role: str, parent: str) -> None:
+def validate_parent(project_root: Path, role: str, parent: str | None) -> None:
+    if not parent:
+        expected = "a PRD id like prd-00001-example-product" if role == "main" else "an ADR id like adr-00001-example-decision"
+        raise SystemExit(f"missing required --parent; expected {expected}")
+
     if role == "patch":
         if not ADR_ID_RE.fullmatch(parent):
             raise SystemExit(
@@ -83,13 +86,10 @@ def validate_parent(project_root: Path, role: str, parent: str) -> None:
             raise SystemExit(f"parent ADR not found: {parent_path}")
         return
 
-    if parent == "<id>":
-        return
-
-    if not GENERIC_DOC_ID_RE.fullmatch(parent):
+    if not PRD_ID_RE.fullmatch(parent):
         raise SystemExit(
-            "for role=main, parent must be <id> or a doc id like "
-            "idea-00001-project-bootstrap-copilot"
+            "for role=main, parent must be a PRD id like "
+            "prd-00001-example-product"
         )
 
     parent_path = doc_path_for_id(project_root, parent)

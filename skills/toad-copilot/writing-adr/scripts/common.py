@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 ADR_ID_RE = re.compile(r"^adr-\d{5}-[a-z0-9-]+$")
+PRD_ID_RE = re.compile(r"^prd-\d{5}-[a-z0-9-]+$")
 GENERIC_DOC_ID_RE = re.compile(
     r"^(adr|idea|integration|memory|operation|plan|prd|record|spec|task|us)-\d{5}-[a-z0-9-]+$"
 )

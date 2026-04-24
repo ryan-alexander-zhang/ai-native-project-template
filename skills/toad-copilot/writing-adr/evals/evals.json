@@ -3,31 +3,33 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Write a draft ADR in docs/adrs for adopting a guided repository bootstrap workflow for new projects. Use parent idea-00001-project-bootstrap-copilot.",
-      "expected_output": "A new main ADR saved under docs/adrs with parent idea-00001-project-bootstrap-copilot and the standard ADR sections filled in.",
+      "prompt": "Write a draft ADR in docs/adrs for adopting a guided repository bootstrap workflow for new projects. Use parent prd-00001-project-bootstrap-copilot.",
+      "expected_output": "An initial response that frames the decision, presents A/B/C options with trade-offs, recommends one option for this repo, and asks the user to choose before any ADR file is drafted.",
       "files": [
         "evals/files/AGENTS.md",
-        "evals/files/docs/ideas/idea-00001-project-bootstrap-copilot.md"
+        "evals/files/docs/prds/prd-00001-project-bootstrap-copilot.md"
       ],
       "expectations": [
-        "The run creates exactly one new markdown file under docs/adrs.",
-        "The new file front matter has type adr, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
-        "The new file includes Context, Decision, and Consequences sections with concrete content.",
-        "The Context names decision drivers or options considered, and the Consequences include at least one downside."
+        "The first response does not draft an ADR file before the user chooses a direction.",
+        "If the repo has no existing ADRs, the response treats that as a normal starting state and continues instead of blocking on missing ADR history.",
+        "The response presents exactly three labeled options: A, B, and C.",
+        "Option A is explicitly recommended and explains why it fits this repo better than the others.",
+        "The response asks the user to choose A, B, or C, or refine the options before drafting.",
+        "The response treats the supplied PRD as the required parent context for the new ADR."
       ]
     },
     {
       "id": 2,
-      "prompt": "Create an active ADR in docs/adrs for using ADRs to record major technical decisions in this repo. Use parent <id>.",
-      "expected_output": "A new main ADR saved under docs/adrs with status active, parent <id>, and the standard ADR sections filled in.",
+      "prompt": "Create an active ADR in docs/adrs for using ADRs to record major technical decisions in this repo. If there is no parent PRD yet, tell me what is missing before drafting.",
+      "expected_output": "An initial response that refuses to draft without a concrete PRD parent and asks for or helps identify the missing PRD before proceeding.",
       "files": [
         "evals/files/AGENTS.md"
       ],
       "expectations": [
-        "The run creates exactly one new markdown file under docs/adrs.",
-        "The new file front matter has type adr, role main, status active, and parent <id>.",
-        "The new file includes Context, Decision, and Consequences sections with concrete content.",
-        "The Decision explains why the chosen option won, and the Consequences include at least one downside."
+        "The first response does not draft an ADR file.",
+        "The response states that a main ADR requires a concrete PRD parent.",
+        "The response asks the user to provide or identify the PRD before it can present options and draft the ADR.",
+        "The response does not accept <id> or another non-PRD document type as the main ADR parent."
       ]
     },
     {

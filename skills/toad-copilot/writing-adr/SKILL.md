@@ -4,7 +4,8 @@ description: >
   Capture a major technical decision in `docs/adrs` as the current project's standard ADR.
   Use this whenever the user wants an ADR, architectural decision record, architecture decision,
   technical trade-off record, or needs to document why one important option beat other plausible
-  alternatives, even if they do not explicitly say "ADR".
+  alternatives. Use it both when the user wants to record a decision and when they need help
+  exploring 2-3 viable approaches before choosing, even if they do not explicitly say "ADR".
 compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/adrs`.
 ---
 
@@ -30,15 +31,16 @@ not change the architecture or operating model.
 
 - Use `main` unless the user explicitly asks for a patch.
 - Use `draft` unless the user explicitly asks for `active` or `archived`.
-- Use `parent: <id>` unless the user gives a specific parent.
+- A `main` ADR must use a concrete `prd-*` parent. Do not leave `parent` as `<id>` or use an `idea`, `spec`, or other doc type.
+- A `patch` ADR must use the parent ADR id it extends.
 - Derive a short slug from the decision title or request.
 - Keep the ADR short and concrete.
 - Prefer a new main ADR plus archiving the old ADR when the decision changes materially.
 
 ## What A Good ADR Must Explain
 
-Before drafting, make sure you can answer these questions from the user request, existing docs, or
-one short clarification:
+Before presenting options or drafting, make sure you can answer these questions from the user
+request, existing docs, or one short clarification:
 
 - What exactly are we deciding?
 - Why now? What changed, broke, or will break if we do nothing?
@@ -51,9 +53,43 @@ one short clarification:
 If any of these are missing and the gap is material, ask the user. Do not silently invent the
 tradeoff analysis.
 
+## New ADR Interaction Model
+
+For `new ADR` requests, do not jump straight to drafting, even when the user already has a
+preferred answer. The hard part of ADR work is usually choosing well, not filling the template.
+
+Before drafting a new ADR:
+
+- inspect related ADRs, the parent PRD, and nearby code or docs that constrain the decision
+- restate the decision in one sentence so the user can confirm the frame
+- present three labeled options: `A`, `B`, and `C`
+- make `A` the recommended option and explain why it wins in this repo
+- keep `B` and `C` credible, not strawmen; one of them can be the status quo or a defer/minimal
+  change path when that is a real option
+- explain the tradeoffs of each option in concrete repo terms: complexity, migration cost,
+  operational risk, team impact, reversibility, or follow-up work
+- ask the user to choose `A`, `B`, or `C`, or to modify the options
+- wait for the user's choice before running `create_adr.py` or drafting the ADR body
+
+If the user already proposed a direction, include it as one of the options rather than treating it
+as settled automatically.
+
+## Empty ADR History
+
+`python3 scripts/list_adrs.py --json` may legitimately return `[]`. Treat that as a normal
+greenfield state, not a blocker.
+
+- Do not keep searching for prior ADRs or stall on the empty result.
+- Use the parent PRD and nearby code or docs as the decision context instead.
+- For a new ADR, continue directly to framing the decision and presenting `A`, `B`, and `C`.
+- Only ask a clarification if a material decision driver is still missing after reading the PRD and
+  nearby context.
+
 ## Drafting Principles
 
 - Read existing ADRs in `docs/adrs` first when the new ADR might overlap with prior decisions.
+- If no ADRs exist yet, say so briefly only when helpful and continue with the PRD and nearby repo
+  context.
 - Read the parent doc when a parent is provided, and scan the nearby code or docs if they constrain
   the decision.
 - Use the Nygard structure, but write strong content inside it:
@@ -74,24 +110,33 @@ tradeoff analysis.
 3. If the user wants to archive an existing ADR, run:
    `python3 scripts/archive_adr.py "<adr id or file path>" --reason "<short archival reason>" [--json]`
    Then run the validator and reviewer before reporting success.
-4. For a new or patch ADR, inspect related ADRs and the parent document when the decision depends on prior context.
-5. For a new or patch ADR, if the decision, parent, or tradeoff is unclear, ask the user before writing the file.
-6. Run:
-   `python3 scripts/create_adr.py "<slug or title>" --json [--role main|patch] [--status draft|active|archived] [--parent <id>]`
+4. If the user wants a review of an existing ADR, read the ADR and report the gaps in decision quality first: missing alternatives, weak rationale, missing downsides, or unclear consequences. Do not rewrite unless the user asks.
+5. For a new ADR:
+   - require a concrete `prd-*` parent before drafting; if the parent PRD is missing, ask for it or help find it first
+   - inspect related ADRs and the parent PRD when the decision depends on prior context; if `list_adrs.py` returns `[]`, treat that as "no prior ADRs" and continue rather than blocking
+   - ask one short clarification only if a material gap blocks credible optioning
+   - present `A`, `B`, and `C` with tradeoffs, mark `A` as recommended, and ask the user to choose before drafting
+   - do not create the ADR file until the user picks an option
+6. For a patch ADR:
+   - inspect the parent ADR and the nearby docs or code that motivate the patch
+   - if the patch itself has materially different choices, you may use the same optioning pattern
+   - otherwise ask a short clarification only when the parent, scope, or tradeoff is unclear, then draft directly
+7. Once the user has chosen the direction for a new ADR, or once a patch ADR is clear enough to draft, run:
+   `python3 scripts/create_adr.py "<slug or title>" --json [--role main|patch] [--status draft|active|archived] --parent <id>`
    Resolve `scripts/create_adr.py` relative to this skill directory.
-7. Open the new file path returned by the script.
-8. Replace the scaffold with real content:
+8. Open the new file path returned by the script.
+9. Replace the scaffold with real content:
    - set a decision title, not a topic title
    - in `Context`, name the trigger, decision drivers, and options considered
    - in `Decision`, state the chosen option and why it beat the other options
    - in `Consequences`, include both gains and costs
-9. Keep the front matter and required sections, but rewrite the placeholder prose freely.
-10. Run:
-    `python3 scripts/validate_doc.py "<file path>"`
+10. Keep the front matter and required sections, but rewrite the placeholder prose freely.
 11. Run:
+    `python3 scripts/validate_doc.py "<file path>"`
+12. Run:
     `python3 scripts/review_adr.py "<file path>"`
-12. If validation fails or the review reports material issues, tighten the ADR and rerun the checks before reporting success.
-13. Report the path back to the user and summarize the core decision in one or two sentences.
+13. If validation fails or the review reports material issues, tighten the ADR and rerun the checks before reporting success.
+14. Report the path back to the user and summarize the core decision in one or two sentences.
 
 ## Project Convention
 

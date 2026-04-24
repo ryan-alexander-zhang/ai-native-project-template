@@ -7,7 +7,7 @@ from pathlib import Path
 
 from common import (
     ADR_ID_RE,
-    GENERIC_DOC_ID_RE,
+    PRD_ID_RE,
     VALID_ROLES,
     VALID_STATUSES,
     doc_path_for_id,
@@ -67,14 +67,13 @@ def validate_adr(doc_path: Path) -> tuple[dict[str, str], str]:
         if not parent_path.exists():
             raise ValueError(f"parent does not exist: {parent_path}")
     else:
-        if parent != "<id>":
-            if not GENERIC_DOC_ID_RE.fullmatch(parent):
-                raise ValueError(
-                    f"{resolved_path} has invalid parent for role=main: {parent}"
-                )
-            parent_path = doc_path_for_id(project_root, parent)
-            if parent_path is None or not parent_path.exists():
-                raise ValueError(f"parent does not exist: {parent}")
+        if not PRD_ID_RE.fullmatch(parent):
+            raise ValueError(
+                f"{resolved_path} has invalid parent for role=main; expected a PRD id, got: {parent}"
+            )
+        parent_path = doc_path_for_id(project_root, parent)
+        if parent_path is None or not parent_path.exists():
+            raise ValueError(f"parent does not exist: {parent}")
 
     title = title_from_body(body)
     if not title:
