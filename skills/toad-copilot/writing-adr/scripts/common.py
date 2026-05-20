@@ -6,12 +6,11 @@ import re
 from pathlib import Path
 
 
-ADR_ID_RE = re.compile(r"^adr-\d{5}-[a-z0-9-]+$")
-PRD_ID_RE = re.compile(r"^prd-\d{5}-[a-z0-9-]+$")
+DECISION_ID_RE = re.compile(r"^decision-\d{5}-[a-z0-9-]+$")
 GENERIC_DOC_ID_RE = re.compile(
-    r"^(adr|idea|integration|memory|operation|plan|prd|record|spec|task|us)-\d{5}-[a-z0-9-]+$"
+    r"^(decision|idea|integration|memory|operation|plan|prd|record|spec|task|us)-\d{5}-[a-z0-9-]+$"
 )
-DOC_RE = re.compile(r"^adr-(\d{5})-[a-z0-9-]+\.md$")
+DOC_RE = re.compile(r"^decision-(\d{5})-[a-z0-9-]+\.md$")
 NON_SLUG_RE = re.compile(r"[^a-z0-9]+")
 DASH_RE = re.compile(r"-+")
 PROJECT_ROOT_MARKERS = (
@@ -24,8 +23,9 @@ PROJECT_ROOT_MARKERS = (
 )
 VALID_ROLES = {"main", "patch"}
 VALID_STATUSES = {"draft", "active", "archived"}
+MAIN_DECISION_PARENT_PREFIXES = {"idea", "prd", "spec"}
 DOC_DIR_BY_PREFIX = {
-    "adr": "adrs",
+    "decision": "decisions",
     "idea": "ideas",
     "integration": "integrations",
     "memory": "memory",
@@ -106,6 +106,12 @@ def doc_path_for_id(project_root: Path, doc_id: str) -> Path | None:
     if not folder:
         return None
     return project_root / "docs" / folder / f"{doc_id}.md"
+
+
+def is_valid_main_decision_parent(doc_id: str) -> bool:
+    if not GENERIC_DOC_ID_RE.fullmatch(doc_id):
+        return False
+    return doc_id.split("-", 1)[0] in MAIN_DECISION_PARENT_PREFIXES
 
 
 def title_from_body(body: str) -> str | None:

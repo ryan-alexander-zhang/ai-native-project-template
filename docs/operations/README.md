@@ -13,4 +13,4 @@ This directory stores operation documents.
 ## Exclude
 
 - product requirements
-- architecture decisions
+- durable decision records

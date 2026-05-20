@@ -3,7 +3,7 @@ name: writing-architecture
 description: >
   Maintain repo-root `ARCHITECTURE.md` as the current project's intended architecture summary.
   Use this whenever the user asks to create, refresh, sync, reconcile, review, or explain
-  `ARCHITECTURE.md`, or wants a durable architecture overview synthesized from ADRs, PRDs, specs,
+  `ARCHITECTURE.md`, or wants a durable architecture overview synthesized from decision records, PRDs, specs,
   plans, user stories, ideas, and other durable repo docs. Preserve manual notes, adapt the
   template to the actual project, and do not let repo scanning dominate the architecture narrative.
   Use code and manifests only as supporting implementation evidence and drift detection. If a
@@ -21,9 +21,9 @@ reviewed as a durable guide for coding agents.
 
 `ARCHITECTURE.md` is a synthesis doc for the intended system architecture:
 
-- ADRs provide explicit architecture decisions when they exist
+- decision records provide explicit architecture decisions when they exist
 - PRDs, specs, plans, user stories, ideas, and other durable docs provide intended structure and
-  boundaries when ADR coverage is partial or absent
+  boundaries when decision coverage is partial or absent
 - code, manifests, and repo structure provide secondary evidence about implementation status and
   drift
 
@@ -40,7 +40,7 @@ inspection to ground names and to detect drift, not to replace the documented de
 - Treat the bundled template as a section library, not a rigid schema.
 - Omit sections that do not fit the repo or are unsupported by evidence.
 - Prefer short, project-specific statements over general architecture prose.
-- Do not block only because an ADR is missing if other durable project docs are sufficient for that
+- Do not block only because a decision record is missing if other durable project docs are sufficient for that
   section.
 
 ## Protected Manual Notes
@@ -65,7 +65,7 @@ protected markers for future safe updates.
 2. In `update` mode, read repo-root `ARCHITECTURE.md` first.
 3. Read `docs/README.md` to understand repo documentation order and conventions.
 4. Read durable design docs before inspecting implementation details. At minimum, inspect:
-   - active `docs/adrs`
+   - active `docs/decisions`
    - relevant `docs/prds`
    - relevant `docs/specs`
    - relevant `docs/plans`
@@ -87,8 +87,8 @@ protected markers for future safe updates.
 7. Open the bundled template at `assets/architecture_template.md.tmpl` only after the architecture
    evidence map is clear.
 8. Build an evidence map for each candidate section:
-   - `ADR`: best source when present
-   - `durable docs`: acceptable source when ADRs are absent or incomplete
+   - `decision record`: best source when present
+   - `durable docs`: acceptable source when decision coverage is absent or incomplete
    - `docs + repo evidence`: safe to write, optionally noting implementation status
    - `documented-vs-implementation conflict`: block and escalate
    - `insufficient docs`: omit the section unless the user explicitly wants a partial/inferred draft
@@ -112,16 +112,16 @@ and report the architecture drift explicitly. Do not:
 - pretend the implementation is the architecture source of truth
 - quietly skip a critical section without reporting why
 
-Missing ADRs alone are not blockers when PRDs, specs, plans, user stories, or ideas provide
+Missing decision records alone are not blockers when PRDs, specs, plans, user stories, or ideas provide
 sufficient architecture evidence for the section.
 
 Use this escalation format:
 
 - `Blocked section:` `<section name>`
-- `Documented architecture:` `<what ADRs/PRD/specs/plans/user stories say>`
+- `Documented architecture:` `<what decision records/PRD/specs/plans/user stories say>`
 - `Observed implementation:` `<what code/manifests/repo structure show>`
 - `Issue type:` `architecture drift` or `insufficient design evidence`
-- `Required follow-up:` `<ADR/spec/plan update or implementation change needed>`
+- `Required follow-up:` `<decision/spec/plan update or implementation change needed>`
 - `Why blocked:` `<why the section cannot be responsibly synthesized>`
 
 ## Section Rules
@@ -166,6 +166,6 @@ When blocked, also report:
 
 - `ARCHITECTURE.md` is first in the repo read order for agents, so weak guesses here create broad downstream errors.
 - First-time creation is document-first, so do not skip PRDs, specs, plans, user stories, and ideas when they define the architecture.
-- Active ADRs outrank template convenience, but missing ADRs do not force a block when other durable docs are sufficient.
+- Active decision records outrank template convenience, but missing decision records do not force a block when other durable docs are sufficient.
 - Code alone can describe implementation reality, but it must not replace the intended architecture defined in the docs.
 - When docs and repo disagree, the correct response is to surface drift, not to rewrite the architecture around the current codebase.

@@ -7,11 +7,11 @@ import fcntl
 import json
 from pathlib import Path
 
-from common import ADR_ID_RE, DOC_RE, PRD_ID_RE, doc_path_for_id, find_project_root, slugify
+from common import DECISION_ID_RE, DOC_RE, doc_path_for_id, find_project_root, is_valid_main_decision_parent, slugify
 
 
 def default_output_dir() -> Path:
-    return find_project_root(Path.cwd()) / "docs" / "adrs"
+    return find_project_root(Path.cwd()) / "docs" / "decisions"
 
 
 def template_path() -> Path:
@@ -38,9 +38,9 @@ def next_number(output_dir: Path) -> int:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create a new ADR file with the next available number."
+        description="Create a new decision record file with the next available number."
     )
-    parser.add_argument("slug_or_title", help="Slug or title for the ADR")
+    parser.add_argument("slug_or_title", help="Slug or title for the decision record")
     parser.add_argument(
         "--role",
         choices=["main", "patch"],
@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--parent",
-        help="Parent id for the front matter. For role=main this must be a PRD id; for role=patch this must be an ADR id.",
+        help="Parent id for the front matter. For role=main this must be an idea, PRD, or spec id; for role=patch this must be a decision id.",
     )
     parser.add_argument(
         "--status",
@@ -61,7 +61,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=default_output_dir(),
-        help="Directory where ADRs are stored. Defaults to <current project>/docs/adrs",
+        help="Directory where decision records are stored. Defaults to <current project>/docs/decisions",
     )
     parser.add_argument(
         "--json",
@@ -73,22 +73,22 @@ def parse_args() -> argparse.Namespace:
 
 def validate_parent(project_root: Path, role: str, parent: str | None) -> None:
     if not parent:
-        expected = "a PRD id like prd-00001-example-product" if role == "main" else "an ADR id like adr-00001-example-decision"
+        expected = "an idea, PRD, or spec id like prd-00001-example-product" if role == "main" else "a decision id like decision-00001-example-decision"
         raise SystemExit(f"missing required --parent; expected {expected}")
 
     if role == "patch":
-        if not ADR_ID_RE.fullmatch(parent):
+        if not DECISION_ID_RE.fullmatch(parent):
             raise SystemExit(
-                "for role=patch, parent must be an ADR id like adr-00001-example-decision"
+                "for role=patch, parent must be a decision id like decision-00001-example-decision"
             )
-        parent_path = project_root / "docs" / "adrs" / f"{parent}.md"
+        parent_path = project_root / "docs" / "decisions" / f"{parent}.md"
         if not parent_path.exists():
-            raise SystemExit(f"parent ADR not found: {parent_path}")
+            raise SystemExit(f"parent decision not found: {parent_path}")
         return
 
-    if not PRD_ID_RE.fullmatch(parent):
+    if not is_valid_main_decision_parent(parent):
         raise SystemExit(
-            "for role=main, parent must be a PRD id like "
+            "for role=main, parent must be an idea, PRD, or spec id like "
             "prd-00001-example-product"
         )
 
@@ -105,7 +105,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     validate_parent(project_root, args.role, args.parent)
 
-    lock_path = output_dir / ".adr-number.lock"
+    lock_path = output_dir / ".decision-number.lock"
     with lock_path.open("a+", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         number = next_number(output_dir)

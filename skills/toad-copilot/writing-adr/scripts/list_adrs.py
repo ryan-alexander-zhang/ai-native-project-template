@@ -10,11 +10,11 @@ from common import DOC_RE, find_project_root, read_front_matter_and_body, title_
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="List ADRs in docs/adrs.")
+    parser = argparse.ArgumentParser(description="List decision records in docs/decisions.")
     parser.add_argument(
         "--status",
         choices=["draft", "active", "archived"],
-        help="Filter ADRs by front matter status",
+        help="Filter decision records by front matter status",
     )
     parser.add_argument(
         "--json",
@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def list_adrs(project_root: Path, status: str | None) -> list[dict[str, str]]:
-    adrs_dir = project_root / "docs" / "adrs"
+    adrs_dir = project_root / "docs" / "decisions"
     if not adrs_dir.exists():
         return []
 

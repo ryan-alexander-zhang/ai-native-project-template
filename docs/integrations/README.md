@@ -12,4 +12,4 @@ This directory stores integration notes for external systems.
 ## Exclude
 
 - general reference materials
-- internal architecture decisions
+- internal decision records

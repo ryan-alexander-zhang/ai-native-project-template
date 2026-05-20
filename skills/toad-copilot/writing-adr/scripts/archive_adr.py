@@ -7,19 +7,19 @@ import json
 from datetime import date
 from pathlib import Path
 
-from common import ADR_ID_RE, find_project_root, render_front_matter, title_from_body
-from validate_doc import validate_adr
+from common import DECISION_ID_RE, find_project_root, render_front_matter, title_from_body
+from validate_doc import validate_decision
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Archive an ADR and add a short archival note."
+        description="Archive a decision record and add a short archival note."
     )
-    parser.add_argument("target", help="ADR id or path to the ADR markdown file")
+    parser.add_argument("target", help="Decision id or path to the decision markdown file")
     parser.add_argument(
         "--reason",
         required=True,
-        help="Short reason that explains why the ADR is being archived",
+        help="Short reason that explains why the decision is being archived",
     )
     parser.add_argument(
         "--json",
@@ -34,18 +34,18 @@ def resolve_target(target: str) -> Path:
     if raw_path.exists():
         return raw_path.resolve()
 
-    if not ADR_ID_RE.fullmatch(target):
-        raise ValueError("target must be an ADR id like adr-00001-example or a file path")
+    if not DECISION_ID_RE.fullmatch(target):
+        raise ValueError("target must be a decision id like decision-00001-example or a file path")
 
     project_root = find_project_root(Path.cwd())
-    return (project_root / "docs" / "adrs" / f"{target}.md").resolve()
+    return (project_root / "docs" / "decisions" / f"{target}.md").resolve()
 
 
 def upsert_archive_note(body: str, note: str) -> str:
     lines = body.splitlines()
     title_index = next((index for index, line in enumerate(lines) if line.startswith("# ")), None)
     if title_index is None:
-        raise ValueError("ADR is missing a top-level title")
+        raise ValueError("decision record is missing a top-level title")
 
     note_index = title_index + 1
     while note_index < len(lines) and lines[note_index] == "":
@@ -63,7 +63,7 @@ def main() -> int:
     args = parse_args()
     try:
         doc_path = resolve_target(args.target)
-        front_matter, body = validate_adr(doc_path)
+        front_matter, body = validate_decision(doc_path)
     except ValueError as error:
         raise SystemExit(str(error))
 

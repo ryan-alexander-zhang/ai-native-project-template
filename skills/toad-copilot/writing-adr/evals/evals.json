@@ -3,46 +3,46 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Write a draft ADR in docs/adrs for adopting a guided repository bootstrap workflow for new projects. Use parent prd-00001-project-bootstrap-copilot.",
-      "expected_output": "An initial response that frames the decision, presents A/B/C options with trade-offs, recommends one option for this repo, and asks the user to choose before any ADR file is drafted.",
+      "prompt": "Write a draft decision record in docs/decisions for adopting a guided repository bootstrap workflow for new projects. Use parent prd-00001-project-bootstrap-copilot.",
+      "expected_output": "An initial response that frames the decision, presents A/B/C options with trade-offs, recommends one option for this repo, and asks the user to choose before any decision file is drafted.",
       "files": [
         "evals/files/AGENTS.md",
         "evals/files/docs/prds/prd-00001-project-bootstrap-copilot.md"
       ],
       "expectations": [
-        "The first response does not draft an ADR file before the user chooses a direction.",
-        "If the repo has no existing ADRs, the response treats that as a normal starting state and continues instead of blocking on missing ADR history.",
+        "The first response does not draft a decision file before the user chooses a direction.",
+        "If the repo has no existing decision records, the response treats that as a normal starting state and continues instead of blocking on missing decision history.",
         "The response presents exactly three labeled options: A, B, and C.",
         "Option A is explicitly recommended and explains why it fits this repo better than the others.",
         "The response asks the user to choose A, B, or C, or refine the options before drafting.",
-        "The response treats the supplied PRD as the required parent context for the new ADR."
+        "The response treats the supplied PRD as valid parent context for the new decision."
       ]
     },
     {
       "id": 2,
-      "prompt": "Create an active ADR in docs/adrs for using ADRs to record major technical decisions in this repo. If there is no parent PRD yet, tell me what is missing before drafting.",
-      "expected_output": "An initial response that refuses to draft without a concrete PRD parent and asks for or helps identify the missing PRD before proceeding.",
+      "prompt": "Create an active decision record in docs/decisions for using decision records to capture major technical decisions in this repo. If there is no valid parent doc yet, tell me what is missing before drafting.",
+      "expected_output": "An initial response that refuses to draft without a concrete upstream parent and asks for or helps identify the missing parent before proceeding.",
       "files": [
         "evals/files/AGENTS.md"
       ],
       "expectations": [
-        "The first response does not draft an ADR file.",
-        "The response states that a main ADR requires a concrete PRD parent.",
-        "The response asks the user to provide or identify the PRD before it can present options and draft the ADR.",
-        "The response does not accept <id> or another non-PRD document type as the main ADR parent."
+        "The first response does not draft a decision file.",
+        "The response states that a main decision requires a concrete idea, PRD, or spec parent.",
+        "The response asks the user to provide or identify the parent before it can present options and draft the decision.",
+        "The response does not accept <id> or another unsupported document type as the main decision parent."
       ]
     },
     {
       "id": 3,
-      "prompt": "Add a patch ADR in docs/adrs to adr-00020-checkout-risk-review that clarifies when suspicious guest checkout orders require manual review.",
-      "expected_output": "A new patch ADR saved under docs/adrs with parent adr-00020-checkout-risk-review and the standard ADR structure.",
+      "prompt": "Add a patch decision record in docs/decisions to decision-00020-checkout-risk-review that clarifies when suspicious guest checkout orders require manual review.",
+      "expected_output": "A new patch decision saved under docs/decisions with parent decision-00020-checkout-risk-review and the standard decision structure.",
       "files": [
         "evals/files/AGENTS.md",
-        "evals/files/docs/adrs/adr-00020-checkout-risk-review.md"
+        "evals/files/docs/decisions/decision-00020-checkout-risk-review.md"
       ],
       "expectations": [
-        "The run creates exactly one new markdown file under docs/adrs.",
-        "The new file front matter has type adr, role patch, status draft, and parent adr-00020-checkout-risk-review.",
+        "The run creates exactly one new markdown file under docs/decisions.",
+        "The new file front matter has type decision, role patch, status draft, and parent decision-00020-checkout-risk-review.",
         "The new file includes Context, Decision, and Consequences sections with concrete content.",
         "The Context names the existing decision being clarified, and the Consequences include at least one downside."
       ]

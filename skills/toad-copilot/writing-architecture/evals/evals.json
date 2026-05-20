@@ -3,8 +3,8 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Create repo-root ARCHITECTURE.md for this project for the first time. Start from ADRs, PRDs, specs, plans, user stories, ideas, and any other durable docs that define the intended architecture. Use the repo tree and manifests only after that, to confirm names and implementation status. Do not turn the document into a repo inventory. If a section has enough durable-doc evidence but no ADR yet, still write the architecture section instead of blocking.",
-      "expected_output": "A first-time ARCHITECTURE.md that synthesizes the intended architecture from durable docs first, uses repo evidence only as supporting implementation context, and does not block solely because an ADR is missing.",
+      "prompt": "Create repo-root ARCHITECTURE.md for this project for the first time. Start from decision records, PRDs, specs, plans, user stories, ideas, and any other durable docs that define the intended architecture. Use the repo tree and manifests only after that, to confirm names and implementation status. Do not turn the document into a repo inventory. If a section has enough durable-doc evidence but no decision record yet, still write the architecture section instead of blocking.",
+      "expected_output": "A first-time ARCHITECTURE.md that synthesizes the intended architecture from durable docs first, uses repo evidence only as supporting implementation context, and does not block solely because a decision record is missing.",
       "files": []
     },
     {
@@ -15,8 +15,8 @@
     },
     {
       "id": 3,
-      "prompt": "Reconcile ARCHITECTURE.md with the repo. If the docs define an architectural section one way but the current implementation contradicts it, do not rewrite the architecture around the repo scan result. Block that section and report the documented architecture, the observed implementation, the issue type, and the required follow-up. Do not block merely because an ADR is missing if PRDs, specs, plans, or user stories already define the section.",
-      "expected_output": "A partial or blocked update that surfaces architecture drift in the required escalation format, keeps docs as the architecture source of truth, and avoids ADR-only blocking when other durable docs are sufficient.",
+      "prompt": "Reconcile ARCHITECTURE.md with the repo. If the docs define an architectural section one way but the current implementation contradicts it, do not rewrite the architecture around the repo scan result. Block that section and report the documented architecture, the observed implementation, the issue type, and the required follow-up. Do not block merely because a decision record is missing if PRDs, specs, plans, or user stories already define the section.",
+      "expected_output": "A partial or blocked update that surfaces architecture drift in the required escalation format, keeps docs as the architecture source of truth, and avoids decision-record-only blocking when other durable docs are sufficient.",
       "files": []
     }
   ]

@@ -1,7 +1,7 @@
 # Architecture Overview
 
 This document summarizes the intended architecture of `toad-copilot` from the active idea, PRD,
-ADR, user stories, and supporting repo evidence. It separates the planned product architecture
+decision records, user stories, and supporting repo evidence. It separates the planned product architecture
 from the current repository implementation where those do not yet match.
 
 <!-- manual-notes:start -->
@@ -21,7 +21,7 @@ checked-in structure is primarily documentation, repo-local skills, and helper s
 ```text
 .
 ├── docs/
-│   ├── adrs/
+│   ├── decisions/
 │   ├── ideas/
 │   ├── plans/
 │   ├── prds/
@@ -79,7 +79,7 @@ independent so later frontends can reuse it without duplicating workflow logic.
 ### Current Repository Components
 
 - `Durable design docs`: the repo currently captures product and architecture intent in
-  `docs/ideas`, `docs/prds`, `docs/adrs`, `docs/specs`, `docs/plans`, and `docs/user-stories`.
+  `docs/ideas`, `docs/prds`, `docs/decisions`, `docs/specs`, `docs/plans`, and `docs/user-stories`.
 - `Repo-local writing skills`: `skills/toad-copilot/*` packages the skill instructions, templates,
   eval fixtures, and helper scripts used to maintain those durable docs.
 - `Helper scripts and installer`: Python scripts under individual skills scaffold or validate docs,
@@ -99,7 +99,7 @@ architecture docs. Low-level storage design is intentionally still unspecified.
 
 ## 5. External Integrations / APIs
 
-No end-user runtime integration is defined in the current idea, PRD, ADR, or user stories.
+No end-user runtime integration is defined in the current idea, PRD, decision records, or user stories.
 
 The current repository does reference externally sourced skills in `skills-lock.json`, but those
 entries are development-time skill dependencies rather than product runtime integrations.
@@ -111,7 +111,7 @@ entries are development-time skill dependencies rather than product runtime inte
 - Managed-file behavior should stay surgical. The user stories for preset files and existing-project
   bootstrap both require creating or standardizing managed resources without unrelated repo changes.
 - No authentication, authorization, secrets-management, or hosted multi-tenant security model is
-  currently documented. If those concerns enter scope later, they need explicit ADR or spec
+  currently documented. If those concerns enter scope later, they need explicit decision-record or spec
   coverage instead of being inferred from implementation details.
 
 ## 7. Development & Testing Environment
@@ -153,7 +153,7 @@ entries are development-time skill dependencies rather than product runtime inte
 
 ## 11. Glossary / Acronyms
 
-- `ADR`: Architecture Decision Record
+- `Decision Record`: durable record of an important business, architecture, or technology choice
 - `PRD`: Product Requirements Document
 - `FR`: Functional Requirement
 - `MVP`: Minimum Viable Product

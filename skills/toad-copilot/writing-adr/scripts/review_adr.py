@@ -7,14 +7,14 @@ import json
 from pathlib import Path
 
 from common import extract_sections, title_from_body
-from validate_doc import validate_adr
+from validate_doc import validate_decision
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Review an ADR for common quality issues."
+        description="Review a decision record for common quality issues."
     )
-    parser.add_argument("doc_path", type=Path, help="Path to the ADR markdown file")
+    parser.add_argument("doc_path", type=Path, help="Path to the decision markdown file")
     parser.add_argument(
         "--json",
         action="store_true",
@@ -37,7 +37,7 @@ def contains_any(value: str, needles: list[str]) -> bool:
 
 
 def review_adr(doc_path: Path) -> dict[str, list[str]]:
-    front_matter, body = validate_adr(doc_path)
+    front_matter, body = validate_decision(doc_path)
     findings = {"errors": [], "warnings": [], "passes": []}
     title = title_from_body(body) or ""
     sections = extract_sections(body)
@@ -98,7 +98,7 @@ def review_adr(doc_path: Path) -> dict[str, list[str]]:
 
     if front_matter["status"] == "archived" and "Archived on " not in body:
         findings["warnings"].append(
-            "Archived ADRs should usually include a short archival note near the top."
+            "Archived decision records should usually include a short archival note near the top."
         )
 
     return findings

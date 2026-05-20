@@ -6,13 +6,13 @@ import argparse
 from pathlib import Path
 
 from common import (
-    ADR_ID_RE,
-    PRD_ID_RE,
+    DECISION_ID_RE,
     VALID_ROLES,
     VALID_STATUSES,
     doc_path_for_id,
     extract_sections,
     find_project_root,
+    is_valid_main_decision_parent,
     read_front_matter_and_body,
     title_from_body,
 )
@@ -20,9 +20,9 @@ from common import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate a generated ADR document."
+        description="Validate a generated decision record."
     )
-    parser.add_argument("doc_path", type=Path, help="Path to the generated ADR markdown file")
+    parser.add_argument("doc_path", type=Path, help="Path to the generated decision markdown file")
     return parser.parse_args()
 
 
@@ -34,7 +34,7 @@ def require_fields(doc_path: Path, front_matter: dict[str, str], *fields: str) -
         )
 
 
-def validate_adr(doc_path: Path) -> tuple[dict[str, str], str]:
+def validate_decision(doc_path: Path) -> tuple[dict[str, str], str]:
     resolved_path = doc_path.resolve()
     if not resolved_path.exists():
         raise ValueError(f"document not found: {resolved_path}")
@@ -44,9 +44,9 @@ def validate_adr(doc_path: Path) -> tuple[dict[str, str], str]:
     require_fields(resolved_path, front_matter, "id", "type", "role", "status", "parent")
 
     doc_id = front_matter["id"]
-    if front_matter["type"] != "adr":
-        raise ValueError(f"{resolved_path} has type {front_matter['type']!r}, expected 'adr'")
-    if not ADR_ID_RE.fullmatch(doc_id):
+    if front_matter["type"] != "decision":
+        raise ValueError(f"{resolved_path} has type {front_matter['type']!r}, expected 'decision'")
+    if not DECISION_ID_RE.fullmatch(doc_id):
         raise ValueError(f"{resolved_path} has invalid id: {doc_id}")
     if resolved_path.stem != doc_id:
         raise ValueError(
@@ -59,17 +59,17 @@ def validate_adr(doc_path: Path) -> tuple[dict[str, str], str]:
 
     parent = front_matter["parent"]
     if front_matter["role"] == "patch":
-        if not ADR_ID_RE.fullmatch(parent):
+        if not DECISION_ID_RE.fullmatch(parent):
             raise ValueError(
                 f"{resolved_path} has invalid parent for role=patch: {parent}"
             )
-        parent_path = project_root / "docs" / "adrs" / f"{parent}.md"
+        parent_path = project_root / "docs" / "decisions" / f"{parent}.md"
         if not parent_path.exists():
             raise ValueError(f"parent does not exist: {parent_path}")
     else:
-        if not PRD_ID_RE.fullmatch(parent):
+        if not is_valid_main_decision_parent(parent):
             raise ValueError(
-                f"{resolved_path} has invalid parent for role=main; expected a PRD id, got: {parent}"
+                f"{resolved_path} has invalid parent for role=main; expected an idea, PRD, or spec id, got: {parent}"
             )
         parent_path = doc_path_for_id(project_root, parent)
         if parent_path is None or not parent_path.exists():
@@ -90,7 +90,7 @@ def validate_adr(doc_path: Path) -> tuple[dict[str, str], str]:
 def main() -> int:
     args = parse_args()
     try:
-        validate_adr(args.doc_path)
+        validate_decision(args.doc_path)
     except ValueError as error:
         raise SystemExit(str(error))
 

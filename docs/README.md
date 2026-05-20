@@ -9,7 +9,7 @@ Every main doc and patch doc should start with:
 ```md
 ---
 id: spec-00001-doc-front-matter
-type: adr|idea|integration|memory|operation|plan|prd|record|spec|task|us
+type: analysis|decision|idea|integration|memory|operation|plan|prd|record|spec|task|us
 role: main|patch
 status: draft|active|archived
 parent: <id>
@@ -28,7 +28,8 @@ function_requirement_id: <FR-id>
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - `type` should match the target folder:
-  - `adrs/` -> `adr`
+  - `analyses/` -> `analysis`
+  - `decisions/` -> `decision`
   - `ideas/` -> `idea`
   - `integrations/` -> `integration`
   - `memory/` -> `memory`
@@ -44,18 +45,19 @@ function_requirement_id: <FR-id>
 - `role: patch` means `parent` is the id of the main document.
 - Main document flow is `idea -> prd -> spec -> plan -> task` when the later stage exists.
 - A main document in that flow should use the upstream main document id as `parent`. For example, a main `spec` should use the related `prd` id.
-- A main `adr` is a child of a `prd`. Its `parent` must be the related PRD id.
-- A patch `adr` is a child of a main `adr`. Its `parent` must be the ADR id it extends.
+- A main `decision` should use the closest upstream main document that created the need for the choice. In this repo that is usually an `idea`, `prd`, or `spec`.
+- A patch `decision` is a child of a main `decision`. Its `parent` must be the decision id it extends.
 - `us` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
 
 ## Folders
 
+- `analyses/`: codebase and business analysis docs
 - `ideas/`: early ideas
 - `prds/`: product requirements
+- `decisions/`: durable decision records
 - `specs/`: engineering specs
 - `plans/`: implementation plans
 - `tasks/`: execution tasks
-- `adrs/`: architecture decision records
 - `integrations/`: third-party integration notes
 - `operations/`: runbooks and operations docs
 - `memory/`: reusable long-term knowledge
@@ -67,17 +69,18 @@ function_requirement_id: <FR-id>
 
 1. `ARCHITECTURE.md`
 2. `memory/`
-3. `adrs/`
-4. `specs/`
-5. `plans/`
-6. `tasks/`
-7. `operations/`
-8. `integrations/`
-9. `records/`
-10. `prds/`
-11. `user-stories/`
-12. `ideas/`
-13. `references/`
+3. `analyses/`
+4. `decisions/`
+5. `specs/`
+6. `plans/`
+7. `tasks/`
+8. `operations/`
+9. `integrations/`
+10. `records/`
+11. `prds/`
+12. `user-stories/`
+13. `ideas/`
+14. `references/`
 
 ## Rules
 
@@ -85,6 +88,7 @@ function_requirement_id: <FR-id>
 - `specs` say what the system should do.
 - `plans` say how to do it.
 - Use `tasks` only for large plans.
-- Write an ADR for major architecture choices.
+- Use `analyses` for exploratory codebase or business analysis that informs later docs.
+- Write a decision record for major business, architecture, product-shape, or technology choices with real trade-offs.
 - Keep long-term knowledge in `memory/`.
 - Keep reports and evidence in `records/`.

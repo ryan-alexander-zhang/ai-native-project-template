@@ -1,6 +1,6 @@
 ---
-id: adr-00001-adopt-typescript-with-node-js-for-the-reusable-core-and-cli-mvp
-type: adr
+id: decision-00001-adopt-typescript-with-node-js-for-the-reusable-core-and-cli-mvp
+type: decision
 role: main
 status: draft
 parent: prd-00001-project-bootstrap-copilot
@@ -10,7 +10,7 @@ parent: prd-00001-project-bootstrap-copilot
 
 ## Context
 - Problem / trigger: `prd-00001-project-bootstrap-copilot` defines a CLI-first MVP for local project bootstrap and resource management, while requiring the workflow core to remain reusable outside the CLI.
-- Decision drivers: keep the MVP focused on local CLI use, support filesystem and process-heavy workflows, preserve a clean boundary between workflow logic and interface code, move quickly on template and document management, and avoid introducing web application concerns before a web frontend is in scope.
+- Decision drivers: choose a stack that keeps the MVP focused on local CLI use, supports filesystem and process-heavy workflows, preserves a clean boundary between workflow logic and interface code, moves quickly on template and document management, and avoids introducing web application concerns before a web frontend is in scope.
 - Options considered:
   - TypeScript with Node.js for a reusable core plus a CLI package, while deferring any web framework.
   - Go for both the core and CLI to optimize for a single-binary distribution model.
