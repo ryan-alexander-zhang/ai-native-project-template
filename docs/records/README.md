@@ -1,6 +1,7 @@
 # Records
 
 This directory stores process records and reports.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

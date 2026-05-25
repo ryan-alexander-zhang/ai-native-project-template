@@ -1,6 +1,7 @@
 # Decisions
 
 This directory stores durable decision records.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

@@ -1,6 +1,7 @@
 # Analyses
 
 This directory stores analysis docs.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

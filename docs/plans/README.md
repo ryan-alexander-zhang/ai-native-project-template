@@ -1,6 +1,7 @@
 # Plans
 
 This directory stores implementation plans.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

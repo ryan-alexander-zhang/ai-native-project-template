@@ -1,6 +1,7 @@
 # PRDs
 
 This directory stores product requirement documents.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

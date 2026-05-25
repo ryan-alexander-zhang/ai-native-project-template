@@ -32,7 +32,7 @@ function_requirement_id: <FR-id>
   - `decisions/` -> `decision`
   - `ideas/` -> `idea`
   - `integrations/` -> `integration`
-  - `memory/` -> `memory`
+  - `memories/` -> `memory`
   - `operations/` -> `operation`
   - `plans/` -> `plan`
   - `prds/` -> `prd`
@@ -60,7 +60,7 @@ function_requirement_id: <FR-id>
 - `tasks/`: execution tasks
 - `integrations/`: third-party integration notes
 - `operations/`: runbooks and operations docs
-- `memory/`: reusable long-term knowledge
+- `memories/`: reusable long-term knowledge
 - `records/`: reports and process records
 - `user-stories/`: user stories attached to PRD functional requirements
 - `references/`: external references
@@ -68,7 +68,7 @@ function_requirement_id: <FR-id>
 ## Read Order
 
 1. `ARCHITECTURE.md`
-2. `memory/`
+2. `memories/`
 3. `analyses/`
 4. `decisions/`
 5. `specs/`
@@ -90,5 +90,5 @@ function_requirement_id: <FR-id>
 - Use `tasks` only for large plans.
 - Use `analyses` for exploratory codebase or business analysis that informs later docs.
 - Write a decision record for major business, architecture, product-shape, or technology choices with real trade-offs.
-- Keep long-term knowledge in `memory/`.
+- Keep long-term knowledge in `memories/`.
 - Keep reports and evidence in `records/`.

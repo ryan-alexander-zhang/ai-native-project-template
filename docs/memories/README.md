@@ -1,6 +1,7 @@
-# Memory
+# Memories
 
 This directory stores long-term reusable knowledge.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

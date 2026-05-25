@@ -1,6 +1,7 @@
 # Ideas
 
 This directory stores early ideas.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

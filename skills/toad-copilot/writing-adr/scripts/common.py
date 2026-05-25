@@ -28,7 +28,7 @@ DOC_DIR_BY_PREFIX = {
     "decision": "decisions",
     "idea": "ideas",
     "integration": "integrations",
-    "memory": "memory",
+    "memory": "memories",
     "operation": "operations",
     "plan": "plans",
     "prd": "prds",

@@ -1,6 +1,7 @@
 # Operations
 
 This directory stores operation documents.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

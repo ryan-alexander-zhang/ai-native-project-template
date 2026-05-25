@@ -1,6 +1,7 @@
 # Integrations
 
 This directory stores integration notes for external systems.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

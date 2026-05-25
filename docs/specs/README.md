@@ -1,6 +1,7 @@
 # Specs
 
 This directory stores engineering specs.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

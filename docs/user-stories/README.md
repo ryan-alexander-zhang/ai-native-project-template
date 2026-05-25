@@ -1,6 +1,7 @@
 # User Stories
 
 This directory stores user story documents.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 

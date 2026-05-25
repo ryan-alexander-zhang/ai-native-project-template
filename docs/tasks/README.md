@@ -1,6 +1,7 @@
 # Tasks
 
 This directory stores execution tasks from plans.
+Use `TEMPLATE.md` for front matter.
 
 ## Include
 
