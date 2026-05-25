@@ -1,0 +1,7 @@
+interface:
+  display_name: "Spec"
+  short_description: "Write an engineering spec in docs/specs"
+  default_prompt: "Use $writing-spec to turn this into an engineering spec in docs/specs with the right parent, front matter, and design-review flow."
+
+policy:
+  allow_implicit_invocation: true
