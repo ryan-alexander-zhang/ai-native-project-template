@@ -1,159 +1,170 @@
 # Architecture Overview
-
-This document summarizes the intended architecture of `toad-copilot` from the active idea, PRD,
-decision records, user stories, and supporting repo evidence. It separates the planned product architecture
-from the current repository implementation where those do not yet match.
-
-<!-- manual-notes:start -->
-<!-- Add human-maintained notes here. This block is preserved during updates. -->
-<!-- manual-notes:end -->
+This document serves as a critical, living template designed to equip agents with a rapid and comprehensive understanding of the codebase's architecture, enabling efficient navigation and effective contribution from day one. Update this document as the codebase evolves.
 
 ## 1. Project Structure
+This section provides a high-level overview of the project's directory and file structure, categorised by architectural layer or major functional area. It is essential for quickly navigating the codebase, locating relevant files, and understanding the overall organization and separation of concerns.
 
-The intended product architecture is a CLI-first application with two main logical boundaries:
 
-- a reusable headless workflow core for project bootstrap and managed-resource operations
-- a CLI interface that exposes those workflows for local terminal use
+[Project Root]/
+├── backend/              # Contains all server-side code and APIs
+│   ├── src/              # Main source code for backend services
+│   │   ├── api/          # API endpoints and controllers
+│   │   ├── client/       # Business logic and service implementations
+│   │   ├── models/       # Database models/schemas
+│   │   └── utils/        # Backend utility functions
+│   ├── config/           # Backend configuration files
+│   ├── tests/            # Backend unit and integration tests
+│   └── Dockerfile        # Dockerfile for backend deployment
+├── frontend/             # Contains all client-side code for user interfaces
+│   ├── src/              # Main source code for frontend applications
+│   │   ├── components/   # Reusable UI components
+│   │   ├── pages/        # Application pages/views
+│   │   ├── assets/       # Images, fonts, and other static assets
+│   │   ├── services/     # Frontend services for API interaction
+│   │   └── store/        # State management (e.g., Redux, Vuex, Context API)
+│   ├── public/           # Publicly accessible assets (e.g., index.html)
+│   ├── tests/            # Frontend unit and E2E tests
+│   └── package.json      # Frontend dependencies and scripts
+├── common/               # Shared code, types, and utilities used by both frontend and backend
+│   ├── types/            # Shared TypeScript/interface definitions
+│   └── utils/            # General utility functions
+├── docs/                 # Project documentation (e.g., API docs, setup guides)
+├── scripts/              # Automation scripts (e.g., deployment, data seeding)
+├── .github/              # GitHub Actions or other CI/CD configurations
+├── .gitignore            # Specifies intentionally untracked files to ignore
+├── README.md             # Project overview and quick start guide
+└── ARCHITECTURE.md       # This document
 
-The current repository does not yet implement those boundaries as dedicated runtime packages. Its
-checked-in structure is primarily documentation, repo-local skills, and helper scripts:
 
-```text
-.
-├── docs/
-│   ├── decision/
-│   ├── idea/
-│   ├── plan/
-│   ├── prd/
-│   ├── spec/
-│   └── user-story/
-├── skills/toad-copilot/
-│   ├── writing-adr/
-│   ├── writing-architecture/
-│   ├── writing-idea-brief/
-│   ├── writing-prd/
-│   └── writing-user-story/
-├── .agents/skills/
-├── scripts/
-├── AGENTS.md
-├── TESTING.md
-└── skills-lock.json
-```
 
 ## 2. High-Level System Diagram
-
-```text
-User
-  |
-  v
-CLI MVP
-  |
-  v
-Reusable bootstrap and resource-management core
-  | \
-  |  \--> Template and managed-resource definitions
-  |
-  \----> Target project filesystem
-
-Future desktop/web/frontend adapters
-  |
-  v
-Same reusable core
-```
-
-The durable docs define the CLI as the first interface and require the workflow layer to stay
-independent so later frontends can reuse it without duplicating workflow logic.
+Provide a simple block diagram (e.g., a C4 Model Level 1: System Context diagram, or a basic component diagram) or a clear text-based description of the major components and their interactions. Focus on how data flows, services communicate, and key architectural boundaries.
+ 
+[User] <--> [Frontend Application] <--> [Backend Service 1] <--> [Database 1]
+                                    |
+                                    +--> [Backend Service 2] <--> [External API]                           
 
 ## 3. Core Components
+(List and briefly describe the main components of the system. For each, include its primary responsibility and key technologies used.)
 
-### Intended Product Components
+### 3.1. Frontend
 
-- `Workflow core`: the headless layer that bootstraps a new local project, standardizes an
-  existing local project, manages preset files such as `AGENTS.md`, and manages project-level
-  skills and reusable resources.
-- `CLI interface`: the MVP entry point for running bootstrap and resource-management workflows from
-  the terminal with clear success or failure results.
-- `Template and managed-resource library`: the reusable definitions the workflow applies locally,
-  including standard directory structure, preset docs, and project-scoped skills or resources.
+Name: [e.g., Web App, Mobile App]
 
-### Current Repository Components
+Description: Briefly describe its primary purpose, key functionalities, and how users or other systems interact with it. E.g., 'The main user interface for interacting with the system, allowing users to manage their profiles, view data dashboards, and initiate workflows.'
 
-- `Durable design docs`: the repo currently captures product and architecture intent in
-  `docs/idea`, `docs/prd`, `docs/decision`, `docs/spec`, `docs/plan`, and `docs/user-story`.
-- `Repo-local writing skills`: `skills/toad-copilot/*` packages the skill instructions, templates,
-  eval fixtures, and helper scripts used to maintain those durable docs.
-- `Helper scripts and installer`: Python scripts under individual skills scaffold or validate docs,
-  and `scripts/install_toad_copilot_skills.sh` links the project skills into `.agents/skills/`.
+Technologies: [e.g., React, Next.js, Vue.js, Swift/Kotlin, HTML/CSS/JS]
+
+Deployment: [e.g., Vercel, Netlify, S3/CloudFront]
+
+### 3.2. Backend Services
+
+(Repeat for each significant backend service. Add more as needed.)
+
+#### 3.2.1. [Service Name 1]
+
+Name: [e.g., User Management Service, Data Processing API]
+
+Description: [Briefly describe its purpose, e.g., "Handles user authentication and profile management."]
+
+Technologies: [e.g., Node.js (Express), Python (Django/Flask), Java (Spring Boot), Go]
+
+Deployment: [e.g., AWS EC2, Kubernetes, Serverless (Lambda/Cloud Functions)]
+
+#### 3.2.2. [Service Name 2]
+
+Name: [e.g., Analytics Service, Notification Service]
+
+Description: [Briefly describe its purpose.]
+
+Technologies: [e.g., Python, Kafka, Redis]
+
+Deployment: [e.g., AWS ECS, Google Cloud Run]
 
 ## 4. Data Stores
 
-- `Target project filesystem`: the planned primary state boundary. The product is expected to
-  create and update local directories, preset files, and project-level skills/resources in place.
-- `Durable repo docs`: within this repo, architecture and product decisions are stored as Markdown
-  under `docs/` and act as the source of truth for intended behavior.
-- `Skill assets and eval fixtures`: templates and evaluation fixtures under
-  `skills/toad-copilot/` are the reusable artifacts that support the current repo-local workflows.
+(List and describe the databases and other persistent storage solutions used.)
 
-No database, queue, remote sync system, or hosted persistence layer is defined in the active
-architecture docs. Low-level storage design is intentionally still unspecified.
+### 4.1. [Data Store Type 1]
+
+Name: [e.g., Primary User Database, Analytics Data Warehouse]
+
+Type: [e.g., PostgreSQL, MongoDB, Redis, S3, Firestore]
+
+Purpose: [Briefly describe what data it stores and why.]
+
+Key Schemas/Collections: [List important tables/collections, e.g., users, products, orders (no need for full schema, just names)]
+
+### 4.2. [Data Store Type 2]
+
+Name: [e.g., Cache, Message Queue]
+
+Type: [e.g., Redis, Kafka, RabbitMQ]
+
+Purpose: [Briefly describe its purpose, e.g., "Used for caching frequently accessed data" or "Inter-service communication."]
 
 ## 5. External Integrations / APIs
 
-No end-user runtime integration is defined in the current idea, PRD, decision records, or user stories.
+(List any third-party services or external APIs the system interacts with.)
 
-The current repository does reference externally sourced skills in `skills-lock.json`, but those
-entries are development-time skill dependencies rather than product runtime integrations.
+Service Name 1: [e.g., Stripe, SendGrid, Google Maps API]
 
-## 6. Security Considerations
+Purpose: [Briefly describe its function, e.g., "Payment processing."]
 
-- The MVP is explicitly local-first. Its main trust boundary is the user's local filesystem and
-  shell environment rather than a hosted service boundary.
-- Managed-file behavior should stay surgical. The user stories for preset files and existing-project
-  bootstrap both require creating or standardizing managed resources without unrelated repo changes.
-- No authentication, authorization, secrets-management, or hosted multi-tenant security model is
-  currently documented. If those concerns enter scope later, they need explicit decision-record or spec
-  coverage instead of being inferred from implementation details.
+Integration Method: [e.g., REST API, SDK]
 
-## 7. Development & Testing Environment
+## 6. Deployment & Infrastructure
 
-- The current repo-native workflows assume a POSIX shell environment with `rg`, Python 3, and write
-  access to repo docs and skill directories.
-- Skills are authored under `skills/toad-copilot/` and exposed locally through `.agents/skills/`.
-- The current automation surface is script-driven: per-skill Python helpers create, review, list,
-  or validate durable Markdown docs.
-- `TESTING.md` is the testing policy for this repo. It requires the lowest effective test level for
-  a change, regression tests for bug fixes, and at least 90% line, branch, and function coverage
-  for executable code changes. Docs-only changes require manual verification.
+Cloud Provider: [e.g., AWS, GCP, Azure, On-premise]
 
-## 8. Implementation Status / Drift Notes
+Key Services Used: [e.g., EC2, Lambda, S3, RDS, Kubernetes, Cloud Functions, App Engine]
 
-- `Documented target architecture`: a TypeScript-on-Node.js reusable core with a separate CLI MVP.
-- `Observed repository state`: no `package.json`, `tsconfig.json`, or TypeScript runtime packages
-  are checked in. The current repo is primarily durable docs, Markdown skills, Python helper
-  scripts, a shell installer, and skill eval workspaces.
-- `Current interpretation`: this repository currently acts as the architecture, documentation, and
-  repo-local skill foundation for the planned product. The documented runtime architecture has been
-  chosen, but the runtime package structure itself has not yet been implemented here.
+CI/CD Pipeline: [e.g., GitHub Actions, GitLab CI, Jenkins, CircleCI]
+
+Monitoring & Logging: [e.g., Prometheus, Grafana, CloudWatch, Stackdriver, ELK Stack]
+
+## 7. Security Considerations
+
+(Highlight any critical security aspects, authentication mechanisms, or data encryption practices.)
+
+Authentication: [e.g., OAuth2, JWT, API Keys]
+
+Authorization: [e.g., RBAC, ACLs]
+
+Data Encryption: [e.g., TLS in transit, AES-256 at rest]
+
+Key Security Tools/Practices: [e.g., WAF, regular security audits]
+
+## 8. Development & Testing Environment
+
+Local Setup Instructions: [Link to CONTRIBUTING.md or brief steps]
+
+Testing Frameworks: [e.g., Jest, Pytest, JUnit]
+
+Code Quality Tools: [e.g., ESLint, Black, SonarQube]
 
 ## 9. Future Considerations / Roadmap
 
-- Keep the workflow core independent from the CLI so future desktop, web, or other frontends can
-  reuse the same logic.
-- Revisit packaging and distribution only after the core and CLI boundaries exist concretely.
-- Do not introduce a web framework into the MVP unless the project scope explicitly expands beyond
-  the CLI-first release.
+(Briefly note any known architectural debts, planned major changes, or significant future features that might impact the architecture.)
+
+[e.g., "Migrate from monolith to microservices."]
+
+[e.g., "Implement event-driven architecture for real-time updates."]
 
 ## 10. Project Identification
 
-- `Project`: `toad-copilot`
-- `Current product theme`: project bootstrap copilot for AI-heavy local repositories
-- `Repository role today`: durable docs plus repo-local skills that define and exercise the
-  intended product architecture
-- `Last updated`: 2026-04-24
+Project Name: [Insert Project Name]
+
+Repository URL: [Insert Repository URL]
+
+Primary Contact/Team: [Insert Lead Developer/Team Name]
+
+Date of Last Update: [YYYY-MM-DD]
 
 ## 11. Glossary / Acronyms
 
-- `Decision Record`: durable record of an important business, architecture, or technology choice
-- `PRD`: Product Requirements Document
-- `FR`: Functional Requirement
-- `MVP`: Minimum Viable Product
+Define any project-specific terms or acronyms.)
+
+[Acronym]: [Full Definition]
+
+[Term]: [Explanation]
