@@ -1,3 +1,0 @@
-I found three functional requirements in `prd-00020-checkout-redesign` (`FR-01` through `FR-03`). I have not created any files yet.
-
-Should I generate the user stories sequentially or in parallel?

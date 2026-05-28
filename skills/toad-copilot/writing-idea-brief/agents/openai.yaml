@@ -1,7 +1,0 @@
-interface:
-  display_name: "Idea Brief"
-  short_description: "Save a short idea brief in docs/idea"
-  default_prompt: "Use $writing-idea-brief to save this idea in docs/idea as the standard idea brief."
-
-policy:
-  allow_implicit_invocation: true

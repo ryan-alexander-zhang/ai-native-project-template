@@ -1,3 +1,0 @@
-Created the FR-01 user story at [story-00020-fr-01-guest-checkout.md](/Users/ryan/GitHubProjects/ryan-alexander-zhang/toad-copilot/skills/toad-copilot/writing-user-story-workspace/iteration-1/eval-1-main-user-story/without_skill/run-1/project/docs/user-story/story-00020-fr-01-guest-checkout.md).
-
-I kept it repo-local and minimal: frontmatter aligned to the PRD, a concise guest-checkout user story, six acceptance criteria focused on completing checkout without account creation, and scope notes that explicitly leave fraud review and email confirmation to `FR-02` and `FR-03`. Verification was a direct file read after creation; no tests were applicable for this doc-only change.

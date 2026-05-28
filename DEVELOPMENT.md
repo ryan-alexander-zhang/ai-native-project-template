@@ -58,14 +58,35 @@ Record stage should:
 
 ## Development Guides
 
-- [TESTING.md](TESTING.md): test expectations and completion bar for code changes.
-- [DOCUMENT.md](DOCUMENT.md): documentation rules and document management flow.
+### Architecture
+
+Use [ARCHITECTURE.md](ARCHITECTURE.md) for system structure, boundaries, and design constraints.
+
+### Commands
+
+Define the canonical commands for environment setup, tests, lint, build, run, and other required workflows.
+
+### Commit
+
+Use [COMMIT.md](COMMIT.md) for commit scope, message rules, and commit hygiene.
+
+### PR
+
+Use [PR.md](PR.md) for PR readiness, review flow, and merge rules.
+
+### Security
+
+Use [SECURITY.md](SECURITY.md) for security rules, risk handling, and sensitive-change requirements.
+
+### Code Style
+
+Use [CODE_STYLE.md](CODE_STYLE.md) for code style, naming, formatting, and consistency rules.
 
 ## Development Matrix
 
 | Change type | Minimum requirement |
 | --- | --- |
-| Docs-only change | Follow `DOCUMENT.md` and verify links, examples, and location. |
+| Docs-only change | Follow the document management workflow and verify links, examples, and location. |
 | Small code change | Make the smallest useful change and run the smallest relevant checks. |
 | Behavior change | Update implementation, tests, and any affected docs together. |
 | Public contract or workflow change | Update implementation, tests, and durable documentation together. |

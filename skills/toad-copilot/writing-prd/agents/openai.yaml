@@ -1,7 +1,0 @@
-interface:
-  display_name: "PRD"
-  short_description: "Write a PRD in docs/prd"
-  default_prompt: "Use $writing-prd to save this request in docs/prd as the standard PRD."
-
-policy:
-  allow_implicit_invocation: true
