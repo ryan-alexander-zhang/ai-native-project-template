@@ -4,7 +4,13 @@ Use this file to record the project-specific integration testing choice for this
 
 ## Test Framework
 
-Use Testcontainers for integration testing in this repo.
+Framework: Testcontainers (template default).
+
+Testcontainers is the pinned default for integration testing in this template
+because it provides real boundaries (database, messaging, filesystem) without
+shared environment drift. Replace it only if the project cannot use
+Testcontainers (e.g., no Docker runtime available); record the reason in a
+decision doc.
 
 ## Command
 

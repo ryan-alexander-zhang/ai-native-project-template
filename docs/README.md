@@ -37,40 +37,32 @@ function_requirement_id: <FR-id>
 - A main `issue` should use the closest main doc it blocks or clarifies. In this repo that is usually a `task`, `plan`, `spec`, or `prd`.
 - `user-story` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
 
+### When to use `role: patch`
+
+Use `patch` only when the main doc is `active` (locked or already in use) and
+the addition is scoped — for example, an FR added after PRD freeze, or a
+decision addendum that narrows an existing decision. Otherwise update the
+main doc in place. Do not create a patch for routine revisions during `draft`.
+
 ## Folders
 
-- `analysis/`: codebase and business analysis docs
-- `idea/`: early ideas
-- `prd/`: product requirements
-- `decision/`: durable decision records
-- `spec/`: engineering specs
-- `plan/`: implementation plans
-- `task/`: execution tasks
-- `issue/`: development issues, fixes, and verification
-- `integration/`: third-party integration notes
-- `operation/`: runbook and operations docs
-- `memory/`: reusable long-term knowledge
-- `record/`: reports and process records
-- `user-story/`: user stories attached to PRD functional requirements
-- `reference/`: external references
+Each folder is marked **core** (most projects need it) or **situational**
+(use only when the project actually calls for it).
 
-## Read Order
-
-1. `ARCHITECTURE.md`
-2. `memory/`
-3. `analysis/`
-4. `decision/`
-5. `spec/`
-6. `plan/`
-7. `task/`
-8. `issue/`
-9. `operation/`
-10. `integration/`
-11. `record/`
-12. `prd/`
-13. `user-story/`
-14. `idea/`
-15. `reference/`
+- `prd/` — **core** — product requirements
+- `spec/` — **core** — engineering specs
+- `plan/` — **core** — implementation plans
+- `decision/` — **core** — durable decision records
+- `issue/` — **core** — development issues, fixes, and verification
+- `operation/` — **core** — runbook and operations docs
+- `memory/` — **core** — reusable long-term knowledge
+- `idea/` — **core** — early ideas (some projects skip and start at `prd/`)
+- `analysis/` — situational — codebase and business analysis docs
+- `task/` — situational — execution tasks (only for large plans)
+- `user-story/` — situational — user stories attached to PRD functional requirements
+- `integration/` — situational — third-party integration notes
+- `record/` — situational — reports and process records
+- `reference/` — situational — external references
 
 ## Rules
 

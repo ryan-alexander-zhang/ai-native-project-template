@@ -4,7 +4,11 @@ Use this file to record the project-specific API testing choice for this repo.
 
 ## Test Framework
 
-Name the API testing framework used by this repo and the short reason it is the chosen default.
+Framework: `<fill in for this project>`. Note the short reason it is the chosen default.
+
+This level has no template default. The repo template only pins
+[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) to Testcontainers; pick the
+API framework that fits the project's HTTP stack.
 
 ## Command
 

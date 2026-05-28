@@ -2,85 +2,71 @@
 
 ## Purpose
 
-This file defines the minimum development workflow standard for this repo.
+This file defines the workflow stages, commands, and Definition of Done for
+implementation work in this repo.
 
-Use it to decide:
-- how work should start
-- what steps are required before changes are done
-- how to keep scope under control
+Behavioral principles (think before coding, simplicity, surgical changes,
+goal-driven execution) live in [AGENTS.md](AGENTS.md) and are not repeated here.
 
-## Development Pattern
-
-Keep development simple:
-- understand the requested behavior before editing
-- prefer the smallest change that solves the problem
-- reuse existing patterns before adding new ones
-- verify the changed behavior with the smallest useful check
-- keep tests and docs aligned with the change
+Use this file to decide:
+- what stage the work is in
+- which commands and checks to run
+- when a change is done
 
 ## Development Stages
 
 ### Understand
 
-Use this stage to confirm the goal, constraints, and affected boundaries.
+Confirm the goal, constraints, and affected boundaries.
 
-Understand stage should:
-- identify the files and interfaces that matter
-- separate facts from assumptions
-- avoid silent scope expansion
+- Identify the files and interfaces that matter.
+- Separate facts from assumptions.
+- Avoid silent scope expansion.
 
 ### Implement
 
-Use this stage to make the smallest change that delivers the requested behavior.
+Make the change.
 
-Implement stage should:
-- keep unrelated code untouched
-- match existing style and structure
-- remove only unused code created by the change
+- Keep unrelated code untouched.
+- Match existing style and structure.
+- Remove only unused code created by the change.
 
 ### Verify
 
-Use this stage to prove the change and check that scope stayed focused.
+Prove the change and check that scope stayed focused.
 
-Verify stage should:
-- run the smallest relevant checks first
-- inspect the diff before completion
-- confirm the requested behavior is complete
+- Run tests per [TESTING.md](TESTING.md). Testing is part of Verify, not a
+  separate phase after it.
+- Inspect the diff before completion.
+- Confirm the requested behavior is complete.
 
 ### Record
 
-Use this stage when the change also needs durable docs, notes, or decisions.
+Use this stage when the change needs durable docs, notes, or decisions.
 
-Record stage should:
-- update docs when behavior, workflow, or contract changed
-- record decisions in the correct place
-- keep long-term documentation consistent
+- Update docs when behavior, workflow, or contract changed.
+- Record decisions in the correct place per [DOCUMENT.md](DOCUMENT.md).
+- Keep long-term documentation consistent.
 
 ## Development Guides
 
-### Architecture
+- [ARCHITECTURE.md](ARCHITECTURE.md): system structure, boundaries, design constraints.
+- [TESTING.md](TESTING.md): test levels, required tests, coverage.
+- [COMMIT.md](COMMIT.md): commit scope, message rules, commit hygiene.
+- [PR.md](PR.md): PR readiness, review flow, merge rules.
+- [SECURITY.md](SECURITY.md): security rules, risk handling.
+- [CODE_STYLE.md](CODE_STYLE.md): naming, formatting, consistency.
+- [DOCUMENT.md](DOCUMENT.md): doc taxonomy and management.
 
-Use [ARCHITECTURE.md](ARCHITECTURE.md) for system structure, boundaries, and design constraints.
+## Commands
 
-### Commands
+Canonical commands for this repo (fill in for the project):
 
-Define the canonical commands for environment setup, tests, lint, build, run, and other required workflows.
-
-### Commit
-
-Use [COMMIT.md](COMMIT.md) for commit scope, message rules, and commit hygiene.
-
-### PR
-
-Use [PR.md](PR.md) for PR readiness, review flow, and merge rules.
-
-### Security
-
-Use [SECURITY.md](SECURITY.md) for security rules, risk handling, and sensitive-change requirements.
-
-### Code Style
-
-Use [CODE_STYLE.md](CODE_STYLE.md) for code style, naming, formatting, and consistency rules.
+- Setup: `<command>`
+- Test: `<command>`
+- Lint: `<command>`
+- Build: `<command>`
+- Run: `<command>`
 
 ## Development Matrix
 
@@ -99,6 +85,8 @@ A change is done only when all of these are true:
 
 - the requested behavior is complete
 - the change scope stays focused
-- the relevant checks pass
-- the relevant docs are updated when needed
+- relevant tests pass and meet the [TESTING.md](TESTING.md) DoD
+- relevant docs are updated per the [DOCUMENT.md](DOCUMENT.md) DoD
+- code style meets the [CODE_STYLE.md](CODE_STYLE.md) DoD
+- security-sensitive changes meet the [SECURITY.md](SECURITY.md) DoD
 - no known regression is left behind
