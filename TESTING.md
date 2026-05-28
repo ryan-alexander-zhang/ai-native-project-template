@@ -38,6 +38,15 @@ Integration tests should:
 - isolate their data
 - not depend on execution order
 
+### API
+
+Use API tests when the behavior is an HTTP contract or endpoint workflow and does not require full UI coverage.
+
+API tests should:
+- verify request and response behavior at the boundary
+- check status, shape, and key side effects
+- stay smaller and cheaper than E2E tests
+
 ### E2E
 
 Use E2E tests only for critical user flows, high-risk system flows, and smoke checks.
@@ -54,7 +63,8 @@ E2E tests should:
 | Docs-only change | Manually verify the edited text, links, commands, and examples. |
 | Pure logic change | Add or update relevant unit tests. |
 | Database or persistence change | Add or update relevant unit tests and integration tests. Verify migrations if schema changed. |
-| API, messaging, or async workflow change | Add or update the relevant unit and/or integration tests. Verify the contract or workflow behavior. |
+| API or HTTP contract change | Add or update the relevant API and/or integration tests. Verify the request, response, and key side effects. |
+| Messaging or async workflow change | Add or update the relevant unit and/or integration tests. Verify the contract or workflow behavior. |
 | Critical user or system flow change | Add or update the relevant tests and run an E2E or smoke check for the changed flow. |
 | Bug fix | Add or update a regression test that would have caught the bug. |
 | Refactor with no intended behavior change | Keep existing tests green. Add tests only if coverage is too weak to prove safety. |
