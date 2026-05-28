@@ -8,7 +8,7 @@ from pathlib import Path
 
 DECISION_ID_RE = re.compile(r"^decision-\d{5}-[a-z0-9-]+$")
 GENERIC_DOC_ID_RE = re.compile(
-    r"^(decision|idea|integration|memory|operation|plan|prd|record|spec|task|us)-\d{5}-[a-z0-9-]+$"
+    r"^(decision|idea|integration|issue|memory|operation|plan|prd|record|spec|task|user-story)-\d{5}-[a-z0-9-]+$"
 )
 DOC_RE = re.compile(r"^decision-(\d{5})-[a-z0-9-]+\.md$")
 NON_SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -28,6 +28,7 @@ DOC_DIR_BY_PREFIX = {
     "decision": "decision",
     "idea": "idea",
     "integration": "integration",
+    "issue": "issue",
     "memory": "memory",
     "operation": "operation",
     "plan": "plan",
@@ -35,8 +36,14 @@ DOC_DIR_BY_PREFIX = {
     "record": "record",
     "spec": "spec",
     "task": "task",
-    "us": "user-story",
+    "user-story": "user-story",
 }
+
+
+def doc_type_prefix(doc_id: str) -> str:
+    if doc_id.startswith("user-story-"):
+        return "user-story"
+    return doc_id.split("-", 1)[0]
 
 
 def slugify(value: str) -> str:
@@ -101,7 +108,7 @@ def replace_front_matter(content: str, front_matter: dict[str, str]) -> str:
 def doc_path_for_id(project_root: Path, doc_id: str) -> Path | None:
     if doc_id == "<id>":
         return None
-    prefix = doc_id.split("-", 1)[0]
+    prefix = doc_type_prefix(doc_id)
     folder = DOC_DIR_BY_PREFIX.get(prefix)
     if not folder:
         return None
@@ -111,7 +118,7 @@ def doc_path_for_id(project_root: Path, doc_id: str) -> Path | None:
 def is_valid_main_decision_parent(doc_id: str) -> bool:
     if not GENERIC_DOC_ID_RE.fullmatch(doc_id):
         return False
-    return doc_id.split("-", 1)[0] in MAIN_DECISION_PARENT_PREFIXES
+    return doc_type_prefix(doc_id) in MAIN_DECISION_PARENT_PREFIXES
 
 
 def title_from_body(body: str) -> str | None:
