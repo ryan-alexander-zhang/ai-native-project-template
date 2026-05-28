@@ -25,17 +25,17 @@ VALID_ROLES = {"main", "patch"}
 VALID_STATUSES = {"draft", "active", "archived"}
 MAIN_DECISION_PARENT_PREFIXES = {"idea", "prd", "spec"}
 DOC_DIR_BY_PREFIX = {
-    "decision": "decisions",
-    "idea": "ideas",
-    "integration": "integrations",
-    "memory": "memories",
-    "operation": "operations",
-    "plan": "plans",
-    "prd": "prds",
-    "record": "records",
-    "spec": "specs",
-    "task": "tasks",
-    "us": "user-stories",
+    "decision": "decision",
+    "idea": "idea",
+    "integration": "integration",
+    "memory": "memory",
+    "operation": "operation",
+    "plan": "plan",
+    "prd": "prd",
+    "record": "record",
+    "spec": "spec",
+    "task": "task",
+    "us": "user-story",
 }
 
 

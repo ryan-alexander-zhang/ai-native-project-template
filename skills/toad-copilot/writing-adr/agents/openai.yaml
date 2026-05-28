@@ -1,7 +1,7 @@
 interface:
   display_name: "Decision Record"
-  short_description: "Write a decision record in docs/decisions"
-  default_prompt: "Use $writing-adr to save this request in docs/decisions as the standard decision record."
+  short_description: "Write a decision record in docs/decision"
+  default_prompt: "Use $writing-adr to save this request in docs/decision as the standard decision record."
 
 policy:
   allow_implicit_invocation: true

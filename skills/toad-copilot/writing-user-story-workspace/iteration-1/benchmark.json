@@ -29,9 +29,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
-          "evidence": "Created docs/user-stories/us-00001-guest-checkout-without-account.md"
+          "evidence": "Created docs/user-story/us-00001-guest-checkout-without-account.md"
         },
         {
           "text": "The new file front matter has type us, role main, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-01.",
@@ -62,9 +62,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
-          "evidence": "Created docs/user-stories/us-00001-routing-high-risk-guest-checkout-orders-to-manual-review.md"
+          "evidence": "Created docs/user-story/us-00001-routing-high-risk-guest-checkout-orders-to-manual-review.md"
         },
         {
           "text": "The new file front matter has type us, role main, status active, parent prd-00020-checkout-redesign, and function_requirement_id FR-02.",
@@ -95,9 +95,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
-          "evidence": "Created docs/user-stories/us-00001-clarify-guest-checkout-confirmation-email-flow.md"
+          "evidence": "Created docs/user-story/us-00001-clarify-guest-checkout-confirmation-email-flow.md"
         },
         {
           "text": "The new file front matter has type us, role patch, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-03.",
@@ -128,9 +128,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
-          "evidence": "Created docs/user-stories/story-00020-fr-01-guest-checkout.md"
+          "evidence": "Created docs/user-story/story-00020-fr-01-guest-checkout.md"
         },
         {
           "text": "The new file front matter has type us, role main, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-01.",
@@ -161,9 +161,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
-          "evidence": "Created docs/user-stories/story-00020-fr-02-manual-review-routing.md"
+          "evidence": "Created docs/user-story/story-00020-fr-02-manual-review-routing.md"
         },
         {
           "text": "The new file front matter has type us, role main, status active, parent prd-00020-checkout-redesign, and function_requirement_id FR-02.",
@@ -194,9 +194,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
-          "evidence": "Created docs/user-stories/story-00020-fr-03-guest-checkout-confirmation-email-patch.md"
+          "evidence": "Created docs/user-story/story-00020-fr-03-guest-checkout-confirmation-email-patch.md"
         },
         {
           "text": "The new file front matter has type us, role patch, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-03.",

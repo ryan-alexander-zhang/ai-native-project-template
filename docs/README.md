@@ -28,18 +28,18 @@ function_requirement_id: <FR-id>
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - `type` should match the target folder:
-  - `analyses/` -> `analysis`
-  - `decisions/` -> `decision`
-  - `ideas/` -> `idea`
-  - `integrations/` -> `integration`
-  - `memories/` -> `memory`
-  - `operations/` -> `operation`
-  - `plans/` -> `plan`
-  - `prds/` -> `prd`
-  - `records/` -> `record`
-  - `specs/` -> `spec`
-  - `tasks/` -> `task`
-  - `user-stories/` -> `us`
+  - `analysis/` -> `analysis`
+  - `decision/` -> `decision`
+  - `idea/` -> `idea`
+  - `integration/` -> `integration`
+  - `memory/` -> `memory`
+  - `operation/` -> `operation`
+  - `plan/` -> `plan`
+  - `prd/` -> `prd`
+  - `record/` -> `record`
+  - `spec/` -> `spec`
+  - `task/` -> `task`
+  - `user-story/` -> `us`
 - `role: main` is the canonical document for a topic. `role: patch` extends that main document.
 - `status: draft` is work in progress. `status: active` is the current live version. `status: archived` is kept for history and is no longer the current live version.
 - `role: patch` means `parent` is the id of the main document.
@@ -51,44 +51,44 @@ function_requirement_id: <FR-id>
 
 ## Folders
 
-- `analyses/`: codebase and business analysis docs
-- `ideas/`: early ideas
-- `prds/`: product requirements
-- `decisions/`: durable decision records
-- `specs/`: engineering specs
-- `plans/`: implementation plans
-- `tasks/`: execution tasks
-- `integrations/`: third-party integration notes
-- `operations/`: runbooks and operations docs
-- `memories/`: reusable long-term knowledge
-- `records/`: reports and process records
-- `user-stories/`: user stories attached to PRD functional requirements
-- `references/`: external references
+- `analysis/`: codebase and business analysis docs
+- `idea/`: early ideas
+- `prd/`: product requirements
+- `decision/`: durable decision records
+- `spec/`: engineering specs
+- `plan/`: implementation plans
+- `task/`: execution tasks
+- `integration/`: third-party integration notes
+- `operation/`: runbook and operations docs
+- `memory/`: reusable long-term knowledge
+- `record/`: reports and process records
+- `user-story/`: user stories attached to PRD functional requirements
+- `reference/`: external references
 
 ## Read Order
 
 1. `ARCHITECTURE.md`
-2. `memories/`
-3. `analyses/`
-4. `decisions/`
-5. `specs/`
-6. `plans/`
-7. `tasks/`
-8. `operations/`
-9. `integrations/`
-10. `records/`
-11. `prds/`
-12. `user-stories/`
-13. `ideas/`
-14. `references/`
+2. `memory/`
+3. `analysis/`
+4. `decision/`
+5. `spec/`
+6. `plan/`
+7. `task/`
+8. `operation/`
+9. `integration/`
+10. `record/`
+11. `prd/`
+12. `user-story/`
+13. `idea/`
+14. `reference/`
 
 ## Rules
 
 - Keep one main version for one topic.
-- `specs` say what the system should do.
-- `plans` say how to do it.
-- Use `tasks` only for large plans.
-- Use `analyses` for exploratory codebase or business analysis that informs later docs.
+- `spec` says what the system should do.
+- `plan` says how to do it.
+- Use `task` only for large plans.
+- Use `analysis` for exploratory codebase or business analysis that informs later docs.
 - Write a decision record for major business, architecture, product-shape, or technology choices with real trade-offs.
-- Keep long-term knowledge in `memories/`.
-- Keep reports and evidence in `records/`.
+- Keep long-term knowledge in `memory/`.
+- Keep reports and evidence in `record/`.

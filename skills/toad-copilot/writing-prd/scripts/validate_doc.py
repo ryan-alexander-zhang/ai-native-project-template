@@ -165,13 +165,13 @@ def main() -> int:
             raise SystemExit(
                 f"{doc_path} has invalid parent for role=main: {parent}"
             )
-        validate_existing_doc(project_root, "ideas", parent)
+        validate_existing_doc(project_root, "idea", parent)
     else:
         if not PRD_ID_RE.fullmatch(parent):
             raise SystemExit(
                 f"{doc_path} has invalid parent for role=patch: {parent}"
             )
-        validate_existing_doc(project_root, "prds", parent)
+        validate_existing_doc(project_root, "prd", parent)
 
     validate_sections(doc_path, body)
     validate_placeholders(doc_path, body)

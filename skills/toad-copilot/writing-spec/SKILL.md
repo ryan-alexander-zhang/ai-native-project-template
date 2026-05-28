@@ -1,20 +1,20 @@
 ---
 name: writing-spec
 description: >
-  Save an engineering spec in `docs/specs` as the current project's standard spec.
+  Save an engineering spec in `docs/spec` as the current project's standard spec.
   Use this whenever the user wants a spec, technical spec, engineering design, behavior spec, or
-  wants to turn approved requirements into a durable engineering spec in `docs/specs`, even if
+  wants to turn approved requirements into a durable engineering spec in `docs/spec`, even if
   they do not explicitly say "spec". Use it both when the user needs help exploring 2-3
   implementation-shape approaches before choosing and when they want the final spec written with
   repo-standard front matter.
 compatibility: >
-  Requires python3, a POSIX environment, and write access to the target project's `docs/specs`.
+  Requires python3, a POSIX environment, and write access to the target project's `docs/spec`.
 ---
 
 # Writing Spec
 
 Use this skill when the user wants an engineering spec saved in the current project's
-`docs/specs`.
+`docs/spec`.
 
 ## What Counts As Spec Work
 
@@ -40,7 +40,7 @@ Do not use a spec for:
 - Use `status: draft` unless the user explicitly asks for `active` or `archived`.
 - A `main` spec must use a concrete `prd-*` parent.
 - A `patch` spec must use a concrete `spec-*` parent.
-- Specs live in `docs/specs`.
+- Specs live in `docs/spec`.
 - Do not use a bundled Markdown body template. Generate the file shell with `create_spec.py`, then
   write the body directly.
 - Do not impose a fixed section template on every spec. The structure should match the approved
@@ -170,7 +170,7 @@ If you find issues, fix them inline and rerun `validate_doc.py` before reporting
 
 ## Generated File
 
-By default the script saves to `docs/specs` in the current project. Use `--output-dir` only when
+By default the script saves to `docs/spec` in the current project. Use `--output-dir` only when
 the user explicitly wants a different location.
 
 - front matter with `id`, `type`, `role`, `status`, and `parent`

@@ -1,9 +1,9 @@
 {
   "expectations": [
     {
-      "text": "The run creates exactly one new markdown file under docs/prds.",
+      "text": "The run creates exactly one new markdown file under docs/prd.",
       "passed": true,
-      "evidence": "Created docs/prds/prd-00001-guided-repository-setup-flow.md"
+      "evidence": "Created docs/prd/prd-00001-guided-repository-setup-flow.md"
     },
     {
       "text": "The new file front matter has type prd, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",

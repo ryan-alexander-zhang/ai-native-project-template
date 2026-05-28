@@ -16,4 +16,4 @@ Use `TEMPLATE.md` for front matter.
 
 ## Note
 
-Before execution, move the content to `prds/` or `specs/`.
+Before execution, move the content to `prd/` or `spec/`.

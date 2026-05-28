@@ -1,9 +1,9 @@
 {
   "expectations": [
     {
-      "text": "The run creates exactly one new markdown file under docs/user-stories.",
+      "text": "The run creates exactly one new markdown file under docs/user-story.",
       "passed": true,
-      "evidence": "Created docs/user-stories/story-00020-fr-02-manual-review-routing.md"
+      "evidence": "Created docs/user-story/story-00020-fr-02-manual-review-routing.md"
     },
     {
       "text": "The new file front matter has type us, role main, status active, parent prd-00020-checkout-redesign, and function_requirement_id FR-02.",

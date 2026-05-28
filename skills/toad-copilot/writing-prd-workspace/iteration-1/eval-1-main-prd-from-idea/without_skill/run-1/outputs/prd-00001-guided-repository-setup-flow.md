@@ -68,7 +68,7 @@ The first version should collect only the inputs needed to generate a useful bas
 The guided flow should be able to create a baseline set of outputs such as:
 
 - Root-level onboarding and context files, such as `README.md` and `AGENTS.md`.
-- Documentation directories for project planning, such as `docs/ideas`, `docs/prds`, and `docs/user-stories`.
+- Documentation directories for project planning, such as `docs/idea`, `docs/prd`, and `docs/user-story`.
 - Any minimal placeholder files needed so the generated structure is immediately usable.
 
 The exact output list may vary by project type, but the first version should stay opinionated and small.

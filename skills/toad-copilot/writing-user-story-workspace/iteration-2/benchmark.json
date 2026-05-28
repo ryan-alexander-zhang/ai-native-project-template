@@ -32,7 +32,7 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
           "evidence": "Found 1 markdown output file(s): ['us-00001-guest-checkout-without-account-creation.md']"
         },
@@ -65,7 +65,7 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
           "evidence": "Found 1 markdown output file(s): ['us-00001-high-risk-guest-checkout-manual-review.md']"
         },
@@ -98,7 +98,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories.",
+          "text": "The run does not create any markdown files under docs/user-story.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -131,7 +131,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories.",
+          "text": "The run does not create any markdown files under docs/user-story.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -164,7 +164,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories.",
+          "text": "The run does not create any markdown files under docs/user-story.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -197,7 +197,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories beyond the existing fixture file.",
+          "text": "The run does not create any markdown files under docs/user-story beyond the existing fixture file.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -230,7 +230,7 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
           "evidence": "Found 1 markdown output file(s): ['us-00001-guest-checkout-without-account.md']"
         },
@@ -263,7 +263,7 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/user-stories.",
+          "text": "The run creates exactly one new markdown file under docs/user-story.",
           "passed": true,
           "evidence": "Found 1 markdown output file(s): ['us-00001-route-high-risk-guest-orders-to-manual-review.md']"
         },
@@ -296,7 +296,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories.",
+          "text": "The run does not create any markdown files under docs/user-story.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -329,7 +329,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories.",
+          "text": "The run does not create any markdown files under docs/user-story.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -362,7 +362,7 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories.",
+          "text": "The run does not create any markdown files under docs/user-story.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
@@ -395,19 +395,19 @@
       },
       "expectations": [
         {
-          "text": "The run does not create any markdown files under docs/user-stories beyond the existing fixture file.",
+          "text": "The run does not create any markdown files under docs/user-story beyond the existing fixture file.",
           "passed": true,
           "evidence": "Found 0 markdown output file(s): []"
         },
         {
           "text": "The final reply shows an execution plan for FR-01.",
           "passed": true,
-          "evidence": "last_message.txt: 'Execution plan for `prd-00020-checkout-redesign` / `FR-01`:\\n\\n1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.\\n2. Check `docs/user-stories` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-'"
+          "evidence": "last_message.txt: 'Execution plan for `prd-00020-checkout-redesign` / `FR-01`:\\n\\n1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.\\n2. Check `docs/user-story` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-'"
         },
         {
           "text": "The execution plan marks FR-01 with role patch.",
           "passed": true,
-          "evidence": "last_message.txt: 'Execution plan for `prd-00020-checkout-redesign` / `FR-01`:\\n\\n1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.\\n2. Check `docs/user-stories` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-'"
+          "evidence": "last_message.txt: 'Execution plan for `prd-00020-checkout-redesign` / `FR-01`:\\n\\n1. Confirm `prd-00020-checkout-redesign` exists and that `FR-01` appears exactly once in that PRD.\\n2. Check `docs/user-story` for an existing story already linked to `parent: prd-00020-checkout-redesign` and `function_requirement_id: FR-'"
         }
       ],
       "notes": []

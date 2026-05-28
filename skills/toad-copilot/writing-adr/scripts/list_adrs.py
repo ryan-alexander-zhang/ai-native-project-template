@@ -10,7 +10,7 @@ from common import DOC_RE, find_project_root, read_front_matter_and_body, title_
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="List decision records in docs/decisions.")
+    parser = argparse.ArgumentParser(description="List decision records in docs/decision.")
     parser.add_argument(
         "--status",
         choices=["draft", "active", "archived"],
@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def list_adrs(project_root: Path, status: str | None) -> list[dict[str, str]]:
-    adrs_dir = project_root / "docs" / "decisions"
+    adrs_dir = project_root / "docs" / "decision"
     if not adrs_dir.exists():
         return []
 

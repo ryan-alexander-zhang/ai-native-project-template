@@ -38,7 +38,7 @@ def resolve_target(target: str) -> Path:
         raise ValueError("target must be a decision id like decision-00001-example or a file path")
 
     project_root = find_project_root(Path.cwd())
-    return (project_root / "docs" / "decisions" / f"{target}.md").resolve()
+    return (project_root / "docs" / "decision" / f"{target}.md").resolve()
 
 
 def upsert_archive_note(body: str, note: str) -> str:

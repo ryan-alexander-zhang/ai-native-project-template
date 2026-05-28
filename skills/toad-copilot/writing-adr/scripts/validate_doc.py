@@ -63,7 +63,7 @@ def validate_decision(doc_path: Path) -> tuple[dict[str, str], str]:
             raise ValueError(
                 f"{resolved_path} has invalid parent for role=patch: {parent}"
             )
-        parent_path = project_root / "docs" / "decisions" / f"{parent}.md"
+        parent_path = project_root / "docs" / "decision" / f"{parent}.md"
         if not parent_path.exists():
             raise ValueError(f"parent does not exist: {parent_path}")
     else:

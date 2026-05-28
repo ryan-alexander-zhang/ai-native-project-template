@@ -1,7 +1,7 @@
 interface:
   display_name: "User Story"
-  short_description: "Write a user story in docs/user-stories"
-  default_prompt: "Use $writing-user-story to save this request in docs/user-stories as a user story tied to the right PRD and FR."
+  short_description: "Write a user story in docs/user-story"
+  default_prompt: "Use $writing-user-story to save this request in docs/user-story as a user story tied to the right PRD and FR."
 
 policy:
   allow_implicit_invocation: true

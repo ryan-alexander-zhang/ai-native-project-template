@@ -1,4 +1,4 @@
-Created the user story for `FR-01` under `project/docs/user-stories/us-00001-guest-checkout-without-account-creation.md` using the `writing-user-story` workflow: planned against `prd-00020-checkout-redesign`, resolved the role as `main`, generated the scaffold, and filled it with concrete acceptance criteria and definition of done for guest checkout without account creation.
+Created the user story for `FR-01` under `project/docs/user-story/us-00001-guest-checkout-without-account-creation.md` using the `writing-user-story` workflow: planned against `prd-00020-checkout-redesign`, resolved the role as `main`, generated the scaffold, and filled it with concrete acceptance criteria and definition of done for guest checkout without account creation.
 
 Output files saved:
 - `/Users/ryan/GitHubProjects/ryan-alexander-zhang/toad-copilot/skills/toad-copilot/writing-user-story-workspace/iteration-2/eval-1-explicit-single-fr-main/new_skill/run-1/outputs/us-00001-guest-checkout-without-account-creation.md`

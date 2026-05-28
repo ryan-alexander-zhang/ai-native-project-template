@@ -1,9 +1,9 @@
 {
   "eval_id": 3,
   "eval_name": "eval-3-patch-user-story",
-  "prompt": "Add a patch user story in docs/user-stories for FR-03 in prd-00020-checkout-redesign to clarify the guest checkout confirmation email flow.",
+  "prompt": "Add a patch user story in docs/user-story for FR-03 in prd-00020-checkout-redesign to clarify the guest checkout confirmation email flow.",
   "assertions": [
-    "The run creates exactly one new markdown file under docs/user-stories.",
+    "The run creates exactly one new markdown file under docs/user-story.",
     "The new file front matter has type us, role patch, status draft, parent prd-00020-checkout-redesign, and function_requirement_id FR-03.",
     "The new file includes the User Story, Acceptance Criteria, and Definition of Done sections with at least three AC-xx checklist items."
   ]

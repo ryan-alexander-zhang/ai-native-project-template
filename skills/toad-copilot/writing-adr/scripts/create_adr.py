@@ -11,7 +11,7 @@ from common import DECISION_ID_RE, DOC_RE, doc_path_for_id, find_project_root, i
 
 
 def default_output_dir() -> Path:
-    return find_project_root(Path.cwd()) / "docs" / "decisions"
+    return find_project_root(Path.cwd()) / "docs" / "decision"
 
 
 def template_path() -> Path:
@@ -61,7 +61,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=default_output_dir(),
-        help="Directory where decision records are stored. Defaults to <current project>/docs/decisions",
+        help="Directory where decision records are stored. Defaults to <current project>/docs/decision",
     )
     parser.add_argument(
         "--json",
@@ -81,7 +81,7 @@ def validate_parent(project_root: Path, role: str, parent: str | None) -> None:
             raise SystemExit(
                 "for role=patch, parent must be a decision id like decision-00001-example-decision"
             )
-        parent_path = project_root / "docs" / "decisions" / f"{parent}.md"
+        parent_path = project_root / "docs" / "decision" / f"{parent}.md"
         if not parent_path.exists():
             raise SystemExit(f"parent decision not found: {parent_path}")
         return

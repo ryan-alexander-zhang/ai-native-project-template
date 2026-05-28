@@ -3,20 +3,20 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Save this idea in docs/ideas: a voice journaling app that turns daily reflections into weekly summaries.",
-      "expected_output": "A new markdown file under docs/ideas with the standard front matter and idea brief template filled in.",
+      "prompt": "Save this idea in docs/idea: a voice journaling app that turns daily reflections into weekly summaries.",
+      "expected_output": "A new markdown file under docs/idea with the standard front matter and idea brief template filled in.",
       "files": []
     },
     {
       "id": 2,
       "prompt": "Create an active idea brief for a finance copilot that compares vendor quotes. Use parent idea-00010-vendor-ops.",
-      "expected_output": "A new markdown file under docs/ideas with status active, parent idea-00010-vendor-ops, and the standard template filled in.",
+      "expected_output": "A new markdown file under docs/idea with status active, parent idea-00010-vendor-ops, and the standard template filled in.",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "write this up in docs/ideas: sms waitlist concierge for independent restaurants",
-      "expected_output": "A concise idea brief saved under docs/ideas even though the prompt is informal.",
+      "prompt": "write this up in docs/idea: sms waitlist concierge for independent restaurants",
+      "expected_output": "A concise idea brief saved under docs/idea even though the prompt is informal.",
       "files": []
     }
   ]

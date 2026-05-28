@@ -17,4 +17,4 @@ Use `TEMPLATE.md` for front matter.
 
 ## Note
 
-If a plan is small, do not split it into `tasks/`.
+If a plan is small, do not split it into `task/`.

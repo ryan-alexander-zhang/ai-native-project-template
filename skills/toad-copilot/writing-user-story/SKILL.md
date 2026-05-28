@@ -1,16 +1,16 @@
 ---
 name: writing-user-story
 description: >
-  Save a user story in `docs/user-stories` as the current project's standard user story.
+  Save a user story in `docs/user-story` as the current project's standard user story.
   Use this whenever the user wants a user story, acceptance criteria for a PRD functional
   requirement, or wants to break a PRD requirement into an executable story, even if they do not
   explicitly say "user story".
-compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/user-stories`.
+compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/user-story`.
 ---
 
 # Writing User Story
 
-Use this skill when the user wants a user story saved in the current project's `docs/user-stories`.
+Use this skill when the user wants a user story saved in the current project's `docs/user-story`.
 
 ## Defaults
 
@@ -48,7 +48,7 @@ Use this skill when the user wants a user story saved in the current project's `
 
 ## Generated File
 
-By default the script saves to `docs/user-stories` in the current project. Use `--output-dir` only
+By default the script saves to `docs/user-story` in the current project. Use `--output-dir` only
 when the user explicitly wants a different location.
 
 - front matter with `id`, `type`, `role`, `status`, `parent`, and `function_requirement_id`

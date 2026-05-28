@@ -29,9 +29,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "text": "The run creates exactly one new markdown file under docs/prd.",
           "passed": true,
-          "evidence": "Created docs/prds/prd-00001-guided-repository-setup-flow.md"
+          "evidence": "Created docs/prd/prd-00001-guided-repository-setup-flow.md"
         },
         {
           "text": "The new file front matter has type prd, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
@@ -62,9 +62,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "text": "The run creates exactly one new markdown file under docs/prd.",
           "passed": true,
-          "evidence": "Created docs/prds/prd-00001-vendor-quote-comparison-copilot.md"
+          "evidence": "Created docs/prd/prd-00001-vendor-quote-comparison-copilot.md"
         },
         {
           "text": "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",
@@ -95,9 +95,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "text": "The run creates exactly one new markdown file under docs/prd.",
           "passed": true,
-          "evidence": "Created docs/prds/prd-00021-manual-review-high-risk-guest-checkout-orders.md"
+          "evidence": "Created docs/prd/prd-00021-manual-review-high-risk-guest-checkout-orders.md"
         },
         {
           "text": "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",
@@ -128,9 +128,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "text": "The run creates exactly one new markdown file under docs/prd.",
           "passed": true,
-          "evidence": "Created docs/prds/prd-00001-guided-repository-setup-flow.md"
+          "evidence": "Created docs/prd/prd-00001-guided-repository-setup-flow.md"
         },
         {
           "text": "The new file front matter has type prd, role main, status draft, and parent idea-00001-project-bootstrap-copilot.",
@@ -161,9 +161,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "text": "The run creates exactly one new markdown file under docs/prd.",
           "passed": true,
-          "evidence": "Created docs/prds/prd-00010-vendor-quote-comparison-copilot.md"
+          "evidence": "Created docs/prd/prd-00010-vendor-quote-comparison-copilot.md"
         },
         {
           "text": "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",
@@ -194,9 +194,9 @@
       },
       "expectations": [
         {
-          "text": "The run creates exactly one new markdown file under docs/prds.",
+          "text": "The run creates exactly one new markdown file under docs/prd.",
           "passed": true,
-          "evidence": "Created docs/prds/prd-00020-patch-01-high-risk-guest-checkout-manual-review.md"
+          "evidence": "Created docs/prd/prd-00020-patch-01-high-risk-guest-checkout-manual-review.md"
         },
         {
           "text": "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",

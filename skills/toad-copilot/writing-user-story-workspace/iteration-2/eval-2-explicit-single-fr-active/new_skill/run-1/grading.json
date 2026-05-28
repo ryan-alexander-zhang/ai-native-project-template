@@ -1,7 +1,7 @@
 {
   "expectations": [
     {
-      "text": "The run creates exactly one new markdown file under docs/user-stories.",
+      "text": "The run creates exactly one new markdown file under docs/user-story.",
       "passed": true,
       "evidence": "Found 1 markdown output file(s): ['us-00001-high-risk-guest-checkout-manual-review.md']"
     },

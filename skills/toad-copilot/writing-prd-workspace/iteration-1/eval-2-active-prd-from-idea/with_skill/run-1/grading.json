@@ -1,9 +1,9 @@
 {
   "expectations": [
     {
-      "text": "The run creates exactly one new markdown file under docs/prds.",
+      "text": "The run creates exactly one new markdown file under docs/prd.",
       "passed": true,
-      "evidence": "Created docs/prds/prd-00001-vendor-quote-comparison-copilot.md"
+      "evidence": "Created docs/prd/prd-00001-vendor-quote-comparison-copilot.md"
     },
     {
       "text": "The new file front matter has type prd, role main, status active, and parent idea-00010-vendor-ops.",

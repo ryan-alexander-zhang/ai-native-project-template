@@ -104,7 +104,7 @@ def main() -> int:
     if not PRD_ID_RE.fullmatch(parent):
         raise SystemExit(f"{doc_path} has invalid PRD parent: {parent}")
 
-    parent_path = project_root / "docs" / "prds" / f"{parent}.md"
+    parent_path = project_root / "docs" / "prd" / f"{parent}.md"
     if not parent_path.exists():
         raise SystemExit(f"parent does not exist: {parent_path}")
 

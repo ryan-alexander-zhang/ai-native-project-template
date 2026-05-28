@@ -41,7 +41,7 @@ def find_project_root(start: Path) -> Path:
 
 
 def default_output_dir() -> Path:
-    return find_project_root(Path.cwd()) / "docs" / "user-stories"
+    return find_project_root(Path.cwd()) / "docs" / "user-story"
 
 
 def template_path() -> Path:
@@ -104,7 +104,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=default_output_dir(),
-        help="Directory where user stories are stored. Defaults to <current project>/docs/user-stories",
+        help="Directory where user stories are stored. Defaults to <current project>/docs/user-story",
     )
     parser.add_argument(
         "--json",
@@ -129,7 +129,7 @@ def validate_function_requirement_id(function_requirement_id: str) -> None:
 
 
 def validate_parent_prd(project_root: Path, parent: str, function_requirement_id: str) -> None:
-    prd_path = project_root / "docs" / "prds" / f"{parent}.md"
+    prd_path = project_root / "docs" / "prd" / f"{parent}.md"
     if not prd_path.exists():
         raise SystemExit(f"parent PRD not found: {prd_path}")
 

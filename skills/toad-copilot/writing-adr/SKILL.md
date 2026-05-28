@@ -1,22 +1,22 @@
 ---
 name: writing-adr
 description: >
-  Capture a major decision in `docs/decisions` as the current project's standard decision record.
+  Capture a major decision in `docs/decision` as the current project's standard decision record.
   Use this whenever the user wants a decision record, architecture decision, business choice
   record, technical trade-off record, stack selection note, or needs to document why one important
   option beat other plausible alternatives. Use it both when the user wants to record a decision
   and when they need help exploring 2-3 viable approaches before choosing, even if they do not
   explicitly say "decision record".
-compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/decisions`.
+compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/decision`.
 ---
 
 # Writing Decision Records
 
 This skill keeps the historical `writing-adr` name for compatibility, but the repo convention is
-now a broader decision-record system under `docs/decisions`.
+now a broader decision-record system under `docs/decision`.
 
 Use this skill when the user wants to record a significant decision in the current project's
-`docs/decisions`.
+`docs/decision`.
 
 ## What Counts As Decision-Worthy
 
@@ -91,7 +91,7 @@ greenfield state, not a blocker.
 
 ## Drafting Principles
 
-- Read existing decision records in `docs/decisions` first when the new decision might overlap with prior decisions.
+- Read existing decision records in `docs/decision` first when the new decision might overlap with prior decisions.
 - If no decision records exist yet, say so briefly only when helpful and continue with the parent doc and nearby repo context.
 - Read the parent doc when a parent is provided, and scan nearby code or docs if they constrain the decision.
 - Use the Nygard structure, but write strong content inside it:

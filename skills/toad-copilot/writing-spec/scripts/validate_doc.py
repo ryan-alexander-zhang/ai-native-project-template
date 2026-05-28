@@ -128,11 +128,11 @@ def main() -> int:
     if front_matter["role"] == "main":
         if not PRD_ID_RE.fullmatch(parent):
             raise SystemExit(f"{doc_path} has invalid parent for role=main: {parent}")
-        validate_existing_doc(project_root, "prds", parent)
+        validate_existing_doc(project_root, "prd", parent)
     else:
         if not SPEC_ID_RE.fullmatch(parent):
             raise SystemExit(f"{doc_path} has invalid parent for role=patch: {parent}")
-        validate_existing_doc(project_root, "specs", parent)
+        validate_existing_doc(project_root, "spec", parent)
 
     validate_title(doc_path, body)
     validate_nonempty_body(doc_path, body)

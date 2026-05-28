@@ -65,12 +65,12 @@ protected markers for future safe updates.
 2. In `update` mode, read repo-root `ARCHITECTURE.md` first.
 3. Read `docs/README.md` to understand repo documentation order and conventions.
 4. Read durable design docs before inspecting implementation details. At minimum, inspect:
-   - active `docs/decisions`
-   - relevant `docs/prds`
-   - relevant `docs/specs`
-   - relevant `docs/plans`
-   - relevant `docs/user-stories`
-   - related `docs/ideas`
+   - active `docs/decision`
+   - relevant `docs/prd`
+   - relevant `docs/spec`
+   - relevant `docs/plan`
+   - relevant `docs/user-story`
+   - related `docs/idea`
    - other durable repo docs in `docs/` that define scope, boundaries, workflows, or constraints
 5. Build a document-first view of the intended architecture before scanning the repo. For each
    candidate section, ask:

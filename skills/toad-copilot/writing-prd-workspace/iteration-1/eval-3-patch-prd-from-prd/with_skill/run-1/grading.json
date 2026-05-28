@@ -1,9 +1,9 @@
 {
   "expectations": [
     {
-      "text": "The run creates exactly one new markdown file under docs/prds.",
+      "text": "The run creates exactly one new markdown file under docs/prd.",
       "passed": true,
-      "evidence": "Created docs/prds/prd-00021-manual-review-high-risk-guest-checkout-orders.md"
+      "evidence": "Created docs/prd/prd-00021-manual-review-high-risk-guest-checkout-orders.md"
     },
     {
       "text": "The new file front matter has type prd, role patch, status draft, and parent prd-00020-checkout-redesign.",

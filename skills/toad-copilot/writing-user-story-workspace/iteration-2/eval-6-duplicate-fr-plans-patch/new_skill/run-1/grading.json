@@ -1,7 +1,7 @@
 {
   "expectations": [
     {
-      "text": "The run does not create any markdown files under docs/user-stories beyond the existing fixture file.",
+      "text": "The run does not create any markdown files under docs/user-story beyond the existing fixture file.",
       "passed": true,
       "evidence": "Found 0 markdown output file(s): []"
     },

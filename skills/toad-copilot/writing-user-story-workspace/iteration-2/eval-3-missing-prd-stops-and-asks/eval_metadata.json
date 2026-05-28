@@ -1,9 +1,9 @@
 {
   "eval_id": 3,
   "eval_name": "missing-prd-stops-and-asks",
-  "prompt": "Write a user story in docs/user-stories for the guest checkout redesign. I did not include the parent PRD yet, so ask me for it and stop.",
+  "prompt": "Write a user story in docs/user-story for the guest checkout redesign. I did not include the parent PRD yet, so ask me for it and stop.",
   "assertions": [
-    "The run does not create any markdown files under docs/user-stories.",
+    "The run does not create any markdown files under docs/user-story.",
     "The final reply asks the user to provide the parent PRD id.",
     "The final reply does not guess a functional requirement from feature text."
   ]

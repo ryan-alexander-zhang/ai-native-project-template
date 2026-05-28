@@ -3,11 +3,11 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Write a draft decision record in docs/decisions for adopting a guided repository bootstrap workflow for new projects. Use parent prd-00001-project-bootstrap-copilot.",
+      "prompt": "Write a draft decision record in docs/decision for adopting a guided repository bootstrap workflow for new projects. Use parent prd-00001-project-bootstrap-copilot.",
       "expected_output": "An initial response that frames the decision, presents A/B/C options with trade-offs, recommends one option for this repo, and asks the user to choose before any decision file is drafted.",
       "files": [
         "evals/files/AGENTS.md",
-        "evals/files/docs/prds/prd-00001-project-bootstrap-copilot.md"
+        "evals/files/docs/prd/prd-00001-project-bootstrap-copilot.md"
       ],
       "expectations": [
         "The first response does not draft a decision file before the user chooses a direction.",
@@ -20,7 +20,7 @@
     },
     {
       "id": 2,
-      "prompt": "Create an active decision record in docs/decisions for using decision records to capture major technical decisions in this repo. If there is no valid parent doc yet, tell me what is missing before drafting.",
+      "prompt": "Create an active decision record in docs/decision for using decision records to capture major technical decisions in this repo. If there is no valid parent doc yet, tell me what is missing before drafting.",
       "expected_output": "An initial response that refuses to draft without a concrete upstream parent and asks for or helps identify the missing parent before proceeding.",
       "files": [
         "evals/files/AGENTS.md"
@@ -34,14 +34,14 @@
     },
     {
       "id": 3,
-      "prompt": "Add a patch decision record in docs/decisions to decision-00020-checkout-risk-review that clarifies when suspicious guest checkout orders require manual review.",
-      "expected_output": "A new patch decision saved under docs/decisions with parent decision-00020-checkout-risk-review and the standard decision structure.",
+      "prompt": "Add a patch decision record in docs/decision to decision-00020-checkout-risk-review that clarifies when suspicious guest checkout orders require manual review.",
+      "expected_output": "A new patch decision saved under docs/decision with parent decision-00020-checkout-risk-review and the standard decision structure.",
       "files": [
         "evals/files/AGENTS.md",
-        "evals/files/docs/decisions/decision-00020-checkout-risk-review.md"
+        "evals/files/docs/decision/decision-00020-checkout-risk-review.md"
       ],
       "expectations": [
-        "The run creates exactly one new markdown file under docs/decisions.",
+        "The run creates exactly one new markdown file under docs/decision.",
         "The new file front matter has type decision, role patch, status draft, and parent decision-00020-checkout-risk-review.",
         "The new file includes Context, Decision, and Consequences sections with concrete content.",
         "The Context names the existing decision being clarified, and the Consequences include at least one downside."

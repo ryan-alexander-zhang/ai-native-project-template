@@ -52,7 +52,7 @@ def find_project_root(start: Path) -> Path:
 
 
 def default_output_dir() -> Path:
-    return find_project_root(Path.cwd()) / "docs" / "specs"
+    return find_project_root(Path.cwd()) / "docs" / "spec"
 
 
 def render_document(
@@ -110,7 +110,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=default_output_dir(),
-        help="Directory where specs are stored. Defaults to <current project>/docs/specs",
+        help="Directory where specs are stored. Defaults to <current project>/docs/spec",
     )
     parser.add_argument(
         "--json",

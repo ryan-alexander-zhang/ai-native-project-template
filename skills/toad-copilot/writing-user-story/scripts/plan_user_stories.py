@@ -89,7 +89,7 @@ def parse_selection(raw_selection: str) -> list[str]:
 
 
 def existing_story_matches(project_root: Path, parent: str) -> dict[str, list[str]]:
-    user_story_dir = project_root / "docs" / "user-stories"
+    user_story_dir = project_root / "docs" / "user-story"
     matches: dict[str, list[str]] = {}
     if not user_story_dir.exists():
         return matches
@@ -131,7 +131,7 @@ def main() -> int:
         raise SystemExit("parent must be a PRD id like prd-00020-checkout-redesign")
 
     project_root = find_project_root(Path.cwd())
-    prd_path = project_root / "docs" / "prds" / f"{args.parent}.md"
+    prd_path = project_root / "docs" / "prd" / f"{args.parent}.md"
     if not prd_path.exists():
         raise SystemExit(f"parent PRD not found: {prd_path}")
 

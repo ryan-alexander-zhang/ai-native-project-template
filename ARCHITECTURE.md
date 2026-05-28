@@ -21,12 +21,12 @@ checked-in structure is primarily documentation, repo-local skills, and helper s
 ```text
 .
 ├── docs/
-│   ├── decisions/
-│   ├── ideas/
-│   ├── plans/
-│   ├── prds/
-│   ├── specs/
-│   └── user-stories/
+│   ├── decision/
+│   ├── idea/
+│   ├── plan/
+│   ├── prd/
+│   ├── spec/
+│   └── user-story/
 ├── skills/toad-copilot/
 │   ├── writing-adr/
 │   ├── writing-architecture/
@@ -79,7 +79,7 @@ independent so later frontends can reuse it without duplicating workflow logic.
 ### Current Repository Components
 
 - `Durable design docs`: the repo currently captures product and architecture intent in
-  `docs/ideas`, `docs/prds`, `docs/decisions`, `docs/specs`, `docs/plans`, and `docs/user-stories`.
+  `docs/idea`, `docs/prd`, `docs/decision`, `docs/spec`, `docs/plan`, and `docs/user-story`.
 - `Repo-local writing skills`: `skills/toad-copilot/*` packages the skill instructions, templates,
   eval fixtures, and helper scripts used to maintain those durable docs.
 - `Helper scripts and installer`: Python scripts under individual skills scaffold or validate docs,

@@ -1,16 +1,16 @@
 ---
 name: writing-idea-brief
 description: >
-  Save a product, feature, or startup idea into `docs/ideas` as the current project's standard
+  Save a product, feature, or startup idea into `docs/idea` as the current project's standard
   idea brief.
   Use this whenever the user wants to save an idea, write up a concept, or put something in
-  `docs/ideas`, even if they do not explicitly say "idea brief".
-compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/ideas`.
+  `docs/idea`, even if they do not explicitly say "idea brief".
+compatibility: Requires python3, a POSIX environment, and write access to the target project's `docs/idea`.
 ---
 
 # Writing Idea Brief
 
-Use this skill when the user wants a new idea brief saved in the current project's `docs/ideas`.
+Use this skill when the user wants a new idea brief saved in the current project's `docs/idea`.
 
 ## Defaults
 
@@ -32,7 +32,7 @@ Use this skill when the user wants a new idea brief saved in the current project
 
 ## Generated File
 
-By default the script saves to `docs/ideas` in the current project. Use `--output-dir` only when
+By default the script saves to `docs/idea` in the current project. Use `--output-dir` only when
 the user explicitly wants a different location.
 
 - front matter with `id`, `type`, `role`, `status`, and `parent`

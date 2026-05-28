@@ -1,17 +1,17 @@
 ---
 name: writing-prd
 description: >
-  Save a PRD in `docs/prds` as the current project's standard PRD.
+  Save a PRD in `docs/prd` as the current project's standard PRD.
   Use this whenever the user wants a PRD, product requirements doc, wants to turn an idea into
   scoped requirements, wants to define `FR-xx` functional requirements, or wants to add a patch to
   an existing PRD, even if they do not explicitly say "PRD".
 compatibility: >
-  Requires python3, a POSIX environment, and write access to the target project's `docs/prds`.
+  Requires python3, a POSIX environment, and write access to the target project's `docs/prd`.
 ---
 
 # Writing PRD
 
-Use this skill when the user wants a PRD saved in the current project's `docs/prds`.
+Use this skill when the user wants a PRD saved in the current project's `docs/prd`.
 
 ## Defaults
 
@@ -87,7 +87,7 @@ If you find issues, fix them inline and rerun `validate_doc.py` before reporting
 
 ## Generated File
 
-By default the script saves to `docs/prds` in the current project. Use `--output-dir` only when
+By default the script saves to `docs/prd` in the current project. Use `--output-dir` only when
 the user explicitly wants a different location.
 
 - front matter with `id`, `type`, `role`, `status`, and `parent`
