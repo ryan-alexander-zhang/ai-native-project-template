@@ -56,6 +56,15 @@ E2E tests should:
 - cover the full happy path first
 - cover only the most valuable failure paths
 
+## Test Level Guides
+
+Use the following docs to define the project-specific framework choice for each test level.
+
+- [UNIT_TESTING.md](UNIT_TESTING.md): fill in the unit testing guide for this repo.
+- [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md): fill in the integration testing guide for this repo.
+- [API_TESTING.md](API_TESTING.md): fill in the API testing guide for this repo.
+- [E2E_TESTING.md](E2E_TESTING.md): fill in the E2E testing guide for this repo.
+
 ## Testing Matrix
 
 | Change type | Minimum requirement |
