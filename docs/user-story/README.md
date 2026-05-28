@@ -3,11 +3,13 @@
 This directory stores user story documents.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - user stories attached to a PRD
 - acceptance criteria for one functional requirement
 - definition of done for that story
+
+Add more when useful.
 
 ## Exclude
 
@@ -18,5 +20,5 @@ Use `TEMPLATE.md` for front matter.
 ## Note
 
 Each user story file uses a PRD id as `parent` and a `function_requirement_id` that matches a
-unique `FR-xx` item in that PRD. User story front matter uses `type: us`, and ids and filenames use
-the `us-00001-...` prefix.
+unique `FR-xx` item in that PRD. User story front matter uses `type: user-story`, and ids and
+filenames use the `user-story-00001-...` prefix.

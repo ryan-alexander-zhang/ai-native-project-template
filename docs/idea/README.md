@@ -3,11 +3,13 @@
 This directory stores early ideas.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - product ideas
 - problem statements
 - early value judgment
+
+Add more when useful.
 
 ## Exclude
 

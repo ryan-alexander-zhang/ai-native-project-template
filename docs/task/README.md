@@ -3,12 +3,14 @@
 This directory stores execution tasks from plans.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - executable task lists
 - order and dependencies
 - subtask split
 - acceptance checklist
+
+Add more when useful.
 
 ## Exclude
 

@@ -3,7 +3,7 @@
 This directory stores product requirement documents.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - one-line summary
 - vision and goals
@@ -12,6 +12,8 @@ Use `TEMPLATE.md` for front matter.
 - functional requirements with unique `FR-xx` ids
 - user experience expectations
 - risks and dependencies
+
+Add more when useful.
 
 ## Exclude
 

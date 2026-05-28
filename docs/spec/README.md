@@ -3,13 +3,15 @@
 This directory stores engineering specs.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - feature boundaries
 - behavior constraints
 - inputs and outputs
 - states and rules
 - non-functional requirements
+
+Add more when useful.
 
 ## Exclude
 

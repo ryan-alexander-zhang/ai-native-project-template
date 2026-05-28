@@ -3,13 +3,15 @@
 This directory stores process records and reports.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - test reports
 - review records
 - acceptance records
 - retrospectives
 - research conclusions
+
+Add more when useful.
 
 ## Exclude
 

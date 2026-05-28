@@ -1,6 +1,6 @@
 ---
-id: us-00001-example-slug
-type: us
+id: user-story-00001-example-slug
+type: user-story
 role: main|patch
 status: draft|active|archived
 parent: <id>

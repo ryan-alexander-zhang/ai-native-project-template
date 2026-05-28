@@ -2,12 +2,14 @@
 
 This directory stores external reference materials.
 
-## Include
+## Must Include
 
 - external links
 - paper or article summaries
 - official doc excerpts
 - benchmark research
+
+Add more when useful.
 
 ## Exclude
 

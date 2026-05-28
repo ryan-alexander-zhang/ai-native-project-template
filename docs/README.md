@@ -9,7 +9,7 @@ Every main doc and patch doc should start with:
 ```md
 ---
 id: spec-00001-doc-front-matter
-type: analysis|decision|idea|integration|memory|operation|plan|prd|record|spec|task|us
+type: analysis|decision|idea|integration|memory|operation|plan|prd|record|spec|task|user-story
 role: main|patch
 status: draft|active|archived
 parent: <id>
@@ -18,7 +18,7 @@ parent: <id>
 
 Write the document description or comment after the front matter.
 
-`us` docs also include:
+`user-story` docs also include:
 
 ```md
 function_requirement_id: <FR-id>
@@ -27,27 +27,14 @@ function_requirement_id: <FR-id>
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
-- `type` should match the target folder:
-  - `analysis/` -> `analysis`
-  - `decision/` -> `decision`
-  - `idea/` -> `idea`
-  - `integration/` -> `integration`
-  - `memory/` -> `memory`
-  - `operation/` -> `operation`
-  - `plan/` -> `plan`
-  - `prd/` -> `prd`
-  - `record/` -> `record`
-  - `spec/` -> `spec`
-  - `task/` -> `task`
-  - `user-story/` -> `us`
 - `role: main` is the canonical document for a topic. `role: patch` extends that main document.
 - `status: draft` is work in progress. `status: active` is the current live version. `status: archived` is kept for history and is no longer the current live version.
 - `role: patch` means `parent` is the id of the main document.
-- Main document flow is `idea -> prd -> spec -> plan -> task` when the later stage exists.
+- Main document flow is `idea -> prd -> spec -> plan` when the later stage exists.
 - A main document in that flow should use the upstream main document id as `parent`. For example, a main `spec` should use the related `prd` id.
 - A main `decision` should use the closest upstream main document that created the need for the choice. In this repo that is usually an `idea`, `prd`, or `spec`.
 - A patch `decision` is a child of a main `decision`. Its `parent` must be the decision id it extends.
-- `us` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
+- `user-story` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
 
 ## Folders
 

@@ -3,12 +3,14 @@
 This directory stores durable decision records.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - business or product-shape choices that materially change scope, workflow, or operating model
 - architecture decisions and structural trade-offs
 - technology or tool selection decisions
 - accepted or rejected options and why
+
+Add more when useful.
 
 ## Good Fit
 

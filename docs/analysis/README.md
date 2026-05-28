@@ -3,12 +3,14 @@
 This directory stores analysis docs.
 Use `TEMPLATE.md` for front matter.
 
-## Include
+## Must Include
 
 - codebase analysis
 - business analysis
 - gap analysis
 - comparative analysis
+
+Add more when useful.
 
 ## Exclude
 
