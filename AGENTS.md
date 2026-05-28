@@ -54,3 +54,12 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. Document Workflow
+
+- For document work, follow `DOCUMENT.md`.
+
+## 6. Development Workflow
+
+- For implementation work, follow `DEVELOPMENT.md`.
+- After implementation, follow `TESTING.md`.
