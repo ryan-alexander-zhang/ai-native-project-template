@@ -7,11 +7,20 @@ Use `TEMPLATE.md` for front matter.
 
 - problem
 - context or trigger
+- root cause (first-principles analysis)
 - reproduction (a failing test written before the fix)
 - fix or workaround
 - verification result
 
 Add more when useful.
+
+### Root cause (first principles)
+
+Explain the defect from first principles, not surface symptoms:
+
+1. State the observed behavior and the expected behavior.
+2. Trace down to the smallest mechanism that makes them diverge (cite `file:line`).
+3. Name the true root cause, and rule out the symptoms it is not.
 
 ### Reproduction (test-first)
 

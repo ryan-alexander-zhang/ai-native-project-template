@@ -77,7 +77,7 @@ Canonical commands for this repo (fill in for the project):
 | Behavior change | Update implementation, tests, and any affected docs together. |
 | Public contract or workflow change | Update implementation, tests, and durable documentation together. |
 | Refactor with no intended behavior change | Keep behavior unchanged, keep tests green, and keep the diff narrowly scoped. |
-| Bug fix | Add or update a regression test and verify the original failure is covered. For tracked or non-trivial bugs, create or update the matching `docs/issue` document. |
+| Bug fix | For any bug worth tracking, first create the matching `docs/issue` doc (first-principles root cause + failing-test reproduction, per `docs/issue/README.md`), then fix and keep its regression test green. |
 
 ## Definition of Done
 
