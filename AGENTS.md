@@ -67,7 +67,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 6. Document Workflow
 
-- For document work, follow `DOCUMENT.md`.
+- For document work, including status transitions, follow `DOCUMENT.md`.
 
 ## 7. Development Workflow
 
@@ -76,3 +76,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - When you discover a bug or defect during any task, before fixing it, create a
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
   with a failing test, following `docs/issue/README.md`. Only then apply the fix.
+- Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.

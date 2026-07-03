@@ -1,0 +1,28 @@
+#!/bin/sh
+# Block committing docs still in an intermediate 'draft' status.
+# A doc must be reviewed and promoted (living -> active, work item -> open)
+# or resolved before it is committed. See "Document Status Workflow" in AGENTS.md.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass intentionally:   git commit --no-verify
+
+fail=0
+for f in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.md$'); do
+  case "$f" in
+    TEMPLATE.md|*/TEMPLATE.md|README.md|*/README.md) continue ;;
+  esac
+  # Match a real status value 'draft' (sole value), not an enum like
+  # 'status: draft|active|archived'.
+  if git show ":$f" | grep -Eq '^status:[[:space:]]*draft[[:space:]]*$'; then
+    echo "  $f is still 'draft'"
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "Commit aborted: the docs above are still in 'draft'."
+  echo "Promote them after review (living -> active, work item -> open/resolved),"
+  echo "or re-run with --no-verify to intentionally save work in progress."
+  exit 1
+fi

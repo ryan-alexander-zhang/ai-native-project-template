@@ -11,7 +11,7 @@ Every main doc and patch doc should start with:
 id: <type>-<five-digit-number>-<slug>
 type: analysis|decision|design|idea|integration|issue|memory|operation|plan|prd|prompt|record|report|spec|task|us
 role: main|patch
-status: draft|active|open|resolved|archived|wontfix
+status: draft   # start here; promote per kind (see Front Matter Rules below)
 parent: <id>
 ---
 ```

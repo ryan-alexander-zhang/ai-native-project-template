@@ -2,46 +2,32 @@
 
 ## Purpose
 
-This file defines how document work is done in this repo — the workflow
-companion to [DEVELOPMENT.md](DEVELOPMENT.md) and [TESTING.md](TESTING.md).
-
-Use it to decide:
-- where a document belongs (root file vs `docs/` folder)
-- what a documentation change must include
-- when a documentation change is complete
-
-[docs/README.md](docs/README.md) is the source of truth for the `docs/`
-taxonomy, folders, front matter, and read order. This file does not restate
-those rules; it covers placement, the change matrix, and the Definition of Done.
+The document-work companion to [DEVELOPMENT.md](DEVELOPMENT.md) and
+[TESTING.md](TESTING.md). [docs/README.md](docs/README.md) is the source of
+truth for the `docs/` taxonomy, folders, and front matter; this file does not
+restate them — it covers placement, status transitions, and done.
 
 ## Placement
 
-- Use [docs/README.md](docs/README.md) to place anything under `docs/`; choose
-  the smallest correct folder.
-- Keep repo-wide policy and workflow in the canonical root docs (this file,
-  `DEVELOPMENT.md`, `TESTING.md`, `ARCHITECTURE.md`, …), not under `docs/`.
-- Do not create parallel structures for the same purpose; keep one current main
-  doc per topic.
-- Put external reference material under `docs/reference/`; do not mix it with
-  canonical project docs.
+- Place anything under `docs/` via [docs/README.md](docs/README.md); choose the smallest correct folder.
+- Keep repo-wide policy and workflow in the root canonical docs, not under `docs/`.
+- Keep one current main doc per topic; do not create parallel structures.
+- When a taxonomy or folder rule changes, update `docs/README.md` and the affected templates and folder `README.md` files together.
 
-## Document Matrix
+## Status Workflow
 
-| Doc change | Minimum requirement |
-| --- | --- |
-| New root policy doc | Keep it generic, scoped, and linked to the right canonical docs. |
-| New main doc under `docs/` | Choose the correct folder and add valid front matter. |
-| New patch doc under `docs/` | Set `role: patch` and point `parent` to the main doc it extends. |
-| Taxonomy or folder rule change | Update `docs/README.md` and any affected templates or folder `README.md` files together. |
-| Replace or supersede a doc | Keep one current main doc and mark old docs clearly. |
-| Reference material import | Put it under `docs/reference/` and do not mix it with canonical project docs. |
+Status values are defined in [docs/README.md](docs/README.md). Never change status silently.
+
+- New docs start as `draft`.
+- After creating or substantively updating a `draft` doc, ask if it is reviewed. If yes, promote it: living docs to `active`, work items to `open`.
+- When the work is done, set the work item to `resolved`; living docs stay `active`.
+- Do not commit a doc left in `draft`; promote it or confirm the exception first.
 
 ## Definition of Done
 
-A documentation change is done only when all of these are true:
+A documentation change is done when:
 
-- the document is in the correct location
-- the required metadata is present when needed
+- the doc is in the correct location with valid front matter
 - links, paths, and examples were checked
-- related templates or taxonomy docs were updated when the rules changed
-- no duplicate current source of truth was introduced
+- no topic has two live main docs
+- no doc it governs is left in `draft`
