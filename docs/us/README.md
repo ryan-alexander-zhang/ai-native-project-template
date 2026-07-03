@@ -24,9 +24,8 @@ Use `TEMPLATE.md` for front matter.
 
 ## Parent
 
-`parent` is the `spec` this story belongs to, or the `prd` when the story is
-part of a product backlog before a spec exists. When the story maps to a PRD
-functional requirement, set `function_requirement_id` to that unique `FR-xx`.
+`parent` is always the `spec` this story belongs to. A user story never
+attaches directly to a `prd`.
 
 ## Exclude
 

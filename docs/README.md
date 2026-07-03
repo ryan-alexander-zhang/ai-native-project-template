@@ -18,12 +18,6 @@ parent: <id>
 
 Write the document description or comment after the front matter.
 
-`us` (user story) docs also include:
-
-```md
-function_requirement_id: <FR-id>
-```
-
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
@@ -38,7 +32,7 @@ function_requirement_id: <FR-id>
 - A main `decision` should use the closest upstream main document that created the need for the choice. In this repo that is usually an `idea`, `prd`, or `spec`.
 - A patch `decision` is a child of a main `decision`. Its `parent` must be the decision id it extends.
 - A main `issue` should use the closest main doc it blocks or clarifies. In this repo that is usually a `task`, `plan`, `spec`, or `prd`.
-- `us` (user story) docs own a requirement unit (value statement + EARS requirements + GWT acceptance). Their `parent` is the `spec` they belong to, or a `prd` when the story is part of a product backlog before a spec exists. When a story maps to a PRD functional requirement, `function_requirement_id` must match a unique `FR-xx` item in that PRD. Requirement ids carry the doc id, e.g. `us-00001-FR-1` and `us-00001-AC-1.1`.
+- `us` (user story) docs own a requirement unit (value statement + EARS requirements + GWT acceptance). Their `parent` is always the `spec` they belong to. Requirement ids carry the doc id, e.g. `us-00001-FR-1` and `us-00001-AC-1.1`.
 
 ### When to use `role: patch`
 

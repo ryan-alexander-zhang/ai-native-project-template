@@ -15,7 +15,7 @@ sprint-sized story is not its own spec; it is a story under one.
 
 - context aligned to `CONTEXT.md`
 - the user stories the feature delivers (see below)
-- cross-cutting / system requirements that belong to no single story
+- cross-cutting / system requirements that belong to no single story (EARS numbered `spec-<n>-XFR-<i>`, acceptance `spec-<n>-XAC-<i>.<k>`)
 - technical design (inline, or a link to a `design/` doc)
 - error handling mapped back to requirement ids
 

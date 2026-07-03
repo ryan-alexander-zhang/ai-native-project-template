@@ -32,12 +32,13 @@ requirements, and GWT acceptance. Reference a requirement globally as
 
 ## 3. Cross-cutting / System Requirements
 Requirements that support the feature but belong to no single story
-(idempotency, reconciliation, security). EARS, numbered `X-FR-<i>`.
-- **X-FR-1** (Unwanted) If the same webhook is delivered more than once, the system shall apply it at most once.
-- **X-FR-2** (Unwanted) If the provider does not respond before timeout, the system shall keep the attempt PROCESSING and reconcile it later.
+(idempotency, reconciliation, security). Numbered with this spec's id:
+`spec-<n>-XFR-<i>` (XFR/XAC mark spec-level cross-cutting, vs a story's FR/AC).
+- **spec-00001-XFR-1** (Unwanted) If the same webhook is delivered more than once, the system shall apply it at most once.
+- **spec-00001-XFR-2** (Unwanted) If the provider does not respond before timeout, the system shall keep the attempt PROCESSING and reconcile it later.
 
 **Acceptance (GWT)**
-- **X-AC-1.1** (X-FR-1)
+- **spec-00001-XAC-1.1** (spec-00001-XFR-1)
   Given a webhook already processed
   When the same webhook is delivered again
   Then the system makes no further state change
@@ -59,9 +60,9 @@ Inline for small scope; extract to `docs/design/` and link when reusable/large.
 | Error | Handling | Requirement |
 | --- | --- | --- |
 | card_declined | keep UNPAID, show reason | us-00001-FR-4 |
-| provider_timeout | stays PROCESSING, reconcile | X-FR-2 |
-| duplicate_webhook | idempotent no-op | X-FR-1 / X-AC-1.1 |
-| idempotency_conflict | reject with conflict | X-FR-1 |
+| provider_timeout | stays PROCESSING, reconcile | spec-00001-XFR-2 |
+| duplicate_webhook | idempotent no-op | spec-00001-XFR-1 / spec-00001-XAC-1.1 |
+| idempotency_conflict | reject with conflict | spec-00001-XFR-1 |
 
 ## 5. Out of Scope (optional)
 - …

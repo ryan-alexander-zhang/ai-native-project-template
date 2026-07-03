@@ -9,7 +9,7 @@ Use `TEMPLATE.md` for front matter.
 - vision and goals
 - actors
 - in-scope and out-of-scope boundaries
-- functional requirements with unique `FR-xx` ids
+- functional requirements (what the product must do)
 - user experience expectations
 - risks and dependencies
 
@@ -22,7 +22,6 @@ Add more when useful.
 
 ## Note
 
-PRDs explain why and what, not how. Each PRD functional requirement (`FR-xx`)
-is realized by one or more `spec/` docs, and detailed as `us/` (user story) docs.
-A user story that maps to a PRD requirement links back via
-`function_requirement_id`.
+PRDs explain why and what, not how, for a human audience. A PRD does not own
+formal requirement ids. Implementation is carried by `spec/` docs, which may
+take a `prd` as `parent`.
