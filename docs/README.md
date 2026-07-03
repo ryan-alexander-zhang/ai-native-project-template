@@ -9,7 +9,7 @@ Every main doc and patch doc should start with:
 ```md
 ---
 id: <type>-<five-digit-number>-<slug>
-type: analysis|decision|design|idea|integration|issue|memory|operation|plan|prd|prompt|record|report|spec|task|user-story
+type: analysis|decision|design|idea|integration|issue|memory|operation|plan|prd|prompt|record|report|spec|task|us
 role: main|patch
 status: draft|active|open|resolved|archived|wontfix
 parent: <id>
@@ -18,7 +18,7 @@ parent: <id>
 
 Write the document description or comment after the front matter.
 
-`user-story` docs also include:
+`us` (user story) docs also include:
 
 ```md
 function_requirement_id: <FR-id>
@@ -29,16 +29,16 @@ function_requirement_id: <FR-id>
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - `role: main` is the canonical document for a topic. `role: patch` extends that main document.
 - `status` has two sub-vocabularies, by document kind. See [decision-00001](decision/decision-00001-doc-status-lifecycle-by-kind.md).
-  - **Living docs** (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `user-story`, `memory`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
+  - **Living docs** (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `us`, `memory`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
 - `role: patch` means `parent` is the id of the main document.
 - Main document flow is `idea -> prd -> spec -> plan` when the later stage exists.
-- A main document in that flow should use the upstream main document id as `parent`. For example, a main `spec` should use the related `prd` id.
+- A main document in that flow should use the upstream main document id as `parent` when one exists. For example, a main `spec` uses the related `prd` id; a `spec` may instead parent to an `idea`, or have no parent when it is itself the entry point.
 - A main `decision` should use the closest upstream main document that created the need for the choice. In this repo that is usually an `idea`, `prd`, or `spec`.
 - A patch `decision` is a child of a main `decision`. Its `parent` must be the decision id it extends.
 - A main `issue` should use the closest main doc it blocks or clarifies. In this repo that is usually a `task`, `plan`, `spec`, or `prd`.
-- `user-story` docs are child docs of PRDs. Their `parent` is always the PRD id and `function_requirement_id` must match a unique `FR-xx` item in that PRD.
+- `us` (user story) docs own a requirement unit (value statement + EARS requirements + GWT acceptance). Their `parent` is the `spec` they belong to, or a `prd` when the story is part of a product backlog before a spec exists. When a story maps to a PRD functional requirement, `function_requirement_id` must match a unique `FR-xx` item in that PRD. Requirement ids carry the doc id, e.g. `us-00001-FR-1` and `us-00001-AC-1.1`.
 
 ### When to use `role: patch`
 
@@ -53,7 +53,7 @@ Each folder is marked **core** (most projects need it) or **situational**
 (use only when the project actually calls for it).
 
 - `prd/` — **core** — product requirements
-- `spec/` — **core** — engineering specs
+- `spec/` — **core** — feature specs (feature view + technical design)
 - `plan/` — **core** — implementation plans
 - `decision/` — **core** — durable decision records
 - `issue/` — **core** — development issues, fixes, and verification
@@ -63,7 +63,7 @@ Each folder is marked **core** (most projects need it) or **situational**
 - `design/` — situational — durable structural design docs
 - `analysis/` — situational — codebase and business analysis docs
 - `task/` — situational — execution tasks (only for large plans)
-- `user-story/` — situational — user stories attached to PRD functional requirements
+- `us/` — situational — user stories: requirement units (EARS + GWT) linked from specs
 - `integration/` — situational — third-party integration notes
 - `record/` — situational — reports and process records
 - `reference/` — situational — external references

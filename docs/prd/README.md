@@ -22,5 +22,7 @@ Add more when useful.
 
 ## Note
 
-PRDs explain why and what, not how.
-User stories can attach to specific PRD functional requirements via `function_requirement_id`.
+PRDs explain why and what, not how. Each PRD functional requirement (`FR-xx`)
+is realized by one or more `spec/` docs, and detailed as `us/` (user story) docs.
+A user story that maps to a PRD requirement links back via
+`function_requirement_id`.

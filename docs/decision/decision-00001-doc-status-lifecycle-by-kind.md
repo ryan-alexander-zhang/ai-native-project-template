@@ -28,7 +28,7 @@ superseded.
 Use two status sub-vocabularies:
 
 - Living docs (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`,
-  `integration`, `reference`, `user-story`, `memory`, `operation`, `record`,
+  `integration`, `reference`, `us`, `memory`, `operation`, `record`,
   `prompt`, `report`): `draft -> active -> archived`.
 - Work items (`issue`, `plan`, `task`): `draft -> open -> resolved`, with
   terminal alternatives `wontfix` and `archived`.
