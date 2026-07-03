@@ -13,8 +13,6 @@ agents:
 - a `docs/` taxonomy for durable product, engineering, and operational docs
 - test-level guides that force each repo to choose its own unit, API, and E2E
   stack while keeping integration testing anchored on Testcontainers by default
-- a `skills-lock.json` file for pinning external skill dependencies
-
 This is not a full application starter. It does not assume a frontend stack,
 backend stack, or deployment platform. You bring the runtime code and keep the
 workflow and documentation structure.
@@ -49,8 +47,6 @@ Start here after creating a repo from this template:
 - [REVIEW.md](REVIEW.md): project-specific review checklist (starts empty)
 - [THIRDPARTY.md](THIRDPARTY.md): register of external reference-only sources
 - [docs/README.md](docs/README.md): source of truth for the docs taxonomy
-- [skills-lock.json](skills-lock.json): pinned external skill sources
-
 ## Suggested Adoption Flow
 
 Use the template in this order:
