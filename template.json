@@ -1,0 +1,11 @@
+{
+  "exclude": [".codex/"],
+  "vars": {
+    "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" }
+  },
+  "substitute": [],
+  "post_create": [
+    { "cmd": "git init -q" },
+    { "cmd": "git config core.hooksPath .githooks" }
+  ]
+}
