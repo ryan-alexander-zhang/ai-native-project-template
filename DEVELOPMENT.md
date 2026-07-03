@@ -77,7 +77,7 @@ Canonical commands for this repo (fill in for the project):
 | Behavior change | Update implementation, tests, and any affected docs together. |
 | Public contract or workflow change | Update implementation, tests, and durable documentation together. |
 | Refactor with no intended behavior change | Keep behavior unchanged, keep tests green, and keep the diff narrowly scoped. |
-| Bug fix | Add or update a regression test and verify the original failure is covered. |
+| Bug fix | Add or update a regression test and verify the original failure is covered. For tracked or non-trivial bugs, create or update the matching `docs/issue` document. |
 
 ## Definition of Done
 
@@ -85,6 +85,7 @@ A change is done only when all of these are true:
 
 - the requested behavior is complete
 - the change scope stays focused
+- tracked or non-trivial bug fixes have a matching `docs/issue` record
 - relevant tests pass and meet the [TESTING.md](TESTING.md) DoD
 - relevant docs are updated per the [DOCUMENT.md](DOCUMENT.md) DoD
 - code style meets the [CODE_STYLE.md](CODE_STYLE.md) DoD

@@ -9,9 +9,9 @@ Every main doc and patch doc should start with:
 ```md
 ---
 id: <type>-<five-digit-number>-<slug>
-type: analysis|decision|idea|integration|issue|memory|operation|plan|prd|record|spec|task|user-story
+type: analysis|decision|design|idea|integration|issue|memory|operation|plan|prd|prompt|record|report|spec|task|user-story
 role: main|patch
-status: draft|active|archived
+status: draft|active|open|resolved|archived|wontfix
 parent: <id>
 ---
 ```
@@ -28,7 +28,10 @@ function_requirement_id: <FR-id>
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - `role: main` is the canonical document for a topic. `role: patch` extends that main document.
-- `status: draft` is work in progress. `status: active` is the current live version. `status: archived` is kept for history and is no longer the current live version.
+- `status` has two sub-vocabularies, by document kind. See [decision-00001](decision/decision-00001-doc-status-lifecycle-by-kind.md).
+  - **Living docs** (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `user-story`, `memory`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
+  - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
+- `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
 - `role: patch` means `parent` is the id of the main document.
 - Main document flow is `idea -> prd -> spec -> plan` when the later stage exists.
 - A main document in that flow should use the upstream main document id as `parent`. For example, a main `spec` should use the related `prd` id.
@@ -57,12 +60,15 @@ Each folder is marked **core** (most projects need it) or **situational**
 - `operation/` — **core** — runbook and operations docs
 - `memory/` — **core** — reusable long-term knowledge
 - `idea/` — **core** — early ideas (some projects skip and start at `prd/`)
+- `design/` — situational — durable structural design docs
 - `analysis/` — situational — codebase and business analysis docs
 - `task/` — situational — execution tasks (only for large plans)
 - `user-story/` — situational — user stories attached to PRD functional requirements
 - `integration/` — situational — third-party integration notes
 - `record/` — situational — reports and process records
 - `reference/` — situational — external references
+- `prompt/` — situational — reusable agent prompt templates
+- `report/` — situational — generated reports and rendered deliverables
 
 ## Rules
 

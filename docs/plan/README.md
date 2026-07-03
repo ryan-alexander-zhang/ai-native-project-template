@@ -7,6 +7,7 @@ Use `TEMPLATE.md` for front matter.
 
 - Design
   - Use only what helps the plan. Examples: database table and field design, state machine, class diagram, sequence flow, etc.
+  - When useful, link to a reusable design doc under `docs/design/`.
 
 - Tasks
 - Detailed Acceptance Path
@@ -27,3 +28,8 @@ Add more when useful.
 ## Note
 
 If a plan is small, do not split it into `task/` dir.
+
+A plan is a work item and uses the work-item status vocabulary. See
+[docs/README.md](../README.md) and
+[decision-00001](../decision/decision-00001-doc-status-lifecycle-by-kind.md)
+for the shared definition.

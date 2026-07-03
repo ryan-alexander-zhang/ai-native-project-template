@@ -55,11 +55,21 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-## 5. Document Workflow
+## 5. Language Consistency
+
+**Use one canonical term for one concept.**
+
+- Use `CONTEXT.md` as the project glossary. If it does not exist, create it from `CONTEXT_TEMPLATE.md`.
+- If a term conflicts with `CONTEXT.md`, stop and resolve it before moving on.
+- If language is vague or overloaded, propose one precise term and test it against concrete scenarios.
+- If the stated behavior conflicts with the code or docs, call out the mismatch explicitly.
+- Update `CONTEXT.md` as soon as a term is resolved. Keep it glossary-only: no implementation details, specs, or design decisions.
+
+## 6. Document Workflow
 
 - For document work, follow `DOCUMENT.md`.
 
-## 6. Development Workflow
+## 7. Development Workflow
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
