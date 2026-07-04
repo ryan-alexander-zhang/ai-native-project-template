@@ -1,5 +1,5 @@
 {
-  "exclude": [".codex/"],
+  "exclude": [".codex/", "docs/decision/decision-*.md"],
   "vars": {
     "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" }
   },
