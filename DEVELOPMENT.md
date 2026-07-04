@@ -23,6 +23,17 @@ Confirm the goal, constraints, and affected boundaries.
 - Separate facts from assumptions.
 - Avoid silent scope expansion.
 
+### Plan
+
+Decide how before building.
+
+- For a feature-sized `spec` (multiple files, real ordering or design choices),
+  create or refresh a `docs/plan/` doc before implementing, then work it
+  task-by-task. Follow the `idea -> prd -> spec -> plan` flow in
+  [docs/README.md](docs/README.md).
+- For small or localized changes, inline reasoning is enough — do not create a
+  plan doc.
+
 ### Implement
 
 Make the change.
@@ -73,6 +84,7 @@ Canonical commands for this repo (fill in for the project):
 | Change type | Minimum requirement |
 | --- | --- |
 | Docs-only change | Follow the document management workflow and verify links, examples, and location. |
+| New feature (spec-sized) | Write or refresh a `docs/plan/` first, then implement task-by-task and test per the plan's acceptance path. |
 | Small code change | Make the smallest useful change and run the smallest relevant checks. |
 | Behavior change | Update implementation, tests, and any affected docs together. |
 | Public contract or workflow change | Update implementation, tests, and durable documentation together. |
