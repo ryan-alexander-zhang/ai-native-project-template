@@ -31,6 +31,9 @@ Decide how before building.
   create or refresh a `docs/plan/` doc before implementing, then work it
   task-by-task. Follow the `idea -> prd -> spec -> plan` flow in
   [docs/README.md](docs/README.md).
+- A `spec` branches to a `docs/design/` doc for its technical design: create and
+  link one by default, inline only for a small spec (see
+  [decision-00002](docs/decision/decision-00002-spec-links-a-design-doc.md)).
 - For small or localized changes, inline reasoning is enough — do not create a
   plan doc.
 
