@@ -77,3 +77,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
   with a failing test, following `docs/issue/README.md`. Only then apply the fix.
 - Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
+- Before a feature-sized `plan` becomes `resolved`, have a subagent verify from the docs that every linked `us`/`spec` GWT has a passing test and no requirement is unfinished, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.
