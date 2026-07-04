@@ -44,8 +44,12 @@ Requirements that support the feature but belong to no single story
   Then the system makes no further state change
 
 ## 4. Technical Design
-Inline for small scope; extract to `docs/design/` and link when reusable/large.
-> Linked design: design-00001-<slug>
+Default: extract to a `docs/design/` doc and link it here. The design may be
+written first and associated with this spec later, and one design may be linked
+by more than one spec.
+Small-spec exception: keep the design inline in this section when the scope is
+small; extract to a file once it is reused or needs independent review.
+> Linked design: [design-00001-<slug>](../design/design-00001-<slug>.md)
 
 ### 4.1 API
 - `POST /invoices/{invoiceId}/payment-attempts` — create a payment attempt
@@ -71,5 +75,5 @@ Inline for small scope; extract to `docs/design/` and link when reusable/large.
 - performance / security / observability constraints
 
 ## Links
-- Design: <design-id or "inline">
+- Design: <design-id (default) or "inline" for a small spec>
 - Plan: <plan-id> · Issue: <issue-id> · Analysis: <analysis-id>

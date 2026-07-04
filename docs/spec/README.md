@@ -16,7 +16,7 @@ sprint-sized story is not its own spec; it is a story under one.
 - context aligned to `CONTEXT.md`
 - the user stories the feature delivers (see below)
 - cross-cutting / system requirements that belong to no single story (EARS numbered `spec-<n>-XFR-<i>`, acceptance `spec-<n>-XAC-<i>.<k>`)
-- technical design (inline, or a link to a `design/` doc)
+- technical design — by default a link to a `design/` doc; inline only as a small-spec exception (see below)
 - error handling mapped back to requirement ids
 
 ## User Stories
@@ -28,6 +28,17 @@ sprint-sized story is not its own spec; it is a story under one.
 - Small-spec exception: one small story may be written inline in the spec
   instead of a separate file. Split into files once there are multiple stories,
   or a story is reused / tracked on its own.
+
+## Technical Design
+
+- By default the technical design lives in its own [`design/`](../design/README.md)
+  doc, and the spec links it. This keeps every design collectable in one folder
+  rather than scattered across specs, lets a design be written first and
+  associated with a spec later, and lets one design be reused by more than one
+  spec.
+- Small-spec exception: keep the design inline in the spec's Technical Design
+  section when the scope is small. Extract it to a `design/` doc once it is
+  reused or needs independent review.
 
 ## Parent
 
