@@ -22,7 +22,7 @@ Write the document description or comment after the front matter.
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - `role: main` is the canonical document for a topic. `role: patch` extends that main document.
-- `status` has two sub-vocabularies, by document kind. See [decision-00001](decision/decision-00001-doc-status-lifecycle-by-kind.md).
+- `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `us`, `memory`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.

@@ -22,6 +22,4 @@ Add more when useful.
 Use this only for large or complex plans.
 
 A task is a work item and uses the work-item status vocabulary. See
-[docs/README.md](../README.md) and
-[decision-00001](../decision/decision-00001-doc-status-lifecycle-by-kind.md)
-for the shared definition.
+[docs/README.md](../README.md) for the shared definition.

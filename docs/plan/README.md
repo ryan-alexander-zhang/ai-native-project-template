@@ -30,6 +30,4 @@ Add more when useful.
 If a plan is small, do not split it into `task/` dir.
 
 A plan is a work item and uses the work-item status vocabulary. See
-[docs/README.md](../README.md) and
-[decision-00001](../decision/decision-00001-doc-status-lifecycle-by-kind.md)
-for the shared definition.
+[docs/README.md](../README.md) for the shared definition.
