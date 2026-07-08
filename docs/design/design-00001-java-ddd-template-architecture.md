@@ -60,10 +60,10 @@ backbone:
 
 Supporting decisions that recur:
 
-- **Module-per-bounded-context, then package-by-layer inside** (Maven module per
-  context à la factory/kgrzybek; layers as packages à la library/spring-modulith).
-  Context facade as the only inbound entry point (modular-monolith). See the
-  layout section and Q8.
+- **Maven module per bounded context *and* per layer** (kgrzybek/COLA style;
+  factory is the 2-module-per-context precedent). Context `*-api` module as the
+  only cross-context entry point (modular-monolith). See the layout section (Q8
+  resolved to B2).
 - **Thin application services / command handlers**: load aggregate → invoke one
   domain method → save; no business logic in the application layer (library,
   factory, hexagon).
@@ -85,87 +85,103 @@ Three terms are used at distinct levels; this design keeps them separate:
 - **Aggregate** (tactical) — a consistency boundary *inside* a bounded context.
   The unit that raises **domain events**. Aggregates never exchange integration
   events directly.
-- **Module** (physical) — how a bounded context is realized in code: a Spring
-  Modulith *application module* = one top-level package (deliberately **not**
-  necessarily a Maven module — Modulith's point is boundaries without separate
-  build units). Optionally also a Maven/Gradle module when a hard build boundary
-  is wanted.
+- **Module** (physical) — how contexts and layers are realized in code: a
+  **Maven module** (a build unit / jar). Per the Q8 decision, each bounded context
+  *and* each layer within it is a Maven module (see the layout section). "Module"
+  in this doc means Maven module unless stated otherwise.
 
-Mapping: one Bounded Context → one Spring Modulith module (top-level package) →
-optionally one build module. "Module" in this doc means the Spring Modulith
-package-module unless it says "Maven/build module". (Note: "Module" is also a
-tactical DDD pattern in Evans — a named model grouping ≈ package — which is the
-same package-level sense used here, not the build-tool sense.)
+Mapping: one Bounded Context → one aggregator Maven module → five layer Maven
+modules (`*-api`/`*-domain`/`*-application`/`*-infrastructure`/`*-adapter`). (Note:
+"Module" is also a tactical DDD pattern in Evans — a named model grouping ≈
+package; here we take it all the way to a build unit for compile-time isolation.
+A Spring Modulith "application module" is a *package*-level concept and is **not**
+our module mechanism — see Enforcement / Q1.)
 
 ## Module & package layout
 
-Decomposition is on two orthogonal axes: **by bounded context** (vertical) and
-**by layer** (horizontal). The default structure below isolates the two axes at
-*different* strengths, deliberately:
+Decomposition is on two orthogonal axes — **by bounded context** (vertical) and
+**by layer** (horizontal) — and, per Q8, **both are Maven modules**, so both
+boundaries are **compile-time** guarantees: an illegal reference is simply not on
+the classpath and does not compile. (B2 / Alibaba-COLA-style layering.)
 
-- **Each bounded context is its own Maven module** — context isolation is a
-  **compile-time** guarantee (a context's classpath simply does not contain
-  another context's `domain` types; illegal cross-context references do not
-  compile). This is the boundary that matters most, so it gets the strongest
-  enforcement.
-- **Layers are sub-packages within a context** (`domain` / `application` /
-  `infrastructure`), enforced at **test time** by ArchUnit + jMolecules. Layers
-  are cheaper to keep as packages; see Q8 for the build-module alternative.
-- **A `shared-kernel` Maven module** holds only the minimal shared base types
-  and general domain primitives. Keep it small — it is the one module both
-  contexts depend on, so anything added here couples them.
+Per bounded context, **five** Maven modules:
 
-Do **not** make layers *global* Maven modules (one `domain` module for all
-contexts): that flattens away context isolation, defeating the modular monolith.
-If layers become build modules, they are per-context (Q8 / see kgrzybek).
+| Module | Role (hexagonal) | Contains | Depends on |
+| --- | --- | --- | --- |
+| `*-api` | published language | integration-event types, public DTOs / facade contract | shared-kernel (minimal) |
+| `*-domain` | core | aggregates, VOs, domain events, domain services, repository **ports** | shared-kernel only — **no Spring/JPA** |
+| `*-application` | use cases | command/query handlers, application services | domain, api |
+| `*-infrastructure` | driven (outbound) adapters | JPA repos, outbox, external gateways, MQ producers | application, domain, api |
+| `*-adapter` | driving (inbound) adapters | Web/REST, RPC, MQ consumers, scheduled jobs | application, api |
+
+Plus two shared modules:
+
+- **`shared-kernel`** — minimal shared base types (`AggregateRoot`, `DomainEvent`,
+  `BusinessRule`, `Result`, general VOs). Kept small; it is the one module everyone
+  depends on, so anything added here couples all contexts.
+- **`start`** — the single composition root: the only `@SpringBootApplication`,
+  `main()`, and full bean wiring; depends on every context's `adapter` +
+  `infrastructure`. One deployable.
+
+`*-adapter` and `*-infrastructure` are **siblings** (inbound vs outbound) and never
+depend on each other — they meet only in `start`. **Cross-context references are
+allowed only to another context's `*-api`** (published language), never into its
+`domain`/`application`.
 
 ```text
-app/                                   aggregator POM (parent, no business code)
-├── pom.xml                            <modules> + dependencyManagement
-├── shared-kernel/                     Maven module — minimal shared base
-│   └── …/shared/  AggregateRoot, DomainEvent, BusinessRule, Result, vo/Money…
-├── catalog/                           Maven module = Bounded Context
-│   ├── pom.xml                        deps: shared-kernel + Spring; NOT ordering
-│   └── …/catalog/
-│       ├── CatalogModule.java         context facade (only inbound entry point)
-│       ├── events/                    published integration events
-│       ├── domain/                    framework-free: aggregates, VOs, ports
-│       ├── application/               command/query handlers, event listeners
-│       └── infrastructure/            JPA adapters, outbox/, web/
-└── ordering/                          Maven module = Bounded Context
-    ├── pom.xml                        deps: shared-kernel; NOT catalog internals
-    └── …/ordering/  {events, domain, application, infrastructure}
+app/                              aggregator POM (parent, no business code)
+├── pom.xml                       <modules> + dependencyManagement
+├── shared-kernel/                minimal shared base
+├── catalog/                      aggregator for the catalog Bounded Context
+│   ├── catalog-api/              integration events + public contract
+│   ├── catalog-domain/           framework-free core
+│   ├── catalog-application/      use cases (command/query handlers)
+│   ├── catalog-infrastructure/   JPA, outbox, gateways (outbound)
+│   └── catalog-adapter/          Web / RPC / MQ-in (inbound)
+├── ordering/                     aggregator for the ordering Bounded Context
+│   └── ordering-{api,domain,application,infrastructure,adapter}
+└── start/                        single @SpringBootApplication → all contexts
 ```
 
 ```mermaid
 graph TD
-  App["aggregator POM (parent)"]
-  App --> Shared["shared-kernel\n(Maven module)"]
-  App --> M1["catalog\n(Maven module = Bounded Context)"]
-  App --> M2["ordering\n(Maven module = Bounded Context)"]
+  Start["start (bootstrap)\n@SpringBootApplication"]
+  Start --> C_ad
+  Start --> C_in
 
-  subgraph catalog [catalog module]
-    C_api["(base pkg) facade +\nintegration events"]
-    C_dom["domain:\naggregates, VOs,\ndomain events, repo ports"]
-    C_app["application:\ncommand/query handlers,\nevent listeners"]
-    C_inf["infrastructure:\nJPA adapters, outbox, web"]
+  subgraph catalog ["catalog BC (5 Maven modules)"]
+    C_ad["catalog-adapter\n(Web/RPC in)"]
+    C_in["catalog-infrastructure\n(JPA/outbox out)"]
+    C_app["catalog-application"]
+    C_dom["catalog-domain"]
+    C_api["catalog-api\n(published language)"]
   end
 
-  C_api --- C_dom
+  C_ad --> C_app
+  C_in --> C_app
+  C_in --> C_dom
   C_app --> C_dom
-  C_inf --> C_app
-  C_inf --> C_dom
-  M1 -. depends on .-> Shared
-  M2 -. depends on .-> Shared
+  C_app --> C_api
+  C_in --> C_api
+  C_dom --> SK["shared-kernel"]
+  C_api --> SK
+  O_in["ordering-infrastructure"] -. integration events .-> C_api
 ```
 
-Enforcement by axis:
+Enforcement by axis — both structural axes are now compile-time; jMolecules /
+ArchUnit shift from *boundary* enforcement to *tactical-DDD* enforcement:
 
 | Boundary | Enforced by | When |
 | --- | --- | --- |
-| Bounded context ↔ bounded context | Maven module deps (no dependency declared) | compile time |
-| Layer (domain ← application ← infrastructure) | ArchUnit + jMolecules rules | test time (CI) |
+| Bounded context ↔ bounded context | Maven deps: a context depends only on others' `*-api` | compile time |
+| Layer (domain ← application ← infra/adapter) | Maven deps: each layer a module; wrong-direction types off the classpath | compile time |
+| `*-domain` stays framework-free | Maven: `*-domain` POM has no Spring/JPA | compile time |
+| Tactical DDD rules (refs by id, VO immutability, naming) | jMolecules + ArchUnit | test time (CI) |
 | Dependency versions | parent POM `dependencyManagement` | build time |
+
+Module count ≈ **5N + 2** (N contexts + `shared-kernel` + `start`); e.g. 3
+contexts ≈ 17 modules — the accepted cost of full compile-time isolation on both
+axes.
 
 Cross-context communication is only: `catalog.events.*` (published language) →
 outbox → `ordering` `@ApplicationModuleListener`; never a direct reference into
@@ -251,13 +267,18 @@ Debezium CDC and a message broker are documented as scale-up options, not defaul
 
 ## Enforcement (correct-by-construction)
 
-- **jMolecules ArchUnit rules** (`JMoleculesDddRules`, `ensureHexagonal`) — DDD
-  structural invariants.
-- **Custom ArchUnit rules** — domain must not depend on Spring/JPA/infrastructure;
-  no bounded-context module references another context's internal packages.
-- **Spring Modulith** `ApplicationModules.verify()` — module boundaries + no cycles;
-  `Documenter` generates C4/PlantUML module docs from code.
-- All three run as ordinary tests in CI, so boundaries can't erode.
+- **Maven module dependencies** — the *primary* boundary mechanism. Context
+  isolation, layer direction, and the framework-free domain are all compile-time
+  (a disallowed type is off the classpath and won't compile).
+- **jMolecules ArchUnit rules** (`JMoleculesDddRules`) — *tactical-DDD* invariants
+  *inside* a module: aggregates reference others only by `Association`/id,
+  identifiers are typed, value objects immutable.
+- **Custom ArchUnit rules** — residual conventions Maven can't express (naming,
+  no field injection, etc.).
+- **Spring Modulith** — **not** the boundary verifier here (Maven modules already
+  enforce boundaries); retained only for its **event publication registry** (the
+  transactional outbox) and, optionally, `Documenter`. See Q1.
+- ArchUnit/jMolecules run as ordinary CI tests.
 
 ## Proposed default stack
 
@@ -268,8 +289,12 @@ proposal pending Q1/Q2.
 
 ## Open questions for review
 
-- **Q1 — Boot/Modulith baseline**: pin Spring Boot 4 / Spring Modulith 2 (matches
-  spring-modulith-with-ddd) or stay on Boot 3.x LTS for broader adoption?
+- **Q1 — Boot baseline & Spring Modulith scope**: pin Spring Boot 4 / Spring
+  Modulith 2 (matches spring-modulith-with-ddd) or Boot 3.x LTS for broader
+  adoption? Decided direction (restated for the record): Spring Modulith is
+  included **only for its event publication registry (transactional outbox)** and
+  optional `Documenter`, **not** as the module-boundary verifier — Maven modules
+  enforce boundaries.
 - **Q2 — jMolecules ByteBuddy**: adopt the build-time plugin (generate JPA/Spring
   boilerplate from domain annotations) or keep an explicit persistence model +
   MapStruct mapper (hexagon style)? Trade-off: less boilerplate vs. more magic.
@@ -286,13 +311,11 @@ proposal pending Q1/Q2.
   versionable, more boilerplate) or `@Externalized` on selected domain events
   (Spring Modulith / jMolecules — less boilerplate, but the external contract is
   coupled to the internal domain-event shape)?
-- **Q8 — Layer isolation mechanism**: keep layers as sub-packages enforced by
-  ArchUnit/jMolecules at test time (default above — lighter, keeps Spring
-  Modulith central), or split each context's layers into Maven build modules
-  (`catalog-domain`/`-application`/`-infrastructure`, kgrzybek-style — compile-time
-  layer guarantee, but module-count explosion and it de-emphasizes Spring
-  Modulith, feeding back into Q1)? Note: context-level isolation is a Maven module
-  either way; Q8 is only about the *layer* axis.
+- **Q8 — RESOLVED (B2)**: layers are per-context Maven modules
+  (`*-api` / `*-domain` / `*-application` / `*-infrastructure` / `*-adapter`), so
+  layer isolation is compile-time (kgrzybek / COLA style). Recorded here; the
+  `decision/` doc will formalize it. Trade-off accepted: ~5N+2 modules and Spring
+  Modulith relegated to its outbox role (Q1).
 
 ## Consequences (once accepted)
 
