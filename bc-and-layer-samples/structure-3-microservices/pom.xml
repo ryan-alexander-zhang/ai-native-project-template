@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Aggregator only: builds both services together for convenience. The two
+       services are INDEPENDENT deployables (each its own Spring Boot app, its own
+       schema); in production they would be separate repos. They share no code —
+       each carries its own copy of the wire contract, as microservices do. -->
+  <groupId>com.acme.samples.s3</groupId>
+  <artifactId>structure-3-microservices</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>ordering-service</module>
+    <module>inventory-service</module>
+  </modules>
+</project>
