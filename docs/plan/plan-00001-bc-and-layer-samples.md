@@ -2,7 +2,7 @@
 id: plan-00001-bc-and-layer-samples
 type: plan
 role: main
-status: draft
+status: open
 parent:
 ---
 
@@ -26,14 +26,14 @@ the acceptance path.
 
 - **Domain = two BCs: `Ordering` and `Inventory`.** Classic, exercises every
   required scenario without inventing a complex domain.
-- **Stack:** Java 21, **Spring Boot 3.4.x** (stable + MyBatis-Plus-proven; Boot 4
-  is possible but I'd verify MyBatis-Plus support first), Maven, MyBatis-Plus
+- **Stack:** Java 21, **Spring Boot 3.5.10**, Maven, **MyBatis-Plus 3.5.15**
   (`mybatis-plus-spring-boot3-starter`), Spring for Apache Kafka, **Flyway** for
   schema (MyBatis-Plus does not migrate), Spring Modulith (structure-1 only).
 - **Middleware (trimmed from your compose):** Postgres 18.1, Kafka 3.7.1 (KRaft),
-  kafka-ui, plus **WireMock** as the real external HTTP dependency. The SigNoz /
-  ClickHouse / ZooKeeper / OTel-collector stack is **excluded** as out of scope
-  (observability); I can add OTel tracing later if you want it.
+  plus **WireMock** as the real external HTTP dependency. kafka-ui and the SigNoz
+  / ClickHouse / ZooKeeper / OTel-collector stack are **excluded** as out of
+  scope; topic inspection is via a `make` Kafka-console target. I can add OTel
+  tracing later if you want it.
 - **External HTTP call** = a driven adapter calling a WireMock "pricing/tax"
   service (a real HTTP hop).
 - **Run one structure at a time** (distinct ports; per-structure DB schemas +
@@ -117,7 +117,6 @@ Follows decision-00004 exactly (see that ADR for the annotated trees):
 | --- | --- | --- |
 | Postgres | 5432 | DB `samples`; schemas `s1_ordering`, `s1_inventory`, `s2_*`, `s3_*` |
 | Kafka | 9092 | KRaft; topics prefixed `s1.` / `s2.` / `s3.`; groups per structure |
-| kafka-ui | 8080 | inspect topics/messages |
 | WireMock | 8089 | external pricing stub (mapped JSON responses) |
 | structure-1 app | 8081 | |
 | structure-2 `start` | 8082 | |
@@ -145,9 +144,9 @@ Cohesive, mostly parallel after T0/T1.
   tests + acceptance test.
 - **T4 — structure-3-microservices.** Two services + sync REST + async Kafka +
   per-service outbox + acceptance test.
-- **T5 — Docs & wrap.** Root `README.md` comparing the three (with a "what to look
-  at" per capability), per-structure `README.md`, final `make` run of all three
-  green.
+- **T5 — Docs & wrap.** `bc-and-layer-samples/README.md` (the samples-dir root
+  README) comparing the three with a "what to look at" per capability,
+  per-structure `README.md`, final `make` run of all three green.
 
 Suggested order: T0 → T1 → **T2 end-to-end first** (proves the full stack), then
 T3, T4 reuse the T2 domain code, then T5.
@@ -166,7 +165,7 @@ curl -X POST localhost:80{81|82|83}/orders -d '{...}' -H 'Content-Type: applicat
 curl localhost:PORT/orders/{orderId}
 #   → eventually status=CONFIRMED (stock reserved) or CANCELLED (rejected)
 # verify side effects:
-#   - kafka-ui (localhost:8080): sN.order-placed and sN.stock-reserved have messages
+#   - make sN-events: sN.order-placed and sN.stock-reserved have messages (kafka console consumer)
 #   - psql: rows in sN_ordering.orders (CONFIRMED) and sN_inventory.stock_items (reserved)
 #   - wiremock got the pricing call (request journal)
 make sN-down            # stop app(s)
