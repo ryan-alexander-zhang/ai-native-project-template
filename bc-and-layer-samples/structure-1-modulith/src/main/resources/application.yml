@@ -1,0 +1,44 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: structure-1-modulith
+  datasource:
+    url: jdbc:postgresql://localhost:5432/samples?currentSchema=s1_ordering
+    username: postgres
+    password: postgres
+  flyway:
+    enabled: true
+    schemas: [s1_ordering, s1_inventory]
+    default-schema: s1_ordering
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: true
+      republish-outstanding-events-on-restart: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+samples:
+  pricing-base-url: http://localhost:8089
+  order-placed-topic: s1.order-placed
+  stock-result-topic: s1.stock-result
+
+logging:
+  level:
+    com.acme.samples: INFO
+    org.springframework.modulith: INFO
