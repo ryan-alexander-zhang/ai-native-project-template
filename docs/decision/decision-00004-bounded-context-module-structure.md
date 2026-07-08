@@ -8,9 +8,9 @@ parent:
 
 # How bounded contexts and layers map to modules
 
-Refines `design-00001-java-ddd-template-architecture`. Draft for review. Every
-claim below is backed either by a distilled note in `docs/reference/` or by an
-external source listed under **Sources**; nothing here is asserted without one.
+Draft for review. Every claim below is backed either by a distilled note in
+`docs/reference/` or by an external source listed under **Sources**; nothing here
+is asserted without one.
 
 ## Context
 
@@ -20,7 +20,7 @@ the DDD position (Evans, Vernon), summarized in
 `docs/reference/domain-driven-hexagon/`. A microservice is a *deployment* unit.
 The two often align but are different axes.
 
-`design-00001` decomposes on two axes — by BC (vertical) and by layer
+A DDD codebase decomposes on two axes — by BC (vertical) and by layer
 (domain/application/infrastructure/adapter/api, horizontal). The question this
 ADR settles: **how do BCs and layers become modules, and when?** There are three
 viable structures (plus one rejected combination), differing in *how many
@@ -174,22 +174,23 @@ app/                          aggregator POM, one deployable
    **not** the layer-boundary mechanism in Structure 2 (Maven is). Basis: Spring
    Modulith docs; `docs/reference/spring-modulith-with-ddd/`.
 
-Open for review (feeds `design-00001` Q3): **which structure does the template
-ship the one worked BC in — Structure 1 (simplest, monolith-first-purest) or
-Structure 2 (shows the full target module layout)?** Recommendation: Structure 2
-for the worked context (it is the reference the template exists to demonstrate),
-with added contexts starting at Structure 1.
+Open for review: **which structure does the template ship the one worked BC in —
+Structure 1 (simplest, monolith-first-purest) or Structure 2 (shows the full
+target module layout)?** Recommendation: Structure 2 for the worked context (it
+is the reference the template exists to demonstrate), with added contexts
+starting at Structure 1.
 
 ## Consequences
 
 - The scaffold ships one worked BC; docs explain adding another (Structure 1
-  package first → promote when justified). Resolves the BC part of Q3.
+  package first → promote when justified).
 - Keep a `spring-modulith-starter-jpa` dependency for the event publication
   registry even under Structure 2.
 - In Structure 1, layer isolation for a context is test-time (ArchUnit) until it
   is promoted to Structure 2.
-- `design-00001` links here for the BC/layer→module mapping; its layout section
-  keeps the module mechanics of Structure 2.
+- The Structure 2 module mechanics live in this ADR (the Structure 2 tree above);
+  a future design doc, if one is written, can reference this ADR rather than
+  restating it.
 
 ## Sources
 
