@@ -34,31 +34,117 @@ domain-driven, **discovered iteratively**, and *will* be re-cut as understanding
 deepens. Fixing the most volatile boundary with the most rigid mechanism is the
 mistake this decision avoids.
 
+## The three candidate structures (catalog + ordering)
+
+Legend: a directory that is a Maven module (its own `pom.xml` / jar) is marked
+**`[module]`**; everything else is a plain Java package.
+
+### Structure 1 — Logical (packages + Spring Modulith). DEFAULT for a young/uncertain BC.
+
+One Maven module; each BC is a top-level package; layers are sub-packages.
+
+```
+app/                                    [module]  one jar
+├── pom.xml
+└── src/main/java/com/acme/
+    ├── AcmeApplication.java                      @SpringBootApplication
+    ├── catalog/                                  BC = package  (Spring Modulith module)
+    │   ├── package-info.java                     @ApplicationModule
+    │   ├── BookAddedToCatalog.java               published event (base pkg = public API)
+    │   ├── domain/                               layer = sub-package (ArchUnit)
+    │   ├── application/
+    │   ├── infrastructure/
+    │   └── adapter/
+    └── ordering/                                 BC = package
+        ├── package-info.java
+        ├── OrderPlaced.java
+        ├── domain/  application/  infrastructure/  adapter/
+```
+
+- Maven modules: **1**. BC boundary and layer boundary are both **test-time**
+  (Modulith `verify()` + ArchUnit). Move a boundary = rename a package (cheap).
+
+### Structure 2 — Global layer modules ("layer = module, BC = package"). REJECTED.
+
+Layers are Maven modules; each holds *both* BCs' code for that layer.
+
+```
+app/                                    aggregator POM
+├── domain/                             [module]  ALL BCs' domain in ONE jar
+│   └── com/acme/
+│       ├── catalog/domain/...                    catalog + ordering domain share a jar →
+│       └── ordering/domain/...                   they can reference each other AT COMPILE TIME
+├── application/                        [module]  com/acme/{catalog,ordering}/application/...
+├── infrastructure/                     [module]  com/acme/{catalog,ordering}/infrastructure/...
+├── adapter/                            [module]  com/acme/{catalog,ordering}/adapter/...
+└── start/                              [module]  @SpringBootApplication
+```
+
+- Compile-time isolation is between **layers**, not BCs → `catalog.domain` can
+  import `ordering.domain` (same jar); BC isolation drops to Modulith test-time.
+- Extracting `catalog` means carving it out of **every** layer jar.
+- Strong guarantee on the low-value axis (layer), weak on the high-value axis
+  (BC). **This is the "layer = module while BC = package" combination — and it is
+  backwards, so it is rejected.**
+
+### Structure 3 — Physical (per-context Maven modules, both axes). The PROMOTED state.
+
+Each BC is an aggregator of five layer modules; cross-BC only via `*-api`.
+
+```
+app/                                    aggregator POM
+├── shared-kernel/                      [module]
+├── catalog/                            aggregator for the catalog BC
+│   ├── catalog-api/                    [module]  integration events + public contract
+│   ├── catalog-domain/                 [module]  framework-free (no Spring/JPA on classpath)
+│   ├── catalog-application/            [module]  → catalog-domain, catalog-api
+│   ├── catalog-infrastructure/         [module]  → catalog-application, -domain, -api
+│   └── catalog-adapter/                [module]  → catalog-application, -api
+├── ordering/                           aggregator for the ordering BC
+│   ├── ordering-api/                   [module]
+│   ├── ordering-domain/                [module]
+│   ├── ordering-application/           [module]
+│   ├── ordering-infrastructure/        [module]  may depend on catalog-api ONLY
+│   └── ordering-adapter/               [module]
+└── start/                              [module]  @SpringBootApplication → every ctx adapter+infra
+```
+
+- Both axes **compile-time**: `catalog-domain`'s classpath has no `ordering-*` (cross-BC
+  leak won't compile) and no Spring/JPA (framework leak won't compile).
+- Extraction: `catalog/` is already self-contained → lift the folder out, swap
+  in-process events for a broker. Cross-BC coupling is only `catalog-api`.
+
 ## Decision
 
-- **Layer axis — physical from day one.** Each layer is a Maven module (per
-  `design-00001` / B2). Layers do not move, so the strongest enforcement is free
-  of churn cost.
-- **Bounded-context axis — logical by default.** A BC is realized as a package
-  (or package group) and enforced by Spring Modulith
-  `ApplicationModules.verify()`. It is **promoted** to its own Maven module — and
-  later, if warranted, its own deployable service — **only once its boundary is
-  stable and it needs independent build, deploy, or scaling.**
-- **The template ships exactly one fully worked bounded context** (as the five
-  layer Maven modules of `design-00001`). A not-yet-promoted context is added as a
-  Spring Modulith package group (layers as sub-packages, ArchUnit-enforced) and
-  promoted to the five-module structure when justified.
+- **Physical vs logical is chosen *per whole bounded context*; a context's two
+  axes move together.** A context is either **logical** (Structure 1: BC = package
+  via `verify()`, layers = sub-packages via ArchUnit) or **physical** (Structure 3:
+  BC = Maven aggregator, layers = Maven modules). "Layer is a Maven module while
+  the BC is only a package" is **not** a valid state for one context — the only way
+  to force it is Structure 2, which is rejected.
+- **Reject Structure 2** (global layer modules): it puts compile-time isolation on
+  the low-value axis (layer), leaves BC isolation test-time only, and makes
+  extraction cross-cutting surgery. (It is fine only when there is a single BC, where
+  Structures 2 and 3 coincide — e.g. a COLA single-service app.)
+- **Default = logical (Structure 1).** New or not-yet-understood contexts start
+  here, because reshaping a boundary is a package refactor.
+- **Promote to physical (Structure 3)** when the boundary is stable *and* the
+  context needs independent build/deploy/scaling — and later, if warranted, its
+  own service.
+- **The template ships one context already promoted (Structure 3)** as the worked
+  example; additional contexts start logical (Structure 1).
 - **Cross-context communication is always via published language** (integration
   events / the `*-api` contract), never a direct internal reference — *regardless*
-  of whether the context is currently a package or a module. This makes promotion
-  a packaging/transport change, not a rewrite.
+  of whether the context is a package or a module. This makes promotion a
+  packaging/transport change, not a rewrite.
 - **Spring Modulith's role is therefore scoped to:** (a) enforcing logical BC
-  boundaries while they are packages; (b) its event publication registry (the
-  transactional outbox) for inter-context events; (c) easing extraction via
+  boundaries in Structure 1; (b) its event publication registry (the transactional
+  outbox) for inter-context events, in any structure; (c) easing extraction via
   `@Externalized`. It is **not** the layer-boundary mechanism — Maven modules are.
 
-Promotion path (contract stable throughout): **package BC** → **Maven-module BC**
-→ **separate service** (in-process events → broker; `*-api` facade call → HTTP/RPC).
+Promotion path (contract stable throughout): **Structure 1 (package BC)** →
+**Structure 3 (Maven-module BC)** → **separate service** (in-process events →
+broker; `*-api` facade call → HTTP/RPC). Structure 2 is never a target.
 
 ## Rationale & sources
 
