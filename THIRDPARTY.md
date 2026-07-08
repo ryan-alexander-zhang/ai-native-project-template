@@ -152,3 +152,25 @@ always-valid domain model, typed-result error handling.
 git clone https://github.com/Sairyss/domain-driven-hexagon ../ddd-refs/domain-driven-hexagon
 git -C ../ddd-refs/domain-driven-hexagon checkout 5c2d15a7e2d69e83dfddf28468ee9f30e02c30de
 ```
+
+## ardalis/CleanArchitecture
+
+| | |
+| --- | --- |
+| Upstream | https://github.com/ardalis/CleanArchitecture |
+| Pinned commit | `4f80d58ddb3eb74c6ec8fcad0394e811d01106f5` (2026-06-17) |
+| License | MIT · C# · 18.3k★ |
+| Local clone | `../ddd-refs/CleanArchitecture` (outside this repo) |
+| Official docs | https://ardalis.github.io/CleanArchitecture |
+| Distilled excerpts | [`docs/reference/clean-architecture/`](docs/reference/clean-architecture/) |
+
+.NET Clean Architecture template (patterns mapped to Java): dependency-rule
+project layout, explicit use-case layer, Result-as-value, repository-per-aggregate
+ports, after-commit event dispatch. Reference for the **boundary skeleton** — a
+single-context CRUD template, so it underserves tactical DDD (anemic model, no
+modules, no outbox); add that richness yourself.
+
+```bash
+git clone https://github.com/ardalis/CleanArchitecture ../ddd-refs/CleanArchitecture
+git -C ../ddd-refs/CleanArchitecture checkout 4f80d58ddb3eb74c6ec8fcad0394e811d01106f5
+```
