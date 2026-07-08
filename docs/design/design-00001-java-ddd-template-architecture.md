@@ -74,21 +74,42 @@ Supporting decisions that recur:
 - **Match architecture to complexity**: don't force the hexagon on simple CRUD
   sub-modules (library Catalogue, factory Spring Data REST lane).
 
+## Terminology
+
+Three terms are used at distinct levels; this design keeps them separate:
+
+- **Bounded Context** (strategic) — a language/model boundary. The unit that
+  publishes and consumes **integration events**. Conceptual diagrams use this.
+- **Aggregate** (tactical) — a consistency boundary *inside* a bounded context.
+  The unit that raises **domain events**. Aggregates never exchange integration
+  events directly.
+- **Module** (physical) — how a bounded context is realized in code: a Spring
+  Modulith *application module* = one top-level package (deliberately **not**
+  necessarily a Maven module — Modulith's point is boundaries without separate
+  build units). Optionally also a Maven/Gradle module when a hard build boundary
+  is wanted.
+
+Mapping: one Bounded Context → one Spring Modulith module (top-level package) →
+optionally one build module. "Module" in this doc means the Spring Modulith
+package-module unless it says "Maven/build module". (Note: "Module" is also a
+tactical DDD pattern in Evans — a named model grouping ≈ package — which is the
+same package-level sense used here, not the build-tool sense.)
+
 ## Module & package layout
 
 Package-per-bounded-context under the app base package; layers are sub-packages.
-Cross-module types live in the module's **base package** (the public API);
+Cross-context types live in the context's **base package** (the public API);
 `domain` / `application` / `infrastructure` are internal.
 
 ```mermaid
 graph TD
   App["app root: SpringBootApplication"]
-  App --> M1["module: catalog"]
-  App --> M2["module: ordering"]
+  App --> M1["Bounded Context: catalog\n(Spring Modulith module)"]
+  App --> M2["Bounded Context: ordering\n(Spring Modulith module)"]
   App --> Shared["shared-kernel (VOs, base types, DomainEvent)"]
 
   subgraph catalog
-    C_api["(base pkg) public API:\ncommands, events, module facade"]
+    C_api["(base pkg) public API:\ncommands, integration events, module facade"]
     C_dom["domain:\naggregates, entities, VOs,\ndomain events, repository ports"]
     C_app["application:\ncommand/query handlers,\nevent listeners"]
     C_inf["infrastructure:\nJPA adapters, outbox,\nREST controllers"]
@@ -100,8 +121,9 @@ graph TD
   C_inf --> C_dom
 ```
 
-Reviewer note: the two example modules (`catalog`, `ordering`) are placeholders —
-the scaffold ships one worked module plus a template module. See open question Q3.
+Reviewer note: the two example bounded contexts (`catalog`, `ordering`) are
+placeholders — the scaffold ships one worked context plus a skeleton context.
+See open question Q3.
 
 ## Dependency rule
 
@@ -136,28 +158,42 @@ repository port → aggregate method (checkRule + registerEvent) → save → ou
 Read path: `Controller → Query → QueryHandler → read model / projection (may hit
 DB directly) → Response DTO`.
 
-## Inter-module communication & Outbox
+## Inter-context communication: domain vs integration events
 
-Modules never call each other's internals. Within a context, domain events fire
-in-process on transaction commit (Spring `ApplicationEventPublisher` /
-`@ApplicationModuleListener`). Across contexts, integration events go through a
-transactional **Outbox** for at-least-once, eventually-consistent delivery; the
-consumer side dedupes (Inbox) for idempotency.
+Two event kinds, deliberately kept separate (backed by kgrzybek, Spring Modulith,
+jMolecules):
+
+| | Domain event | Integration event |
+| --- | --- | --- |
+| Scope | inside one bounded context, raised by an **aggregate** | across bounded contexts (**published language**) |
+| Transport | in-process, after commit (`@TransactionalEventListener(AFTER_COMMIT)`) | async via transactional **Outbox** → registry/broker |
+| Contract | domain types, fine-grained, free to change | serialized, **versioned, stable** contract |
+| Consistency | same transaction / strong | eventual |
+| Purpose | decouple aggregates within a context; trigger side effects | notify other contexts that a fact occurred |
+
+A bounded context never calls another's internals. Inside a context, aggregates
+raise **domain events** handled in-process. At the boundary, a selected domain
+event is **translated into an integration event** (published language /
+anti-corruption) and appended to the **Outbox** in the same transaction as the
+state change; a relay publishes it asynchronously and the consumer dedupes
+(**Inbox**) for idempotency. The translation mechanism is Q7.
 
 ```mermaid
 sequenceDiagram
-  participant H as CommandHandler (module A)
-  participant DB as DB (module A schema)
-  participant OB as Outbox table
+  participant AG as Aggregate (Bounded Context A)
+  participant DB as DB (BC A schema)
+  participant OB as Outbox
   participant R as Relay (scheduled)
-  participant B as Module B listener
+  participant BC as Bounded Context B
 
-  H->>DB: save aggregate (tx)
-  H->>OB: append integration event (same tx)
-  Note over H,OB: single @Transactional commit
+  AG->>AG: domain event (in-process, AFTER_COMMIT)
+  AG->>DB: save aggregate (tx)
+  Note over AG,OB: boundary: domain event → integration event
+  AG->>OB: append integration event (same tx)
+  Note over AG,OB: single @Transactional commit
   R->>OB: poll unsent
-  R->>B: publish event
-  B->>B: idempotent handle (inbox/dedupe)
+  R->>BC: publish integration event (published language)
+  BC->>BC: idempotent handle (inbox/dedupe)
 ```
 
 Default relay: Spring Modulith JPA event publication registry (no external broker).
@@ -168,7 +204,7 @@ Debezium CDC and a message broker are documented as scale-up options, not defaul
 - **jMolecules ArchUnit rules** (`JMoleculesDddRules`, `ensureHexagonal`) — DDD
   structural invariants.
 - **Custom ArchUnit rules** — domain must not depend on Spring/JPA/infrastructure;
-  no module references another module's internal packages.
+  no bounded-context module references another context's internal packages.
 - **Spring Modulith** `ApplicationModules.verify()` — module boundaries + no cycles;
   `Documenter` generates C4/PlantUML module docs from code.
 - All three run as ordinary tests in CI, so boundaries can't erode.
@@ -195,10 +231,15 @@ proposal pending Q1/Q2.
   (library/hexagon) or a sealed domain-exception hierarchy + `@ControllerAdvice`?
 - **Q6 — Persistence**: Spring Data JPA (matches most refs) vs Spring Data JDBC
   (library) for the default — JDBC keeps the model simpler and closer to DDD.
+- **Q7 — Integration-event mechanism**: an explicit integration-event type
+  translated at the boundary (kgrzybek — strongest decoupling, independently
+  versionable, more boilerplate) or `@Externalized` on selected domain events
+  (Spring Modulith / jMolecules — less boilerplate, but the external contract is
+  coupled to the internal domain-event shape)?
 
 ## Consequences (once accepted)
 
-- A `decision/` record will pin the accepted answers to Q1–Q6.
+- A `decision/` record will pin the accepted answers to Q1–Q7.
 - `ARCHITECTURE.md`, `CODE_STYLE.md`, and the module skeleton on this branch will
   be written to match; the docs-system skeleton stays owned by main (see
   main's decision on docs ownership).
