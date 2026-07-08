@@ -60,8 +60,10 @@ backbone:
 
 Supporting decisions that recur:
 
-- **Package-by-bounded-context, then by layer inside** (library, factory,
-  spring-modulith). Module facade as the only inbound entry point (modular-monolith).
+- **Module-per-bounded-context, then package-by-layer inside** (Maven module per
+  context à la factory/kgrzybek; layers as packages à la library/spring-modulith).
+  Context facade as the only inbound entry point (modular-monolith). See the
+  layout section and Q8.
 - **Thin application services / command handlers**: load aggregate → invoke one
   domain method → save; no business logic in the application layer (library,
   factory, hexagon).
@@ -97,29 +99,77 @@ same package-level sense used here, not the build-tool sense.)
 
 ## Module & package layout
 
-Package-per-bounded-context under the app base package; layers are sub-packages.
-Cross-context types live in the context's **base package** (the public API);
-`domain` / `application` / `infrastructure` are internal.
+Decomposition is on two orthogonal axes: **by bounded context** (vertical) and
+**by layer** (horizontal). The default structure below isolates the two axes at
+*different* strengths, deliberately:
+
+- **Each bounded context is its own Maven module** — context isolation is a
+  **compile-time** guarantee (a context's classpath simply does not contain
+  another context's `domain` types; illegal cross-context references do not
+  compile). This is the boundary that matters most, so it gets the strongest
+  enforcement.
+- **Layers are sub-packages within a context** (`domain` / `application` /
+  `infrastructure`), enforced at **test time** by ArchUnit + jMolecules. Layers
+  are cheaper to keep as packages; see Q8 for the build-module alternative.
+- **A `shared-kernel` Maven module** holds only the minimal shared base types
+  and general domain primitives. Keep it small — it is the one module both
+  contexts depend on, so anything added here couples them.
+
+Do **not** make layers *global* Maven modules (one `domain` module for all
+contexts): that flattens away context isolation, defeating the modular monolith.
+If layers become build modules, they are per-context (Q8 / see kgrzybek).
+
+```text
+app/                                   aggregator POM (parent, no business code)
+├── pom.xml                            <modules> + dependencyManagement
+├── shared-kernel/                     Maven module — minimal shared base
+│   └── …/shared/  AggregateRoot, DomainEvent, BusinessRule, Result, vo/Money…
+├── catalog/                           Maven module = Bounded Context
+│   ├── pom.xml                        deps: shared-kernel + Spring; NOT ordering
+│   └── …/catalog/
+│       ├── CatalogModule.java         context facade (only inbound entry point)
+│       ├── events/                    published integration events
+│       ├── domain/                    framework-free: aggregates, VOs, ports
+│       ├── application/               command/query handlers, event listeners
+│       └── infrastructure/            JPA adapters, outbox/, web/
+└── ordering/                          Maven module = Bounded Context
+    ├── pom.xml                        deps: shared-kernel; NOT catalog internals
+    └── …/ordering/  {events, domain, application, infrastructure}
+```
 
 ```mermaid
 graph TD
-  App["app root: SpringBootApplication"]
-  App --> M1["Bounded Context: catalog\n(Spring Modulith module)"]
-  App --> M2["Bounded Context: ordering\n(Spring Modulith module)"]
-  App --> Shared["shared-kernel (VOs, base types, DomainEvent)"]
+  App["aggregator POM (parent)"]
+  App --> Shared["shared-kernel\n(Maven module)"]
+  App --> M1["catalog\n(Maven module = Bounded Context)"]
+  App --> M2["ordering\n(Maven module = Bounded Context)"]
 
-  subgraph catalog
-    C_api["(base pkg) public API:\ncommands, integration events, module facade"]
-    C_dom["domain:\naggregates, entities, VOs,\ndomain events, repository ports"]
+  subgraph catalog [catalog module]
+    C_api["(base pkg) facade +\nintegration events"]
+    C_dom["domain:\naggregates, VOs,\ndomain events, repo ports"]
     C_app["application:\ncommand/query handlers,\nevent listeners"]
-    C_inf["infrastructure:\nJPA adapters, outbox,\nREST controllers"]
+    C_inf["infrastructure:\nJPA adapters, outbox, web"]
   end
 
   C_api --- C_dom
   C_app --> C_dom
   C_inf --> C_app
   C_inf --> C_dom
+  M1 -. depends on .-> Shared
+  M2 -. depends on .-> Shared
 ```
+
+Enforcement by axis:
+
+| Boundary | Enforced by | When |
+| --- | --- | --- |
+| Bounded context ↔ bounded context | Maven module deps (no dependency declared) | compile time |
+| Layer (domain ← application ← infrastructure) | ArchUnit + jMolecules rules | test time (CI) |
+| Dependency versions | parent POM `dependencyManagement` | build time |
+
+Cross-context communication is only: `catalog.events.*` (published language) →
+outbox → `ordering` `@ApplicationModuleListener`; never a direct reference into
+another context's `domain`.
 
 Reviewer note: the two example bounded contexts (`catalog`, `ordering`) are
 placeholders — the scaffold ships one worked context plus a skeleton context.
@@ -236,10 +286,17 @@ proposal pending Q1/Q2.
   versionable, more boilerplate) or `@Externalized` on selected domain events
   (Spring Modulith / jMolecules — less boilerplate, but the external contract is
   coupled to the internal domain-event shape)?
+- **Q8 — Layer isolation mechanism**: keep layers as sub-packages enforced by
+  ArchUnit/jMolecules at test time (default above — lighter, keeps Spring
+  Modulith central), or split each context's layers into Maven build modules
+  (`catalog-domain`/`-application`/`-infrastructure`, kgrzybek-style — compile-time
+  layer guarantee, but module-count explosion and it de-emphasizes Spring
+  Modulith, feeding back into Q1)? Note: context-level isolation is a Maven module
+  either way; Q8 is only about the *layer* axis.
 
 ## Consequences (once accepted)
 
-- A `decision/` record will pin the accepted answers to Q1–Q7.
+- A `decision/` record will pin the accepted answers to Q1–Q8.
 - `ARCHITECTURE.md`, `CODE_STYLE.md`, and the module skeleton on this branch will
   be written to match; the docs-system skeleton stays owned by main (see
   main's decision on docs ownership).
