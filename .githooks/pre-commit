@@ -26,3 +26,25 @@ if [ "$fail" -ne 0 ]; then
   echo "or re-run with --no-verify to intentionally save work in progress."
   exit 1
 fi
+
+# On a lang/* branch, the docs-system skeleton (.template-sync.json "frozen")
+# is owned by main and must not be edited here. This mirrors the CI gate so the
+# rejection happens locally. Change those files on main, then run
+# scripts/sync-docs.sh. Bypass intentionally with --no-verify.
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+case "$branch" in
+  lang/*)
+    if [ -f .template-sync.json ] && command -v jq >/dev/null 2>&1; then
+      globs=$(jq -r '.frozen[]' .template-sync.json)
+      # shellcheck disable=SC2086
+      frozen=$(git diff --cached --name-only --diff-filter=ACMRD -- $globs)
+      if [ -n "$frozen" ]; then
+        echo "Commit aborted: these docs-system files are owned by main and"
+        echo "cannot be changed on branch '$branch':"
+        echo "$frozen" | sed 's/^/  /'
+        echo "Make the change on main, then run scripts/sync-docs.sh."
+        exit 1
+      fi
+    fi
+    ;;
+esac

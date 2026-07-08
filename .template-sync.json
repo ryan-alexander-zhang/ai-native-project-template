@@ -1,0 +1,14 @@
+{
+  "note": "Paths owned by the main branch. They define the docs-system skeleton and must stay byte-identical on every lang/* branch. Everything not listed here (language-specific docs like CODE_STYLE.md / *_TESTING.md / ARCHITECTURE.md, template.json, README.md, source files, and docs/<kind>/ instance documents) is free to customize on a lang branch. See decision-00003 and DEVELOPMENT.md.",
+  "frozen": [
+    "AGENTS.md",
+    "DOCUMENT.md",
+    "COMMIT.md",
+    "PR.md",
+    "REVIEW.md",
+    "CONTEXT_TEMPLATE.md",
+    "SECURITY.md",
+    ":(glob)docs/**/README.md",
+    ":(glob)docs/**/TEMPLATE.md"
+  ]
+}

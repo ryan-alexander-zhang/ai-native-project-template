@@ -1,0 +1,43 @@
+# Enforce the docs-system ownership rule on language branches.
+#
+# The docs-system skeleton (see .template-sync.json "frozen") is owned by main.
+# lang/* branches may add and edit their own files — including docs/<kind>/
+# instance documents (spec, design, ...) — but must never modify the frozen
+# skeleton. Those files change on main only and reach lang branches via merge
+# (see scripts/sync-docs.sh). This job fails a lang branch that touched them.
+name: frozen-docs
+
+on:
+  push:
+    branches: ['lang/**']
+  pull_request:
+    branches: ['lang/**']
+
+jobs:
+  frozen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history to find the merge-base with main
+
+      - name: Check frozen docs-system files are unchanged vs main
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+
+          # merge-base, not origin/main tip: main being ahead is fine; we only
+          # flag changes the lang branch itself introduced to frozen paths.
+          base=$(git merge-base origin/main HEAD)
+
+          mapfile -t globs < <(jq -r '.frozen[]' .template-sync.json)
+          changed=$(git diff --name-only "$base" HEAD -- "${globs[@]}")
+
+          if [ -n "$changed" ]; then
+            echo "::error::These docs-system files are owned by main and cannot be changed on a lang branch:"
+            echo "$changed" | sed 's/^/  /'
+            echo ""
+            echo "Move the change to main, then propagate with: scripts/sync-docs.sh"
+            exit 1
+          fi
+          echo "OK — no frozen docs-system files were modified on this branch."
