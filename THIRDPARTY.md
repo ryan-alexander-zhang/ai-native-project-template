@@ -83,10 +83,11 @@ git -C ../ddd-refs/jmolecules checkout 20d2636beba2e3cb8f0a9b62c07e3606c49da84f
 | Official docs | itnext.io blog series (see reference notes) |
 | Distilled excerpts | [`docs/reference/spring-modulith-with-ddd/`](docs/reference/spring-modulith-with-ddd/) |
 
-Closest match to the target stack: Spring Boot 4 / Spring Modulith 2 +
-jMolecules modular monolith. `ApplicationModules.verify()`,
-`@ApplicationModuleListener` + JPA event registry, `@ApplicationModuleTest`
-`Scenario` API, generated C4 docs.
+Spring Modulith modular monolith (its own stack: Spring Boot 4 / Spring
+Modulith 2 + jMolecules). Ahead of this repo's samples, which currently run
+Spring Boot 3.5 / Spring Modulith 1.4 + MyBatis-Plus and do not use jMolecules.
+`ApplicationModules.verify()`, `@ApplicationModuleListener` + JPA event
+registry, `@ApplicationModuleTest` `Scenario` API, generated C4 docs.
 
 ```bash
 git clone https://github.com/xsreality/spring-modulith-with-ddd ../ddd-refs/spring-modulith-with-ddd
