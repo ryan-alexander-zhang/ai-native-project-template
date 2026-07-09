@@ -27,4 +27,12 @@ public class StockRepository implements StockItems {
         po.setAvailable(po.getAvailable() - qty);
         stockMapper.updateById(po);
     }
+
+    @Override
+    public void increment(String sku, int qty) {
+        StockItemPo po = stockMapper.selectById(sku);
+        if (po == null) throw new IllegalStateException("unknown sku: " + sku);
+        po.setAvailable(po.getAvailable() + qty);
+        stockMapper.updateById(po);
+    }
 }

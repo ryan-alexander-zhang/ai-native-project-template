@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+
 @Repository
 public class ReservationRepository implements Reservations {
 
@@ -28,5 +29,20 @@ public class ReservationRepository implements Reservations {
         po.setQty(qty);
         po.setOutcome(outcome);
         reservationMapper.insert(po);
+    }
+
+    @Override
+    public Optional<Reservation> find(String orderId) {
+        ReservationPo po = reservationMapper.selectById(orderId);
+        return po == null ? Optional.empty()
+                : Optional.of(new Reservation(po.getSku(), po.getQty(), po.getOutcome()));
+    }
+
+    @Override
+    public void markReleased(String orderId) {
+        ReservationPo po = reservationMapper.selectById(orderId);
+        if (po == null) return;
+        po.setOutcome("RELEASED");
+        reservationMapper.updateById(po);
     }
 }

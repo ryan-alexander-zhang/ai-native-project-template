@@ -6,4 +6,5 @@ import java.util.Optional;
 public interface StockItems {
     Optional<StockItem> bySku(String sku);
     void decrement(String sku, int qty);
+    void increment(String sku, int qty);   // release reserved stock (compensation)
 }

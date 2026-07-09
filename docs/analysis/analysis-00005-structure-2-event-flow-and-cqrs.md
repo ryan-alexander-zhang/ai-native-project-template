@@ -511,15 +511,30 @@ VIEW-->>Client: OrderSnapshot（不载入聚合）
 ## 八、一致性与 Saga（补 G6）
 
 整条流程是一个**编排式 Saga（choreography）**：`OrderPlaced → 预留 → StockResult → confirm/cancel`，无中心协调者，
-靠事件推进。风险：`StockResult` 丢失/超时 → 订单永久停在 `PENDING`。目标态补：
+靠事件推进。风险:`StockResult` 丢失/超时 → 订单永久停在 `PENDING`。
 
-- **超时补偿**：为 PENDING 订单设截止时间（定时扫描或延时消息），超时未收结果则 `cancel()` 并（可选）发补偿集成事件。
-- **可观测**：Saga 关联 id（orderId）贯穿日志/trace；outbox、inbox、投影三处均可审计。
-- 若跨 BC 步骤增多，再考虑升级为**编排/流程管理器（orchestration / process manager）**（Axon Saga 风格，见
-  `docs/reference/axon-framework/`），但 YAGNI——两步 saga 用 choreography 足够。
+> **超时补偿 ≠ Outbox**：Outbox（§四）保证"已决定要发的消息"每一跳不丢(at-least-once)，但没有"我在等回复、等多久算超时"的概念；
+> 若 Inventory 长时间不消费、或结果消息超出重试彻底丢失，订单仍会永远 PENDING。超时补偿是**整条 Saga 的活性(liveness)兜底**：
+> 过了截止时间还没结果，就主动补偿。二者正交、互补。
 
-依据：Chris Richardson *Saga pattern*（microservices.io）；Garcia-Molina & Salem *Sagas*（1987）；
-Vernon《Implementing DDD》长流程/过程管理器；`docs/reference/axon-framework/`（Saga/process manager）。
+**已实现（闭环）：**
+
+- **触发（Ordering）**：`PendingOrderTimeoutScanner`（`@Scheduled`）扫 `status=PENDING 且 created_at < now-超时`的订单 →
+  经命令总线派发 `CancelStaleOrderCommand` → `CancelStaleOrderService` 在状态仍为 PENDING 时 `order.cancel()`（状态守卫做幂等：
+  若迟到的 StockResult 已把订单 confirm/cancel，则 no-op）。超时值 `samples.pending-timeout`（默认 `PT30S`）。
+- **补偿传播**：`OrderCancelledEvent` 经 `OrderEventsHandler` 翻译为集成事件 `OrderCancelled`（`ordering-api`）写 outbox → Kafka。
+- **释放（Inventory）**：`OrderCancelledListener` 消费 → `ReleaseStockService`：仅当预留仍为 `RESERVED` 时 `stock.increment(...)`
+  归还库存并标记 `RELEASED`（幂等，防重投重复释放）。
+- **可观测**：Saga 关联 id（orderId）贯穿；outbox、inbox、投影、reservation 四处可审计。
+
+**已知残留边界（如实标注，样例范围内不处理）：**
+- reservation 只存首个 sku + 合计 qty，多行订单的释放不按行精确；
+- `OrderCancelled` 若抢先于原始 `OrderPlaced` 到达，Inventory 查不到预留、无法预先阻止后续预留（跨主题竞态）——
+  生产级需按行释放 + 取消 tombstone，超出本样例。
+- 若跨 BC 步骤增多，再考虑升级为**编排/流程管理器（orchestration / process manager）**（Axon Saga 风格），YAGNI。
+
+依据：Chris Richardson *Saga pattern*（microservices.io，补偿事务）；Garcia-Molina & Salem *Sagas*（1987）；
+Axon `DeadlineManager`/`EventScheduler`（超时 + 补偿，见 `docs/reference/axon-framework/`）；Vernon《IDDD》过程管理器。
 
 ---
 
@@ -532,7 +547,7 @@ Vernon《Implementing DDD》长流程/过程管理器；`docs/reference/axon-fra
 | G3 | 读模型未分离 | 新增 `OrderQueries` 端口 + `OrderReadModel` 直查视图；`FindOrderService` 改依赖它 | ordering-application / infrastructure | library / clean-arch / Grzybek |
 | G4 | Ordering 消费端无幂等 | `OrderConfirmationListener` 加 Inbox 去重 | ordering-adapter | Richardson *Idempotent Consumer* |
 | G5 | 无投影 | 新增 `order_view` 表 + 领域事件驱动投影更新 | ordering-infrastructure | library `SheetsReadModel` |
-| G6 | Saga 无补偿 | PENDING 超时补偿 + 关联 id 可观测 | ordering-application | Richardson *Saga* |
+| G6 | Saga 无补偿 | ✅ 已实现：`PendingOrderTimeoutScanner` → `CancelStaleOrderCommand` → `OrderCancelled` 集成事件 → Inventory `ReleaseStockService` 幂等释放 | ordering-* / inventory-* | Richardson *Saga*；Axon DeadlineManager |
 | G7 | 契约无版本化 | `*-api` 事件纳入 Schema Registry + 兼容策略 | *-api | Confluent |
 | G8 | relay 无退避/DLQ | `OutboxRelay` 加退避+重试上限+DLQ；或换 CDC/Modulith registry | ordering-infrastructure | Richardson *Transactional Outbox*；analysis-00001 |
 | GC1 | 命令非一等/不对称 | 抽出顶层 `PlaceOrderCommand` / `ConfirmOrderCommand` | ordering-application | ddh；ddd-by-examples/library（§五） |

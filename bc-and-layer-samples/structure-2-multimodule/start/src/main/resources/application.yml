@@ -31,6 +31,10 @@ samples:
   pricing-base-url: http://localhost:8089
   order-placed-topic: s2.order-placed
   stock-result-topic: s2.stock-result
+  order-cancelled-topic: s2.order-cancelled
+  # Saga liveness (G6): cancel a PENDING order whose stock result never arrived.
+  pending-timeout: PT30S
+  pending-scan-interval-ms: 5000
 
 logging:
   level:
