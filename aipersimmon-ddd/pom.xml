@@ -42,6 +42,7 @@
     <module>aipersimmon-ddd-events-spring</module>
     <module>aipersimmon-ddd-outbox-jdbc</module>
     <module>aipersimmon-ddd-inbox-jdbc</module>
+    <module>aipersimmon-ddd-messaging-kafka</module>
     <module>aipersimmon-ddd-archunit</module>
   </modules>
 
