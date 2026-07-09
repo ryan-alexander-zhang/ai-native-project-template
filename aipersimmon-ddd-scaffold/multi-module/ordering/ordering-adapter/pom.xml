@@ -21,11 +21,11 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-application</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-domain</artifactId>
     </dependency>
     <dependency>
@@ -34,7 +34,7 @@
     </dependency>
     <!-- Cross-context: consumes inventory's published contract to confirm the order. -->
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>inventory-api</artifactId>
     </dependency>
     <dependency>

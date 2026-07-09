@@ -35,18 +35,8 @@
   </properties>
 
   <modules>
-    <module>ordering/ordering-api</module>
-    <module>ordering/ordering-domain</module>
-    <module>ordering/ordering-application</module>
-    <module>ordering/ordering-infrastructure</module>
-    <module>ordering/ordering-adapter</module>
-
-    <module>inventory/inventory-api</module>
-    <module>inventory/inventory-domain</module>
-    <module>inventory/inventory-application</module>
-    <module>inventory/inventory-infrastructure</module>
-    <module>inventory/inventory-adapter</module>
-
+    <module>ordering</module>
+    <module>inventory</module>
     <module>start</module>
   </modules>
 
@@ -60,17 +50,17 @@
         <scope>import</scope>
       </dependency>
 
-      <dependency><groupId>com.example</groupId><artifactId>ordering-api</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>ordering-domain</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>ordering-application</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>ordering-infrastructure</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>ordering-adapter</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-domain</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-application</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-infrastructure</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-adapter</artifactId><version>${project.version}</version></dependency>
 
-      <dependency><groupId>com.example</groupId><artifactId>inventory-api</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>inventory-domain</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>inventory-application</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>inventory-infrastructure</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>com.example</groupId><artifactId>inventory-adapter</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-domain</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-application</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-infrastructure</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-adapter</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>
 </project>

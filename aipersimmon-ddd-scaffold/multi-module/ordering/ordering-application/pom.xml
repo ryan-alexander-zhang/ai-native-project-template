@@ -23,7 +23,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-domain</artifactId>
     </dependency>
     <dependency>
@@ -31,7 +31,7 @@
       <artifactId>aipersimmon-ddd-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-api</artifactId>
     </dependency>
     <dependency>

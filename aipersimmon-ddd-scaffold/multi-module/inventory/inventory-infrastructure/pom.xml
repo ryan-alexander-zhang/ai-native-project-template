@@ -18,15 +18,15 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>inventory-application</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>inventory-domain</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>inventory-api</artifactId>
     </dependency>
     <dependency>

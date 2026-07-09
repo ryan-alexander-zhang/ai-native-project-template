@@ -21,12 +21,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>inventory-application</artifactId>
     </dependency>
     <!-- Cross-context: consumes ordering's published contract. -->
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-api</artifactId>
     </dependency>
     <dependency>

@@ -193,7 +193,7 @@ com.aipersimmon.ddd.core
 ```mermaid
 flowchart LR
   mm["scaffold/multi-module<br/>手写双 BC 参考项目(建立在库之上)"]
-  mm -->|archetype:create-from-project<br/>+ 参数化 + requiredProperties| arch["multi-module archetype 工件(派生物)"]
+  mm -->|archetype:create-from-project<br/>-Darchetype.properties| arch["persimmon-scaffold-archetype 工件(派生物)"]
   arch -->|mvn archetype:generate| gen["生成的骨架项目"]
   gen -.->|回归:重生成 + 比对| arch
   samples["scaffold-samples<br/>聚焦单点 how-to 例子"] -.->|各自演示一项技术| mm
@@ -201,9 +201,12 @@ flowchart LR
 
 - **参考项目 `multi-module`(archetype 的源,真相源)**:一个**手写、可运行的双 BC** 多模块 DDD 项目,建立在 `aipersimmon-ddd-*`(BOM + core + archunit)之上,遵循 [[decision-00005-package-per-aggregate]] 的包结构。它**先由人手写**(可参考只读的 `bc-and-layer-samples`,但不复制),是 `create-from-project` 的**唯一输入**。
   - **两个 BC,至少一个多聚合**:`ordering`(多聚合:`Order` + `Customer`)、`inventory`(单聚合:`Stock`)。单 BC 不足以表达 BC 边界与跨 BC 协作。
-  - **目录嵌套 `<bc>/<bc>-<layer>`**:多 BC 必须按 BC 分目录(`ordering/ordering-adapter`、`inventory/inventory-domain`),BC 目录仅分组、非 Maven 模块;根 pom 以路径列各层模块。**不可**用扁平的 `ordering-adapter`(那是退化的单 BC 写法)。
+  - **目录嵌套 `<bc>/<bc>-<layer>`,且 BC 目录是聚合 pom**:每个 BC 一个目录含一个聚合 `pom.xml`(`packaging=pom`,列出该 BC 的五层模块),根 pom 只列 `ordering` / `inventory` / `start`。**不可**用扁平的 `ordering-adapter`(退化的单 BC 写法)。BC 目录必须是**有 pom 的聚合模块**——否则 `create-from-project` 无法处理"无 pom 的分组目录"(见下)。
+  - **内部模块依赖用 `${project.groupId}` / `${project.version}`**(reactor groupId 无关),而非写死 `com.example`——否则派生出的 archetype 生成项目时内部依赖仍指向 `com.example`(见下)。
   - **跨 BC 走进程内集成事件**(模块化单体,一个可部署单元):`ordering` 下单→发 `OrderPlaced`(ordering-api)→`inventory` 进程内预留→发 `StockReserved`(inventory-api)→`ordering` 进程内确认。跨 BC **只经对方 `*-api`**。broker/outbox/幂等/补偿留后续阶段。
-- **archetype 工件(派生物)**:`create-from-project` 从 `multi-module` 派生,再参数化 `groupId`/`artifactId`/`package`/`version`,补 `archetype-metadata.xml` 的 `requiredProperties`。**`multi-module` 是真相源,archetype 是派生物**——改动流程是改 `multi-module` 后重新派生。
+- **archetype 工件(派生物,已验证)**:`mvn archetype:create-from-project -Darchetype.properties=./archetype.properties` 从 `multi-module` 派生;`archetype.properties` 指定派生工件坐标 `com.ryan.persimmon:persimmon-scaffold-archetype:0.0.1-SNAPSHOT` 与 `excludePatterns`(`**/target/**` 等)。随后 `mvn -f target/generated-sources/archetype/pom.xml install`。**`multi-module` 是真相源,archetype 是派生物**——改流程是改 `multi-module` 后重派生(archetype 产物在 `target/`,不提交)。
+  - **两处 create-from-project 落地发现**:①它无法处理"无 pom 的分组目录"→ 把 BC 目录做成聚合 pom(上一条),派生的 `archetype-metadata.xml` 才正确嵌套。②它**不模板化依赖里的 groupId** → 内部依赖改用 `${project.groupId}`(上一条),生成项目才在使用者的 groupId 下解析成功。
+  - **端到端验证**:从 archetype 生成 `com.acme.shop`(package `com.acme.shop`)后 `mvn test` 全绿(含 `OrderingFlowTest` 跨 BC 闭环),无 `com.example` 残留。
 - **`scaffold-samples`**:一组**聚焦单点 how-to** 的小例子,各只讲清一件事(如"加一个集成事件与进程内处理""加 outbox""接一个 saga""加 CQRS 读模型"),便于查阅与复制,而非再造一个大而全的应用。完整的双 BC 结构表达已由 `multi-module` 承担。
 
 ## 七、后果与开放项

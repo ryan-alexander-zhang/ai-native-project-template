@@ -23,15 +23,15 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-application</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-domain</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>ordering-api</artifactId>
     </dependency>
     <dependency>
