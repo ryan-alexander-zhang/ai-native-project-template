@@ -34,6 +34,10 @@
       <artifactId>aipersimmon-ddd-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
     </dependency>

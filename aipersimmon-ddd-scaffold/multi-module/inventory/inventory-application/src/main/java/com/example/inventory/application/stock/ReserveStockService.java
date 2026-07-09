@@ -1,5 +1,6 @@
 package com.example.inventory.application.stock;
 
+import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.inventory.api.StockReserved;
 import com.example.inventory.domain.stock.Sku;
@@ -15,11 +16,11 @@ import org.springframework.stereotype.Service;
 public class ReserveStockService {
 
     private final Stocks stocks;
-    private final StockReservedPublisher stockReservedPublisher;
+    private final IntegrationEvents integrationEvents;
 
-    public ReserveStockService(Stocks stocks, StockReservedPublisher stockReservedPublisher) {
+    public ReserveStockService(Stocks stocks, IntegrationEvents integrationEvents) {
         this.stocks = stocks;
-        this.stockReservedPublisher = stockReservedPublisher;
+        this.integrationEvents = integrationEvents;
     }
 
     public void reserve(ReserveStockCommand command) {
@@ -30,6 +31,6 @@ public class ReserveStockService {
             stock.reserve(line.quantity());
             stocks.save(stock);
         }
-        stockReservedPublisher.publish(new StockReserved(command.orderId()));
+        integrationEvents.publish(new StockReserved(command.orderId()));
     }
 }

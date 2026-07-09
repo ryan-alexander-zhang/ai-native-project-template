@@ -1,5 +1,7 @@
 package com.example.ordering.application.order;
 
+import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.example.ordering.api.OrderPlaced;
 import com.example.ordering.domain.customer.CreditExceededException;
 import com.example.ordering.domain.customer.Customer;
@@ -25,14 +27,14 @@ public class PlaceOrderService {
     private final Orders orders;
     private final Customers customers;
     private final DomainEvents domainEvents;
-    private final OrderPlacedPublisher orderPlacedPublisher;
+    private final IntegrationEvents integrationEvents;
 
     public PlaceOrderService(Orders orders, Customers customers, DomainEvents domainEvents,
-                             OrderPlacedPublisher orderPlacedPublisher) {
+                             IntegrationEvents integrationEvents) {
         this.orders = orders;
         this.customers = customers;
         this.domainEvents = domainEvents;
-        this.orderPlacedPublisher = orderPlacedPublisher;
+        this.integrationEvents = integrationEvents;
     }
 
     public String handle(PlaceOrderCommand command) {
@@ -57,7 +59,7 @@ public class PlaceOrderService {
         domainEvents.publishAll(order.domainEvents());
         order.clearDomainEvents();
 
-        orderPlacedPublisher.publish(toIntegrationEvent(orderId, command));
+        integrationEvents.publish(toIntegrationEvent(orderId, command));
         return orderId.value();
     }
 

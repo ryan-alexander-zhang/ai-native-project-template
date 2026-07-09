@@ -1,5 +1,6 @@
 package com.example.ordering.application.order;
 
+import com.aipersimmon.ddd.application.DomainEvents;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.Orders;

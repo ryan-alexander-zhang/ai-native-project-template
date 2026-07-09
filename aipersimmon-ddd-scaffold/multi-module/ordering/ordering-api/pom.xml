@@ -19,4 +19,11 @@
   <artifactId>ordering-api</artifactId>
   <name>ordering-api</name>
   <description>Published integration contract of the ordering context.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+    </dependency>
+  </dependencies>
 </project>
