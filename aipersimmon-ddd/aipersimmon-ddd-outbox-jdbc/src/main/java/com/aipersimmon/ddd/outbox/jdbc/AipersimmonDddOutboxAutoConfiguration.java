@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -15,8 +17,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Wires the outbox once a {@code JdbcTemplate} is available: a writer that
  * implements the integration-event publisher port, a scheduled relay, and a
- * logging dispatcher as the default transport. Enables scheduling so the relay
- * runs in the background; an application can override any of these beans.
+ * dispatcher. The default dispatcher only logs; setting
+ * {@code aipersimmon.ddd.outbox.dispatch=in-process} switches to republishing
+ * events in process instead. Enables scheduling so the relay runs in the
+ * background; an application can override any of these beans.
  */
 @AutoConfiguration(after = JdbcTemplateAutoConfiguration.class)
 @EnableScheduling
@@ -26,6 +30,12 @@ public class AipersimmonDddOutboxAutoConfiguration {
     @ConditionalOnMissingBean
     public Clock outboxClock() {
         return Clock.systemUTC();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.dispatch", havingValue = "in-process")
+    public OutboxDispatcher inProcessOutboxDispatcher(ApplicationEventPublisher publisher) {
+        return new InProcessOutboxDispatcher(publisher, new ObjectMapper());
     }
 
     @Bean

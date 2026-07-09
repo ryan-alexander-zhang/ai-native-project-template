@@ -157,11 +157,17 @@ com.aipersimmon.ddd.core
 - `IntegrationEvent` 标记(区别于 `-core` 的 `DomainEvent`);`EventEnvelope<T extends IntegrationEvent>`(`eventId`/`type`/`version`/`occurredAt`/`traceId`/`payload`),**构造即校验**;版本化契约约定写入 Javadoc。
 - **纯数据持有**:不做序列化、不取时钟/随机——由 infra starter 在封装时盖章。
 
-### 5.7 `aipersimmon-ddd-events-spring`(starter,→ `-application` + Spring)
+> **事件传输总览(需求)**:**领域事件只有同步进程内**;**集成事件三种方式**,共用 `IntegrationEvents` port,换实现即切换:
+> - **方式一 进程内同步** → `SpringIntegrationEvents`(§5.7,`ApplicationEventPublisher`,无 outbox)。
+> - **方式二 进程内异步 + outbox/inbox** → `OutboxWriter` + **进程内** `OutboxDispatcher`(§5.8)+ `Inbox`(§5.9)。
+> - **方式三 broker + outbox/inbox** → `OutboxWriter` + **broker** `OutboxDispatcher`(`-messaging-kafka`,后续)+ 远端 `Inbox`。
 
-- 提供 `DomainEvents` 的 Spring 实现:`SpringDomainEvents`(委托 `ApplicationEventPublisher`);Boot 自动装配(`AutoConfiguration.imports`),引入即生效。
-- **语义(承接 analysis-00001):默认同步、同线程、同事务**——发布在 `@Transactional` 内调用,`@EventListener` 处理器内联执行、与聚合原子提交。**此处不可异步**(否则破坏 outbox 翻译步骤的原子性)。
-- 消费者用 `@EventListener` / `@TransactionalEventListener` 注册对某 `DomainEvent` 的处理器。
+### 5.7 `aipersimmon-ddd-events-spring`(starter,→ `-application` + `-integration` + Spring)
+
+- **领域事件**:`SpringDomainEvents`(委托 `ApplicationEventPublisher`);Boot 自动装配(`AutoConfiguration.imports`),引入即生效。
+- **集成事件·方式一(进程内同步)**:`SpringIntegrationEvents`(同样委托 `ApplicationEventPublisher`)。自动装配用 `@ConditionalOnMissingBean(IntegrationEvents)` + `@ConditionalOnMissingClass(OutboxWriter)` 守卫——**仅当 outbox 不在 classpath 时兜底**,保证"outbox 在→走 outbox"的确定性,用户始终可自定义 bean 覆盖。
+- **语义(承接 analysis-00001):默认同步、同线程、同事务**——发布在 `@Transactional` 内调用,`@EventListener` 处理器内联执行、与聚合原子提交。领域事件**此处不可异步**。
+- 消费者用 `@EventListener` / `@TransactionalEventListener` 注册处理器。
 
 ### 5.8 `aipersimmon-ddd-outbox-jdbc`(starter,→ `-application` + `-integration` + `spring-boot-starter-jdbc` + Jackson)
 
@@ -172,8 +178,11 @@ com.aipersimmon.ddd.core
   - 表 `aipersimmon_outbox`:`id`/`event_id`(唯一)/`type`/`version`/`payload`(JSON)/`occurred_at`/`trace_id`/`sent`/`sent_at`/`attempts`/`created_at`。建表由消费者(Flyway/Liquibase)负责;主包附**非自动执行**的样例 DDL(`META-INF/aipersimmon-ddd/outbox-schema.sql`),测试用 `schema.sql`(H2)。
   - `OutboxWriter implements IntegrationEvents`:盖章 `EventEnvelope`(eventId=UUID、type=类全名、version=1、occurredAt=now)→ Jackson 序列化 payload → **当前事务** `JdbcTemplate` 插入一行。
   - `OutboxRelay`:`@Scheduled` 轮询未发送行 → 交给 **broker 发布 port `OutboxDispatcher`** → 逐行置 `sent`;失败留待下轮 + `attempts++`。
-  - `OutboxDispatcher` port + **默认 `LoggingOutboxDispatcher`**(`@ConditionalOnMissingBean`,开箱即用);真 broker 由后续 `-messaging-kafka` 供给覆盖。
-  - `AipersimmonDddOutboxAutoConfiguration`:`@AutoConfiguration(after=JdbcTemplateAutoConfiguration)` + `@EnableScheduling`;各 bean 用 `@ConditionalOnBean(JdbcTemplate)` / `@ConditionalOnMissingBean` 守卫。
+  - `OutboxDispatcher` port,三个实现选一(决定方式二/三):
+    - **默认 `LoggingOutboxDispatcher`**(`@ConditionalOnMissingBean`,开箱即用,只记日志)。
+    - **`InProcessOutboxDispatcher`(方式二)**:属性 `aipersimmon.ddd.outbox.dispatch=in-process` 启用;按 `type` 反序列化 payload 后 `ApplicationEventPublisher.publishEvent`,投递给进程内 `@EventListener`——outbox 变成"进程内异步"传输(生产者只在其事务里写 outbox,relay 异步投递本地消费者;配 `Inbox` 幂等)。
+    - **broker dispatcher(方式三)**:由后续 `-messaging-kafka` 提供,覆盖默认。
+  - `AipersimmonDddOutboxAutoConfiguration`:`@AutoConfiguration(after=JdbcTemplateAutoConfiguration)` + `@EnableScheduling`;各 bean 用 `@ConditionalOnBean(JdbcTemplate)` / `@ConditionalOnMissingBean` / `@ConditionalOnProperty` 守卫。
 - 决策:序列化 = Jackson;relay = `@Scheduled`(可配 `poll-delay-ms`/`batch-size`);broker = port;暂无 DLQ/最大重试(留 `attempts` 观测)。
 
 ### 5.9 `aipersimmon-ddd-inbox-jdbc`(starter,→ `-application` + `spring-boot-starter-jdbc`)
