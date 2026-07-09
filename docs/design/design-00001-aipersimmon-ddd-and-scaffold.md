@@ -163,16 +163,18 @@ com.aipersimmon.ddd.core
 - **语义(承接 analysis-00001):默认同步、同线程、同事务**——发布在 `@Transactional` 内调用,`@EventListener` 处理器内联执行、与聚合原子提交。**此处不可异步**(否则破坏 outbox 翻译步骤的原子性)。
 - 消费者用 `@EventListener` / `@TransactionalEventListener` 注册对某 `DomainEvent` 的处理器。
 
-### 5.8 `aipersimmon-ddd-outbox-jpa`(starter,最重,→ `-application` + `-integration` + Spring Data JPA + Jackson)
+### 5.8 `aipersimmon-ddd-outbox-jdbc`(starter,→ `-application` + `-integration` + `spring-boot-starter-jdbc` + Jackson)
 
-- **事务性 outbox**:把集成事件(`EventEnvelope` 序列化为 JSON)与聚合变更**同事务**写入 outbox 表;relay 轮询未发送行,发到 broker,置 `sent`。
+> **实现阶段发现**:库里放 JPA `@Entity` 有"实体扫描覆盖"陷阱——库的 `@EntityScan` 会让使用者靠默认扫描的自有实体失效。故**先做 `-outbox-jdbc`**(`JdbcTemplate`,无 `@Entity`/`@EntityScan`,零扫描冲突);`-outbox-jpa` 作为后续变体。发布 port `IntegrationEvents` 已加到 `-application`。
+
+- **事务性 outbox**:集成事件与聚合变更**同事务**写入 `aipersimmon_outbox` 表;relay 轮询未发送行,发到 broker,置 `sent`。**at-least-once**(dispatch 后置 sent 前崩溃会重投 → 消费方需幂等)。
 - 组件:
-  - `OutboxPo`(JPA 实体):`id` / `type` / `version` / `payload`(JSON)/ `occurredAt` / `traceId` / `sent` / `createdAt`。
-  - `OutboxWriter`:实现"写 outbox"port(集成事件发布 port 的 outbox 版),Jackson 序列化 `EventEnvelope` 后在当前事务插入一行。
-  - `OutboxRelay`:`@Scheduled` 轮询未发送行 → 交给 **broker 发布 port `OutboxDispatcher`** → 置 `sent`;带退避 + 重试上限。
-  - **broker 抽象**:本模块只定义 `OutboxDispatcher` port,不含具体 broker;后续 `-messaging-kafka`(或一个 log/no-op 实现)供给。
-- 序列化 = Jackson;表结构随 starter 文档化,DDL 迁移由消费者(Flyway/Liquibase)落地或附 `schema.sql` 样例。
-- 决策:先做 `-jpa`(Spring Data),`-jdbc` 变体后续;relay = `@Scheduled`;broker = port。
+  - 表 `aipersimmon_outbox`:`id`/`event_id`(唯一)/`type`/`version`/`payload`(JSON)/`occurred_at`/`trace_id`/`sent`/`sent_at`/`attempts`/`created_at`。建表由消费者(Flyway/Liquibase)负责;主包附**非自动执行**的样例 DDL(`META-INF/aipersimmon-ddd/outbox-schema.sql`),测试用 `schema.sql`(H2)。
+  - `OutboxWriter implements IntegrationEvents`:盖章 `EventEnvelope`(eventId=UUID、type=类全名、version=1、occurredAt=now)→ Jackson 序列化 payload → **当前事务** `JdbcTemplate` 插入一行。
+  - `OutboxRelay`:`@Scheduled` 轮询未发送行 → 交给 **broker 发布 port `OutboxDispatcher`** → 逐行置 `sent`;失败留待下轮 + `attempts++`。
+  - `OutboxDispatcher` port + **默认 `LoggingOutboxDispatcher`**(`@ConditionalOnMissingBean`,开箱即用);真 broker 由后续 `-messaging-kafka` 供给覆盖。
+  - `AipersimmonDddOutboxAutoConfiguration`:`@AutoConfiguration(after=JdbcTemplateAutoConfiguration)` + `@EnableScheduling`;各 bean 用 `@ConditionalOnBean(JdbcTemplate)` / `@ConditionalOnMissingBean` 守卫。
+- 决策:序列化 = Jackson;relay = `@Scheduled`(可配 `poll-delay-ms`/`batch-size`);broker = port;暂无 DLQ/最大重试(留 `attempts` 观测)。
 
 ### 5.9 `aipersimmon-ddd-inbox-jpa`(starter,→ `-application` + Spring Data JPA)
 

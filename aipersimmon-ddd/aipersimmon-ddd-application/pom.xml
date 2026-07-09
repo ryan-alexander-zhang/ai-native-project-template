@@ -12,10 +12,10 @@
   </parent>
 
   <!--
-    Application-tier building blocks: the domain-event publisher port, a use-case
-    marker, and the application exception base. Framework-free (depends only on
-    the core tier); a use case wires these without importing Spring or any other
-    framework. The only dependency besides core is JUnit, at test scope.
+    Application-tier building blocks: the domain-event publisher port, the
+    integration-event publisher port, a use-case marker, and the application
+    exception base. Framework-free (depends only on the pure core and integration
+    tiers); a use case wires these without importing Spring or any other framework.
   -->
   <artifactId>aipersimmon-ddd-application</artifactId>
   <name>aipersimmon-ddd-application</name>
@@ -25,6 +25,11 @@
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
