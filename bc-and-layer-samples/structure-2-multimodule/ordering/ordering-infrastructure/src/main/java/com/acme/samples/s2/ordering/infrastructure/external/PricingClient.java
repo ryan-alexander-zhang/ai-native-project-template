@@ -1,6 +1,6 @@
-package com.acme.samples.s2.ordering.infrastructure;
+package com.acme.samples.s2.ordering.infrastructure.external;
 
-import com.acme.samples.s2.ordering.application.PricingPort;
+import com.acme.samples.s2.ordering.application.order.PricingPort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;

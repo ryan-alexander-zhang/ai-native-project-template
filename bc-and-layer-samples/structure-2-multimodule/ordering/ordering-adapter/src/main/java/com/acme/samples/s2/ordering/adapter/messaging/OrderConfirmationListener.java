@@ -1,7 +1,7 @@
 package com.acme.samples.s2.ordering.adapter.messaging;
 
 import com.acme.samples.s2.inventory.api.StockResult;
-import com.acme.samples.s2.ordering.application.ConfirmOrderService;
+import com.acme.samples.s2.ordering.application.order.ConfirmOrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;

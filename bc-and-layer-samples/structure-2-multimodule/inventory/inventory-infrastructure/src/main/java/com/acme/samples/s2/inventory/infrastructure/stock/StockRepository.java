@@ -1,4 +1,4 @@
-package com.acme.samples.s2.inventory.infrastructure;
+package com.acme.samples.s2.inventory.infrastructure.stock;
 
 import com.acme.samples.s2.inventory.domain.stock.StockItem;
 import com.acme.samples.s2.inventory.domain.stock.StockItems;

@@ -25,7 +25,11 @@ structure-2-multimodule/            reactor POM
   is package-private, so outside the `order` package you cannot `new OrderLine(...)`
   — the "reach an aggregate only through its root" rule is compiler-enforced. The
   root is built/rehydrated from public `OrderLineData`, so the repository (another
-  module) never touches the internal entity.
+  module) never touches the internal entity. The *other* layers are grouped the
+  same way (per decision-00005): `application/order`, `infrastructure/order` +
+  `infrastructure/customer` for aggregate-specific code, and `infrastructure/outbox`
+  + `infrastructure/external` for cross-cutting concerns; inbound adapters stay
+  grouped by mechanism (`web`, `messaging`).
 - **`*-api`** modules hold the published language (integration events); cross-BC
   references target only these.
 - **Hand-rolled transactional outbox**: `OutboxWriter` inserts into the `outbox`

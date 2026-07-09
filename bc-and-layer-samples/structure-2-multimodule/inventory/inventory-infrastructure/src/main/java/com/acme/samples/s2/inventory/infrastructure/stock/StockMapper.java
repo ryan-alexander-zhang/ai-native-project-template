@@ -1,4 +1,4 @@
-package com.acme.samples.s2.inventory.infrastructure;
+package com.acme.samples.s2.inventory.infrastructure.stock;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;

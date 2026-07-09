@@ -2,7 +2,7 @@
 id: decision-00005-package-per-aggregate
 type: decision
 role: main
-status: draft
+status: active
 parent:
 ---
 
@@ -86,11 +86,25 @@ holds an aggregate's internal entities/VOs, so package-private "reach the aggreg
 only through its root" applies there and nowhere else. The other layers have no
 such internals to hide.
 
-The broader principle — **group by aggregate, not by technical type** — does apply
-to `application`, `infrastructure`, and `adapter` (sub-package them `…/order`,
-`…/customer` rather than lumping all handlers / all mappers together), but there it
-buys **cohesion and navigability** (Common Closure Principle — things that change
-together live together), *not* invariant enforcement.
+The broader principle — **group by aggregate, not by technical type** — applies to
+the other layers too, for **cohesion** (Common Closure Principle), *not* invariant
+enforcement. But apply it precisely, because a layer holds two kinds of code:
+
+- **Aggregate-specific code** — use-case handlers (`application`), persistence
+  adapters (`infrastructure`) — **group by aggregate** (`…/order`, `…/customer`),
+  don't lump all handlers / all mappers together.
+- **Cross-cutting code that belongs to no single aggregate** — the outbox relay,
+  external-service gateway clients — **group by concern** (`…/outbox`,
+  `…/external`), not by aggregate.
+- **Inbound adapters** may group by **delivery mechanism** (`web`, `messaging`,
+  `rpc`), since an adapter is defined by its protocol; grouping by aggregate is
+  also fine when several aggregates share one mechanism.
+- A layer module that contains only **one** aggregate's code needn't add a
+  sub-package (avoid nesting-for-its-own-sake); introduce it when the second
+  aggregate arrives.
+
+Rule of thumb: **by aggregate where the code is aggregate-specific; by
+concern/mechanism where it isn't.**
 
 "By layer" and "by aggregate" are orthogonal dimensions; which one is the *outer*
 dimension is a separate choice compared in

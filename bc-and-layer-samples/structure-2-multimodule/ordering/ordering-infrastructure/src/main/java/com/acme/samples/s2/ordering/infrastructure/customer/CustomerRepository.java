@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.infrastructure;
+package com.acme.samples.s2.ordering.infrastructure.customer;
 
 import com.acme.samples.s2.ordering.domain.customer.Customer;
 import com.acme.samples.s2.ordering.domain.customer.Customers;

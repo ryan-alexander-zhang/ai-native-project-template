@@ -1,7 +1,7 @@
-package com.acme.samples.s2.ordering.infrastructure;
+package com.acme.samples.s2.ordering.infrastructure.outbox;
 
 import com.acme.samples.s2.ordering.api.OrderPlaced;
-import com.acme.samples.s2.ordering.application.OrderPlacedPublisher;
+import com.acme.samples.s2.ordering.application.order.OrderPlacedPublisher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;

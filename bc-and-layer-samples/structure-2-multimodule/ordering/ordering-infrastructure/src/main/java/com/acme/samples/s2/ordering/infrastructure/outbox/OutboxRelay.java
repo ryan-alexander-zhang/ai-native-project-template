@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.infrastructure;
+package com.acme.samples.s2.ordering.infrastructure.outbox;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.kafka.core.KafkaTemplate;

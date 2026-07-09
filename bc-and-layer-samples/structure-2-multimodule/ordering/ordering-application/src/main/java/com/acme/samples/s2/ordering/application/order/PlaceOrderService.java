@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.application;
+package com.acme.samples.s2.ordering.application.order;
 
 import com.acme.samples.s2.ordering.api.OrderPlaced;
 import com.acme.samples.s2.ordering.domain.customer.Customer;

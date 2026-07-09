@@ -1,7 +1,7 @@
 package com.acme.samples.s2.inventory.adapter.messaging;
 
 import com.acme.samples.s2.inventory.api.StockResult;
-import com.acme.samples.s2.inventory.application.ReserveStockService;
+import com.acme.samples.s2.inventory.application.stock.ReserveStockService;
 import com.acme.samples.s2.ordering.api.OrderPlaced;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;

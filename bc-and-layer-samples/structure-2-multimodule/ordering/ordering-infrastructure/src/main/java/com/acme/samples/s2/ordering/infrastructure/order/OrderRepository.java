@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.infrastructure;
+package com.acme.samples.s2.ordering.infrastructure.order;
 
 import com.acme.samples.s2.ordering.domain.order.Order;
 import com.acme.samples.s2.ordering.domain.order.OrderLineData;
