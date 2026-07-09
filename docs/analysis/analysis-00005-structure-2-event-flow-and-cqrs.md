@@ -36,10 +36,12 @@ parent:
 5. **确认路径要走聚合方法**：`ConfirmOrderService` 应调用 `order.confirm()/cancel()`（触发领域事件 + 校验状态机），
    而非 `orders.updateStatus` 直写——现状绕过了 `Order` 已有的不变式（`Order.java` 第 47-55 行 vs `ConfirmOrderService.java`）。
 6. **命令侧要与读侧对称**：CQRS 是 Command **和** Query 两侧。读侧已有显式 `OrderQueries` 端口 + DTO，命令侧却把命令内嵌
-   （`PlaceOrder`）或缺失（`ConfirmOrderService` 无命令对象）。应把命令做成**一等、任务型**的显式对象 + 薄命令 handler；
-   **命令总线是可选项**（YAGNI），只在需要统一校验/日志/事务或跨进程分发时引入。依据：domain-driven-hexagon（命令=改状态意图、
-   总线"optional"）、modular-monolith-with-ddd（命令总线 + Logging→Validation→UnitOfWork 装饰器链）、Greg Young / Udi Dahan
-   （task-based command）。详见 §五。
+   （`PlaceOrder`）或缺失（`ConfirmOrderService` 无命令对象）。应把命令做成**一等、任务型**的显式对象 + 薄命令 handler。
+   **本模板采纳命令总线 + 装饰器链**（Logging→Validation→Transaction）：总线可完整接管 UnitOfWork（`TransactionTemplate`
+   装饰器；因 MyBatis 无 EF 式 ChangeTracker，事件集中 drain 需补一个每请求聚合收集器），handler 变纯、横切统一治理。
+   命令总线本身是可选项（YAGNI，domain-driven-hexagon 明说"optional"；ddd-by-examples/library 即无总线形），
+   本模板为展示可集中治理的完整命令管道而采纳。依据：modular-monolith-with-ddd（Logging→Validation→UnitOfWork）、
+   eShop（pipeline behaviors）、Greg Young / Udi Dahan（task-based command）。详见 §五。
 
 ---
 
@@ -176,18 +178,26 @@ Handler）；ddd-by-examples/library（命令是显式对象 `PlaceOnHoldCommand
 **写模型 = 聚合。** 命令只经聚合的意图方法改状态，不变式在聚合内（§一 G2 已修：`Order.confirm()/cancel()`）。
 这与查询侧（5.2）构成读写分离：命令侧永不碰读模型 `order_view`，查询侧永不载入聚合。
 
-**命令总线 + 装饰器链（可选，大厂标配但按需引入）。** 用一个轻量 `CommandBus` 把调用方与 handler 解耦，并在其上叠
-**有序装饰器**：`Logging（关联 id）→ Validation（Bean Validation）→ Transaction（事务 + 领域事件派发放最外层，
-使事件在同一 commit 内触发）`。这与本文 [[analysis-00001-domain-event-publishing]] 里 `DomainEvents` 的"横切=装饰器"
-是同一手法。依据：modular-monolith-with-ddd（MediatR + **Logging→Validation→UnitOfWork** 装饰器链，
-见 `docs/reference/modular-monolith-with-ddd/`）；clean-architecture（Mediator/pipeline behaviors，
+**命令总线 + 装饰器链。** 用一个轻量 `CommandBus` 把调用方与 handler 解耦，并在其上叠**有序装饰器**：
+`Logging（关联 id）→ Validation（Bean Validation）→ Transaction`。这与本文 [[analysis-00001-domain-event-publishing]]
+里 `DomainEvents` 的"横切=装饰器"是同一手法。依据：modular-monolith-with-ddd（MediatR + **Logging→Validation→UnitOfWork**
+装饰器链，见 `docs/reference/modular-monolith-with-ddd/`）；clean-architecture（Mediator/pipeline behaviors，
 见 `docs/reference/clean-architecture/`）；Microsoft eShopOnContainers（MediatR pipeline behaviors 做校验/日志）；
 axon-framework（`CommandBus` + `@CommandHandler`，"decide vs apply"）。Java 落地：手写 `CommandHandler<C,R>` +
 按命令类型分发的 dispatcher，或 Axon `CommandBus`。
 
-**要不要引总线（YAGNI 轴）。** 命令少、无跨切策略时，handler 直接 `@Service` 注入调用即可——domain-driven-hexagon
-明说命令总线"optional"。出现下列任一信号再引：①多个 handler 想统一校验/日志/事务；②命令需跨进程/异构分发；
-③想要命令级审计/重试。**本 sample 只有两条命令，默认可不引总线，但命令对象与 handler 必须显式、对称。**
+**关于 UnitOfWork（措辞更正，避免误读）。** 总线**能完整接管 UnitOfWork**：用 `TransactionTemplate`
+（包 `PlatformTransactionManager`）做一个 `Transaction` 装饰器，把事务边界放到总线层，handler 就变成纯 POJO、
+不再各自标 `@Transactional`——这正是 MediatR `UnitOfWorkBehavior` / Grzybek UoW 装饰器的等价物。所以**事务边界零障碍**，
+不要误以为"Spring 里 `@Transactional` 已占位、总线加不了 UoW"（那只是"当前把边界放在哪"，不是"总线做不做得到"）。
+唯一需要额外补的是**领域事件的集中 drain**：.NET/EF 的 UoW 能自动派发事件，是因为 `ChangeTracker` 天然知道本次改了哪些聚合；
+我们用 MyBatis-Plus **没有 ChangeTracker**，若要在 UoW 装饰器里集中 drain，需加一个"每请求聚合收集器"（handler 把动过的
+聚合登记进去，UoW 收尾统一 `domainEvents.publish(...)`）；否则保持 handler 自行 publish（§三现状）。
+
+**本模板的取舍。** 采纳**命令总线 + 装饰器链**（本文档配套实现的方向）：即便只有两条命令，模板的价值在于展示**可集中治理**的
+完整命令管道（统一校验/日志/事务，想漏都漏不掉），并与读侧显式端口对称。事件 drain 采用**每请求聚合收集器**，使
+`Transaction` 装饰器同时收尾事务与事件派发，handler 不再手动 publish。YAGNI 轴仍成立、供读者判断：命令极少且无跨切治理需求时，
+handler 直接 `@Service` 注入调用（domain-driven-hexagon 明说总线"optional"，ddd-by-examples/library 即此形）也是正当选择。
 
 **命令幂等。** 从消息触发、可重投的命令（如 `ConfirmOrderCommand` 源自 `stock-result`）需去重——本文已用 inbox
 （`ProcessedResults`，§一 G4）承接，等价于 eShop 的 *idempotent command identifier*。
@@ -215,7 +225,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | GC1 | 命令非一等/不对称 | `PlaceOrder` 内嵌于 `PlaceOrderService`；`ConfirmOrderService.apply(orderId, reserved)` 无命令对象 | 抽出顶层 `PlaceOrderCommand` / `ConfirmOrderCommand` |
 | GC2 | 无 `Command` 标记/命名约定 | 命令散落、无统一抽象（对照读侧有 `OrderQueries`） | 加 `Command` 标记接口 + 祈使命名 + `CommandHandler<C,R>` |
-| GC3 | 横切关注点分散，无（可选）总线 | 校验/日志/事务写在各 handler 里 | 轻量 `CommandBus` + Logging→Validation→Transaction 装饰器链；或按 YAGNI 暂缓（仅显式命令对象） |
+| GC3 | 横切关注点分散，无总线 | 校验/日志/事务写在各 handler 里 | 轻量 `CommandBus` + Logging→Validation→Transaction 装饰器链 + 每请求聚合收集器（**本模板采纳**） |
 | GC4 | 命令幂等未显式表述 | 依赖 inbox 但文档未点明其"命令幂等"角色 | 已由 `ProcessedResults` 承接，文档化 |
 
 > 目标态与读侧对称：命令侧 = `Command` 标记 + `PlaceOrderCommand`/`ConfirmOrderCommand` + `CommandHandler<C,R>`
@@ -527,7 +537,7 @@ Vernon《Implementing DDD》长流程/过程管理器；`docs/reference/axon-fra
 | G8 | relay 无退避/DLQ | `OutboxRelay` 加退避+重试上限+DLQ；或换 CDC/Modulith registry | ordering-infrastructure | Richardson *Transactional Outbox*；analysis-00001 |
 | GC1 | 命令非一等/不对称 | 抽出顶层 `PlaceOrderCommand` / `ConfirmOrderCommand` | ordering-application | ddh；ddd-by-examples/library（§五） |
 | GC2 | 无 `Command` 标记/命名约定 | 加 `Command` 标记接口 + `CommandHandler<C,R>` + 祈使命名 | ordering-application / shared-kernel | Young / Dahan（§五） |
-| GC3 | 横切分散、无（可选）总线 | 轻量 `CommandBus` + Logging→Validation→Transaction 装饰器链；或 YAGNI 暂缓 | ordering-application / infrastructure | Grzybek；clean-arch；eShop（§五） |
+| GC3 | 横切分散、无总线 | 轻量 `CommandBus` + Logging→Validation→Transaction 装饰器链 + 每请求聚合收集器（本模板采纳） | ordering-application / infrastructure | Grzybek；clean-arch；eShop（§五） |
 | GC4 | 命令幂等未点明 | 由 `ProcessedResults` inbox 承接，文档化 | ordering-application | eShop *idempotent command*（§五） |
 | — | Inventory 生产侧不对称 | Inventory 亦"领域事件→翻译→Outbox"，两 BC 对称 | inventory-* | 本文第四节 |
 
