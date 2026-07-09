@@ -1,6 +1,7 @@
 package com.acme.samples.s2.ordering.adapter.web;
 
 import com.acme.samples.s2.ordering.application.order.CreditExceededException;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,6 +15,12 @@ public class OrderingExceptionHandler {
     @ExceptionHandler(CreditExceededException.class)
     public ProblemDetail credit(CreditExceededException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    /** Command-bus Validation decorator rejected the command. */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ProblemDetail invalid(ConstraintViolationException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

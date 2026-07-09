@@ -5,34 +5,36 @@ import com.acme.samples.s2.ordering.domain.customer.Customers;
 import com.acme.samples.s2.ordering.domain.order.Order;
 import com.acme.samples.s2.ordering.domain.order.OrderLineData;
 import com.acme.samples.s2.ordering.domain.order.Orders;
-import com.acme.samples.s2.shared.DomainEvents;
+import com.acme.samples.s2.shared.AggregateChanges;
+import com.acme.samples.s2.shared.CommandHandler;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Command handler for {@link PlaceOrderCommand}. Thin: load aggregates, invoke
+ * domain behaviour, persist, register the aggregate for domain-event drain. No
+ * {@code @Transactional} here — the CommandBus's Transaction decorator owns the
+ * UnitOfWork (transaction + domain-event dispatch), analysis-00005 §5.1.
+ */
 @Service
-public class PlaceOrderService {
-
-    public record PlaceOrder(String customerId, List<Line> lines) {
-        public record Line(String sku, int qty) {}
-    }
+public class PlaceOrderService implements CommandHandler<PlaceOrderCommand, String> {
 
     private final Customers customers;
     private final Orders orders;
     private final PricingPort pricing;
-    private final DomainEvents domainEvents;
+    private final AggregateChanges changes;
 
-    public PlaceOrderService(Customers customers, Orders orders, PricingPort pricing, DomainEvents domainEvents) {
+    public PlaceOrderService(Customers customers, Orders orders, PricingPort pricing, AggregateChanges changes) {
         this.customers = customers;
         this.orders = orders;
         this.pricing = pricing;
-        this.domainEvents = domainEvents;
+        this.changes = changes;
     }
 
-    @Transactional
-    public String place(PlaceOrder command) {
+    @Override
+    public String handle(PlaceOrderCommand command) {
         Customer customer = customers.byId(command.customerId())
                 .orElseThrow(() -> new IllegalArgumentException("unknown customer: " + command.customerId()));
 
@@ -49,10 +51,7 @@ public class PlaceOrderService {
         }
 
         orders.save(order);
-        // Publish the recorded domain event(s) in-process, same transaction. An
-        // @EventListener translates OrderPlacedEvent -> the OrderPlaced integration
-        // event (written to the outbox) and updates the read model (OrderEventsHandler).
-        domainEvents.publish(order.domainEvents());
+        changes.register(order);   // UnitOfWork decorator drains + publishes OrderPlacedEvent in-tx
         return order.id();
     }
 }
