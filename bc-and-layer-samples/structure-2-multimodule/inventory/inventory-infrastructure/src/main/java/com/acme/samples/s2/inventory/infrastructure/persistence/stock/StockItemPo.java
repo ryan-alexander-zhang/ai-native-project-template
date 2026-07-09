@@ -1,4 +1,4 @@
-package com.acme.samples.s2.inventory.infrastructure.stock;
+package com.acme.samples.s2.inventory.infrastructure.persistence.stock;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.infrastructure.outbox;
+package com.acme.samples.s2.ordering.infrastructure.messaging;
 
 import com.acme.samples.s2.ordering.api.OrderPlaced;
 import com.acme.samples.s2.ordering.application.order.OrderPlacedPublisher;

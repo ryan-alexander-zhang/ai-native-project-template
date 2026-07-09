@@ -1,4 +1,4 @@
-package com.acme.samples.s2.inventory.infrastructure.inbox;
+package com.acme.samples.s2.inventory.infrastructure.messaging;
 
 import com.acme.samples.s2.inventory.application.stock.Reservations;
 import org.springframework.stereotype.Repository;

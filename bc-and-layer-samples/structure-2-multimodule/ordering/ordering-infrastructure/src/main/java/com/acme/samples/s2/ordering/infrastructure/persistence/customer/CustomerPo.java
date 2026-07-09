@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.infrastructure.customer;
+package com.acme.samples.s2.ordering.infrastructure.persistence.customer;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

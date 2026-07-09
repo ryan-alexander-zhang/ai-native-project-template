@@ -86,25 +86,33 @@ holds an aggregate's internal entities/VOs, so package-private "reach the aggreg
 only through its root" applies there and nowhere else. The other layers have no
 such internals to hide.
 
-The broader principle — **group by aggregate, not by technical type** — applies to
-the other layers too, for **cohesion** (Common Closure Principle), *not* invariant
-enforcement. But apply it precisely, because a layer holds two kinds of code:
+The grouping is for **cohesion** (Common Closure Principle), not invariant
+enforcement, and the **grouping axis follows the layer's nature**:
 
-- **Aggregate-specific code** — use-case handlers (`application`), persistence
-  adapters (`infrastructure`) — **group by aggregate** (`…/order`, `…/customer`),
-  don't lump all handlers / all mappers together.
-- **Cross-cutting code that belongs to no single aggregate** — the outbox relay,
-  external-service gateway clients — **group by concern** (`…/outbox`,
-  `…/external`), not by aggregate.
-- **Inbound adapters** may group by **delivery mechanism** (`web`, `messaging`,
-  `rpc`), since an adapter is defined by its protocol; grouping by aggregate is
-  also fine when several aggregates share one mechanism.
-- A layer module that contains only **one** aggregate's code needn't add a
-  sub-package (avoid nesting-for-its-own-sake); introduce it when the second
-  aggregate arrives.
+- **`domain` and `application` → by aggregate / use case.** These are domain
+  layers; the aggregate (and the use cases acting on it) is the unit of cohesion.
+  Group them `…/order`, `…/customer`. (Domain additionally gets the package-private
+  compiler enforcement above; application does not.)
+- **`infrastructure` and `adapter` → by technical concern / delivery mechanism.**
+  These are *technical* layers, so their natural axis is technology, not domain —
+  this is what Alibaba COLA does (`infrastructure` split into persistence /
+  gateway-impl / messaging / config; `adapter` by protocol). So
+  `infrastructure/persistence`, `infrastructure/messaging`,
+  `infrastructure/external`; `adapter/web`, `adapter/messaging`, `adapter/rpc`.
+- **Within a concern that is itself aggregate-specific → sub-group by aggregate.**
+  Persistence is per-aggregate, so `infrastructure/persistence/order`,
+  `infrastructure/persistence/customer`. Cross-cutting concerns (outbox/inbox
+  messaging, external gateways) are not aggregate-specific and stay flat under
+  their concern.
+- A layer that holds only **one** aggregate's / concern's code needn't add a
+  sub-package; introduce it when the second arrives.
 
-Rule of thumb: **by aggregate where the code is aggregate-specific; by
-concern/mechanism where it isn't.**
+So aggregate cohesion lives where it matters most (domain + application); the
+technical layers are organized technically, with per-aggregate sub-grouping only
+*inside* aggregate-specific concerns such as persistence. Do **not** mix axes at
+one level (e.g. `infrastructure/{order, customer, outbox, external}` puts two
+aggregate names beside two concern names — pick the concern axis for a technical
+layer).
 
 "By layer" and "by aggregate" are orthogonal dimensions; which one is the *outer*
 dimension is a separate choice compared in
