@@ -8,10 +8,10 @@ parent:
 
 # Package per aggregate, with aggregate internals package-private
 
-Refines the domain-layer packaging left open by
-`decision-00004-bounded-context-module-structure` (which fixed the BC/layer→module
-mapping but not how a bounded context's *domain* is organized internally). Draft
-for review. Every claim is backed by a `docs/reference/` note or an external
+Refines the domain-layer packaging that
+`analysis-00004-bounded-context-module-structure` leaves open (it *compares*
+BC/layer→module structures but not how a bounded context's *domain* is organized
+internally). Every claim is backed by a `docs/reference/` note or an external
 source under **Sources**.
 
 ## Context

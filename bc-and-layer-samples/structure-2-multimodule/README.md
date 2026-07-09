@@ -1,7 +1,7 @@
 # structure-2-multimodule
 
 Modular monolith with **physical** bounded contexts — Structure 2 of
-[`decision-00004`](../../docs/decision/decision-00004-bounded-context-module-structure.md).
+[`analysis-00004`](../../docs/analysis/analysis-00004-bounded-context-module-structure.md).
 One deployable (`start`), but every bounded context *and* every layer is its own
 Maven module, so boundaries are enforced at **compile time**.
 

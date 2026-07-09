@@ -1,7 +1,7 @@
 # bc-and-layer-samples
 
 Three runnable Spring Boot projects, one per structure in
-[`decision-00004`](../docs/decision/decision-00004-bounded-context-module-structure.md),
+[`analysis-00004`](../docs/analysis/analysis-00004-bounded-context-module-structure.md),
 all implementing the **same** `Ordering` + `Inventory` domain and the same
 "place an order" scenario — so the three structures can be compared directly.
 Only the module/deployment structure differs.

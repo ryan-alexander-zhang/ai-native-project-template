@@ -1,7 +1,7 @@
 # structure-3-microservices
 
 **Service per bounded context** (COLA-style) — Structure 3 of
-[`decision-00004`](../../docs/decision/decision-00004-bounded-context-module-structure.md).
+[`analysis-00004`](../../docs/analysis/analysis-00004-bounded-context-module-structure.md).
 Two **independent** Spring Boot services, each its own deployable and its own
 schema, communicating over the network. They share **no code** — each carries
 its own copy of the wire contract, as real microservices do. (The aggregator

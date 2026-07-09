@@ -1,7 +1,7 @@
 # structure-1-modulith
 
 Modular monolith with **logical** bounded contexts — Structure 1 of
-[`decision-00004`](../../docs/decision/decision-00004-bounded-context-module-structure.md).
+[`analysis-00004`](../../docs/analysis/analysis-00004-bounded-context-module-structure.md).
 One deployable; each BC is a top-level package; boundaries are enforced at
 **test time** by Spring Modulith + ArchUnit.
 

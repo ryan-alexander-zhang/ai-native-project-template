@@ -6,11 +6,11 @@ status: resolved
 parent:
 ---
 
-# Plan: `bc-and-layer-samples` — three runnable structures from decision-00004
+# Plan: `bc-and-layer-samples` — three runnable structures from analysis-00004
 
 Build `bc-and-layer-samples/` at the repo root containing **three** runnable
 Spring Boot projects, one per structure in
-`docs/decision/decision-00004-bounded-context-module-structure.md`:
+`docs/analysis/analysis-00004-bounded-context-module-structure.md`:
 
 1. `structure-1-modulith/` — modular monolith, **logical** BCs (Spring Modulith).
 2. `structure-2-multimodule/` — modular monolith, **physical** BCs (multi-module / B2).
@@ -97,7 +97,7 @@ URL, outbox poll).
 
 ### Module layout per structure
 
-Follows decision-00004 exactly (see that ADR for the annotated trees):
+Follows analysis-00004 (see that analysis for the annotated trees):
 
 - **structure-1**: one Maven module; packages `…​.ordering` / `…​.inventory` are
   Spring Modulith modules; layers are sub-packages; `ApplicationModules.verify()`
@@ -186,5 +186,5 @@ data.
 - Boot/MyBatis-Plus/Modulith version alignment is the main compile risk — pinned
   and verified in T2 before replicating.
 - This plan realizes the structures defined in
-  `docs/decision/decision-00004-bounded-context-module-structure.md`; it does not
+  `docs/analysis/analysis-00004-bounded-context-module-structure.md`; it does not
   re-decide them.

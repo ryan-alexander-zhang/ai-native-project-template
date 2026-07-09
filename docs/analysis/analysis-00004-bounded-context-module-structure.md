@@ -1,16 +1,21 @@
 ---
-id: decision-00004-bounded-context-module-structure
-type: decision
+id: analysis-00004-bounded-context-module-structure
+type: analysis
 role: main
-status: draft
+status: active
 parent:
 ---
 
-# How bounded contexts and layers map to modules
+# How bounded contexts and layers map to modules — structure options
 
-Draft for review. Every claim below is backed either by a distilled note in
-`docs/reference/` or by an external source listed under **Sources**; nothing here
-is asserted without one.
+**Comparative analysis, not a decision.** Its purpose is to explore *which*
+structure this project should adopt for its DDD scaffold; that choice is **not
+yet made** — the `bc-and-layer-samples` exist precisely to try the options in
+running code before committing. Findings below are recommendations, not binding
+rules. Every claim is backed either by a distilled note in `docs/reference/` or
+by an external source listed under **Sources**; nothing here is asserted without
+one. When a structure is finally chosen, record that pick (and any firm
+principles below) in a `decision/` doc.
 
 ## Context
 
@@ -22,8 +27,8 @@ The two often align but are different axes.
 
 A DDD codebase decomposes on two axes — by BC (vertical) and by layer
 (domain/application/infrastructure/adapter/api, horizontal). The question this
-ADR settles: **how do BCs and layers become modules, and when?** There are three
-viable structures (plus one rejected combination), differing in *how many
+analysis explores: **how do BCs and layers become modules, and when?** There are
+three viable structures (plus one rejected combination), differing in *how many
 deployables* and *whether each boundary is enforced at compile time or test
 time*.
 
@@ -147,7 +152,10 @@ app/                          aggregator POM, one deployable
   monolith-first is cheap BC extraction (Newman) — this structure makes it
   cross-cutting.
 
-## Decision
+## Assessment & recommendations
+
+Working recommendations from the comparison above — to be confirmed (and recorded
+in a `decision/` doc) once a structure is chosen for the scaffold:
 
 1. **Default to a modular monolith, not service-per-BC.** New systems start at
    Structure 1 or 2 (one deployable), never Structure 3, because stable BC
@@ -188,9 +196,8 @@ starting at Structure 1.
   registry even under Structure 2.
 - In Structure 1, layer isolation for a context is test-time (ArchUnit) until it
   is promoted to Structure 2.
-- The Structure 2 module mechanics live in this ADR (the Structure 2 tree above);
-  a future design doc, if one is written, can reference this ADR rather than
-  restating it.
+- The Structure 2 module mechanics live in this analysis (the Structure 2 tree
+  above); a future design or decision doc can reference it rather than restating.
 
 ## Sources
 

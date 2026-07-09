@@ -80,7 +80,7 @@ Both keep **package-per-aggregate** and package-private domain internals
   (`docs/reference/modular-monolith-with-ddd/`)
 - **bc-and-layer-samples/structure-2** → **B**: layer = Maven module,
   aggregate = sub-package inside each layer module. Chosen because it makes the
-  layer boundary a *compile-time* Maven boundary (see decision-00004).
+  layer boundary a *compile-time* Maven boundary (see analysis-00004).
 
 So both are mainstream; the split correlates with intent: teaching/feature-team
 codebases lean **A**; codebases that want layer boundaries as build-enforced
@@ -105,5 +105,5 @@ modules lean **B**.
   `docs/reference/modular-monolith-with-ddd/`
 - Alibaba COLA — https://github.com/alibaba/COLA
 - Robert C. Martin — Common Closure Principle (package cohesion)
-- Related: `decision-00004-bounded-context-module-structure`,
+- Related: `analysis-00004-bounded-context-module-structure`,
   `decision-00005-package-per-aggregate`
