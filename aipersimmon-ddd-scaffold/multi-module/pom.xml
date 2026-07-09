@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.10</version>
+    <relativePath/>
+  </parent>
+
+  <!--
+    Reference multi-module DDD project, one bounded context (ordering) split into
+    api / domain / application / infrastructure / adapter modules plus a start
+    module that assembles them. It is built on the AiPersimmon DDD building blocks
+    (imported via the BOM below) and is the source from which the multi-module
+    archetype is generated. Persistence is in-memory so the project runs and tests
+    without any external database.
+
+    Unlike the building-block library, this is an application, so it may inherit
+    spring-boot-starter-parent.
+  -->
+  <groupId>com.example</groupId>
+  <artifactId>multi-module</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>multi-module</name>
+  <description>Reference multi-module DDD project built on the AiPersimmon DDD building blocks.</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <aipersimmon-ddd.version>0.1.0-SNAPSHOT</aipersimmon-ddd.version>
+  </properties>
+
+  <modules>
+    <module>ordering/ordering-api</module>
+    <module>ordering/ordering-domain</module>
+    <module>ordering/ordering-application</module>
+    <module>ordering/ordering-infrastructure</module>
+    <module>ordering/ordering-adapter</module>
+
+    <module>inventory/inventory-api</module>
+    <module>inventory/inventory-domain</module>
+    <module>inventory/inventory-application</module>
+    <module>inventory/inventory-infrastructure</module>
+    <module>inventory/inventory-adapter</module>
+
+    <module>start</module>
+  </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-bom</artifactId>
+        <version>${aipersimmon-ddd.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <dependency><groupId>com.example</groupId><artifactId>ordering-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>ordering-domain</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>ordering-application</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>ordering-infrastructure</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>ordering-adapter</artifactId><version>${project.version}</version></dependency>
+
+      <dependency><groupId>com.example</groupId><artifactId>inventory-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>inventory-domain</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>inventory-application</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>inventory-infrastructure</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.example</groupId><artifactId>inventory-adapter</artifactId><version>${project.version}</version></dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>

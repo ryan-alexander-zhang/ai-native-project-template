@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example</groupId>
+    <artifactId>multi-module</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The domain layer: model and business rules. Its only dependency is the
+    framework-free building-block library; it must never depend on Spring, JPA,
+    or any other framework, nor on the application, infrastructure, or interface
+    layers. Architecture tests enforce this.
+  -->
+  <artifactId>ordering-domain</artifactId>
+  <name>ordering-domain</name>
+  <description>Domain model and business rules of the ordering context.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+    </dependency>
+  </dependencies>
+</project>

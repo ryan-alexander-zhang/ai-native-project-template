@@ -27,12 +27,15 @@ parent:
 │                                    (-application / -integration / *-starter 后续阶段)
 │
 ├── aipersimmon-ddd-scaffold/        [独立 reactor] 三个**手写参考项目** → 各自派生一个 archetype
-│   ├── multi-module/                ← Phase 1:手写、可运行的参考项目,create-from-project 的源
+│   ├── multi-module/                ← Phase 1:双 BC、可运行的参考项目,create-from-project 的源
+│   │   ├── ordering/                BC(多聚合):ordering-{api,domain,application,infrastructure,adapter}
+│   │   ├── inventory/               BC(单聚合):inventory-{api,domain,application,infrastructure,adapter}
+│   │   └── start/                   @SpringBootApplication 装配双 BC + 架构测试
 │   ├── modulith/                    (后续)
 │   └── microservice/                (后续)
 │
-└── aipersimmon-ddd-scaffold-samples/  用 multi-module 派生的 archetype **生成后**手写补全的
-                                        **双 BC 全量样例**(ordering + inventory);demo + archetype 验证靶子
+└── aipersimmon-ddd-scaffold-samples/  一组**聚焦单点 how-to** 的小例子(如"加一个集成事件"
+                                        "加 outbox""接一个 saga"),各讲清一件事;不是大而全的应用
 ```
 
 - **两个 reactor 相互独立**:库与脚手架发布节奏不同,各自 `mvn` 构建;scaffold 通过依赖坐标引用**已发布/已 install** 的库。
@@ -95,7 +98,7 @@ flowchart TD
 | Phase 3 | `-cqrs(+spring)` / `-saga(+spring)` | CQRS 与 saga 构件 |
 | Phase 4 | `modulith` / `microservice` archetype + CI/CD 发布 GitHub Packages | 补齐另两种拓扑与发布 |
 
-**依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype;④用 archetype 生成 + 手写补全 scaffold-samples。
+**依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写双 BC 参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype 并验证生成/回归;④按需补 `scaffold-samples` 的聚焦 how-to 例子。
 
 ## 五、Phase 1 详细设计
 
@@ -146,24 +149,25 @@ com.aipersimmon.ddd.core
 
 ```mermaid
 flowchart LR
-  mm["scaffold/multi-module<br/>手写参考项目(建立在库之上)"]
+  mm["scaffold/multi-module<br/>手写双 BC 参考项目(建立在库之上)"]
   mm -->|archetype:create-from-project<br/>+ 参数化 + requiredProperties| arch["multi-module archetype 工件(派生物)"]
   arch -->|mvn archetype:generate| gen["生成的骨架项目"]
-  gen -->|手写补全第二个 BC| samples["scaffold-samples(双 BC 全量)"]
-  samples -.->|回归:重生成 + 比对| arch
+  gen -.->|回归:重生成 + 比对| arch
+  samples["scaffold-samples<br/>聚焦单点 how-to 例子"] -.->|各自演示一项技术| mm
 ```
 
-- **参考项目 `multi-module`(archetype 的源,真相源)**:一个**手写、可运行**的多模块 DDD 项目,直接建立在 `aipersimmon-ddd-*`(BOM + core + archunit)之上,遵循 [[decision-00005-package-per-aggregate]] 的包结构。它**先由人手写**(可参考只读的 `bc-and-layer-samples`,但不复制),是 `create-from-project` 的**唯一输入**。
+- **参考项目 `multi-module`(archetype 的源,真相源)**:一个**手写、可运行的双 BC** 多模块 DDD 项目,建立在 `aipersimmon-ddd-*`(BOM + core + archunit)之上,遵循 [[decision-00005-package-per-aggregate]] 的包结构。它**先由人手写**(可参考只读的 `bc-and-layer-samples`,但不复制),是 `create-from-project` 的**唯一输入**。
+  - **两个 BC,至少一个多聚合**:`ordering`(多聚合:`Order` + `Customer`)、`inventory`(单聚合:`Stock`)。单 BC 不足以表达 BC 边界与跨 BC 协作。
+  - **目录嵌套 `<bc>/<bc>-<layer>`**:多 BC 必须按 BC 分目录(`ordering/ordering-adapter`、`inventory/inventory-domain`),BC 目录仅分组、非 Maven 模块;根 pom 以路径列各层模块。**不可**用扁平的 `ordering-adapter`(那是退化的单 BC 写法)。
+  - **跨 BC 走进程内集成事件**(模块化单体,一个可部署单元):`ordering` 下单→发 `OrderPlaced`(ordering-api)→`inventory` 进程内预留→发 `StockReserved`(inventory-api)→`ordering` 进程内确认。跨 BC **只经对方 `*-api`**。broker/outbox/幂等/补偿留后续阶段。
 - **archetype 工件(派生物)**:`create-from-project` 从 `multi-module` 派生,再参数化 `groupId`/`artifactId`/`package`/`version`,补 `archetype-metadata.xml` 的 `requiredProperties`。**`multi-module` 是真相源,archetype 是派生物**——改动流程是改 `multi-module` 后重新派生。
-- **产出(骨架)**:根 aggregator pom(import BOM)+ 一个 worked BC 的五层模块(api/domain/application/infrastructure/adapter)+ `start` + 接好 `-archunit` 的 `ArchitectureTest`;生成即可 `mvn test` 通过。
-  - *开放项*:`multi-module` 参考项目含 **1 个** worked BC(archetype 即产出 1 个);双 BC 全量在 scaffold-samples。待确认。
-- **`scaffold-samples`**:用该 archetype 生成后,手写补全为 **ordering + inventory 双 BC 全量**(事件链路 + outbox/inbox,后续阶段再加 cqrs/saga),**建立在库之上**。三重角色:活文档 demo、archetype 集成测试(重生成 + diff)、`bc-and-layer-samples` 的替代者。
+- **`scaffold-samples`**:一组**聚焦单点 how-to** 的小例子,各只讲清一件事(如"加一个集成事件与进程内处理""加 outbox""接一个 saga""加 CQRS 读模型"),便于查阅与复制,而非再造一个大而全的应用。完整的双 BC 结构表达已由 `multi-module` 承担。
 
 ## 七、后果与开放项
 
 - **后果**:分析→设计落地;库与脚手架解耦;生成项目靠 BOM 版本升级;`bc-and-layer-samples` 在 scaffold-samples 就绪后删除。
 - **开放项**:
-  1. ~~archetype 骨架产出 1 个 BC 还是 0 个~~ **已定:1 个 worked BC**(对齐 analysis-00004 "ship one worked BC");双 BC 全量放 scaffold-samples。
+  1. ~~archetype 骨架产出几个 BC~~ **已定:双 BC(ordering 多聚合 + inventory 单聚合),嵌套目录,跨 BC 走进程内集成事件**。单 BC 表达力不足;完整结构由 multi-module 承担,scaffold-samples 转为聚焦单点 how-to。
   2. `-archunit` 的规则如何参数化消费者的分层包命名(约定 vs 显式传参)?Phase 1 落地时定。
   3. GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)。
 
