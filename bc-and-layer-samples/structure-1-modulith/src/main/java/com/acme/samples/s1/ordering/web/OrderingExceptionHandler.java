@@ -1,6 +1,6 @@
 package com.acme.samples.s1.ordering.web;
 
-import com.acme.samples.s1.ordering.application.CreditExceededException;
+import com.acme.samples.s1.ordering.application.order.CreditExceededException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;

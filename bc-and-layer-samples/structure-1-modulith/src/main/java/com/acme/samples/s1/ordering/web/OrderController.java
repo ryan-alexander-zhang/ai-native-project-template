@@ -1,8 +1,8 @@
 package com.acme.samples.s1.ordering.web;
 
-import com.acme.samples.s1.ordering.application.PlaceOrderService;
-import com.acme.samples.s1.ordering.domain.Order;
-import com.acme.samples.s1.ordering.domain.Orders;
+import com.acme.samples.s1.ordering.application.order.PlaceOrderService;
+import com.acme.samples.s1.ordering.domain.order.Order;
+import com.acme.samples.s1.ordering.domain.order.Orders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
