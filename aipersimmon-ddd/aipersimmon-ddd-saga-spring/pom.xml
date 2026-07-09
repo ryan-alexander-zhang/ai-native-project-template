@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring implementation of the saga contracts, for the optional lightweight
+    orchestration tier.
+
+      - SchedulingDeadlineScheduler: an in-process DeadlineScheduler backed by a
+        TaskScheduler. It fires a saga's timeouts and dispatches them to the
+        application's DeadlineHandler, generalising the "scan for overdue work"
+        timeout of a hand-written choreography into one reusable mechanism. Being
+        in-process, pending timeouts do not survive a restart; a durable timer is
+        what a database-poll variant or a durable-execution engine would add.
+
+      - JdbcSagaStore: an abstract SagaStore base that owns the versioned upsert,
+        the correlation-id lookup, and the optimistic-lock check (raising Spring's
+        OptimisticLockingFailureException on a concurrent advance). A bounded
+        context subclasses it and supplies only the mapping between its concrete
+        saga state and the stored columns, keeping persistence mapping explicit and
+        hand-written rather than reflective.
+
+    Both are opt-in: a bounded context adds a DeadlineHandler bean to get timeout
+    dispatch, and subclasses JdbcSagaStore (registering it as a bean) to persist a
+    particular saga.
+  -->
+  <artifactId>aipersimmon-ddd-saga-spring</artifactId>
+  <name>aipersimmon-ddd-saga-spring</name>
+  <description>Spring starter implementing the saga contracts: a TaskScheduler-backed DeadlineScheduler and an abstract JDBC SagaStore with optimistic locking.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-saga</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- JdbcTemplate for the SagaStore, plus the transaction manager and
+         OptimisticLockingFailureException it reports concurrency with. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

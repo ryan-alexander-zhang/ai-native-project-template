@@ -44,6 +44,26 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-cqrs</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-saga</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-saga-spring</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-events-spring</artifactId>
         <version>${project.version}</version>
       </dependency>

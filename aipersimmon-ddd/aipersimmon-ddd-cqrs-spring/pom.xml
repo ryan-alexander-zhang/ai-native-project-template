@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring implementation of the CQRS contracts. Adding this module auto-configures:
+      - a CommandBus that routes each command to its single registered handler and
+        applies the interceptor chain around it;
+      - a QueryBus that routes each query to its handler;
+      - the built-in interceptors logging -> validation -> transaction, where the
+        transaction interceptor runs the handler in a UnitOfWork (backed by the
+        application's transaction manager) and, still inside that transaction,
+        drains the domain events of the aggregates gathered by the collector so
+        state and events commit together;
+      - a thread-scoped AggregateCollector and a TransactionTemplate-backed
+        UnitOfWork.
+    Validation is wired only when a Bean Validation provider is on the classpath.
+  -->
+  <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
+  <name>aipersimmon-ddd-cqrs-spring</name>
+  <description>Spring starter implementing the CQRS command/query buses, interceptor chain, unit-of-work and aggregate collector.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!-- Optional: the validation interceptor is wired only if a Bean Validation
+         provider is present. Optional so consumers who do not validate commands
+         do not inherit the API. -->
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Brings a transaction manager (spring-jdbc) and an in-memory database so the
+         transaction interceptor and event drain can be exercised end to end. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Bean Validation provider for the validation-interceptor test. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

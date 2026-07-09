@@ -35,6 +35,10 @@
     <module>aipersimmon-ddd-core</module>
     <module>aipersimmon-ddd-application</module>
     <module>aipersimmon-ddd-integration</module>
+    <module>aipersimmon-ddd-cqrs</module>
+    <module>aipersimmon-ddd-cqrs-spring</module>
+    <module>aipersimmon-ddd-saga</module>
+    <module>aipersimmon-ddd-saga-spring</module>
     <module>aipersimmon-ddd-events-spring</module>
     <module>aipersimmon-ddd-outbox-jdbc</module>
     <module>aipersimmon-ddd-inbox-jdbc</module>

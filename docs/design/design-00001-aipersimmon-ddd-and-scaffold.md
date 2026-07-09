@@ -95,12 +95,12 @@ flowchart TD
 | --- | --- | --- |
 | **Phase 1** | `-bom` → `-core` → `-archunit`(**按此序,一个一个做**)+ `multi-module` archetype + scaffold-samples | 先把"库依赖 + 分层 + arch 校验"跑通;archetype 依赖上述库子集 |
 | Phase 2 | `-application` / `-integration` + `-events-spring` / `-outbox` / `-inbox` | 事件与 outbox/inbox 上移进库 |
-| Phase 3 | `-cqrs(+spring)` / `-saga(+spring)` | CQRS 与 saga 构件 |
+| **Phase 3 ✅** | `-cqrs(+spring)` / `-saga(+spring)` | CQRS 与 saga 构件(**已交付**,见 §5.10–5.13) |
 | Phase 4 | `modulith` / `microservice` archetype + CI/CD 发布 GitHub Packages | 补齐另两种拓扑与发布 |
 
 **依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写双 BC 参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype 并验证生成/回归;④按需补 `scaffold-samples` 的聚焦 how-to 例子。
 
-## 五、库模块详细设计(Phase 1:5.1–5.4;Phase 2:5.5–5.9)
+## 五、库模块详细设计(Phase 1:5.1–5.4;Phase 2:5.5–5.9;Phase 3:5.10–5.13)
 
 ### 5.1 `aipersimmon-ddd/pom.xml`(parent + aggregator)
 
@@ -195,6 +195,42 @@ com.aipersimmon.ddd.core
 
 > **参考项目采纳(留待决定,倾向)**:`multi-module` base 保持内存 + 进程内(精简、可跑);starter 的用法由 `scaffold-samples` 的聚焦 how-to 演示("迁移到 outbox / events / inbox"),不把 base 参考项目复杂化。
 
+### 5.10 `aipersimmon-ddd-cqrs`(纯,可选,→ `-core`)
+
+承接 [[analysis-00006-ddd-building-blocks-library]] §五(纯/脏分离、CQRS 整体可选)。framework-free,只依赖 `-core`。
+
+- **写侧**:`Command<R>` / `CommandHandler<C,R>`(薄 handler)/ `CommandBus.send`;`CommandInterceptor` 环绕 SPI(`Invocation<R>.proceed()` + `order()`,越小越外层)。
+- **读侧**:`Query<R>` / `QueryHandler<Q,R>` / `QueryBus.ask`;`@ReadModel` / `@Projection` stereotype。
+- **横切抽象**:`UnitOfWork`(事务边界 port);`AggregateCollector`(收集本次命令触碰的聚合,供集中 drain 事件——补 JDBC/MyBatis 无 ChangeTracker,analysis-00005 §5 的务实点)。
+- 测试:契约级(泛型可组合 + 拦截器环绕/排序 + `UnitOfWork` 默认重载),3/3。
+
+### 5.11 `aipersimmon-ddd-cqrs-spring`(starter,可选,→ `-cqrs` + `-application` + Spring)
+
+analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction,`TransactionTemplate` 接管 UnitOfWork,每请求 AggregateCollector)。
+
+- `RegistryCommandBus` / `RegistryQueryBus`:按 handler 泛型签名(`ResolvableType`)索引命令/查询类型;**handler 须是具体类**(lambda 会擦除泛型,无法索引)。
+- 内置拦截器:`LoggingCommandInterceptor`(order 0)、`ValidationCommandInterceptor`(order 100,`@ConditionalOnClass/Bean(Validator)`,Bean Validation 存在才装配)、`TransactionCommandInterceptor`(order 200,在事务内跑 handler 并**同事务** drain `AggregateCollector` 收集聚合的领域事件经 `DomainEvents` 发布;无 `DomainEvents` 时只提供事务边界)。
+- `ThreadLocalAggregateCollector`(线程域,非 web 也可用)、`TransactionTemplateUnitOfWork`。
+- `AipersimmonDddCqrsAutoConfiguration`:`@ConditionalOnMissingBean` 全可覆盖;`@AutoConfiguration(after = {DataSourceTransactionManager/Transaction/ValidationAutoConfiguration})` 以正确评估 `@ConditionalOnBean`。测试:端到端(happy / 失败回滚且不 drain / 校验先于事务拒绝 / 查询侧),4/4。
+
+### 5.12 `aipersimmon-ddd-saga`(纯,可选,→ `-core`)
+
+承接 [[analysis-00007-saga-process-manager]] §六(借 Axon"标记 + 关联路由 + 生命周期 + deadline"四样形态,放弃 ES/Server)。framework-free。
+
+- `@ProcessManager` stereotype;`SagaState`(基类:`correlationId` 关联路由 + `SagaStatus` 生命周期守卫 + 乐观锁 `version`;状态 `RUNNING→COMPENSATING→ABORTED` / `RUNNING→COMPLETED`,非法迁移抛错);`SagaStatus`。
+- `Deadline`(correlationId + name + fireAt 的"到点回调");`SagaStore<S>` 按 correlationId 存取(乐观锁语义);`DeadlineScheduler`(登记/取消)+ `DeadlineHandler`(到点回调 SPI)。
+- 测试:`SagaState` 关联/生命周期/乐观锁 version,6/6。
+
+### 5.13 `aipersimmon-ddd-saga-spring`(starter,可选,→ `-saga` + `spring-boot-starter-jdbc`)
+
+analysis-00007 §六实现侧(把 s2 的 `PendingOrderTimeoutScanner` 抽象成通用 DeadlineManager;SagaStore 含乐观锁)。
+
+- `SchedulingDeadlineScheduler`:`TaskScheduler` 支撑的**进程内** DeadlineScheduler,到点派发给 `DeadlineHandler`,可按 (correlationId,name) 取消。**进程内 = 重启丢定时器**(诚实注明);持久定时器是 DB-poll 变体或档 2 引擎要补的。
+- `JdbcSagaStore<S>`(**抽象基类**):自持 correlation 查询 + 版本化 upsert + 乐观锁校验(冲突抛 Spring `OptimisticLockingFailureException`);把**具体聚合↔列的映射**(`mapRow`/`serializeData`)留给 BC 子类**手写**(承接 repo `*Po`/`*Mapper` 显式映射哲学,避免泛型反射序列化的脆弱)。附非自动执行样例 DDL。
+- `AipersimmonDddSagaAutoConfiguration`:有 `DeadlineHandler` bean 时装配 scheduler,缺 `TaskScheduler` 时补一个单线程的;`SagaStore` **不自动装配**(BC 子类化后自注册为 bean)。测试:scheduler 触发/取消(2)+ JdbcSagaStore 插入/推进/乐观锁冲突(3),5/5。
+
+> **本阶段落地取舍(诚实记录)**:saga-spring 的 `SagaStore` 实现选**抽象 JDBC 基类 + BC 手写映射**,而非泛型 JSON 自动序列化——因 `SagaState` 子类构造器难被通用反序列化(需 `-parameters`/`@JsonCreator`),泛型全自动 store 脆弱。`DeadlineScheduler` 先给**进程内** `TaskScheduler` 实现(重启丢定时器,已注明)。**留待后续**:持久化 DeadlineScheduler(DB-poll)、saga 经 `-cqrs` CommandBus 发命令 + 经 `-outbox` 可靠外发的组合、`-saga-jpa`;以及一个"接一个 saga / 加 CQRS 读模型"的 scaffold-samples how-to。
+
 ## 六、脚手架设计(`multi-module`)
 
 **约定:archetype 从我们自己手写的参考项目 `aipersimmon-ddd-scaffold/multi-module` 派生,不碰只读的 `bc-and-layer-samples`(后者可读作知识参考,但不作输入、不提炼、不复制)。**
@@ -225,6 +261,9 @@ flowchart LR
   1. ~~archetype 骨架产出几个 BC~~ **已定:双 BC(ordering 多聚合 + inventory 单聚合),嵌套目录,跨 BC 走进程内集成事件**。单 BC 表达力不足;完整结构由 multi-module 承担,scaffold-samples 转为聚焦单点 how-to。
   2. `-archunit` 的规则如何参数化消费者的分层包命名(约定 vs 显式传参)?Phase 1 落地时定。
   3. GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)。
+  4. **集成事件方式三(broker)**:`-messaging-kafka`(broker `OutboxDispatcher`,需 Kafka + Testcontainers)——未做。
+  5. **saga 深化(Phase 3 之后)**:持久化 `DeadlineScheduler`(DB-poll,替换进程内实现)、saga 经 `-cqrs` CommandBus 发命令 + `-outbox` 可靠外发的组合样例、`-saga-jpa`;JPA 变体 `-outbox-jpa` / `-inbox-jpa`。
+  6. **scaffold-samples 补 how-to**:"接一个 saga(orchestration + deadline)""加 CQRS 命令管道/读模型";`multi-module` 是否示范一条 orchestration saga(当前为 choreography)。
 
 ## Sources
 

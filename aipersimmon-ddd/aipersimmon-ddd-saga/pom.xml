@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Saga / process-manager contracts for coordinating a multi-step, cross-aggregate
+    flow from one place: the ProcessManager and Saga markers, a SagaState holding
+    correlation id, lifecycle status and step data, a Deadline for scheduled
+    timeouts, and the SagaStore / DeadlineScheduler ports an implementation backs.
+
+    Optional and framework-free (depends only on the pure core tier). Choreography
+    — reacting to events with no central coordinator — remains the default; this
+    module is for when a flow gains enough steps, branches, or timeouts that an
+    explicit, observable state machine is worth it. The contracts are engine-neutral
+    so a flow can later move to a durable-execution engine by swapping the
+    implementation, not by rewriting the flow. A Spring implementation of the ports
+    lives in a separate starter.
+  -->
+  <artifactId>aipersimmon-ddd-saga</artifactId>
+  <name>aipersimmon-ddd-saga</name>
+  <description>Framework-free saga / process-manager contracts: process-manager markers, saga state, correlation routing, deadlines, and store/scheduler ports.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
