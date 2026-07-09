@@ -25,6 +25,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <junit.version>5.11.4</junit.version>
     <archunit.version>1.4.0</archunit.version>
+    <spring-boot.version>3.5.10</spring-boot.version>
   </properties>
 
   <modules>
@@ -34,16 +35,29 @@
     <module>aipersimmon-ddd-core</module>
     <module>aipersimmon-ddd-application</module>
     <module>aipersimmon-ddd-integration</module>
+    <module>aipersimmon-ddd-events-spring</module>
     <module>aipersimmon-ddd-archunit</module>
   </modules>
 
   <dependencyManagement>
     <dependencies>
-      <!-- Test toolchain shared by library modules (no spring-boot-parent to manage it). -->
+      <!-- Test toolchain shared by library modules (no spring-boot-parent to manage it).
+           Declared first so JUnit resolves to this version rather than the one the
+           Spring Boot BOM below would otherwise supply. -->
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
         <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Managed versions for the Spring/JPA/Jackson used by the *-spring and *-jpa
+           starters. Importing this BOM only supplies versions; it adds no dependency,
+           so the pure tier (core/application/integration) stays framework-free. -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

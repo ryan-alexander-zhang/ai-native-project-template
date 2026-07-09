@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring starter that supplies a DomainEvents implementation. Adding this module
+    auto-configures a publisher that hands each domain event to Spring's
+    ApplicationEventPublisher, so handlers registered with @EventListener (or
+    @TransactionalEventListener) receive it.
+
+    Publishing is synchronous, same-thread, and same-transaction by default: the
+    publisher is called inside the caller's transaction and @EventListener handlers
+    run inline and commit atomically with the aggregate. This is deliberate — a
+    transactional outbox translation step relies on it — so this bridge is not made
+    asynchronous.
+  -->
+  <artifactId>aipersimmon-ddd-events-spring</artifactId>
+  <name>aipersimmon-ddd-events-spring</name>
+  <description>Spring starter bridging the DomainEvents port to Spring's ApplicationEventPublisher.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

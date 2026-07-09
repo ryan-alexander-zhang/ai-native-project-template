@@ -44,6 +44,11 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-events-spring</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-archunit</artifactId>
         <version>${project.version}</version>
       </dependency>
