@@ -1,6 +1,6 @@
-package com.acme.samples.s3.ordering.app;
+package com.acme.samples.s3.ordering.app.order;
 
-import com.acme.samples.s3.ordering.domain.Orders;
+import com.acme.samples.s3.ordering.domain.order.Orders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

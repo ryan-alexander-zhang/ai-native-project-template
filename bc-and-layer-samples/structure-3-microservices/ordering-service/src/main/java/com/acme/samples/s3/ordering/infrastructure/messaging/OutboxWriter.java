@@ -1,6 +1,6 @@
-package com.acme.samples.s3.ordering.infrastructure;
+package com.acme.samples.s3.ordering.infrastructure.messaging;
 
-import com.acme.samples.s3.ordering.app.OrderPlacedPublisher;
+import com.acme.samples.s3.ordering.app.order.OrderPlacedPublisher;
 import com.acme.samples.s3.ordering.client.OrderPlaced;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

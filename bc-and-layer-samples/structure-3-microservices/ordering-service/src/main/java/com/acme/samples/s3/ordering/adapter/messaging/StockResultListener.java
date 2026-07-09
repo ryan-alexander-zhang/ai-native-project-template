@@ -1,6 +1,6 @@
 package com.acme.samples.s3.ordering.adapter.messaging;
 
-import com.acme.samples.s3.ordering.app.ConfirmOrderService;
+import com.acme.samples.s3.ordering.app.order.ConfirmOrderService;
 import com.acme.samples.s3.ordering.client.StockResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.kafka.annotation.KafkaListener;

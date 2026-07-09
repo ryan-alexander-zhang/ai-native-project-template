@@ -1,4 +1,4 @@
-package com.acme.samples.s3.inventory.infrastructure;
+package com.acme.samples.s3.inventory.infrastructure.messaging;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;

@@ -1,4 +1,4 @@
-package com.acme.samples.s3.ordering.infrastructure;
+package com.acme.samples.s3.ordering.infrastructure.persistence.customer;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;

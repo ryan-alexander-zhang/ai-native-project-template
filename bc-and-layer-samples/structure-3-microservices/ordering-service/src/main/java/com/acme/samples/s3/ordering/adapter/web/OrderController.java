@@ -1,8 +1,8 @@
 package com.acme.samples.s3.ordering.adapter.web;
 
-import com.acme.samples.s3.ordering.app.FindOrderService;
-import com.acme.samples.s3.ordering.app.FindOrderService.OrderSnapshot;
-import com.acme.samples.s3.ordering.app.PlaceOrderService;
+import com.acme.samples.s3.ordering.app.order.FindOrderService;
+import com.acme.samples.s3.ordering.app.order.FindOrderService.OrderSnapshot;
+import com.acme.samples.s3.ordering.app.order.PlaceOrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

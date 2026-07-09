@@ -1,8 +1,8 @@
-package com.acme.samples.s3.ordering.infrastructure;
+package com.acme.samples.s3.ordering.infrastructure.persistence.customer;
 
-import com.acme.samples.s3.ordering.domain.Customer;
-import com.acme.samples.s3.ordering.domain.Customers;
-import com.acme.samples.s3.ordering.domain.Money;
+import com.acme.samples.s3.ordering.domain.customer.Customer;
+import com.acme.samples.s3.ordering.domain.customer.Customers;
+import com.acme.samples.s3.ordering.domain.shared.Money;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;

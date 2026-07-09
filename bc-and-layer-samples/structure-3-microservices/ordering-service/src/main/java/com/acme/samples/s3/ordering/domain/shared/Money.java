@@ -1,4 +1,4 @@
-package com.acme.samples.s3.ordering.domain;
+package com.acme.samples.s3.ordering.domain.shared;
 
 public record Money(long amountMinor, String currency) {
     public Money {

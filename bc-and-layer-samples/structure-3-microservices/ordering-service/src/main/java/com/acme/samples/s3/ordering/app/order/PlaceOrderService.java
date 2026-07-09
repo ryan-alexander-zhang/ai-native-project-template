@@ -1,11 +1,11 @@
-package com.acme.samples.s3.ordering.app;
+package com.acme.samples.s3.ordering.app.order;
 
 import com.acme.samples.s3.ordering.client.OrderPlaced;
-import com.acme.samples.s3.ordering.domain.Customer;
-import com.acme.samples.s3.ordering.domain.Customers;
-import com.acme.samples.s3.ordering.domain.Order;
-import com.acme.samples.s3.ordering.domain.OrderLine;
-import com.acme.samples.s3.ordering.domain.Orders;
+import com.acme.samples.s3.ordering.domain.customer.Customer;
+import com.acme.samples.s3.ordering.domain.customer.Customers;
+import com.acme.samples.s3.ordering.domain.order.Order;
+import com.acme.samples.s3.ordering.domain.order.OrderLineData;
+import com.acme.samples.s3.ordering.domain.order.Orders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +39,9 @@ public class PlaceOrderService {
         Customer customer = customers.byId(command.customerId())
                 .orElseThrow(() -> new IllegalArgumentException("unknown customer: " + command.customerId()));
 
-        List<OrderLine> lines = command.lines().stream()
-                .map(l -> new OrderLine(l.sku(), l.qty(), pricing.unitPriceMinor(l.sku())))  // external HTTP
+        // build raw line data (external HTTP pricing per sku); the aggregate builds its own internal lines
+        List<OrderLineData> lines = command.lines().stream()
+                .map(l -> new OrderLineData(l.sku(), l.qty(), pricing.unitPriceMinor(l.sku())))
                 .toList();
 
         Order order = Order.place(UUID.randomUUID().toString(), command.customerId(), lines);
@@ -51,7 +52,7 @@ public class PlaceOrderService {
         }
 
         // synchronous cross-service REST pre-check against inventory-service
-        for (OrderLine line : lines) {
+        for (OrderLineData line : lines) {
             if (!inventory.isAvailable(line.sku(), line.qty())) {
                 throw new StockUnavailableException("sku " + line.sku() + " not available x" + line.qty());
             }

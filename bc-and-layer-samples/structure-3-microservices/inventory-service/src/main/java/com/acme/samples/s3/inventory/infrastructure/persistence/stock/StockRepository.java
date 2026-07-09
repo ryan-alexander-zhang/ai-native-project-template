@@ -1,7 +1,7 @@
-package com.acme.samples.s3.inventory.infrastructure;
+package com.acme.samples.s3.inventory.infrastructure.persistence.stock;
 
-import com.acme.samples.s3.inventory.domain.StockItem;
-import com.acme.samples.s3.inventory.domain.StockItems;
+import com.acme.samples.s3.inventory.domain.stock.StockItem;
+import com.acme.samples.s3.inventory.domain.stock.StockItems;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;

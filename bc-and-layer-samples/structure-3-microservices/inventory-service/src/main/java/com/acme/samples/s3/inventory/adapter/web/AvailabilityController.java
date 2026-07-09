@@ -1,6 +1,6 @@
 package com.acme.samples.s3.inventory.adapter.web;
 
-import com.acme.samples.s3.inventory.app.CheckAvailabilityService;
+import com.acme.samples.s3.inventory.app.stock.CheckAvailabilityService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;

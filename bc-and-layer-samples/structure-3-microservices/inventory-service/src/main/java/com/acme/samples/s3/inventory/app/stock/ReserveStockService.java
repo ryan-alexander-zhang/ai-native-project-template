@@ -1,9 +1,9 @@
-package com.acme.samples.s3.inventory.app;
+package com.acme.samples.s3.inventory.app.stock;
 
 import com.acme.samples.s3.inventory.client.OrderPlaced;
 import com.acme.samples.s3.inventory.client.StockResult;
-import com.acme.samples.s3.inventory.domain.StockItem;
-import com.acme.samples.s3.inventory.domain.StockItems;
+import com.acme.samples.s3.inventory.domain.stock.StockItem;
+import com.acme.samples.s3.inventory.domain.stock.StockItems;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

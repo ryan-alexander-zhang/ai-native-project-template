@@ -1,6 +1,6 @@
-package com.acme.samples.s3.inventory.infrastructure;
+package com.acme.samples.s3.inventory.infrastructure.messaging;
 
-import com.acme.samples.s3.inventory.app.Reservations;
+import com.acme.samples.s3.inventory.app.stock.Reservations;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;

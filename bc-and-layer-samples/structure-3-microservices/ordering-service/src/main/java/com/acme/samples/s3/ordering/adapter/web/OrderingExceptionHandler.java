@@ -1,7 +1,7 @@
 package com.acme.samples.s3.ordering.adapter.web;
 
-import com.acme.samples.s3.ordering.app.CreditExceededException;
-import com.acme.samples.s3.ordering.app.StockUnavailableException;
+import com.acme.samples.s3.ordering.app.order.CreditExceededException;
+import com.acme.samples.s3.ordering.app.order.StockUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;

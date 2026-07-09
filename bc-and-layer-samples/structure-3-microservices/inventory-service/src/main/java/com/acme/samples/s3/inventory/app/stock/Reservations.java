@@ -1,4 +1,4 @@
-package com.acme.samples.s3.inventory.app;
+package com.acme.samples.s3.inventory.app.stock;
 
 import java.util.Optional;
 

@@ -1,6 +1,6 @@
 package com.acme.samples.s3.inventory.adapter.messaging;
 
-import com.acme.samples.s3.inventory.app.ReserveStockService;
+import com.acme.samples.s3.inventory.app.stock.ReserveStockService;
 import com.acme.samples.s3.inventory.client.OrderPlaced;
 import com.acme.samples.s3.inventory.client.StockResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
