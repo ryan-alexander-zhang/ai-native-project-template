@@ -1,11 +1,11 @@
 package com.acme.samples.s2.ordering.application;
 
 import com.acme.samples.s2.ordering.api.OrderPlaced;
-import com.acme.samples.s2.ordering.domain.Customer;
-import com.acme.samples.s2.ordering.domain.Customers;
-import com.acme.samples.s2.ordering.domain.Order;
-import com.acme.samples.s2.ordering.domain.OrderLine;
-import com.acme.samples.s2.ordering.domain.Orders;
+import com.acme.samples.s2.ordering.domain.customer.Customer;
+import com.acme.samples.s2.ordering.domain.customer.Customers;
+import com.acme.samples.s2.ordering.domain.order.Order;
+import com.acme.samples.s2.ordering.domain.order.OrderLineData;
+import com.acme.samples.s2.ordering.domain.order.Orders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,8 +36,9 @@ public class PlaceOrderService {
         Customer customer = customers.byId(command.customerId())
                 .orElseThrow(() -> new IllegalArgumentException("unknown customer: " + command.customerId()));
 
-        List<OrderLine> lines = command.lines().stream()
-                .map(l -> new OrderLine(l.sku(), l.qty(), pricing.unitPriceMinor(l.sku())))
+        // build raw line data (external HTTP pricing per sku); the aggregate builds its own internal lines
+        List<OrderLineData> lines = command.lines().stream()
+                .map(l -> new OrderLineData(l.sku(), l.qty(), pricing.unitPriceMinor(l.sku())))
                 .toList();
 
         Order order = Order.place(UUID.randomUUID().toString(), command.customerId(), lines);
@@ -48,13 +49,10 @@ public class PlaceOrderService {
         }
 
         orders.save(order);
-
-        // outbox write happens in this same transaction
         publisher.publish(new OrderPlaced(order.id(), order.customerId(),
                 order.lines().stream()
                         .map(l -> new OrderPlaced.Line(l.sku(), l.qty(), l.unitPriceMinor()))
                         .toList()));
-
         return order.id();
     }
 }

@@ -1,8 +1,8 @@
 package com.acme.samples.s2.inventory.application;
 
 import com.acme.samples.s2.inventory.api.StockResult;
-import com.acme.samples.s2.inventory.domain.StockItem;
-import com.acme.samples.s2.inventory.domain.StockItems;
+import com.acme.samples.s2.inventory.domain.stock.StockItem;
+import com.acme.samples.s2.inventory.domain.stock.StockItems;
 import com.acme.samples.s2.ordering.api.OrderPlaced;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

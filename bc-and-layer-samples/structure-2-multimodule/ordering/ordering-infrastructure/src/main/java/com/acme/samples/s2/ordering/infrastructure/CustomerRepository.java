@@ -1,7 +1,7 @@
 package com.acme.samples.s2.ordering.infrastructure;
 
-import com.acme.samples.s2.ordering.domain.Customer;
-import com.acme.samples.s2.ordering.domain.Customers;
+import com.acme.samples.s2.ordering.domain.customer.Customer;
+import com.acme.samples.s2.ordering.domain.customer.Customers;
 import com.acme.samples.s2.shared.Money;
 import org.springframework.stereotype.Repository;
 

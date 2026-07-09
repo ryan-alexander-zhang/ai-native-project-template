@@ -1,7 +1,7 @@
 package com.acme.samples.s2.ordering.application;
 
-import com.acme.samples.s2.ordering.domain.OrderStatus;
-import com.acme.samples.s2.ordering.domain.Orders;
+import com.acme.samples.s2.ordering.domain.order.OrderStatus;
+import com.acme.samples.s2.ordering.domain.order.Orders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

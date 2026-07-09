@@ -1,6 +1,6 @@
 package com.acme.samples.s2.ordering.application;
 
-import com.acme.samples.s2.ordering.domain.Orders;
+import com.acme.samples.s2.ordering.domain.order.Orders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +14,7 @@ public class FindOrderService {
 
     private final Orders orders;
 
-    public FindOrderService(Orders orders) {
-        this.orders = orders;
-    }
+    public FindOrderService(Orders orders) { this.orders = orders; }
 
     @Transactional(readOnly = true)
     public Optional<OrderSnapshot> byId(String id) {

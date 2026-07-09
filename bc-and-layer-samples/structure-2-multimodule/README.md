@@ -20,6 +20,12 @@ structure-2-multimodule/            reactor POM
 - **Compile-time isolation both axes.** `*-domain` has no Spring/JPA on its
   classpath (framework leak won't compile); a context depends only on another
   context's `*-api` (cross-BC leak won't compile).
+- **Package-per-aggregate with package-private internals** (decision-00005):
+  `ordering-domain` is split into `order/` and `customer/` packages; `OrderLine`
+  is package-private, so outside the `order` package you cannot `new OrderLine(...)`
+  — the "reach an aggregate only through its root" rule is compiler-enforced. The
+  root is built/rehydrated from public `OrderLineData`, so the repository (another
+  module) never touches the internal entity.
 - **`*-api`** modules hold the published language (integration events); cross-BC
   references target only these.
 - **Hand-rolled transactional outbox**: `OutboxWriter` inserts into the `outbox`

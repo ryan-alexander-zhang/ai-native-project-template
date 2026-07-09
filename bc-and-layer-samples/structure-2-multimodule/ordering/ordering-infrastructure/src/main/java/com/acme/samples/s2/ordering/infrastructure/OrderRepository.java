@@ -1,9 +1,9 @@
 package com.acme.samples.s2.ordering.infrastructure;
 
-import com.acme.samples.s2.ordering.domain.Order;
-import com.acme.samples.s2.ordering.domain.OrderLine;
-import com.acme.samples.s2.ordering.domain.OrderStatus;
-import com.acme.samples.s2.ordering.domain.Orders;
+import com.acme.samples.s2.ordering.domain.order.Order;
+import com.acme.samples.s2.ordering.domain.order.OrderLineData;
+import com.acme.samples.s2.ordering.domain.order.OrderStatus;
+import com.acme.samples.s2.ordering.domain.order.Orders;
 import com.acme.samples.s2.shared.Money;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Repository;
@@ -33,7 +33,7 @@ public class OrderRepository implements Orders {
         po.setCurrency(order.total().currency());
         po.setCreatedAt(OffsetDateTime.now());
         orderMapper.insert(po);
-        for (OrderLine line : order.lines()) {
+        for (OrderLineData line : order.lines()) {   // public boundary data, not the internal entity
             OrderLinePo lp = new OrderLinePo();
             lp.setOrderId(order.id());
             lp.setSku(line.sku());
@@ -47,8 +47,8 @@ public class OrderRepository implements Orders {
     public Optional<Order> byId(String id) {
         OrderPo po = orderMapper.selectById(id);
         if (po == null) return Optional.empty();
-        List<OrderLine> lines = lineMapper.selectList(new QueryWrapper<OrderLinePo>().eq("order_id", id))
-                .stream().map(l -> new OrderLine(l.getSku(), l.getQty(), l.getUnitPriceMinor())).toList();
+        List<OrderLineData> lines = lineMapper.selectList(new QueryWrapper<OrderLinePo>().eq("order_id", id))
+                .stream().map(l -> new OrderLineData(l.getSku(), l.getQty(), l.getUnitPriceMinor())).toList();
         return Optional.of(Order.rehydrate(po.getId(), po.getCustomerId(), lines,
                 new Money(po.getTotalMinor(), po.getCurrency()), OrderStatus.valueOf(po.getStatus())));
     }

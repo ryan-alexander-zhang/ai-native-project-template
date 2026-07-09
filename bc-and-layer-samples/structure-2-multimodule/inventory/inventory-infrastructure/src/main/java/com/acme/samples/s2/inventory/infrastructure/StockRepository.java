@@ -1,7 +1,7 @@
 package com.acme.samples.s2.inventory.infrastructure;
 
-import com.acme.samples.s2.inventory.domain.StockItem;
-import com.acme.samples.s2.inventory.domain.StockItems;
+import com.acme.samples.s2.inventory.domain.stock.StockItem;
+import com.acme.samples.s2.inventory.domain.stock.StockItems;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -11,9 +11,7 @@ public class StockRepository implements StockItems {
 
     private final StockMapper stockMapper;
 
-    public StockRepository(StockMapper stockMapper) {
-        this.stockMapper = stockMapper;
-    }
+    public StockRepository(StockMapper stockMapper) { this.stockMapper = stockMapper; }
 
     @Override
     public Optional<StockItem> bySku(String sku) {

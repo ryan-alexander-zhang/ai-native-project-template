@@ -1,4 +1,4 @@
-package com.acme.samples.s2.inventory.domain;
+package com.acme.samples.s2.inventory.domain.stock;
 
 import java.util.Optional;
 

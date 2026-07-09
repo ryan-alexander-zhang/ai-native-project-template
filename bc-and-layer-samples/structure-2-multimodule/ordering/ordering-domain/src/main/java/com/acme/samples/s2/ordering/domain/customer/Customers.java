@@ -1,4 +1,4 @@
-package com.acme.samples.s2.ordering.domain;
+package com.acme.samples.s2.ordering.domain.customer;
 
 import java.util.Optional;
 
