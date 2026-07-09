@@ -100,7 +100,7 @@ flowchart TD
 
 **依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写双 BC 参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype 并验证生成/回归;④按需补 `scaffold-samples` 的聚焦 how-to 例子。
 
-## 五、Phase 1 详细设计
+## 五、库模块详细设计(Phase 1:5.1–5.4;Phase 2:5.5–5.9)
 
 ### 5.1 `aipersimmon-ddd/pom.xml`(parent + aggregator)
 
@@ -142,6 +142,45 @@ com.aipersimmon.ddd.core
   - `IntegrationEvent` 只在 `*-api`;`DomainEvent` 不得泄漏到 adapter。
   - **每个 package 必须有 `package-info.java`**(§二 规约 5)。
 - 消费项目写一个 `ArchitectureTest`,按其分层包命名约定套用规则。
+
+---
+
+**Phase 2 起,parent 的 `dependencyManagement` import `spring-boot-dependencies` BOM(3.5.10)**,让 starter 依赖 Spring/JPA/Jackson 时无需自己钉版本;**纯层不受影响**——import BOM 只管版本、不引入依赖,`-core`/`-application`/`-integration` 仍零框架。
+
+### 5.5 `aipersimmon-ddd-application`(纯,→ `-core`)
+
+- `DomainEvents` 发布 port(`publish` / `publishAll`);`@UseCase` 标记;`ApplicationException` 基类。零框架(仅 test junit)。
+- `DomainEvents` 与参考项目本地内联的同名 port **签名一致**,便于日后回收。
+
+### 5.6 `aipersimmon-ddd-integration`(纯,零依赖)
+
+- `IntegrationEvent` 标记(区别于 `-core` 的 `DomainEvent`);`EventEnvelope<T extends IntegrationEvent>`(`eventId`/`type`/`version`/`occurredAt`/`traceId`/`payload`),**构造即校验**;版本化契约约定写入 Javadoc。
+- **纯数据持有**:不做序列化、不取时钟/随机——由 infra starter 在封装时盖章。
+
+### 5.7 `aipersimmon-ddd-events-spring`(starter,→ `-application` + Spring)
+
+- 提供 `DomainEvents` 的 Spring 实现:`SpringDomainEvents`(委托 `ApplicationEventPublisher`);Boot 自动装配(`AutoConfiguration.imports`),引入即生效。
+- **语义(承接 analysis-00001):默认同步、同线程、同事务**——发布在 `@Transactional` 内调用,`@EventListener` 处理器内联执行、与聚合原子提交。**此处不可异步**(否则破坏 outbox 翻译步骤的原子性)。
+- 消费者用 `@EventListener` / `@TransactionalEventListener` 注册对某 `DomainEvent` 的处理器。
+
+### 5.8 `aipersimmon-ddd-outbox-jpa`(starter,最重,→ `-application` + `-integration` + Spring Data JPA + Jackson)
+
+- **事务性 outbox**:把集成事件(`EventEnvelope` 序列化为 JSON)与聚合变更**同事务**写入 outbox 表;relay 轮询未发送行,发到 broker,置 `sent`。
+- 组件:
+  - `OutboxPo`(JPA 实体):`id` / `type` / `version` / `payload`(JSON)/ `occurredAt` / `traceId` / `sent` / `createdAt`。
+  - `OutboxWriter`:实现"写 outbox"port(集成事件发布 port 的 outbox 版),Jackson 序列化 `EventEnvelope` 后在当前事务插入一行。
+  - `OutboxRelay`:`@Scheduled` 轮询未发送行 → 交给 **broker 发布 port `OutboxDispatcher`** → 置 `sent`;带退避 + 重试上限。
+  - **broker 抽象**:本模块只定义 `OutboxDispatcher` port,不含具体 broker;后续 `-messaging-kafka`(或一个 log/no-op 实现)供给。
+- 序列化 = Jackson;表结构随 starter 文档化,DDL 迁移由消费者(Flyway/Liquibase)落地或附 `schema.sql` 样例。
+- 决策:先做 `-jpa`(Spring Data),`-jdbc` 变体后续;relay = `@Scheduled`;broker = port。
+
+### 5.9 `aipersimmon-ddd-inbox-jpa`(starter,→ `-application` + Spring Data JPA)
+
+- **幂等消费**:inbox 表记录已处理的去重键;消费前查、重投时收敛。
+- 组件:`InboxPo`(`dedupKey` / `processedAt`);`Inbox` port + JPA 实现(`alreadyProcessed(key)` / `markProcessed(key)`)。
+- 去重键 = 集成事件 `eventId`(来自 `EventEnvelope`)。
+
+> **参考项目采纳(留待决定,倾向)**:`multi-module` base 保持内存 + 进程内(精简、可跑);starter 的用法由 `scaffold-samples` 的聚焦 how-to 演示("迁移到 outbox / events / inbox"),不把 base 参考项目复杂化。
 
 ## 六、脚手架设计(`multi-module`)
 
