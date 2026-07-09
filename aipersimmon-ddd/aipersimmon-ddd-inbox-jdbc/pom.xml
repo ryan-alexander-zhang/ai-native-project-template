@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Idempotent-consumer (inbox) starter over JdbcTemplate. It implements the Inbox
+    port by recording each handled message key in an inbox table, using a unique
+    key so a redelivered message is detected and skipped. Called inside the
+    consumer's transaction, the record commits with the processing and rolls back
+    with it on failure, so a failed message is retried.
+
+    JDBC, not JPA, for the same reason as the outbox starter: no @Entity and no
+    @EntityScan, so it never overrides a consumer's own entity scanning. The
+    consumer creates the inbox table (a documented DDL).
+  -->
+  <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
+  <name>aipersimmon-ddd-inbox-jdbc</name>
+  <description>Idempotent-consumer (inbox) starter over JdbcTemplate.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
