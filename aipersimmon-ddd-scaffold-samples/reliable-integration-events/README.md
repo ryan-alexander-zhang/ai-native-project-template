@@ -13,6 +13,12 @@ starters, and nothing else.
   versa). A scheduled relay then dispatches unsent rows and marks them sent
   (at-least-once delivery).
 
+- **In-process asynchronous delivery** — setting
+  `aipersimmon.ddd.outbox.dispatch=in-process` makes the relay republish each
+  stored event to local `@EventListener` handlers instead of only logging. You get
+  outbox reliability (the event waits durably in the table) with in-process
+  handling and no broker.
+
 - **Idempotent inbox (`aipersimmon-ddd-inbox-jdbc`)** — guarding a consumer with
   the `Inbox` port makes it converge under redelivery: handling the same message
   key twice applies the effect once.
@@ -23,7 +29,9 @@ starters, and nothing else.
 mvn test
 ```
 
-The test drives both patterns against an in-memory H2 database, so no broker or
-external database is needed. `ReliableIntegrationEventsHowToTest` asserts:
-the outbox row is written with the business change; a failure rolls back both;
-the relay dispatches and marks rows sent; and a duplicate delivery is skipped.
+Two tests drive the patterns against an in-memory H2 database, so no broker or
+external database is needed. `ReliableIntegrationEventsHowToTest` asserts: the
+outbox row is written with the business change; a failure rolls back both; the
+relay dispatches and marks rows sent; and a duplicate delivery is skipped.
+`InProcessDeliveryHowToTest` enables in-process dispatch and asserts the relay
+delivers the event to the local listener, which applies it once.
