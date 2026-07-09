@@ -79,6 +79,27 @@ Order.rehydrate(id, customerId, List<LineData> lines, status);
 So the domain module's *public API* is exactly {aggregate roots + repository ports
 + shared public VOs}; everything else stays package-private.
 
+## Scope across layers
+
+The **compiler-enforced encapsulation** above is **domain-only**: only the domain
+holds an aggregate's internal entities/VOs, so package-private "reach the aggregate
+only through its root" applies there and nowhere else. The other layers have no
+such internals to hide.
+
+The broader principle — **group by aggregate, not by technical type** — does apply
+to `application`, `infrastructure`, and `adapter` (sub-package them `…/order`,
+`…/customer` rather than lumping all handlers / all mappers together), but there it
+buys **cohesion and navigability** (Common Closure Principle — things that change
+together live together), *not* invariant enforcement.
+
+"By layer" and "by aggregate" are orthogonal dimensions; which one is the *outer*
+dimension is a separate choice compared in
+`analysis-00003-aggregate-first-vs-layer-first`. In structure-2 the layer is the
+outer dimension (one Maven module per layer) and the aggregate is a sub-package
+inside each layer module. Note Java package-private is judged per *leaf* package
+(there is no sub-package inheritance of access), so the domain encapsulation
+benefit is unaffected by that ordering.
+
 ## Rationale & sources
 
 Reference implementations (`docs/reference/`):
