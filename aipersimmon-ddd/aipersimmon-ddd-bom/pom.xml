@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Bill of Materials for the AiPersimmon DDD building blocks.
+    Consumers import this BOM (dependencyManagement with scope=import) to align the
+    versions of every aipersimmon-ddd-* module without pinning each one by hand.
+    Entries may be declared here ahead of the corresponding module being built:
+    dependencyManagement is lazy, so a not-yet-built entry stays inert until a
+    consumer actually depends on it.
+  -->
+  <artifactId>aipersimmon-ddd-bom</artifactId>
+  <packaging>pom</packaging>
+  <name>aipersimmon-ddd-bom</name>
+  <description>BOM aligning versions of the AiPersimmon DDD building-block modules.</description>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Phase 1 -->
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-archunit</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Additional modules (application, integration, cqrs, and the pluggable
+           starters) are appended here as they are built. -->
+    </dependencies>
+  </dependencyManagement>
+</project>

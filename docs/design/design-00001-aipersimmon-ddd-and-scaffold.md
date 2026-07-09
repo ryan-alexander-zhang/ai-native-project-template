@@ -1,0 +1,181 @@
+---
+id: design-00001-aipersimmon-ddd-and-scaffold
+type: design
+role: main
+status: active
+parent:
+---
+
+# aipersimmon-ddd 库 + Maven-archetype 脚手架：最终形态与 Phase 1 设计
+
+把分析阶段的结论落成**可构建的设计**。承接 [[analysis-00006-ddd-building-blocks-library]]
+（构件库按 Layer × 可插拔性切分、参考不依赖、拓扑无关）、[[analysis-00007-saga-process-manager]]
+（saga 分档）、[[analysis-00004-bounded-context-module-structure]]（三种拓扑）、
+[[decision-00005-package-per-aggregate]]（domain 包结构)。
+
+分析阶段结束,`bc-and-layer-samples/` 是分析期 demo,**最终删除**——由 archetype + scaffold-samples 取代。
+
+## 一、最终形态：mono-repo,三顶层目录,两个独立 reactor
+
+```
+<repo root>
+├── aipersimmon-ddd/                 [独立 reactor] 发布型 DDD 库(analysis-00006 模块集)
+│   ├── pom.xml                      parent + aggregator(framework-free,NOT spring-boot-parent)
+│   ├── aipersimmon-ddd-bom/         消费者 import 的 BOM
+│   ├── aipersimmon-ddd-core/        纯净:注解 / marker / 基类 / Transitions
+│   └── aipersimmon-ddd-archunit/    可复用 ArchUnit 规则(test)
+│                                    (-application / -integration / *-starter 后续阶段)
+│
+├── aipersimmon-ddd-scaffold/        [独立 reactor] 三个**手写参考项目** → 各自派生一个 archetype
+│   ├── multi-module/                ← Phase 1:手写、可运行的参考项目,create-from-project 的源
+│   ├── modulith/                    (后续)
+│   └── microservice/                (后续)
+│
+└── aipersimmon-ddd-scaffold-samples/  用 multi-module 派生的 archetype **生成后**手写补全的
+                                        **双 BC 全量样例**(ordering + inventory);demo + archetype 验证靶子
+```
+
+- **两个 reactor 相互独立**:库与脚手架发布节奏不同,各自 `mvn` 构建;scaffold 通过依赖坐标引用**已发布/已 install** 的库。
+- **groupId `com.aipersimmon.ddd`,基础包 `com.aipersimmon.ddd.*`**;生成项目的 groupId/package 由 archetype 属性给(默认 `com.example.app`,创建时可改)。
+- **生成的项目"依赖"库 BOM,不拷源码**(analysis-00006 铁律)。
+- **CI/CD 发布到 GitHub Packages:后续**,本设计不展开。
+
+## 二、贯穿性设计约束
+
+1. **库 parent 必须 framework-free**:`aipersimmon-ddd/pom.xml` **不继承** `spring-boot-starter-parent`,只设 Java 21 + 插件 + 内部 dependencyManagement。只有后续 `*-spring` starter 才引 Spring。否则 `-core` 不再零依赖,违反 analysis-00006。
+2. **版本治理**:`-bom` 管住所有 `aipersimmon-ddd-*` 版本;消费者只 `import` 这一个。
+3. **拓扑无关**:同一套库,三种 archetype 复用;差异只在打包与消息传输(analysis-00006 §七)。
+4. **Java 21 / Maven 3.9**;编码 UTF-8;`maven.compiler.release=21`。
+5. **每个 Java package 必须有 `package-info.java`**:承载包级 Javadoc 与分层 stereotype 注解(`@DomainLayer` 等标注于此),并让"包意图"显式。由 `-archunit` 校验存在性(§5.4)。适用于库、参考项目与生成项目的所有包。
+
+## 三、库 reactor 模块依赖图(analysis-00006 落地)
+
+```mermaid
+flowchart TD
+  subgraph pure["纯净层 framework-free"]
+    core["aipersimmon-ddd-core"]
+    app["aipersimmon-ddd-application"]
+    integ["aipersimmon-ddd-integration"]
+    cqrs["aipersimmon-ddd-cqrs"]
+  end
+  subgraph starter["可插拔 starter (Spring/JPA/Kafka)"]
+    events["-events-spring"]
+    outbox["-outbox-jpa / -jdbc"]
+    inbox["-inbox-jpa"]
+    msg["-messaging-kafka / -rabbit"]
+    cqrsSpring["-cqrs-spring"]
+    saga["-saga / -saga-spring"]
+  end
+  arch["aipersimmon-ddd-archunit (test)"]
+  bom["aipersimmon-ddd-bom"]
+
+  app --> core
+  integ --> core
+  cqrs --> core
+  events --> app
+  outbox --> app
+  inbox --> app
+  cqrsSpring --> cqrs
+  arch --> core
+  bom -. 管理版本 .-> core
+  bom -. 管理版本 .-> arch
+
+  classDef p1 fill:#dff0d8,stroke:#3c763d;
+  class core,arch,bom p1
+```
+
+> 绿色 = **Phase 1 交付**(`-bom` / `-core` / `-archunit`);其余为后续阶段。
+
+## 四、分阶段计划
+
+| 阶段 | 交付 | 说明 |
+| --- | --- | --- |
+| **Phase 1** | `-bom` → `-core` → `-archunit`(**按此序,一个一个做**)+ `multi-module` archetype + scaffold-samples | 先把"库依赖 + 分层 + arch 校验"跑通;archetype 依赖上述库子集 |
+| Phase 2 | `-application` / `-integration` + `-events-spring` / `-outbox` / `-inbox` | 事件与 outbox/inbox 上移进库 |
+| Phase 3 | `-cqrs(+spring)` / `-saga(+spring)` | CQRS 与 saga 构件 |
+| Phase 4 | `modulith` / `microservice` archetype + CI/CD 发布 GitHub Packages | 补齐另两种拓扑与发布 |
+
+**依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype;④用 archetype 生成 + 手写补全 scaffold-samples。
+
+## 五、Phase 1 详细设计
+
+### 5.1 `aipersimmon-ddd/pom.xml`(parent + aggregator)
+
+- `groupId=com.aipersimmon.ddd`、`artifactId=aipersimmon-ddd-parent`、`version=0.1.0-SNAPSHOT`、`packaging=pom`。
+- **不继承** spring-boot-parent。`properties`:`maven.compiler.release=21`、`project.build.sourceEncoding=UTF-8`、`archunit.version`。
+- `dependencyManagement`:声明 `archunit-junit5`(供 `-archunit` 用),内部模块版本用 `${project.version}`。
+- `modules`:随阶段追加。Phase 1 逐步为 `aipersimmon-ddd-bom` → `+core` → `+archunit`。
+
+### 5.2 `aipersimmon-ddd-bom`(第一步)
+
+- `packaging=pom`,parent 指向上面的 parent。
+- `dependencyManagement` 列出 Phase-1 构件坐标(`-core`、`-archunit`,版本 `${project.version}`);后续模块随阶段追加。
+- 消费者(生成项目)`<dependencyManagement><scope>import</scope>` 引它即可对齐版本。
+
+### 5.3 `aipersimmon-ddd-core`(第二步,零依赖)
+
+包结构(承接 analysis-00006 §三 + §十):
+
+```
+com.aipersimmon.ddd.core
+├── annotation/    @AggregateRoot @Entity @ValueObject @Repository @Identity @DomainEvent @Service
+├── architecture/  @DomainLayer @ApplicationLayer @InfrastructureLayer @InterfaceLayer  (hexagonal 可选)
+├── model/         AggregateRoot<ID>  Entity<ID>  Identifier  Association<T,ID>  AbstractAggregateRoot
+├── event/         DomainEvent (marker)
+├── state/         Transitions<S>  IllegalStateTransitionException   (analysis-00006 §十)
+└── exception/     DomainException
+```
+
+- `AbstractAggregateRoot`:迁移 repo 现有 `shared-kernel/AggregateRoot`(事件登记/清空)并验证零 framework 依赖。
+- `Transitions<S>`:analysis-00006 §十 已给出完整实现与 demo,直接落地。
+- **`pom.xml` 无任何 `dependencies`**(除测试 `junit-jupiter`)——这是 `-core` 的验收红线。
+
+### 5.4 `aipersimmon-ddd-archunit`(第三步)
+
+- 依赖 `-core`(识别注解/marker)+ `archunit-junit5`(**compile** 依赖,消费者以 test scope 引 `-archunit` 即可传递获得)。
+- 提供可复用 `ArchRule` 常量 + 一个便捷聚合入口(如 `AiPersimmonDddRules.all(basePackage)`),规则集(analysis-00006 §六):
+  - domain 不得依赖 application / infrastructure / adapter / 任何 framework;
+  - 跨聚合只经 `Association` / `Identifier` 引用聚合根;
+  - `IntegrationEvent` 只在 `*-api`;`DomainEvent` 不得泄漏到 adapter。
+  - **每个 package 必须有 `package-info.java`**(§二 规约 5)。
+- 消费项目写一个 `ArchitectureTest`,按其分层包命名约定套用规则。
+
+## 六、脚手架设计(`multi-module`)
+
+**约定:archetype 从我们自己手写的参考项目 `aipersimmon-ddd-scaffold/multi-module` 派生,不碰只读的 `bc-and-layer-samples`(后者可读作知识参考,但不作输入、不提炼、不复制)。**
+
+```mermaid
+flowchart LR
+  mm["scaffold/multi-module<br/>手写参考项目(建立在库之上)"]
+  mm -->|archetype:create-from-project<br/>+ 参数化 + requiredProperties| arch["multi-module archetype 工件(派生物)"]
+  arch -->|mvn archetype:generate| gen["生成的骨架项目"]
+  gen -->|手写补全第二个 BC| samples["scaffold-samples(双 BC 全量)"]
+  samples -.->|回归:重生成 + 比对| arch
+```
+
+- **参考项目 `multi-module`(archetype 的源,真相源)**:一个**手写、可运行**的多模块 DDD 项目,直接建立在 `aipersimmon-ddd-*`(BOM + core + archunit)之上,遵循 [[decision-00005-package-per-aggregate]] 的包结构。它**先由人手写**(可参考只读的 `bc-and-layer-samples`,但不复制),是 `create-from-project` 的**唯一输入**。
+- **archetype 工件(派生物)**:`create-from-project` 从 `multi-module` 派生,再参数化 `groupId`/`artifactId`/`package`/`version`,补 `archetype-metadata.xml` 的 `requiredProperties`。**`multi-module` 是真相源,archetype 是派生物**——改动流程是改 `multi-module` 后重新派生。
+- **产出(骨架)**:根 aggregator pom(import BOM)+ 一个 worked BC 的五层模块(api/domain/application/infrastructure/adapter)+ `start` + 接好 `-archunit` 的 `ArchitectureTest`;生成即可 `mvn test` 通过。
+  - *开放项*:`multi-module` 参考项目含 **1 个** worked BC(archetype 即产出 1 个);双 BC 全量在 scaffold-samples。待确认。
+- **`scaffold-samples`**:用该 archetype 生成后,手写补全为 **ordering + inventory 双 BC 全量**(事件链路 + outbox/inbox,后续阶段再加 cqrs/saga),**建立在库之上**。三重角色:活文档 demo、archetype 集成测试(重生成 + diff)、`bc-and-layer-samples` 的替代者。
+
+## 七、后果与开放项
+
+- **后果**:分析→设计落地;库与脚手架解耦;生成项目靠 BOM 版本升级;`bc-and-layer-samples` 在 scaffold-samples 就绪后删除。
+- **开放项**:
+  1. ~~archetype 骨架产出 1 个 BC 还是 0 个~~ **已定:1 个 worked BC**(对齐 analysis-00004 "ship one worked BC");双 BC 全量放 scaffold-samples。
+  2. `-archunit` 的规则如何参数化消费者的分层包命名(约定 vs 显式传参)?Phase 1 落地时定。
+  3. GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)。
+
+## Sources
+
+内部:
+- [[analysis-00006-ddd-building-blocks-library]] —— 模块切分、参考不依赖、CQRS、§十 `Transitions<S>`。
+- [[analysis-00007-saga-process-manager]] —— saga 分档(Phase 3)。
+- [[analysis-00004-bounded-context-module-structure]] —— 三种拓扑与 "ship one worked BC"。
+- [[decision-00005-package-per-aggregate]] —— domain 包结构(archetype 骨架遵循)。
+
+外部:
+- Maven Archetype —— Guide to Creating Archetypes / `archetype:create-from-project`。https://maven.apache.org/guides/mini/guide-creating-archetypes.html
+- Maven —— Introduction to the Dependency Mechanism(BOM / `import` scope)。https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html
+- GitHub Packages —— Apache Maven registry。https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry

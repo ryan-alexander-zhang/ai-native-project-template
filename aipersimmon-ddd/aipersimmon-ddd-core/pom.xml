@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The pure tier of the building blocks: tactical DDD annotations, type
+    interfaces, an aggregate-root base that records domain events, a
+    state-transition guard, and the domain exception base.
+
+    Hard rule: this module has ZERO compile dependencies. It must never import
+    Spring, JPA, a message broker, or any other framework, so it can be used from
+    any domain layer without dragging a framework onto the classpath. The only
+    dependency below is JUnit, at test scope.
+  -->
+  <artifactId>aipersimmon-ddd-core</artifactId>
+  <name>aipersimmon-ddd-core</name>
+  <description>Framework-free tactical DDD building blocks: annotations, type interfaces, aggregate base, state-transition guard, and the domain exception base.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
