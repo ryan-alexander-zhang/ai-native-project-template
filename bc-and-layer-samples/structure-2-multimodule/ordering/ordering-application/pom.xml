@@ -14,6 +14,7 @@
   <dependencies>
     <dependency><groupId>com.acme.samples.s2</groupId><artifactId>ordering-domain</artifactId></dependency>
     <dependency><groupId>com.acme.samples.s2</groupId><artifactId>ordering-api</artifactId></dependency>
+    <dependency><groupId>com.acme.samples.s2</groupId><artifactId>shared-kernel</artifactId></dependency>
     <dependency><groupId>org.springframework</groupId><artifactId>spring-context</artifactId></dependency>
     <dependency><groupId>org.springframework</groupId><artifactId>spring-tx</artifactId></dependency>
   </dependencies>

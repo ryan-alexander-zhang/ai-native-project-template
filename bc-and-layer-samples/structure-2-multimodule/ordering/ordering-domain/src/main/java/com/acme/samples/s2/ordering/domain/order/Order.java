@@ -1,5 +1,6 @@
 package com.acme.samples.s2.ordering.domain.order;
 
+import com.acme.samples.s2.shared.AggregateRoot;
 import com.acme.samples.s2.shared.Money;
 
 import java.util.List;
@@ -8,9 +9,9 @@ import java.util.List;
  * Order aggregate root. Built and rehydrated from {@link OrderLineData} (raw
  * data), never from {@link OrderLine} instances — that keeps the internal entity
  * package-private, so callers in other packages/modules can only go through the
- * root.
+ * root. Extends {@link AggregateRoot} to record domain events on state changes.
  */
-public class Order {
+public class Order extends AggregateRoot {
 
     private final String id;
     private final String customerId;
@@ -34,7 +35,9 @@ public class Order {
         if (lines.isEmpty()) throw new IllegalArgumentException("an order needs at least one line");
         List<OrderLine> entities = toLines(lines);
         Money total = entities.stream().map(OrderLine::lineTotal).reduce(Money.usd(0), Money::plus);
-        return new Order(id, customerId, entities, total, OrderStatus.PENDING);
+        Order order = new Order(id, customerId, entities, total, OrderStatus.PENDING);
+        order.registerEvent(new OrderPlacedEvent(id, customerId, List.copyOf(lines), total));
+        return order;
     }
 
     public static Order rehydrate(String id, String customerId, List<OrderLineData> lines, Money total, OrderStatus status) {
@@ -44,11 +47,13 @@ public class Order {
     public void confirm() {
         if (status != OrderStatus.PENDING) throw new IllegalStateException("only a PENDING order can be confirmed");
         status = OrderStatus.CONFIRMED;
+        registerEvent(new OrderConfirmedEvent(id));
     }
 
     public void cancel() {
         if (status == OrderStatus.CONFIRMED) throw new IllegalStateException("a CONFIRMED order cannot be cancelled");
         status = OrderStatus.CANCELLED;
+        registerEvent(new OrderCancelledEvent(id, "stock not reserved"));
     }
 
     public String id() { return id; }

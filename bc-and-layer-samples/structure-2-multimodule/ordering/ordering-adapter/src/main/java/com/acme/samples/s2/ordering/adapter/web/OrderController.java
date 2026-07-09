@@ -1,7 +1,7 @@
 package com.acme.samples.s2.ordering.adapter.web;
 
 import com.acme.samples.s2.ordering.application.order.FindOrderService;
-import com.acme.samples.s2.ordering.application.order.FindOrderService.OrderSnapshot;
+import com.acme.samples.s2.ordering.application.order.OrderSnapshot;
 import com.acme.samples.s2.ordering.application.order.PlaceOrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

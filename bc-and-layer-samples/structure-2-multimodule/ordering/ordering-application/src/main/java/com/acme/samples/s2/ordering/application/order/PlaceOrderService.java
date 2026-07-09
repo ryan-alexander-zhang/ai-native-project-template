@@ -1,11 +1,11 @@
 package com.acme.samples.s2.ordering.application.order;
 
-import com.acme.samples.s2.ordering.api.OrderPlaced;
 import com.acme.samples.s2.ordering.domain.customer.Customer;
 import com.acme.samples.s2.ordering.domain.customer.Customers;
 import com.acme.samples.s2.ordering.domain.order.Order;
 import com.acme.samples.s2.ordering.domain.order.OrderLineData;
 import com.acme.samples.s2.ordering.domain.order.Orders;
+import com.acme.samples.s2.shared.DomainEvents;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +22,13 @@ public class PlaceOrderService {
     private final Customers customers;
     private final Orders orders;
     private final PricingPort pricing;
-    private final OrderPlacedPublisher publisher;
+    private final DomainEvents domainEvents;
 
-    public PlaceOrderService(Customers customers, Orders orders, PricingPort pricing, OrderPlacedPublisher publisher) {
+    public PlaceOrderService(Customers customers, Orders orders, PricingPort pricing, DomainEvents domainEvents) {
         this.customers = customers;
         this.orders = orders;
         this.pricing = pricing;
-        this.publisher = publisher;
+        this.domainEvents = domainEvents;
     }
 
     @Transactional
@@ -49,10 +49,10 @@ public class PlaceOrderService {
         }
 
         orders.save(order);
-        publisher.publish(new OrderPlaced(order.id(), order.customerId(),
-                order.lines().stream()
-                        .map(l -> new OrderPlaced.Line(l.sku(), l.qty(), l.unitPriceMinor()))
-                        .toList()));
+        // Publish the recorded domain event(s) in-process, same transaction. An
+        // @EventListener translates OrderPlacedEvent -> the OrderPlaced integration
+        // event (written to the outbox) and updates the read model (OrderEventsHandler).
+        domainEvents.publish(order.domainEvents());
         return order.id();
     }
 }
