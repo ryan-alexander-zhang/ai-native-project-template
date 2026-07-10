@@ -24,6 +24,11 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>inventory-application</artifactId>
     </dependency>
+    <!-- Sends the ReserveStock command through the command bus. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+    </dependency>
     <!-- Cross-context: consumes ordering's published contract. -->
     <dependency>
       <groupId>${project.groupId}</groupId>

@@ -37,6 +37,11 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-saga</artifactId>
     </dependency>
+    <!-- Command and query buses used by the controller and the saga. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+    </dependency>
     <!-- Cross-context: consumes inventory's published contract to confirm or cancel the order. -->
     <dependency>
       <groupId>${project.groupId}</groupId>
