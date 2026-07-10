@@ -27,6 +27,9 @@
 
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-core</artifactId></dependency>
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-application</artifactId></dependency>
+    <!-- CQRS: the ReserveStock command and the Spring bus that routes to its handler. -->
+    <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-cqrs</artifactId></dependency>
+    <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-cqrs-spring</artifactId></dependency>
     <!-- Reliable integration events over Kafka: outbox writer + relay, inbox, Kafka transport. -->
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-outbox-jdbc</artifactId></dependency>
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-inbox-jdbc</artifactId></dependency>

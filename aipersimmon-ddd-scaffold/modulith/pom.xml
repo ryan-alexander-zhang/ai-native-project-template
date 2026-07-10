@@ -71,10 +71,20 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-saga</artifactId>
     </dependency>
+    <!-- CQRS contracts (commands, queries, handler interfaces). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+    </dependency>
     <!-- In-process synchronous transport for both domain and integration events. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-events-spring</artifactId>
+    </dependency>
+    <!-- CQRS command/query buses; registers the handlers and routes to them. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
     </dependency>
 
     <dependency>

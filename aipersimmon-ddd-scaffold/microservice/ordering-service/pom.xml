@@ -28,6 +28,9 @@
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-core</artifactId></dependency>
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-application</artifactId></dependency>
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-saga</artifactId></dependency>
+    <!-- CQRS: command/query contracts and the Spring buses that route to the handlers. -->
+    <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-cqrs</artifactId></dependency>
+    <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-cqrs-spring</artifactId></dependency>
     <!-- In-process domain events. -->
     <dependency><groupId>com.aipersimmon.ddd</groupId><artifactId>aipersimmon-ddd-events-spring</artifactId></dependency>
     <!-- Reliable integration events over Kafka: outbox writer + relay, inbox, Kafka transport. -->
