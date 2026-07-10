@@ -30,3 +30,13 @@ needed. `SagaOrchestrationHowToTest` drives the branches deterministically
 (completing on reservation, compensating on timeout, ignoring a late deadline).
 `SagaDeadlineFiresHowToTest` uses a short timeout to prove the scheduler fires the
 deadline and compensates on its own.
+
+## Durable deadlines
+
+This how-to uses the default in-process deadline scheduler: pending timeouts live
+in memory and are lost on restart — fine for a short, single-instance flow. For
+timeouts that must survive a restart or be handled across instances, switch to the
+durable JDBC scheduler by setting `aipersimmon.ddd.saga.deadline.store=jdbc` and
+creating the `aipersimmon_deadline` table (see `deadline-schema.sql` shipped in
+`aipersimmon-ddd-saga-spring`). Nothing else changes — the process manager keeps
+using the same `DeadlineScheduler` port.

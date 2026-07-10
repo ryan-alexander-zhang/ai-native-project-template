@@ -225,11 +225,13 @@ analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction
 
 analysis-00007 §六实现侧(把 s2 的 `PendingOrderTimeoutScanner` 抽象成通用 DeadlineManager;SagaStore 含乐观锁)。
 
-- `SchedulingDeadlineScheduler`:`TaskScheduler` 支撑的**进程内** DeadlineScheduler,到点派发给 `DeadlineHandler`,可按 (correlationId,name) 取消。**进程内 = 重启丢定时器**(诚实注明);持久定时器是 DB-poll 变体或档 2 引擎要补的。
+- **DeadlineScheduler 两实现,按 `aipersimmon.ddd.saga.deadline.store` 选**:
+  - `SchedulingDeadlineScheduler`(默认 `in-process`):`TaskScheduler` 支撑,到点派发给 `DeadlineHandler`,可按 (correlationId,name) 取消。简单无 broker,但**进程内 = 重启丢定时器**、单节点。
+  - `JdbcDeadlineScheduler`(`jdbc`):把 deadline 存表(`aipersimmon_deadline`),`@Scheduled` 轮询到点行→派发→删除,失败留行下轮重试(**at-least-once**,与 outbox 同构)。**重启不丢、可多实例**;触发有轮询延迟、可能多次触发,故 handler 需幂等——saga 生命周期守卫(`isActive`)天然提供。附非自动执行样例 DDL。
 - `JdbcSagaStore<S>`(**抽象基类**):自持 correlation 查询 + 版本化 upsert + 乐观锁校验(冲突抛 Spring `OptimisticLockingFailureException`);把**具体聚合↔列的映射**(`mapRow`/`serializeData`)留给 BC 子类**手写**(承接 repo `*Po`/`*Mapper` 显式映射哲学,避免泛型反射序列化的脆弱)。附非自动执行样例 DDL。
 - `AipersimmonDddSagaAutoConfiguration`:有 `DeadlineHandler` bean 时装配 scheduler,缺 `TaskScheduler` 时补一个单线程的;`SagaStore` **不自动装配**(BC 子类化后自注册为 bean)。测试:scheduler 触发/取消(2)+ JdbcSagaStore 插入/推进/乐观锁冲突(3),5/5。
 
-> **本阶段落地取舍(诚实记录)**:saga-spring 的 `SagaStore` 实现选**抽象 JDBC 基类 + BC 手写映射**,而非泛型 JSON 自动序列化——因 `SagaState` 子类构造器难被通用反序列化(需 `-parameters`/`@JsonCreator`),泛型全自动 store 脆弱。`DeadlineScheduler` 先给**进程内** `TaskScheduler` 实现(重启丢定时器,已注明)。**留待后续**:持久化 DeadlineScheduler(DB-poll)、saga 经 `-cqrs` CommandBus 发命令 + 经 `-outbox` 可靠外发的组合、`-saga-jpa`;以及一个"接一个 saga / 加 CQRS 读模型"的 scaffold-samples how-to。
+> **本阶段落地取舍(诚实记录)**:saga-spring 的 `SagaStore` 实现选**抽象 JDBC 基类 + BC 手写映射**,而非泛型 JSON 自动序列化——因 `SagaState` 子类构造器难被通用反序列化(需 `-parameters`/`@JsonCreator`),泛型全自动 store 脆弱。`DeadlineScheduler` 进程内与 **DB-poll 持久化(`JdbcDeadlineScheduler`,已交付)** 两实现按属性可选。**留待后续**:saga 经 `-cqrs` CommandBus 发命令 + 经 `-outbox` 可靠外发的组合、`-saga-jpa`。
 
 ### 5.14 `aipersimmon-ddd-messaging-kafka`(starter,可选,→ `-outbox-jdbc` + spring-kafka)
 
@@ -270,7 +272,7 @@ flowchart LR
   2. `-archunit` 的规则如何参数化消费者的分层包命名(约定 vs 显式传参)?Phase 1 落地时定。
   3. ~~GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)~~ **已交付**:`.github/workflows/ci.yml`(装库→建脚手架/样例)、`publish-library.yml`(release/手动触发 → `mvn deploy` 库到 GitHub Packages,`setup-java` 配 `github` server + `GITHUB_TOKEN`)、库 parent `distributionManagement`(repo id `github`)。消费者需在自己的 Maven 配置加同一 GitHub Packages 仓库并鉴权。
   4. ~~**集成事件方式三(broker)**:`-messaging-kafka`~~ **已交付(§5.14)**:Kafka `OutboxDispatcher` + inbox 守卫的进程内消费桥;实时 broker 端到端集成测试归消费方应用,库内为无 broker 的单元/装配测试。
-  5. **saga 深化(Phase 3 之后)**:持久化 `DeadlineScheduler`(DB-poll,替换进程内实现)、saga 经 `-cqrs` CommandBus 发命令 + `-outbox` 可靠外发的组合样例、`-saga-jpa`;JPA 变体 `-outbox-jpa` / `-inbox-jpa`。
+  5. **saga 深化(Phase 3 之后)**:~~持久化 `DeadlineScheduler`(DB-poll)~~ **已交付**(`JdbcDeadlineScheduler`,`store=jdbc` 选,at-least-once 轮询,重启不丢/可多实例);待做:saga 经 `-cqrs` CommandBus 发命令 + `-outbox` 可靠外发的组合样例、`-saga-jpa`;JPA 变体 `-outbox-jpa` / `-inbox-jpa`。
   7. **`microservice` 拓扑落地要点(已交付)**:每 BC 独立部署,跨服务**只经 Kafka**(outbox→Kafka→inbox 守卫的消费桥→进程内重投)。选**共享 `contracts` 模块**(两服务同依赖 → 事件类 FQN 一致 → 库的消费桥 `Class.forName` 直接可用,无需库改动)。**落地发现**:e2e 同一 JVM 启两服务时,两服务 jar 的 `application.properties` 在同一 classpath 根**冲突**(后启的服务错读前者配置);修法 = e2e 用各服务专属 `spring.config.name`(`ordering-e2e`/`inventory-e2e`),各服务自身的 `application.properties` 保持不变(独立部署/生成项目仍正确)。单主题 + 各服务独立消费组:每方收到全量、只对自己关心的事件反应。
   6. ~~**scaffold-samples 补 how-to**:"接一个 saga""加 CQRS 读模型""集成事件走 Kafka"~~ **已交付**:`add-cqrs-read-model`(命令管道+读模型)、`orchestrate-with-saga`(process manager + deadline + 补偿)、`integration-events-over-kafka`(outbox→Kafka→inbox→进程内,EmbeddedKafka 端到端)。**落地时修了库两处装配缺陷**:saga-spring 的 `DeadlineScheduler`↔`DeadlineHandler` 构造循环(改 scheduler 惰性 `Supplier<DeadlineHandler>` 解析);messaging-kafka autoconfig 未 `after = KafkaAutoConfiguration`,致 `@ConditionalOnBean(KafkaTemplate)` 早评估、Kafka dispatcher 未顶替日志默认(已修)。**`multi-module` 已改为 orchestration saga**(`OrderFulfilment` 过程管理器 + `OrderFulfilmentSaga` 中心状态 + 内存 `SagaStore`,`StockReserved` 确认 / `StockReservationFailed` 补偿取消);archetype 重新派生并验证生成 `com.acme.shop` 全绿(含补偿分支)。
 
