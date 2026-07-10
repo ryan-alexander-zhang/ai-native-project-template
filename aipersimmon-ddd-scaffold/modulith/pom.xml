@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.10</version>
+    <relativePath/>
+  </parent>
+
+  <!--
+    Reference modular-monolith DDD project: one deployable holding two bounded
+    contexts (ordering with multiple aggregates, inventory with one) as packages,
+    each split into api / domain / application / infrastructure / adapter layers.
+    It is built on the AiPersimmon DDD building blocks (imported via the BOM) and
+    is the source from which the modulith archetype is generated.
+
+    Same building blocks and same code as the multi-module reference; the topology
+    differs. Here everything is ONE Maven module, so the bounded-context and layer
+    boundaries are packages enforced at TEST time by the architecture tests
+    (ArchUnit), not separate modules enforced at compile time. Cross-context calls
+    go only through the other context's api package (a convention the tests do not
+    yet mechanically enforce; a multi-module or Spring Modulith setup would).
+
+    Persistence and the fulfilment saga store are in-memory, so it runs and tests
+    without any external infrastructure. Cross-context coordination uses the
+    in-process order-fulfilment orchestration saga.
+  -->
+  <groupId>com.example</groupId>
+  <artifactId>modulith</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>modulith</name>
+  <description>Reference modular-monolith DDD project built on the AiPersimmon DDD building blocks.</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <aipersimmon-ddd.version>0.1.0-SNAPSHOT</aipersimmon-ddd.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-bom</artifactId>
+        <version>${aipersimmon-ddd.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Pure DDD building blocks used by the domain, application, and api layers. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+    </dependency>
+    <!-- Saga contracts for the order-fulfilment process manager. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-saga</artifactId>
+    </dependency>
+    <!-- In-process synchronous transport for both domain and integration events. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-events-spring</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-archunit</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
