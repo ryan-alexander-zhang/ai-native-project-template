@@ -30,6 +30,7 @@ jobs:
         run: |
           mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/multi-module/pom.xml test
           mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/modulith/pom.xml test
+          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/microservice/pom.xml test
 
       - name: Build the how-to samples
         run: |
