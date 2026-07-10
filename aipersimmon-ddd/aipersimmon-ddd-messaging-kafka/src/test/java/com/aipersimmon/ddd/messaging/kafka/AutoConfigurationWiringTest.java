@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.messaging.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -40,5 +41,20 @@ class AutoConfigurationWiringTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(AipersimmonDddMessagingKafkaAutoConfiguration.class))
                 .run(context -> assertThat(context).doesNotHaveBean(OutboxDispatcher.class));
+    }
+
+    @Test
+    void kafkaDispatcherWinsWhenInProcessPropertyIsAlsoSet() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        AipersimmonDddMessagingKafkaAutoConfiguration.class,
+                        AipersimmonDddOutboxAutoConfiguration.class))
+                .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class))
+                .withPropertyValues("aipersimmon.ddd.outbox.dispatch=in-process")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(OutboxDispatcher.class);
+                    assertThat(context.getBean(OutboxDispatcher.class))
+                            .isInstanceOf(KafkaOutboxDispatcher.class);
+                });
     }
 }
