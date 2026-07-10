@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +25,9 @@ import org.springframework.kafka.core.KafkaTemplate;
  * the {@link KafkaIntegrationEventListener} consumer bridge, wiring in the
  * {@link Inbox} if one is available. Every bean is overridable by the application.
  */
-@AutoConfiguration(before = AipersimmonDddOutboxAutoConfiguration.class)
+@AutoConfiguration(
+        after = KafkaAutoConfiguration.class,
+        before = AipersimmonDddOutboxAutoConfiguration.class)
 @ConditionalOnClass(KafkaTemplate.class)
 @EnableConfigurationProperties(KafkaMessagingProperties.class)
 public class AipersimmonDddMessagingKafkaAutoConfiguration {

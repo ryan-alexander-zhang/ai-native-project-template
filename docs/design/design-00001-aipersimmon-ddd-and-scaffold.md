@@ -271,7 +271,7 @@ flowchart LR
   3. GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)。
   4. ~~**集成事件方式三(broker)**:`-messaging-kafka`~~ **已交付(§5.14)**:Kafka `OutboxDispatcher` + inbox 守卫的进程内消费桥;实时 broker 端到端集成测试归消费方应用,库内为无 broker 的单元/装配测试。
   5. **saga 深化(Phase 3 之后)**:持久化 `DeadlineScheduler`(DB-poll,替换进程内实现)、saga 经 `-cqrs` CommandBus 发命令 + `-outbox` 可靠外发的组合样例、`-saga-jpa`;JPA 变体 `-outbox-jpa` / `-inbox-jpa`。
-  6. **scaffold-samples 补 how-to**:"接一个 saga(orchestration + deadline)""加 CQRS 命令管道/读模型";`multi-module` 是否示范一条 orchestration saga(当前为 choreography)。
+  6. ~~**scaffold-samples 补 how-to**:"接一个 saga""加 CQRS 读模型""集成事件走 Kafka"~~ **已交付**:`add-cqrs-read-model`(命令管道+读模型)、`orchestrate-with-saga`(process manager + deadline + 补偿)、`integration-events-over-kafka`(outbox→Kafka→inbox→进程内,EmbeddedKafka 端到端)。**落地时修了库两处装配缺陷**:saga-spring 的 `DeadlineScheduler`↔`DeadlineHandler` 构造循环(改 scheduler 惰性 `Supplier<DeadlineHandler>` 解析);messaging-kafka autoconfig 未 `after = KafkaAutoConfiguration`,致 `@ConditionalOnBean(KafkaTemplate)` 早评估、Kafka dispatcher 未顶替日志默认(已修)。遗留:`multi-module` 是否示范一条 orchestration saga(当前为 choreography)。
 
 ## Sources
 

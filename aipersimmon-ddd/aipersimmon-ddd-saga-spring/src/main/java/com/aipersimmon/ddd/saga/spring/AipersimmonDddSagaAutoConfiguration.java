@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.saga.spring;
 
 import com.aipersimmon.ddd.saga.DeadlineHandler;
 import com.aipersimmon.ddd.saga.DeadlineScheduler;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -32,7 +33,10 @@ public class AipersimmonDddSagaAutoConfiguration {
     @Bean
     @ConditionalOnBean(DeadlineHandler.class)
     @ConditionalOnMissingBean(DeadlineScheduler.class)
-    public DeadlineScheduler deadlineScheduler(TaskScheduler taskScheduler, DeadlineHandler handler) {
-        return new SchedulingDeadlineScheduler(taskScheduler, handler);
+    public DeadlineScheduler deadlineScheduler(TaskScheduler taskScheduler,
+                                               ObjectProvider<DeadlineHandler> handler) {
+        // Resolve the handler lazily so a process manager can both arm deadlines
+        // through this scheduler and be the handler, without a construction cycle.
+        return new SchedulingDeadlineScheduler(taskScheduler, handler::getObject);
     }
 }

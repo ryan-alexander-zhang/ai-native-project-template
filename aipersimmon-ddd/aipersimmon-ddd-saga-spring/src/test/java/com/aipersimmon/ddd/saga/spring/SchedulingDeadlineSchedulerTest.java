@@ -38,7 +38,7 @@ class SchedulingDeadlineSchedulerTest {
     void firesDueDeadlineToTheHandler() throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<Deadline> fired = new AtomicReference<>();
-        SchedulingDeadlineScheduler scheduler = new SchedulingDeadlineScheduler(taskScheduler, d -> {
+        SchedulingDeadlineScheduler scheduler = new SchedulingDeadlineScheduler(taskScheduler, () -> d -> {
             fired.set(d);
             latch.countDown();
         });
@@ -54,7 +54,7 @@ class SchedulingDeadlineSchedulerTest {
     void cancelPreventsAPendingDeadlineFromFiring() throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(1);
         SchedulingDeadlineScheduler scheduler =
-                new SchedulingDeadlineScheduler(taskScheduler, d -> latch.countDown());
+                new SchedulingDeadlineScheduler(taskScheduler, () -> d -> latch.countDown());
 
         scheduler.schedule(new Deadline("order-1", "confirm-timeout", Instant.now().plusMillis(300)));
         scheduler.cancel("order-1", "confirm-timeout");

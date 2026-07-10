@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.10</version>
+    <relativePath/>
+  </parent>
+
+  <!--
+    How-to: orchestrate a multi-step flow with a saga (process manager) on the
+    AiPersimmon DDD saga starter. A focused, runnable example that shows:
+      1. A process manager coordinating an order-fulfilment flow from one place:
+         it starts when an order is placed, schedules a confirmation deadline, and
+         completes when stock is reserved.
+      2. If the deadline fires before stock is reserved, the saga compensates and
+         ends — the timeout branch a central state machine makes explicit.
+      3. Saga state is persisted with optimistic locking through the JDBC saga
+         store, keyed by the order id.
+    Uses an in-memory H2 database so it runs without external infrastructure.
+  -->
+  <groupId>com.example</groupId>
+  <artifactId>orchestrate-with-saga-how-to</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>orchestrate-with-saga-how-to</name>
+  <description>How-to: orchestrate a flow with a saga (process manager) on the AiPersimmon DDD saga starter.</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <aipersimmon-ddd.version>0.1.0-SNAPSHOT</aipersimmon-ddd.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-bom</artifactId>
+        <version>${aipersimmon-ddd.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-saga-spring</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
