@@ -26,6 +26,15 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>ordering-domain</artifactId>
     </dependency>
+    <!-- The in-memory saga store implements a saga port over the application's saga state. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>ordering-application</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-saga</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>

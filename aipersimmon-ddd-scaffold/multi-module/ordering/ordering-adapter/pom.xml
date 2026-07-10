@@ -32,7 +32,12 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-core</artifactId>
     </dependency>
-    <!-- Cross-context: consumes inventory's published contract to confirm the order. -->
+    <!-- Saga contracts for the order-fulfilment process manager. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-saga</artifactId>
+    </dependency>
+    <!-- Cross-context: consumes inventory's published contract to confirm or cancel the order. -->
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>inventory-api</artifactId>

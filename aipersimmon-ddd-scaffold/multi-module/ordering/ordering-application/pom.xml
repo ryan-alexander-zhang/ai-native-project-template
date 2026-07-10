@@ -34,6 +34,11 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-application</artifactId>
     </dependency>
+    <!-- Saga contracts for the order-fulfilment process manager's state. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-saga</artifactId>
+    </dependency>
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>ordering-api</artifactId>

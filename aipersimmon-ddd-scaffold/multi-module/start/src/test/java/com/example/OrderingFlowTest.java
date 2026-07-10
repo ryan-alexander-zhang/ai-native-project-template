@@ -12,9 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
- * End-to-end across both bounded contexts: placing an order publishes an
- * integration event that inventory reserves stock for and acknowledges in
- * process, which in turn confirms the order. All synchronous, no broker.
+ * End-to-end across both bounded contexts, driven by the order-fulfilment
+ * orchestration saga. Placing an order starts the saga and announces the order;
+ * inventory reacts and reports the outcome as an integration event; the saga then
+ * either confirms the order (stock reserved) or cancels it (reservation failed).
+ * All synchronous, no broker.
  */
 @SpringBootTest
 class OrderingFlowTest {
@@ -26,12 +28,22 @@ class OrderingFlowTest {
     FindOrderService findOrder;
 
     @Test
-    void placingAnOrderReservesStockAndConfirmsTheOrder() {
+    void placingAnOrderReservesStockAndTheSagaConfirmsTheOrder() {
         String orderId = placeOrder.handle(new PlaceOrderCommand(
                 "CUST-1",
                 List.of(new PlaceOrderCommand.Line("SKU-1", 2, 100, "USD"))));
 
         OrderSnapshot snapshot = findOrder.byId(orderId).orElseThrow();
         assertEquals("CONFIRMED", snapshot.status());
+    }
+
+    @Test
+    void whenStockCannotBeReservedTheSagaCompensatesByCancellingTheOrder() {
+        String orderId = placeOrder.handle(new PlaceOrderCommand(
+                "CUST-1",
+                List.of(new PlaceOrderCommand.Line("SKU-404", 1, 100, "USD"))));
+
+        OrderSnapshot snapshot = findOrder.byId(orderId).orElseThrow();
+        assertEquals("CANCELLED", snapshot.status());
     }
 }
