@@ -1,8 +1,8 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
 import com.aipersimmon.ddd.application.Inbox;
-import com.aipersimmon.ddd.outbox.jdbc.AipersimmonDddOutboxAutoConfiguration;
-import com.aipersimmon.ddd.outbox.jdbc.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

@@ -31,6 +31,11 @@
   <dependencies>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-application</artifactId>
       <version>${project.version}</version>
     </dependency>

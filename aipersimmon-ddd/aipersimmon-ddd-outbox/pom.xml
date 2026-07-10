@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Storage-agnostic core of the transactional outbox: the delivery contract
+    (OutboxDispatcher) and the stored-message shape (OutboxMessage) that every
+    storage backend (JdbcTemplate, MyBatis-Plus, ...) and every transport
+    (logging, in-process, Kafka, ...) share, plus the two default dispatchers and
+    the auto-configuration that selects between them.
+
+    Deliberately holds NO persistence: a storage starter (aipersimmon-ddd-outbox-*)
+    supplies the writer that implements the integration-event publisher port and
+    the relay that polls unsent rows and hands them to the dispatcher. Keeping the
+    dispatcher contract here lets a broker starter (for example -messaging-kafka)
+    plug into any storage backend without depending on a particular one.
+  -->
+  <artifactId>aipersimmon-ddd-outbox</artifactId>
+  <name>aipersimmon-ddd-outbox</name>
+  <description>Storage-agnostic transactional-outbox core: the dispatcher contract, stored-message shape, and default dispatchers.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

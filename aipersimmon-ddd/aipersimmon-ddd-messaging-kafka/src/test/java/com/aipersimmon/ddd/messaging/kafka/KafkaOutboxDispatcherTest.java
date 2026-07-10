@@ -7,7 +7,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import com.aipersimmon.ddd.outbox.jdbc.OutboxMessage;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;

@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.outbox.jdbc;
+package com.aipersimmon.ddd.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

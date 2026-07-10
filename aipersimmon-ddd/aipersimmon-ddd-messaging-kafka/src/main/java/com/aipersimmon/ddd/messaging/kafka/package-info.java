@@ -2,7 +2,7 @@
  * Kafka transport for integration events, layered on the transactional outbox.
  *
  * <p>{@link com.aipersimmon.ddd.messaging.kafka.KafkaOutboxDispatcher} is the
- * producer side: an {@link com.aipersimmon.ddd.outbox.jdbc.OutboxDispatcher} that
+ * producer side: an {@link com.aipersimmon.ddd.outbox.OutboxDispatcher} that
  * publishes each stored outbox row to a Kafka topic, carrying the envelope metadata
  * in {@link com.aipersimmon.ddd.messaging.kafka.IntegrationEventHeaders} and the
  * JSON payload as the record value; the outbox relay drives it, marking a row sent

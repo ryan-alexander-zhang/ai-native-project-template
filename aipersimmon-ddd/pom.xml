@@ -26,6 +26,7 @@
     <junit.version>5.11.4</junit.version>
     <archunit.version>1.4.0</archunit.version>
     <spring-boot.version>3.5.10</spring-boot.version>
+    <mybatis-plus.version>3.5.15</mybatis-plus.version>
   </properties>
 
   <modules>
@@ -40,8 +41,11 @@
     <module>aipersimmon-ddd-saga</module>
     <module>aipersimmon-ddd-saga-spring</module>
     <module>aipersimmon-ddd-events-spring</module>
+    <module>aipersimmon-ddd-outbox</module>
     <module>aipersimmon-ddd-outbox-jdbc</module>
+    <module>aipersimmon-ddd-outbox-mybatis-plus</module>
     <module>aipersimmon-ddd-inbox-jdbc</module>
+    <module>aipersimmon-ddd-inbox-mybatis-plus</module>
     <module>aipersimmon-ddd-messaging-kafka</module>
     <module>aipersimmon-ddd-archunit</module>
   </modules>
@@ -65,6 +69,16 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
         <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Managed versions for the MyBatis-Plus used by the -inbox/-outbox-mybatis-plus
+           starters (Spring Boot 3 / jakarta). Import only supplies versions; it adds
+           no dependency, so the pure tier stays framework-free. -->
+      <dependency>
+        <groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-bom</artifactId>
+        <version>${mybatis-plus.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

@@ -46,10 +46,18 @@
   </dependencyManagement>
 
   <dependencies>
-    <!-- Kafka transport; brings the outbox starter and the application ports transitively. -->
+    <!-- Kafka transport. It carries only the storage-agnostic outbox core (the
+         dispatcher contract), so the application must also pick an outbox storage
+         starter to get the writer that records events — here the JdbcTemplate one. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
+    </dependency>
+    <!-- Outbox storage: the writer (IntegrationEvents) and the relay the Kafka
+         dispatcher plugs into. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
     </dependency>
     <!-- Idempotent inbox for the consumer bridge to deduplicate redeliveries. -->
     <dependency>

@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.outbox.jdbc;
+package com.aipersimmon.ddd.outbox;
 
 import java.time.Instant;
 

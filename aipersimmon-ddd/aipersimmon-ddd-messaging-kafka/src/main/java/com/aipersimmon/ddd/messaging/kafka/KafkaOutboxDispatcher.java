@@ -1,7 +1,7 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
-import com.aipersimmon.ddd.outbox.jdbc.OutboxDispatcher;
-import com.aipersimmon.ddd.outbox.jdbc.OutboxMessage;
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
 import org.apache.kafka.clients.producer.ProducerRecord;

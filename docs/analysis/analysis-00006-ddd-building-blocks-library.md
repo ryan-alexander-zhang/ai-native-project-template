@@ -79,8 +79,9 @@ parent:
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-events-spring` | infrastructure | Spring | `ApplicationEventPublisher`→`DomainEvents` port 桥接;`@TransactionalEventListener` 装配;日志/装饰器 |
 | `aipersimmon-ddd-cqrs-spring` | infrastructure(可选) | `-cqrs` + Spring | Spring 实现的 `CommandBus` + 装饰器链(Logging→Validation→Transaction,用 `TransactionTemplate` 接管 UnitOfWork);每请求 `AggregateCollector`(补 MyBatis 无 ChangeTracker,见§五) |
-| `aipersimmon-ddd-outbox-jpa` / `aipersimmon-ddd-outbox-jdbc` | infrastructure | JPA / JDBC | outbox 表 PO、writer、relay/poller(跨进程不丢) |
-| `aipersimmon-ddd-inbox-jpa` | infrastructure | JPA | 幂等/inbox,消费方去重 |
+| `aipersimmon-ddd-outbox` | infrastructure(存储无关 core) | `spring-context` + Jackson | 投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、默认 dispatcher(logging / in-process)+ dispatch autoconfig;无持久化 |
+| `aipersimmon-ddd-outbox-jdbc` / `aipersimmon-ddd-outbox-mybatis-plus`(`-outbox-jpa` 待做) | infrastructure | `-outbox` + JDBC / MyBatis-Plus | outbox 表 writer + relay/poller;两者同表结构可互换,消费者选一个 |
+| `aipersimmon-ddd-inbox-jdbc` / `aipersimmon-ddd-inbox-mybatis-plus`(`-inbox-jpa` 待做) | infrastructure | JDBC / MyBatis-Plus | 幂等/inbox,消费方去重;`Inbox` 契约在 `-application` |
 | `aipersimmon-ddd-messaging-kafka` / `aipersimmon-ddd-messaging-rabbit` | infrastructure | Kafka / Rabbit | 集成事件传输;**随拓扑选**(见§七) |
 
 ### 校验与治理

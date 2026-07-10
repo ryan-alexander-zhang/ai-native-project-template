@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Idempotent-consumer (inbox) starter over MyBatis-Plus. It implements the Inbox
+    port by inserting each handled message key into an inbox table through a
+    MyBatis-Plus BaseMapper, relying on the table's unique key so a redelivered
+    message is detected and skipped. Called inside the consumer's transaction, the
+    record commits with the processing and rolls back with it on failure, so a
+    failed message is retried.
+
+    For projects standardized on MyBatis-Plus: the inbox uses the same
+    SqlSessionFactory, DataSource, and transaction manager as the rest of the
+    persistence, rather than a separate JdbcTemplate. It registers ONLY its own
+    mapper (via a MapperFactoryBean), so it never triggers or hijacks the
+    consumer's @MapperScan. The consumer creates the inbox table (a documented
+    DDL). This is the MyBatis-Plus sibling of aipersimmon-ddd-inbox-jdbc; include
+    exactly one inbox starter.
+  -->
+  <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
+  <name>aipersimmon-ddd-inbox-mybatis-plus</name>
+  <description>Idempotent-consumer (inbox) starter over MyBatis-Plus.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

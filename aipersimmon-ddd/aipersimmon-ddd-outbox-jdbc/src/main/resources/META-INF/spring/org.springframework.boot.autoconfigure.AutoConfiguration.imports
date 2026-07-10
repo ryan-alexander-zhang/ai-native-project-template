@@ -1,1 +1,1 @@
-com.aipersimmon.ddd.outbox.jdbc.AipersimmonDddOutboxAutoConfiguration
+com.aipersimmon.ddd.outbox.jdbc.AipersimmonDddOutboxJdbcAutoConfiguration

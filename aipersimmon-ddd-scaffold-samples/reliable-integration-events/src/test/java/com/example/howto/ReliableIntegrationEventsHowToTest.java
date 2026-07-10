@@ -3,8 +3,8 @@ package com.example.howto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.aipersimmon.ddd.outbox.jdbc.OutboxDispatcher;
-import com.aipersimmon.ddd.outbox.jdbc.OutboxMessage;
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.jdbc.OutboxRelay;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

@@ -38,12 +38,20 @@
   <description>Kafka transport for integration events over the transactional outbox: a Kafka OutboxDispatcher and an inbox-guarded in-process consumer bridge.</description>
 
   <dependencies>
-    <!-- The outbox starter supplies the OutboxDispatcher port and OutboxMessage this
-         transport implements and carries, and transitively the application ports
-         (IntegrationEvents, Inbox) and Jackson. -->
+    <!-- The storage-agnostic outbox core supplies the OutboxDispatcher port and
+         OutboxMessage this transport implements and carries, plus the dispatch
+         auto-configuration this module orders itself before. Depending on the core
+         (not a storage starter) lets this Kafka transport plug into any backend
+         (JdbcTemplate, MyBatis-Plus, ...). -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-outbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The Inbox port used by the consumer bridge. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

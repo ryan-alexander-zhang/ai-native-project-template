@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.outbox.InProcessOutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;

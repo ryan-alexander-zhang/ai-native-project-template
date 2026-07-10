@@ -1,5 +1,7 @@
 package com.aipersimmon.ddd.outbox.jdbc;
 
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.List;
