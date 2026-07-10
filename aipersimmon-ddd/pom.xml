@@ -89,4 +89,23 @@
       </plugins>
     </pluginManagement>
   </build>
+
+  <!--
+    Publishing target for `mvn deploy` (see the publish-library CI workflow). The
+    repository id `github` matches the server the workflow configures in settings.xml
+    (authenticated with GITHUB_ACTOR / GITHUB_TOKEN); it affects only deploy, not the
+    build. Consumers reading these packages add the same GitHub Packages repository.
+  -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/ryan-alexander-zhang/ai-native-project-template</url>
+    </repository>
+    <snapshotRepository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/ryan-alexander-zhang/ai-native-project-template</url>
+    </snapshotRepository>
+  </distributionManagement>
 </project>

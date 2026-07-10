@@ -1,0 +1,39 @@
+# Publish the AiPersimmon DDD building-block library to GitHub Packages.
+#
+# Runs on a published GitHub release, or on demand. Only the library reactor
+# (aipersimmon-ddd/) is published — the scaffold reference projects and how-to
+# samples are archetype sources and examples, not artifacts to consume.
+#
+# setup-java writes a settings.xml whose `github` server authenticates with
+# GITHUB_ACTOR / GITHUB_TOKEN; that id matches the distributionManagement
+# repository in aipersimmon-ddd/pom.xml.
+name: Publish library
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+          server-id: github
+
+      - name: Deploy to GitHub Packages
+        run: mvn -B --no-transfer-progress -DskipTests -f aipersimmon-ddd/pom.xml deploy
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

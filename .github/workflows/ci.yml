@@ -1,0 +1,42 @@
+# Build and test everything: the DDD building-block library, then the scaffold
+# reference projects and the focused how-to samples that depend on it.
+#
+# The library reactor is installed to the local .m2 first, so the scaffold and
+# samples resolve the aipersimmon-ddd-* SNAPSHOTs they import via the BOM.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Build and install the building-block library
+        run: mvn -B --no-transfer-progress -f aipersimmon-ddd/pom.xml install
+
+      - name: Build the scaffold reference projects
+        run: |
+          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/multi-module/pom.xml test
+          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/modulith/pom.xml test
+
+      - name: Build the how-to samples
+        run: |
+          for sample in aipersimmon-ddd-scaffold-samples/*/; do
+            if [ -f "$sample/pom.xml" ]; then
+              echo "::group::$sample"
+              mvn -B --no-transfer-progress -f "$sample/pom.xml" test
+              echo "::endgroup::"
+            fi
+          done
