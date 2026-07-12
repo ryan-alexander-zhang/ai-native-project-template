@@ -76,6 +76,30 @@ public final class AiPersimmonDddRules {
                 .allowEmptyShould(true);
     }
 
+    /**
+     * Stricter, <em>opt-in</em> rule: the interface/adapter layer must not depend on
+     * the domain directly, driving use cases through the application layer instead.
+     *
+     * <p>Deliberately <strong>not</strong> part of {@link #all()}: some inbound
+     * adapters legitimately subscribe to domain events (a messaging adapter that
+     * reacts to an internal event and hands off to a process manager, for example),
+     * which this rule would forbid. Adopt it in projects that want the tighter
+     * hexagonal discipline where every driving adapter goes through the application
+     * layer, and add it to a test alongside {@link #all()}:
+     *
+     * <pre>{@code
+     * @ArchTest static final ArchRule adapters = AiPersimmonDddRules.adapterShouldNotDependOnDomain();
+     * }</pre>
+     */
+    public static ArchRule adapterShouldNotDependOnDomain() {
+        return noClasses().that().resideInAPackage("..adapter..")
+                .should().dependOnClassesThat().resideInAPackage("..domain..")
+                .as("interface/adapter classes should not depend on the domain layer directly")
+                .because("driving adapters should invoke use cases through the application layer, "
+                        + "rather than reaching into domain internals")
+                .allowEmptyShould(true);
+    }
+
     /** Domain events belong to the domain layer, not to the interface or integration layers. */
     public static ArchRule domainEventsShouldStayInDomain() {
         return classes().that().implement(DomainEvent.class)

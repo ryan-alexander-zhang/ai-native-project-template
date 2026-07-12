@@ -42,6 +42,17 @@ class AiPersimmonDddRulesTest {
     }
 
     @Test
+    void adapterShouldNotDependOnDomain_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.adapterShouldNotDependOnDomain().check(GOOD));
+    }
+
+    @Test
+    void adapterShouldNotDependOnDomain_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.adapterShouldNotDependOnDomain().check(BAD));
+    }
+
+    @Test
     void all_passesForGood() {
         assertDoesNotThrow(() -> AiPersimmonDddRules.all().check(GOOD));
     }
