@@ -1,0 +1,65 @@
+package com.aipersimmon.ddd.web.error;
+
+import java.util.List;
+
+/**
+ * A framework-free value model of an error response, shaped after RFC 9457
+ * "Problem Details for HTTP APIs". It carries the five standard members
+ * ({@code type}, {@code title}, {@code status}, {@code detail}, {@code instance})
+ * plus the extension members this library standardises on: a machine-readable
+ * {@link #code()}, a {@link #traceId()} correlation anchor, and a list of
+ * {@link FieldError}s for field-level validation failures.
+ *
+ * <p>Kept independent of Spring's {@code ProblemDetail}; a starter translates this
+ * to the wire form and sets the {@code application/problem+json} media type. The
+ * instance is immutable and validated on construction.
+ *
+ * @param type     URI reference identifying the problem type (an identifier, not a
+ *                 required link); defaults to {@code "about:blank"} when null
+ * @param title    short, human-readable summary, stable across occurrences
+ * @param status   HTTP status code (100–599)
+ * @param detail   occurrence-specific human-readable explanation (nullable)
+ * @param instance URI reference for this specific occurrence (nullable)
+ * @param code     machine-readable domain error code (nullable)
+ * @param traceId  correlation id tying this response to logs/traces (nullable)
+ * @param errors   field-level validation problems; never null (empty when none)
+ */
+public record ApiError(
+        String type,
+        String title,
+        int status,
+        String detail,
+        String instance,
+        String code,
+        String traceId,
+        List<FieldError> errors) {
+
+    public ApiError {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title must not be blank");
+        }
+        if (status < 100 || status > 599) {
+            throw new IllegalArgumentException("status must be a valid HTTP status (100-599), was " + status);
+        }
+        type = (type == null || type.isBlank()) ? "about:blank" : type;
+        errors = errors == null ? List.of() : List.copyOf(errors);
+    }
+
+    /**
+     * Builds an error from a catalogue entry and a resolved title. The title is
+     * passed in already resolved because message-source lookup lives in the
+     * starter, not in this framework-free tier.
+     *
+     * @param problemType the catalogue entry (supplies type, status, code)
+     * @param title       the resolved, human-readable title
+     * @param detail      occurrence-specific explanation (nullable)
+     * @param instance    URI of this occurrence (nullable)
+     * @param traceId     correlation id (nullable)
+     * @param errors      field-level problems (nullable → empty)
+     */
+    public static ApiError from(ProblemType problemType, String title, String detail,
+                                String instance, String traceId, List<FieldError> errors) {
+        return new ApiError(problemType.typeUri(), title, problemType.status(),
+                detail, instance, problemType.code(), traceId, errors);
+    }
+}

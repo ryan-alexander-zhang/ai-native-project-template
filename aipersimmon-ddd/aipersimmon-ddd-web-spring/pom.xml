@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring Web implementation of the web contracts. Adding this module
+    auto-configures the inbound-HTTP cross-cutting layer:
+      - a @RestControllerAdvice mapping ApiException, the -core DomainException,
+        the (optional) -application ApplicationException, Bean Validation failures
+        and not-found to RFC 9457 ProblemDetail responses;
+      - a trace-id filter that reads or generates a correlation id, puts it in the
+        MDC, echoes it on the response, and feeds it into the problem body;
+      - cursor-aware Jackson (de)serialization for the Slice/Page value objects;
+      - i18n title resolution for problem types via the application MessageSource.
+    Each concern is toggled by aipersimmon.ddd.web.* properties. The opt-in
+    idempotency / replay / rate-limit filters and their pluggable stores build on
+    this in the -web-store-* modules.
+  -->
+  <artifactId>aipersimmon-ddd-web-spring</artifactId>
+  <name>aipersimmon-ddd-web-spring</name>
+  <description>Spring starter for the web layer: exception-to-ProblemDetail advice, trace-id, cursor pagination serialization and i18n.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Optional: the ApplicationException advice is wired only when -application
+         is on the classpath, so consumers that do not use it inherit nothing. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- A servlet container + MockMvc to drive the advice and filter end to end. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Bean Validation provider for the validation-mapping test. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

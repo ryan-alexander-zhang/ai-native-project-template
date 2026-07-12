@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Web (inbound HTTP / interface) contracts, framework-free. It carries the
+    vocabulary a REST adapter needs without committing to Spring: a ProblemType
+    error catalogue and an RFC 9457-shaped ApiError value model (kept independent
+    of Spring's ProblemDetail), cursor-based Page/Slice value objects, and the
+    cross-cutting SPIs whose state a starter needs a store for — idempotency,
+    replay protection (nonce), rate limiting, and request-signature verification.
+
+    Depends only on the pure core tier. A Spring implementation of these ports —
+    the exception-to-ProblemDetail advice, trace-id, pagination, i18n, and the
+    opt-in idempotency / replay / rate-limit filters — lives in a separate
+    starter, and pluggable Redis/JDBC backends implement the SPIs.
+  -->
+  <artifactId>aipersimmon-ddd-web</artifactId>
+  <name>aipersimmon-ddd-web</name>
+  <description>Framework-free web contracts: ProblemType catalogue, RFC 9457 ApiError model, cursor pagination value objects, and idempotency/replay/rate-limit/signature SPIs.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

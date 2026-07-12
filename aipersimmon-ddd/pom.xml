@@ -47,6 +47,10 @@
     <module>aipersimmon-ddd-inbox-jdbc</module>
     <module>aipersimmon-ddd-inbox-mybatis-plus</module>
     <module>aipersimmon-ddd-messaging-kafka</module>
+    <module>aipersimmon-ddd-web</module>
+    <module>aipersimmon-ddd-web-spring</module>
+    <module>aipersimmon-ddd-web-store-jdbc</module>
+    <module>aipersimmon-ddd-web-store-redis</module>
     <module>aipersimmon-ddd-archunit</module>
   </modules>
 

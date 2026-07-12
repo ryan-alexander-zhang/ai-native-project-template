@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    JdbcTemplate-backed store for the web layer's stateful SPIs: idempotency,
+    replay-nonce, and rate-limit counters. Adding it (once a JdbcTemplate is
+    present) replaces the in-memory defaults in -web-spring, so the state is shared
+    across instances. Deliberately JDBC, not JPA: no @Entity, no @EntityScan. The
+    consumer creates the tables (a documented DDL; via Flyway/Liquibase in
+    production). Note that a fixed-window JDBC rate limiter is adequate but not
+    optimal under high concurrency; prefer -web-store-redis there.
+  -->
+  <artifactId>aipersimmon-ddd-web-store-jdbc</artifactId>
+  <name>aipersimmon-ddd-web-store-jdbc</name>
+  <description>JdbcTemplate-backed idempotency / replay-nonce / rate-limit stores for the web layer.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
