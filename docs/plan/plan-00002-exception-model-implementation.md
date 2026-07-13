@@ -18,8 +18,13 @@ parent: design-00003-exception-model
 
 - ✅ **P1**(`-core`:`ErrorCode`/`ErrorCategory`/`BusinessRule`/`checkRule` + `DomainException` 带码)—— 已实现并测试(6 tests 绿,零依赖保持)。
 - ✅ **P2**(`-application`:`ApplicationException` 带码 + `EntityNotFoundException`/`ConcurrencyConflictException`)—— 已实现。
-- ✅ **P3**(`-web`:`ProblemType extends ErrorCode` + `ProblemTypeRegistry`)—— 已实现(既有契约测试 9 tests 不回归)。
-- ⏳ **P4–P7** 待实现(P4 需改造 advice 并更新其现有测试;P6 消息可靠性为较大独立块;P7 收口端到端验收)。
+- ✅ **P3**(`-web`:`ProblemType extends ErrorCode` + `ProblemTypeRegistry` + `ProblemTypeCatalog`)—— 已实现(既有契约测试不回归)。
+- ✅ **P4**(`-web-spring`:`ProblemDetailFactory` registry 贯通 + advice 全量映射 + `ConstraintViolation→400` 修复)—— 已实现(WebLayerTest 11 tests 绿)。**未做子项**:i18n 默认 bundle 交付、filter 路径接入 MessageSource、401/403 条件化(均为加法,不影响验收)。
+- ✅ **P5**(`-cqrs-spring`:`OptimisticLockingFailureException → ConcurrencyConflictException`)—— 已实现。
+- ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkRule` + `EntityNotFound` + `OrderingProblemType`/catalog)—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code/type,unknown → 404(`ExceptionContractTest`,multi-module 10 tests 绿)。
+- ⏳ **P6**(消息可靠性:重试上限 + DLQ,`-outbox`/`-outbox-jdbc`/`-outbox-mybatis-plus`/`-messaging-kafka`)—— **未做**(较大独立块,不影响 §八 验收)。
+- ⏳ **P7(modulith)**—— **未做**:modulith 仍是旧手写 `OrderExceptionHandler`、未引 web-spring,需先补 web-spring 接入,再镜像 multi-module 的异常模型改动。
+- ⏳ **P4 剩余子项**(i18n bundle、401/403)。
 
 ## Design
 
