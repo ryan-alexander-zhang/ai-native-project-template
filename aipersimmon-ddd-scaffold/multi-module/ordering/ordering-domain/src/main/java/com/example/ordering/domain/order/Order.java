@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.aipersimmon.ddd.core.state.Transitions;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
+import com.example.ordering.domain.shared.OrderingErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +21,8 @@ public class Order extends AbstractAggregateRoot<OrderId> {
     private static final Transitions<OrderStatus> RULES = Transitions.<OrderStatus>of()
             .allow(OrderStatus.PENDING, OrderStatus.CONFIRMED)
             .allow(OrderStatus.PENDING, OrderStatus.CANCELLED);
+
+    private static final int MAX_LINES = 100;
 
     private final OrderId id;
     private final CustomerId customerId;
@@ -41,9 +44,16 @@ public class Order extends AbstractAggregateRoot<OrderId> {
                 lines.add(new OrderLine(line.sku(), line.quantity(), line.unitPrice()));
             }
         }
+        // Trivial guards stay as coded throws; only a non-trivial, named invariant
+        // (no repeated SKU across lines) is worth expressing as a BusinessRule.
+        if (lines.isEmpty()) {
+            throw new DomainException(OrderingErrorCode.ORDER_EMPTY, "an order needs at least one line");
+        }
+        if (lines.size() > MAX_LINES) {
+            throw new DomainException(
+                    OrderingErrorCode.TOO_MANY_LINES, "an order may not exceed " + MAX_LINES + " lines");
+        }
         Order order = new Order(id, customerId, lines);
-        order.checkRule(new OrderMustHaveLines(lines));
-        order.checkRule(new OrderWithinLineLimit(lines));
         order.checkRule(new OrderHasDistinctSkus(lines));
         order.registerEvent(new OrderPlacedEvent(id, order.total()));
         return order;

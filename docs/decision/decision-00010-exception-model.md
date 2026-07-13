@@ -33,8 +33,8 @@ framework-free**(`-core` 零依赖是验收红线)。
 
 ### 二、`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule()`
 
-- 业务不变量建模为 `BusinessRule`(`isBroken()`/`message()`/可选 `errorCode()`),聚合根经 `checkRule(rule)` 触发
-  `BusinessRuleViolationException`,取代散落的 `if (...) throw new DomainException("...")`。采 modular-monolith-with-ddd 模式。
+- 库**提供** `BusinessRule`(`isBroken()`/`message()`/可选 `errorCode()`)+ 聚合根 `checkRule(rule)` → `BusinessRuleViolationException`(采 modular-monolith-with-ddd 模式)。
+- **但它是升级项、不是默认**:聚合内不变量默认用 coded `throw`,仅当**非平凡 / 可复用 / 需清点或组合**时才升级为 `BusinessRule`(判据见 [[design-00003-exception-model]] §4.5)。两者走同一错误码通道,升降级不影响线上契约。避免"一行条件套个类"的仪式化。
 
 ### 三、新增语义化应用异常子类
 

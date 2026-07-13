@@ -215,10 +215,18 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 | 约束范围 | 落点 | 机制 | 违反 | 脚手架实例(ordering) |
 | --- | --- | --- | --- | --- |
 | 单个值/单个实体自身 | 值对象 / 实体**构造器**(Always-Valid) | 构造即校验,直接 `throw` | `DomainException` → 422 | `OrderLine`:`sku required` / `quantity > 0`;`Money`:`amount >= 0` |
-| **一个聚合内、跨其成员** | 聚合根,`checkRule(BusinessRule)` | `BusinessRule` 对象 | `BusinessRuleViolationException` → 422 | `Order`:`OrderMustHaveLines`、`OrderWithinLineLimit`、`OrderHasDistinctSkus` |
+| **一个聚合内、跨其成员** | 聚合根 | **默认** coded `throw`;**够格时**才 `checkRule(BusinessRule)` | `DomainException` / `BusinessRuleViolationException` → 422 | `Order`:空/超上限用 coded `throw`(`ORDER_EMPTY`/`TOO_MANY_LINES`);无重复 SKU 用 `BusinessRule`(`OrderHasDistinctSkus`) |
 | **跨多个聚合 / 需外部状态** | **应用层**用例(handler) | 取齐依赖后显式 `throw`(或抛领域异常) | `DomainException`/`ApplicationException` → 按码 | `PlaceOrderHandler`:信用超限(需 `Customer` + `Order`)→ `CreditExceededException` |
 
-原则:**不变量能自足判定就往里放**(VO < 聚合 < 应用层),越靠内越好。反面——把跨聚合校验硬塞进 `Order.checkRule` 会迫使 `Order` 依赖 `Customer`,破坏聚合边界;把单值校验拔高到聚合 `checkRule` 则丢了"值对象永远合法"的保证。`BusinessRule` 只服务**中间那层**:一个聚合内、跨成员、无需外部状态的不变量。
+原则:**不变量能自足判定就往里放**(VO < 聚合 < 应用层),越靠内越好。反面——把跨聚合校验硬塞进 `Order.checkRule` 会迫使 `Order` 依赖 `Customer`,破坏聚合边界;把单值校验拔高到聚合层则丢了"值对象永远合法"的保证。
+
+**`BusinessRule` 不是默认,是升级项。** 聚合内不变量**默认用 coded `throw`**;只有当它满足下列**至少一条**时,才值得升级成 `BusinessRule`:
+
+- **非平凡**:多条件 / 有值得命名的领域概念(如"无重复 SKU"),而非 `isEmpty()`/`size()>N` 这种一行守卫;
+- **可复用**:同一规则被多个方法或多个聚合共用;
+- **需清点或组合**:要把一组规则当数据遍历、按开关启停、或一次累积多个违反(见 §4.4 的 `checkRules` 增量)。
+
+都不满足就用 coded `throw` —— 一行条件套个类只是仪式,反而稀释了"规则"这个词的信号。`BusinessRule` 与 coded `throw` 走同一条错误码/映射通道(前者的 `BusinessRuleViolationException` 就是 `DomainException` 子类),所以升级/降级**不影响线上契约**,可随领域演进自由调整。
 
 ## 五、错误码→ProblemDetail 的贯通(解 §五断裂)
 
@@ -322,7 +330,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 | `-web` | `ProblemType extends ErrorCode`;新增 `ProblemTypeRegistry` |
 | `-web-spring` | advice 全量映射(含 `ConstraintViolationException`、registry 贯通、`EntityNotFoundException`/`ConcurrencyConflictException`);交付 i18n bundle;filter 路径接入 `MessageSource`;401/403 条件化配置 |
 | `-cqrs-spring` | 把 `OptimisticLockingFailureException` 翻译为 `ConcurrencyConflictException` |
-| **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `OrderingProblemType.CREDIT_EXCEEDED`;把散落的信用/状态校验改写为 `checkRule`;"unknown order/customer" 改抛 `EntityNotFoundException`(取代先前的 `NoSuchElementException` 临时手法) |
+| **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `CREDIT_EXCEEDED`;聚合内**够格**不变量(无重复 SKU)用 `checkRule(OrderHasDistinctSkus)`,**琐碎守卫**(空/超上限)用 coded `throw`(§4.5);"unknown order/customer" 改抛 `EntityNotFoundException`(取代 `NoSuchElementException` 临时手法) |
 
 **验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 **422** ProblemDetail
 (带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。

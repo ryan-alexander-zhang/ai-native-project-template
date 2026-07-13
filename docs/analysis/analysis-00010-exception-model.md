@@ -148,7 +148,7 @@ framework-free 的错误码抽象来解**(详见 [[design-00003-exception-model]
 
 1. **贯穿式错误码**:`-core` 里 framework-free 的 `ErrorCode` 抽象;`DomainException`/`ApplicationException`
    可携带;`-web` 的 `ProblemType` 与之对齐;advice 从抛出的异常读出 `code` 填进 ProblemDetail。→ 解 #1、#2、#7。
-2. **`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule()`**,取代散落的 `if/throw`。→ 解 #5。
+2. **`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule()`**,供**够格**不变量(非平凡/可复用/需清点组合)使用,琐碎守卫仍 coded `throw`(判据见 design §4.5)。→ 解 #5。
 3. **完整且正确的异常→HTTP 映射**,含 `ConstraintViolationException`;统一两处 Bean Validation 的 `FieldError`。→ 解 #3、#8。
 4. **随库交付 i18n bundle** + 让 filter 路径也走 MessageSource;脚手架给真实 `ProblemType` 枚举样例。→ 解 #2、#4。
 5. **Guard-vs-Validate 分工**成文;对 `Result`/`Either` 给出明确取舍(采纳/推迟/不做)。

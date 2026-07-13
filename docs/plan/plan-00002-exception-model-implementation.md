@@ -79,7 +79,7 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 
 ### P7 — scaffold 示范 + 端到端验收(→ P4,P5)
 - [ ] `OrderingProblemType` 枚举 implements `ProblemType`(含 `CREDIT_EXCEEDED` 等)。
-- [ ] `CreditExceededException` 携 `OrderingProblemType.CREDIT_EXCEEDED`;信用/状态校验改写为 `checkRule`。
+- [ ] `CreditExceededException` 携 `CREDIT_EXCEEDED`;够格不变量(无重复 SKU)用 `checkRule`,琐碎守卫用 coded `throw`(§4.5)。
 - [ ] "unknown order/customer" 改抛 `EntityNotFoundException`(取代 P0 的 `NoSuchElementException`)。
 - [ ] 同步 modulith 与 multi-module 两个脚手架。
 - **验收**:见下方 Acceptance Path。
