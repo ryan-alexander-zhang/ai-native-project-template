@@ -313,6 +313,7 @@ Content-Type: application/problem+json
 - [[decision-00007-web-api-response-envelope]] —— 本设计的决策来源(策略、六个遗留问题、opt-in+可插拔原则、未来项)。
 - [[analysis-00008-web-api-response-envelope]] —— 15+ 大厂 + IETF 标准证据底座(响应/错误/分页/命名/版本/幂等/防重放/限流)。
 - [[analysis-00006-ddd-building-blocks-library]] —— 纯/脏分离硬约束、模块清单。
+- [[design-00003-exception-model]] —— 向内的延伸:本文定的 RFC 9457 `code`/`type`/`errors` 由它从领域异常贯通产出(修 §八 示例当前产不出的断裂)。
 - [[design-00001-aipersimmon-ddd-and-scaffold]] —— 库总设计;§5.8 outbox 的"契约+可换存储+确定性装配"骨架为本设计蓝本(§三依赖图与 §5 清单需加指针引用本文)。
 
 外部(一手):

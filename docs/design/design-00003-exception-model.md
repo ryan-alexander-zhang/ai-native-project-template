@@ -1,0 +1,335 @@
+---
+id: design-00003-exception-model
+type: design
+role: main
+status: active
+parent: decision-00010-exception-model
+---
+
+# aipersimmon-ddd 异常/错误体系:完整设计
+
+把 [[decision-00010-exception-model]] 拍板的策略、以及 [[analysis-00010-exception-model]] 列出的缺口,
+落成**可实现的、贯穿领域→应用→接口→基础设施四层的错误体系设计**。传输层线上契约(无信封 + RFC 9457)沿用 [[decision-00007-web-api-response-envelope]] /
+[[design-00002-web-layer]],**本文不改线上格式**;本文补的是缺口的另一半——**错误在进程内如何被建模、
+如何携带稳定机器码、如何从领域一路贯通到边界**,以及消息链路的可靠性错误模型。
+
+严守 [[analysis-00006-ddd-building-blocks-library]] 的两条铁律:**依赖一律指向内/下**、**纯净层
+framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §5 与 [[design-00002-web-layer]]
+的增量,不替代它们。
+
+> 前提:仓内代码是**开发中的脚手架,不是 truth**。下文"现状"仅作对比;"设计"即目标,该改的照改。
+
+## 一、范围
+
+| 分类 | 条目 |
+| --- | --- |
+| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule`;④错误码→`ProblemType`→ProblemDetail 的贯通桥接;⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦消息可靠性错误模型(transient/permanent + 重试上限 + DLQ);⑧Guard-vs-Validate 分工成文;⑨401/403 条件化补齐 |
+| **不做**(见 §十一) | 在 `-core` 引入 `Result`/`Either` 或 Vavr 依赖;通用异常基类大而全的字段(错误上下文 map 等);把 HTTP 状态码泄漏进 `-core` |
+| **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC `ProblemType` 枚举思路、filter 层 429/401 出口(均来自 [[design-00002-web-layer]]) |
+
+## 二、贯穿性设计约束
+
+1. **错误码是"从内到外"的一等契约**。业务逻辑**抛出的那一刻**就带上稳定机器码(`ordering.credit-exceeded`),
+   原样透传到 ProblemDetail 的 `code` 扩展成员。这是解 [[analysis-00010-exception-model]] §五"断裂"的核心。
+2. **HTTP 语义绝不进 `-core`/`-application`**。纯层只认 `ErrorCode`(一个字符串码 + 可选语义类别),
+   **状态码由 `-web`/`-web-spring` 决定**。方向永远是 `-web → -core`,绝不反向。
+3. **异常用于"异常/不变量违反";边缘输入用非异常校验**(Guard vs Validate,§八)。
+4. **默认 throw-based**,不强推函数式(§十一);但错误必须**结构化**(带码),不能只是裸 message。
+5. **每个新增 package 有 `package-info.java`**(承 design-00001 §二规约 5,受 `-archunit` 校验)。
+
+## 三、模块依赖图(增量)
+
+```mermaid
+flowchart TD
+  subgraph pure["纯净层 framework-free"]
+    core["aipersimmon-ddd-core<br/>ErrorCode · ErrorCategory · DomainException(+code)<br/>BusinessRule · BusinessRuleViolationException · checkRule"]
+    app["aipersimmon-ddd-application<br/>ApplicationException(+code)<br/>EntityNotFoundException · ConcurrencyConflictException"]
+    web["aipersimmon-ddd-web<br/>ProblemType extends ErrorCode<br/>ApiError · FieldError · ApiException · ProblemTypeRegistry"]
+  end
+  subgraph dirty["脏 starter / 实现层"]
+    webspring["aipersimmon-ddd-web-spring<br/>Advice(全量映射) · i18n bundle · 401/403 条件化"]
+    cqrsspring["aipersimmon-ddd-cqrs-spring<br/>ValidationInterceptor(ConstraintViolation)<br/>OptimisticLock→ConcurrencyConflict 翻译"]
+    outbox["aipersimmon-ddd-outbox(+jdbc/mybatis)<br/>RetryPolicy · DeadLetterStore"]
+    kafka["aipersimmon-ddd-messaging-kafka<br/>DefaultErrorHandler + DLT"]
+  end
+
+  app --> core
+  web --> core
+  webspring --> web
+  webspring -. 可选映射 .-> app
+  cqrsspring --> app
+  outbox --> core
+  kafka --> outbox
+```
+
+关键:`ProblemType extends ErrorCode`,`-web` 依赖 `-core` —— 于是**领域抛出的 `ErrorCode` 能被 `-web` 认识**,
+而 `-core` 永远不认识 `-web`。断裂由此接通。
+
+## 四、类型层级(核心)
+
+```mermaid
+classDiagram
+  class ErrorCode {
+    <<interface>>
+    +String code()
+    +ErrorCategory category()
+  }
+  class ErrorCategory {
+    <<enum>>
+    DOMAIN_RULE
+    NOT_FOUND
+    CONFLICT
+    VALIDATION
+    UNAUTHORIZED
+    FORBIDDEN
+    UNEXPECTED
+  }
+  class DomainException {
+    -ErrorCode errorCode
+    +Optional~ErrorCode~ errorCode()
+  }
+  class BusinessRule {
+    <<interface>>
+    +boolean isBroken()
+    +String message()
+    +ErrorCode errorCode()
+  }
+  class BusinessRuleViolationException
+  class IllegalStateTransitionException
+  class ApplicationException {
+    -ErrorCode errorCode
+  }
+  class EntityNotFoundException
+  class ConcurrencyConflictException
+  class ProblemType {
+    <<interface>>
+    +String typeUri()
+    +int status()
+    +String titleKey()
+  }
+  class ApiException {
+    -ProblemType problemType
+    -List~FieldError~ errors
+  }
+
+  ErrorCode ..> ErrorCategory
+  RuntimeException <|-- DomainException
+  DomainException <|-- BusinessRuleViolationException
+  DomainException <|-- IllegalStateTransitionException
+  RuntimeException <|-- ApplicationException
+  ApplicationException <|-- EntityNotFoundException
+  ApplicationException <|-- ConcurrencyConflictException
+  RuntimeException <|-- ApiException
+  ErrorCode <|-- ProblemType
+  BusinessRuleViolationException ..> BusinessRule
+```
+
+### 4.1 `-core`(零依赖)
+
+```java
+// com.aipersimmon.ddd.core.error
+public interface ErrorCode {
+    String code();                                  // 稳定、BC 前缀、点分:"ordering.credit-exceeded"
+    default ErrorCategory category() { return ErrorCategory.DOMAIN_RULE; }  // 无 ProblemType 时的默认状态映射依据
+}
+
+public enum ErrorCategory { DOMAIN_RULE, NOT_FOUND, CONFLICT, VALIDATION, UNAUTHORIZED, FORBIDDEN, UNEXPECTED; }
+```
+
+```java
+// com.aipersimmon.ddd.core.exception
+public class DomainException extends RuntimeException {
+    private final transient ErrorCode errorCode;    // 可空:老式 message-only 仍合法
+    public DomainException(String message) { this(null, message, null); }
+    public DomainException(ErrorCode code, String message) { this(code, message, null); }
+    public DomainException(ErrorCode code, String message, Throwable cause) { super(message, cause); this.errorCode = code; }
+    public Optional<ErrorCode> errorCode() { return Optional.ofNullable(errorCode); }
+}
+```
+
+```java
+// com.aipersimmon.ddd.core.rule
+public interface BusinessRule {
+    boolean isBroken();
+    String message();
+    default ErrorCode errorCode() { return null; }
+}
+public final class BusinessRuleViolationException extends DomainException {
+    public BusinessRuleViolationException(BusinessRule rule) { super(rule.errorCode(), rule.message()); }
+}
+```
+
+```java
+// AbstractAggregateRoot 增补
+protected final void checkRule(BusinessRule rule) {
+    if (rule.isBroken()) throw new BusinessRuleViolationException(rule);
+}
+```
+
+- `errorCode` 用 `transient`,与 `AbstractAggregateRoot` 现有 `transient` 事件表约定一致,避免误序列化。
+- **`-core` 仍零依赖**(仅 test junit)——这是 [[analysis-00006-ddd-building-blocks-library]] 的验收红线,本设计不破坏。
+- `IllegalStateTransitionException` 保留,新增可选 `ErrorCode` 构造。
+
+### 4.2 `-application`(→ `-core`)
+
+```java
+// com.aipersimmon.ddd.application.exception
+public class ApplicationException extends RuntimeException {           // 携带可空 ErrorCode,同 DomainException 形态
+    public Optional<ErrorCode> errorCode();
+}
+public class EntityNotFoundException extends ApplicationException {}    // 缺失聚合/资源;映射 404
+public class ConcurrencyConflictException extends ApplicationException {} // 乐观锁冲突;映射 409
+```
+
+- **`EntityNotFoundException` 取代脚手架先前"抛 `NoSuchElementException` 换 404"的临时手法**:语义一等、可带码、
+  应用层仍零 web 依赖。JDK `NoSuchElementException` 的 404 映射保留作兜底,但业务代码优先用它。
+- `ConcurrencyConflictException`:由 `-cqrs-spring` 把 Spring `OptimisticLockingFailureException` 在应用边界翻译进来,
+  让并发冲突有稳定语义(409),不再是裸框架异常。
+
+### 4.3 `-web`(纯契约,→ `-core`)
+
+```java
+// com.aipersimmon.ddd.web.error
+public interface ProblemType extends ErrorCode {   // ProblemType 本身就是一个 ErrorCode
+    String typeUri();          // 相对 URI:"/problems/credit-exceeded"(标识符,不要求可解析)
+    int status();              // 默认 HTTP 状态
+    String titleKey();         // i18n key
+    // 继承 code() / category()
+}
+public interface ProblemTypeRegistry {             // code -> ProblemType 查找;消费者注册各 BC 的枚举
+    Optional<ProblemType> byCode(String code);
+}
+```
+
+- `ProblemType extends ErrorCode` 是**接通点**:领域随手抛的 `ErrorCode`,只要其 `code()` 在 registry 里能查到对应
+  `ProblemType`,advice 就能补齐 `type`/`status`/`title`;查不到也能靠 `category()` 给出合理默认。
+- `ApiException`/`ApiError`/`FieldError` 形态不变(见 [[design-00002-web-layer]] §5)。
+
+## 五、错误码→ProblemDetail 的贯通(解 §五断裂)
+
+`-web-spring` 的 `@RestControllerAdvice` 处理任一领域/应用异常时,按下述**解析顺序**产出 `code`/`type`/`status`/`title`:
+
+```mermaid
+flowchart LR
+  ex["抛出的异常"] --> hasCode{"带 ErrorCode?"}
+  hasCode -- 是 --> reg{"registry.byCode 命中?"}
+  reg -- 是 --> pt["用 ProblemType:type/status/title/code 全有"]
+  reg -- 否 --> cat["用 ErrorCategory 默认状态 + 原始 code"]
+  hasCode -- 否 --> typ["按异常类型默认:Domain→409 / App→422 / NotFound→404 …"]
+```
+
+于是 [[design-00002-web-layer]] §八 的旗舰示例**可复现**:领域抛
+`new CreditExceededException(OrderingProblemType.CREDIT_EXCEEDED, "...")`(该枚举实现 `ProblemType`,
+既是领域可见的 `ErrorCode`,又携带 `/problems/credit-exceeded` + 409 + titleKey)→ advice 命中 registry →
+输出带 `code:"ordering.credit-exceeded"`、`type:"/problems/credit-exceeded"` 的 409。
+
+## 六、完整异常 → HTTP 映射(修订版)
+
+| 异常 | HTTP | 说明 | 相对现状 |
+| --- | --- | --- | --- |
+| `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径 | 不变 |
+| `BusinessRuleViolationException` / `DomainException`(带码) | 命中 registry 则用其 status,否则 **409** | `code`/`type` 从 `ErrorCode` 贯通 | **新增贯通** |
+| `DomainException`(无码) | 409 | 兼容旧路径 | 不变 |
+| `ApplicationException`(无码) | 422 | 用例级失败 | 不变 |
+| `EntityNotFoundException` | **404** | 缺失聚合/资源 | **新增语义类型** |
+| `ConcurrencyConflictException` | **409** | 乐观锁冲突 | **新增语义类型** |
+| `MethodArgumentNotValidException` / `BindException` | 400 | 填 `errors[]` | 不变 |
+| **`jakarta.validation.ConstraintViolationException`** | **400** | 命令总线 JSR-380;与上一行**共享** `FieldError` 映射 | **修复缺口 #3/#8** |
+| `NoSuchElementException` | 404 | JDK 兜底(业务优先用 `EntityNotFoundException`) | 不变 |
+| 认证 `AuthenticationException` | 401 | 仅当 classpath 有 spring-security(§十) | **新增,条件化** |
+| 授权 `AccessDeniedException` | 403 | 同上 | **新增,条件化** |
+| 限流 `RateLimitExceededException` | 429 | filter 层,带 `Retry-After`/`RateLimit-*` | 不变 |
+| 兜底 `Exception` | 500 | 不回显 message | 不变 |
+
+**`ConstraintViolationException` 处理器**把每个 `ConstraintViolation` 映射为 `FieldError(propertyPath, code, message)`,
+与 `MethodArgumentNotValidException` 走同一个 `FieldError` 构造路径 —— 统一两处 Bean Validation 的线上结构(#8)。
+
+## 七、i18n(交付 bundle,解 #4)
+
+- `-web-spring` 交付**默认英文 bundle** `messages/aipersimmon-web-errors.properties`(键 = 通用 `ProblemType.titleKey()` +
+  校验 code),`i18n.basename` 可覆盖/追加;消费者按 BC 加自己的 bundle。
+- `ProblemHttpResponseWriter`(filter 路径)**也接入 `MessageSource`**,不再只用 status reason phrase —— 与 advice 路径一致。
+- `Accept-Language` 决定 locale,缺省英文(承 [[design-00002-web-layer]] §5.4)。
+
+## 八、Guard vs Validate 分工(成文)
+
+采纳 domain-driven-hexagon 的"Bad input isn't a bug; a broken invariant is",落成四层职责:
+
+| 层 | 拦什么 | 机制 | 是否异常 | HTTP |
+| --- | --- | --- | --- | --- |
+| 入站 adapter / DTO | 不可信外部输入(格式/必填/范围) | Bean Validation `@Valid` | 非异常校验 | 400 |
+| 应用 / 命令总线 | 命令前置条件 | `ValidationCommandInterceptor`(JSR-380) | 抛 `ConstraintViolationException` | 400 |
+| 应用用例 | 缺失聚合 / 用例冲突 | `EntityNotFoundException` / `ConcurrencyConflictException` / `ApplicationException` | 抛 | 404 / 409 / 422 |
+| 领域聚合 / VO | 业务不变量 | `checkRule(BusinessRule)` / VO 构造自校验 → `DomainException` | 抛 | 409(或按码) |
+| 基础设施 | 技术故障 | 未捕获 | 抛 | 500 |
+
+原则:**边缘输入错误是"预期的",走非异常校验;不变量违反是"异常的",走 throw**。二者错误结构统一为 RFC 9457 + `errors[]`。
+
+## 九、消息链路可靠性错误模型(解 #6)
+
+现状:outbox relay / deadline scheduler 只 `attempts++` + `warn` **无限重试**;Kafka 纯靠 broker 重投,**无 DLQ**。设计:
+
+1. **transient / permanent 分类**:`-outbox` 定义 framework-free 的 `RetryPolicy` 与 `FailureClassifier`。默认:
+   Spring `TransientDataAccessException`、超时、`5xx`→ **transient**;反序列化失败、`ClassNotFoundException`、
+   `4xx`、业务永久拒绝 → **permanent**。
+2. **重试上限 + 退避**:`max-attempts`(默认 8)+ 指数退避(可配)。`attempts` 达上限 → 转 permanent。
+3. **死信**:`-outbox` 增 `DeadLetterStore` SPI;`-outbox-jdbc`/`-mybatis-plus` 落 `dead_letter` 表(消息体 + 末次异常 +
+   attempts + 时间)。permanent 或超上限的消息**移入死信**,停止重投,可人工/工具重放。
+4. **Kafka**:`-messaging-kafka` 装配 Spring Kafka `DefaultErrorHandler` + `DeadLetterPublishingRecoverer` →
+   写 `<topic>.DLT`;退避 + 上限对齐 (1)–(2)。inbox 幂等语义不变。
+5. **可观测**:死信写入与重试耗尽各发一条 `warn`/`error` + traceId,便于告警(与 [[design-00002-web-layer]] traceId 打通)。
+
+## 十、401 / 403 条件化补齐(解 #9)
+
+- `-web-spring` 增一个 `@ConditionalOnClass(name = "org.springframework.security...")` 的配置:提供
+  `AuthenticationEntryPoint` / `AccessDeniedHandler`,把 401/403 也写成 `application/problem+json`
+  (`/problems/unauthorized`、`/problems/forbidden`)。
+- 不引入 spring-security 硬依赖(承 [[decision-00007-web-api-response-envelope]] §六:"仅当 classpath 有 spring-security 时激活")。
+
+## 十一、明确取舍:为什么默认不上 `Result`/`Either`
+
+参考项目里 ddd-by-examples-library(Vavr `Either`)、clean-architecture(`Ardalis.Result`)、
+domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-structure-2-event-flow-and-cqrs]] 也提过 Result。
+本设计的取舍(类比 [[decision-00007-web-api-response-envelope]] 的"明确不做"):
+
+- **默认 throw + 结构化错误码**,不在 `-core` 引入 `Result`/`Either` 或 Vavr。理由:①保持 `-core` 零依赖红线;
+  ②与 Spring/MyBatis 的事务回滚、`@Transactional` rollback-on-exception 语义天然契合(Result 需处处手工传播);
+  ③与生态近邻 jMolecules / spring-modulith-with-ddd 一致(它们也不函数式)。
+- **允许局部采用**:团队可在**纯领域策略/规格**边界自行引 Vavr 返回 `Either<Rejection, T>`(如 ddd-by-examples 的
+  `Policy`),只要**不进 `-core` 公共 API**。库不阻止,也不内建。
+- 这不是"反最佳实践",是**成本/一致性权衡**;若未来重估,应走独立 decision。
+
+## 十二、脚手架落地改动(code 不是 truth,照改)
+
+| 模块 | 改动 |
+| --- | --- |
+| `-core` | 新增 `error/ErrorCode`、`error/ErrorCategory`、`rule/BusinessRule`、`rule/BusinessRuleViolationException`;`DomainException` 加带码构造;`AbstractAggregateRoot.checkRule` |
+| `-application` | `ApplicationException` 加带码构造;新增 `EntityNotFoundException`、`ConcurrencyConflictException` |
+| `-web` | `ProblemType extends ErrorCode`;新增 `ProblemTypeRegistry` |
+| `-web-spring` | advice 全量映射(含 `ConstraintViolationException`、registry 贯通、`EntityNotFoundException`/`ConcurrencyConflictException`);交付 i18n bundle;filter 路径接入 `MessageSource`;401/403 条件化配置 |
+| `-cqrs-spring` | 把 `OptimisticLockingFailureException` 翻译为 `ConcurrencyConflictException` |
+| `-outbox(+jdbc/mybatis)` | `RetryPolicy`/`FailureClassifier`/`DeadLetterStore` + `dead_letter` 表 |
+| `-messaging-kafka` | `DefaultErrorHandler` + DLT |
+| **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `OrderingProblemType.CREDIT_EXCEEDED`;把散落的信用/状态校验改写为 `checkRule`;"unknown order/customer" 改抛 `EntityNotFoundException`(取代先前的 `NoSuchElementException` 临时手法) |
+
+**验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 409 ProblemDetail
+(带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。
+
+## 十三、后果
+
+- **正向**:错误码从领域一路贯通到边界,`code`/`type` 对领域异常首次可达;规则成一等对象,可测可组合;
+  校验/并发/未找到有稳定语义与状态码;消息毒丸不再无限重投;i18n 真正可用。纯/脏与依赖向内不变,无新范式。
+- **负向 / 治理**:`ErrorCode`/`ProblemType` 的 `code` 与 `typeUri` **一旦发布即成对外契约**,变更须走版本
+  (承 [[decision-00007-web-api-response-envelope]] §Consequences);错误码枚举跨 BC 增长需命名前缀治理;
+  `-application` 新增两个语义子类,消费者需知晓其映射。
+- **迁移**:所有新增构造都是**加法**(旧 message-only 构造保留),存量代码不强制一次性改;但脚手架作为示范应改齐。
+
+## 关联
+
+- [[decision-00010-exception-model]] —— 本设计落地的决策来源(策略、取舍、被拒选项)。
+- [[analysis-00010-exception-model]] —— 本设计的缺口来源与验收清单。
+- [[analysis-00008-web-api-response-envelope]] —— 线上错误契约的大厂/标准对照(本文沿用其结论,不改格式)。
+- [[analysis-00006-ddd-building-blocks-library]] —— 纯/脏分离与依赖向内铁律,约束 `ErrorCode` 只能落 `-core`。
+- [[analysis-00005-structure-2-event-flow-and-cqrs]] —— Result/受控异常意图出处(本文对 Result 给出取舍)。
+- [[decision-00007-web-api-response-envelope]] —— `code`/`type`/i18n/401-403 推迟等决策来源。
+- [[design-00001-aipersimmon-ddd-and-scaffold]] / [[design-00002-web-layer]] —— 被本文增量扩展的既有设计。

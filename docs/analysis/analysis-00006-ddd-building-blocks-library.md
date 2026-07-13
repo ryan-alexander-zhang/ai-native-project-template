@@ -296,6 +296,9 @@ Internal(distilled,在 `docs/reference/`):
 `modular-monolith-with-ddd/`(Outbox/Inbox、module=BC)、
 `spring-modulith-with-ddd/`(event externalization `mapping()` + `@Externalized`)。
 
+下游:本文的 `-core` `DomainException` / `-application` `ApplicationException` 基类,其完整异常体系
+(`ErrorCode` 贯通、`BusinessRule`、语义子类、消息可靠性)见 [[analysis-00010-exception-model]] 与 [[design-00003-exception-model]]。
+
 External:
 
 - xmolecules/jMolecules — https://github.com/xmolecules/jmolecules · https://jmolecules.org （参考实现,不作依赖）
