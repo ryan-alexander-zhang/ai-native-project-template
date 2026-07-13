@@ -9,7 +9,7 @@ parent: design-00003-exception-model
 # 异常/错误体系落地计划
 
 把 [[design-00003-exception-model]](决策见 [[decision-00010-exception-model]])落成代码。目标验收锚点:
-**对信用超限的下单请求,脚手架原样产出 [[design-00002-web-layer]] §八 的 409 ProblemDetail(带
+**对信用超限的下单请求,脚手架原样产出 [[design-00002-web-layer]] §八 的 422 ProblemDetail(带
 `code:"ordering.credit-exceeded"` + `type`)**;当前产不出来即未完成。
 
 全为**加法式**改动(旧 message-only 构造保留),不破坏 `-core` 零依赖红线与依赖向内铁律。
@@ -90,8 +90,8 @@ P2 与 P3 只依赖 P1,可并行;P6 基本独立;P7 收口验收。
 
 1. **全部相位任务勾完**,且 `mvn -q -o install`(库)+ 两个脚手架 `mvn -q -o test` 全绿。
 2. **贯通验收(核心)**:对信用超限下单,响应为
-   `409 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/credit-exceeded"` —— 与 [[design-00002-web-layer]] §八 逐字段一致。
-3. **回归验收**:unknown order → 404;命令 Bean Validation 失败 → 400 带 `errors[]`;领域规则违反 → 409;未预期 → 500 不回显。
+   `422 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/credit-exceeded"` —— 与 [[design-00002-web-layer]] §八 逐字段一致。
+3. **回归验收**:unknown order → 404;命令 Bean Validation 失败 → 400 带 `errors[]`;领域业务规则违反 → 422;状态机非法迁移/并发 → 409;未预期 → 500 不回显。
 4. **可靠性验收**:构造一个永久失败的 outbox/kafka 消息,确认达 `max-attempts` 后进死信、不再无限重投。
 5. **架构验收**:`-core`/`-application`/`-web` 仍 framework-free(archunit + pom 零依赖红线);无 `-web → 领域` 的反向依赖。
 

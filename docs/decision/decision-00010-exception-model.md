@@ -41,10 +41,14 @@ framework-free**(`-core` 零依赖是验收红线)。
 - `EntityNotFoundException`(→404)、`ConcurrencyConflictException`(→409),均属 `-application`、零 web 依赖。
 - `EntityNotFoundException` **取代**脚手架先前"抛 `NoSuchElementException` 换 404"的临时手法。
 
-### 四、完整且正确的异常→HTTP 映射
+### 四、异常→HTTP 状态映射:业务规则默认 422,409 收窄给冲突
 
-- 采用 [[design-00003-exception-model]] §六 的映射表;**修复 `ConstraintViolationException`(命令总线 JSR-380)
-  当前掉进 500 的缺陷 → 400**,并与 `MethodArgumentNotValidException` 共享 `FieldError` 结构。
+采用 [[design-00003-exception-model]] §六 映射表。核心取舍(纠正早先"`DomainException` 默认 409"的可疑默认):
+
+- **领域业务规则违反默认 422**(Unprocessable Content):报文合法但语义不可处理(RFC 9110 §15.5.21)。对齐 GitHub/Rails/Spring 社区。
+- **409 收窄**给"与当前状态冲突":乐观锁/并发(gRPC `ABORTED`)、重复(`ALREADY_EXISTS`)、状态机非法迁移(`IllegalStateTransitionException`)。**不**作一般业务规则默认——与 409 惯例(幂等/乐观锁)一致。
+- **400** 仅报文畸形 + 字段级校验;**修复 `ConstraintViolationException`(命令总线 JSR-380)当前掉进 500 的缺陷 → 400**,并与 `MethodArgumentNotValidException` 共享 `FieldError`。
+- **权威由每个 `ProblemType.status()` 逐码决定**,基类默认只是兜底。取 422 派而非 Google/Stripe 的 400 派,因本模板已选 RFC 9457 + `errors[]`,422 语义更精确。
 
 ### 五、消息链路可靠性错误模型
 

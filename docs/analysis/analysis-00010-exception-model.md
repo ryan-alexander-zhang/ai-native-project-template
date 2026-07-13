@@ -123,15 +123,17 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 [[design-00002-web-layer]] §八(lines 258-271)亲自给出的旗舰 wire 示例:
 
 ```
-HTTP/1.1 409 Conflict
+HTTP/1.1 422 Unprocessable Content
 Content-Type: application/problem+json
 { "type": "/problems/credit-exceeded",
   "code": "ordering.credit-exceeded",
-  "status": 409, "detail": "...", "traceId": "..." }
+  "status": 422, "detail": "...", "traceId": "..." }
 ```
 
+> 注:业务规则默认状态由早先的 409 修正为 **422**(见 [[decision-00010-exception-model]] §四;design-00002 §八 已同步)。
+
 但在当前脚手架里**这个响应产不出来**:`CreditExceededException extends DomainException` → 命中
-`handleDomain` → 409、`type=about:blank`、**`code` 缺失**。要得到文档那个带 `code`/`type` 的响应,
+`handleDomain` → 409(状态也错,应为 422)、`type=about:blank`、**`code` 缺失**。要得到文档那个带 `code`/`type` 的响应,
 必须改抛 `ApiException(OrderingProblemType.CREDIT_EXCEEDED, …)`;可 `ApiException`/`ProblemType` 都在
 `-web`,**领域层不能依赖 web**(违反 [[analysis-00006-ddd-building-blocks-library]] 的 framework-free/依赖向内铁律)。
 

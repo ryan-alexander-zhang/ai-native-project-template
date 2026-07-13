@@ -205,6 +205,12 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
   `ProblemType`,advice 就能补齐 `type`/`status`/`title`;查不到也能靠 `category()` 给出合理默认。
 - `ApiException`/`ApiError`/`FieldError` 形态不变(见 [[design-00002-web-layer]] §5)。
 
+### 4.4 基数与 fail-fast
+
+- **一个聚合 N 条规则、一个 BC 的 `ErrorCode` 枚举 N 个值**。`BusinessRule` 是"一条不变量 = 一个对象",聚合在方法里 `checkRule(...)` 多次;`ErrorCode` 实现为 per-BC 枚举,天然多值(`CREDIT_EXCEEDED`/`ORDER_EMPTY`/`ORDER_ALREADY_CONFIRMED`/…)。**不存在"一个聚合一条规则、一个码"**。
+- **fail-fast**:`checkRule` 命中第一条被违反的规则即抛,不累积——领域不变量间常有前后依赖,且与"边缘输入校验**累积**报 `errors[]`"(§八)刻意分工。
+- 若某场景确需一次报多条领域规则(如批量导入),可加 `checkRules(BusinessRule...)` 变体,让 `BusinessRuleViolationException` 携带多条明细。**本期不做**,留作 opt-in 增量。
+
 ## 五、错误码→ProblemDetail 的贯通(解 §五断裂)
 
 `-web-spring` 的 `@RestControllerAdvice` 处理任一领域/应用异常时,按下述**解析顺序**产出 `code`/`type`/`status`/`title`:
@@ -215,24 +221,25 @@ flowchart LR
   hasCode -- 是 --> reg{"registry.byCode 命中?"}
   reg -- 是 --> pt["用 ProblemType:type/status/title/code 全有"]
   reg -- 否 --> cat["用 ErrorCategory 默认状态 + 原始 code"]
-  hasCode -- 否 --> typ["按异常类型默认:Domain→409 / App→422 / NotFound→404 …"]
+  hasCode -- 否 --> typ["按异常类型默认:领域规则→422 / 状态机→409 / App→422 / NotFound→404 …"]
 ```
 
 于是 [[design-00002-web-layer]] §八 的旗舰示例**可复现**:领域抛
 `new CreditExceededException(OrderingProblemType.CREDIT_EXCEEDED, "...")`(该枚举实现 `ProblemType`,
-既是领域可见的 `ErrorCode`,又携带 `/problems/credit-exceeded` + 409 + titleKey)→ advice 命中 registry →
-输出带 `code:"ordering.credit-exceeded"`、`type:"/problems/credit-exceeded"` 的 409。
+既是领域可见的 `ErrorCode`,又携带 `/problems/credit-exceeded` + 422 + titleKey)→ advice 命中 registry →
+输出带 `code:"ordering.credit-exceeded"`、`type:"/problems/credit-exceeded"` 的 422。
 
 ## 六、完整异常 → HTTP 映射(修订版)
 
 | 异常 | HTTP | 说明 | 相对现状 |
 | --- | --- | --- | --- |
 | `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径 | 不变 |
-| `BusinessRuleViolationException` / `DomainException`(带码) | 命中 registry 则用其 status,否则 **409** | `code`/`type` 从 `ErrorCode` 贯通 | **新增贯通** |
-| `DomainException`(无码) | 409 | 兼容旧路径 | 不变 |
+| `BusinessRuleViolationException` / `DomainException`(带码) | 命中 registry 则用其 status,否则 **422** | `code`/`type` 从 `ErrorCode` 贯通 | **新增贯通** |
+| `DomainException`(无码) | **422** | 业务规则:报文合法但语义不可处理 | **改默认 409→422** |
+| `IllegalStateTransitionException` | **409** | 状态机非法迁移 = 与当前状态冲突 | **改默认 409(明确)** |
 | `ApplicationException`(无码) | 422 | 用例级失败 | 不变 |
 | `EntityNotFoundException` | **404** | 缺失聚合/资源 | **新增语义类型** |
-| `ConcurrencyConflictException` | **409** | 乐观锁冲突 | **新增语义类型** |
+| `ConcurrencyConflictException` | **409** | 乐观锁 / 并发冲突 | **新增语义类型** |
 | `MethodArgumentNotValidException` / `BindException` | 400 | 填 `errors[]` | 不变 |
 | **`jakarta.validation.ConstraintViolationException`** | **400** | 命令总线 JSR-380;与上一行**共享** `FieldError` 映射 | **修复缺口 #3/#8** |
 | `NoSuchElementException` | 404 | JDK 兜底(业务优先用 `EntityNotFoundException`) | 不变 |
@@ -243,6 +250,16 @@ flowchart LR
 
 **`ConstraintViolationException` 处理器**把每个 `ConstraintViolation` 映射为 `FieldError(propertyPath, code, message)`,
 与 `MethodArgumentNotValidException` 走同一个 `FieldError` 构造路径 —— 统一两处 Bean Validation 的线上结构(#8)。
+
+### 6.1 为什么领域规则默认 422、409 收窄给冲突
+
+映射的**权威由每个 `ProblemType.status()` 逐码决定**;下述只是"未注册 ProblemType 时"的基类兜底,取舍依据 RFC 9110 语义:
+
+- **422 Unprocessable Content**(§15.5.21):服务器**理解**报文的类型与语法、但**因语义无法处理**——这精确对应"业务不变量违反"(信用超限、金额不合规、超配额)。故 `DomainException`/`BusinessRuleViolationException` 默认 422。对齐 GitHub、Rails/Laravel、Spring 社区的既有习惯。
+- **409 Conflict**(§15.5.10):请求**与目标资源的当前状态冲突**——**收窄**给:乐观锁/并发(gRPC `ABORTED`)、重复创建(`ALREADY_EXISTS`)、状态机非法迁移(`IllegalStateTransitionException`)。**不**用作一般业务规则的默认。
+- **400 Bad Request**:仅报文畸形/类型错 + 字段级校验(`errors[]`)。Google AIP/gRPC 把 `FAILED_PRECONDITION` 也归 400——本模板既已选 RFC 9457 + `errors[]`,取 **422 派**更精确。
+- 心智模型(gRPC 最干净):`INVALID_ARGUMENT`→400、`FAILED_PRECONDITION`→422(本模板)、`ABORTED`/`ALREADY_EXISTS`→409、`NOT_FOUND`→404。
+- 决策见 [[decision-00010-exception-model]] §四。
 
 ## 七、i18n(交付 bundle,解 #4)
 
@@ -260,7 +277,7 @@ flowchart LR
 | 入站 adapter / DTO | 不可信外部输入(格式/必填/范围) | Bean Validation `@Valid` | 非异常校验 | 400 |
 | 应用 / 命令总线 | 命令前置条件 | `ValidationCommandInterceptor`(JSR-380) | 抛 `ConstraintViolationException` | 400 |
 | 应用用例 | 缺失聚合 / 用例冲突 | `EntityNotFoundException` / `ConcurrencyConflictException` / `ApplicationException` | 抛 | 404 / 409 / 422 |
-| 领域聚合 / VO | 业务不变量 | `checkRule(BusinessRule)` / VO 构造自校验 → `DomainException` | 抛 | 409(或按码) |
+| 领域聚合 / VO | 业务不变量 | `checkRule(BusinessRule)` / VO 构造自校验 → `DomainException` | 抛 | 422(状态机冲突则 409;或按码) |
 | 基础设施 | 技术故障 | 未捕获 | 抛 | 500 |
 
 原则:**边缘输入错误是"预期的",走非异常校验;不变量违反是"异常的",走 throw**。二者错误结构统一为 RFC 9457 + `errors[]`。
@@ -312,7 +329,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 | `-messaging-kafka` | `DefaultErrorHandler` + DLT |
 | **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `OrderingProblemType.CREDIT_EXCEEDED`;把散落的信用/状态校验改写为 `checkRule`;"unknown order/customer" 改抛 `EntityNotFoundException`(取代先前的 `NoSuchElementException` 临时手法) |
 
-**验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 409 ProblemDetail
+**验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 **422** ProblemDetail
 (带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。
 
 ## 十三、后果

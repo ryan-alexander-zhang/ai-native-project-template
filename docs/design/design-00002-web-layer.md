@@ -146,13 +146,15 @@ Boot 自动装配(`AutoConfiguration.imports`)。
   | 异常 | HTTP | 说明 |
   | --- | --- | --- |
   | `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径:type/code/title 全来自目录 |
-  | `-core` `DomainException` | 409(可按子类细分) | 语义冲突默认 Conflict |
-  | `-application` `ApplicationException` | 422/409 | 用例级失败 |
+  | `-core` `DomainException` / `BusinessRuleViolationException` | **422**(默认;逐码可细分) | 业务规则:报文合法但语义不可处理 |
+  | `-core` `IllegalStateTransitionException` | 409 | 状态机非法迁移 = 与当前状态冲突 |
+  | `-application` `ApplicationException`(`EntityNotFound`→404,`ConcurrencyConflict`→409) | 422 | 用例级失败 |
   | Bean Validation(`MethodArgumentNotValidException` 等) | 400 | 填 `errors[]`(field/code/message) |
   | `NoSuchElementException` / 自定义 NotFound | 404 | |
   | `RateLimitExceededException`(§5.5) | 429 | 带 `Retry-After` + `RateLimit-*` |
   | 兜底 `Exception` | 500 | 不泄漏堆栈(承 Zalando #177) |
 
+- 状态默认由 **每个 `ProblemType.status()` 逐码决定**;上表为兜底。**业务规则默认 422**、**409 收窄给冲突/并发/状态机**的取舍依据见 [[design-00003-exception-model]] §6.1。
 - **不依赖** `spring.mvc.problemdetails.enabled`——本 advice 显式接管,保证扩展成员与 i18n 一致。
 
 ### 5.2 traceId(默认开)
@@ -256,12 +258,12 @@ Content-Type: application/json
 **失败**(RFC 9457 + 扩展成员):
 
 ```
-HTTP/1.1 409 Conflict
+HTTP/1.1 422 Unprocessable Content
 Content-Type: application/problem+json
 {
   "type": "/problems/credit-exceeded",
   "title": "Credit limit exceeded",
-  "status": 409,
+  "status": 422,
   "detail": "Order total 5000 exceeds remaining credit 3000",
   "instance": "/v1/orders",
   "code": "ordering.credit-exceeded",
