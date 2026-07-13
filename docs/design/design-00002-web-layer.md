@@ -43,7 +43,7 @@ flowchart TD
   core["aipersimmon-ddd-core"]
   app["aipersimmon-ddd-application"]
   subgraph webpure["纯契约 framework-free"]
-    web["aipersimmon-ddd-web<br/>ProblemType/ApiError/Page/Cursor + 横切 SPI"]
+    web["aipersimmon-ddd-web<br/>ProblemDescriptor/ProblemRegistry/ApiError/Page/Cursor + 横切 SPI"]
   end
   subgraph webstarter["脏 starter (Spring Web)"]
     webspring["aipersimmon-ddd-web-spring<br/>Advice/filters/autoconfig + 内存默认实现"]
@@ -76,30 +76,33 @@ flowchart TD
 
 ```
 com.aipersimmon.ddd.web
-├── error/      ProblemType(接口) ApiError FieldError ApiException(基类,可选)
+├── error/      ProblemDescriptor · DefaultProblemFamilies · ProblemRegistry · ProblemCatalog · ApiError · FieldError · ApiException(可选)
 ├── page/       Page<T>  Slice<T>  Cursor
 └── spi/        IdempotencyStore  ReplayGuard  RateLimiter  RequestSignatureVerifier
 ```
 
 ### 4.1 错误契约 `error/`
 
-- **`ProblemType`(接口)**:错误码目录的抽象。每个 BC 用**枚举**实现它(决策问题 5):
+- **`ProblemDescriptor`(record)+ `ProblemRegistry` / `ProblemCatalog`**:错误身份(`-core` 的 `ErrorCode`)与
+  HTTP 传输**组合**,不是继承。`ProblemDescriptor` 是纯传输定义;`ProblemRegistry` 在边界把 `ErrorCode` 解析成它
+  (per-code override,否则 `ErrorCategory` 的 `DefaultProblemFamilies` family)。为何不用 `ProblemType extends ErrorCode`
+  见 [[design-00003-exception-model]] §4.7。
 
   ```java
-  public interface ProblemType {
-      String code();          // 机器码,如 "ordering.credit-exceeded"(BC 前缀防冲突)
-      String typeUri();       // 相对 URI,如 "/problems/credit-exceeded"(标识符,不要求可解析)
-      int status();           // 默认 HTTP 状态,如 409
-      String titleKey();      // i18n 消息 key(title 稳定、跨发生不变)
-  }
+  public record ProblemDescriptor(     // 纯传输,不含 code、不 extends ErrorCode
+      String typeUri,                  // 相对 URI,如 "/problems/domain-rule-violation"(标识符,不要求可解析)
+      int status,                      // 默认 HTTP 状态
+      String titleKey) {}              // i18n 消息 key(title 稳定、跨发生不变)
+  public interface ProblemCatalog { Map<ErrorCode, ProblemDescriptor> overrides(); }  // 各 BC 只登记够格专属 type 的少数码
+  public interface ProblemRegistry { ProblemDescriptor resolve(ErrorCode code); }     // override 优先,否则 category family
   ```
 
 - **`ApiError`**:RFC 9457 的**框架无关**值模型(对齐 `{type,title,status,detail,instance}` + 扩展成员),
   由 `-web-spring` 翻译成 Spring `ProblemDetail`。字段:`type`/`title`/`status`/`detail`/`instance` +
   扩展 `code`/`traceId`/`errors`(`List<FieldError>`)。不可变,构造即校验。
 - **`FieldError`**:字段级校验明细元素 `{field, code, message}`(对齐 PayPal/GitHub/JSON:API 的 `details`)。
-- **`ApiException`(可选基类)**:携带 `ProblemType` + 参数的运行时异常,便于 handler 直接抛;
-  与 `-core` `DomainException` / `-application` `ApplicationException` 的映射由 starter 兜底(见 §5.1)。
+- **`ApiException`(可选基类)**:携带 `ErrorCode` + `FieldError` 的运行时异常,便于 handler 直接抛;它与带码
+  `-core` `DomainException` / `-application` `ApplicationException` **同路解析**(code → descriptor),映射由 starter 兜底(见 §5.1)。
 
 ### 4.2 分页契约 `page/`
 
@@ -145,7 +148,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
 
   | 异常 | HTTP | 说明 |
   | --- | --- | --- |
-  | `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径:type/code/title 全来自目录 |
+  | `ApiException`(带 `ErrorCode`) | `registry.resolve(code).status()` | 首选路径:type/status/title 来自 override 或 category family,code 恒在 |
   | `-core` `DomainException` / `InvariantViolationException` | **422**(默认;逐码可细分) | 业务规则:报文合法但语义不可处理 |
   | `-core` `IllegalStateTransitionException` | 409 | 状态机非法迁移 = 与当前状态冲突 |
   | `-application` `ApplicationException`(`EntityNotFound`→404,`ConcurrencyConflict`→409) | 422 | 用例级失败 |
@@ -154,7 +157,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
   | `RateLimitExceededException`(§5.5) | 429 | 带 `Retry-After` + `RateLimit-*` |
   | 兜底 `Exception` | 500 | 不泄漏堆栈(承 Zalando #177) |
 
-- 状态默认由 **每个 `ProblemType.status()` 逐码决定**;上表为兜底。**业务规则默认 422**、**409 收窄给冲突/并发/状态机**的取舍依据见 [[design-00003-exception-model]] §6.1。
+- 状态默认由 **`registry.resolve(code)` 的 descriptor 决定**(per-code override,否则 category family);上表为无码兜底。**业务规则默认 422**、**409 收窄给冲突/并发/状态机**的取舍依据见 [[design-00003-exception-model]] §6.1;身份/传输组合的理由见 §4.7。
 - **不依赖** `spring.mvc.problemdetails.enabled`——本 advice 显式接管,保证扩展成员与 i18n 一致。
 
 ### 5.2 traceId(默认开)
@@ -169,7 +172,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
 
 ### 5.4 i18n(默认开,缺省英文)
 
-- `MessageSource` 按 `ProblemType.titleKey()` / 校验 code 取文案;`Accept-Language` 决定 locale;
+- `MessageSource` 按 `ProblemDescriptor.titleKey()`(family 或 override)/ 校验 code 取文案;`Accept-Language` 决定 locale;
   缺省 bundle 英文。属性 `i18n.basename` 等。
 
 ### 5.5 幂等键(opt-in,`idempotency.enabled`)
@@ -287,7 +290,7 @@ Content-Type: application/problem+json
 
 **顺序**(每步可独立验收,承 design-00001 "一个一个做"):
 
-1. `-web`(纯契约 + SPI + 值对象);单测:`ApiError`/`Page`/`Cursor` 构造校验、`ProblemType` 枚举样例。
+1. `-web`(纯契约 + SPI + 值对象);单测:`ApiError`/`Page`/`Cursor` 构造校验、`ProblemDescriptor` + `ProblemCatalog` override 样例。
 2. `-web-spring` 核心(advice + traceId + 分页 + i18n);切片测试 `@WebMvcTest`:异常→problem+json、扩展成员、traceId 回显。
 3. `-web-spring` opt-in 三能力(幂等/防重放/限流)+ 内存默认实现;filter 级测试 + 开关矩阵。
 4. `-web-store-redis` / `-web-store-jdbc`;各自 SPI 契约测试(Testcontainers Redis / H2),验证与内存实现同语义 + 装配顶替。

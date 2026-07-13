@@ -23,10 +23,10 @@ framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §
 
 | 分类 | 条目 |
 | --- | --- |
-| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`Invariant` 一等抽象 + `AbstractAggregateRoot.checkInvariant`;④错误码→`ProblemType`→ProblemDetail 的贯通桥接;⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦Guard-vs-Validate 分工成文;⑧401/403 条件化补齐 |
+| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`Invariant` 一等抽象 + `AbstractAggregateRoot.checkInvariant`;④错误码→`ProblemDescriptor`(category family + per-code override)→ProblemDetail 的贯通桥接(§4.7);⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦Guard-vs-Validate 分工成文;⑧401/403 条件化补齐 |
 | **不属本设计** | 异步**消息投递可靠性**(重试上限/退避/死信 DLQ)——投递面而非错误建模面,见 [[issue-00003-messaging-delivery-reliability]] |
 | **不做**(见 §十一) | 在 `-core` 引入 `Result`/`Either` 或 Vavr 依赖;通用异常基类大而全的字段(错误上下文 map 等);把 HTTP 状态码泄漏进 `-core` |
-| **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC `ProblemType` 枚举思路、filter 层 429/401 出口(均来自 [[design-00002-web-layer]]) |
+| **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC 错误码目录思路(传输映射形态改为 §4.7 的 family + override 组合)、filter 层 429/401 出口(均来自 [[design-00002-web-layer]]) |
 
 ## 二、贯穿性设计约束
 
@@ -45,7 +45,7 @@ flowchart TD
   subgraph pure["纯净层 framework-free"]
     core["aipersimmon-ddd-core<br/>ErrorCode · ErrorCategory · DomainException(+code)<br/>Invariant · InvariantViolationException · checkInvariant"]
     app["aipersimmon-ddd-application<br/>ApplicationException(+code)<br/>EntityNotFoundException · ConcurrencyConflictException"]
-    web["aipersimmon-ddd-web<br/>ProblemType extends ErrorCode<br/>ApiError · FieldError · ApiException · ProblemTypeRegistry"]
+    web["aipersimmon-ddd-web<br/>ProblemDescriptor · DefaultProblemFamilies · ProblemRegistry · ProblemCatalog<br/>ApiError · FieldError · ApiException(+ErrorCode)"]
   end
   subgraph dirty["脏 starter / 实现层"]
     webspring["aipersimmon-ddd-web-spring<br/>Advice(全量映射) · i18n bundle · 401/403 条件化"]
@@ -59,8 +59,11 @@ flowchart TD
   cqrsspring --> app
 ```
 
-关键:`ProblemType extends ErrorCode`,`-web` 依赖 `-core` —— 于是**领域抛出的 `ErrorCode` 能被 `-web` 认识**,
-而 `-core` 永远不认识 `-web`。断裂由此接通。
+关键:`-web` 依赖 `-core`(而 `-core` 永不认识 `-web`),`ProblemRegistry` 在边界把领域抛出的 `ErrorCode`
+**解析**成 `ProblemDescriptor`(传输定义:type/status/title)。身份(`ErrorCode`)与传输(`ProblemDescriptor`)是
+**组合而非继承**——两者不再是同一个类型,断裂在边界接通。**为何不用 `ProblemType extends ErrorCode`**:那会把
+HTTP 传输焊进错误身份(六个参考项目无一如此),且逼每个领域码 1:1 对应一个公开 type URI、内部重构泄漏成外部契约变更;
+组合让"多码共享一个 family type"成为常态,契约不随领域码膨胀。详见 §4.7。
 
 ## 四、类型层级(核心)
 
@@ -98,14 +101,18 @@ classDiagram
   }
   class EntityNotFoundException
   class ConcurrencyConflictException
-  class ProblemType {
-    <<interface>>
+  class ProblemDescriptor {
+    <<record>>
     +String typeUri()
     +int status()
     +String titleKey()
   }
+  class ProblemRegistry {
+    <<interface>>
+    +ProblemDescriptor resolve(ErrorCode)
+  }
   class ApiException {
-    -ProblemType problemType
+    -ErrorCode errorCode
     -List~FieldError~ errors
   }
 
@@ -117,9 +124,13 @@ classDiagram
   ApplicationException <|-- EntityNotFoundException
   ApplicationException <|-- ConcurrencyConflictException
   RuntimeException <|-- ApiException
-  ErrorCode <|-- ProblemType
+  ApiException ..> ErrorCode
+  ProblemRegistry ..> ErrorCode
+  ProblemRegistry ..> ProblemDescriptor
   InvariantViolationException ..> Invariant
 ```
+
+注意:`ProblemDescriptor` **不再** `extends ErrorCode`——身份与传输是组合关系,由 `ProblemRegistry` 在边界连接。
 
 ### 4.1 `-core`(零依赖)
 
@@ -127,7 +138,7 @@ classDiagram
 // com.aipersimmon.ddd.core.error
 public interface ErrorCode {
     String code();                                  // 稳定、BC 前缀、点分:"ordering.credit-exceeded"
-    default ErrorCategory category() { return ErrorCategory.DOMAIN_RULE; }  // 无 ProblemType 时的默认状态映射依据
+    default ErrorCategory category() { return ErrorCategory.DOMAIN_RULE; }  // 决定该码的 family(status/type/title 默认)
 }
 
 public enum ErrorCategory { DOMAIN_RULE, NOT_FOUND, CONFLICT, VALIDATION, UNAUTHORIZED, FORBIDDEN, UNEXPECTED; }
@@ -187,20 +198,27 @@ public class ConcurrencyConflictException extends ApplicationException {} // 乐
 
 ```java
 // com.aipersimmon.ddd.web.error
-public interface ProblemType extends ErrorCode {   // ProblemType 本身就是一个 ErrorCode
-    String typeUri();          // 相对 URI:"/problems/credit-exceeded"(标识符,不要求可解析)
-    int status();              // 默认 HTTP 状态
-    String titleKey();         // i18n key
-    // 继承 code() / category()
+public record ProblemDescriptor(         // 纯传输定义,不 extends ErrorCode
+    String typeUri,                      // 相对 URI:"/problems/domain-rule-violation"(标识符,不要求可解析)
+    int status,                          // 默认 HTTP 状态
+    String titleKey) {}                  // i18n key
+public interface ProblemCatalog {        // 各 BC 只登记"够格专属 type"的少数码(其余走 family)
+    Map<ErrorCode, ProblemDescriptor> overrides();
 }
-public interface ProblemTypeRegistry {             // code -> ProblemType 查找;消费者注册各 BC 的枚举
-    Optional<ProblemType> byCode(String code);
+public interface ProblemRegistry {       // 对任意带码错误总能解析出 descriptor
+    ProblemDescriptor resolve(ErrorCode code);   // override 优先,否则 category 的 family 默认
 }
+// DefaultProblemFamilies.DEFAULTS: Map<ErrorCategory, ProblemDescriptor> —— 库自带,每个 category 一个 family type
 ```
 
-- `ProblemType extends ErrorCode` 是**接通点**:领域随手抛的 `ErrorCode`,只要其 `code()` 在 registry 里能查到对应
-  `ProblemType`,advice 就能补齐 `type`/`status`/`title`;查不到也能靠 `category()` 给出合理默认。
-- `ApiException`/`ApiError`/`FieldError` 形态不变(见 [[design-00002-web-layer]] §5)。
+- **接通点是 `ProblemRegistry.resolve(ErrorCode)`**(组合,非继承):领域随手抛的 `ErrorCode`,先看有无 per-code
+  override,否则用其 `category()` 的 family 默认。**带码错误因此永不落 `about:blank`**,客户端总能按有意义的 `type`
+  判别 Problem Family,再按 `code` 扩展位细分具体业务原因。只有真正无码的异常(裸 `DomainException`、字段校验、404
+  兜底、`UNEXPECTED`)才用 `about:blank`——那才是 RFC 9457 里 `about:blank` 的本义("除 status 外无额外语义")。
+- **为何这样分**:`ErrorCode`(身份)与 `ProblemDescriptor`(传输)拆成两个类型、`ErrorCategory` 提供 family 默认、
+  个别码 override 专属 type——对齐参考项目的边界映射(Ardalis.Result category→HTTP、hexagon `@ControllerAdvice`)与
+  大厂 code-first(Google `reason`、Stripe `code`),同时保住 RFC 9457 的 `type` 语义。详见 §4.7。
+- `ApiException` 改为携带 `ErrorCode`(与带码 `DomainException` 同路解析);`ApiError`/`FieldError` 形态不变(见 [[design-00002-web-layer]] §5)。
 
 ### 4.4 基数与 fail-fast
 
@@ -260,6 +278,18 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 - 需要**返回丰富结果**(不只 pass/fail,还要带 allowance 数据或一次收集多条拒绝原因),或规则**随可注入策略/配置变化** → 决策型 / 注入型 `Policy`(边界局部用 `Either`,或把策略对象注入聚合方法);
 - "**事件 → 命令**"的跨聚合编排 → Saga / Process(含义③),两者都不是,不塞进聚合(见 [[analysis-00005-structure-2-event-flow-and-cqrs]])。
 
+### 4.7 错误身份 vs 传输映射:为何组合(`ErrorCode → ProblemDescriptor`)而非继承
+
+早先设计让 `-web` 的 `ProblemType extends ErrorCode`——一个类型身兼两职(领域失败身份 + HTTP 传输)。**已废弃**,改成组合。三条理由:
+
+- **参考项目无一如此**。六个 reference(Axon / clean-architecture / domain-driven-hexagon / ddd-by-examples / modular-monolith / jMolecules)里没有"ProblemType extends ErrorCode"这种把传输焊进身份的建模;它们都在**边界**翻译(Ardalis.Result 的 `ResultStatus` 类别 → HTTP、hexagon 的 `@ControllerAdvice`),Axon 干脆不碰 HTTP、只在消息边界转结构化失败。组合把翻译放回边界(`ProblemRegistry`),与它们一致。
+- **大厂 code-first**。Google(`ErrorInfo.reason`)、Stripe(`code`)、Microsoft(`innererror.code`)都用稳定字符串 `code` 作机器判别,而非"每个业务错误一个可解析 URI"。本仓一直出 `code`,组合让 `code` 担细粒度判别、`type` 担粗粒度 Problem Family,两者解耦。
+- **契约不随领域码膨胀**。继承逼每个 `ErrorCode` 1:1 对应一个公开 type URI;内部细化错误码(诊断/日志)会直接扩张对外 Problem Type 契约,registry 也变成全量维护热点、漏登记还静默降级。组合下,**多个码共享一个 family type**是常态,只有具备独立客户端处理 / 独立扩展 schema / 独立文档的码才 override 专属 type。
+
+**四层契约**:`status`(HTTP 大类)· `type`(Problem Family,客户端识别处理契约)· `code`(精确业务身份)· `detail`/扩展(本次上下文)。**两条硬约束**:①外部 `code` 用**显式字符串**固定(非 Java 枚举名派生),它是对外契约、不是实现细节;②**带码业务错误禁止落 `about:blank`**——至少走 category family;`about:blank` 只留给"status 已足够描述"的无码/内部错误。因 `registry.resolve` 对任意码总返回非空 descriptor,这条**由构造保证**,并由契约测试兜底(`WebLayerTest` 断言无 override 的带码错误 `type == "/problems/domain-rule-violation"`、无码错误才 `about:blank`)。
+
+**放置红线**:category → (status, family type, title) 的映射表(`DefaultProblemFamilies`)住在 `-web`(纯 `int` status、相对 URI),**绝不进 `-core`**——`ErrorCategory` 留在 `-core` 只做纯语义标签,否则 HTTP/URI 又渗回零依赖核心。
+
 ## 五、错误码→ProblemDetail 的贯通(解 §五断裂)
 
 `-web-spring` 的 `@RestControllerAdvice` 处理任一领域/应用异常时,按下述**解析顺序**产出 `code`/`type`/`status`/`title`:
@@ -267,24 +297,26 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 ```mermaid
 flowchart LR
   ex["抛出的异常"] --> hasCode{"带 ErrorCode?"}
-  hasCode -- 是 --> reg{"registry.byCode 命中?"}
-  reg -- 是 --> pt["用 ProblemType:type/status/title/code 全有"]
-  reg -- 否 --> cat["用 ErrorCategory 默认状态 + 原始 code"]
-  hasCode -- 否 --> typ["按异常类型默认:领域规则→422 / 状态机→409 / App→422 / NotFound→404 …"]
+  hasCode -- 是 --> reg{"registry.resolve(code)"}
+  reg -- "有 override" --> ov["用专属 ProblemDescriptor:type/status/title + 原始 code"]
+  reg -- "否(family)" --> cat["用 category family descriptor:type/status/title + 原始 code"]
+  hasCode -- 否 --> typ["无码兜底 about:blank + 异常类型默认状态:领域规则→422 / 状态机→409 / App→422 / NotFound→404 …"]
 ```
 
+带码路径**总能解析出 descriptor**(override 优先,否则 family),故带码错误的 `type` 永远有意义、绝不 `about:blank`。
 于是 [[design-00002-web-layer]] §八 的旗舰示例**可复现**:领域抛
-`new CreditExceededException(OrderingProblemType.CREDIT_EXCEEDED, "...")`(该枚举实现 `ProblemType`,
-既是领域可见的 `ErrorCode`,又携带 `/problems/credit-exceeded` + 422 + titleKey)→ advice 命中 registry →
-输出带 `code:"ordering.credit-exceeded"`、`type:"/problems/credit-exceeded"` 的 422。
+`new CreditExceededException(OrderingErrorCode.CREDIT_EXCEEDED, "...")`(纯 `ErrorCode`,`DOMAIN_RULE`)→ advice
+`registry.resolve` 命中 `OrderingProblemCatalog` 的 override → 输出带 `code:"ordering.credit-exceeded"`、
+`type:"/problems/insufficient-credit"` 的 422;未 override 的码(如 `ordering.duplicate-sku`)则输出 family
+`type:"/problems/domain-rule-violation"` + 各自的 `code`。
 
 ## 六、完整异常 → HTTP 映射(修订版)
 
 | 异常 | HTTP | 说明 | 相对现状 |
 | --- | --- | --- | --- |
-| `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径 | 不变 |
-| `InvariantViolationException` / `DomainException`(带码) | 命中 registry 则用其 status,否则 **422** | `code`/`type` 从 `ErrorCode` 贯通 | **新增贯通** |
-| `DomainException`(无码) | **422** | 业务规则:报文合法但语义不可处理 | **改默认 409→422** |
+| `ApiException`(带 `ErrorCode`) | `registry.resolve(code).status()` | 首选路径:override 或 family | 改携 `ErrorCode` |
+| `InvariantViolationException` / `DomainException`(带码) | `registry.resolve` 的 descriptor status(override 或 family,后者按 category:`DOMAIN_RULE`→422) | `code` + 有意义的 `type`(绝非 about:blank)贯通 | **新增贯通** |
+| `DomainException`(无码) | **422** + `about:blank` | 无业务码:status 已足够描述 | **改默认 409→422** |
 | `IllegalStateTransitionException` | **409** | 状态机非法迁移 = 与当前状态冲突 | **改默认 409(明确)** |
 | `ApplicationException`(无码) | 422 | 用例级失败 | 不变 |
 | `EntityNotFoundException` | **404** | 缺失聚合/资源 | **新增语义类型** |
@@ -302,7 +334,7 @@ flowchart LR
 
 ### 6.1 为什么领域规则默认 422、409 收窄给冲突
 
-映射的**权威由每个 `ProblemType.status()` 逐码决定**;下述只是"未注册 ProblemType 时"的基类兜底,取舍依据 RFC 9110 语义:
+映射的**权威由 `registry.resolve(code)` 的 descriptor status 决定**(per-code override,否则 category family;family 的 status 见下);无码时才回落异常类型的基类兜底。取舍依据 RFC 9110 语义:
 
 - **422 Unprocessable Content**(§15.5.21):服务器**理解**报文的类型与语法、但**因语义无法处理**——这精确对应"业务不变量违反"(信用超限、金额不合规、超配额)。故 `DomainException`/`InvariantViolationException` 默认 422。对齐 GitHub、Rails/Laravel、Spring 社区的既有习惯。
 - **409 Conflict**(§15.5.10):请求**与目标资源的当前状态冲突**——**收窄**给:乐观锁/并发(gRPC `ABORTED`)、重复创建(`ALREADY_EXISTS`)、状态机非法迁移(`IllegalStateTransitionException`)。**不**用作一般业务规则的默认。
@@ -312,7 +344,7 @@ flowchart LR
 
 ## 七、i18n(交付 bundle,解 #4)
 
-- `-web-spring` 交付**默认英文 bundle** `messages/aipersimmon-web-errors.properties`(键 = 通用 `ProblemType.titleKey()` +
+- `-web-spring` 交付**默认英文 bundle** `messages/aipersimmon-web-errors.properties`(键 = family/override 的 `ProblemDescriptor.titleKey()`,如 `problem.domain-rule-violation.title` +
   校验 code),`i18n.basename` 可覆盖/追加;消费者按 BC 加自己的 bundle。
 - `ProblemHttpResponseWriter`(filter 路径)**也接入 `MessageSource`**,不再只用 status reason phrase —— 与 advice 路径一致。
 - `Accept-Language` 决定 locale,缺省英文(承 [[design-00002-web-layer]] §5.4)。
@@ -372,10 +404,10 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 | --- | --- |
 | `-core` | 新增 `error/ErrorCode`、`error/ErrorCategory`、`rule/Invariant`、`rule/InvariantViolationException`;`DomainException` 加带码构造;`AbstractAggregateRoot.checkInvariant` |
 | `-application` | `ApplicationException` 加带码构造;新增 `EntityNotFoundException`、`ConcurrencyConflictException` |
-| `-web` | `ProblemType extends ErrorCode`;新增 `ProblemTypeRegistry` |
+| `-web` | `ProblemDescriptor`(record,不 extends ErrorCode)+ `DefaultProblemFamilies`(category→family)+ `ProblemCatalog`(override)+ `ProblemRegistry.resolve(ErrorCode)`;`ApiException` 改携 `ErrorCode`(§4.7) |
 | `-web-spring` | advice 全量映射(含 `ConstraintViolationException`、registry 贯通、`EntityNotFoundException`/`ConcurrencyConflictException`);交付 i18n bundle;filter 路径接入 `MessageSource`;401/403 条件化配置 |
 | `-cqrs-spring` | 把 `OptimisticLockingFailureException` 翻译为 `ConcurrencyConflictException` |
-| **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `CREDIT_EXCEEDED`;聚合内**够格**不变量(无重复 SKU)用 `checkInvariant(OrderHasDistinctSkus)`,**琐碎守卫**(空/超上限)用 coded `throw`(§4.5);"unknown order/customer" 改抛 `EntityNotFoundException`(取代 `NoSuchElementException` 临时手法) |
+| **scaffold(ordering)** | `OrderingProblemCatalog`(implements `ProblemCatalog`)**只 override** `CREDIT_EXCEEDED`→`/problems/insufficient-credit`,其余码走 category family;`CreditExceededException` 携 `CREDIT_EXCEEDED`;聚合内**够格**不变量(无重复 SKU)用 `checkInvariant(OrderHasDistinctSkus)`,**琐碎守卫**(空/超上限)用 coded `throw`(§4.5);"unknown order/customer" 改抛 `EntityNotFoundException`(取代 `NoSuchElementException` 临时手法) |
 
 **验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 **422** ProblemDetail
 (带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。
@@ -384,7 +416,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 
 - **正向**:错误码从领域一路贯通到边界,`code`/`type` 对领域异常首次可达;规则成一等对象,可测可组合;
   校验/并发/未找到有稳定语义与状态码;i18n 真正可用。纯/脏与依赖向内不变,无新范式。
-- **负向 / 治理**:`ErrorCode`/`ProblemType` 的 `code` 与 `typeUri` **一旦发布即成对外契约**,变更须走版本
+- **负向 / 治理**:`ErrorCode` 的 `code` 与 `ProblemDescriptor` 的 `typeUri` **一旦发布即成对外契约**,变更须走版本
   (承 [[decision-00007-web-api-response-envelope]] §Consequences);错误码枚举跨 BC 增长需命名前缀治理;
   `-application` 新增两个语义子类,消费者需知晓其映射。
 - **迁移**:所有新增构造都是**加法**(旧 message-only 构造保留),存量代码不强制一次性改;但脚手架作为示范应改齐。

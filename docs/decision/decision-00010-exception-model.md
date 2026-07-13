@@ -28,8 +28,11 @@ framework-free**(`-core` 零依赖是验收红线)。
 
 - `-core` 定义 `ErrorCode`(稳定、BC 前缀、点分的 `code()` + 可选语义 `ErrorCategory`);**HTTP 状态码绝不进 `-core`**。
 - `DomainException` / `ApplicationException` **可携带**(可空)`ErrorCode`;旧 message-only 构造保留(加法式)。
-- `-web` 的 `ProblemType extends ErrorCode`,并提供 `ProblemTypeRegistry`:领域抛出的 `ErrorCode` 因此能被
-  `-web` 认识并补齐 `type`/`status`/`title`,而 `-core` 永不认识 `-web`。**这是接通断裂的唯一合规方式**。
+- `-web` 用**组合而非继承**接通:领域抛出的纯 `ErrorCode` 由 `ProblemRegistry.resolve(ErrorCode)` 在边界解析成
+  `ProblemDescriptor`(type/status/title)——per-code `ProblemCatalog` override 优先,否则其 `ErrorCategory` 的
+  `DefaultProblemFamilies` family 默认。`-web` 依赖 `-core`,`-core` 永不认识 `-web`;`ErrorCategory` 留在 `-core` 纯语义,
+  family 映射(含 HTTP status/URI)放 `-web`。**放弃早先的 `ProblemType extends ErrorCode`**(把传输焊进身份、逼码与 type
+  1:1、契约随领域码膨胀,且六个参考项目无一如此),理由详见 [[design-00003-exception-model]] §4.7。
 
 ### 二、`Invariant` 一等抽象 + `AbstractAggregateRoot.checkInvariant()`
 
@@ -48,7 +51,7 @@ framework-free**(`-core` 零依赖是验收红线)。
 - **领域业务规则违反默认 422**(Unprocessable Content):报文合法但语义不可处理(RFC 9110 §15.5.21)。对齐 GitHub/Rails/Spring 社区。
 - **409 收窄**给"与当前状态冲突":乐观锁/并发(gRPC `ABORTED`)、重复(`ALREADY_EXISTS`)、状态机非法迁移(`IllegalStateTransitionException`)。**不**作一般业务规则默认——与 409 惯例(幂等/乐观锁)一致。
 - **400** 仅报文畸形 + 字段级校验;**修复 `ConstraintViolationException`(命令总线 JSR-380)当前掉进 500 的缺陷 → 400**,并与 `MethodArgumentNotValidException` 共享 `FieldError`。
-- **权威由每个 `ProblemType.status()` 逐码决定**,基类默认只是兜底。取 422 派而非 Google/Stripe 的 400 派,因本模板已选 RFC 9457 + `errors[]`,422 语义更精确。
+- **权威由 `registry.resolve(code)` 的 descriptor 决定**(per-code override,否则 category family),无码才回落异常类型基类默认。取 422 派而非 Google/Stripe 的 400 派,因本模板已选 RFC 9457 + `errors[]`,422 语义更精确。带码错误的 `type` 恒为有意义的 family/override(绝非 `about:blank`);`about:blank` 只留给无码/内部错误。
 
 ### 五、i18n 与 401/403
 
@@ -67,7 +70,8 @@ framework-free**(`-core` 零依赖是验收红线)。
 
 ### 被拒选项
 
-- **让 `DomainException` 直接依赖 `-web` 的 `ProblemType`**:最省事,但反向依赖、破坏 framework-free,拒。
+- **让 `DomainException` 直接依赖 `-web` 的 `ProblemDescriptor`/HTTP**:最省事,但反向依赖、破坏 framework-free,拒。
+- **`ProblemType extends ErrorCode`(身份即传输)**:见 [[design-00003-exception-model]] §4.7,已改为组合。
 - **只在边界(adapter)现拼错误码**:边界无法得知领域语义,码不稳定、易漂移,拒(码必须"从内到外")。
 - **全面函数式(`Either` 进 core)**:见"明确不做 1"。
 
