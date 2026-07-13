@@ -58,6 +58,12 @@ public class AipersimmonDddCqrsAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
+    public ConcurrencyTranslationCommandInterceptor concurrencyTranslationCommandInterceptor() {
+        return new ConcurrencyTranslationCommandInterceptor();
+    }
+
+    @Bean
     @ConditionalOnBean(UnitOfWork.class)
     @ConditionalOnMissingBean
     public TransactionCommandInterceptor transactionCommandInterceptor(
