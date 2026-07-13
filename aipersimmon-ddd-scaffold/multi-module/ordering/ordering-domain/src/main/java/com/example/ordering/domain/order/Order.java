@@ -35,14 +35,14 @@ public class Order extends AbstractAggregateRoot<OrderId> {
 
     /** Place a new order from raw line data, recording the order-placed event. */
     public static Order place(OrderId id, CustomerId customerId, List<LineData> lineData) {
-        if (lineData == null || lineData.isEmpty()) {
-            throw new DomainException("an order needs at least one line");
-        }
         List<OrderLine> lines = new ArrayList<>();
-        for (LineData line : lineData) {
-            lines.add(new OrderLine(line.sku(), line.quantity(), line.unitPrice()));
+        if (lineData != null) {
+            for (LineData line : lineData) {
+                lines.add(new OrderLine(line.sku(), line.quantity(), line.unitPrice()));
+            }
         }
         Order order = new Order(id, customerId, lines);
+        order.checkRule(new OrderMustHaveLines(lines));
         order.registerEvent(new OrderPlacedEvent(id, order.total()));
         return order;
     }
