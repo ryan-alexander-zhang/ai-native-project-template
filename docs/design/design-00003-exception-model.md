@@ -228,6 +228,36 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 
 都不满足就用 coded `throw` —— 一行条件套个类只是仪式,反而稀释了"规则"这个词的信号。`BusinessRule` 与 coded `throw` 走同一条错误码/映射通道(前者的 `BusinessRuleViolationException` 就是 `DomainException` 子类),所以升级/降级**不影响线上契约**,可随领域演进自由调整。
 
+### 4.6 `BusinessRule` vs `Policy`/`Specification`:同一思想的两个流派
+
+§4.5 回答的是"校验落在**哪一层**";本节回答的是"聚合内那条规则该用**哪种形态**"。`BusinessRule` 常被和参考项目里的 `Policy`/`Specification` 混为一谈——二者其实是"**规则 = 一等命名对象**(而非散落的 `if…throw`)"这一战术思想的两个流派。先厘清 "Policy" 的三种含义,能对上 `BusinessRule` 的只有第一种:
+
+| "Policy" 的含义 | 与 `BusinessRule` 的关系 |
+| --- | --- |
+| ①**决策型 Policy / Specification**（ddd-by-examples 的 `PlacingOnHoldPolicy`） | **同一层的兄弟**——本节重点比这个 |
+| ②**注入型 Policy**（ddd-by-examples-factory 的 `ReviewPolicy` 注入进聚合方法） | `BusinessRule` 的扩展方向：规则需可变策略/配置时的形态 |
+| ③**反应型 Policy / Saga**（"每当发生事件 X 就触发命令 Y"） | **无关**——属应用 / 流程层编排,不是聚合内不变量 |
+
+`BusinessRule`(断言流派)与决策型 `Policy`(函数式流派)的核心差异:
+
+| 维度 | `BusinessRule`（本仓默认） | 决策型 `Policy`（函数式） |
+| --- | --- | --- |
+| **本质** | **断言 / 卫兵**:"这条不变量被违反了吗?" | **决策**:"这个动作允许吗?允许则产出什么?" |
+| **提问方向** | 负向——`isBroken()`,默认合法、标出违反 | 正向——判定 allow / reject 并**产出结果** |
+| **结果模型** | `boolean` → 聚合 **throw** 异常(二元通过/违反) | 返回 `Either<Rejection, Allowance>`(**值**,可携带理由/数据) |
+| **控制流** | 异常驱动,契合 `@Transactional` rollback-on-exception | 值驱动,需处处显式传播 / 组合 |
+| **外部状态** | §4.5 限定:聚合内、跨成员、**无外部状态**、自足判定 | 常可**注入**可变策略 / 配置(见含义②) |
+| **组合** | 逐条 `checkRule(...)`,**fail-fast** 短路(§4.4) | 列表清点、可一次累积多条 rejection |
+| **谱系** | 参考 `modular-monolith-with-ddd`(Grzybek;上溯微软 eShopOnContainers) | 参考 `ddd-by-examples-library`(Vavr `Either`) |
+
+**本仓取舍**:默认口径是 `BusinessRule`;决策型 `Policy`(`Either`)是 **§十 允许的局部逃生舱**——团队可在纯领域策略/规格边界自行引 Vavr,但**不得进 `-core` 公共 API**。二者不是并存的两套机制,而是"默认 + opt-in 逃生舱"。理由(零依赖红线、事务语义契合)见 §十。
+
+**选型指引**:
+
+- 约束是**硬不变量**(必须永真,违反 = 异常)且**聚合内可自足判定** → `BusinessRule`;
+- 需要**返回丰富结果**(不只 pass/fail,还要带 allowance 数据或一次收集多条拒绝原因),或规则**随可注入策略/配置变化** → 决策型 / 注入型 `Policy`(边界局部用 `Either`,或把策略对象注入聚合方法);
+- "**事件 → 命令**"的跨聚合编排 → Saga / Process(含义③),两者都不是,不塞进聚合(见 [[analysis-00005-structure-2-event-flow-and-cqrs]])。
+
 ## 五、错误码→ProblemDetail 的贯通(解 §五断裂)
 
 `-web-spring` 的 `@RestControllerAdvice` 处理任一领域/应用异常时,按下述**解析顺序**产出 `code`/`type`/`status`/`title`:
@@ -318,7 +348,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
   ②与 Spring/MyBatis 的事务回滚、`@Transactional` rollback-on-exception 语义天然契合(Result 需处处手工传播);
   ③与生态近邻 jMolecules / spring-modulith-with-ddd 一致(它们也不函数式)。
 - **允许局部采用**:团队可在**纯领域策略/规格**边界自行引 Vavr 返回 `Either<Rejection, T>`(如 ddd-by-examples 的
-  `Policy`),只要**不进 `-core` 公共 API**。库不阻止,也不内建。
+  `Policy`),只要**不进 `-core` 公共 API**。库不阻止,也不内建。`Policy`(函数式)与 `BusinessRule`(断言)的形态差异与选型见 **§4.6**。
 - 这不是"反最佳实践",是**成本/一致性权衡**;若未来重估,应走独立 decision。
 
 ## 十一、脚手架落地改动(code 不是 truth,照改)
