@@ -18,10 +18,10 @@ parent: design-00003-exception-model
 
 - ✅ **P1**(`-core`:`ErrorCode`/`ErrorCategory`/`Invariant`/`checkInvariant` + `DomainException` 带码)—— 已实现并测试(6 tests 绿,零依赖保持)。
 - ✅ **P2**(`-application`:`ApplicationException` 带码 + `EntityNotFoundException`/`ConcurrencyConflictException`)—— 已实现。
-- ✅ **P3**(`-web`:`ProblemType extends ErrorCode` + `ProblemTypeRegistry` + `ProblemTypeCatalog`)—— 已实现(既有契约测试不回归)。
+- ✅ **P3**(`-web`:`ProblemDescriptor` + `DefaultProblemFamilies`(category→family)+ `ProblemCatalog`(override)+ `ProblemRegistry.resolve(ErrorCode)`;`ApiException` 携 `ErrorCode`)—— 已实现(身份/传输组合,非 `ProblemType extends ErrorCode`,见 design §4.7;契约测试不回归)。
 - ✅ **P4**(`-web-spring`:`ProblemDetailFactory` registry 贯通 + advice 全量映射 + `ConstraintViolation→400` 修复)—— 已实现(WebLayerTest 11 tests 绿)。**未做子项**:i18n 默认 bundle 交付、filter 路径接入 MessageSource、401/403 条件化(均为加法,不影响验收)。
 - ✅ **P5**(`-cqrs-spring`:`OptimisticLockingFailureException → ConcurrencyConflictException`)—— 已实现。
-- ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkInvariant` + `EntityNotFound` + `OrderingProblemType`/catalog)—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code/type,unknown → 404(`ExceptionContractTest`,multi-module 10 tests 绿)。
+- ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkInvariant` + `EntityNotFound` + `OrderingProblemCatalog`(只 override `CREDIT_EXCEEDED`,余走 family))—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code + `type:/problems/insufficient-credit`,duplicate-sku → 422 带 family `type:/problems/domain-rule-violation`,unknown → 404(`ExceptionContractTest`,multi-module tests 绿)。
 - ↗ **消息投递可靠性(原 P6)已移出本计划**,作为独立 issue 追踪:[[issue-00003-messaging-delivery-reliability]](属投递可靠性,非异常体系)。
 - ⏳ **P7(modulith)**—— **未做**:modulith 仍是旧手写 `OrderExceptionHandler`、未引 web-spring,需先补 web-spring 接入,再镜像 multi-module 的异常模型改动。
 - ⏳ **P4 剩余子项**(i18n bundle、401/403)。
@@ -33,7 +33,7 @@ parent: design-00003-exception-model
 ```mermaid
 flowchart TD
   P1["P1 -core:ErrorCode/Invariant/checkInvariant"] --> P2["P2 -application:语义异常"]
-  P1 --> P3["P3 -web:ProblemType extends ErrorCode + Registry"]
+  P1 --> P3["P3 -web:ProblemDescriptor + Registry(resolve) + Families"]
   P2 --> P4["P4 -web-spring:全量映射 + i18n + 401/403"]
   P3 --> P4
   P2 --> P5["P5 -cqrs-spring:乐观锁→ConcurrencyConflict"]
@@ -60,15 +60,17 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 - **验收**:模块 framework-free 编译通过;单测构造/取码。
 
 ### P3 — `-web` 契约接通(→ P1)
-- [ ] `ProblemType extends ErrorCode`(补继承,保留 `typeUri/status/titleKey`)。
-- [ ] 新增 `ProblemTypeRegistry`(`Optional<ProblemType> byCode(String)`)。
-- **验收**:`-web` 纯契约编译;既有 `ApiError`/`ApiException` 测试不回归。
+- [ ] `ProblemDescriptor`(record:`typeUri/status/titleKey`,不 extends ErrorCode)。
+- [ ] `DefaultProblemFamilies`(`Map<ErrorCategory, ProblemDescriptor>`,库自带 family 默认)。
+- [ ] `ProblemCatalog`(`Map<ErrorCode, ProblemDescriptor> overrides()`)、`ProblemRegistry`(`ProblemDescriptor resolve(ErrorCode)`,override→family)。
+- [ ] `ApiException` 改携 `ErrorCode`。
+- **验收**:`-web` 纯契约编译;`ApiError`/`ApiException`/`ProblemDescriptor` 契约测试通过。
 
 ### P4 — `-web-spring` 全量映射 + i18n + 401/403(→ P1,P2,P3)
-- [ ] advice:`DomainException`/`ApplicationException` 读 `errorCode()` → 经 `ProblemTypeRegistry` 补 `code/type/status/title`,查不到按 `ErrorCategory`/异常类型默认。
+- [ ] advice:`DomainException`/`ApplicationException` 读 `errorCode()` → 经 `ProblemRegistry.resolve` 得 descriptor(override 或 category family),填 `code/type/status/title`;无码才按异常类型 `about:blank` + 默认状态。
 - [ ] `EntityNotFoundException`→404、`ConcurrencyConflictException`→409 处理器。
 - [ ] **新增 `ConstraintViolationException`→400**,与 `MethodArgumentNotValidException` 共享 `FieldError` 映射(修 analysis-00010 #3/#8)。
-- [ ] `ProblemTypeRegistry` 默认 bean(聚合发现所有 `ProblemType` 枚举/bean)。
+- [ ] `ProblemRegistry` 默认 bean:`DefaultProblemFamilies` 叠加所有 `ProblemCatalog` 的 override。
 - [ ] 交付默认英文 `messages` bundle;`ProblemHttpResponseWriter`(filter 路径)接入 `MessageSource`。
 - [ ] 401/403 → ProblemDetail,`@ConditionalOnClass` spring-security。
 - **验收**:web-spring 测试含 ConstraintViolation→400、带码 DomainException→§八 形态、EntityNotFound→404;i18n 键可解析。
@@ -78,7 +80,7 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 - **验收**:并发冲突路径映射 409(非裸框架异常)。
 
 ### P7 — scaffold 示范 + 端到端验收(→ P4,P5)
-- [ ] `OrderingProblemType` 枚举 implements `ProblemType`(含 `CREDIT_EXCEEDED` 等)。
+- [ ] `OrderingProblemCatalog` implements `ProblemCatalog`,**只 override** 够格专属 type 的码(`CREDIT_EXCEEDED`→`/problems/insufficient-credit`);其余码走 category family。
 - [ ] `CreditExceededException` 携 `CREDIT_EXCEEDED`;够格不变量(无重复 SKU)用 `checkInvariant`,琐碎守卫用 coded `throw`(§4.5)。
 - [ ] "unknown order/customer" 改抛 `EntityNotFoundException`(取代 P0 的 `NoSuchElementException`)。
 - [ ] 同步 modulith 与 multi-module 两个脚手架。
@@ -88,7 +90,7 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 
 1. **全部相位任务勾完**,且 `mvn -q -o install`(库)+ 两个脚手架 `mvn -q -o test` 全绿。
 2. **贯通验收(核心)**:对信用超限下单,响应为
-   `422 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/credit-exceeded"` —— 与 [[design-00002-web-layer]] §八 逐字段一致。
+   `422 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/insufficient-credit"`(该码 override 了专属 type)—— 与 [[design-00002-web-layer]] §八 一致。
 3. **回归验收**:unknown order → 404;命令 Bean Validation 失败 → 400 带 `errors[]`;领域业务规则违反 → 422;状态机非法迁移/并发 → 409;未预期 → 500 不回显。
 4. **架构验收**:`-core`/`-application`/`-web` 仍 framework-free(archunit + pom 零依赖红线);无 `-web → 领域` 的反向依赖。
 

@@ -64,7 +64,7 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 
 | 模块 | 层 / 性质 | 依赖 | 内容 |
 | --- | --- | --- | --- |
-| `aipersimmon-ddd-web` | interface 契约,**framework-free** | `-core`(极薄) | `ProblemType` 错误码目录抽象;`ApiError`/字段错误语义模型(对齐 9457,不绑 Spring);`Page<T>`/`Slice<T>`/`Cursor` 分页值对象;**横切 SPI**:`IdempotencyStore`、`ReplayGuard`(nonce)、`RateLimiter`、`RequestSignatureVerifier` |
+| `aipersimmon-ddd-web` | interface 契约,**framework-free** | `-core`(极薄) | `ProblemDescriptor` + `ProblemRegistry`(错误码→传输映射,身份与传输组合;见 [[design-00003-exception-model]] §4.7);`ApiError`/字段错误语义模型(对齐 9457,不绑 Spring);`Page<T>`/`Slice<T>`/`Cursor` 分页值对象;**横切 SPI**:`IdempotencyStore`、`ReplayGuard`(nonce)、`RateLimiter`、`RequestSignatureVerifier` |
 | `aipersimmon-ddd-web-spring` | interface 实现,脏 starter | `-web` + Spring Web | 共享 `@RestControllerAdvice`(异常 → `ProblemDetail`,含 400/404/409/422/429);`traceId` filter;分页序列化;i18n(`MessageSource`);各横切能力的 filter + **开关** + 默认**内存** SPI 实现 |
 | `aipersimmon-ddd-web-store-redis` | infrastructure,可选后端 | `-web` + Redis | Redis 实现 `IdempotencyStore`/`ReplayGuard`/`RateLimiter`(TTL、原子 `INCR`、令牌桶 Lua) |
 | `aipersimmon-ddd-web-store-jdbc` | infrastructure,可选后端 | `-web` + JDBC | JDBC 实现同一批 SPI(表 + 过期清理);与 Redis 同 SPI 可互换 |
@@ -107,7 +107,7 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 | 2 | 版本策略 | **URL 路径 `/v{major}/`**(仅大版本,如 `/v1/`) | 最直观,对齐 Google/PayPal/Adyen/Shopify;Zalando 反 URL 版本属少数派 |
 | 3 | 幂等键是否进 v1 | **v1 提供支持点但默认关闭**(opt-in);不设为强制 | YAGNI;与 inbox 幂等边界见下方 Consequences。Stripe/PayPal/Adyen 均有,故保留 hook |
 | 4 | 模块命名 | **`-web` / `-web-spring`** | 与 `-cqrs`/`-cqrs-spring`、`-events-spring` 命名对称;避开 `-integration`(已指集成事件契约,见 [[analysis-00002-domain-vs-integration-events]])与 `interface`(与 Java 关键字/分层名歧义)。`-rest`/`-rest-spring` 为落选备选 |
-| 5 | 错误码目录组织 | **按 BC 归属的枚举,实现 `-web` 的 `ProblemType` 接口**;每项含稳定 `type`(相对 URI)+ 默认 HTTP 状态 + 消息 key(i18n) | 枚举天然是稳定、可穷举的机器码集合;i18n 走 starter 的 `MessageSource`,`type` 相对 URI 对齐 Zalando |
+| 5 | 错误码目录组织 | **按 BC 归属的 `ErrorCode` 枚举(纯身份)+ `ProblemCatalog` 只 override 够格专属 type 的码**;其余码走 `ErrorCategory` 的 family 默认;`type` 稳定(相对 URI)、状态与消息 key 由 `ProblemDescriptor` 承载(i18n) | 身份(`ErrorCode`)与传输(`ProblemDescriptor`)组合而非继承,契约不随领域码膨胀;i18n 走 starter 的 `MessageSource`,`type` 相对 URI 对齐 Zalando。**此项细化/取代早先"枚举 implements ProblemType"的表述**,见 [[design-00003-exception-model]] §4.7 |
 | 6 | 防重放攻击落位与范围 | **全做,opt-in + 可插拔(见 §三/§五)**:签名请求与 webhook 两种防重放都提供为 `-web-spring` 可选能力,时间窗默认 **5 分钟**,可选 nonce 单次去重走可换 store。默认关 | 是 Web 层安全标配;架构约束是"默认关 + 可插拔",而非"不做"([[analysis-00008-web-api-response-envelope]] §六B) |
 
 ### 五、安全:防重放(replay)≠ 幂等(idempotency)——分三层,都做但不混淆
