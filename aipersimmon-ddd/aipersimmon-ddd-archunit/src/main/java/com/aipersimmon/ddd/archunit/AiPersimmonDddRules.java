@@ -92,12 +92,13 @@ public final class AiPersimmonDddRules {
      * Stricter, <em>opt-in</em> rule: the interface/adapter layer must not depend on
      * the domain directly, driving use cases through the application layer instead.
      *
-     * <p>Deliberately <strong>not</strong> part of {@link #all()}: some inbound
-     * adapters legitimately subscribe to domain events (a messaging adapter that
-     * reacts to an internal event and hands off to a process manager, for example),
-     * which this rule would forbid. Adopt it in projects that want the tighter
-     * hexagonal discipline where every driving adapter goes through the application
-     * layer, and add it to a test alongside {@link #all()}:
+     * <p>Deliberately <strong>not</strong> part of {@link #all()}: it forbids
+     * <em>every</em> adapter&#8594;domain reference, which some layouts legitimately
+     * need — for example a project that keeps its persistence adapters (repository
+     * implementations that map aggregates) in the same module as its inbound
+     * adapters. Adopt it in projects that separate persistence adapters out and want
+     * the tighter hexagonal discipline where every driving adapter goes through the
+     * application layer, and add it to a test alongside {@link #all()}:
      *
      * <pre>{@code
      * @ArchTest static final ArchRule adapters = AiPersimmonDddRules.adapterShouldNotDependOnDomain();
@@ -130,16 +131,13 @@ public final class AiPersimmonDddRules {
     }
 
     /**
-     * Stricter, <em>opt-in</em> rule: a subscriber of an in-process domain event (an
-     * {@code @EventListener} method whose argument is a {@link DomainEvent}) resides
-     * in the application layer (or the domain), never in an inbound adapter. A domain
-     * event is consumed within its own bounded context; its subscriber orchestrates a
-     * use case or starts a process, which is application (or domain) work — not the
-     * transport translation an adapter does.
-     *
-     * <p>Belongs to the same discipline as {@link #adapterShouldNotDependOnDomain()}
-     * and is likewise excluded from {@link #all()}: adopt them together in a project
-     * that keeps every domain-event subscription out of its adapters.
+     * A subscriber of an in-process domain event (an {@code @EventListener} method
+     * whose argument is a {@link DomainEvent}) resides in the application layer (or
+     * the domain), never in an inbound adapter. A domain event is consumed within its
+     * own bounded context; its subscriber orchestrates a use case or starts a process,
+     * which is application (or domain) work — not the transport translation an adapter
+     * does. Part of {@link #all()}; the rule matches nothing (and so passes) in a
+     * project that has no such subscribers.
      */
     public static ArchRule domainEventListenersShouldResideInApplicationOrDomain() {
         return methods().that(areEventListenersHandling(DomainEvent.class))
@@ -151,18 +149,13 @@ public final class AiPersimmonDddRules {
     }
 
     /**
-     * Stricter, <em>opt-in</em> rule: a subscriber of an integration event (an
-     * {@code @EventListener} method whose argument is an {@link IntegrationEvent})
-     * resides in the interface/adapter layer. An integration event arrives from
-     * another context over a transport; the subscriber is the inbound adapter that
-     * receives it at the boundary and translates it into a command (or hands a
-     * correlation id to a process manager) — it holds no orchestration or domain
-     * logic itself.
-     *
-     * <p>Deliberately <strong>not</strong> part of {@link #all()}: where the inbound
-     * adapter is a distinct layer this holds, but a project may legitimately place the
-     * subscription elsewhere (for example a single-package deployable with no separate
-     * adapter layer). Adopt it where inbound adapters are their own layer.
+     * A subscriber of an integration event (an {@code @EventListener} method whose
+     * argument is an {@link IntegrationEvent}) resides in the interface/adapter layer.
+     * An integration event arrives from another context over a transport; the
+     * subscriber is the inbound adapter that receives it at the boundary and
+     * translates it into a command (or hands a correlation id to a process manager) —
+     * it holds no orchestration or domain logic itself. Part of {@link #all()}; the
+     * rule matches nothing (and so passes) in a project that has no such subscribers.
      */
     public static ArchRule integrationEventListenersShouldResideInAdapter() {
         return methods().that(areEventListenersHandling(IntegrationEvent.class))
@@ -191,6 +184,8 @@ public final class AiPersimmonDddRules {
         return CompositeArchRule.of(domainShouldNotDependOnOuterLayers())
                 .and(applicationShouldNotDependOnInfrastructureOrInterface())
                 .and(domainShouldBeFrameworkFree())
-                .and(domainEventsShouldStayInDomain());
+                .and(domainEventsShouldStayInDomain())
+                .and(domainEventListenersShouldResideInApplicationOrDomain())
+                .and(integrationEventListenersShouldResideInAdapter());
     }
 }
