@@ -38,6 +38,8 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 
 1. **两个独立事件类型标记**:`DomainEvent`(内部)与 `IntegrationEvent`(对外契约)两个**独立
    marker 接口**。**不采用** jMolecules 的 `@Externalized`/`Externalized`(单事件加标记)模型。
+   领域事件**另有**一个 `core.annotation.@DomainEvent` 角色注解;集成事件**有意不设** `@IntegrationEvent`
+   注解(理由见命题一末)。
 2. **不提供** `@DomainEventPublisher`:发布走 `DomainEvents` / `IntegrationEvents` **端口**,不用注解标发布方法。
 3. **`@DomainEventHandler`——必须**。作为架构语义注解,标注"这是一个领域事件的订阅者"(application 层组件),
    使分层意图显式、自文档化,并让 ArchUnit 能**按注解**精确定位(而非靠命名或反射参数类型)。
@@ -58,6 +60,15 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 见 [[analysis-00002-domain-vs-integration-events]]。证据:
 - `modular-monolith-with-ddd`:*"A separate **IntegrationEvents** assembly per module publishes only the event contracts others may depend on — never implementation."* / *"A module depends only on other modules' integration-event contracts."*
 - `modular-monolith-with-ddd`:*"Application (CQRS handlers, **domain events**, **integration events**, internal commands)"*(二者并列为不同类型)。
+
+**为何集成事件不设 `@IntegrationEvent` 注解(有意的不对称)**:领域事件的 `core.annotation.@DomainEvent`
+并不是"`DomainEvent` 接口的注解版",而是 `core.annotation` 里**战术 DDD 角色标记家族**的一员
+(`@AggregateRoot`/`@Entity`/`@ValueObject`/`@Repository`/`@Service`/`@Identity`/`@DomainEvent`)——它标记的是
+一个**领域建模角色**。集成事件不是领域战术角色,而是**集成层的对外契约**(住在 `aipersimmon-ddd-integration`,
+配套 `EventEnvelope`),靠**实现 `IntegrationEvent` 接口**声明即可;集成层没有对应的"战术角色注解家族",
+硬加 `@IntegrationEvent` 会错误暗示它是个领域战术角色。加上接口本身已 framework-free、集成事件总是刻意设计的
+契约(实现接口是惯用法),注解版收益≈0,且当前无任何规则需按注解识别集成事件。故**只提供 `IntegrationEvent`
+接口,不设注解**——这与命题三"集成侧保持精简"(连 `@IntegrationEventHandler` 也不设)同源。
 
 ### 命题二 —— `@DomainEventHandler` 必须(架构语义注解)
 
