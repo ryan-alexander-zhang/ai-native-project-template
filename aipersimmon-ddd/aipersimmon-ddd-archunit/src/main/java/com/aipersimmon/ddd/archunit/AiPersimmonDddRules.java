@@ -6,11 +6,16 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.aipersimmon.ddd.core.event.DomainEvent;
+import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
  * Reusable ArchUnit rules enforcing the DDD layering and building-block
@@ -187,6 +192,53 @@ public final class AiPersimmonDddRules {
     }
 
     /**
+     * A {@link CommandHandler} implementation must not depend on another
+     * {@link CommandHandler} implementation. A command handler is an entry point on
+     * the command bus, not an internal API: one handler invoking another either
+     * bypasses the callee's {@code CommandInterceptor} chain (its transaction,
+     * validation, logging) or, if routed back through the bus, nests transactions and
+     * double-applies those concerns; it also blurs the unit-of-work boundary and
+     * couples two use cases that should evolve independently. Reusable logic belongs
+     * in a domain service or a non-handler application collaborator, injected into
+     * both handlers — see {@code decision-00010}. Part of {@link #all()}; matches
+     * nothing (and so passes) in a project that has no command handlers.
+     */
+    public static ArchRule commandHandlersShouldNotDependOnOtherCommandHandlers() {
+        return classes().that().implement(CommandHandler.class)
+                .should(notDependOnAnotherCommandHandler())
+                .as("command handlers should not depend on other command handlers")
+                .because("a CommandHandler is a command-bus entry point, not an internal API; reuse belongs "
+                        + "in a domain service or a non-handler application collaborator, not in a "
+                        + "handler-to-handler dependency")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * Reports a violation for each dependency whose target is a {@link CommandHandler}
+     * implementation other than the {@code CommandHandler} interface itself and other
+     * than the origin class. Excluding the interface keeps a handler's own
+     * {@code implements CommandHandler} from counting; excluding the origin keeps a
+     * self-reference from counting. Used with {@code classes().should(...)}, so a
+     * {@code violated} event is a rule violation.
+     */
+    private static ArchCondition<JavaClass> notDependOnAnotherCommandHandler() {
+        return new ArchCondition<>("not depend on another CommandHandler implementation") {
+            @Override
+            public void check(JavaClass origin, ConditionEvents events) {
+                origin.getDirectDependenciesFromSelf().forEach(dependency -> {
+                    JavaClass target = dependency.getTargetClass();
+                    boolean anotherHandler = target.isAssignableTo(CommandHandler.class)
+                            && !target.isEquivalentTo(CommandHandler.class)
+                            && !target.getName().equals(origin.getName());
+                    if (anotherHandler) {
+                        events.add(SimpleConditionEvent.violated(dependency, dependency.getDescription()));
+                    }
+                });
+            }
+        };
+    }
+
+    /**
      * A method that both carries Spring's {@code @EventListener} (matched by name, see
      * {@link #SPRING_EVENT_LISTENER}) and takes a parameter assignable to the given
      * event marker — i.e. an event subscriber for that kind of event.
@@ -207,6 +259,7 @@ public final class AiPersimmonDddRules {
                 .and(domainEventsShouldStayInDomain())
                 .and(domainEventListenersShouldResideInApplicationOrDomain())
                 .and(integrationEventListenersShouldResideInAdapter())
-                .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler());
+                .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler())
+                .and(commandHandlersShouldNotDependOnOtherCommandHandlers());
     }
 }

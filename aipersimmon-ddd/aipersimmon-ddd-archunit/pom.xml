@@ -17,12 +17,13 @@
     gets both the rules and ArchUnit's JUnit 5 support (@AnalyzeClasses, @ArchTest)
     transitively.
 
-    Depends on aipersimmon-ddd-core and aipersimmon-ddd-integration so rules can
-    reference the building-block marker types (the domain-event and integration-event
-    markers). ArchUnit is a compile dependency here so it flows to the consumer's
-    test classpath. Spring is a test-only dependency, used solely by the fixtures
-    that exercise the @EventListener placement rules; the rules themselves match
-    @EventListener by name and carry no compile dependency on Spring.
+    Depends on aipersimmon-ddd-core, aipersimmon-ddd-integration, aipersimmon-ddd-application,
+    and aipersimmon-ddd-cqrs so rules can reference the building-block types they
+    guard (the domain-event and integration-event markers, the @DomainEventHandler
+    marker, and the CommandHandler contract). ArchUnit is a compile dependency here
+    so it flows to the consumer's test classpath. Spring is a test-only dependency,
+    used solely by the fixtures that exercise the @EventListener placement rules; the
+    rules themselves match @EventListener by name and carry no compile dependency on Spring.
   -->
   <artifactId>aipersimmon-ddd-archunit</artifactId>
   <name>aipersimmon-ddd-archunit</name>
@@ -43,6 +44,12 @@
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- For the CommandHandler contract referenced by the handler-dependency rule. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

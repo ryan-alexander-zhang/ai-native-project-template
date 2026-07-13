@@ -81,6 +81,18 @@ class AiPersimmonDddRulesTest {
     }
 
     @Test
+    void commandHandlersShouldNotDependOnOtherCommandHandlers_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules
+                .commandHandlersShouldNotDependOnOtherCommandHandlers().check(GOOD));
+    }
+
+    @Test
+    void commandHandlersShouldNotDependOnOtherCommandHandlers_failsForBad() {
+        assertThrows(AssertionError.class, () -> AiPersimmonDddRules
+                .commandHandlersShouldNotDependOnOtherCommandHandlers().check(BAD));
+    }
+
+    @Test
     void domainShouldBeFrameworkFree_passesForGood() {
         assertDoesNotThrow(() -> AiPersimmonDddRules.domainShouldBeFrameworkFree().check(GOOD));
     }
