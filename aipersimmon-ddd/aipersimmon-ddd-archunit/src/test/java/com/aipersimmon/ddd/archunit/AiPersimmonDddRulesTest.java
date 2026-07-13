@@ -13,6 +13,8 @@ class AiPersimmonDddRulesTest {
             .importPackages("com.aipersimmon.ddd.archunit.fixture.good");
     private static final JavaClasses BAD = new ClassFileImporter()
             .importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
+    private static final JavaClasses ANNOTATED_EVENT_IN_ADAPTER = new ClassFileImporter()
+            .importPackages("com.aipersimmon.ddd.archunit.fixture.annotated");
 
     @Test
     void domainShouldNotDependOnOuterLayers_passesForGood() {
@@ -34,6 +36,36 @@ class AiPersimmonDddRulesTest {
     void domainEventsShouldStayInDomain_failsForBad() {
         assertThrows(AssertionError.class,
                 () -> AiPersimmonDddRules.domainEventsShouldStayInDomain().check(BAD));
+    }
+
+    @Test
+    void domainEventsShouldStayInDomain_catchesAnnotatedEventOutsideDomain() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.domainEventsShouldStayInDomain().check(ANNOTATED_EVENT_IN_ADAPTER));
+    }
+
+    @Test
+    void domainEventListenersShouldResideInApplicationOrDomain_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.domainEventListenersShouldResideInApplicationOrDomain().check(GOOD));
+    }
+
+    @Test
+    void domainEventListenersShouldResideInApplicationOrDomain_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.domainEventListenersShouldResideInApplicationOrDomain().check(BAD));
+    }
+
+    @Test
+    void integrationEventListenersShouldResideInAdapter_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.integrationEventListenersShouldResideInAdapter().check(GOOD));
+    }
+
+    @Test
+    void integrationEventListenersShouldResideInAdapter_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.integrationEventListenersShouldResideInAdapter().check(BAD));
     }
 
     @Test

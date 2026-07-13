@@ -12,8 +12,11 @@
   </parent>
 
   <!--
-    The interface layer: inbound adapters that drive use cases. Here a REST API
-    over HTTP. It depends inward on the application and domain layers.
+    The interface layer: inbound adapters that drive use cases — a REST API over
+    HTTP and a messaging listener for cross-context integration events. It depends
+    inward on the application layer only: inbound adapters translate a transport
+    into a command/query and never reference the context's own domain types (those
+    are consumed by application-layer subscribers instead).
   -->
   <artifactId>ordering-adapter</artifactId>
   <name>ordering-adapter</name>
@@ -24,20 +27,12 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>ordering-application</artifactId>
     </dependency>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>ordering-domain</artifactId>
-    </dependency>
+    <!-- Library core: the @InterfaceLayer marker and DomainException. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-core</artifactId>
     </dependency>
-    <!-- Saga contracts for the order-fulfilment process manager. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-saga</artifactId>
-    </dependency>
-    <!-- Command and query buses used by the controller and the saga. -->
+    <!-- Command and query buses used by the controller. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs</artifactId>

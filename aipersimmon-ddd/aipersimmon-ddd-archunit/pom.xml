@@ -17,9 +17,12 @@
     gets both the rules and ArchUnit's JUnit 5 support (@AnalyzeClasses, @ArchTest)
     transitively.
 
-    Depends on aipersimmon-ddd-core so rules can reference the building-block
-    marker types (for example, the domain-event marker). ArchUnit is a compile
-    dependency here so it flows to the consumer's test classpath.
+    Depends on aipersimmon-ddd-core and aipersimmon-ddd-integration so rules can
+    reference the building-block marker types (the domain-event and integration-event
+    markers). ArchUnit is a compile dependency here so it flows to the consumer's
+    test classpath. Spring is a test-only dependency, used solely by the fixtures
+    that exercise the @EventListener placement rules; the rules themselves match
+    @EventListener by name and carry no compile dependency on Spring.
   -->
   <artifactId>aipersimmon-ddd-archunit</artifactId>
   <name>aipersimmon-ddd-archunit</name>
@@ -32,12 +35,22 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.tngtech.archunit</groupId>
       <artifactId>archunit-junit5</artifactId>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

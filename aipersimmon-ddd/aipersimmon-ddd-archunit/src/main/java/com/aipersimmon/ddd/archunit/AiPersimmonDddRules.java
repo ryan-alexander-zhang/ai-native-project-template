@@ -1,9 +1,13 @@
 package com.aipersimmon.ddd.archunit;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.aipersimmon.ddd.core.event.DomainEvent;
+import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
 
@@ -43,6 +47,14 @@ public final class AiPersimmonDddRules {
             "com.baomidou..",
             "com.fasterxml.jackson..",
     };
+
+    /**
+     * Spring's event-subscriber annotation, matched by fully-qualified name so the
+     * event-listener placement rules stay free of a compile dependency on Spring:
+     * a project that does not use Spring simply has no matching methods, and the
+     * rule passes vacuously.
+     */
+    private static final String SPRING_EVENT_LISTENER = "org.springframework.context.event.EventListener";
 
     private AiPersimmonDddRules() {
     }
@@ -100,14 +112,78 @@ public final class AiPersimmonDddRules {
                 .allowEmptyShould(true);
     }
 
-    /** Domain events belong to the domain layer, not to the interface or integration layers. */
+    /**
+     * Domain events belong to the domain layer, not to the interface or integration
+     * layers. Matches a type declared as a domain event <em>either</em> way the core
+     * offers — implementing the {@link DomainEvent} marker interface or carrying the
+     * {@link com.aipersimmon.ddd.core.annotation.DomainEvent @DomainEvent} annotation
+     * — since both express the same role and the annotation path must be guarded too.
+     */
     public static ArchRule domainEventsShouldStayInDomain() {
         return classes().that().implement(DomainEvent.class)
+                .or().areAnnotatedWith(com.aipersimmon.ddd.core.annotation.DomainEvent.class)
                 .should().resideInAPackage("..domain..")
                 .as("domain events should reside in the domain layer")
                 .because("a domain event is an internal fact of the bounded context, "
                         + "not a cross-context contract or a delivery concern")
                 .allowEmptyShould(true);
+    }
+
+    /**
+     * Stricter, <em>opt-in</em> rule: a subscriber of an in-process domain event (an
+     * {@code @EventListener} method whose argument is a {@link DomainEvent}) resides
+     * in the application layer (or the domain), never in an inbound adapter. A domain
+     * event is consumed within its own bounded context; its subscriber orchestrates a
+     * use case or starts a process, which is application (or domain) work — not the
+     * transport translation an adapter does.
+     *
+     * <p>Belongs to the same discipline as {@link #adapterShouldNotDependOnDomain()}
+     * and is likewise excluded from {@link #all()}: adopt them together in a project
+     * that keeps every domain-event subscription out of its adapters.
+     */
+    public static ArchRule domainEventListenersShouldResideInApplicationOrDomain() {
+        return methods().that(areEventListenersHandling(DomainEvent.class))
+                .should().beDeclaredInClassesThat().resideInAnyPackage("..application..", "..domain..")
+                .as("domain-event @EventListener handlers should reside in the application or domain layer")
+                .because("a domain event is consumed within its bounded context; its subscriber belongs to "
+                        + "the application (or domain) layer, not to an inbound adapter")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * Stricter, <em>opt-in</em> rule: a subscriber of an integration event (an
+     * {@code @EventListener} method whose argument is an {@link IntegrationEvent})
+     * resides in the interface/adapter layer. An integration event arrives from
+     * another context over a transport; the subscriber is the inbound adapter that
+     * receives it at the boundary and translates it into a command (or hands a
+     * correlation id to a process manager) — it holds no orchestration or domain
+     * logic itself.
+     *
+     * <p>Deliberately <strong>not</strong> part of {@link #all()}: where the inbound
+     * adapter is a distinct layer this holds, but a project may legitimately place the
+     * subscription elsewhere (for example a single-package deployable with no separate
+     * adapter layer). Adopt it where inbound adapters are their own layer.
+     */
+    public static ArchRule integrationEventListenersShouldResideInAdapter() {
+        return methods().that(areEventListenersHandling(IntegrationEvent.class))
+                .should().beDeclaredInClassesThat().resideInAPackage("..adapter..")
+                .as("integration-event @EventListener handlers should reside in the interface/adapter layer")
+                .because("an integration event arrives over a transport at the boundary, so its subscriber is "
+                        + "an inbound adapter that translates it and hands off inward")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A method that both carries Spring's {@code @EventListener} (matched by name, see
+     * {@link #SPRING_EVENT_LISTENER}) and takes a parameter assignable to the given
+     * event marker — i.e. an event subscriber for that kind of event.
+     */
+    private static DescribedPredicate<JavaMethod> areEventListenersHandling(Class<?> eventMarker) {
+        return DescribedPredicate.describe(
+                "@EventListener methods handling a " + eventMarker.getSimpleName(),
+                method -> method.isAnnotatedWith(SPRING_EVENT_LISTENER)
+                        && method.getRawParameterTypes().stream()
+                                .anyMatch(parameter -> parameter.isAssignableTo(eventMarker)));
     }
 
     /** All of the above, combined into a single rule. */
