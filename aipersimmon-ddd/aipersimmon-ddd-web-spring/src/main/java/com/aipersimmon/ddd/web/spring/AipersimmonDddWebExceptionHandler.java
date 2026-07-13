@@ -12,6 +12,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 /**
  * Maps exceptions to RFC 9457 {@link ProblemDetail} responses.
@@ -24,8 +25,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *       (well-formed but semantically unprocessable).</li>
  *   <li>An {@link IllegalStateTransitionException} is a conflict with the current
  *       state, so it defaults to <strong>409</strong>.</li>
- *   <li>Bean Validation failures map to 400 with field-level errors; not-found to 404;
- *       anything else to a 500 that does not leak the exception message.</li>
+ *   <li>Bean Validation failures map to 400 with field-level errors — both the
+ *       request-body path ({@link MethodArgumentNotValidException}) and the
+ *       method-parameter path ({@code @Validated} on {@code @RequestParam}/
+ *       {@code @PathVariable}, raised as {@link HandlerMethodValidationException} since
+ *       Spring 6.1); not-found to 404; anything else to a 500 that does not leak the
+ *       exception message.</li>
  * </ul>
  *
  * <p>The application-layer exceptions are handled by {@link ApplicationExceptionAdvice},
@@ -63,6 +68,23 @@ public class AipersimmonDddWebExceptionHandler {
                         fe.getField(),
                         fe.getCode() == null ? "invalid" : fe.getCode(),
                         fe.getDefaultMessage()))
+                .toList();
+        return factory.simple(HttpStatus.BAD_REQUEST, "Validation failed", errors);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ProblemDetail handleMethodValidation(HandlerMethodValidationException ex) {
+        List<FieldError> errors = ex.getParameterValidationResults().stream()
+                .flatMap(result -> {
+                    String name = result.getMethodParameter().getParameterName();
+                    String field = name == null ? "?" : name;
+                    return result.getResolvableErrors().stream()
+                            .map(err -> new FieldError(
+                                    field,
+                                    err.getCodes() == null || err.getCodes().length == 0
+                                            ? "invalid" : err.getCodes()[0],
+                                    err.getDefaultMessage()));
+                })
                 .toList();
         return factory.simple(HttpStatus.BAD_REQUEST, "Validation failed", errors);
     }
