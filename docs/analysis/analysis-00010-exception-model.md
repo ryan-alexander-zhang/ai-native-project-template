@@ -95,10 +95,11 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 - 00008 讨论的是**响应/错误的线上契约**(信封 vs ProblemDetail、字段级 errors、状态码语义)——即"错误**离开进程之后**长什么样"。本库这块**达标甚至领先**。
 - 00008 **没有**讨论**错误在进程内如何被建模、如何从领域一路带到边界**——即"错误**在进程内部**如何流动、如何携带机器码"。本库这块**是空的**。
 
-大厂经验落到进程内建模,有两条与本库直接相关:
+大厂经验落到进程内建模,与本库直接相关的一条:
 
 1. **机器可读错误码是"从内到外"的贯穿契约**,不是边界现拼的。Stripe(`type`/`code`)、Google(`ErrorInfo.reason`+`domain`)、阿里云/华为云(点分 `Code`)——错误码在**业务逻辑抛出的那一刻**就确定,原样透传到响应。本库的 `code` 只能由 `-web` 的 `ApiException` 携带,**领域异常带不出来**(见第五节),等于把"从内到外"截断在了边界。
-2. **transient vs permanent / 可重试性**是错误的一等属性(AWS SDK 的 retryable 分类、gRPC `UNAVAILABLE` vs `INVALID_ARGUMENT`)。本库消息链路完全没有这个维度(见缺口 #6)。
+
+(另一维度——错误的 transient/permanent 可重试性——属**异步投递可靠性**,不在本异常体系范围,独立追踪见 [[issue-00003-messaging-delivery-reliability]]。)
 
 ---
 
@@ -111,7 +112,7 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 | 3 | **`ConstraintViolationException` → 500(应 400/422)** | 🔴 高(近似 bug) | `ValidationCommandInterceptor.java:31` 在命令总线抛 JSR-380 的 `ConstraintViolationException`,但 advice 只处理 `MethodArgumentNotValidException`/`BindException`,于是**命令级校验失败掉进 500 兜底**(`:63`)。 |
 | 4 | **i18n 挂了架子没放东西** | 🟡 中 | `ProblemTitleResolver` 接了 `MessageSource`,但**全库无任何 `messages*.properties`**,title 回退成 raw key;filter 路径(`ProblemHttpResponseWriter`)干脆不走 MessageSource。 |
 | 5 | **无 `BusinessRule` 抽象 / 无 `Result`** | 🟡 中 | 规则散落成 `if/throw`,可发现性、可测试性、可组合性均低于 modular-monolith / ddd-by-examples;与 `analysis-00005` 的 Result 意图不符。 |
-| 6 | **消息链路无 DLQ、无重试上限、无 transient/permanent** | 🟡 中 | outbox relay 只 `attempts++`+`warn` 无限重试(`OutboxRelay.java:50`);`JdbcDeadlineScheduler` 同;Kafka 纯靠 broker 重投,**无 `DefaultErrorHandler`/死信 topic/毒丸路由**。毒丸消息无限重投。 |
+| 6 | **消息投递无 DLQ/重试上限**(**已移出**) | — | 属**异步投递可靠性**、非异常体系;独立追踪见 [[issue-00003-messaging-delivery-reliability]]。 |
 | 7 | **`DomainException` 无子类层级、恒回显 message** | 🟢 低 | 除 `IllegalStateTransitionException` 外无细分;raw message 直进 `detail`,措辞即对外契约却不受版本治理。 |
 | 8 | **两处 Bean Validation 不共享 `FieldError`/code 路径** | 🟢 低 | 命令总线 JSR-380(cqrs-spring)与 web 400 映射(web-spring)各走各的,错误结构不统一。 |
 | 9 | **401/403 错误格式不统一(已知推迟项)** | 🟢 低 | 见 `decision-00007` §六:Spring Security 过滤器链早于 advice,401/403 仍是 Security 默认体。设计需给出条件化补齐路径。 |
@@ -150,9 +151,10 @@ framework-free 的错误码抽象来解**(详见 [[design-00003-exception-model]
 2. **`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule()`**,取代散落的 `if/throw`。→ 解 #5。
 3. **完整且正确的异常→HTTP 映射**,含 `ConstraintViolationException`;统一两处 Bean Validation 的 `FieldError`。→ 解 #3、#8。
 4. **随库交付 i18n bundle** + 让 filter 路径也走 MessageSource;脚手架给真实 `ProblemType` 枚举样例。→ 解 #2、#4。
-5. **消息可靠性错误模型**:transient/permanent 分类、重试上限 + 退避、死信(DLQ 表/topic)。→ 解 #6。
-6. **Guard-vs-Validate 分工**成文;对 `Result`/`Either` 给出明确取舍(采纳/推迟/不做)。
-7. **401/403 条件化补齐**路径(仅当 classpath 有 spring-security)。→ 解 #9。
+5. **Guard-vs-Validate 分工**成文;对 `Result`/`Either` 给出明确取舍(采纳/推迟/不做)。
+6. **401/403 条件化补齐**路径(仅当 classpath 有 spring-security)。→ 解 #9。
+
+(缺口 #6 消息投递可靠性不在本清单——见 [[issue-00003-messaging-delivery-reliability]]。)
 
 ---
 

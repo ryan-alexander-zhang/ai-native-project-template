@@ -11,7 +11,7 @@ parent: decision-00010-exception-model
 把 [[decision-00010-exception-model]] 拍板的策略、以及 [[analysis-00010-exception-model]] 列出的缺口,
 落成**可实现的、贯穿领域→应用→接口→基础设施四层的错误体系设计**。传输层线上契约(无信封 + RFC 9457)沿用 [[decision-00007-web-api-response-envelope]] /
 [[design-00002-web-layer]],**本文不改线上格式**;本文补的是缺口的另一半——**错误在进程内如何被建模、
-如何携带稳定机器码、如何从领域一路贯通到边界**,以及消息链路的可靠性错误模型。
+如何携带稳定机器码、如何从领域一路贯通到边界**。(异步**消息投递可靠性**——重试/退避/死信——不属本设计,独立追踪见 [[issue-00003-messaging-delivery-reliability]]。)
 
 严守 [[analysis-00006-ddd-building-blocks-library]] 的两条铁律:**依赖一律指向内/下**、**纯净层
 framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §5 与 [[design-00002-web-layer]]
@@ -23,7 +23,8 @@ framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §
 
 | 分类 | 条目 |
 | --- | --- |
-| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule`;④错误码→`ProblemType`→ProblemDetail 的贯通桥接;⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦消息可靠性错误模型(transient/permanent + 重试上限 + DLQ);⑧Guard-vs-Validate 分工成文;⑨401/403 条件化补齐 |
+| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule`;④错误码→`ProblemType`→ProblemDetail 的贯通桥接;⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦Guard-vs-Validate 分工成文;⑧401/403 条件化补齐 |
+| **不属本设计** | 异步**消息投递可靠性**(重试上限/退避/死信 DLQ)——投递面而非错误建模面,见 [[issue-00003-messaging-delivery-reliability]] |
 | **不做**(见 §十一) | 在 `-core` 引入 `Result`/`Either` 或 Vavr 依赖;通用异常基类大而全的字段(错误上下文 map 等);把 HTTP 状态码泄漏进 `-core` |
 | **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC `ProblemType` 枚举思路、filter 层 429/401 出口(均来自 [[design-00002-web-layer]]) |
 
@@ -49,8 +50,6 @@ flowchart TD
   subgraph dirty["脏 starter / 实现层"]
     webspring["aipersimmon-ddd-web-spring<br/>Advice(全量映射) · i18n bundle · 401/403 条件化"]
     cqrsspring["aipersimmon-ddd-cqrs-spring<br/>ValidationInterceptor(ConstraintViolation)<br/>OptimisticLock→ConcurrencyConflict 翻译"]
-    outbox["aipersimmon-ddd-outbox(+jdbc/mybatis)<br/>RetryPolicy · DeadLetterStore"]
-    kafka["aipersimmon-ddd-messaging-kafka<br/>DefaultErrorHandler + DLT"]
   end
 
   app --> core
@@ -58,8 +57,6 @@ flowchart TD
   webspring --> web
   webspring -. 可选映射 .-> app
   cqrsspring --> app
-  outbox --> core
-  kafka --> outbox
 ```
 
 关键:`ProblemType extends ErrorCode`,`-web` 依赖 `-core` —— 于是**领域抛出的 `ErrorCode` 能被 `-web` 认识**,
@@ -282,28 +279,14 @@ flowchart LR
 
 原则:**边缘输入错误是"预期的",走非异常校验;不变量违反是"异常的",走 throw**。二者错误结构统一为 RFC 9457 + `errors[]`。
 
-## 九、消息链路可靠性错误模型(解 #6)
-
-现状:outbox relay / deadline scheduler 只 `attempts++` + `warn` **无限重试**;Kafka 纯靠 broker 重投,**无 DLQ**。设计:
-
-1. **transient / permanent 分类**:`-outbox` 定义 framework-free 的 `RetryPolicy` 与 `FailureClassifier`。默认:
-   Spring `TransientDataAccessException`、超时、`5xx`→ **transient**;反序列化失败、`ClassNotFoundException`、
-   `4xx`、业务永久拒绝 → **permanent**。
-2. **重试上限 + 退避**:`max-attempts`(默认 8)+ 指数退避(可配)。`attempts` 达上限 → 转 permanent。
-3. **死信**:`-outbox` 增 `DeadLetterStore` SPI;`-outbox-jdbc`/`-mybatis-plus` 落 `dead_letter` 表(消息体 + 末次异常 +
-   attempts + 时间)。permanent 或超上限的消息**移入死信**,停止重投,可人工/工具重放。
-4. **Kafka**:`-messaging-kafka` 装配 Spring Kafka `DefaultErrorHandler` + `DeadLetterPublishingRecoverer` →
-   写 `<topic>.DLT`;退避 + 上限对齐 (1)–(2)。inbox 幂等语义不变。
-5. **可观测**:死信写入与重试耗尽各发一条 `warn`/`error` + traceId,便于告警(与 [[design-00002-web-layer]] traceId 打通)。
-
-## 十、401 / 403 条件化补齐(解 #9)
+## 九、401 / 403 条件化补齐(解 #9)
 
 - `-web-spring` 增一个 `@ConditionalOnClass(name = "org.springframework.security...")` 的配置:提供
   `AuthenticationEntryPoint` / `AccessDeniedHandler`,把 401/403 也写成 `application/problem+json`
   (`/problems/unauthorized`、`/problems/forbidden`)。
 - 不引入 spring-security 硬依赖(承 [[decision-00007-web-api-response-envelope]] §六:"仅当 classpath 有 spring-security 时激活")。
 
-## 十一、明确取舍:为什么默认不上 `Result`/`Either`
+## 十、明确取舍:为什么默认不上 `Result`/`Either`
 
 参考项目里 ddd-by-examples-library(Vavr `Either`)、clean-architecture(`Ardalis.Result`)、
 domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-structure-2-event-flow-and-cqrs]] 也提过 Result。
@@ -316,7 +299,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
   `Policy`),只要**不进 `-core` 公共 API**。库不阻止,也不内建。
 - 这不是"反最佳实践",是**成本/一致性权衡**;若未来重估,应走独立 decision。
 
-## 十二、脚手架落地改动(code 不是 truth,照改)
+## 十一、脚手架落地改动(code 不是 truth,照改)
 
 | 模块 | 改动 |
 | --- | --- |
@@ -325,17 +308,15 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 | `-web` | `ProblemType extends ErrorCode`;新增 `ProblemTypeRegistry` |
 | `-web-spring` | advice 全量映射(含 `ConstraintViolationException`、registry 贯通、`EntityNotFoundException`/`ConcurrencyConflictException`);交付 i18n bundle;filter 路径接入 `MessageSource`;401/403 条件化配置 |
 | `-cqrs-spring` | 把 `OptimisticLockingFailureException` 翻译为 `ConcurrencyConflictException` |
-| `-outbox(+jdbc/mybatis)` | `RetryPolicy`/`FailureClassifier`/`DeadLetterStore` + `dead_letter` 表 |
-| `-messaging-kafka` | `DefaultErrorHandler` + DLT |
 | **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `OrderingProblemType.CREDIT_EXCEEDED`;把散落的信用/状态校验改写为 `checkRule`;"unknown order/customer" 改抛 `EntityNotFoundException`(取代先前的 `NoSuchElementException` 临时手法) |
 
 **验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 **422** ProblemDetail
 (带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。
 
-## 十三、后果
+## 十二、后果
 
 - **正向**:错误码从领域一路贯通到边界,`code`/`type` 对领域异常首次可达;规则成一等对象,可测可组合;
-  校验/并发/未找到有稳定语义与状态码;消息毒丸不再无限重投;i18n 真正可用。纯/脏与依赖向内不变,无新范式。
+  校验/并发/未找到有稳定语义与状态码;i18n 真正可用。纯/脏与依赖向内不变,无新范式。
 - **负向 / 治理**:`ErrorCode`/`ProblemType` 的 `code` 与 `typeUri` **一旦发布即成对外契约**,变更须走版本
   (承 [[decision-00007-web-api-response-envelope]] §Consequences);错误码枚举跨 BC 增长需命名前缀治理;
   `-application` 新增两个语义子类,消费者需知晓其映射。

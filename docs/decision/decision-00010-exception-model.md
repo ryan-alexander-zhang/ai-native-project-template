@@ -17,7 +17,7 @@ parent:
 现状是两极分化(详见 [[analysis-00010-exception-model]]):传输层(`-web`/`-web-spring`)的 RFC 9457 线上
 契约优秀,但**领域/应用层异常模型极薄**(全库仅 4 个自定义异常,`DomainException`/`ApplicationException`
 只有一个 String message),两层之间还有一道断裂——领域异常**带不出**机器可读 `code`/`type`,导致
-[[design-00002-web-layer]] §八 的旗舰示例产不出来。同时消息链路无重试上限、无死信。
+[[design-00002-web-layer]] §八 的旗舰示例产不出来。
 
 约束不可动:[[analysis-00006-ddd-building-blocks-library]] 的**依赖一律指向内/下**、**纯净层
 framework-free**(`-core` 零依赖是验收红线)。
@@ -50,12 +50,7 @@ framework-free**(`-core` 零依赖是验收红线)。
 - **400** 仅报文畸形 + 字段级校验;**修复 `ConstraintViolationException`(命令总线 JSR-380)当前掉进 500 的缺陷 → 400**,并与 `MethodArgumentNotValidException` 共享 `FieldError`。
 - **权威由每个 `ProblemType.status()` 逐码决定**,基类默认只是兜底。取 422 派而非 Google/Stripe 的 400 派,因本模板已选 RFC 9457 + `errors[]`,422 语义更精确。
 
-### 五、消息链路可靠性错误模型
-
-- `transient` / `permanent` 分类 + `max-attempts`(默认 8)+ 指数退避;超上限或 permanent → **死信**
-  (`-outbox` 加 `DeadLetterStore` + `dead_letter` 表;Kafka 用 `DefaultErrorHandler` + DLT)。终结"无限重投毒丸"。
-
-### 六、i18n 与 401/403
+### 五、i18n 与 401/403
 
 - `-web-spring` 交付默认英文错误 bundle,filter 路径也接入 `MessageSource`。
 - 401/403 → ProblemDetail 仅在 classpath 有 spring-security 时条件化激活(承 [[decision-00007-web-api-response-envelope]] §六)。
@@ -78,7 +73,7 @@ framework-free**(`-core` 零依赖是验收红线)。
 ## Consequences
 
 - **正向**:`code`/`type` 对领域异常首次可达,[[design-00002-web-layer]] §八 示例可复现;规则可测可组合;
-  未找到/并发/校验有稳定语义;消息毒丸不再无限重投。纯/脏与依赖向内不变。
+  未找到/并发/校验有稳定语义。纯/脏与依赖向内不变。
 - **治理成本**:`code`/`typeUri` 一旦发布即**对外契约**,变更走版本;错误码枚举跨 BC 增长需命名前缀治理;
   `-application` 新增两个语义子类,消费者需知其映射。
 - **迁移**:全为加法(旧构造保留),存量不强制一次性改;脚手架作为示范应改齐(见 [[design-00003-exception-model]] §十二)。

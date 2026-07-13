@@ -22,7 +22,7 @@ parent: design-00003-exception-model
 - ✅ **P4**(`-web-spring`:`ProblemDetailFactory` registry 贯通 + advice 全量映射 + `ConstraintViolation→400` 修复)—— 已实现(WebLayerTest 11 tests 绿)。**未做子项**:i18n 默认 bundle 交付、filter 路径接入 MessageSource、401/403 条件化(均为加法,不影响验收)。
 - ✅ **P5**(`-cqrs-spring`:`OptimisticLockingFailureException → ConcurrencyConflictException`)—— 已实现。
 - ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkRule` + `EntityNotFound` + `OrderingProblemType`/catalog)—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code/type,unknown → 404(`ExceptionContractTest`,multi-module 10 tests 绿)。
-- ⏳ **P6**(消息可靠性:重试上限 + DLQ,`-outbox`/`-outbox-jdbc`/`-outbox-mybatis-plus`/`-messaging-kafka`)—— **未做**(较大独立块,不影响 §八 验收)。
+- ↗ **消息投递可靠性(原 P6)已移出本计划**,作为独立 issue 追踪:[[issue-00003-messaging-delivery-reliability]](属投递可靠性,非异常体系)。
 - ⏳ **P7(modulith)**—— **未做**:modulith 仍是旧手写 `OrderExceptionHandler`、未引 web-spring,需先补 web-spring 接入,再镜像 multi-module 的异常模型改动。
 - ⏳ **P4 剩余子项**(i18n bundle、401/403)。
 
@@ -37,12 +37,11 @@ flowchart TD
   P2 --> P4["P4 -web-spring:全量映射 + i18n + 401/403"]
   P3 --> P4
   P2 --> P5["P5 -cqrs-spring:乐观锁→ConcurrencyConflict"]
-  P1 --> P6["P6 消息可靠性:重试上限 + DLQ"]
   P4 --> P7["P7 scaffold 示范 + 验收"]
   P5 --> P7
 ```
 
-P2 与 P3 只依赖 P1,可并行;P6 基本独立;P7 收口验收。
+P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[issue-00003-messaging-delivery-reliability]],不属本计划。)
 
 ## Tasks
 
@@ -78,12 +77,6 @@ P2 与 P3 只依赖 P1,可并行;P6 基本独立;P7 收口验收。
 - [ ] 把 `OptimisticLockingFailureException` 在应用边界翻译为 `ConcurrencyConflictException`。
 - **验收**:并发冲突路径映射 409(非裸框架异常)。
 
-### P6 — 消息链路可靠性(→ P1,基本独立)
-- [ ] `-outbox`:`RetryPolicy`、`FailureClassifier`(transient/permanent)、`DeadLetterStore` SPI。
-- [ ] `-outbox-jdbc` / `-outbox-mybatis-plus`:`dead_letter` 表 + relay 接入 `max-attempts`(默认 8)+ 退避 + 超限转死信。
-- [ ] `-messaging-kafka`:`DefaultErrorHandler` + `DeadLetterPublishingRecoverer` → `<topic>.DLT`。
-- **验收**:毒丸消息在上限后进死信、停止重投;各存储后端一致。
-
 ### P7 — scaffold 示范 + 端到端验收(→ P4,P5)
 - [ ] `OrderingProblemType` 枚举 implements `ProblemType`(含 `CREDIT_EXCEEDED` 等)。
 - [ ] `CreditExceededException` 携 `OrderingProblemType.CREDIT_EXCEEDED`;信用/状态校验改写为 `checkRule`。
@@ -97,8 +90,7 @@ P2 与 P3 只依赖 P1,可并行;P6 基本独立;P7 收口验收。
 2. **贯通验收(核心)**:对信用超限下单,响应为
    `422 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/credit-exceeded"` —— 与 [[design-00002-web-layer]] §八 逐字段一致。
 3. **回归验收**:unknown order → 404;命令 Bean Validation 失败 → 400 带 `errors[]`;领域业务规则违反 → 422;状态机非法迁移/并发 → 409;未预期 → 500 不回显。
-4. **可靠性验收**:构造一个永久失败的 outbox/kafka 消息,确认达 `max-attempts` 后进死信、不再无限重投。
-5. **架构验收**:`-core`/`-application`/`-web` 仍 framework-free(archunit + pom 零依赖红线);无 `-web → 领域` 的反向依赖。
+4. **架构验收**:`-core`/`-application`/`-web` 仍 framework-free(archunit + pom 零依赖红线);无 `-web → 领域` 的反向依赖。
 
 ## 关联
 
