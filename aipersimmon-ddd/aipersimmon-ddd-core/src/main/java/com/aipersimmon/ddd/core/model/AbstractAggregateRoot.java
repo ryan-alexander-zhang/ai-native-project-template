@@ -1,6 +1,8 @@
 package com.aipersimmon.ddd.core.model;
 
 import com.aipersimmon.ddd.core.event.DomainEvent;
+import com.aipersimmon.ddd.core.rule.BusinessRule;
+import com.aipersimmon.ddd.core.rule.BusinessRuleViolationException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +26,18 @@ public abstract class AbstractAggregateRoot<ID> implements AggregateRoot<ID> {
     /** Record a domain event to be published after the aggregate is persisted. */
     protected void registerEvent(DomainEvent event) {
         domainEvents.add(event);
+    }
+
+    /**
+     * Enforce a business invariant from inside an intention-revealing method: throw a
+     * {@link BusinessRuleViolationException} if {@code rule} is broken, otherwise do
+     * nothing. Prefer this over inline {@code if (...) throw} so invariants stay named
+     * and reusable.
+     */
+    protected void checkRule(BusinessRule rule) {
+        if (rule.isBroken()) {
+            throw new BusinessRuleViolationException(rule);
+        }
     }
 
     /** An unmodifiable snapshot of the events recorded since load or creation. */
