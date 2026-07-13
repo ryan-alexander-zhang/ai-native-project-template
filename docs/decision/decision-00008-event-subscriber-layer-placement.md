@@ -134,16 +134,22 @@ C1、C2 不是本项目自创,业界都有明确正名与框架实现;当前 sam
 - 需要一个 **application 层的领域事件订阅示范**(见 [[issue-00001-move-domain-event-listener-to-application]] 方案 1)。
 - saga 启动的时序保证不变:领域事件 `OrderPlacedEvent` 仍是进程内、同事务、同步发布,application 订阅者
   在同一事务内启动 saga,先于任何跨上下文响应。
-- **已加 ArchUnit 规则固化本决策的分层归位**(`aipersimmon-ddd-archunit` 的 `AiPersimmonDddRules`,均为
-  opt-in、不入 `all()`,已在 `multi-module/start/…/ArchitectureTest` 挂上):
+- **已加 ArchUnit 规则固化本决策的分层归位,并作为一等公民并入 `all()`**(`aipersimmon-ddd-archunit`
+  的 `AiPersimmonDddRules`):
   - `domainEventListenersShouldResideInApplicationOrDomain()` —— `@EventListener` 且参数为 `DomainEvent`
     的方法须声明在 `..application..` 或 `..domain..`(承接命题 B;`domain/Core` 亦合法故一并允许)。
   - `integrationEventListenersShouldResideInAdapter()` —— `@EventListener` 且参数为 `IntegrationEvent`
     的方法须声明在 `..adapter..`(承接命题 C 的订阅位置)。
-  - `orderingAdapterDoesNotDependOnDomain`(样例本地规则)—— `ordering-adapter` 不得依赖 `…ordering.domain`。
-  - 三者刻意保持 opt-in:其余脚手架(`modulith`/`microservice`)的领域事件监听器暂仍在 adapter(见
-    [[issue-00001-move-domain-event-listener-to-application]] 未做项),若入 `all()` 会连带打挂它们。
-    规则以全限定名匹配 `@EventListener`,故对不使用 Spring 的项目为空匹配、自动通过。
+  - 两条均入 `all()`,故 `multi-module/start/…/ArchitectureTest` 只需 `AiPersimmonDddRules.all()` 即自动获得,
+    无需单列。规则以全限定名匹配 `@EventListener`,对不使用 Spring 的项目为空匹配、自动通过。
+  - `orderingAdapterDoesNotDependOnDomain` 仍是 **multi-module 样例本地**的更严规则(禁 `ordering-adapter`
+    →`ordering.domain` 的任何引用),因它依赖"持久化适配器已拆到 `ordering-infrastructure`"这一前提,不宜泛化;
+    库里的 `adapterShouldNotDependOnDomain()` 同理保持 opt-in、不入 `all()`。
+- **`modulith` / `microservice` 两个脚手架已彻底移除 ArchUnit**(删除各自的 `ArchitectureTest` 与
+  `PackageInfoTest`,并从 pom 去掉 `aipersimmon-ddd-archunit` 依赖)。原因:这两者的领域事件监听器仍在 adapter
+  (见 [[issue-00001-move-domain-event-listener-to-application]] 未做项),若继续跑 `all()` 会被新规则打挂;
+  当前**聚焦 multi-module 作示范**,故让这两者暂不引入 ArchUnit,而非为迁就它们把规则降级为 opt-in。
+  后续若把这两者的领域事件订阅也迁到 application 层,可再重新引入 `all()`。
 - 顺带修正一处既有规则盲点:`domainEventsShouldStayInDomain()` 原只认 `DomainEvent` **接口**,现改为
   **接口或 `@DomainEvent` 注解**任一路径(`.or().areAnnotatedWith(...)`),使"走注解声明领域事件"的路径
   同样被守卫住。

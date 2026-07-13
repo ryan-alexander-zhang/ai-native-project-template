@@ -100,7 +100,10 @@ class OrderFulfilmentStarter {
 
 **未做(后续项)**:
 
-- 其余脚手架形态(`modulith`、`microservice`)的同类改动未做(领域事件订阅仍在 adapter),作为后续同类项。
+- 其余脚手架形态(`modulith`、`microservice`)的领域事件订阅**未迁**(仍在 adapter),作为后续同类项。
+  为使这两者不被新并入 `all()` 的监听器规则打挂,已从它们**彻底移除 ArchUnit**(删 `ArchitectureTest` /
+  `PackageInfoTest`、去 pom 依赖),当前聚焦 multi-module 作示范——详见
+  [[decision-00008-event-subscriber-layer-placement]] Consequences。
 
 ## 关联
 
