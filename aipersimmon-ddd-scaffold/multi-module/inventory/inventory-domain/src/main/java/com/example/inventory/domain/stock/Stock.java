@@ -26,7 +26,11 @@ public class Stock extends AbstractAggregateRoot<Sku> {
             throw new DomainException("quantity must be > 0");
         }
         if (quantity > available) {
-            throw new DomainException("insufficient stock for " + sku.value());
+            // A single-condition guard, so it stays a coded throw — not worth upgrading to
+            // an Invariant (design-00003 §4.5). It carries a stable code so a failed
+            // reservation surfaces a machine identity even though inventory has no HTTP edge.
+            throw new DomainException(InventoryErrorCode.INSUFFICIENT_STOCK,
+                    "insufficient stock for " + sku.value());
         }
         this.available -= quantity;
     }

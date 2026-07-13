@@ -2,10 +2,12 @@ package com.example.inventory.application.stock;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.application.UseCase;
+import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.api.StockReserved;
+import com.example.inventory.domain.stock.InventoryErrorCode;
 import com.example.inventory.domain.stock.Sku;
 import com.example.inventory.domain.stock.Stock;
 import com.example.inventory.domain.stock.Stocks;
@@ -37,8 +39,8 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
             for (ReserveStock.Line line : command.lines()) {
                 Stock stock = stockFor(line.sku());
                 if (line.quantity() <= 0 || line.quantity() > stock.available()) {
-                    throw new DomainException("cannot reserve " + line.quantity()
-                            + " of " + line.sku());
+                    throw new DomainException(InventoryErrorCode.INSUFFICIENT_STOCK,
+                            "cannot reserve " + line.quantity() + " of " + line.sku());
                 }
             }
             for (ReserveStock.Line line : command.lines()) {
@@ -48,13 +50,18 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
             }
             integrationEvents.publish(new StockReserved(command.orderId()));
         } catch (DomainException failure) {
-            integrationEvents.publish(new StockReservationFailed(command.orderId(), failure.getMessage()));
+            // The failing code (if any) rides the event: a BC with no HTTP edge still
+            // surfaces a stable machine identity for the reacting saga to branch on.
+            String code = failure.errorCode().map(ErrorCode::code).orElse(null);
+            integrationEvents.publish(
+                    new StockReservationFailed(command.orderId(), code, failure.getMessage()));
         }
         return null;
     }
 
     private Stock stockFor(String sku) {
         return stocks.findBySku(new Sku(sku))
-                .orElseThrow(() -> new DomainException("unknown sku: " + sku));
+                .orElseThrow(() -> new DomainException(
+                        InventoryErrorCode.STOCK_NOT_FOUND, "unknown sku: " + sku));
     }
 }
