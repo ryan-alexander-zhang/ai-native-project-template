@@ -3,18 +3,21 @@ package com.aipersimmon.ddd.web.spring;
 import com.aipersimmon.ddd.application.ApplicationException;
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
+import com.aipersimmon.ddd.core.error.ErrorCategory;
+import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.core.state.IllegalStateTransitionException;
 import com.aipersimmon.ddd.web.error.ApiException;
 import com.aipersimmon.ddd.web.error.FieldError;
-import com.aipersimmon.ddd.web.error.ProblemType;
-import com.aipersimmon.ddd.web.error.ProblemTypeCatalog;
+import com.aipersimmon.ddd.web.error.ProblemCatalog;
+import com.aipersimmon.ddd.web.error.ProblemDescriptor;
 import com.aipersimmon.ddd.web.page.Cursor;
 import com.aipersimmon.ddd.web.page.Slice;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -39,11 +42,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Drives the web starter end to end through MockMvc: the advice renders each
- * exception family to an RFC 9457 problem body with the corrected status semantics
- * (business rule → 422, state conflict → 409, not-found → 404, bean validation → 400),
- * a domain error code resolves through the registry into the full wire form, and a
- * Slice serialises with its cursor as an opaque string.
+ * Drives the web starter end to end through MockMvc: the advice renders each exception
+ * family to an RFC 9457 problem body with the corrected status semantics (business rule
+ * → 422, state conflict → 409, not-found → 404, bean validation → 400). A coded error
+ * resolves through the two-tier registry — a per-code override to its own problem type,
+ * or its category family — and so never renders {@code about:blank}; an uncoded failure
+ * legitimately does. A Slice serialises with its cursor as an opaque string.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -56,11 +60,11 @@ class WebLayerTest {
     }
 
     @Test
-    void apiExceptionRendersCatalogueFields() throws Exception {
+    void apiExceptionResolvesOverrideProblemType() throws Exception {
         mvc.perform(post("/test/api-exception"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
-                .andExpect(jsonPath("$.type").value("/problems/credit-exceeded"))
+                .andExpect(jsonPath("$.type").value("/problems/insufficient-credit"))
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"))
                 .andExpect(jsonPath("$.title").value(notNullValue()))
@@ -70,18 +74,30 @@ class WebLayerTest {
     }
 
     @Test
-    void codedDomainExceptionResolvesThroughRegistry() throws Exception {
+    void codedDomainExceptionWithOverrideResolvesToOwnType() throws Exception {
         mvc.perform(post("/test/domain-coded"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.type").value("/problems/credit-exceeded"))
+                .andExpect(jsonPath("$.type").value("/problems/insufficient-credit"))
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"));
     }
 
     @Test
-    void uncodedDomainExceptionDefaultsToUnprocessable() throws Exception {
+    void codedDomainExceptionWithoutOverrideResolvesToCategoryFamily() throws Exception {
+        // ORDER_REJECTED has no override, so it rides the DOMAIN_RULE family — a meaningful
+        // type, never about:blank, still distinguished by its code.
+        mvc.perform(post("/test/domain-family"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("/problems/domain-rule-violation"))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.code").value("ordering.order-rejected"));
+    }
+
+    @Test
+    void uncodedDomainExceptionDefaultsToAboutBlankUnprocessable() throws Exception {
         mvc.perform(post("/test/domain"))
                 .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.status").value(422));
     }
 
@@ -144,13 +160,21 @@ class WebLayerTest {
                 .andExpect(jsonPath("$.nextCursor").value("abc"));
     }
 
-    enum OrderProblem implements ProblemType {
-        CREDIT_EXCEEDED;
+    /** The ordering context's codes; CREDIT_EXCEEDED is overridden, ORDER_REJECTED rides its family. */
+    enum OrderCode implements ErrorCode {
+        CREDIT_EXCEEDED("ordering.credit-exceeded", ErrorCategory.DOMAIN_RULE),
+        ORDER_REJECTED("ordering.order-rejected", ErrorCategory.DOMAIN_RULE);
 
-        @Override public String code() { return "ordering.credit-exceeded"; }
-        @Override public String typeUri() { return "/problems/credit-exceeded"; }
-        @Override public int status() { return 422; }
-        @Override public String titleKey() { return "ordering.credit-exceeded.title"; }
+        private final String code;
+        private final ErrorCategory category;
+
+        OrderCode(String code, ErrorCategory category) {
+            this.code = code;
+            this.category = category;
+        }
+
+        @Override public String code() { return code; }
+        @Override public ErrorCategory category() { return category; }
     }
 
     record CreateReq(@NotBlank String name) {
@@ -161,13 +185,18 @@ class WebLayerTest {
 
         @PostMapping("/test/api-exception")
         String apiException() {
-            throw new ApiException(OrderProblem.CREDIT_EXCEEDED, "over limit",
+            throw new ApiException(OrderCode.CREDIT_EXCEEDED, "over limit",
                     List.of(new FieldError("/lines/0/qty", "out-of-range", "must be positive")));
         }
 
         @PostMapping("/test/domain-coded")
         String domainCoded() {
-            throw new DomainException(OrderProblem.CREDIT_EXCEEDED, "over limit");
+            throw new DomainException(OrderCode.CREDIT_EXCEEDED, "over limit");
+        }
+
+        @PostMapping("/test/domain-family")
+        String domainFamily() {
+            throw new DomainException(OrderCode.ORDER_REJECTED, "order rejected");
         }
 
         @PostMapping("/test/domain")
@@ -222,8 +251,10 @@ class WebLayerTest {
     static class App {
 
         @Bean
-        ProblemTypeCatalog orderingCatalog() {
-            return () -> List.of(OrderProblem.values());
+        ProblemCatalog orderingCatalog() {
+            return () -> Map.of(
+                    OrderCode.CREDIT_EXCEEDED,
+                    new ProblemDescriptor("/problems/insufficient-credit", 422, "ordering.insufficient-credit.title"));
         }
     }
 }

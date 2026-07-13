@@ -7,8 +7,9 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
  * The ordering context's catalogue of stable, machine-readable error codes. Domain
  * and application code carries one of these on the exceptions it throws, so the code
  * is fixed where the error originates and travels unchanged to the API edge. It is a
- * pure {@link ErrorCode} (no HTTP or transport concern); the interface layer maps
- * each code to a wire {@code ProblemType}.
+ * pure {@link ErrorCode} (no HTTP or transport concern); the interface layer resolves
+ * each code to a wire {@code ProblemDescriptor} (its category family, or a per-code
+ * override in {@code OrderingProblemCatalog}).
  */
 public enum OrderingErrorCode implements ErrorCode {
 

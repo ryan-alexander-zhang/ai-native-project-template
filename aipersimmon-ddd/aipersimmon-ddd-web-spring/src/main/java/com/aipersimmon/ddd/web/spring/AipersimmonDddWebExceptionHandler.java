@@ -19,7 +19,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
  *
  * <ul>
  *   <li>An {@link ApiException} is the first-class path — its
- *       {@link com.aipersimmon.ddd.web.error.ProblemType} supplies type/status/code/title.</li>
+ *       {@link com.aipersimmon.ddd.core.error.ErrorCode} resolves through the registry to a
+ *       problem descriptor (per-code override or category family).</li>
  *   <li>A {@link DomainException} that carries an error code resolves through the
  *       registry; otherwise a business-rule violation defaults to <strong>422</strong>
  *       (well-formed but semantically unprocessable).</li>

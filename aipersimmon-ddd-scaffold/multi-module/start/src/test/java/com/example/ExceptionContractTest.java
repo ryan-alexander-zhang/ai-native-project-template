@@ -40,7 +40,8 @@ class ExceptionContractTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
                 .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.type").value("/problems/credit-exceeded"))
+                // CREDIT_EXCEEDED is overridden to its own problem type (client shows a top-up flow).
+                .andExpect(jsonPath("$.type").value("/problems/insufficient-credit"))
                 .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"));
     }
 
@@ -57,7 +58,8 @@ class ExceptionContractTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.code").value("ordering.duplicate-sku"))
-                .andExpect(jsonPath("$.type").value("/problems/duplicate-sku"));
+                // No override → rides the DOMAIN_RULE family type, distinguished by its code.
+                .andExpect(jsonPath("$.type").value("/problems/domain-rule-violation"));
     }
 
     @Test

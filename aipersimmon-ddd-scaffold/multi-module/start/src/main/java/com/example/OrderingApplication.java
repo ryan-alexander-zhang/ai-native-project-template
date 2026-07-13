@@ -1,7 +1,6 @@
 package com.example;
 
-import com.aipersimmon.ddd.web.error.ProblemTypeCatalog;
-import java.util.List;
+import com.aipersimmon.ddd.web.error.ProblemCatalog;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -14,9 +13,9 @@ public class OrderingApplication {
         SpringApplication.run(OrderingApplication.class, args);
     }
 
-    /** Registers the ordering error catalogue so domain codes resolve to problem types. */
+    /** Registers the ordering problem-type overrides; unlisted codes ride their category family. */
     @Bean
-    ProblemTypeCatalog orderingProblemTypeCatalog() {
-        return () -> List.of(OrderingProblemType.values());
+    ProblemCatalog orderingProblemCatalog() {
+        return new OrderingProblemCatalog();
     }
 }

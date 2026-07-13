@@ -1,9 +1,10 @@
 package com.aipersimmon.ddd.web;
 
+import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.web.error.ApiError;
 import com.aipersimmon.ddd.web.error.ApiException;
 import com.aipersimmon.ddd.web.error.FieldError;
-import com.aipersimmon.ddd.web.error.ProblemType;
+import com.aipersimmon.ddd.web.error.ProblemDescriptor;
 import com.aipersimmon.ddd.web.page.Cursor;
 import com.aipersimmon.ddd.web.page.Page;
 import com.aipersimmon.ddd.web.page.Slice;
@@ -28,40 +29,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Contract-level tests for the framework-free web value objects and SPIs. */
 class WebContractsTest {
 
-    /** A bounded context declares its error catalogue as an enum implementing ProblemType. */
-    enum OrderingProblem implements ProblemType {
-        CREDIT_EXCEEDED("ordering.credit-exceeded", "/problems/credit-exceeded", 409, "ordering.credit-exceeded.title");
-
-        private final String code;
-        private final String typeUri;
-        private final int status;
-        private final String titleKey;
-
-        OrderingProblem(String code, String typeUri, int status, String titleKey) {
-            this.code = code;
-            this.typeUri = typeUri;
-            this.status = status;
-            this.titleKey = titleKey;
-        }
-
-        @Override public String code() { return code; }
-        @Override public String typeUri() { return typeUri; }
-        @Override public int status() { return status; }
-        @Override public String titleKey() { return titleKey; }
-    }
-
     @Test
-    void apiErrorFromProblemTypeCarriesCatalogueFieldsAndExtensions() {
-        ApiError error = ApiError.from(OrderingProblem.CREDIT_EXCEEDED,
+    void apiErrorFromDescriptorCarriesFieldsAndExtensions() {
+        ApiError error = ApiError.from(
+                new ProblemDescriptor("/problems/credit-exceeded", 422, "ordering.credit-exceeded.title"),
+                "ordering.credit-exceeded",
                 "Credit limit exceeded", "total 5000 exceeds remaining 3000",
                 "/v1/orders", "trace-abc",
                 List.of(new FieldError("/lines/0/qty", "out-of-range", "must be positive")));
 
         assertEquals("/problems/credit-exceeded", error.type());
-        assertEquals(409, error.status());
+        assertEquals(422, error.status());
         assertEquals("ordering.credit-exceeded", error.code());
         assertEquals("trace-abc", error.traceId());
         assertEquals(1, error.errors().size());
+    }
+
+    @Test
+    void problemDescriptorRejectsBlankTitleAndOutOfRangeStatusAndDefaultsBlankType() {
+        assertThrows(IllegalArgumentException.class, () -> new ProblemDescriptor("/p", 422, " "));
+        assertThrows(IllegalArgumentException.class, () -> new ProblemDescriptor("/p", 99, "t"));
+        assertEquals("about:blank", new ProblemDescriptor("", 500, "problem.internal-error.title").typeUri());
     }
 
     @Test
@@ -85,10 +73,11 @@ class WebContractsTest {
     }
 
     @Test
-    void apiExceptionCarriesProblemTypeAndErrors() {
-        ApiException ex = new ApiException(OrderingProblem.CREDIT_EXCEEDED, "over limit",
+    void apiExceptionCarriesErrorCodeAndErrors() {
+        ErrorCode code = () -> "ordering.credit-exceeded";
+        ApiException ex = new ApiException(code, "over limit",
                 List.of(new FieldError("f", "c", "m")));
-        assertSame(OrderingProblem.CREDIT_EXCEEDED, ex.problemType());
+        assertSame(code, ex.errorCode());
         assertEquals("over limit", ex.getMessage());
         assertEquals(1, ex.errors().size());
         assertThrows(IllegalArgumentException.class, () -> new ApiException(null, "x"));

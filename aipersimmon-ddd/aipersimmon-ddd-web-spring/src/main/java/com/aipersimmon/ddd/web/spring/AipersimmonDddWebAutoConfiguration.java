@@ -1,9 +1,11 @@
 package com.aipersimmon.ddd.web.spring;
 
 import com.aipersimmon.ddd.application.ApplicationException;
-import com.aipersimmon.ddd.web.error.ProblemType;
-import com.aipersimmon.ddd.web.error.ProblemTypeCatalog;
-import com.aipersimmon.ddd.web.error.ProblemTypeRegistry;
+import com.aipersimmon.ddd.core.error.ErrorCode;
+import com.aipersimmon.ddd.web.error.DefaultProblemFamilies;
+import com.aipersimmon.ddd.web.error.ProblemCatalog;
+import com.aipersimmon.ddd.web.error.ProblemDescriptor;
+import com.aipersimmon.ddd.web.error.ProblemRegistry;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
@@ -12,7 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -49,19 +50,28 @@ public class AipersimmonDddWebAutoConfiguration {
         return new ProblemTitleResolver(messageSource.getIfAvailable());
     }
 
-    /** Indexes every consumer-supplied {@link ProblemTypeCatalog} by error code. */
+    /**
+     * Builds the two-tier problem registry: every {@link ErrorCode} resolves to its
+     * per-code {@link ProblemCatalog} override if one is registered, otherwise to its
+     * {@link com.aipersimmon.ddd.core.error.ErrorCategory} {@link DefaultProblemFamilies
+     * family default}. Resolution is total for any coded error — never {@code about:blank}.
+     */
     @Bean
     @ConditionalOnMissingBean
-    public ProblemTypeRegistry aipersimmonDddProblemTypeRegistry(ObjectProvider<ProblemTypeCatalog> catalogs) {
-        Map<String, ProblemType> byCode = new HashMap<>();
-        catalogs.forEach(catalog -> catalog.problemTypes().forEach(type -> byCode.put(type.code(), type)));
-        return code -> Optional.ofNullable(byCode.get(code));
+    public ProblemRegistry aipersimmonDddProblemRegistry(ObjectProvider<ProblemCatalog> catalogs) {
+        Map<String, ProblemDescriptor> overridesByCode = new HashMap<>();
+        catalogs.forEach(catalog -> catalog.overrides()
+                .forEach((code, descriptor) -> overridesByCode.put(code.code(), descriptor)));
+        return code -> {
+            ProblemDescriptor override = overridesByCode.get(code.code());
+            return override != null ? override : DefaultProblemFamilies.DEFAULTS.get(code.category());
+        };
     }
 
     @Bean
     @ConditionalOnMissingBean
     public ProblemDetailFactory aipersimmonDddProblemDetailFactory(
-            ProblemTypeRegistry registry, ProblemTitleResolver titleResolver) {
+            ProblemRegistry registry, ProblemTitleResolver titleResolver) {
         return new ProblemDetailFactory(registry, titleResolver);
     }
 

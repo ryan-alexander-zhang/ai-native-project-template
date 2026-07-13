@@ -46,20 +46,24 @@ public record ApiError(
     }
 
     /**
-     * Builds an error from a catalogue entry and a resolved title. The title is
-     * passed in already resolved because message-source lookup lives in the
-     * starter, not in this framework-free tier.
+     * Builds an error from a resolved {@link ProblemDescriptor}, the thrown code, and a
+     * resolved title. The descriptor supplies {@code type}/{@code status}; the {@code code}
+     * is the thrown {@link com.aipersimmon.ddd.core.error.ErrorCode}'s value, kept separate
+     * from the descriptor so several codes may share one descriptor. The title is passed
+     * in already resolved because message-source lookup lives in the starter, not in this
+     * framework-free tier.
      *
-     * @param problemType the catalogue entry (supplies type, status, code)
-     * @param title       the resolved, human-readable title
-     * @param detail      occurrence-specific explanation (nullable)
-     * @param instance    URI of this occurrence (nullable)
-     * @param traceId     correlation id (nullable)
-     * @param errors      field-level problems (nullable → empty)
+     * @param descriptor the resolved transport definition (supplies type, status)
+     * @param code       the machine-readable domain code carried by the exception (nullable)
+     * @param title      the resolved, human-readable title
+     * @param detail     occurrence-specific explanation (nullable)
+     * @param instance   URI of this occurrence (nullable)
+     * @param traceId    correlation id (nullable)
+     * @param errors     field-level problems (nullable → empty)
      */
-    public static ApiError from(ProblemType problemType, String title, String detail,
+    public static ApiError from(ProblemDescriptor descriptor, String code, String title, String detail,
                                 String instance, String traceId, List<FieldError> errors) {
-        return new ApiError(problemType.typeUri(), title, problemType.status(),
-                detail, instance, problemType.code(), traceId, errors);
+        return new ApiError(descriptor.typeUri(), title, descriptor.status(),
+                detail, instance, code, traceId, errors);
     }
 }
