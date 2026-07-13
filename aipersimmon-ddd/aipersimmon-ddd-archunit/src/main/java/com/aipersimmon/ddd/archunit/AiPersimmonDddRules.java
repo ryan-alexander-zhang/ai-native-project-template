@@ -6,6 +6,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.aipersimmon.ddd.core.event.DomainEvent;
+import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
+import com.aipersimmon.ddd.core.rule.BusinessRule;
+import com.aipersimmon.ddd.core.rule.BusinessRuleViolationException;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -239,6 +242,54 @@ public final class AiPersimmonDddRules {
     }
 
     /**
+     * A {@link BusinessRule} — a business invariant expressed as an object — resides in
+     * the domain layer. It captures domain policy, so it belongs with the model, not in
+     * the application, infrastructure, or interface layers. Part of {@link #all()};
+     * matches nothing (and so passes) in a project that defines no business rules.
+     */
+    public static ArchRule businessRulesShouldResideInDomain() {
+        return classes().that().implement(BusinessRule.class)
+                .should().resideInAPackage("..domain..")
+                .as("BusinessRule implementations should reside in the domain layer")
+                .because("a business rule is a domain invariant, so it belongs with the model")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A {@link BusinessRuleViolationException} is raised only through
+     * {@link AbstractAggregateRoot#checkRule(BusinessRule)} — never constructed directly
+     * by application, domain, or adapter code. Routing every violation through
+     * {@code checkRule} keeps invariant enforcement uniform and the rule object the single
+     * source of the message and code. Part of {@link #all()}; matches nothing (and so
+     * passes) in a project that never constructs it directly.
+     */
+    public static ArchRule businessRuleViolationsShouldOnlyComeFromCheckRule() {
+        return noClasses().that().doNotHaveFullyQualifiedName(AbstractAggregateRoot.class.getName())
+                .should().callConstructor(BusinessRuleViolationException.class, BusinessRule.class)
+                .as("BusinessRuleViolationException should be raised only via AbstractAggregateRoot.checkRule")
+                .because("routing every invariant violation through checkRule keeps enforcement uniform and "
+                        + "the rule object the single source of its message and code")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A {@link BusinessRule} is a plain domain object, not a Spring-managed bean: it must
+     * not carry a Spring stereotype ({@code @Component} or a meta-annotation of it such as
+     * {@code @Service}/{@code @Repository}). Matched by fully-qualified name so the rule
+     * needs no compile dependency on Spring. Part of {@link #all()}; matches nothing (and
+     * so passes) in a project whose rules are not Spring beans.
+     */
+    public static ArchRule businessRulesShouldNotBeSpringComponents() {
+        return noClasses().that().implement(BusinessRule.class)
+                .should().beAnnotatedWith("org.springframework.stereotype.Component")
+                .orShould().beMetaAnnotatedWith("org.springframework.stereotype.Component")
+                .as("BusinessRule implementations should not be Spring components")
+                .because("a business rule is a plain domain object constructed where the invariant is "
+                        + "checked, not a container-managed bean")
+                .allowEmptyShould(true);
+    }
+
+    /**
      * A method that both carries Spring's {@code @EventListener} (matched by name, see
      * {@link #SPRING_EVENT_LISTENER}) and takes a parameter assignable to the given
      * event marker — i.e. an event subscriber for that kind of event.
@@ -260,6 +311,9 @@ public final class AiPersimmonDddRules {
                 .and(domainEventListenersShouldResideInApplicationOrDomain())
                 .and(integrationEventListenersShouldResideInAdapter())
                 .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler())
-                .and(commandHandlersShouldNotDependOnOtherCommandHandlers());
+                .and(commandHandlersShouldNotDependOnOtherCommandHandlers())
+                .and(businessRulesShouldResideInDomain())
+                .and(businessRuleViolationsShouldOnlyComeFromCheckRule())
+                .and(businessRulesShouldNotBeSpringComponents());
     }
 }

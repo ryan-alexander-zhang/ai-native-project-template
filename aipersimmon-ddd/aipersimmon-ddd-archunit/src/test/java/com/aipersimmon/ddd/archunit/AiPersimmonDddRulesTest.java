@@ -109,6 +109,40 @@ class AiPersimmonDddRulesTest {
     }
 
     @Test
+    void businessRulesShouldResideInDomain_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.businessRulesShouldResideInDomain().check(GOOD));
+    }
+
+    @Test
+    void businessRulesShouldResideInDomain_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.businessRulesShouldResideInDomain().check(BAD));
+    }
+
+    @Test
+    void businessRuleViolationsShouldOnlyComeFromCheckRule_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.businessRuleViolationsShouldOnlyComeFromCheckRule().check(GOOD));
+    }
+
+    @Test
+    void businessRuleViolationsShouldOnlyComeFromCheckRule_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.businessRuleViolationsShouldOnlyComeFromCheckRule().check(BAD));
+    }
+
+    @Test
+    void businessRulesShouldNotBeSpringComponents_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.businessRulesShouldNotBeSpringComponents().check(GOOD));
+    }
+
+    @Test
+    void businessRulesShouldNotBeSpringComponents_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.businessRulesShouldNotBeSpringComponents().check(BAD));
+    }
+
+    @Test
     void all_passesForGood() {
         assertDoesNotThrow(() -> AiPersimmonDddRules.all().check(GOOD));
     }

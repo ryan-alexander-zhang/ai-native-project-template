@@ -228,6 +228,8 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 
 都不满足就用 coded `throw` —— 一行条件套个类只是仪式,反而稀释了"规则"这个词的信号。`BusinessRule` 与 coded `throw` 走同一条错误码/映射通道(前者的 `BusinessRuleViolationException` 就是 `DomainException` 子类),所以升级/降级**不影响线上契约**,可随领域演进自由调整。
 
+**可沉淀为 ArchUnit 的部分**(已并入 `AiPersimmonDddRules.all()`,配 good/bad fixture 双向自测):①`BusinessRule` 实现须在 `..domain..`;②`BusinessRuleViolationException` 只能经 `checkRule` 抛出(禁止直接 `new`);③`BusinessRule` 不得是 Spring bean。**不可沉淀、留给 review 的**:"这条约束是否真的跨聚合""这个 `if/throw` 该不该升级成规则"——纯语义判断;唯一的结构代理(规则引用了外部 `@AggregateRoot`)是启发式、有假阳性,**刻意不并入 `all()`**。
+
 ### 4.6 `BusinessRule` vs `Policy`/`Specification`:同一思想的两个流派
 
 §4.5 回答的是"校验落在**哪一层**";本节回答的是"聚合内那条规则该用**哪种形态**"。`BusinessRule` 常被和参考项目里的 `Policy`/`Specification` 混为一谈——二者其实是"**规则 = 一等命名对象**(而非散落的 `if…throw`)"这一战术思想的两个流派。先厘清 "Policy" 的三种含义,能对上 `BusinessRule` 的只有第一种:
