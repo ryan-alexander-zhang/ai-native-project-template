@@ -69,6 +69,18 @@ class AiPersimmonDddRulesTest {
     }
 
     @Test
+    void domainEventListenersShouldBeAnnotatedWithDomainEventHandler_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules
+                .domainEventListenersShouldBeAnnotatedWithDomainEventHandler().check(GOOD));
+    }
+
+    @Test
+    void domainEventListenersShouldBeAnnotatedWithDomainEventHandler_failsForBad() {
+        assertThrows(AssertionError.class, () -> AiPersimmonDddRules
+                .domainEventListenersShouldBeAnnotatedWithDomainEventHandler().check(BAD));
+    }
+
+    @Test
     void domainShouldBeFrameworkFree_passesForGood() {
         assertDoesNotThrow(() -> AiPersimmonDddRules.domainShouldBeFrameworkFree().check(GOOD));
     }

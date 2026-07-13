@@ -39,6 +39,12 @@
       <artifactId>aipersimmon-ddd-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- For the @DomainEventHandler marker referenced by the event-subscriber rules. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.tngtech.archunit</groupId>
       <artifactId>archunit-junit5</artifactId>

@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -167,6 +168,25 @@ public final class AiPersimmonDddRules {
     }
 
     /**
+     * A subscriber of an in-process domain event (an {@code @EventListener} method
+     * whose argument is a {@link DomainEvent}) is declared in a class annotated
+     * {@link DomainEventHandler @DomainEventHandler}. This makes the subscriber's role
+     * explicit and lets tools locate domain-event handlers by annotation rather than
+     * by a naming or parameter-shape heuristic. Pairs with
+     * {@link #domainEventListenersShouldResideInApplicationOrDomain()}: that fixes the
+     * layer, this requires the marker. Part of {@link #all()}; matches nothing (and so
+     * passes) in a project that has no such subscribers.
+     */
+    public static ArchRule domainEventListenersShouldBeAnnotatedWithDomainEventHandler() {
+        return methods().that(areEventListenersHandling(DomainEvent.class))
+                .should().beDeclaredInClassesThat().areAnnotatedWith(DomainEventHandler.class)
+                .as("domain-event @EventListener handlers should be declared in a @DomainEventHandler class")
+                .because("a domain-event subscriber is a first-class application concern, marked as such so "
+                        + "its role is explicit and architecture tests can find it by annotation")
+                .allowEmptyShould(true);
+    }
+
+    /**
      * A method that both carries Spring's {@code @EventListener} (matched by name, see
      * {@link #SPRING_EVENT_LISTENER}) and takes a parameter assignable to the given
      * event marker — i.e. an event subscriber for that kind of event.
@@ -186,6 +206,7 @@ public final class AiPersimmonDddRules {
                 .and(domainShouldBeFrameworkFree())
                 .and(domainEventsShouldStayInDomain())
                 .and(domainEventListenersShouldResideInApplicationOrDomain())
-                .and(integrationEventListenersShouldResideInAdapter());
+                .and(integrationEventListenersShouldResideInAdapter())
+                .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler());
     }
 }
