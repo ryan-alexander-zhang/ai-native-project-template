@@ -20,10 +20,11 @@
 
     Same building blocks and same code as the multi-module reference; the topology
     differs. Here everything is ONE Maven module, so the bounded-context and layer
-    boundaries are packages enforced at TEST time by the architecture tests
-    (ArchUnit), not separate modules enforced at compile time. Cross-context calls
-    go only through the other context's api package (a convention the tests do not
-    yet mechanically enforce; a multi-module or Spring Modulith setup would).
+    boundaries are packages rather than separate modules enforced at compile time.
+    Those boundaries (and cross-context calls going only through the other context's
+    api package) are conventions this scaffold does not mechanically enforce; the
+    multi-module reference is where the ArchUnit layering rules live. A Spring
+    Modulith setup would be another way to enforce them within one module.
 
     Persistence and the fulfilment saga store are in-memory, so it runs and tests
     without any external infrastructure. Cross-context coordination uses the
@@ -95,11 +96,6 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-archunit</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

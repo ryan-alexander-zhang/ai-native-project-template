@@ -1,5 +1,6 @@
 package com.example.ordering.application.fulfilment;
 
+import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.example.ordering.domain.order.OrderPlacedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
  * arrives — the same timing guarantee, now without an adapter touching the domain.
  */
 @Component
+@DomainEventHandler
 public class OrderFulfilmentStarter {
 
     private final OrderFulfilmentProcessManager process;
