@@ -45,6 +45,22 @@ class ExceptionContractTest {
     }
 
     @Test
+    void duplicateSkuViolatesAggregateRuleWith422AndCode() throws Exception {
+        // Two lines with the same SKU breaks the Order.checkRule(OrderHasDistinctSkus) invariant.
+        String body = """
+                {"customerId":"CUST-1",
+                 "lines":[{"sku":"SKU-1","quantity":1,"unitAmountMinor":100,"currency":"USD"},
+                          {"sku":"SKU-1","quantity":2,"unitAmountMinor":100,"currency":"USD"}]}
+                """;
+
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.code").value("ordering.duplicate-sku"))
+                .andExpect(jsonPath("$.type").value("/problems/duplicate-sku"));
+    }
+
+    @Test
     void unknownCustomerRendersProblemWith404AndCode() throws Exception {
         String body = """
                 {"customerId":"NOPE",

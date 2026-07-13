@@ -28,6 +28,10 @@ class OrderLine {
         this.unitPrice = unitPrice;
     }
 
+    String sku() {
+        return sku;
+    }
+
     Money subtotal() {
         return unitPrice.times(quantity);
     }

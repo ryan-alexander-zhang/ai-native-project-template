@@ -43,6 +43,8 @@ public class Order extends AbstractAggregateRoot<OrderId> {
         }
         Order order = new Order(id, customerId, lines);
         order.checkRule(new OrderMustHaveLines(lines));
+        order.checkRule(new OrderWithinLineLimit(lines));
+        order.checkRule(new OrderHasDistinctSkus(lines));
         order.registerEvent(new OrderPlacedEvent(id, order.total()));
         return order;
     }

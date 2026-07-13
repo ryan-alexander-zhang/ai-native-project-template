@@ -14,6 +14,8 @@ public enum OrderingErrorCode implements ErrorCode {
 
     CREDIT_EXCEEDED("ordering.credit-exceeded", ErrorCategory.DOMAIN_RULE),
     ORDER_EMPTY("ordering.order-empty", ErrorCategory.DOMAIN_RULE),
+    TOO_MANY_LINES("ordering.too-many-lines", ErrorCategory.DOMAIN_RULE),
+    DUPLICATE_SKU("ordering.duplicate-sku", ErrorCategory.DOMAIN_RULE),
     ORDER_NOT_FOUND("ordering.order-not-found", ErrorCategory.NOT_FOUND),
     CUSTOMER_NOT_FOUND("ordering.customer-not-found", ErrorCategory.NOT_FOUND);
 
