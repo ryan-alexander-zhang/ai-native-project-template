@@ -14,6 +14,13 @@ parent: design-00003-exception-model
 
 全为**加法式**改动(旧 message-only 构造保留),不破坏 `-core` 零依赖红线与依赖向内铁律。
 
+## 进度
+
+- ✅ **P1**(`-core`:`ErrorCode`/`ErrorCategory`/`BusinessRule`/`checkRule` + `DomainException` 带码)—— 已实现并测试(6 tests 绿,零依赖保持)。
+- ✅ **P2**(`-application`:`ApplicationException` 带码 + `EntityNotFoundException`/`ConcurrencyConflictException`)—— 已实现。
+- ✅ **P3**(`-web`:`ProblemType extends ErrorCode` + `ProblemTypeRegistry`)—— 已实现(既有契约测试 9 tests 不回归)。
+- ⏳ **P4–P7** 待实现(P4 需改造 advice 并更新其现有测试;P6 消息可靠性为较大独立块;P7 收口端到端验收)。
+
 ## Design
 
 设计细节不在此重复,见 [[design-00003-exception-model]] §四–§十。相位依赖:
