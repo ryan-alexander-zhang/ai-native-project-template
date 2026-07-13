@@ -208,6 +208,18 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 - **fail-fast**:`checkRule` 命中第一条被违反的规则即抛,不累积——领域不变量间常有前后依赖,且与"边缘输入校验**累积**报 `errors[]`"(§八)刻意分工。
 - 若某场景确需一次报多条领域规则(如批量导入),可加 `checkRules(BusinessRule...)` 变体,让 `BusinessRuleViolationException` 携带多条明细。**本期不做**,留作 opt-in 增量。
 
+### 4.5 校验落在哪一层:VO 自校验 vs 聚合 `BusinessRule` vs 应用层跨聚合
+
+`checkRule` 不是"所有校验的统一入口"。**判断标准是这条约束需要多大范围的状态才能判定**——范围决定归属:
+
+| 约束范围 | 落点 | 机制 | 违反 | 脚手架实例(ordering) |
+| --- | --- | --- | --- | --- |
+| 单个值/单个实体自身 | 值对象 / 实体**构造器**(Always-Valid) | 构造即校验,直接 `throw` | `DomainException` → 422 | `OrderLine`:`sku required` / `quantity > 0`;`Money`:`amount >= 0` |
+| **一个聚合内、跨其成员** | 聚合根,`checkRule(BusinessRule)` | `BusinessRule` 对象 | `BusinessRuleViolationException` → 422 | `Order`:`OrderMustHaveLines`、`OrderWithinLineLimit`、`OrderHasDistinctSkus` |
+| **跨多个聚合 / 需外部状态** | **应用层**用例(handler) | 取齐依赖后显式 `throw`(或抛领域异常) | `DomainException`/`ApplicationException` → 按码 | `PlaceOrderHandler`:信用超限(需 `Customer` + `Order`)→ `CreditExceededException` |
+
+原则:**不变量能自足判定就往里放**(VO < 聚合 < 应用层),越靠内越好。反面——把跨聚合校验硬塞进 `Order.checkRule` 会迫使 `Order` 依赖 `Customer`,破坏聚合边界;把单值校验拔高到聚合 `checkRule` 则丢了"值对象永远合法"的保证。`BusinessRule` 只服务**中间那层**:一个聚合内、跨成员、无需外部状态的不变量。
+
 ## 五、错误码→ProblemDetail 的贯通(解 §五断裂)
 
 `-web-spring` 的 `@RestControllerAdvice` 处理任一领域/应用异常时,按下述**解析顺序**产出 `code`/`type`/`status`/`title`:
@@ -278,6 +290,8 @@ flowchart LR
 | 基础设施 | 技术故障 | 未捕获 | 抛 | 500 |
 
 原则:**边缘输入错误是"预期的",走非异常校验;不变量违反是"异常的",走 throw**。二者错误结构统一为 RFC 9457 + `errors[]`。
+
+> 本表按"层"分职责;最后一行"领域聚合 / VO"内部还需再分——VO 自校验 vs 聚合 `BusinessRule` vs 应用层跨聚合校验的落点判断,见 §4.5。
 
 ## 九、401 / 403 条件化补齐(解 #9)
 
