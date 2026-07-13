@@ -15,6 +15,7 @@ import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.Orders;
 import com.example.ordering.domain.shared.Money;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -46,7 +47,7 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     public String handle(PlaceOrder command) {
         CustomerId customerId = new CustomerId(command.customerId());
         Customer customer = customers.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("unknown customer: " + command.customerId()));
+                .orElseThrow(() -> new NoSuchElementException("unknown customer: " + command.customerId()));
 
         List<LineData> lines = command.lines().stream()
                 .map(line -> new LineData(line.sku(), line.quantity(),

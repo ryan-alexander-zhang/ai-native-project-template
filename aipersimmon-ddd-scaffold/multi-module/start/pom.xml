@@ -43,6 +43,15 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
     </dependency>
+    <!--
+      Web-layer contract: maps DomainException/ApplicationException and validation
+      failures to RFC 9457 ProblemDetail responses, plus a trace-id filter. These
+      zero-risk concerns are auto-configured on and replace a hand-written advice.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web-spring</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
