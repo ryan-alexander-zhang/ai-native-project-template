@@ -23,7 +23,7 @@ framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §
 
 | 分类 | 条目 |
 | --- | --- |
-| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule`;④错误码→`ProblemType`→ProblemDetail 的贯通桥接;⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦Guard-vs-Validate 分工成文;⑧401/403 条件化补齐 |
+| **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`Invariant` 一等抽象 + `AbstractAggregateRoot.checkInvariant`;④错误码→`ProblemType`→ProblemDetail 的贯通桥接;⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦Guard-vs-Validate 分工成文;⑧401/403 条件化补齐 |
 | **不属本设计** | 异步**消息投递可靠性**(重试上限/退避/死信 DLQ)——投递面而非错误建模面,见 [[issue-00003-messaging-delivery-reliability]] |
 | **不做**(见 §十一) | 在 `-core` 引入 `Result`/`Either` 或 Vavr 依赖;通用异常基类大而全的字段(错误上下文 map 等);把 HTTP 状态码泄漏进 `-core` |
 | **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC `ProblemType` 枚举思路、filter 层 429/401 出口(均来自 [[design-00002-web-layer]]) |
@@ -43,7 +43,7 @@ framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §
 ```mermaid
 flowchart TD
   subgraph pure["纯净层 framework-free"]
-    core["aipersimmon-ddd-core<br/>ErrorCode · ErrorCategory · DomainException(+code)<br/>BusinessRule · BusinessRuleViolationException · checkRule"]
+    core["aipersimmon-ddd-core<br/>ErrorCode · ErrorCategory · DomainException(+code)<br/>Invariant · InvariantViolationException · checkInvariant"]
     app["aipersimmon-ddd-application<br/>ApplicationException(+code)<br/>EntityNotFoundException · ConcurrencyConflictException"]
     web["aipersimmon-ddd-web<br/>ProblemType extends ErrorCode<br/>ApiError · FieldError · ApiException · ProblemTypeRegistry"]
   end
@@ -85,13 +85,13 @@ classDiagram
     -ErrorCode errorCode
     +Optional~ErrorCode~ errorCode()
   }
-  class BusinessRule {
+  class Invariant {
     <<interface>>
     +boolean isBroken()
     +String message()
     +ErrorCode errorCode()
   }
-  class BusinessRuleViolationException
+  class InvariantViolationException
   class IllegalStateTransitionException
   class ApplicationException {
     -ErrorCode errorCode
@@ -111,14 +111,14 @@ classDiagram
 
   ErrorCode ..> ErrorCategory
   RuntimeException <|-- DomainException
-  DomainException <|-- BusinessRuleViolationException
+  DomainException <|-- InvariantViolationException
   DomainException <|-- IllegalStateTransitionException
   RuntimeException <|-- ApplicationException
   ApplicationException <|-- EntityNotFoundException
   ApplicationException <|-- ConcurrencyConflictException
   RuntimeException <|-- ApiException
   ErrorCode <|-- ProblemType
-  BusinessRuleViolationException ..> BusinessRule
+  InvariantViolationException ..> Invariant
 ```
 
 ### 4.1 `-core`(零依赖)
@@ -146,20 +146,20 @@ public class DomainException extends RuntimeException {
 
 ```java
 // com.aipersimmon.ddd.core.rule
-public interface BusinessRule {
+public interface Invariant {
     boolean isBroken();
     String message();
     default ErrorCode errorCode() { return null; }
 }
-public final class BusinessRuleViolationException extends DomainException {
-    public BusinessRuleViolationException(BusinessRule rule) { super(rule.errorCode(), rule.message()); }
+public final class InvariantViolationException extends DomainException {
+    public InvariantViolationException(Invariant rule) { super(rule.errorCode(), rule.message()); }
 }
 ```
 
 ```java
 // AbstractAggregateRoot 增补
-protected final void checkRule(BusinessRule rule) {
-    if (rule.isBroken()) throw new BusinessRuleViolationException(rule);
+protected final void checkInvariant(Invariant rule) {
+    if (rule.isBroken()) throw new InvariantViolationException(rule);
 }
 ```
 
@@ -204,59 +204,59 @@ public interface ProblemTypeRegistry {             // code -> ProblemType 查找
 
 ### 4.4 基数与 fail-fast
 
-- **一个聚合 N 条规则、一个 BC 的 `ErrorCode` 枚举 N 个值**。`BusinessRule` 是"一条不变量 = 一个对象",聚合在方法里 `checkRule(...)` 多次;`ErrorCode` 实现为 per-BC 枚举,天然多值(`CREDIT_EXCEEDED`/`ORDER_EMPTY`/`ORDER_ALREADY_CONFIRMED`/…)。**不存在"一个聚合一条规则、一个码"**。
-- **fail-fast**:`checkRule` 命中第一条被违反的规则即抛,不累积——领域不变量间常有前后依赖,且与"边缘输入校验**累积**报 `errors[]`"(§八)刻意分工。
-- 若某场景确需一次报多条领域规则(如批量导入),可加 `checkRules(BusinessRule...)` 变体,让 `BusinessRuleViolationException` 携带多条明细。**本期不做**,留作 opt-in 增量。
+- **一个聚合 N 条规则、一个 BC 的 `ErrorCode` 枚举 N 个值**。`Invariant` 是"一条不变量 = 一个对象",聚合在方法里 `checkInvariant(...)` 多次;`ErrorCode` 实现为 per-BC 枚举,天然多值(`CREDIT_EXCEEDED`/`ORDER_EMPTY`/`ORDER_ALREADY_CONFIRMED`/…)。**不存在"一个聚合一条规则、一个码"**。
+- **fail-fast**:`checkInvariant` 命中第一条被违反的规则即抛,不累积——领域不变量间常有前后依赖,且与"边缘输入校验**累积**报 `errors[]`"(§八)刻意分工。
+- 若某场景确需一次报多条领域规则(如批量导入),可加 `checkInvariants(Invariant...)` 变体,让 `InvariantViolationException` 携带多条明细。**本期不做**,留作 opt-in 增量。
 
-### 4.5 校验落在哪一层:VO 自校验 vs 聚合 `BusinessRule` vs 应用层跨聚合
+### 4.5 校验落在哪一层:VO 自校验 vs 聚合 `Invariant` vs 应用层跨聚合
 
-`checkRule` 不是"所有校验的统一入口"。**判断标准是这条约束需要多大范围的状态才能判定**——范围决定归属:
+`checkInvariant` 不是"所有校验的统一入口"。**判断标准是这条约束需要多大范围的状态才能判定**——范围决定归属:
 
 | 约束范围 | 落点 | 机制 | 违反 | 脚手架实例(ordering) |
 | --- | --- | --- | --- | --- |
 | 单个值/单个实体自身 | 值对象 / 实体**构造器**(Always-Valid) | 构造即校验,直接 `throw` | `DomainException` → 422 | `OrderLine`:`sku required` / `quantity > 0`;`Money`:`amount >= 0` |
-| **一个聚合内、跨其成员** | 聚合根 | **默认** coded `throw`;**够格时**才 `checkRule(BusinessRule)` | `DomainException` / `BusinessRuleViolationException` → 422 | `Order`:空/超上限用 coded `throw`(`ORDER_EMPTY`/`TOO_MANY_LINES`);无重复 SKU 用 `BusinessRule`(`OrderHasDistinctSkus`) |
+| **一个聚合内、跨其成员** | 聚合根 | **默认** coded `throw`;**够格时**才 `checkInvariant(Invariant)` | `DomainException` / `InvariantViolationException` → 422 | `Order`:空/超上限用 coded `throw`(`ORDER_EMPTY`/`TOO_MANY_LINES`);无重复 SKU 用 `Invariant`(`OrderHasDistinctSkus`) |
 | **跨多个聚合 / 需外部状态** | **应用层**用例(handler) | 取齐依赖后显式 `throw`(或抛领域异常) | `DomainException`/`ApplicationException` → 按码 | `PlaceOrderHandler`:信用超限(需 `Customer` + `Order`)→ `CreditExceededException` |
 
-原则:**不变量能自足判定就往里放**(VO < 聚合 < 应用层),越靠内越好。反面——把跨聚合校验硬塞进 `Order.checkRule` 会迫使 `Order` 依赖 `Customer`,破坏聚合边界;把单值校验拔高到聚合层则丢了"值对象永远合法"的保证。
+原则:**不变量能自足判定就往里放**(VO < 聚合 < 应用层),越靠内越好。反面——把跨聚合校验硬塞进 `Order.checkInvariant` 会迫使 `Order` 依赖 `Customer`,破坏聚合边界;把单值校验拔高到聚合层则丢了"值对象永远合法"的保证。
 
-**`BusinessRule` 不是默认,是升级项。** 聚合内不变量**默认用 coded `throw`**;只有当它满足下列**至少一条**时,才值得升级成 `BusinessRule`:
+**`Invariant` 不是默认,是升级项。** 聚合内不变量**默认用 coded `throw`**;只有当它满足下列**至少一条**时,才值得升级成 `Invariant`:
 
 - **非平凡**:多条件 / 有值得命名的领域概念(如"无重复 SKU"),而非 `isEmpty()`/`size()>N` 这种一行守卫;
 - **可复用**:同一规则被多个方法或多个聚合共用;
-- **需清点或组合**:要把一组规则当数据遍历、按开关启停、或一次累积多个违反(见 §4.4 的 `checkRules` 增量)。
+- **需清点或组合**:要把一组规则当数据遍历、按开关启停、或一次累积多个违反(见 §4.4 的 `checkInvariants` 增量)。
 
-都不满足就用 coded `throw` —— 一行条件套个类只是仪式,反而稀释了"规则"这个词的信号。`BusinessRule` 与 coded `throw` 走同一条错误码/映射通道(前者的 `BusinessRuleViolationException` 就是 `DomainException` 子类),所以升级/降级**不影响线上契约**,可随领域演进自由调整。
+都不满足就用 coded `throw` —— 一行条件套个类只是仪式,反而稀释了"规则"这个词的信号。`Invariant` 与 coded `throw` 走同一条错误码/映射通道(前者的 `InvariantViolationException` 就是 `DomainException` 子类),所以升级/降级**不影响线上契约**,可随领域演进自由调整。
 
-**可沉淀为 ArchUnit 的部分**(已并入 `AiPersimmonDddRules.all()`,配 good/bad fixture 双向自测):①`BusinessRule` 实现须在 `..domain..`;②`BusinessRuleViolationException` 只能经 `checkRule` 抛出(禁止直接 `new`);③`BusinessRule` 不得是 Spring bean。**不可沉淀、留给 review 的**:"这条约束是否真的跨聚合""这个 `if/throw` 该不该升级成规则"——纯语义判断;唯一的结构代理(规则引用了外部 `@AggregateRoot`)是启发式、有假阳性,**刻意不并入 `all()`**。
+**可沉淀为 ArchUnit 的部分**(已并入 `AiPersimmonDddRules.all()`,配 good/bad fixture 双向自测):①`Invariant` 实现须在 `..domain..`;②`InvariantViolationException` 只能经 `checkInvariant` 抛出(禁止直接 `new`);③`Invariant` 不得是 Spring bean。**不可沉淀、留给 review 的**:"这条约束是否真的跨聚合""这个 `if/throw` 该不该升级成规则"——纯语义判断;唯一的结构代理(规则引用了外部 `@AggregateRoot`)是启发式、有假阳性,**刻意不并入 `all()`**。
 
-### 4.6 `BusinessRule` vs `Policy`/`Specification`:同一思想的两个流派
+### 4.6 `Invariant` vs `Policy`/`Specification`:同一思想的两个流派
 
-§4.5 回答的是"校验落在**哪一层**";本节回答的是"聚合内那条规则该用**哪种形态**"。`BusinessRule` 常被和参考项目里的 `Policy`/`Specification` 混为一谈——二者其实是"**规则 = 一等命名对象**(而非散落的 `if…throw`)"这一战术思想的两个流派。先厘清 "Policy" 的三种含义,能对上 `BusinessRule` 的只有第一种:
+§4.5 回答的是"校验落在**哪一层**";本节回答的是"聚合内那条规则该用**哪种形态**"。`Invariant` 常被和参考项目里的 `Policy`/`Specification` 混为一谈——二者其实是"**规则 = 一等命名对象**(而非散落的 `if…throw`)"这一战术思想的两个流派。先厘清 "Policy" 的三种含义,能对上 `Invariant` 的只有第一种:
 
-| "Policy" 的含义 | 与 `BusinessRule` 的关系 |
+| "Policy" 的含义 | 与 `Invariant` 的关系 |
 | --- | --- |
 | ①**决策型 Policy / Specification**（ddd-by-examples 的 `PlacingOnHoldPolicy`） | **同一层的兄弟**——本节重点比这个 |
-| ②**注入型 Policy**（ddd-by-examples-factory 的 `ReviewPolicy` 注入进聚合方法） | `BusinessRule` 的扩展方向：规则需可变策略/配置时的形态 |
+| ②**注入型 Policy**（ddd-by-examples-factory 的 `ReviewPolicy` 注入进聚合方法） | `Invariant` 的扩展方向：规则需可变策略/配置时的形态 |
 | ③**反应型 Policy / Saga**（"每当发生事件 X 就触发命令 Y"） | **无关**——属应用 / 流程层编排,不是聚合内不变量 |
 
-`BusinessRule`(断言流派)与决策型 `Policy`(函数式流派)的核心差异:
+`Invariant`(断言流派)与决策型 `Policy`(函数式流派)的核心差异:
 
-| 维度 | `BusinessRule`（本仓默认） | 决策型 `Policy`（函数式） |
+| 维度 | `Invariant`（本仓默认） | 决策型 `Policy`（函数式） |
 | --- | --- | --- |
 | **本质** | **断言 / 卫兵**:"这条不变量被违反了吗?" | **决策**:"这个动作允许吗?允许则产出什么?" |
 | **提问方向** | 负向——`isBroken()`,默认合法、标出违反 | 正向——判定 allow / reject 并**产出结果** |
 | **结果模型** | `boolean` → 聚合 **throw** 异常(二元通过/违反) | 返回 `Either<Rejection, Allowance>`(**值**,可携带理由/数据) |
 | **控制流** | 异常驱动,契合 `@Transactional` rollback-on-exception | 值驱动,需处处显式传播 / 组合 |
 | **外部状态** | §4.5 限定:聚合内、跨成员、**无外部状态**、自足判定 | 常可**注入**可变策略 / 配置(见含义②) |
-| **组合** | 逐条 `checkRule(...)`,**fail-fast** 短路(§4.4) | 列表清点、可一次累积多条 rejection |
+| **组合** | 逐条 `checkInvariant(...)`,**fail-fast** 短路(§4.4) | 列表清点、可一次累积多条 rejection |
 | **谱系** | 参考 `modular-monolith-with-ddd`(Grzybek;上溯微软 eShopOnContainers) | 参考 `ddd-by-examples-library`(Vavr `Either`) |
 
-**本仓取舍**:默认口径是 `BusinessRule`;决策型 `Policy`(`Either`)是 **§十 允许的局部逃生舱**——团队可在纯领域策略/规格边界自行引 Vavr,但**不得进 `-core` 公共 API**。二者不是并存的两套机制,而是"默认 + opt-in 逃生舱"。理由(零依赖红线、事务语义契合)见 §十。
+**本仓取舍**:默认口径是 `Invariant`;决策型 `Policy`(`Either`)是 **§十 允许的局部逃生舱**——团队可在纯领域策略/规格边界自行引 Vavr,但**不得进 `-core` 公共 API**。二者不是并存的两套机制,而是"默认 + opt-in 逃生舱"。理由(零依赖红线、事务语义契合)见 §十。
 
 **选型指引**:
 
-- 约束是**硬不变量**(必须永真,违反 = 异常)且**聚合内可自足判定** → `BusinessRule`;
+- 约束是**硬不变量**(必须永真,违反 = 异常)且**聚合内可自足判定** → `Invariant`;
 - 需要**返回丰富结果**(不只 pass/fail,还要带 allowance 数据或一次收集多条拒绝原因),或规则**随可注入策略/配置变化** → 决策型 / 注入型 `Policy`(边界局部用 `Either`,或把策略对象注入聚合方法);
 - "**事件 → 命令**"的跨聚合编排 → Saga / Process(含义③),两者都不是,不塞进聚合(见 [[analysis-00005-structure-2-event-flow-and-cqrs]])。
 
@@ -283,7 +283,7 @@ flowchart LR
 | 异常 | HTTP | 说明 | 相对现状 |
 | --- | --- | --- | --- |
 | `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径 | 不变 |
-| `BusinessRuleViolationException` / `DomainException`(带码) | 命中 registry 则用其 status,否则 **422** | `code`/`type` 从 `ErrorCode` 贯通 | **新增贯通** |
+| `InvariantViolationException` / `DomainException`(带码) | 命中 registry 则用其 status,否则 **422** | `code`/`type` 从 `ErrorCode` 贯通 | **新增贯通** |
 | `DomainException`(无码) | **422** | 业务规则:报文合法但语义不可处理 | **改默认 409→422** |
 | `IllegalStateTransitionException` | **409** | 状态机非法迁移 = 与当前状态冲突 | **改默认 409(明确)** |
 | `ApplicationException`(无码) | 422 | 用例级失败 | 不变 |
@@ -304,7 +304,7 @@ flowchart LR
 
 映射的**权威由每个 `ProblemType.status()` 逐码决定**;下述只是"未注册 ProblemType 时"的基类兜底,取舍依据 RFC 9110 语义:
 
-- **422 Unprocessable Content**(§15.5.21):服务器**理解**报文的类型与语法、但**因语义无法处理**——这精确对应"业务不变量违反"(信用超限、金额不合规、超配额)。故 `DomainException`/`BusinessRuleViolationException` 默认 422。对齐 GitHub、Rails/Laravel、Spring 社区的既有习惯。
+- **422 Unprocessable Content**(§15.5.21):服务器**理解**报文的类型与语法、但**因语义无法处理**——这精确对应"业务不变量违反"(信用超限、金额不合规、超配额)。故 `DomainException`/`InvariantViolationException` 默认 422。对齐 GitHub、Rails/Laravel、Spring 社区的既有习惯。
 - **409 Conflict**(§15.5.10):请求**与目标资源的当前状态冲突**——**收窄**给:乐观锁/并发(gRPC `ABORTED`)、重复创建(`ALREADY_EXISTS`)、状态机非法迁移(`IllegalStateTransitionException`)。**不**用作一般业务规则的默认。
 - **400 Bad Request**:仅报文畸形/类型错 + 字段级校验(`errors[]`)。Google AIP/gRPC 把 `FAILED_PRECONDITION` 也归 400——本模板既已选 RFC 9457 + `errors[]`,取 **422 派**更精确。
 - 心智模型(gRPC 最干净):`INVALID_ARGUMENT`→400、`FAILED_PRECONDITION`→422(本模板)、`ABORTED`/`ALREADY_EXISTS`→409、`NOT_FOUND`→404。
@@ -326,12 +326,12 @@ flowchart LR
 | 入站 adapter / DTO | 不可信外部输入(格式/必填/范围) | Bean Validation `@Valid` | 非异常校验 | 400 |
 | 应用 / 命令总线 | 命令前置条件 | `ValidationCommandInterceptor`(JSR-380) | 抛 `ConstraintViolationException` | 400 |
 | 应用用例 | 缺失聚合 / 用例冲突 | `EntityNotFoundException` / `ConcurrencyConflictException` / `ApplicationException` | 抛 | 404 / 409 / 422 |
-| 领域聚合 / VO | 业务不变量 | `checkRule(BusinessRule)` / VO 构造自校验 → `DomainException` | 抛 | 422(状态机冲突则 409;或按码) |
+| 领域聚合 / VO | 业务不变量 | `checkInvariant(Invariant)` / VO 构造自校验 → `DomainException` | 抛 | 422(状态机冲突则 409;或按码) |
 | 基础设施 | 技术故障 | 未捕获 | 抛 | 500 |
 
 原则:**边缘输入错误是"预期的",走非异常校验;不变量违反是"异常的",走 throw**。二者错误结构统一为 RFC 9457 + `errors[]`。
 
-> 本表按"层"分职责;最后一行"领域聚合 / VO"内部还需再分——VO 自校验 vs 聚合 `BusinessRule` vs 应用层跨聚合校验的落点判断,见 §4.5。
+> 本表按"层"分职责;最后一行"领域聚合 / VO"内部还需再分——VO 自校验 vs 聚合 `Invariant` vs 应用层跨聚合校验的落点判断,见 §4.5。
 
 ## 九、401 / 403 条件化补齐(解 #9)
 
@@ -346,23 +346,36 @@ flowchart LR
 domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-structure-2-event-flow-and-cqrs]] 也提过 Result。
 本设计的取舍(类比 [[decision-00007-web-api-response-envelope]] 的"明确不做"):
 
-- **默认 throw + 结构化错误码**,不在 `-core` 引入 `Result`/`Either` 或 Vavr。理由:①保持 `-core` 零依赖红线;
-  ②与 Spring/MyBatis 的事务回滚、`@Transactional` rollback-on-exception 语义天然契合(Result 需处处手工传播);
-  ③与生态近邻 jMolecules / spring-modulith-with-ddd 一致(它们也不函数式)。
+**先厘清一个常见的混淆**:"不上 Result" ≠ "因为 `-core` 要零依赖"。`Result` 并不等于 Vavr——完全可以零依赖地写成一个
+`sealed interface Result<T> permits Success, Failure`。所以零依赖红线只否决 **Vavr 这个依赖**,并不能单独否决 **Result 这个模式**。
+把两者混为一谈是不诚实的论证。默认 throw 的真正理由是下面三条,零依赖只是其中一条的附带结果:
+
+- **① 人机工程 / 易漏用**(主因):`throw` 无法被调用方"忘记"——不处理就沿栈上抛、被顶层 advice 兜住;而 `Result` 是一个
+  **返回值**,调用方可以静默丢弃(尤其无 `@CheckReturnValue`/linter 时),一处漏检就把一次业务失败吞成"成功"。异常在"必须被处理"这点上默认更安全。
+- **② 生态一致**:近邻 jMolecules / spring-modulith-with-ddd 都不函数式;默认 throw 与它们、以及与 `@Transactional`
+  的既有心智模型一致,团队只需一套错误处理范式。
+- **③ 事务语义(有限成立)**:`throw` 与 `@Transactional` rollback-on-exception 天然契合。**但要诚实**:预期内的业务拒绝
+  通常发生在**任何状态变更/发事件之前**(如信用超限先于 `save`),此时没有需要回滚的写入,Result 也不会"漏回滚"。真正必须靠异常回滚的是
+  **执行到一半的技术故障/未知错误**。所以这条支持的是"默认 throw 更省心",而非"Result 不安全"。
+- 附带结果:既然默认不用 Result,也就**不在 `-core` 引入 Vavr**,零依赖红线顺带保住——这是**结论的副产品,不是前提**。
+
 - **允许局部采用**:团队可在**纯领域策略/规格**边界自行引 Vavr 返回 `Either<Rejection, T>`(如 ddd-by-examples 的
-  `Policy`),只要**不进 `-core` 公共 API**。库不阻止,也不内建。`Policy`(函数式)与 `BusinessRule`(断言)的形态差异与选型见 **§4.6**。
-- 这不是"反最佳实践",是**成本/一致性权衡**;若未来重估,应走独立 decision。
+  `Policy`),或零依赖地自定义 `Result`,只要**不进 `-core` 公共 API**。库不阻止,也不内建。`Policy`(函数式)与 `Invariant`(断言)的形态差异与选型见 **§4.6**。
+- **分布式消息边界的例外**(参考不依赖):若未来接入 Axon 一类分布式 command/query 总线,异常跨进程会被泛化成
+  `CommandExecutionException`、丢失类型信息;此时应在**边界**把领域异常转成**结构化失败结果**(稳定 code + 参数),聚合内部仍可 coded throw。
+  本仓当前不依赖 Axon(见 [[analysis-00007-saga-process-manager]] "参考不依赖"),故仅作为接入时的边界指引,不改默认口径。
+- 这不是"反最佳实践",是**成本/一致性权衡**;若未来重估(例如团队愿意用零依赖 `Result` + linter 强制处理),应走独立 decision。
 
 ## 十一、脚手架落地改动(code 不是 truth,照改)
 
 | 模块 | 改动 |
 | --- | --- |
-| `-core` | 新增 `error/ErrorCode`、`error/ErrorCategory`、`rule/BusinessRule`、`rule/BusinessRuleViolationException`;`DomainException` 加带码构造;`AbstractAggregateRoot.checkRule` |
+| `-core` | 新增 `error/ErrorCode`、`error/ErrorCategory`、`rule/Invariant`、`rule/InvariantViolationException`;`DomainException` 加带码构造;`AbstractAggregateRoot.checkInvariant` |
 | `-application` | `ApplicationException` 加带码构造;新增 `EntityNotFoundException`、`ConcurrencyConflictException` |
 | `-web` | `ProblemType extends ErrorCode`;新增 `ProblemTypeRegistry` |
 | `-web-spring` | advice 全量映射(含 `ConstraintViolationException`、registry 贯通、`EntityNotFoundException`/`ConcurrencyConflictException`);交付 i18n bundle;filter 路径接入 `MessageSource`;401/403 条件化配置 |
 | `-cqrs-spring` | 把 `OptimisticLockingFailureException` 翻译为 `ConcurrencyConflictException` |
-| **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `CREDIT_EXCEEDED`;聚合内**够格**不变量(无重复 SKU)用 `checkRule(OrderHasDistinctSkus)`,**琐碎守卫**(空/超上限)用 coded `throw`(§4.5);"unknown order/customer" 改抛 `EntityNotFoundException`(取代 `NoSuchElementException` 临时手法) |
+| **scaffold(ordering)** | 定义 `OrderingProblemType`(enum implements `ProblemType`);`CreditExceededException` 携 `CREDIT_EXCEEDED`;聚合内**够格**不变量(无重复 SKU)用 `checkInvariant(OrderHasDistinctSkus)`,**琐碎守卫**(空/超上限)用 coded `throw`(§4.5);"unknown order/customer" 改抛 `EntityNotFoundException`(取代 `NoSuchElementException` 临时手法) |
 
 **验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 **422** ProblemDetail
 (带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。

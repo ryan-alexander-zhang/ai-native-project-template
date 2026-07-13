@@ -297,7 +297,7 @@ Internal(distilled,在 `docs/reference/`):
 `spring-modulith-with-ddd/`(event externalization `mapping()` + `@Externalized`)。
 
 下游:本文的 `-core` `DomainException` / `-application` `ApplicationException` 基类,其完整异常体系
-(`ErrorCode` 贯通、`BusinessRule`、语义子类、消息可靠性)见 [[analysis-00010-exception-model]] 与 [[design-00003-exception-model]]。
+(`ErrorCode` 贯通、`Invariant`、语义子类、消息可靠性)见 [[analysis-00010-exception-model]] 与 [[design-00003-exception-model]]。
 
 External:
 

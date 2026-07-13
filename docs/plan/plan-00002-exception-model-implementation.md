@@ -16,12 +16,12 @@ parent: design-00003-exception-model
 
 ## 进度
 
-- ✅ **P1**(`-core`:`ErrorCode`/`ErrorCategory`/`BusinessRule`/`checkRule` + `DomainException` 带码)—— 已实现并测试(6 tests 绿,零依赖保持)。
+- ✅ **P1**(`-core`:`ErrorCode`/`ErrorCategory`/`Invariant`/`checkInvariant` + `DomainException` 带码)—— 已实现并测试(6 tests 绿,零依赖保持)。
 - ✅ **P2**(`-application`:`ApplicationException` 带码 + `EntityNotFoundException`/`ConcurrencyConflictException`)—— 已实现。
 - ✅ **P3**(`-web`:`ProblemType extends ErrorCode` + `ProblemTypeRegistry` + `ProblemTypeCatalog`)—— 已实现(既有契约测试不回归)。
 - ✅ **P4**(`-web-spring`:`ProblemDetailFactory` registry 贯通 + advice 全量映射 + `ConstraintViolation→400` 修复)—— 已实现(WebLayerTest 11 tests 绿)。**未做子项**:i18n 默认 bundle 交付、filter 路径接入 MessageSource、401/403 条件化(均为加法,不影响验收)。
 - ✅ **P5**(`-cqrs-spring`:`OptimisticLockingFailureException → ConcurrencyConflictException`)—— 已实现。
-- ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkRule` + `EntityNotFound` + `OrderingProblemType`/catalog)—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code/type,unknown → 404(`ExceptionContractTest`,multi-module 10 tests 绿)。
+- ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkInvariant` + `EntityNotFound` + `OrderingProblemType`/catalog)—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code/type,unknown → 404(`ExceptionContractTest`,multi-module 10 tests 绿)。
 - ↗ **消息投递可靠性(原 P6)已移出本计划**,作为独立 issue 追踪:[[issue-00003-messaging-delivery-reliability]](属投递可靠性,非异常体系)。
 - ⏳ **P7(modulith)**—— **未做**:modulith 仍是旧手写 `OrderExceptionHandler`、未引 web-spring,需先补 web-spring 接入,再镜像 multi-module 的异常模型改动。
 - ⏳ **P4 剩余子项**(i18n bundle、401/403)。
@@ -32,7 +32,7 @@ parent: design-00003-exception-model
 
 ```mermaid
 flowchart TD
-  P1["P1 -core:ErrorCode/BusinessRule/checkRule"] --> P2["P2 -application:语义异常"]
+  P1["P1 -core:ErrorCode/Invariant/checkInvariant"] --> P2["P2 -application:语义异常"]
   P1 --> P3["P3 -web:ProblemType extends ErrorCode + Registry"]
   P2 --> P4["P4 -web-spring:全量映射 + i18n + 401/403"]
   P3 --> P4
@@ -48,11 +48,11 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 ### P1 — `-core` 错误码与规则基元(基础,阻塞多数)
 - [ ] 新增 `com.aipersimmon.ddd.core.error`:`ErrorCode`(`code()` + 默认 `category()`)、`ErrorCategory` 枚举。
 - [ ] `DomainException` 加 `(ErrorCode, message)` / `(ErrorCode, message, cause)` 构造 + `Optional<ErrorCode> errorCode()`;保留 message-only 构造。
-- [ ] 新增 `com.aipersimmon.ddd.core.rule`:`BusinessRule`、`BusinessRuleViolationException extends DomainException`。
-- [ ] `AbstractAggregateRoot.checkRule(BusinessRule)`。
+- [ ] 新增 `com.aipersimmon.ddd.core.rule`:`Invariant`、`InvariantViolationException extends DomainException`。
+- [ ] `AbstractAggregateRoot.checkInvariant(Invariant)`。
 - [ ] `IllegalStateTransitionException` 增可选 `ErrorCode` 构造(不改现有行为)。
 - [ ] 新 package 补 `package-info.java`;`-core` pom 仍零依赖(仅 test)。
-- **验收**:`-core` 单测覆盖 `checkRule`(broken→抛、否则不抛)与 `BusinessRuleViolationException` 携码;`mvn -pl aipersimmon-ddd-core test` 绿;archunit 仍绿。
+- **验收**:`-core` 单测覆盖 `checkInvariant`(broken→抛、否则不抛)与 `InvariantViolationException` 携码;`mvn -pl aipersimmon-ddd-core test` 绿;archunit 仍绿。
 
 ### P2 — `-application` 语义异常(→ P1)
 - [ ] `ApplicationException` 加带码构造 + `errorCode()`。
@@ -79,7 +79,7 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 
 ### P7 — scaffold 示范 + 端到端验收(→ P4,P5)
 - [ ] `OrderingProblemType` 枚举 implements `ProblemType`(含 `CREDIT_EXCEEDED` 等)。
-- [ ] `CreditExceededException` 携 `CREDIT_EXCEEDED`;够格不变量(无重复 SKU)用 `checkRule`,琐碎守卫用 coded `throw`(§4.5)。
+- [ ] `CreditExceededException` 携 `CREDIT_EXCEEDED`;够格不变量(无重复 SKU)用 `checkInvariant`,琐碎守卫用 coded `throw`(§4.5)。
 - [ ] "unknown order/customer" 改抛 `EntityNotFoundException`(取代 P0 的 `NoSuchElementException`)。
 - [ ] 同步 modulith 与 multi-module 两个脚手架。
 - **验收**:见下方 Acceptance Path。

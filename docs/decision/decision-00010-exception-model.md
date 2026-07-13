@@ -6,7 +6,7 @@ status: active
 parent:
 ---
 
-# 异常/错误体系:领域贯穿式错误码 + BusinessRule 一等抽象 + 默认 throw(不上 Result)
+# 异常/错误体系:领域贯穿式错误码 + Invariant 一等抽象 + 默认 throw(不上 Result)
 
 固化 `aipersimmon-ddd` 的**跨层异常与错误处理策略**。缺口证据与大厂/参考对照见
 [[analysis-00010-exception-model]](及其引用的 [[analysis-00008-web-api-response-envelope]]);
@@ -31,10 +31,10 @@ framework-free**(`-core` 零依赖是验收红线)。
 - `-web` 的 `ProblemType extends ErrorCode`,并提供 `ProblemTypeRegistry`:领域抛出的 `ErrorCode` 因此能被
   `-web` 认识并补齐 `type`/`status`/`title`,而 `-core` 永不认识 `-web`。**这是接通断裂的唯一合规方式**。
 
-### 二、`BusinessRule` 一等抽象 + `AbstractAggregateRoot.checkRule()`
+### 二、`Invariant` 一等抽象 + `AbstractAggregateRoot.checkInvariant()`
 
-- 库**提供** `BusinessRule`(`isBroken()`/`message()`/可选 `errorCode()`)+ 聚合根 `checkRule(rule)` → `BusinessRuleViolationException`(采 modular-monolith-with-ddd 模式)。
-- **但它是升级项、不是默认**:聚合内不变量默认用 coded `throw`,仅当**非平凡 / 可复用 / 需清点或组合**时才升级为 `BusinessRule`(判据见 [[design-00003-exception-model]] §4.5)。两者走同一错误码通道,升降级不影响线上契约。避免"一行条件套个类"的仪式化。
+- 库**提供** `Invariant`(`isBroken()`/`message()`/**必填** `errorCode()`)+ 聚合根 `checkInvariant(rule)` → `InvariantViolationException`(采 modular-monolith-with-ddd 的 `IBusinessRule`/`CheckRule` 模式,但改名 `Invariant` 以避免与边缘输入校验 `Validator` 混淆——见 [[design-00003-exception-model]] §4.6)。
+- **但它是升级项、不是默认**:聚合内不变量默认用 coded `throw`,仅当**非平凡 / 可复用 / 需清点或组合**时才升级为 `Invariant`(判据见 [[design-00003-exception-model]] §4.5)。两者走同一错误码通道,升降级不影响线上契约。避免"一行条件套个类"的仪式化。
 
 ### 三、新增语义化应用异常子类
 
@@ -57,10 +57,11 @@ framework-free**(`-core` 零依赖是验收红线)。
 
 ## 明确不做 / 取舍
 
-1. **不在 `-core` 引入 `Result`/`Either`/Vavr**。默认 throw + 结构化错误码。理由:①保 `-core` 零依赖红线;
-   ②契合 Spring/MyBatis 事务 rollback-on-exception 语义;③与生态近邻 jMolecules / spring-modulith-with-ddd 一致。
-   **允许**团队在纯领域策略边界局部自采 Vavr `Either`(不进 `-core` 公共 API)。此为成本/一致性权衡,非"反最佳实践";
-   重估须走独立 decision。
+1. **默认 throw + 结构化错误码,不上 `Result`/`Either` 作默认口径**。理由(诚实排序,见 [[design-00003-exception-model]] §十):
+   ①**人机工程**——`throw` 无法被调用方"忘记",`Result` 作返回值可被静默丢弃,一处漏检即把业务失败吞成成功;
+   ②与生态近邻 jMolecules / spring-modulith-with-ddd 一致;③事务语义**有限**契合(预期拒绝多在状态变更前,Result 也不会漏回滚,故此条只支持"更省心"而非"Result 不安全")。
+   注意:`Result` **不等于 Vavr**——零依赖红线只否决 Vavr 依赖、不否决 Result 模式;`-core` 不引 Vavr 是本结论的**副产品**,不是前提。
+   **允许**团队在纯领域策略边界局部自采 `Either`/零依赖 `Result`(不进 `-core` 公共 API);分布式消息边界(如接入 Axon)应在边界转结构化失败。此为成本/一致性权衡,非"反最佳实践";重估须走独立 decision。
 2. **HTTP 语义不进 `-core`/`-application`**。状态码只由 `-web`/`-web-spring` 决定。
 3. **不做大而全的异常上下文**(任意 key-value map、堆栈携带等)。错误结构收敛为 `code` + message + 可选 `FieldError[]`。
 

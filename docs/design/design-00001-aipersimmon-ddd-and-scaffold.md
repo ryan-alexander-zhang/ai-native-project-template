@@ -293,7 +293,7 @@ flowchart LR
 - [[analysis-00007-saga-process-manager]] —— saga 分档(Phase 3)。
 - [[analysis-00004-bounded-context-module-structure]] —— 三种拓扑与 "ship one worked BC"。
 - [[decision-00005-package-per-aggregate]] —— domain 包结构(archetype 骨架遵循)。
-- [[design-00003-exception-model]] —— `-core`/`-application` 异常体系增量(`ErrorCode`/`BusinessRule` + 语义子类),扩展本文 §5.3/§5.5。
+- [[design-00003-exception-model]] —— `-core`/`-application` 异常体系增量(`ErrorCode`/`Invariant` + 语义子类),扩展本文 §5.3/§5.5。
 
 外部:
 - Maven Archetype —— Guide to Creating Archetypes / `archetype:create-from-project`。https://maven.apache.org/guides/mini/guide-creating-archetypes.html

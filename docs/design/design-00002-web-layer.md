@@ -146,7 +146,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
   | 异常 | HTTP | 说明 |
   | --- | --- | --- |
   | `ApiException`(带 `ProblemType`) | `ProblemType.status()` | 首选路径:type/code/title 全来自目录 |
-  | `-core` `DomainException` / `BusinessRuleViolationException` | **422**(默认;逐码可细分) | 业务规则:报文合法但语义不可处理 |
+  | `-core` `DomainException` / `InvariantViolationException` | **422**(默认;逐码可细分) | 业务规则:报文合法但语义不可处理 |
   | `-core` `IllegalStateTransitionException` | 409 | 状态机非法迁移 = 与当前状态冲突 |
   | `-application` `ApplicationException`(`EntityNotFound`→404,`ConcurrencyConflict`→409) | 422 | 用例级失败 |
   | Bean Validation(`MethodArgumentNotValidException` 等) | 400 | 填 `errors[]`(field/code/message) |
