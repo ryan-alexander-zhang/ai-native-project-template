@@ -60,7 +60,7 @@ class WebLayerTest {
     }
 
     @Test
-    void apiExceptionResolvesOverrideProblemType() throws Exception {
+    void apiExceptionResolvesOverrideDescriptor() throws Exception {
         mvc.perform(post("/test/api-exception"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
