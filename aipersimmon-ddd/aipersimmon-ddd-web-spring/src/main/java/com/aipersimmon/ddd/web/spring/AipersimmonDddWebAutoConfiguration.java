@@ -1,11 +1,18 @@
 package com.aipersimmon.ddd.web.spring;
 
 import com.aipersimmon.ddd.application.ApplicationException;
+import com.aipersimmon.ddd.web.error.ProblemType;
+import com.aipersimmon.ddd.web.error.ProblemTypeCatalog;
+import com.aipersimmon.ddd.web.error.ProblemTypeRegistry;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
 import com.aipersimmon.ddd.web.spi.RequestSignatureVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.ConstraintViolationException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -42,11 +49,39 @@ public class AipersimmonDddWebAutoConfiguration {
         return new ProblemTitleResolver(messageSource.getIfAvailable());
     }
 
+    /** Indexes every consumer-supplied {@link ProblemTypeCatalog} by error code. */
+    @Bean
+    @ConditionalOnMissingBean
+    public ProblemTypeRegistry aipersimmonDddProblemTypeRegistry(ObjectProvider<ProblemTypeCatalog> catalogs) {
+        Map<String, ProblemType> byCode = new HashMap<>();
+        catalogs.forEach(catalog -> catalog.problemTypes().forEach(type -> byCode.put(type.code(), type)));
+        return code -> Optional.ofNullable(byCode.get(code));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ProblemDetailFactory aipersimmonDddProblemDetailFactory(
+            ProblemTypeRegistry registry, ProblemTitleResolver titleResolver) {
+        return new ProblemDetailFactory(registry, titleResolver);
+    }
+
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "aipersimmon.ddd.web.problem-details", name = "enabled", matchIfMissing = true)
-    public AipersimmonDddWebExceptionHandler aipersimmonDddWebExceptionHandler(ProblemTitleResolver resolver) {
-        return new AipersimmonDddWebExceptionHandler(resolver);
+    public AipersimmonDddWebExceptionHandler aipersimmonDddWebExceptionHandler(ProblemDetailFactory factory) {
+        return new AipersimmonDddWebExceptionHandler(factory);
+    }
+
+    /** Registered only when the Bean Validation API is present. */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(ConstraintViolationException.class)
+    static class ConstraintViolationConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        public ConstraintViolationAdvice constraintViolationAdvice(ProblemDetailFactory factory) {
+            return new ConstraintViolationAdvice(factory);
+        }
     }
 
     @Bean
@@ -148,8 +183,8 @@ public class AipersimmonDddWebAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        public ApplicationExceptionAdvice applicationExceptionAdvice() {
-            return new ApplicationExceptionAdvice();
+        public ApplicationExceptionAdvice applicationExceptionAdvice(ProblemDetailFactory factory) {
+            return new ApplicationExceptionAdvice(factory);
         }
     }
 }
