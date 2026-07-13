@@ -46,7 +46,7 @@ class ExceptionContractTest {
 
     @Test
     void duplicateSkuViolatesAggregateRuleWith422AndCode() throws Exception {
-        // Two lines with the same SKU breaks the Order.checkRule(OrderHasDistinctSkus) invariant.
+        // Two lines with the same SKU breaks the Order.checkInvariant(OrderHasDistinctSkus) invariant.
         String body = """
                 {"customerId":"CUST-1",
                  "lines":[{"sku":"SKU-1","quantity":1,"unitAmountMinor":100,"currency":"USD"},

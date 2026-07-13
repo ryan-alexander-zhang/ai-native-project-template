@@ -1,8 +1,8 @@
 package com.aipersimmon.ddd.core.model;
 
 import com.aipersimmon.ddd.core.event.DomainEvent;
-import com.aipersimmon.ddd.core.rule.BusinessRule;
-import com.aipersimmon.ddd.core.rule.BusinessRuleViolationException;
+import com.aipersimmon.ddd.core.rule.Invariant;
+import com.aipersimmon.ddd.core.rule.InvariantViolationException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,14 +29,14 @@ public abstract class AbstractAggregateRoot<ID> implements AggregateRoot<ID> {
     }
 
     /**
-     * Enforce a business invariant from inside an intention-revealing method: throw a
-     * {@link BusinessRuleViolationException} if {@code rule} is broken, otherwise do
-     * nothing. Prefer this over inline {@code if (...) throw} so invariants stay named
-     * and reusable.
+     * Enforce a business invariant from inside an intention-revealing method: throw an
+     * {@link InvariantViolationException} if {@code invariant} is broken, otherwise do
+     * nothing. Prefer this over inline {@code if (...) throw} when the invariant is worth
+     * naming and reusing; trivial one-off guards stay as coded {@code throw} (§4.5).
      */
-    protected void checkRule(BusinessRule rule) {
-        if (rule.isBroken()) {
-            throw new BusinessRuleViolationException(rule);
+    protected void checkInvariant(Invariant invariant) {
+        if (invariant.isBroken()) {
+            throw new InvariantViolationException(invariant);
         }
     }
 

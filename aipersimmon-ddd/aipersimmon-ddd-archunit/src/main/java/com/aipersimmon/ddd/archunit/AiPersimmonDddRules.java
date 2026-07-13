@@ -7,8 +7,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
-import com.aipersimmon.ddd.core.rule.BusinessRule;
-import com.aipersimmon.ddd.core.rule.BusinessRuleViolationException;
+import com.aipersimmon.ddd.core.rule.Invariant;
+import com.aipersimmon.ddd.core.rule.InvariantViolationException;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -242,49 +242,49 @@ public final class AiPersimmonDddRules {
     }
 
     /**
-     * A {@link BusinessRule} — a business invariant expressed as an object — resides in
+     * An {@link Invariant} — a business invariant expressed as an object — resides in
      * the domain layer. It captures domain policy, so it belongs with the model, not in
      * the application, infrastructure, or interface layers. Part of {@link #all()};
-     * matches nothing (and so passes) in a project that defines no business rules.
+     * matches nothing (and so passes) in a project that defines no invariants.
      */
-    public static ArchRule businessRulesShouldResideInDomain() {
-        return classes().that().implement(BusinessRule.class)
+    public static ArchRule invariantsShouldResideInDomain() {
+        return classes().that().implement(Invariant.class)
                 .should().resideInAPackage("..domain..")
-                .as("BusinessRule implementations should reside in the domain layer")
-                .because("a business rule is a domain invariant, so it belongs with the model")
+                .as("Invariant implementations should reside in the domain layer")
+                .because("an invariant is a domain rule, so it belongs with the model")
                 .allowEmptyShould(true);
     }
 
     /**
-     * A {@link BusinessRuleViolationException} is raised only through
-     * {@link AbstractAggregateRoot#checkRule(BusinessRule)} — never constructed directly
+     * An {@link InvariantViolationException} is raised only through
+     * {@link AbstractAggregateRoot#checkInvariant(Invariant)} — never constructed directly
      * by application, domain, or adapter code. Routing every violation through
-     * {@code checkRule} keeps invariant enforcement uniform and the rule object the single
-     * source of the message and code. Part of {@link #all()}; matches nothing (and so
-     * passes) in a project that never constructs it directly.
+     * {@code checkInvariant} keeps invariant enforcement uniform and the invariant object
+     * the single source of the message and code. Part of {@link #all()}; matches nothing
+     * (and so passes) in a project that never constructs it directly.
      */
-    public static ArchRule businessRuleViolationsShouldOnlyComeFromCheckRule() {
+    public static ArchRule invariantViolationsShouldOnlyComeFromCheckInvariant() {
         return noClasses().that().doNotHaveFullyQualifiedName(AbstractAggregateRoot.class.getName())
-                .should().callConstructor(BusinessRuleViolationException.class, BusinessRule.class)
-                .as("BusinessRuleViolationException should be raised only via AbstractAggregateRoot.checkRule")
-                .because("routing every invariant violation through checkRule keeps enforcement uniform and "
-                        + "the rule object the single source of its message and code")
+                .should().callConstructor(InvariantViolationException.class, Invariant.class)
+                .as("InvariantViolationException should be raised only via AbstractAggregateRoot.checkInvariant")
+                .because("routing every invariant violation through checkInvariant keeps enforcement uniform and "
+                        + "the invariant object the single source of its message and code")
                 .allowEmptyShould(true);
     }
 
     /**
-     * A {@link BusinessRule} is a plain domain object, not a Spring-managed bean: it must
+     * An {@link Invariant} is a plain domain object, not a Spring-managed bean: it must
      * not carry a Spring stereotype ({@code @Component} or a meta-annotation of it such as
      * {@code @Service}/{@code @Repository}). Matched by fully-qualified name so the rule
      * needs no compile dependency on Spring. Part of {@link #all()}; matches nothing (and
-     * so passes) in a project whose rules are not Spring beans.
+     * so passes) in a project whose invariants are not Spring beans.
      */
-    public static ArchRule businessRulesShouldNotBeSpringComponents() {
-        return noClasses().that().implement(BusinessRule.class)
+    public static ArchRule invariantsShouldNotBeSpringComponents() {
+        return noClasses().that().implement(Invariant.class)
                 .should().beAnnotatedWith("org.springframework.stereotype.Component")
                 .orShould().beMetaAnnotatedWith("org.springframework.stereotype.Component")
-                .as("BusinessRule implementations should not be Spring components")
-                .because("a business rule is a plain domain object constructed where the invariant is "
+                .as("Invariant implementations should not be Spring components")
+                .because("an invariant is a plain domain object constructed where it is "
                         + "checked, not a container-managed bean")
                 .allowEmptyShould(true);
     }
@@ -312,8 +312,8 @@ public final class AiPersimmonDddRules {
                 .and(integrationEventListenersShouldResideInAdapter())
                 .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler())
                 .and(commandHandlersShouldNotDependOnOtherCommandHandlers())
-                .and(businessRulesShouldResideInDomain())
-                .and(businessRuleViolationsShouldOnlyComeFromCheckRule())
-                .and(businessRulesShouldNotBeSpringComponents());
+                .and(invariantsShouldResideInDomain())
+                .and(invariantViolationsShouldOnlyComeFromCheckInvariant())
+                .and(invariantsShouldNotBeSpringComponents());
     }
 }

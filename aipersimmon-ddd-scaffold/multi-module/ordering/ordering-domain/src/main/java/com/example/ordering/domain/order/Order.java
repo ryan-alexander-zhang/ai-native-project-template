@@ -45,7 +45,7 @@ public class Order extends AbstractAggregateRoot<OrderId> {
             }
         }
         // Trivial guards stay as coded throws; only a non-trivial, named invariant
-        // (no repeated SKU across lines) is worth expressing as a BusinessRule.
+        // (no repeated SKU across lines) is worth expressing as an Invariant.
         if (lines.isEmpty()) {
             throw new DomainException(OrderingErrorCode.ORDER_EMPTY, "an order needs at least one line");
         }
@@ -54,7 +54,7 @@ public class Order extends AbstractAggregateRoot<OrderId> {
                     OrderingErrorCode.TOO_MANY_LINES, "an order may not exceed " + MAX_LINES + " lines");
         }
         Order order = new Order(id, customerId, lines);
-        order.checkRule(new OrderHasDistinctSkus(lines));
+        order.checkInvariant(new OrderHasDistinctSkus(lines));
         order.registerEvent(new OrderPlacedEvent(id, order.total()));
         return order;
     }

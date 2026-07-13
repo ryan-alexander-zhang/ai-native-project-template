@@ -109,37 +109,37 @@ class AiPersimmonDddRulesTest {
     }
 
     @Test
-    void businessRulesShouldResideInDomain_passesForGood() {
-        assertDoesNotThrow(() -> AiPersimmonDddRules.businessRulesShouldResideInDomain().check(GOOD));
+    void invariantsShouldResideInDomain_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.invariantsShouldResideInDomain().check(GOOD));
     }
 
     @Test
-    void businessRulesShouldResideInDomain_failsForBad() {
+    void invariantsShouldResideInDomain_failsForBad() {
         assertThrows(AssertionError.class,
-                () -> AiPersimmonDddRules.businessRulesShouldResideInDomain().check(BAD));
+                () -> AiPersimmonDddRules.invariantsShouldResideInDomain().check(BAD));
     }
 
     @Test
-    void businessRuleViolationsShouldOnlyComeFromCheckRule_passesForGood() {
+    void invariantViolationsShouldOnlyComeFromCheckInvariant_passesForGood() {
         assertDoesNotThrow(
-                () -> AiPersimmonDddRules.businessRuleViolationsShouldOnlyComeFromCheckRule().check(GOOD));
+                () -> AiPersimmonDddRules.invariantViolationsShouldOnlyComeFromCheckInvariant().check(GOOD));
     }
 
     @Test
-    void businessRuleViolationsShouldOnlyComeFromCheckRule_failsForBad() {
+    void invariantViolationsShouldOnlyComeFromCheckInvariant_failsForBad() {
         assertThrows(AssertionError.class,
-                () -> AiPersimmonDddRules.businessRuleViolationsShouldOnlyComeFromCheckRule().check(BAD));
+                () -> AiPersimmonDddRules.invariantViolationsShouldOnlyComeFromCheckInvariant().check(BAD));
     }
 
     @Test
-    void businessRulesShouldNotBeSpringComponents_passesForGood() {
-        assertDoesNotThrow(() -> AiPersimmonDddRules.businessRulesShouldNotBeSpringComponents().check(GOOD));
+    void invariantsShouldNotBeSpringComponents_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.invariantsShouldNotBeSpringComponents().check(GOOD));
     }
 
     @Test
-    void businessRulesShouldNotBeSpringComponents_failsForBad() {
+    void invariantsShouldNotBeSpringComponents_failsForBad() {
         assertThrows(AssertionError.class,
-                () -> AiPersimmonDddRules.businessRulesShouldNotBeSpringComponents().check(BAD));
+                () -> AiPersimmonDddRules.invariantsShouldNotBeSpringComponents().check(BAD));
     }
 
     @Test

@@ -11,7 +11,7 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import org.junit.jupiter.api.Test;
 
-class CheckRuleTest {
+class CheckInvariantTest {
 
     /** A minimal error-code enum, the way a bounded context would define one. */
     private enum SampleCode implements ErrorCode {
@@ -23,7 +23,7 @@ class CheckRuleTest {
         }
     }
 
-    private record CreditRule(boolean broken) implements BusinessRule {
+    private record CreditRule(boolean broken) implements Invariant {
         @Override
         public boolean isBroken() {
             return broken;
@@ -52,23 +52,23 @@ class CheckRuleTest {
             return id;
         }
 
-        void enforce(BusinessRule rule) {
-            checkRule(rule);
+        void enforce(Invariant invariant) {
+            checkInvariant(invariant);
         }
     }
 
     @Test
-    void checkRule_doesNothing_whenRuleHolds() {
+    void checkInvariant_doesNothing_whenInvariantHolds() {
         SampleAggregate aggregate = new SampleAggregate("a-1");
         assertDoesNotThrow(() -> aggregate.enforce(new CreditRule(false)));
     }
 
     @Test
-    void checkRule_throws_whenRuleBroken_carryingMessageAndCode() {
+    void checkInvariant_throws_whenInvariantBroken_carryingMessageAndCode() {
         SampleAggregate aggregate = new SampleAggregate("a-1");
 
-        BusinessRuleViolationException ex =
-                assertThrows(BusinessRuleViolationException.class,
+        InvariantViolationException ex =
+                assertThrows(InvariantViolationException.class,
                         () -> aggregate.enforce(new CreditRule(true)));
 
         assertEquals("credit limit exceeded", ex.getMessage());
