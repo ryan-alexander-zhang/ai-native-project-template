@@ -204,17 +204,17 @@ com.aipersimmon.ddd.core
 
 - **写侧**:`Command<R>` / `CommandHandler<C,R>`(薄 handler)/ `CommandBus.send`;`CommandInterceptor` 环绕 SPI(`Invocation<R>.proceed()` + `order()`,越小越外层)。
 - **读侧**:`Query<R>` / `QueryHandler<Q,R>` / `QueryBus.ask`;`@ReadModel` / `@Projection` stereotype。
-- **横切抽象**:`UnitOfWork`(事务边界 port);`AggregateCollector`(收集本次命令触碰的聚合,供集中 drain 事件——补 JDBC/MyBatis 无 ChangeTracker,analysis-00005 §5 的务实点)。
+- **横切抽象**:`UnitOfWork`(事务边界 port)。领域事件不经旁路收集器:聚合自带事件,由保存它的一方在 save 处、同事务内 `DomainEvents.publishAndClear(root)` 排空(见 [[decision-00012-no-ambient-per-command-state]];**替代**原 `AggregateCollector`,补 JDBC/MyBatis 无 ChangeTracker 的同一问题)。
 - 测试:契约级(泛型可组合 + 拦截器环绕/排序 + `UnitOfWork` 默认重载),3/3。
 
 ### 5.11 `aipersimmon-ddd-cqrs-spring`(starter,可选,→ `-cqrs` + `-application` + Spring)
 
-analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction,`TransactionTemplate` 接管 UnitOfWork,每请求 AggregateCollector)。
+analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction,`TransactionTemplate` 接管 UnitOfWork)。
 
 - `RegistryCommandBus` / `RegistryQueryBus`:按 handler 泛型签名(`ResolvableType`)索引命令/查询类型;**handler 须是具体类**(lambda 会擦除泛型,无法索引)。
-- 内置拦截器:`LoggingCommandInterceptor`(order 0)、`ValidationCommandInterceptor`(order 100,`@ConditionalOnClass/Bean(Validator)`,Bean Validation 存在才装配)、`TransactionCommandInterceptor`(order 200,在事务内跑 handler 并**同事务** drain `AggregateCollector` 收集聚合的领域事件经 `DomainEvents` 发布;无 `DomainEvents` 时只提供事务边界)。
-- `ThreadLocalAggregateCollector`(线程域,非 web 也可用)、`TransactionTemplateUnitOfWork`。
-- `AipersimmonDddCqrsAutoConfiguration`:`@ConditionalOnMissingBean` 全可覆盖;`@AutoConfiguration(after = {DataSourceTransactionManager/Transaction/ValidationAutoConfiguration})` 以正确评估 `@ConditionalOnBean`。测试:端到端(happy / 失败回滚且不 drain / 校验先于事务拒绝 / 查询侧),4/4。
+- 内置拦截器:`LoggingCommandInterceptor`(order 0)、`ValidationCommandInterceptor`(order 100,`@ConditionalOnClass/Bean(Validator)`,Bean Validation 存在才装配)、`TransactionCommandInterceptor`(order 200,只提供事务边界;领域事件由聚合在 save 处 `DomainEvents.publishAndClear` 同事务排空,拦截器不再集中 drain,见 [[decision-00012-no-ambient-per-command-state]])。
+- `TransactionTemplateUnitOfWork`(领域事件排空不再依赖任何线程域收集器)。
+- `AipersimmonDddCqrsAutoConfiguration`:`@ConditionalOnMissingBean` 全可覆盖;`@AutoConfiguration(after = {DataSourceTransactionManager/Transaction/ValidationAutoConfiguration})` 以正确评估 `@ConditionalOnBean`。测试:端到端(happy / 失败回滚且不投递事件 / 校验先于事务拒绝 / 查询侧),4/4。
 
 ### 5.12 `aipersimmon-ddd-saga`(纯,可选,→ `-core`)
 

@@ -1,7 +1,5 @@
 package com.aipersimmon.ddd.cqrs.spring;
 
-import com.aipersimmon.ddd.application.DomainEvents;
-import com.aipersimmon.ddd.cqrs.AggregateCollector;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
@@ -40,12 +38,6 @@ public class AipersimmonDddCqrsAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public AggregateCollector aggregateCollector() {
-        return new ThreadLocalAggregateCollector();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
     @ConditionalOnBean(PlatformTransactionManager.class)
     public UnitOfWork unitOfWork(PlatformTransactionManager transactionManager) {
         return new TransactionTemplateUnitOfWork(new TransactionTemplate(transactionManager));
@@ -66,11 +58,8 @@ public class AipersimmonDddCqrsAutoConfiguration {
     @Bean
     @ConditionalOnBean(UnitOfWork.class)
     @ConditionalOnMissingBean
-    public TransactionCommandInterceptor transactionCommandInterceptor(
-            UnitOfWork unitOfWork,
-            AggregateCollector collector,
-            ObjectProvider<DomainEvents> domainEvents) {
-        return new TransactionCommandInterceptor(unitOfWork, collector, domainEvents.getIfAvailable());
+    public TransactionCommandInterceptor transactionCommandInterceptor(UnitOfWork unitOfWork) {
+        return new TransactionCommandInterceptor(unitOfWork);
     }
 
     @Bean

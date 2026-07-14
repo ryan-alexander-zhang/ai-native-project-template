@@ -6,10 +6,9 @@
  * {@link com.aipersimmon.ddd.cqrs.CommandHandler}, with an ordered chain of
  * {@link com.aipersimmon.ddd.cqrs.CommandInterceptor}s (typically
  * logging → validation → transaction) applied around it. The transaction step
- * runs the handler inside a {@link com.aipersimmon.ddd.cqrs.UnitOfWork} and drains
- * the domain events of the aggregates gathered by the
- * {@link com.aipersimmon.ddd.cqrs.AggregateCollector}, so state changes and events
- * commit together.
+ * runs the handler inside a {@link com.aipersimmon.ddd.cqrs.UnitOfWork}; the domain
+ * events an aggregate records are drained where it is saved, within that same
+ * transaction, so state changes and events commit together.
  *
  * <p>Read side: a {@link com.aipersimmon.ddd.cqrs.Query} is answered by a
  * {@link com.aipersimmon.ddd.cqrs.QueryHandler} (optionally routed through the

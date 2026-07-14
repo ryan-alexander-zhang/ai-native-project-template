@@ -53,7 +53,7 @@ load order → order.confirm()/cancel() → save → domainEvents.publishAll →
 
 | 复用的东西 | 抽成 | 分层 | 包归属 |
 | --- | --- | --- | --- |
-| 横切关注点(日志 / 事务 / 校验 / 事件抽取发布) | 不属于 handler | —— | 已由 `CommandBus` + `CommandInterceptor` / `AggregateCollector` 提供,handler 里**不重复写** |
+| 横切关注点(日志 / 事务 / 校验 / 事件抽取发布) | 不属于 handler | —— | 日志/事务/校验由 `CommandBus` + `CommandInterceptor` 提供;领域事件在 save 处 `DomainEvents.publishAndClear` 同事务排空(见 [[decision-00012-no-ambient-per-command-state]],**替代**原 `AggregateCollector`),handler 里**不重复写** |
 | 一段可复用的**应用编排片段**(碰 Port / 仓储 / 事件发布) | 非-handler 的 application collaborator(不实现 `CommandHandler`、无 `Command`、不上总线) | application | 跟用它的用例同包:`application/<usecase>/`,与 handler 并排 |
 | **单聚合**的领域规则 | 聚合根方法,或该聚合的 Policy / Specification | domain | 该聚合包 `domain/<aggregate>/` |
 | **跨聚合**的领域规则(纯计算、无主) | Domain Service | domain | 见规则三——**不进 `shared/`** |
@@ -98,7 +98,7 @@ com/example/ordering/domain/
 ### 规则二:复用按类型分流
 
 - **横切归总线**:`modular-monolith-with-ddd` 的 Logging → Validation → UnitOfWork decorator 链;本项目落为
-  `CommandBus` + `CommandInterceptor` + `AggregateCollector`(事件抽取)。
+  `CommandBus` + `CommandInterceptor`(事务边界),领域事件在 save 处 `DomainEvents.publishAndClear` 同事务排空(见 [[decision-00012-no-ambient-per-command-state]])。
 - **应用编排片段是薄应用服务**:`ddd-by-examples-factory` — *"Keep application services thin (load → one domain method → save); push rules into aggregates + injected policy objects."*;
   *"Application Service (primary port) — `DemandService` is thin: load aggregate → call one domain method → save."*
 - **一致性 / 长流程走事件与 saga**:`domain-driven-hexagon` — *"cross-aggregate consistency via **Domain Events** within a transaction, not direct references."*;

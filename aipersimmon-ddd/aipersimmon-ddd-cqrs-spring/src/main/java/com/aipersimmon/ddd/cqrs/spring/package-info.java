@@ -10,10 +10,11 @@
  * Validation provider is present), and
  * {@link com.aipersimmon.ddd.cqrs.spring.TransactionCommandInterceptor} (innermost),
  * which runs the handler in a
- * {@link com.aipersimmon.ddd.cqrs.spring.TransactionTemplateUnitOfWork} and drains
- * the events of the aggregates gathered by the
- * {@link com.aipersimmon.ddd.cqrs.spring.ThreadLocalAggregateCollector} within that
- * transaction. {@link com.aipersimmon.ddd.cqrs.spring.AipersimmonDddCqrsAutoConfiguration}
+ * {@link com.aipersimmon.ddd.cqrs.spring.TransactionTemplateUnitOfWork}. An
+ * aggregate's recorded events are drained where it is saved (via
+ * {@link com.aipersimmon.ddd.application.DomainEvents#publishAndClear}) within that
+ * transaction, so no thread-scoped collector is involved.
+ * {@link com.aipersimmon.ddd.cqrs.spring.AipersimmonDddCqrsAutoConfiguration}
  * wires it all, each bean overridable by the application.
  */
 package com.aipersimmon.ddd.cqrs.spring;

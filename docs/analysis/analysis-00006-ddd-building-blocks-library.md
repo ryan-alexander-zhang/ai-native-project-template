@@ -70,7 +70,7 @@ parent:
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-core` | domain 词汇 | **零依赖** | 注解 `@AggregateRoot`/`@Entity`/`@ValueObject`/`@Repository`/`@Identity`/`@DomainEvent`/`@Service`；分层 stereotype `@DomainLayer`/`@ApplicationLayer`/`@InfrastructureLayer`/`@InterfaceLayer`(+ hexagonal 可选)；marker 接口 `AggregateRoot<ID>`/`Entity<ID>`/`Identifier`/`Association<T,ID>`/`DomainEvent`；基类 `AbstractAggregateRoot`(事件登记/清空)；`DomainException` 基类；**可选** `Transitions<S>` 状态迁移守卫(见§十) |
 | `aipersimmon-ddd-application` | application | `-core` | `DomainEvents` 发布 port(见 [[analysis-00001-domain-event-publishing]])；`UseCase` 标记；`ApplicationException` 基类 |
-| `aipersimmon-ddd-cqrs` | application(可选) | `-core` | CQRS 契约(见§五)：`Command`/`Query` 标记、`CommandHandler<C>`/`QueryHandler<Q,R>`、`CommandBus`/`QueryBus` port、装饰器 SPI、`ReadModel` 标记、`Projection` 写 port、`UnitOfWork`/`AggregateCollector` 抽象。**framework-free** |
+| `aipersimmon-ddd-cqrs` | application(可选) | `-core` | CQRS 契约(见§五)：`Command`/`Query` 标记、`CommandHandler<C>`/`QueryHandler<Q,R>`、`CommandBus`/`QueryBus` port、装饰器 SPI、`ReadModel` 标记、`Projection` 写 port、`UnitOfWork` 抽象。**framework-free**（领域事件在 save 处排空,不再有 `AggregateCollector`,见 [[decision-00012-no-ambient-per-command-state]]） |
 | `aipersimmon-ddd-integration` | api(跨 BC 契约) | `-core`(极薄) | `IntegrationEvent` 基类、`EventEnvelope`(id/type/version/occurredAt/traceId)、版本化约定。拓扑无关的**契约层**(见 [[analysis-00002-domain-vs-integration-events]]) |
 
 ### 可插拔实现层(有主见的 adapter starter,可选)
@@ -78,7 +78,7 @@ parent:
 | 模块 | 层 | 依赖 | 内容 |
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-events-spring` | infrastructure | Spring | `ApplicationEventPublisher`→`DomainEvents` port 桥接;`@TransactionalEventListener` 装配;日志/装饰器 |
-| `aipersimmon-ddd-cqrs-spring` | infrastructure(可选) | `-cqrs` + Spring | Spring 实现的 `CommandBus` + 装饰器链(Logging→Validation→Transaction,用 `TransactionTemplate` 接管 UnitOfWork);每请求 `AggregateCollector`(补 MyBatis 无 ChangeTracker,见§五) |
+| `aipersimmon-ddd-cqrs-spring` | infrastructure(可选) | `-cqrs` + Spring | Spring 实现的 `CommandBus` + 装饰器链(Logging→Validation→Transaction,用 `TransactionTemplate` 接管 UnitOfWork);领域事件在 save 处同事务排空,无线程域收集器(见§五、[[decision-00012-no-ambient-per-command-state]]) |
 | `aipersimmon-ddd-outbox` | infrastructure(存储无关 core) | `spring-context` + Jackson | 投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、默认 dispatcher(logging / in-process)+ dispatch autoconfig;无持久化 |
 | `aipersimmon-ddd-outbox-jdbc` / `aipersimmon-ddd-outbox-mybatis-plus`(`-outbox-jpa` 待做) | infrastructure | `-outbox` + JDBC / MyBatis-Plus | outbox 表 writer + relay/poller;两者同表结构可互换,消费者选一个 |
 | `aipersimmon-ddd-inbox-jdbc` / `aipersimmon-ddd-inbox-mybatis-plus`(`-inbox-jpa` 待做) | infrastructure | JDBC / MyBatis-Plus | 幂等/inbox,消费方去重;`Inbox` 契约在 `-application` |
@@ -133,11 +133,11 @@ CQRS 是这个模板的重头戏(详见 [[analysis-00005-structure-2-event-flow-
 
 - **契约(纯)**：`Command` 标记(一等、任务型命令对象,如 `PlaceOrderCommand`)、
   `CommandHandler<C>`(薄 handler,只编排聚合)、`CommandBus` port、装饰器 SPI、
-  `UnitOfWork` / `AggregateCollector` 抽象。
+  `UnitOfWork` 抽象。
 - **实现(starter)**：Spring 版 `CommandBus` + **装饰器链 Logging→Validation→Transaction**;
   Transaction 装饰器用 `TransactionTemplate` 接管 UnitOfWork,使 handler 保持纯净、横切统一治理。
-- **一个务实点(analysis-00005 §5)**：MyBatis 无 EF 式 ChangeTracker,事件集中 drain 需补一个
-  **每请求 `AggregateCollector`**——归 `-cqrs-spring`,不污染纯契约。
+- **一个务实点(analysis-00005 §5)**：MyBatis 无 EF 式 ChangeTracker——聚合自带事件,由**保存它的一方**在
+  save 处 `DomainEvents.publishAndClear` 同事务排空,无需旁路收集器(见 [[decision-00012-no-ambient-per-command-state]];**替代**原"每请求 `AggregateCollector`",既解决同一问题又不引入线程域状态)。
 
 ### 查询侧(读)—— 真正绕过写模型
 
@@ -147,7 +147,7 @@ CQRS 是这个模板的重头戏(详见 [[analysis-00005-structure-2-event-flow-
   (repo 现状:`OrderProjection.placed/statusChanged`)——与事件链路(§一/[[analysis-00001-domain-event-publishing]])对齐。
 - `QueryBus`/`QueryHandler<Q,R>` 可选;读侧简单时直接注入 port 即可,不必上总线。
 
-> 归属小结:命令/查询**契约**在 `-cqrs`(纯、可选);命令**总线+装饰器+AggregateCollector**
+> 归属小结:命令/查询**契约**在 `-cqrs`(纯、可选);命令**总线+装饰器**
 > 在 `-cqrs-spring`(脏、可选);读模型**实现**(直查 DB 的视图)在各 BC 的 infrastructure。
 
 ## 六、`aipersimmon-ddd-archunit`:规则一套,强制点随拓扑不同

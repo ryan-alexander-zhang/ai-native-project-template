@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
-import com.aipersimmon.ddd.cqrs.AggregateCollector;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
@@ -26,14 +25,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Drives the full command pipeline end to end: the bus routes a command to its
- * handler through the logging → validation → transaction chain, and the
- * transaction interceptor drains the touched aggregate's domain events in the same
- * transaction. Asserts the happy path, rollback on handler failure (no row, no
- * event drained), validation rejecting a command before any transaction, and the
- * query bus.
+ * handler through the logging → validation → transaction chain; the handler drains
+ * its aggregate's domain events where it saves it, inside the transaction opened by
+ * the transaction interceptor. Asserts the happy path, rollback on handler failure
+ * (no row, no event delivered), validation rejecting a command before any
+ * transaction, and the query bus.
  */
 @SpringBootTest
 class CqrsPipelineTest {
@@ -127,8 +128,8 @@ class CqrsPipelineTest {
         }
 
         @Bean
-        PlaceThingHandler placeThingHandler(JdbcTemplate jdbc, AggregateCollector collector) {
-            return new PlaceThingHandler(jdbc, collector);
+        PlaceThingHandler placeThingHandler(JdbcTemplate jdbc, DomainEvents domainEvents) {
+            return new PlaceThingHandler(jdbc, domainEvents);
         }
 
         @Bean
@@ -141,18 +142,18 @@ class CqrsPipelineTest {
     // signature, so the bus can index them by it (a lambda would erase it).
     static final class PlaceThingHandler implements CommandHandler<PlaceThing, String> {
         private final JdbcTemplate jdbc;
-        private final AggregateCollector collector;
+        private final DomainEvents domainEvents;
 
-        PlaceThingHandler(JdbcTemplate jdbc, AggregateCollector collector) {
+        PlaceThingHandler(JdbcTemplate jdbc, DomainEvents domainEvents) {
             this.jdbc = jdbc;
-            this.collector = collector;
+            this.domainEvents = domainEvents;
         }
 
         @Override
         public String handle(PlaceThing command) {
             String id = "thing-" + command.name();
             jdbc.update("INSERT INTO thing(id) VALUES (?)", id);
-            collector.register(new Thing(id));
+            domainEvents.publishAndClear(new Thing(id));
             if ("boom".equals(command.name())) {
                 throw new IllegalStateException("boom");
             }
@@ -173,12 +174,28 @@ class CqrsPipelineTest {
         }
     }
 
+    /**
+     * A transaction-aware publisher: it records an event only after the surrounding
+     * transaction commits, so an event drained during a command that later rolls
+     * back is never delivered (matching how an outbox or an
+     * {@code @TransactionalEventListener} behaves). Outside a transaction it records
+     * immediately.
+     */
     static final class CapturingDomainEvents implements DomainEvents {
         final List<DomainEvent> events = new CopyOnWriteArrayList<>();
 
         @Override
         public void publish(DomainEvent event) {
-            events.add(event);
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        events.add(event);
+                    }
+                });
+            } else {
+                events.add(event);
+            }
         }
     }
 }
