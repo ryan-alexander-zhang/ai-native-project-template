@@ -160,9 +160,11 @@ CQRS 是这个模板的重头戏(详见 [[analysis-00005-structure-2-event-flow-
 | structure-2 multi-module | Maven 模块(编译期) | `aipersimmon-ddd-archunit` 管**模块内**层规则 |
 | structure-3 microservice | 网络 | 每服务复用同一份"服务内"层规则 |
 
-规则集示例:domain 不得依赖 application/infrastructure/adapter/任何 framework;
-跨聚合只能经 `Association`/`Identifier` 引用聚合根,不得直接对象引用;
-`IntegrationEvent` 只能出现在 `*-api`/`-integration`;`DomainEvent` 不得泄漏到 adapter。
+规则集示例(权威清单见 `AiPersimmonDddRules` 类级 Javadoc):domain 不得依赖
+application/infrastructure/adapter/任何 framework(已落地,在 `all()`);
+`IntegrationEvent` 只能出现在 `*-api`(已落地,opt-in `integrationEventsShouldResideInApi`);
+`DomainEvent` 不得泄漏到 adapter(已落地,在 `all()`)。跨聚合只能经
+`Association`/`Identifier` 引用聚合根、不得直接对象引用,是设计约定,暂未由 ArchUnit 强制。
 
 ## 七、构件库拓扑无关,唯一例外是消息传输
 
