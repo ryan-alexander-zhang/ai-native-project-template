@@ -50,8 +50,9 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
     @Bean
     @ConditionalOnBean(SqlSessionFactory.class)
     @ConditionalOnMissingBean(IntegrationEvents.class)
-    public IntegrationEvents outboxWriter(OutboxMapper outboxMapper, Clock outboxClock) {
-        return new OutboxWriter(outboxMapper, new ObjectMapper(), outboxClock);
+    public IntegrationEvents outboxWriter(OutboxMapper outboxMapper, Clock outboxClock,
+            @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}") String source) {
+        return new OutboxWriter(outboxMapper, new ObjectMapper(), outboxClock, source);
     }
 
     @Bean

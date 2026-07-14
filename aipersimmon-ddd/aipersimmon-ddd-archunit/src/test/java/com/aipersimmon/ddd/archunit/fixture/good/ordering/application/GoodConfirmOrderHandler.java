@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.archunit.fixture.good.ordering.application;
 
 import com.aipersimmon.ddd.archunit.fixture.good.ordering.domain.GoodOrder;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 
 /**
@@ -18,7 +19,7 @@ public class GoodConfirmOrderHandler implements CommandHandler<GoodConfirmOrder,
     }
 
     @Override
-    public Void handle(GoodConfirmOrder command) {
+    public Void handle(GoodConfirmOrder command, CommandContext context) {
         GoodOrder order = new GoodOrder(command.orderId());
         orderService.idOf(order);
         return null;

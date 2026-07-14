@@ -38,8 +38,9 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
     @Bean
     @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean(IntegrationEvents.class)
-    public IntegrationEvents outboxWriter(JdbcTemplate jdbcTemplate, Clock outboxClock) {
-        return new OutboxWriter(jdbcTemplate, new ObjectMapper(), outboxClock);
+    public IntegrationEvents outboxWriter(JdbcTemplate jdbcTemplate, Clock outboxClock,
+            @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}") String source) {
+        return new OutboxWriter(jdbcTemplate, new ObjectMapper(), outboxClock, source);
     }
 
     @Bean

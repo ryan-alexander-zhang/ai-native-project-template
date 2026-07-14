@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.cqrs.spring;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import com.aipersimmon.ddd.cqrs.UnitOfWork;
 
@@ -28,7 +29,7 @@ public class TransactionCommandInterceptor implements CommandInterceptor {
     }
 
     @Override
-    public <R> R intercept(Command<R> command, Invocation<R> invocation) {
+    public <R> R intercept(Command<R> command, CommandContext context, Invocation<R> invocation) {
         return unitOfWork.execute(invocation::proceed);
     }
 

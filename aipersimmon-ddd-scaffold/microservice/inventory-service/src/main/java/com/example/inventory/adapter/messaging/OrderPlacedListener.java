@@ -1,6 +1,8 @@
 package com.example.inventory.adapter.messaging;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.example.inventory.application.stock.ReserveStock;
 import com.example.contracts.OrderPlaced;
 import org.springframework.context.event.EventListener;
@@ -8,8 +10,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Reacts to ordering's {@link OrderPlaced} integration event by sending a
- * {@link ReserveStock} command through the command bus. It reads only the published
- * contract of the ordering context, keeping the two contexts decoupled.
+ * {@link ReserveStock} command through the command bus. As the anti-corruption
+ * layer it receives the full {@link EventEnvelope}, reads only the published
+ * contract of the ordering context (keeping the two contexts decoupled), and maps
+ * the envelope's metadata to a {@link CommandContext} so the reservation — and the
+ * events it emits — stay correlated to the order that caused them.
  */
 @Component
 public class OrderPlacedListener {
@@ -21,10 +26,11 @@ public class OrderPlacedListener {
     }
 
     @EventListener
-    public void on(OrderPlaced event) {
+    public void on(EventEnvelope<OrderPlaced> envelope) {
+        OrderPlaced event = envelope.payload();
         var lines = event.lines().stream()
                 .map(line -> new ReserveStock.Line(line.sku(), line.quantity()))
                 .toList();
-        commandBus.send(new ReserveStock(event.orderId(), lines));
+        commandBus.send(new ReserveStock(event.orderId(), lines), CommandContext.of(envelope));
     }
 }

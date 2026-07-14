@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
 
@@ -22,7 +23,7 @@ class ConcurrencyTranslationCommandInterceptorTest {
         OptimisticLockingFailureException cause = new OptimisticLockingFailureException("stale");
 
         ConcurrencyConflictException ex = assertThrows(ConcurrencyConflictException.class,
-                () -> interceptor.intercept(new Ping(), () -> {
+                () -> interceptor.intercept(new Ping(), CommandContext.root("m1", null), () -> {
                     throw cause;
                 }));
 
@@ -31,7 +32,8 @@ class ConcurrencyTranslationCommandInterceptorTest {
 
     @Test
     void passesThroughWhenNoConflict() {
-        assertEquals("ok", interceptor.intercept(new StringCommand(), () -> "ok"));
+        assertEquals("ok",
+                interceptor.intercept(new StringCommand(), CommandContext.root("m2", null), () -> "ok"));
     }
 
     private record StringCommand() implements Command<String> {

@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.cqrs.spring;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -26,7 +27,7 @@ public class ValidationCommandInterceptor implements CommandInterceptor {
     }
 
     @Override
-    public <R> R intercept(Command<R> command, Invocation<R> invocation) {
+    public <R> R intercept(Command<R> command, CommandContext context, Invocation<R> invocation) {
         Set<ConstraintViolation<Command<R>>> violations = validator.validate(command);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);

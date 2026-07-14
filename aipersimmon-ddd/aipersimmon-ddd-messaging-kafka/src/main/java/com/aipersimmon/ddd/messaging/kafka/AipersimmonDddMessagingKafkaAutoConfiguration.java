@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
 import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
 import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +45,9 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
     @ConditionalOnMissingBean
     public KafkaIntegrationEventListener kafkaIntegrationEventListener(
-            ApplicationEventPublisher publisher, ObjectProvider<Inbox> inbox) {
-        return new KafkaIntegrationEventListener(publisher, new ObjectMapper(), inbox.getIfAvailable());
+            ApplicationEventPublisher publisher, ObjectProvider<Inbox> inbox,
+            IntegrationEventTypeResolver typeResolver) {
+        return new KafkaIntegrationEventListener(
+                publisher, new ObjectMapper(), inbox.getIfAvailable(), typeResolver);
     }
 }

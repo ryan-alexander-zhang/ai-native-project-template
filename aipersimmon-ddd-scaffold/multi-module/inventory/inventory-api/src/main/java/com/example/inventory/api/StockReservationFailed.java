@@ -14,4 +14,9 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * how a bounded context with no HTTP surface still surfaces a stable error identity.
  */
 public record StockReservationFailed(String orderId, String code, String reason) implements IntegrationEvent {
+
+    @Override
+    public String subject() {
+        return orderId();
+    }
 }

@@ -15,7 +15,8 @@ public class LoggingOutboxDispatcher implements OutboxDispatcher {
 
     @Override
     public void dispatch(OutboxMessage message) {
-        log.info("outbox dispatch (logging only): type={} eventId={} payload={}",
-                message.type(), message.eventId(), message.payload());
+        log.info("outbox dispatch (logging only): type={} eventId={} correlationId={} causationId={} payload={}",
+                message.type(), message.eventId(), message.correlationId(), message.causationId(),
+                message.payload());
     }
 }

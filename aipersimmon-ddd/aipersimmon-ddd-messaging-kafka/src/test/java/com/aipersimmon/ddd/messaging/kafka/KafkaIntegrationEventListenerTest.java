@@ -4,33 +4,41 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
+import com.aipersimmon.ddd.integration.RegistryIntegrationEventTypeResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.PayloadApplicationEvent;
 
 /**
- * Verifies the consumer bridge reconstructs an event from the type header and JSON
- * payload and republishes it in process, that the inbox deduplicates a redelivery,
- * and that without an inbox every record is republished.
+ * Verifies the consumer bridge reconstructs the {@link EventEnvelope} from the
+ * headers and JSON payload and republishes it in process, that the inbox
+ * deduplicates a redelivery, and that without an inbox every record is republished.
  */
 class KafkaIntegrationEventListenerTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
+    private final IntegrationEventTypeResolver typeResolver =
+            new RegistryIntegrationEventTypeResolver(Map.of("SampleEvent", SampleEvent.class));
 
     @Test
     void reconstructsAndRepublishesThenDeduplicatesRedelivery() throws Exception {
         CapturingPublisher publisher = new CapturingPublisher();
         InMemoryInbox inbox = new InMemoryInbox();
         KafkaIntegrationEventListener listener =
-                new KafkaIntegrationEventListener(publisher, mapper, inbox);
+                new KafkaIntegrationEventListener(publisher, mapper, inbox, typeResolver);
 
         ConsumerRecord<String, String> record = recordFor(new SampleEvent("o-1", "placed"), "evt-1");
 
@@ -38,15 +46,20 @@ class KafkaIntegrationEventListenerTest {
         listener.onMessage(record); // redelivery of the same event id
 
         assertEquals(1, publisher.events.size(), "redelivery must be deduplicated by the inbox");
-        SampleEvent republished = assertInstanceOf(SampleEvent.class, publisher.events.get(0));
+        EventEnvelope<?> envelope = envelopeOf(publisher.events.get(0));
+        SampleEvent republished = assertInstanceOf(SampleEvent.class, envelope.payload());
         assertEquals(new SampleEvent("o-1", "placed"), republished);
+        assertEquals("evt-1", envelope.eventId());
+        assertEquals("/ordering", envelope.source());
+        assertEquals("evt-1", envelope.correlationId(),
+                "correlationId falls back to the event id when the header is absent");
     }
 
     @Test
     void withoutAnInboxEveryRecordIsRepublished() throws Exception {
         CapturingPublisher publisher = new CapturingPublisher();
         KafkaIntegrationEventListener listener =
-                new KafkaIntegrationEventListener(publisher, mapper, null);
+                new KafkaIntegrationEventListener(publisher, mapper, null, typeResolver);
 
         ConsumerRecord<String, String> record = recordFor(new SampleEvent("o-1", "placed"), "evt-1");
 
@@ -58,17 +71,23 @@ class KafkaIntegrationEventListenerTest {
 
     private ConsumerRecord<String, String> recordFor(SampleEvent event, String eventId) throws Exception {
         ConsumerRecord<String, String> record =
-                new ConsumerRecord<>("orders", 0, 0L, eventId, mapper.writeValueAsString(event));
-        record.headers().add(IntegrationEventHeaders.TYPE,
-                SampleEvent.class.getName().getBytes(StandardCharsets.UTF_8));
-        record.headers().add(IntegrationEventHeaders.EVENT_ID, eventId.getBytes(StandardCharsets.UTF_8));
+                new ConsumerRecord<>("orders", 0, 0L, event.orderId, mapper.writeValueAsString(event));
+        // CloudEvents binary binding: logical type in ce_type (not the Java class name).
+        record.headers().add(IntegrationEventHeaders.TYPE, "SampleEvent".getBytes(StandardCharsets.UTF_8));
+        record.headers().add(IntegrationEventHeaders.ID, eventId.getBytes(StandardCharsets.UTF_8));
+        record.headers().add(IntegrationEventHeaders.SOURCE, "/ordering".getBytes(StandardCharsets.UTF_8));
         return record;
+    }
+
+    private static EventEnvelope<?> envelopeOf(Object published) {
+        PayloadApplicationEvent<?> event = assertInstanceOf(PayloadApplicationEvent.class, published);
+        return assertInstanceOf(EventEnvelope.class, event.getPayload());
     }
 
     // --- fixtures ----------------------------------------------------------
 
     /** A JavaBean event so Jackson maps it by field without needing -parameters. */
-    public static class SampleEvent {
+    public static class SampleEvent implements IntegrationEvent {
         public String orderId;
         public String status;
 

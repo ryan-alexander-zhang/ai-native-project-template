@@ -8,4 +8,9 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * ordering service's saga can compensate by cancelling the order.
  */
 public record StockReservationFailed(String orderId, String reason) implements IntegrationEvent {
+
+    @Override
+    public String subject() {
+        return orderId();
+    }
 }

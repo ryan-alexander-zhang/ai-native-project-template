@@ -12,6 +12,11 @@ import java.util.List;
  */
 public record OrderPlaced(String orderId, List<Line> lines) implements IntegrationEvent {
 
+    @Override
+    public String subject() {
+        return orderId();
+    }
+
     public record Line(String sku, int quantity) {
     }
 }

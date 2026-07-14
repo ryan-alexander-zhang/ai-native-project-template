@@ -1,6 +1,7 @@
 package com.example.ordering.application.fulfilment;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.saga.ProcessManager;
 import com.aipersimmon.ddd.saga.SagaStore;
 import com.example.ordering.application.order.CancelOrder;
@@ -19,9 +20,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>How the triggering events physically arrive (a Spring {@code @EventListener},
  * a Kafka consumer, …) is a delivery concern kept out of this layer: an inbound
- * messaging adapter subscribes to them, unwraps each to its correlation id (the
- * order id), and calls the matching method here. So this coordinator never sees a
- * cross-context contract type and stays testable without any message transport.
+ * messaging adapter subscribes to them, unwraps each to its business correlation id
+ * (the order id) plus the triggering message's {@link CommandContext}, and calls the
+ * matching method here — the context is passed on to the command bus so the next
+ * command stays correlated to the event that triggered it. So this coordinator never
+ * sees a cross-context contract type and stays testable without any message transport.
  */
 @Component
 @ProcessManager
@@ -41,20 +44,20 @@ public class OrderFulfilmentProcessManager {
     }
 
     /** Inventory reserved the stock: complete the flow and confirm the order. */
-    public void onStockReserved(String orderId) {
+    public void onStockReserved(String orderId, CommandContext cause) {
         sagas.find(orderId).filter(OrderFulfilmentSaga::isActive).ifPresent(saga -> {
             saga.reservationConfirmed();
             sagas.save(saga);
-            commandBus.send(new ConfirmOrder(orderId));
+            commandBus.send(new ConfirmOrder(orderId), cause);
         });
     }
 
     /** Inventory could not reserve the stock: compensate by cancelling the order. */
-    public void onStockReservationFailed(String orderId) {
+    public void onStockReservationFailed(String orderId, CommandContext cause) {
         sagas.find(orderId).filter(OrderFulfilmentSaga::isActive).ifPresent(saga -> {
             saga.reservationFailed();
             sagas.save(saga);
-            commandBus.send(new CancelOrder(orderId));
+            commandBus.send(new CancelOrder(orderId), cause);
         });
     }
 }

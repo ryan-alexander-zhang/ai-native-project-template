@@ -3,6 +3,7 @@ package com.example.ordering.application.order;
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.application.UseCase;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.contracts.OrderPlaced;
 import com.example.ordering.domain.customer.CreditExceededException;
@@ -43,7 +44,7 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     }
 
     @Override
-    public String handle(PlaceOrder command) {
+    public String handle(PlaceOrder command, CommandContext context) {
         CustomerId customerId = new CustomerId(command.customerId());
         Customer customer = customers.findById(customerId)
                 .orElseThrow(() -> new IllegalArgumentException("unknown customer: " + command.customerId()));
@@ -62,10 +63,9 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
         }
 
         orders.save(order);
-        domainEvents.publishAll(order.domainEvents());
-        order.clearDomainEvents();
+        domainEvents.publishAndClear(order);
 
-        integrationEvents.publish(toIntegrationEvent(orderId, command));
+        integrationEvents.publish(toIntegrationEvent(orderId, command), context);
         return orderId.value();
     }
 

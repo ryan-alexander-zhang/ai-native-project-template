@@ -58,10 +58,14 @@ public class OutboxRelay {
     private static OutboxMessage toMessage(OutboxRecord record) {
         return new OutboxMessage(
                 record.getEventId(),
+                record.getSource(),
                 record.getType(),
                 record.getVersion(),
                 record.getPayload(),
                 record.getOccurredAt(),
+                record.getSubject(),
+                record.getCorrelationId(),
+                record.getCausationId(),
                 record.getTraceId());
     }
 }

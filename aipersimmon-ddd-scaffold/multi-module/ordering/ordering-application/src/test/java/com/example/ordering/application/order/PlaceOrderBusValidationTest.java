@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.spring.RegistryCommandBus;
 import com.aipersimmon.ddd.cqrs.spring.ValidationCommandInterceptor;
@@ -55,7 +56,7 @@ class PlaceOrderBusValidationTest {
         private boolean invoked;
 
         @Override
-        public String handle(PlaceOrder command) {
+        public String handle(PlaceOrder command, CommandContext context) {
             invoked = true;
             return "ord-1";
         }

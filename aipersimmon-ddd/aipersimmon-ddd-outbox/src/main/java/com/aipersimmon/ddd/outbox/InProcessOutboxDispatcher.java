@@ -1,14 +1,21 @@
 package com.aipersimmon.ddd.outbox;
 
+import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.PayloadApplicationEvent;
+import org.springframework.core.ResolvableType;
 
 /**
  * Dispatches outbox messages back into the same process: it reconstructs the
- * integration event from the stored type and payload and republishes it through
- * Spring's {@link ApplicationEventPublisher}, so in-process consumers with
- * {@code @EventListener} handlers receive it.
+ * integration event and its {@link EventEnvelope} (payload plus metadata) from the
+ * stored row and republishes the envelope through Spring's
+ * {@link ApplicationEventPublisher}, so in-process consumers with
+ * {@code @EventListener} handlers for {@code EventEnvelope<TheEvent>} receive it with
+ * the full metadata (event id, correlation, causation, trace) intact.
  *
  * <p>This turns the outbox into an in-process asynchronous transport: the producer
  * commits fast (only the outbox row, in its transaction), and the scheduled relay
@@ -19,22 +26,41 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
 
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
+    private final IntegrationEventTypeResolver typeResolver;
 
-    public InProcessOutboxDispatcher(ApplicationEventPublisher publisher, ObjectMapper objectMapper) {
+    public InProcessOutboxDispatcher(ApplicationEventPublisher publisher, ObjectMapper objectMapper,
+                                     IntegrationEventTypeResolver typeResolver) {
         this.publisher = publisher;
         this.objectMapper = objectMapper;
+        this.typeResolver = typeResolver;
     }
 
     @Override
     public void dispatch(OutboxMessage message) {
-        publisher.publishEvent(reconstruct(message));
+        EventEnvelope<IntegrationEvent> envelope = reconstruct(message);
+        // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
+        // match despite erasure.
+        ResolvableType type = ResolvableType.forClassWithGenerics(
+                EventEnvelope.class, envelope.payload().getClass());
+        publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
     }
 
-    private Object reconstruct(OutboxMessage message) {
+    private EventEnvelope<IntegrationEvent> reconstruct(OutboxMessage message) {
         try {
-            Class<?> type = Class.forName(message.type());
-            return objectMapper.readValue(message.payload(), type);
-        } catch (ClassNotFoundException | JsonProcessingException e) {
+            Class<? extends IntegrationEvent> type = typeResolver.resolve(message.type());
+            IntegrationEvent payload = objectMapper.readValue(message.payload(), type);
+            return new EventEnvelope<>(
+                    message.eventId(),
+                    message.source(),
+                    message.type(),
+                    message.version(),
+                    message.occurredAt(),
+                    message.subject(),
+                    message.correlationId(),
+                    message.causationId(),
+                    message.traceId(),
+                    payload);
+        } catch (JsonProcessingException e) {
             throw new IllegalStateException(
                     "failed to reconstruct outbox message " + message.eventId()
                             + " of type " + message.type(), e);

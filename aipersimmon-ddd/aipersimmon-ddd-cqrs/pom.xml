@@ -12,25 +12,32 @@
   </parent>
 
   <!--
-    CQRS contracts: the write side (Command / CommandHandler / CommandBus and an
-    around-interceptor SPI) and the read side (Query / QueryHandler / QueryBus,
-    the ReadModel and Projection markers), plus the UnitOfWork and
-    AggregateCollector abstractions a bus implementation uses to run a handler in
-    one transaction and drain the touched aggregates' domain events centrally.
+    CQRS contracts: the write side (Command / CommandHandler / CommandBus, the
+    CommandContext dispatch metadata, and an around-interceptor SPI) and the read
+    side (Query / QueryHandler / QueryBus, the ReadModel and Projection markers),
+    plus the UnitOfWork abstraction a bus implementation uses to run a handler in
+    one transaction.
 
-    Entirely optional and framework-free: it depends only on the pure core tier,
-    so an application can adopt the command/query pipeline without importing Spring,
-    and can equally leave this module out and wire use cases directly. A Spring
-    implementation of the ports lives in a separate starter.
+    Framework-free. It depends on the pure core tier, and on the (equally
+    framework-free) integration tier so CommandContext can be built from an inbound
+    EventEnvelope — the single conversion an inbound adapter uses to correlate the
+    command it dispatches. A Spring implementation of the ports lives in a separate
+    starter.
   -->
   <artifactId>aipersimmon-ddd-cqrs</artifactId>
   <name>aipersimmon-ddd-cqrs</name>
-  <description>Framework-free CQRS contracts: command/query buses, handler markers, interceptor SPI, unit-of-work and aggregate-collector abstractions.</description>
+  <description>Framework-free CQRS contracts: command/query buses, handler markers, interceptor SPI, command context, and the unit-of-work abstraction.</description>
 
   <dependencies>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- EventEnvelope: CommandContext.of(envelope) maps an inbound message to a dispatch context. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

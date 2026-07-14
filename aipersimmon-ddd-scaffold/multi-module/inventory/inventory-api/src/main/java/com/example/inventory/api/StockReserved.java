@@ -8,4 +8,9 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * originating context can react.
  */
 public record StockReserved(String orderId) implements IntegrationEvent {
+
+    @Override
+    public String subject() {
+        return orderId();
+    }
 }

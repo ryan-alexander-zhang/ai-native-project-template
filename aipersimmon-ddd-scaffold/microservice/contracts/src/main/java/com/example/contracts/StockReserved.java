@@ -8,4 +8,9 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * service's saga can confirm the order.
  */
 public record StockReserved(String orderId) implements IntegrationEvent {
+
+    @Override
+    public String subject() {
+        return orderId();
+    }
 }

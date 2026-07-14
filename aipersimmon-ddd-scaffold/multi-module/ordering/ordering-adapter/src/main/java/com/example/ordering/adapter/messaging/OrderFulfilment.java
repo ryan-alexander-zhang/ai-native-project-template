@@ -1,5 +1,7 @@
 package com.example.ordering.adapter.messaging;
 
+import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.api.StockReserved;
 import com.example.ordering.application.fulfilment.OrderFulfilmentProcessManager;
@@ -31,12 +33,12 @@ public class OrderFulfilment {
     }
 
     @EventListener
-    public void onStockReserved(StockReserved event) {
-        process.onStockReserved(event.orderId());
+    public void onStockReserved(EventEnvelope<StockReserved> envelope) {
+        process.onStockReserved(envelope.payload().orderId(), CommandContext.of(envelope));
     }
 
     @EventListener
-    public void onStockReservationFailed(StockReservationFailed event) {
-        process.onStockReservationFailed(event.orderId());
+    public void onStockReservationFailed(EventEnvelope<StockReservationFailed> envelope) {
+        process.onStockReservationFailed(envelope.payload().orderId(), CommandContext.of(envelope));
     }
 }

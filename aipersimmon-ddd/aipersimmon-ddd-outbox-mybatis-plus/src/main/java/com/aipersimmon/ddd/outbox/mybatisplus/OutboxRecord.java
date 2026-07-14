@@ -18,10 +18,14 @@ public class OutboxRecord {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String eventId;
+    private String source;
     private String type;
     private Integer version;
     private String payload;
     private Instant occurredAt;
+    private String subject;
+    private String correlationId;
+    private String causationId;
     private String traceId;
     private Boolean sent;
     private Instant sentAt;
@@ -42,6 +46,14 @@ public class OutboxRecord {
 
     public void setEventId(String eventId) {
         this.eventId = eventId;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public String getType() {
@@ -74,6 +86,30 @@ public class OutboxRecord {
 
     public void setOccurredAt(Instant occurredAt) {
         this.occurredAt = occurredAt;
+    }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public void setSubject(String subject) {
+        this.subject = subject;
+    }
+
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
+    }
+
+    public String getCausationId() {
+        return causationId;
+    }
+
+    public void setCausationId(String causationId) {
+        this.causationId = causationId;
     }
 
     public String getTraceId() {

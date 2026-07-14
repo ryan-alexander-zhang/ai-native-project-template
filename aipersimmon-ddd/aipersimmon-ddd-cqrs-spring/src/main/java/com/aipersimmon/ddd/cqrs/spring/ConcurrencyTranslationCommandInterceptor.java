@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.cqrs.spring;
 
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import org.springframework.dao.OptimisticLockingFailureException;
 
@@ -19,7 +20,7 @@ public class ConcurrencyTranslationCommandInterceptor implements CommandIntercep
     public static final int ORDER = 50;
 
     @Override
-    public <R> R intercept(Command<R> command, Invocation<R> invocation) {
+    public <R> R intercept(Command<R> command, CommandContext context, Invocation<R> invocation) {
         try {
             return invocation.proceed();
         } catch (OptimisticLockingFailureException e) {

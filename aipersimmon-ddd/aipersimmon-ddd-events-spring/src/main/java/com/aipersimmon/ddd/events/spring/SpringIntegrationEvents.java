@@ -1,15 +1,24 @@
 package com.aipersimmon.ddd.events.spring;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import java.time.Clock;
+import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.PayloadApplicationEvent;
+import org.springframework.core.ResolvableType;
 
 /**
  * Publishes integration events in process through Spring's
  * {@link ApplicationEventPublisher} — the synchronous, same-thread,
  * same-transaction transport for a modular monolith where producer and consumer
- * share one deployable. Consumers register {@code @EventListener} handlers for the
- * integration-event type.
+ * share one deployable. It wraps the event in an {@link EventEnvelope} carrying the
+ * minted event id, timestamp, and the causal chain from the emitting command's
+ * {@link CommandContext}, and publishes the envelope so consumers register
+ * {@code @EventListener} handlers for {@code EventEnvelope<TheEvent>} and receive the
+ * full metadata — the same shape they would get from the outbox or a broker.
  *
  * <p>This is the "in-process synchronous" integration transport. For reliable
  * delivery decoupled from the producer's transaction (or across processes), use
@@ -18,13 +27,36 @@ import org.springframework.context.ApplicationEventPublisher;
 public class SpringIntegrationEvents implements IntegrationEvents {
 
     private final ApplicationEventPublisher publisher;
+    private final Clock clock;
+    private final String source;
 
-    public SpringIntegrationEvents(ApplicationEventPublisher publisher) {
+    public SpringIntegrationEvents(ApplicationEventPublisher publisher, String source) {
+        this(publisher, Clock.systemUTC(), source);
+    }
+
+    public SpringIntegrationEvents(ApplicationEventPublisher publisher, Clock clock, String source) {
         this.publisher = publisher;
+        this.clock = clock;
+        this.source = source;
     }
 
     @Override
-    public void publish(IntegrationEvent event) {
-        publisher.publishEvent(event);
+    public void publish(IntegrationEvent event, CommandContext context) {
+        EventEnvelope<IntegrationEvent> envelope = new EventEnvelope<>(
+                UUID.randomUUID().toString(),
+                source,
+                event.eventType(),
+                1,
+                clock.instant(),
+                event.subject(),
+                context.correlationId(),
+                context.messageId(),
+                context.traceId(),
+                event);
+        // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
+        // match despite erasure.
+        ResolvableType type = ResolvableType.forClassWithGenerics(
+                EventEnvelope.class, event.getClass());
+        publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
     }
 }

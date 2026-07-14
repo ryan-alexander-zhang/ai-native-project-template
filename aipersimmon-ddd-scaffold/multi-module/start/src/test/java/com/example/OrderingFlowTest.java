@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
@@ -86,8 +87,8 @@ class OrderingFlowTest {
         private volatile StockReservationFailed last;
 
         @EventListener
-        void on(StockReservationFailed event) {
-            this.last = event;
+        void on(EventEnvelope<StockReservationFailed> envelope) {
+            this.last = envelope.payload();
         }
 
         StockReservationFailed last() {

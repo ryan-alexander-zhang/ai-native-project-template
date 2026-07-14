@@ -12,12 +12,15 @@ public interface CommandInterceptor {
 
     /**
      * @param command    the command being dispatched
+     * @param context    the command's dispatch context (message id, correlation,
+     *                   causation, trace) — for correlating logs/traces; most
+     *                   interceptors just pass it through
      * @param invocation the continuation of the chain (the next interceptor, or
      *                   finally the handler)
      * @param <R>        the command's result type
      * @return the result of proceeding, possibly adapted by this interceptor
      */
-    <R> R intercept(Command<R> command, Invocation<R> invocation);
+    <R> R intercept(Command<R> command, CommandContext context, Invocation<R> invocation);
 
     /**
      * Position in the chain: lower runs further out (earlier before, later after).

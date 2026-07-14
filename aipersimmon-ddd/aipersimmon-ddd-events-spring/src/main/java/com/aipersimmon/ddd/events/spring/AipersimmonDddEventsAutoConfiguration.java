@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.events.spring;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
@@ -31,7 +32,8 @@ public class AipersimmonDddEventsAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(IntegrationEvents.class)
     @ConditionalOnMissingClass("com.aipersimmon.ddd.outbox.jdbc.OutboxWriter")
-    public IntegrationEvents integrationEvents(ApplicationEventPublisher publisher) {
-        return new SpringIntegrationEvents(publisher);
+    public IntegrationEvents integrationEvents(ApplicationEventPublisher publisher,
+            @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}") String source) {
+        return new SpringIntegrationEvents(publisher, source);
     }
 }

@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.api.StockReserved;
@@ -33,7 +34,7 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
     }
 
     @Override
-    public Void handle(ReserveStock command) {
+    public Void handle(ReserveStock command, CommandContext context) {
         try {
             // Validate all lines first, so a later failure leaves no partial reservation.
             for (ReserveStock.Line line : command.lines()) {
@@ -48,13 +49,13 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
                 stock.reserve(line.quantity());
                 stocks.save(stock);
             }
-            integrationEvents.publish(new StockReserved(command.orderId()));
+            integrationEvents.publish(new StockReserved(command.orderId()), context);
         } catch (DomainException failure) {
             // The failing code (if any) rides the event: a BC with no HTTP edge still
             // surfaces a stable machine identity for the reacting saga to branch on.
             String code = failure.errorCode().map(ErrorCode::code).orElse(null);
             integrationEvents.publish(
-                    new StockReservationFailed(command.orderId(), code, failure.getMessage()));
+                    new StockReservationFailed(command.orderId(), code, failure.getMessage()), context);
         }
         return null;
     }

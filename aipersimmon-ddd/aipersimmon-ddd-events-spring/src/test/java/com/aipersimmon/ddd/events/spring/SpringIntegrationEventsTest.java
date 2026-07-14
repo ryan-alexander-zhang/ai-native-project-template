@@ -1,13 +1,17 @@
 package com.aipersimmon.ddd.events.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.PayloadApplicationEvent;
 
 class SpringIntegrationEventsTest {
 
@@ -15,14 +19,23 @@ class SpringIntegrationEventsTest {
     }
 
     @Test
-    void publishDelegatesToApplicationEventPublisher() {
+    void publishesEnvelopeCarryingEventAndCausalMetadata() {
         List<Object> captured = new ArrayList<>();
         ApplicationEventPublisher publisher = captured::add;
-        IntegrationEvents events = new SpringIntegrationEvents(publisher);
+        IntegrationEvents events = new SpringIntegrationEvents(publisher, "/inventory");
 
         SampleIntegrationEvent event = new SampleIntegrationEvent("1");
-        events.publish(event);
+        CommandContext context = new CommandContext("cmd-1", "corr-1", "cause-0", "trace-1");
+        events.publish(event, context);
 
-        assertEquals(List.of(event), captured);
+        assertEquals(1, captured.size());
+        PayloadApplicationEvent<?> published = (PayloadApplicationEvent<?>) captured.get(0);
+        EventEnvelope<?> envelope = (EventEnvelope<?>) published.getPayload();
+        assertSame(event, envelope.payload());
+        assertEquals("/inventory", envelope.source());
+        assertEquals("SampleIntegrationEvent", envelope.type(), "logical type defaults to the simple class name");
+        assertEquals("corr-1", envelope.correlationId(), "inherits the command's correlation");
+        assertEquals("cmd-1", envelope.causationId(), "caused by the emitting command");
+        assertEquals("trace-1", envelope.traceId());
     }
 }

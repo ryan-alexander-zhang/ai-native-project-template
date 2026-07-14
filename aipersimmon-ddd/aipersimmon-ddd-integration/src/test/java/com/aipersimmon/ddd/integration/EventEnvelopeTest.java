@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.integration;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Instant;
@@ -14,33 +15,46 @@ class EventEnvelopeTest {
     private static final SampleEvent PAYLOAD = new SampleEvent("O-1");
     private static final Instant WHEN = Instant.parse("2026-01-01T00:00:00Z");
 
-    @Test
-    void buildsWithValidMetadata() {
-        assertDoesNotThrow(() ->
-                new EventEnvelope<>("evt-1", "OrderPlaced", 1, WHEN, "trace-1", PAYLOAD));
+    private static EventEnvelope<SampleEvent> envelope(String eventId, String source, String type,
+                                                       String subject, String correlationId) {
+        return new EventEnvelope<>(eventId, source, type, 1, WHEN, subject, correlationId, "cause-1", "trace-1", PAYLOAD);
     }
 
     @Test
-    void allowsNullTraceId() {
+    void buildsWithValidMetadata() {
+        assertDoesNotThrow(() -> envelope("evt-1", "/ordering", "OrderPlaced", "O-1", "corr-1"));
+    }
+
+    @Test
+    void allowsNullSubjectCausationAndTrace() {
         assertDoesNotThrow(() ->
-                new EventEnvelope<>("evt-1", "OrderPlaced", 1, WHEN, null, PAYLOAD));
+                new EventEnvelope<>("evt-1", "/ordering", "OrderPlaced", 1, WHEN, null, "corr-1", null, null, PAYLOAD));
+    }
+
+    @Test
+    void partitionKeyIsTheSubjectWhenPresentElseEventId() {
+        assertEquals("O-1", envelope("evt-1", "/ordering", "OrderPlaced", "O-1", "corr-1").partitionKey());
+        assertEquals("evt-1", envelope("evt-1", "/ordering", "OrderPlaced", null, "corr-1").partitionKey());
     }
 
     @Test
     void rejectsBlankEventId() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new EventEnvelope<>(" ", "OrderPlaced", 1, WHEN, "trace-1", PAYLOAD));
+        assertThrows(IllegalArgumentException.class, () -> envelope(" ", "/ordering", "OrderPlaced", "O-1", "corr-1"));
     }
 
     @Test
-    void rejectsVersionBelowOne() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new EventEnvelope<>("evt-1", "OrderPlaced", 0, WHEN, "trace-1", PAYLOAD));
+    void rejectsBlankSource() {
+        assertThrows(IllegalArgumentException.class, () -> envelope("evt-1", " ", "OrderPlaced", "O-1", "corr-1"));
+    }
+
+    @Test
+    void rejectsBlankCorrelationId() {
+        assertThrows(IllegalArgumentException.class, () -> envelope("evt-1", "/ordering", "OrderPlaced", "O-1", " "));
     }
 
     @Test
     void rejectsNullPayload() {
         assertThrows(IllegalArgumentException.class, () ->
-                new EventEnvelope<SampleEvent>("evt-1", "OrderPlaced", 1, WHEN, "trace-1", null));
+                new EventEnvelope<SampleEvent>("evt-1", "/ordering", "OrderPlaced", 1, WHEN, "O-1", "corr-1", null, null, null));
     }
 }

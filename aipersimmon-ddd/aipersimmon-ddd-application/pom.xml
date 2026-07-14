@@ -32,6 +32,17 @@
       <artifactId>aipersimmon-ddd-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!--
+      The integration-event publisher port carries the emitting command's
+      CommandContext (correlation/causation), so the application tier depends on the
+      framework-free CQRS contracts. cqrs itself depends only on core, so this adds
+      no cycle.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

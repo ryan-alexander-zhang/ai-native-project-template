@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.archunit.fixture.bad.ordering.application;
 
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 
 /**
@@ -17,7 +18,7 @@ public class BadCancelOrderHandler implements CommandHandler<BadCancelOrder, Voi
     }
 
     @Override
-    public Void handle(BadCancelOrder command) {
-        return confirmOrderHandler.handle(new BadConfirmOrder(command.orderId()));
+    public Void handle(BadCancelOrder command, CommandContext context) {
+        return confirmOrderHandler.handle(new BadConfirmOrder(command.orderId()), context);
     }
 }

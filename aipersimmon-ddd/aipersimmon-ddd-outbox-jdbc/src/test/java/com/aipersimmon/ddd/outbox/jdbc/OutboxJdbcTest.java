@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
@@ -69,7 +70,7 @@ class OutboxJdbcTest {
 
     @Test
     void writesUnsentRowThenRelayDispatchesAndMarksSent() {
-        integrationEvents.publish(new SampleEvent("O-1"));
+        integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1", null));
 
         assertEquals(Integer.valueOf(1),
                 jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = FALSE", Integer.class));
@@ -78,8 +79,10 @@ class OutboxJdbcTest {
 
         assertEquals(1, dispatcher.messages.size());
         OutboxMessage message = dispatcher.messages.get(0);
-        assertEquals(SampleEvent.class.getName(), message.type());
+        assertEquals("SampleEvent", message.type(), "the logical event type, not the Java class name");
         assertTrue(message.payload().contains("O-1"));
+        assertEquals("cmd-1", message.correlationId(), "correlation propagated from the command");
+        assertEquals("cmd-1", message.causationId(), "caused by the emitting command");
         assertEquals(Integer.valueOf(1),
                 jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = TRUE", Integer.class));
     }

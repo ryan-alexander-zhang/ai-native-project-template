@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.UseCase;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.OrderId;
@@ -22,7 +23,7 @@ public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
     }
 
     @Override
-    public Void handle(CancelOrder command) {
+    public Void handle(CancelOrder command, CommandContext context) {
         OrderId id = new OrderId(command.orderId());
         Order order = orders.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("unknown order: " + command.orderId()));
@@ -30,8 +31,7 @@ public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
         order.cancel();
 
         orders.save(order);
-        domainEvents.publishAll(order.domainEvents());
-        order.clearDomainEvents();
+        domainEvents.publishAndClear(order);
         return null;
     }
 }

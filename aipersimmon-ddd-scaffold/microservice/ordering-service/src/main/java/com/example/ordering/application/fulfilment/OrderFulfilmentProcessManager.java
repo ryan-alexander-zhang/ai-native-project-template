@@ -1,6 +1,7 @@
 package com.example.ordering.application.fulfilment;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.saga.ProcessManager;
 import com.aipersimmon.ddd.saga.SagaStore;
 import com.example.ordering.application.order.CancelOrder;
@@ -41,20 +42,20 @@ public class OrderFulfilmentProcessManager {
     }
 
     /** Inventory reserved the stock: complete the flow and confirm the order. */
-    public void onStockReserved(String orderId) {
+    public void onStockReserved(String orderId, CommandContext cause) {
         sagas.find(orderId).filter(OrderFulfilmentSaga::isActive).ifPresent(saga -> {
             saga.reservationConfirmed();
             sagas.save(saga);
-            commandBus.send(new ConfirmOrder(orderId));
+            commandBus.send(new ConfirmOrder(orderId), cause);
         });
     }
 
     /** Inventory could not reserve the stock: compensate by cancelling the order. */
-    public void onStockReservationFailed(String orderId) {
+    public void onStockReservationFailed(String orderId, CommandContext cause) {
         sagas.find(orderId).filter(OrderFulfilmentSaga::isActive).ifPresent(saga -> {
             saga.reservationFailed();
             sagas.save(saga);
-            commandBus.send(new CancelOrder(orderId));
+            commandBus.send(new CancelOrder(orderId), cause);
         });
     }
 }

@@ -26,10 +26,14 @@ class KafkaOutboxDispatcherTest {
 
     private final OutboxMessage message = new OutboxMessage(
             "evt-1",
-            "com.example.OrderPlaced",
+            "/ordering",
+            "OrderPlaced",
             1,
             "{\"orderId\":\"o-1\"}",
             Instant.parse("2026-01-01T00:00:00Z"),
+            "o-1",
+            "corr-1",
+            "cause-1",
             "trace-9");
 
     @Test
@@ -46,13 +50,20 @@ class KafkaOutboxDispatcherTest {
         ProducerRecord<String, String> record = captor.getValue();
 
         assertEquals("orders", record.topic());
-        assertEquals("evt-1", record.key());
+        assertEquals("o-1", record.key(), "the aggregate subject is the partition key, not the event id");
         assertEquals("{\"orderId\":\"o-1\"}", record.value());
-        assertEquals("com.example.OrderPlaced", header(record, IntegrationEventHeaders.TYPE));
-        assertEquals("evt-1", header(record, IntegrationEventHeaders.EVENT_ID));
-        assertEquals("1", header(record, IntegrationEventHeaders.VERSION));
+        assertEquals("evt-1", header(record, IntegrationEventHeaders.ID));
+        assertEquals("/ordering", header(record, IntegrationEventHeaders.SOURCE));
+        assertEquals("1.0", header(record, IntegrationEventHeaders.SPEC_VERSION));
+        assertEquals("OrderPlaced", header(record, IntegrationEventHeaders.TYPE));
+        assertEquals("o-1", header(record, IntegrationEventHeaders.SUBJECT));
+        assertEquals("1", header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
+        assertEquals("corr-1", header(record, IntegrationEventHeaders.CORRELATION_ID));
+        assertEquals("cause-1", header(record, IntegrationEventHeaders.CAUSATION_ID));
         assertEquals("trace-9", header(record, IntegrationEventHeaders.TRACE_ID));
-        assertEquals("2026-01-01T00:00:00Z", header(record, IntegrationEventHeaders.OCCURRED_AT));
+        assertEquals("o-1", header(record, IntegrationEventHeaders.PARTITION_KEY));
+        assertEquals("application/json", header(record, IntegrationEventHeaders.CONTENT_TYPE));
+        assertEquals("2026-01-01T00:00:00Z", header(record, IntegrationEventHeaders.TIME));
     }
 
     @Test

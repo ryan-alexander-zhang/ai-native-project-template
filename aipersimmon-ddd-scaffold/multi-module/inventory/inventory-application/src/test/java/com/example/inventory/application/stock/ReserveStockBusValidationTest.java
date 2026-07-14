@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.spring.RegistryCommandBus;
 import com.aipersimmon.ddd.cqrs.spring.ValidationCommandInterceptor;
@@ -53,7 +54,7 @@ class ReserveStockBusValidationTest {
         private boolean invoked;
 
         @Override
-        public Void handle(ReserveStock command) {
+        public Void handle(ReserveStock command, CommandContext context) {
             invoked = true;
             return null;
         }

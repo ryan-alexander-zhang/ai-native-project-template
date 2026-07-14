@@ -29,6 +29,12 @@
   <description>Storage-agnostic transactional-outbox core: the dispatcher contract, stored-message shape, and default dispatchers.</description>
 
   <dependencies>
+    <!-- EventEnvelope: the in-process dispatcher republishes the full envelope. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>

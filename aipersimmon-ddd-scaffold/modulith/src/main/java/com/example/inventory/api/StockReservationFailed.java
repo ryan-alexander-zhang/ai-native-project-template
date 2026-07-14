@@ -10,4 +10,9 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * order-fulfilment saga react to it as one of the flow's outcomes.
  */
 public record StockReservationFailed(String orderId, String reason) implements IntegrationEvent {
+
+    @Override
+    public String subject() {
+        return orderId();
+    }
 }

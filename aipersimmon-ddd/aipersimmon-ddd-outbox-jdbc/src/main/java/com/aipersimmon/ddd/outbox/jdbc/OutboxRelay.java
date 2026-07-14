@@ -21,7 +21,8 @@ public class OutboxRelay {
     private static final Logger log = LoggerFactory.getLogger(OutboxRelay.class);
 
     private static final String SELECT_UNSENT =
-            "SELECT event_id, type, version, payload, occurred_at, trace_id "
+            "SELECT event_id, source, type, version, payload, occurred_at, subject, "
+            + "correlation_id, causation_id, trace_id "
             + "FROM aipersimmon_outbox WHERE sent = FALSE ORDER BY created_at ASC LIMIT ?";
     private static final String MARK_SENT =
             "UPDATE aipersimmon_outbox SET sent = TRUE, sent_at = ? WHERE event_id = ?";
@@ -57,10 +58,14 @@ public class OutboxRelay {
     private OutboxMessage mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
         return new OutboxMessage(
                 rs.getString("event_id"),
+                rs.getString("source"),
                 rs.getString("type"),
                 rs.getInt("version"),
                 rs.getString("payload"),
                 rs.getTimestamp("occurred_at").toInstant(),
+                rs.getString("subject"),
+                rs.getString("correlation_id"),
+                rs.getString("causation_id"),
                 rs.getString("trace_id"));
     }
 }

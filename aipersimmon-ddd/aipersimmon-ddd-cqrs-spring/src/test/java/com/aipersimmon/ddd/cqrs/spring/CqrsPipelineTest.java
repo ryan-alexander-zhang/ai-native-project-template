@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.Query;
 import com.aipersimmon.ddd.cqrs.QueryBus;
@@ -150,7 +151,7 @@ class CqrsPipelineTest {
         }
 
         @Override
-        public String handle(PlaceThing command) {
+        public String handle(PlaceThing command, CommandContext context) {
             String id = "thing-" + command.name();
             jdbc.update("INSERT INTO thing(id) VALUES (?)", id);
             domainEvents.publishAndClear(new Thing(id));
