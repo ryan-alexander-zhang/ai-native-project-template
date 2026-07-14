@@ -41,7 +41,8 @@ load order → order.confirm()/cancel() → save → domainEvents.publishAll →
   (见 [[decision-00009-event-type-markers-and-handler-contracts]] 与 `CommandBus`)。直接调用对方 handler
   等于**绕过对方整条 interceptor 链**(事务、校验都没了);若改走总线嵌套,又变成**嵌套事务 / 双重日志**。
 - **Command 是入口契约,不是函数参数**。直接调用要先"伪造"一个对方的 `Command` 对象,把本应是外部输入
-  契约的东西当内部调用参数,污染语义。
+  契约的东西当内部调用参数,污染语义。(`Command`/`CommandHandler` 为何是**接口**而非注解,见
+  [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]。)
 - **事务边界含糊**。一次业务操作到底是一个 UoW 还是两个?`modular-monolith-with-ddd` 把 UnitOfWork 定义为
   "围绕单个 command handler 的 decorator",嵌套调用直接破坏该模型。
 - **耦合两个入口点**:两个 use case 从此必须一起改、一起测。
@@ -154,7 +155,7 @@ com/example/ordering/domain/
 - `docs/reference/jmolecules/20260708161438-ddd-notes.md` —— `@DomainServiceRing` 等 ring 注解,身份与目录正交。
 - `docs/reference/axon-framework/20260708161438-ddd-notes.md` —— 长流程跨聚合用 saga / process manager。
 - `docs/reference/modular-monolith-with-ddd/20260708161438-ddd-notes.md` —— 横切是每个 command handler 外的 decorator(Logging/Validation/UnitOfWork)。
-- [[decision-00005-package-per-aggregate]]、[[decision-00008-event-subscriber-layer-placement]]、[[decision-00009-event-type-markers-and-handler-contracts]]。
+- [[decision-00005-package-per-aggregate]]、[[decision-00008-event-subscriber-layer-placement]]、[[decision-00009-event-type-markers-and-handler-contracts]]、[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]。
 
 外部:
 

@@ -101,6 +101,9 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 - **领域事件处理**是**一等的 application 概念**(上下文内部反应),值得显式标记 → `@DomainEventHandler`。
 - **集成事件消费**是**传输/边界关注点**(adapter + 消息框架),其身份由**位置与类型**自证,且下游是普通 command 处理 → 不需要注解。
 
+> 写侧"接口 vs 注解"的同类抉择(为何 `Command`/`CommandHandler` 是接口、不设 `@Command`),
+> 见 [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]——同一条判据:标签→注解,带类型的派发契约→接口。
+
 ## Consequences
 
 - 保留/明确 `DomainEvent`(core)与 `IntegrationEvent`(integration)两个 marker 接口;不引入 `@Externalized`、`@DomainEventPublisher`。
@@ -119,7 +122,7 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 - `docs/reference/ddd-by-examples-library/20260708161438-ddd-notes.md` —— 事件处理器置于 `…/application/…`。
 - `docs/reference/clean-architecture/20260708161438-ddd-notes.md` —— handlers 置于 Core/Handlers。
 - `docs/reference/axon-framework/20260708161438-ddd-notes.md` —— "commands (one handler), events (many)" 非对称。
-- [[decision-00008-event-subscriber-layer-placement]]、[[analysis-00002-domain-vs-integration-events]]、[[analysis-00009-saga-implementation-deep-dive]]。
+- [[decision-00008-event-subscriber-layer-placement]]、[[analysis-00002-domain-vs-integration-events]]、[[analysis-00009-saga-implementation-deep-dive]]、[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]。
 
 外部:
 
