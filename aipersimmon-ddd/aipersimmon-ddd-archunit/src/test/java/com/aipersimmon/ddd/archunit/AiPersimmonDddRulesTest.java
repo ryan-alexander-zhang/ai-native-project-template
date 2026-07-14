@@ -15,6 +15,10 @@ class AiPersimmonDddRulesTest {
             .importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
     private static final JavaClasses ANNOTATED_EVENT_IN_ADAPTER = new ClassFileImporter()
             .importPackages("com.aipersimmon.ddd.archunit.fixture.annotated");
+    private static final String CONTEXTS_GOOD_BASE = "com.aipersimmon.ddd.archunit.fixture.contexts.good";
+    private static final String CONTEXTS_BAD_BASE = "com.aipersimmon.ddd.archunit.fixture.contexts.bad";
+    private static final JavaClasses CONTEXTS_GOOD = new ClassFileImporter().importPackages(CONTEXTS_GOOD_BASE);
+    private static final JavaClasses CONTEXTS_BAD = new ClassFileImporter().importPackages(CONTEXTS_BAD_BASE);
 
     @Test
     void domainShouldNotDependOnOuterLayers_passesForGood() {
@@ -140,6 +144,132 @@ class AiPersimmonDddRulesTest {
     void invariantsShouldNotBeSpringComponents_failsForBad() {
         assertThrows(AssertionError.class,
                 () -> AiPersimmonDddRules.invariantsShouldNotBeSpringComponents().check(BAD));
+    }
+
+    @Test
+    void domainBuildingBlocksShouldResideInDomain_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.domainBuildingBlocksShouldResideInDomain().check(GOOD));
+    }
+
+    @Test
+    void domainBuildingBlocksShouldResideInDomain_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.domainBuildingBlocksShouldResideInDomain().check(BAD));
+    }
+
+    @Test
+    void domainServicesShouldResideInDomain_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.domainServicesShouldResideInDomain().check(GOOD));
+    }
+
+    @Test
+    void domainServicesShouldResideInDomain_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.domainServicesShouldResideInDomain().check(BAD));
+    }
+
+    @Test
+    void aggregateRootsShouldExtendAbstractAggregateRoot_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.aggregateRootsShouldExtendAbstractAggregateRoot().check(GOOD));
+    }
+
+    @Test
+    void aggregateRootsShouldExtendAbstractAggregateRoot_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.aggregateRootsShouldExtendAbstractAggregateRoot().check(BAD));
+    }
+
+    @Test
+    void valueObjectsShouldBeImmutable_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.valueObjectsShouldBeImmutable().check(GOOD));
+    }
+
+    @Test
+    void valueObjectsShouldBeImmutable_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.valueObjectsShouldBeImmutable().check(BAD));
+    }
+
+    @Test
+    void illegalStateTransitionsShouldOnlyComeFromTransitions_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.illegalStateTransitionsShouldOnlyComeFromTransitions().check(GOOD));
+    }
+
+    @Test
+    void illegalStateTransitionsShouldOnlyComeFromTransitions_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.illegalStateTransitionsShouldOnlyComeFromTransitions().check(BAD));
+    }
+
+    @Test
+    void errorCodesShouldBeEnums_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.errorCodesShouldBeEnums().check(GOOD));
+    }
+
+    @Test
+    void errorCodesShouldBeEnums_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.errorCodesShouldBeEnums().check(BAD));
+    }
+
+    @Test
+    void repositoryPortsShouldBeInterfacesInDomain_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.repositoryPortsShouldBeInterfacesInDomain().check(GOOD));
+    }
+
+    @Test
+    void repositoryPortsShouldBeInterfacesInDomain_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.repositoryPortsShouldBeInterfacesInDomain().check(BAD));
+    }
+
+    @Test
+    void repositoryImplementationsShouldResideInInfrastructure_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.repositoryImplementationsShouldResideInInfrastructure().check(GOOD));
+    }
+
+    @Test
+    void repositoryImplementationsShouldResideInInfrastructure_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.repositoryImplementationsShouldResideInInfrastructure().check(BAD));
+    }
+
+    @Test
+    void repositoryImplementationsShouldBeSpringRepositories_passesForGood() {
+        assertDoesNotThrow(
+                () -> AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories().check(GOOD));
+    }
+
+    @Test
+    void repositoryImplementationsShouldBeSpringRepositories_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories().check(BAD));
+    }
+
+    @Test
+    void integrationEventsShouldResideInApi_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.integrationEventsShouldResideInApi().check(GOOD));
+    }
+
+    @Test
+    void integrationEventsShouldResideInApi_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.integrationEventsShouldResideInApi().check(BAD));
+    }
+
+    @Test
+    void boundedContextsShouldOnlyDependOnEachOthersApi_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules
+                .boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_GOOD_BASE).check(CONTEXTS_GOOD));
+    }
+
+    @Test
+    void boundedContextsShouldOnlyDependOnEachOthersApi_failsForBad() {
+        assertThrows(AssertionError.class, () -> AiPersimmonDddRules
+                .boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_BAD_BASE).check(CONTEXTS_BAD));
     }
 
     @Test

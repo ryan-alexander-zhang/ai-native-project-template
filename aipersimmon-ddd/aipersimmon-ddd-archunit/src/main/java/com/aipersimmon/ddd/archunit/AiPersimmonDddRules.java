@@ -5,10 +5,18 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.aipersimmon.ddd.application.DomainEventHandler;
+import com.aipersimmon.ddd.core.annotation.AggregateRoot;
+import com.aipersimmon.ddd.core.annotation.Entity;
+import com.aipersimmon.ddd.core.annotation.Repository;
+import com.aipersimmon.ddd.core.annotation.Service;
+import com.aipersimmon.ddd.core.annotation.ValueObject;
+import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.aipersimmon.ddd.core.rule.Invariant;
 import com.aipersimmon.ddd.core.rule.InvariantViolationException;
+import com.aipersimmon.ddd.core.state.IllegalStateTransitionException;
+import com.aipersimmon.ddd.core.state.Transitions;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -39,6 +47,52 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
  *
  * <p>Every rule tolerates an empty match, so a project that has not yet
  * introduced a given layer still passes rather than erroring.
+ *
+ * <h2>Rules bundled by {@link #all()}</h2>
+ *
+ * These are framework-agnostic — each passes vacuously without the framework it
+ * concerns — so {@code all()} is safe for any layout, single-deployable or
+ * multi-module:
+ * <ul>
+ *   <li><em>Layering</em> — {@link #domainShouldNotDependOnOuterLayers()},
+ *       {@link #applicationShouldNotDependOnInfrastructureOrInterface()},
+ *       {@link #domainShouldBeFrameworkFree()}.</li>
+ *   <li><em>Events</em> — {@link #domainEventsShouldStayInDomain()},
+ *       {@link #domainEventListenersShouldResideInApplicationOrDomain()},
+ *       {@link #integrationEventListenersShouldResideInAdapter()},
+ *       {@link #domainEventListenersShouldBeAnnotatedWithDomainEventHandler()}.</li>
+ *   <li><em>CQRS</em> — {@link #commandHandlersShouldNotDependOnOtherCommandHandlers()}.</li>
+ *   <li><em>Building blocks</em> — {@link #domainBuildingBlocksShouldResideInDomain()},
+ *       {@link #domainServicesShouldResideInDomain()},
+ *       {@link #aggregateRootsShouldExtendAbstractAggregateRoot()},
+ *       {@link #valueObjectsShouldBeImmutable()}.</li>
+ *   <li><em>Repositories</em> — {@link #repositoryPortsShouldBeInterfacesInDomain()},
+ *       {@link #repositoryImplementationsShouldResideInInfrastructure()}.</li>
+ *   <li><em>Invariants, state &amp; errors</em> — {@link #invariantsShouldResideInDomain()},
+ *       {@link #invariantViolationsShouldOnlyComeFromCheckInvariant()},
+ *       {@link #invariantsShouldNotBeSpringComponents()},
+ *       {@link #illegalStateTransitionsShouldOnlyComeFromTransitions()},
+ *       {@link #errorCodesShouldBeEnums()}.</li>
+ * </ul>
+ *
+ * <h2>Opt-in rules (not in {@code all()})</h2>
+ *
+ * Each is left out of the bundle because it presumes something {@code all()} must
+ * not — a stricter layout, a specific framework, a packaging convention, or a
+ * parameter — so a project adopts it deliberately, alongside {@code all()}:
+ * <ul>
+ *   <li>{@link #adapterShouldNotDependOnDomain()} — stricter hexagonal discipline;
+ *       forbids <em>every</em> adapter&#8594;domain reference.</li>
+ *   <li>{@link #repositoryImplementationsShouldBeSpringRepositories()} — presumes Spring.</li>
+ *   <li>{@link #integrationEventsShouldResideInApi()} — presumes the {@code ..api..}
+ *       published-contract convention.</li>
+ *   <li>{@link #boundedContextsShouldOnlyDependOnEachOthersApi(String)} — parameterised
+ *       on the base package under which each sub-package is a bounded context.</li>
+ * </ul>
+ *
+ * <p>{@link PackageInfoChecks} is a separate, source-level companion (a
+ * {@code package-info.java} without annotations produces no class file, so bytecode
+ * analysis cannot see it); wire it into a plain {@code @Test}.
  */
 public final class AiPersimmonDddRules {
 
@@ -64,6 +118,12 @@ public final class AiPersimmonDddRules {
      * rule passes vacuously.
      */
     private static final String SPRING_EVENT_LISTENER = "org.springframework.context.event.EventListener";
+
+    /**
+     * Spring's {@code @Repository} stereotype, matched by fully-qualified name so the
+     * Spring-specific repository rule stays free of a compile dependency on Spring.
+     */
+    private static final String SPRING_REPOSITORY = "org.springframework.stereotype.Repository";
 
     private AiPersimmonDddRules() {
     }
@@ -290,6 +350,296 @@ public final class AiPersimmonDddRules {
     }
 
     /**
+     * The tactical building blocks that make up an aggregate — a type carrying
+     * {@link AggregateRoot @AggregateRoot}, {@link Entity @Entity}, or
+     * {@link ValueObject @ValueObject} — reside in the domain layer. Each marks a
+     * model concept, so it belongs with the model, never in the application,
+     * infrastructure, or interface layers. Part of {@link #all()}; matches nothing
+     * (and so passes) in a project that annotates no building blocks.
+     */
+    public static ArchRule domainBuildingBlocksShouldResideInDomain() {
+        return classes().that().areAnnotatedWith(AggregateRoot.class)
+                .or().areAnnotatedWith(Entity.class)
+                .or().areAnnotatedWith(ValueObject.class)
+                .should().resideInAPackage("..domain..")
+                .as("@AggregateRoot, @Entity, and @ValueObject types should reside in the domain layer")
+                .because("aggregate roots, entities, and value objects are model concepts that belong with "
+                        + "the domain, not in the application, infrastructure, or interface layers")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A domain service — a type carrying {@link Service @Service} — resides in the
+     * domain layer. It is stateless domain behaviour that does not sit naturally on a
+     * single entity or value object, so it belongs with the model rather than in an
+     * application, infrastructure, or interface package. Matched by the core
+     * {@code @Service} annotation, not Spring's stereotype, so an application component
+     * annotated with Spring's {@code @Service} is unaffected. Part of {@link #all()};
+     * matches nothing (and so passes) in a project that declares no domain services.
+     */
+    public static ArchRule domainServicesShouldResideInDomain() {
+        return classes().that().areAnnotatedWith(Service.class)
+                .should().resideInAPackage("..domain..")
+                .as("@Service (domain service) types should reside in the domain layer")
+                .because("a domain service is stateless domain behaviour, so it belongs with the model")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A type marked {@link AggregateRoot @AggregateRoot} extends
+     * {@link AbstractAggregateRoot}, so it actually carries the aggregate lifecycle —
+     * recording domain events and enforcing invariants through {@code checkInvariant} —
+     * rather than only claiming the role by annotation. Pairs with
+     * {@link #domainBuildingBlocksShouldResideInDomain()}: that fixes the layer, this
+     * requires the base class. Part of {@link #all()}; matches nothing (and so passes)
+     * in a project with no annotated aggregate roots.
+     */
+    public static ArchRule aggregateRootsShouldExtendAbstractAggregateRoot() {
+        return classes().that().areAnnotatedWith(AggregateRoot.class)
+                .should().beAssignableTo(AbstractAggregateRoot.class)
+                .as("@AggregateRoot types should extend AbstractAggregateRoot")
+                .because("an aggregate root records domain events and enforces invariants through the base "
+                        + "class, so the annotation and the lifecycle it implies must not drift apart")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A value object — a type carrying {@link ValueObject @ValueObject} — has only final
+     * fields, so it cannot be mutated after construction. A value object is defined by
+     * its attributes and compared by their equality; letting a field change would give
+     * it identity-like behaviour and break that contract. A {@code record} satisfies this
+     * for free; a class must declare its fields {@code final}. Part of {@link #all()};
+     * matches nothing (and so passes) in a project that annotates no value objects.
+     */
+    public static ArchRule valueObjectsShouldBeImmutable() {
+        return classes().that().areAnnotatedWith(ValueObject.class)
+                .should().haveOnlyFinalFields()
+                .as("@ValueObject types should be immutable (have only final fields)")
+                .because("a value object is defined by its attributes and compared by their equality, so it "
+                        + "must not change after construction")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * An {@link IllegalStateTransitionException} is raised only from within
+     * {@link Transitions#check(Object, Object)} — never constructed directly by domain,
+     * application, or adapter code. Declaring the legal transitions in a
+     * {@link Transitions} table and routing every check through it keeps the transition
+     * rules in one place and the exception's message uniform, exactly as
+     * {@link #invariantViolationsShouldOnlyComeFromCheckInvariant()} does for invariants.
+     * Guards the {@code (from, to)} constructor that {@code Transitions} uses; the
+     * {@link ErrorCode}-carrying overload is a deliberate escape hatch and is not covered.
+     * Part of {@link #all()}; matches nothing (and so passes) in a project that never
+     * constructs it directly.
+     */
+    public static ArchRule illegalStateTransitionsShouldOnlyComeFromTransitions() {
+        return noClasses().that().doNotHaveFullyQualifiedName(Transitions.class.getName())
+                .should().callConstructor(IllegalStateTransitionException.class, Object.class, Object.class)
+                .as("IllegalStateTransitionException should be raised only via Transitions.check")
+                .because("declaring the legal transitions in a Transitions table and routing every check "
+                        + "through it keeps the transition rules in one place and the exception uniform")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * An {@link ErrorCode} implementation is an enum, so a bounded context's error codes
+     * form one enumerated catalogue in a single place, as the {@code ErrorCode} contract
+     * intends. Matches only named (or anonymous) classes that declare
+     * {@code implements ErrorCode}; the inline {@code () -> "code"} lambda shorthand used
+     * for a one-off code compiles to an {@code invokedynamic} target with no such class
+     * and is not matched, so it stays allowed. Part of {@link #all()}; matches nothing
+     * (and so passes) in a project that declares no named {@code ErrorCode} type.
+     */
+    public static ArchRule errorCodesShouldBeEnums() {
+        return classes().that().implement(ErrorCode.class)
+                .should().beAssignableTo(Enum.class)
+                .as("ErrorCode implementations should be enums")
+                .because("modelling a context's error codes as an enum keeps the catalogue in one place, "
+                        + "rather than scattering ad-hoc classes")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A repository port — a type carrying the core {@link Repository @Repository} — is an
+     * interface that resides in the domain layer. A repository is the collection-like
+     * abstraction over an aggregate, so the port is a domain concept (an interface the
+     * domain owns), while its technical implementation lives in the infrastructure layer
+     * (see {@link #repositoryImplementationsShouldResideInInfrastructure()}). Matches the
+     * core {@code @Repository} annotation, not Spring's stereotype, so a Spring
+     * {@code @Repository} on an implementation class is unaffected. Part of {@link #all()};
+     * matches nothing (and so passes) in a project that declares no repository ports.
+     */
+    public static ArchRule repositoryPortsShouldBeInterfacesInDomain() {
+        return classes().that().areAnnotatedWith(Repository.class)
+                .should().beInterfaces()
+                .andShould().resideInAPackage("..domain..")
+                .as("@Repository ports should be interfaces residing in the domain layer")
+                .because("a repository is a collection-like abstraction the domain owns, so the port is a "
+                        + "domain interface, while its technical implementation lives in infrastructure")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A repository implementation — a concrete class implementing a domain
+     * {@link Repository @Repository} port — resides in the infrastructure layer. The port
+     * is the domain-owned abstraction; the class that fulfils it with a concrete
+     * persistence technology is an outbound adapter and belongs in infrastructure. Part of
+     * {@link #all()}; matches nothing (and so passes) in a project with no repository
+     * implementations.
+     */
+    public static ArchRule repositoryImplementationsShouldResideInInfrastructure() {
+        return classes().that(implementARepositoryPort())
+                .should().resideInAPackage("..infrastructure..")
+                .as("repository implementations should reside in the infrastructure layer")
+                .because("the class that fulfils a domain repository port with a concrete persistence "
+                        + "technology is an outbound adapter, which belongs in infrastructure")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A repository implementation carries Spring's {@code @Repository} stereotype (matched
+     * by name, see {@link #SPRING_REPOSITORY}) rather than a bare {@code @Component}. As a
+     * specialization of {@code @Component} it is component-scanned identically, but it also
+     * names the adapter's role precisely and enables Spring's persistence-exception
+     * translation. Deliberately <strong>not</strong> part of {@link #all()}: it presumes
+     * Spring, so a non-Spring project's implementations — which carry no such annotation —
+     * would fail it rather than pass vacuously. Adopt it in Spring projects alongside
+     * {@link #all()}:
+     *
+     * <pre>{@code
+     * @ArchTest static final ArchRule repos = AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories();
+     * }</pre>
+     */
+    public static ArchRule repositoryImplementationsShouldBeSpringRepositories() {
+        return classes().that(implementARepositoryPort())
+                .should().beAnnotatedWith(SPRING_REPOSITORY)
+                .orShould().beMetaAnnotatedWith(SPRING_REPOSITORY)
+                .as("repository implementations should be annotated with Spring's @Repository")
+                .because("Spring's @Repository names the persistence adapter's role and enables "
+                        + "persistence-exception translation, which a bare @Component does not")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * An {@link IntegrationEvent} — a fact one bounded context publishes for others —
+     * resides in the context's {@code ..api..} package, its published contract. It is the
+     * mirror of {@link #domainEventsShouldStayInDomain()}: a domain event stays private to
+     * the domain, while an integration event is deliberately exposed, so it lives with the
+     * rest of the outward contract rather than in the domain, application, or adapter
+     * internals. Deliberately <strong>not</strong> part of {@link #all()}: it presumes the
+     * {@code ..api..} published-contract convention (used by the modulith and multi-module
+     * layouts); a layout that publishes contracts elsewhere — for example a shared
+     * {@code contracts} module in a microservice split — would adopt its own variant.
+     * Adopt it alongside {@link #all()}:
+     *
+     * <pre>{@code
+     * @ArchTest static final ArchRule events = AiPersimmonDddRules.integrationEventsShouldResideInApi();
+     * }</pre>
+     */
+    public static ArchRule integrationEventsShouldResideInApi() {
+        return classes().that().implement(IntegrationEvent.class)
+                .should().resideInAPackage("..api..")
+                .as("integration events should reside in the ..api.. published-contract package")
+                .because("an integration event is a fact published for other contexts, so it belongs with "
+                        + "the outward contract, not in the domain, application, or adapter internals")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * Each bounded context under {@code basePackage} depends on another context only through
+     * that context's {@code ..api..} package — never by reaching into its domain,
+     * application, infrastructure, or adapter internals. A context is the first package
+     * segment under {@code basePackage} (so under {@code "com.example"} the contexts are
+     * {@code com.example.ordering}, {@code com.example.inventory}, …), and its
+     * {@code ..api..} package is its published contract; everything else is private to it.
+     * This is the multi-context isolation rule that keeps the "published language" boundary
+     * honest.
+     *
+     * <p>Parameterised on {@code basePackage}, so it is <strong>not</strong> part of the
+     * parameterless {@link #all()}; wire it into a test that also scopes which classes are
+     * analysed. Only analysed classes are checked, so keep the composition root (which
+     * legitimately wires every context together) out of {@code @AnalyzeClasses}, or it will
+     * be reported. A class that sits directly in {@code basePackage} (an application root,
+     * with no context segment) is skipped.
+     *
+     * <pre>{@code
+     * @ArchTest static final ArchRule contexts =
+     *         AiPersimmonDddRules.boundedContextsShouldOnlyDependOnEachOthersApi("com.example");
+     * }</pre>
+     *
+     * @param basePackage the package under which each immediate sub-package is a context
+     */
+    public static ArchRule boundedContextsShouldOnlyDependOnEachOthersApi(String basePackage) {
+        return classes().that().resideInAPackage(basePackage + "..")
+                .should(dependOnOtherContextsOnlyThroughApi(basePackage))
+                .as("bounded contexts should depend on each other only through their ..api.. packages")
+                .because("a context's internals are private; only its ..api.. package is the published "
+                        + "contract that other contexts may depend on")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A concrete class (not an interface) that implements, directly or transitively, an
+     * interface annotated with the core {@link Repository @Repository} — i.e. a repository
+     * implementation. Excludes the port interfaces themselves, which carry the annotation
+     * but do not <em>implement</em> it.
+     */
+    private static DescribedPredicate<JavaClass> implementARepositoryPort() {
+        return DescribedPredicate.describe("implement a @Repository port",
+                javaClass -> !javaClass.isInterface()
+                        && javaClass.getAllRawInterfaces().stream()
+                                .anyMatch(anInterface -> anInterface.isAnnotatedWith(Repository.class)));
+    }
+
+    /**
+     * Reports a violation for each dependency whose target lives in a <em>different</em>
+     * bounded context (a different first segment under {@code basePackage}) and is not in
+     * that context's {@code ..api..} package. Dependencies within the same context, on the
+     * target context's {@code ..api..}, or on anything outside {@code basePackage} (the JDK,
+     * frameworks, shared kernel) are allowed.
+     */
+    private static ArchCondition<JavaClass> dependOnOtherContextsOnlyThroughApi(String basePackage) {
+        String prefix = basePackage.endsWith(".") ? basePackage : basePackage + ".";
+        return new ArchCondition<>("depend on other bounded contexts only through their ..api.. packages") {
+            @Override
+            public void check(JavaClass origin, ConditionEvents events) {
+                String originContext = contextSegment(origin.getName(), prefix);
+                if (originContext == null) {
+                    return;
+                }
+                origin.getDirectDependenciesFromSelf().forEach(dependency -> {
+                    JavaClass target = dependency.getTargetClass();
+                    String targetContext = contextSegment(target.getName(), prefix);
+                    if (targetContext == null || targetContext.equals(originContext)) {
+                        return;
+                    }
+                    String apiPackage = prefix + targetContext + ".api";
+                    String targetPackage = target.getPackageName();
+                    boolean throughApi = targetPackage.equals(apiPackage)
+                            || targetPackage.startsWith(apiPackage + ".");
+                    if (!throughApi) {
+                        events.add(SimpleConditionEvent.violated(dependency, dependency.getDescription()));
+                    }
+                });
+            }
+        };
+    }
+
+    /**
+     * The bounded-context segment of {@code className}: the first package segment after
+     * {@code prefix}, or {@code null} when the class does not live under {@code prefix} or
+     * sits directly in it (no context segment).
+     */
+    private static String contextSegment(String className, String prefix) {
+        if (!className.startsWith(prefix)) {
+            return null;
+        }
+        String remainder = className.substring(prefix.length());
+        int dot = remainder.indexOf('.');
+        return dot < 0 ? null : remainder.substring(0, dot);
+    }
+
+    /**
      * A method that both carries Spring's {@code @EventListener} (matched by name, see
      * {@link #SPRING_EVENT_LISTENER}) and takes a parameter assignable to the given
      * event marker — i.e. an event subscriber for that kind of event.
@@ -314,6 +664,14 @@ public final class AiPersimmonDddRules {
                 .and(commandHandlersShouldNotDependOnOtherCommandHandlers())
                 .and(invariantsShouldResideInDomain())
                 .and(invariantViolationsShouldOnlyComeFromCheckInvariant())
-                .and(invariantsShouldNotBeSpringComponents());
+                .and(invariantsShouldNotBeSpringComponents())
+                .and(domainBuildingBlocksShouldResideInDomain())
+                .and(domainServicesShouldResideInDomain())
+                .and(aggregateRootsShouldExtendAbstractAggregateRoot())
+                .and(valueObjectsShouldBeImmutable())
+                .and(illegalStateTransitionsShouldOnlyComeFromTransitions())
+                .and(errorCodesShouldBeEnums())
+                .and(repositoryPortsShouldBeInterfacesInDomain())
+                .and(repositoryImplementationsShouldResideInInfrastructure());
     }
 }
