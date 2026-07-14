@@ -6,10 +6,10 @@ import com.example.inventory.domain.stock.Stocks;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 /** In-memory {@link Stocks} implementation, seeded with demo stock levels. */
-@Component
+@Repository
 public class InMemoryStocks implements Stocks {
 
     private final Map<String, Stock> store = new ConcurrentHashMap<>();

@@ -6,10 +6,10 @@ import com.example.ordering.domain.order.Orders;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 /** In-memory {@link Orders} implementation, keyed by order id. */
-@Component
+@Repository
 public class InMemoryOrders implements Orders {
 
     private final Map<String, Order> store = new ConcurrentHashMap<>();

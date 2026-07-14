@@ -7,10 +7,10 @@ import com.example.ordering.domain.shared.Money;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 /** In-memory {@link Customers} implementation, seeded with one demo customer. */
-@Component
+@Repository
 public class InMemoryCustomers implements Customers {
 
     private final Map<String, Customer> store = new ConcurrentHashMap<>();

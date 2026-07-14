@@ -19,6 +19,35 @@ class ArchitectureTest {
     static final ArchRule ddd = AiPersimmonDddRules.all();
 
     /**
+     * Spring-specific companion to {@code all()}: every persistence adapter implementing a
+     * domain {@code @Repository} port carries Spring's {@code @Repository} stereotype (not a
+     * bare {@code @Component}), so it names its role and gets persistence-exception
+     * translation. Opt-in because it presumes Spring, which the framework-free {@code all()}
+     * bundle does not.
+     */
+    @ArchTest
+    static final ArchRule repositoryImplementations =
+            AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories();
+
+    /**
+     * Integration events — the facts each context publishes for others — live in that
+     * context's {@code ..api..} package, its published contract. Opt-in because it presumes
+     * the {@code ..api..} convention this layout uses.
+     */
+    @ArchTest
+    static final ArchRule integrationEvents = AiPersimmonDddRules.integrationEventsShouldResideInApi();
+
+    /**
+     * The ordering and inventory contexts depend on each other only through their
+     * {@code ..api..} packages, never by reaching into each other's domain, application,
+     * infrastructure, or adapter internals. The {@code start} composition root, which
+     * legitimately wires both contexts together, is not analysed (see {@code @AnalyzeClasses}).
+     */
+    @ArchTest
+    static final ArchRule contextsAreIsolated =
+            AiPersimmonDddRules.boundedContextsShouldOnlyDependOnEachOthersApi("com.example");
+
+    /**
      * The ordering inbound adapter must not depend on the ordering domain. Inbound
      * adapters translate a transport (HTTP, a cross-context integration event) into a
      * command or query; a domain-event subscriber belongs in the application layer,
