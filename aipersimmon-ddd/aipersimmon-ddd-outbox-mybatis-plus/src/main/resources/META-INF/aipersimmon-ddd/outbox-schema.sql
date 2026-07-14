@@ -20,3 +20,23 @@ CREATE TABLE IF NOT EXISTS aipersimmon_outbox (
     attempts    INT          NOT NULL DEFAULT 0,
     created_at  TIMESTAMP    NOT NULL
 );
+
+-- Speeds up the relay poll (WHERE sent = FALSE AND attempts < ? ORDER BY created_at)
+-- and the cleanup scan. On PostgreSQL a partial index (... WHERE sent = false) is
+-- smaller and faster. Drop the IF NOT EXISTS on databases that do not support it on
+-- CREATE INDEX (e.g. MySQL).
+CREATE INDEX IF NOT EXISTS idx_aipersimmon_outbox_unsent
+    ON aipersimmon_outbox (sent, created_at);
+
+-- Lock table backing ShedLock, which makes the scheduled relay run on a single
+-- instance at a time (see OutboxRelay#relay). Required whenever the outbox starter
+-- is on the classpath and a DataSource is present. The column names and types are
+-- ShedLock's JDBC contract — do not rename them. TIMESTAMP is correct for
+-- PostgreSQL here too (ShedLock stores UTC via usingDbTime).
+CREATE TABLE IF NOT EXISTS shedlock (
+    name       VARCHAR(64)  NOT NULL,
+    lock_until TIMESTAMP    NOT NULL,
+    locked_at  TIMESTAMP    NOT NULL,
+    locked_by  VARCHAR(255) NOT NULL,
+    PRIMARY KEY (name)
+);

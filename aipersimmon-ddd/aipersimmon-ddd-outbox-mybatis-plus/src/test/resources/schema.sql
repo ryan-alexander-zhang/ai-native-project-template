@@ -15,3 +15,11 @@ CREATE TABLE IF NOT EXISTS aipersimmon_outbox (
     attempts    INT          NOT NULL DEFAULT 0,
     created_at  TIMESTAMP    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS shedlock (
+    name       VARCHAR(64)  NOT NULL,
+    lock_until TIMESTAMP    NOT NULL,
+    locked_at  TIMESTAMP    NOT NULL,
+    locked_by  VARCHAR(255) NOT NULL,
+    PRIMARY KEY (name)
+);

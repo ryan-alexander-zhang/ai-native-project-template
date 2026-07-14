@@ -45,9 +45,10 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
     @ConditionalOnMissingBean
     public KafkaIntegrationEventListener kafkaIntegrationEventListener(
-            ApplicationEventPublisher publisher, ObjectProvider<Inbox> inbox,
-            IntegrationEventTypeResolver typeResolver) {
+            ApplicationEventPublisher publisher, ObjectProvider<ObjectMapper> objectMapper,
+            ObjectProvider<Inbox> inbox, IntegrationEventTypeResolver typeResolver) {
         return new KafkaIntegrationEventListener(
-                publisher, new ObjectMapper(), inbox.getIfAvailable(), typeResolver);
+                publisher, objectMapper.getIfAvailable(ObjectMapper::new),
+                inbox.getIfAvailable(), typeResolver);
     }
 }

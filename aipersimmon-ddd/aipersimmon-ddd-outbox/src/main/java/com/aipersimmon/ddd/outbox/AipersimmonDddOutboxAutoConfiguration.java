@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
@@ -92,8 +93,10 @@ public class AipersimmonDddOutboxAutoConfiguration {
     @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.dispatch", havingValue = "in-process")
     @ConditionalOnMissingBean(OutboxDispatcher.class)
     public OutboxDispatcher inProcessOutboxDispatcher(ApplicationEventPublisher publisher,
+                                                      ObjectProvider<ObjectMapper> objectMapper,
                                                       IntegrationEventTypeResolver typeResolver) {
-        return new InProcessOutboxDispatcher(publisher, new ObjectMapper(), typeResolver);
+        return new InProcessOutboxDispatcher(
+                publisher, objectMapper.getIfAvailable(ObjectMapper::new), typeResolver);
     }
 
     @Bean

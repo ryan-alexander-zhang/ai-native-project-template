@@ -27,6 +27,7 @@
     <archunit.version>1.4.0</archunit.version>
     <spring-boot.version>3.5.10</spring-boot.version>
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
+    <shedlock.version>6.6.0</shedlock.version>
   </properties>
 
   <modules>
@@ -83,6 +84,16 @@
         <groupId>com.baomidou</groupId>
         <artifactId>mybatis-plus-bom</artifactId>
         <version>${mybatis-plus.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Managed versions for ShedLock, used by the outbox storage starters to run
+           the scheduled relay on a single instance at a time (multi-instance safe).
+           Import only supplies versions; it adds no dependency to the pure tier. -->
+      <dependency>
+        <groupId>net.javacrumbs.shedlock</groupId>
+        <artifactId>shedlock-bom</artifactId>
+        <version>${shedlock.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

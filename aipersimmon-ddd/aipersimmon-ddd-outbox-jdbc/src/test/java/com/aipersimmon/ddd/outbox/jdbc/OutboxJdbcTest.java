@@ -91,4 +91,14 @@ class OutboxJdbcTest {
     void autoConfiguresWriterAsIntegrationEventsPublisher() {
         assertInstanceOf(OutboxWriter.class, integrationEvents);
     }
+
+    @Test
+    void relayPollIsGuardedByShedLock() {
+        relay.relay();
+
+        assertEquals(Integer.valueOf(1),
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM shedlock WHERE name = 'aipersimmon-outbox-relay'", Integer.class),
+                "the relay poll must acquire a ShedLock lock so only one instance polls at a time");
+    }
 }

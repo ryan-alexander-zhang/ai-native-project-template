@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.application.Inbox;
+import java.time.Clock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,8 @@ class InboxMybatisPlusTest {
     Inbox inbox;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    InboxMapper inboxMapper;
 
     @BeforeEach
     void reset() {
@@ -37,6 +40,17 @@ class InboxMybatisPlusTest {
         assertFalse(inbox.alreadyProcessed("k1"), "first delivery should be new");
         assertTrue(inbox.alreadyProcessed("k1"), "redelivery of the same key should be detected");
         assertFalse(inbox.alreadyProcessed("k2"), "a different key should be new");
+    }
+
+    @Test
+    void dedupIsScopedPerConsumer() {
+        MybatisPlusInbox serviceA = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a");
+        MybatisPlusInbox serviceB = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b");
+
+        assertFalse(serviceA.alreadyProcessed("evt-1"), "first delivery to service-a is new");
+        assertTrue(serviceA.alreadyProcessed("evt-1"), "redelivery to service-a is a duplicate");
+        assertFalse(serviceB.alreadyProcessed("evt-1"),
+                "the same message id under a different consumer must be handled independently");
     }
 
     @Test
