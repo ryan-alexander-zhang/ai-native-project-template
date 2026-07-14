@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.Optional;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +34,7 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<Void> place(@RequestBody PlaceOrderRequest request) {
+    public ResponseEntity<Void> place(@Valid @RequestBody PlaceOrderRequest request) {
         String id = commandBus.send(request.toCommand());
         return ResponseEntity.created(URI.create("/orders/" + id)).build();
     }

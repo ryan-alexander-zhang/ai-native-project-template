@@ -1,11 +1,26 @@
 package com.example.inventory.application.stock;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 
-/** Command to reserve stock for an order: the order id and the lines to reserve. No result. */
-public record ReserveStock(String orderId, List<Line> lines) implements Command<Void> {
+/**
+ * Command to reserve stock for an order: the order id and the lines to reserve. No result.
+ *
+ * <p>This command arrives from an integration-event listener, not from HTTP, which is
+ * exactly why its Bean Validation constraints matter: the command bus enforces them for
+ * every entry point, so an inbound event with a malformed payload is rejected the same
+ * way a bad HTTP request would be — there is no web adapter here to guard it.
+ */
+public record ReserveStock(
+        @NotBlank String orderId,
+        @NotEmpty List<@Valid Line> lines) implements Command<Void> {
 
-    public record Line(String sku, int quantity) {
+    public record Line(
+            @NotBlank String sku,
+            @Positive int quantity) {
     }
 }
