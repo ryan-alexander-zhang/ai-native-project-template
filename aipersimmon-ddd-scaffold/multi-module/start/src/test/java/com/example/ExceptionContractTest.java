@@ -87,4 +87,26 @@ class ExceptionContractTest {
         mvc.perform(get("/orders/NON-EXISTENT"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void confirmingAnAlreadyConfirmedOrderRenders409() throws Exception {
+        // Placing succeeds and the fulfilment saga synchronously confirms the order
+        // (SKU-1 has stock), so it is already CONFIRMED when the request returns.
+        String body = """
+                {"customerId":"CUST-1",
+                 "lines":[{"sku":"SKU-1","quantity":1,"unitAmountMinor":100,"currency":"USD"}]}
+                """;
+        String location = mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+
+        // Confirming again is a transition the Order state machine does not allow
+        // (CONFIRMED -> CONFIRMED), i.e. a conflict with the current state → 409.
+        mvc.perform(post(location + "/confirm"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                // The state-machine guard carries no code, so the type is about:blank (a
+                // conflict whose semantics are fully described by the 409 status).
+                .andExpect(jsonPath("$.type").value("about:blank"));
+    }
 }
