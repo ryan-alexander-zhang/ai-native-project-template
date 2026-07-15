@@ -2,7 +2,10 @@ package com.aipersimmon.ddd.outbox.mybatisplus;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
+import com.aipersimmon.ddd.outbox.DeadLetterStore;
+import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
@@ -18,10 +21,13 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Wires the MyBatis-Plus-backed outbox storage once MyBatis-Plus has produced a
@@ -36,6 +42,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @AutoConfiguration(after = {
         MybatisPlusAutoConfiguration.class,
+        DataSourceTransactionManagerAutoConfiguration.class,
         AipersimmonDddOutboxAutoConfiguration.class})
 @EnableScheduling
 public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
@@ -57,6 +64,24 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
 
     @Bean
     @ConditionalOnBean(SqlSessionFactory.class)
+    @ConditionalOnMissingBean
+    public MapperFactoryBean<DeadLetterMapper> aipersimmonDeadLetterMapper(SqlSessionFactory sqlSessionFactory) {
+        MapperFactoryBean<DeadLetterMapper> factory = new MapperFactoryBean<>(DeadLetterMapper.class);
+        factory.setSqlSessionFactory(sqlSessionFactory);
+        return factory;
+    }
+
+    @Bean
+    @ConditionalOnBean(SqlSessionFactory.class)
+    @ConditionalOnMissingBean(DeadLetterStore.class)
+    public DeadLetterStore outboxDeadLetterStore(OutboxMapper outboxMapper, DeadLetterMapper deadLetterMapper,
+            PlatformTransactionManager transactionManager, Clock outboxClock) {
+        return new MybatisDeadLetterStore(
+                outboxMapper, deadLetterMapper, new TransactionTemplate(transactionManager), outboxClock);
+    }
+
+    @Bean
+    @ConditionalOnBean(SqlSessionFactory.class)
     @ConditionalOnMissingBean(IntegrationEvents.class)
     public IntegrationEvents outboxWriter(OutboxMapper outboxMapper, ObjectProvider<ObjectMapper> objectMapper,
             Clock outboxClock,
@@ -69,10 +94,14 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
     @ConditionalOnBean(SqlSessionFactory.class)
     @ConditionalOnMissingBean
     public OutboxRelay outboxRelay(OutboxMapper outboxMapper, OutboxDispatcher outboxDispatcher,
+                                   DeadLetterStore deadLetterStore, FailureClassifier failureClassifier,
                                    Clock outboxClock,
                                    @Value("${aipersimmon.ddd.outbox.batch-size:100}") int batchSize,
-                                   @Value("${aipersimmon.ddd.outbox.max-attempts:10}") int maxAttempts) {
-        return new OutboxRelay(outboxMapper, outboxDispatcher, outboxClock, batchSize, maxAttempts);
+                                   @Value("${aipersimmon.ddd.outbox.max-attempts:10}") int maxAttempts,
+                                   @Value("${aipersimmon.ddd.outbox.retry.base-backoff-ms:1000}") long baseBackoffMs,
+                                   @Value("${aipersimmon.ddd.outbox.retry.max-backoff-ms:60000}") long maxBackoffMs) {
+        return new OutboxRelay(outboxMapper, outboxDispatcher, deadLetterStore, failureClassifier,
+                new RetryBackoff(baseBackoffMs, maxBackoffMs), outboxClock, batchSize, maxAttempts);
     }
 
     @Bean

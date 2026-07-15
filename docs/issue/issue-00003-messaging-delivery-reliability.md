@@ -16,17 +16,21 @@ parent: design-00001-aipersimmon-ddd-and-scaffold
 
 两条链路,两种都不对的失败模式:
 
-- **生产侧 `OutboxRelay.relay()`**(`aipersimmon-ddd-outbox-jdbc/.../OutboxRelay.java:48-57`,mybatis 版同构):
-  失败仅 `attempts++` + `warn`,行仍 `sent=FALSE`;配合 `WHERE sent=FALSE ORDER BY created_at ASC` 每 1s 轮询
-  → **毒丸行无限重试**。无 `max-attempts`、无退避(立即下轮再撞)、无死信;`attempts` 只是无人读的计数器;
-  毒丸永占队头 → 日志刷屏 + DB/网络空转,重则**队头阻塞**。
+- **生产侧 `OutboxRelay.relay()`**(jdbc / mybatis-plus 同构):失败仅 `attempts++` + `warn`,行仍
+  `sent=FALSE`;`SELECT ... WHERE sent=FALSE AND attempts < max-attempts` 每 1s 轮询。达 `max-attempts`
+  (默认 10)后该行被 `attempts < ?` **永久排除**,却仍留在表内 `sent=FALSE` → **有界但不可恢复的遗弃**
+  (非早先描述的"无限重试":`max-attempts` 已由提交 `4a0e94b` 加入)。其代价:(1)**零退避**——上限内每 1s 硬撞
+  (default 10 次 ≈ 10s),broker 重启即熬过,瞬时抖动坐实为永久跨 BC 不一致;(2)**无死信**——遗弃行是隐形墓碑,
+  无 `last_error`/`dead_at`/重放入口;(3)**无瞬时/永久分类**——反序列化等必然失败也白耗满 10 次;(4)遗弃行被排除
+  后其 `subject` 后续事件继续发送 → **give-up 点之后静默乱序**。
 - **消费侧 `KafkaIntegrationEventListener.onMessage()`**(`aipersimmon-ddd-messaging-kafka`,`@Transactional`):
   handler 抛异常 → inbox 记录回滚 → 冒泡到容器;而 autoconfig **未配置** `DefaultErrorHandler`/
-  `DeadLetterPublishingRecoverer`/`BackOff` → 落到 Spring Kafka 默认(有限次重试后**提交位点跳过**),
-  且**无 DLT 捕获** → 毒丸记录最终**静默丢失**(无留存、无取证、无重放)。
+  `DeadLetterPublishingRecoverer`/`BackOff` → 落到 Spring Kafka 默认(零退避重试 9 次后**提交位点跳过**),
+  且**无 DLT 捕获** → 毒丸记录最终**静默丢失**(无留存、无取证、无重放)。永久失败(反序列化、未知
+  `(type, version)` 抛 `UnknownIntegrationEventException`)同样白耗重试后被丢。
 - 旁证:`JdbcDeadlineScheduler.poll()`(saga-spring)同为 catch→warn→无限重试。
 
-一句话:生产侧"永不放弃"(死循环),消费侧"悄悄放弃"(静默丢失)。
+一句话:生产侧"永不真正放弃却静默丢行"(有界遗弃),消费侧"悄悄放弃"(静默丢失)。
 
 ## 提议(受控可靠性 = 三件事)
 
@@ -68,6 +72,29 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
 - **AC-3**:Kafka 毒丸记录经退避重试后进 `<topic>.DLT`(而非静默丢弃);inbox 幂等语义不回归。
 - **AC-4**:死信可被工具/人工重放回主流程。
 - **AC-5**:jdbc 与 mybatis-plus 两后端行为一致;以 Testcontainers(Postgres + Kafka)验证 AC-1..4。
+
+## 落地进度
+
+**生产侧(outbox,对应 H1)已落地**——库反应堆 + multi-module 脚手架全绿:
+
+- **`FailureClassifier` SPI + `DefaultFailureClassifier`**(`-outbox`,framework-free):瞬时(默认)/ 永久
+  (`UnknownIntegrationEventException`、Jackson `JsonProcessingException`,沿 cause 链识别)分类;可覆盖 bean。
+- **`RetryBackoff`**(`-outbox`):等-jitter 指数退避(cap 逐次翻倍、封顶、`[cap/2, cap]`),经 `next_attempt_at`
+  列落库,`SELECT ... AND (next_attempt_at IS NULL OR next_attempt_at <= now)` 到期才取;`base=0` 可关退避。
+  配置 `aipersimmon.ddd.outbox.retry.base-backoff-ms`(默认 1000)/ `max-backoff-ms`(默认 60000)。
+- **`DeadLetterStore` SPI**(`-outbox`)+ `aipersimmon_dead_letter` 表(jdbc / mybatis-plus):永久失败或耗尽重试的
+  行经 `TransactionTemplate` **同事务从 outbox 移入**死信表(不再滞留热表),留存 `attempts`/`reason`
+  (`PERMANENT` | `RETRIES_EXHAUSTED`)/ `last_error`/ `failed_at`;`replay(eventId)` 反向搬回 outbox 重投。
+- **relay 收口**:失败先分类——永久即刻死信(不耗重试),瞬时退避重试至 `max-attempts`(默认仍 10)再死信;
+  live 重试行仍按 `subject` 保序回避,死信行放行其聚合后续。
+- 验证:`RetryBackoff` 单测;jdbc `OutboxRelayResilienceTest`(保序 / 耗尽即死信 / 永久即死信 / replay 回投)+
+  `OutboxRelayBackoffTest`(退避入未来、下轮跳过);mybatis-plus 对等弹性测试(双后端一致)。
+- 满足 **AC-1 / AC-2 / AC-4**,及 **AC-5** 的 jdbc / mybatis-plus 一致性(以 H2 验证,未引入 Testcontainers)。
+
+**消费侧(Kafka DLT,对应 H3 / AC-3)待后续提交**:`-messaging-kafka` autoconfig 装配
+`DefaultErrorHandler(ExponentialBackOffWithMaxRetries)` + `DeadLetterPublishingRecoverer` → `<topic>.DLT`,并将
+`FailureClassifier` 的永久语义(尤其 `UnknownIntegrationEventException`,承 issue-00005 边界 #5)接入不可重试路由。
+故本 issue 保持 `open` 直至 H3 落地。
 
 ## 关联
 

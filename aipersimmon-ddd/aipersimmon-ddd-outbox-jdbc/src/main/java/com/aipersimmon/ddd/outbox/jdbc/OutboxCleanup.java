@@ -12,8 +12,8 @@ import org.springframework.scheduling.annotation.Scheduled;
  * Deletes outbox rows that were sent longer ago than the retention window, so the
  * table does not grow without bound. Opt-in (see the auto-configuration) because
  * deleting data and the right retention are deployment decisions. Only sent rows are
- * removed; unsent rows — including dead letters — are kept for delivery or
- * inspection.
+ * removed; unsent rows are kept for delivery, and dead letters live in their own table
+ * (untouched by this purge) for inspection and replay.
  *
  * <p>Guarded by ShedLock like the relay, so one instance runs the purge at a time.
  */

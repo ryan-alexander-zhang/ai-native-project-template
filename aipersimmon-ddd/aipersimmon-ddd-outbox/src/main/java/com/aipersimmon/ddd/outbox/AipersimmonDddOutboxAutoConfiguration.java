@@ -115,6 +115,17 @@ public class AipersimmonDddOutboxAutoConfiguration {
         }
     }
 
+    /**
+     * The default {@link FailureClassifier} the relay uses to tell a retryable dispatch
+     * failure from a hopeless one. Storage-agnostic, so it lives here rather than in a
+     * storage starter. Override the bean to refine the rules for your transport.
+     */
+    @Bean
+    @ConditionalOnMissingBean(FailureClassifier.class)
+    public FailureClassifier outboxFailureClassifier() {
+        return new DefaultFailureClassifier();
+    }
+
     @Bean
     @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.dispatch", havingValue = "in-process")
     @ConditionalOnMissingBean(OutboxDispatcher.class)

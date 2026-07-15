@@ -6,14 +6,14 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.Instant;
 
 /**
- * One stored integration event in the outbox table: the transport metadata, the
- * serialized JSON payload, and the delivery bookkeeping (sent flag, sent time,
- * attempt count). Uses MyBatis-Plus {@code @TableName}/{@code @TableId}, not a JPA
- * {@code @Entity}, so it never affects a consumer's JPA entity scanning. Column
- * names are the snake_case of the field names (MyBatis-Plus maps them by default).
+ * One dead-lettered message in the {@code aipersimmon_dead_letter} table: the same
+ * transport metadata and payload as the outbox row it was moved from, plus the triage
+ * fields (attempts made, reason given up on, the last error, when). Uses MyBatis-Plus
+ * {@code @TableName}/{@code @TableId} like {@link OutboxRecord}, so it never affects a
+ * consumer's JPA entity scanning.
  */
-@TableName("aipersimmon_outbox")
-public class OutboxRecord {
+@TableName("aipersimmon_dead_letter")
+public class DeadLetterRecord {
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -27,11 +27,10 @@ public class OutboxRecord {
     private String correlationId;
     private String causationId;
     private String traceId;
-    private Boolean sent;
-    private Instant sentAt;
     private Integer attempts;
-    private Instant nextAttemptAt;
-    private Instant createdAt;
+    private String reason;
+    private String lastError;
+    private Instant failedAt;
 
     public Long getId() {
         return id;
@@ -121,22 +120,6 @@ public class OutboxRecord {
         this.traceId = traceId;
     }
 
-    public Boolean getSent() {
-        return sent;
-    }
-
-    public void setSent(Boolean sent) {
-        this.sent = sent;
-    }
-
-    public Instant getSentAt() {
-        return sentAt;
-    }
-
-    public void setSentAt(Instant sentAt) {
-        this.sentAt = sentAt;
-    }
-
     public Integer getAttempts() {
         return attempts;
     }
@@ -145,19 +128,27 @@ public class OutboxRecord {
         this.attempts = attempts;
     }
 
-    public Instant getNextAttemptAt() {
-        return nextAttemptAt;
+    public String getReason() {
+        return reason;
     }
 
-    public void setNextAttemptAt(Instant nextAttemptAt) {
-        this.nextAttemptAt = nextAttemptAt;
+    public void setReason(String reason) {
+        this.reason = reason;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
+    public String getLastError() {
+        return lastError;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
+    public void setLastError(String lastError) {
+        this.lastError = lastError;
+    }
+
+    public Instant getFailedAt() {
+        return failedAt;
+    }
+
+    public void setFailedAt(Instant failedAt) {
+        this.failedAt = failedAt;
     }
 }

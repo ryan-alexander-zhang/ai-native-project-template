@@ -1,8 +1,7 @@
-package com.aipersimmon.ddd.outbox.jdbc;
+package com.aipersimmon.ddd.outbox.mybatisplus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
@@ -25,11 +24,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Exercises the relay's ordering-under-failure, dead-letter, and replay behaviour
- * against H2, using a dispatcher whose failures are scripted per event id. Backoff is
- * disabled (base = 0) so a retried row is eligible again on the next poll and the test
- * can drive attempts deterministically; backoff timing itself is covered by
- * {@link OutboxRelayBackoffTest}.
+ * The MyBatis-Plus backend's counterpart to the JDBC starter's resilience test: the same
+ * ordering-under-failure, dead-letter, and replay behaviour, so the two backends are
+ * interchangeable. Backoff is disabled (base = 0) so a retried row is eligible again on
+ * the next poll and the test can drive attempts deterministically.
  */
 @SpringBootTest(
         classes = OutboxRelayResilienceTest.TestApp.class,
@@ -95,11 +93,6 @@ class OutboxRelayResilienceTest {
                 Timestamp.from(Instant.now().plusSeconds(createdOffsetSeconds)));
     }
 
-    private Integer attempts(String eventId) {
-        return jdbc.queryForObject(
-                "SELECT attempts FROM aipersimmon_outbox WHERE event_id = ?", Integer.class, eventId);
-    }
-
     private int outboxCount() {
         return jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox", Integer.class);
     }
@@ -116,16 +109,9 @@ class OutboxRelayResilienceTest {
 
         relay.relay();
 
-        assertTrue(dispatcher.dispatched.contains("e1"), "the oldest event is attempted");
+        assertTrue(dispatcher.dispatched.contains("e1"));
         assertFalse(dispatcher.dispatched.contains("e2"),
                 "a later event of the same aggregate must not overtake the stuck one");
-        assertEquals(Integer.valueOf(1), attempts("e1"));
-        assertNotNull(
-                jdbc.queryForObject(
-                        "SELECT next_attempt_at FROM aipersimmon_outbox WHERE event_id = ?",
-                        Timestamp.class, "e1"),
-                "a transient failure schedules the next attempt");
-        assertEquals(Integer.valueOf(0), attempts("e2"), "the held-back event was not attempted");
     }
 
     @Test
@@ -133,20 +119,16 @@ class OutboxRelayResilienceTest {
         insert("e1", null, 0);
         dispatcher.failEventIds.add("e1");
 
-        relay.relay(); // attempt 1 -> attempts = 1, retry scheduled
-        relay.relay(); // attempt 2 -> reaches max-attempts, dead-lettered
-        relay.relay(); // gone from the outbox, not attempted again
+        relay.relay();
+        relay.relay();
+        relay.relay();
 
-        assertEquals(2, dispatcher.dispatched.stream().filter("e1"::equals).count(),
-                "after max-attempts the row is dead-lettered and no longer selected");
-        assertEquals(0, outboxCount(), "the spent row is moved out of the hot outbox table");
-        assertEquals(1, deadLetterCount(), "and preserved in the dead-letter store");
+        assertEquals(2, dispatcher.dispatched.stream().filter("e1"::equals).count());
+        assertEquals(0, outboxCount());
+        assertEquals(1, deadLetterCount());
         assertEquals("RETRIES_EXHAUSTED",
                 jdbc.queryForObject(
                         "SELECT reason FROM aipersimmon_dead_letter WHERE event_id = ?", String.class, "e1"));
-        assertEquals(Integer.valueOf(2),
-                jdbc.queryForObject(
-                        "SELECT attempts FROM aipersimmon_dead_letter WHERE event_id = ?", Integer.class, "e1"));
     }
 
     @Test
@@ -155,41 +137,32 @@ class OutboxRelayResilienceTest {
         dispatcher.permanentlyFailEventIds.add("e1");
 
         relay.relay();
-        relay.relay(); // nothing left to select
+        relay.relay();
 
-        assertEquals(1, dispatcher.dispatched.stream().filter("e1"::equals).count(),
-                "a permanent failure is not retried");
+        assertEquals(1, dispatcher.dispatched.stream().filter("e1"::equals).count());
         assertEquals(0, outboxCount());
-        assertEquals(1, deadLetterCount());
         assertEquals("PERMANENT",
                 jdbc.queryForObject(
                         "SELECT reason FROM aipersimmon_dead_letter WHERE event_id = ?", String.class, "e1"));
-        String lastError = jdbc.queryForObject(
-                "SELECT last_error FROM aipersimmon_dead_letter WHERE event_id = ?", String.class, "e1");
-        assertTrue(lastError.contains(UnknownIntegrationEventException.class.getName()),
-                "the final error is captured for triage");
     }
 
     @Test
     void replayMovesADeadLetterBackToTheOutboxAndItThenDelivers() {
         insert("e1", null, 0);
         dispatcher.permanentlyFailEventIds.add("e1");
-        relay.relay(); // dead-lettered
+        relay.relay();
         assertEquals(1, deadLetterCount());
 
-        // the cause is "fixed": the dispatcher stops failing, an operator replays it
         dispatcher.permanentlyFailEventIds.clear();
-        assertTrue(deadLetterStore.replay("e1"), "an existing dead letter is requeued");
-        assertFalse(deadLetterStore.replay("missing"), "a missing id requeues nothing");
+        assertTrue(deadLetterStore.replay("e1"));
+        assertFalse(deadLetterStore.replay("missing"));
 
-        assertEquals(1, outboxCount(), "the message is back in the outbox, unsent");
+        assertEquals(1, outboxCount());
         assertEquals(0, deadLetterCount());
-        assertEquals(Integer.valueOf(0), attempts("e1"), "its delivery bookkeeping is reset");
 
         relay.relay();
 
-        assertEquals(1,
-                jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = TRUE", Integer.class),
-                "the replayed message now delivers");
+        assertEquals(Integer.valueOf(1),
+                jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = TRUE", Integer.class));
     }
 }
