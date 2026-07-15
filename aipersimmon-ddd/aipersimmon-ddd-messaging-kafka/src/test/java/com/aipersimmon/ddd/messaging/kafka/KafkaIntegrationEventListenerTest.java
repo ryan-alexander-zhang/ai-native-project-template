@@ -2,11 +2,14 @@ package com.aipersimmon.ddd.messaging.kafka;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.application.Inbox;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,6 +71,39 @@ class KafkaIntegrationEventListenerTest {
         listener.onMessage(record);
 
         assertEquals(2, publisher.events.size());
+    }
+
+    @Test
+    void rejectsARecordMissingTheRequiredIdHeaderInsteadOfFabricatingOne() throws Exception {
+        CapturingPublisher publisher = new CapturingPublisher();
+        InMemoryInbox inbox = new InMemoryInbox();
+        KafkaIntegrationEventListener listener =
+                new KafkaIntegrationEventListener(publisher, mapper, inbox, catalog);
+
+        ConsumerRecord<String, String> record =
+                new ConsumerRecord<>("orders", 0, 0L, "o-1", mapper.writeValueAsString(new SampleEvent("o-1", "x")));
+        record.headers().add(IntegrationEventHeaders.TYPE, "SampleEvent".getBytes(StandardCharsets.UTF_8));
+        // no ce_id header
+
+        assertThrows(MalformedIntegrationEventException.class, () -> listener.onMessage(record),
+                "a missing ce_id must be rejected (permanent -> dead-letter), not given a random id");
+        assertEquals(0, publisher.events.size(), "nothing is republished");
+        assertTrue(inbox.seen.isEmpty(), "the inbox must not be touched with a fabricated id");
+    }
+
+    @Test
+    void rejectsARecordMissingTheRequiredTypeHeader() throws Exception {
+        CapturingPublisher publisher = new CapturingPublisher();
+        KafkaIntegrationEventListener listener =
+                new KafkaIntegrationEventListener(publisher, mapper, null, catalog);
+
+        ConsumerRecord<String, String> record =
+                new ConsumerRecord<>("orders", 0, 0L, "o-1", mapper.writeValueAsString(new SampleEvent("o-1", "x")));
+        record.headers().add(IntegrationEventHeaders.ID, "evt-1".getBytes(StandardCharsets.UTF_8));
+        // no ce_type header
+
+        assertThrows(MalformedIntegrationEventException.class, () -> listener.onMessage(record));
+        assertEquals(0, publisher.events.size());
     }
 
     private ConsumerRecord<String, String> recordFor(SampleEvent event, String eventId) throws Exception {

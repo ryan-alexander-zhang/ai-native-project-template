@@ -4,13 +4,13 @@ import com.aipersimmon.ddd.application.Inbox;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 import org.springframework.context.ApplicationEventPublisher;
@@ -21,11 +21,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Consumes CloudEvents-encoded integration events from Kafka and hands them to local
- * handlers. For each record it guards against redelivery with the {@link Inbox}
- * (keyed by the {@code ce_id} header); otherwise it resolves the {@code ce_type}
- * (type, version) pair to a local class via the {@link IntegrationEventCatalog} — never
- * loading the producer's class by name, dead-lettering an unknown pair — reconstructs the {@link EventEnvelope} from
- * the {@code ce_} headers and JSON payload, and republishes the envelope through
+ * handlers. A record must carry the required CloudEvents attributes {@code ce_id} (the
+ * inbox key) and {@code ce_type} (the catalog key); one that is missing either is
+ * malformed and rejected as a {@link MalformedIntegrationEventException} (a permanent
+ * failure, dead-lettered) rather than given a fabricated id that would defeat the inbox.
+ * For a well-formed record it guards against redelivery with the {@link Inbox} (keyed by
+ * {@code ce_id}); otherwise it resolves the {@code ce_type} (type, version) pair to a
+ * local class via the {@link IntegrationEventCatalog} — never loading the producer's
+ * class by name, dead-lettering an unknown pair — reconstructs the {@link EventEnvelope}
+ * from the {@code ce_} headers and JSON payload, and republishes the envelope through
  * Spring's {@link ApplicationEventPublisher}, so beans with {@code @EventListener}
  * handlers for {@code EventEnvelope<TheEvent>} receive it with the full metadata
  * intact — the inbound adapter is the anti-corruption layer and needs that metadata.
@@ -72,11 +76,15 @@ public class KafkaIntegrationEventListener {
             groupId = "${aipersimmon.ddd.messaging.kafka.consumer.group-id:${spring.application.name:aipersimmon}}")
     @Transactional
     public void onMessage(ConsumerRecord<String, String> record) {
-        String eventId = header(record, IntegrationEventHeaders.ID);
-        if (inbox != null && eventId != null && inbox.alreadyProcessed(eventId)) {
+        // ce_id is a required CloudEvents attribute and the inbox key. A record without
+        // it cannot be deduplicated; fabricating an id would make every redelivery look
+        // like a new event and silently defeat the inbox — so reject it (permanent
+        // failure -> dead-letter) rather than invent identity.
+        String eventId = require(record, IntegrationEventHeaders.ID);
+        if (inbox != null && inbox.alreadyProcessed(eventId)) {
             return;
         }
-        EventEnvelope<IntegrationEvent> envelope = reconstruct(record);
+        EventEnvelope<IntegrationEvent> envelope = reconstruct(record, eventId);
         // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
         // match despite erasure.
         ResolvableType type = ResolvableType.forClassWithGenerics(
@@ -84,18 +92,13 @@ public class KafkaIntegrationEventListener {
         publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
     }
 
-    private EventEnvelope<IntegrationEvent> reconstruct(ConsumerRecord<String, String> record) {
-        String type = header(record, IntegrationEventHeaders.TYPE);
-        if (type == null) {
-            throw new IllegalStateException(
-                    "Kafka record is missing the " + IntegrationEventHeaders.TYPE + " header");
-        }
+    private EventEnvelope<IntegrationEvent> reconstruct(ConsumerRecord<String, String> record, String eventId) {
+        String type = require(record, IntegrationEventHeaders.TYPE);
         int version = parseVersion(header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
         Class<? extends IntegrationEvent> eventType = catalog.lookup(type, version)
                 .orElseThrow(() -> new UnknownIntegrationEventException(type, version));
         try {
             IntegrationEvent payload = objectMapper.readValue(record.value(), eventType);
-            String eventId = orElse(header(record, IntegrationEventHeaders.ID), UUID.randomUUID().toString());
             String source = orElse(header(record, IntegrationEventHeaders.SOURCE), "unknown");
             String subject = header(record, IntegrationEventHeaders.SUBJECT);
             String correlationId = orElse(header(record, IntegrationEventHeaders.CORRELATION_ID), eventId);
@@ -121,6 +124,16 @@ public class KafkaIntegrationEventListener {
 
     private static String orElse(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    /** Reads a required CloudEvents header, rejecting the record if it is absent or blank. */
+    private static String require(ConsumerRecord<String, String> record, String name) {
+        String value = header(record, name);
+        if (value == null || value.isBlank()) {
+            throw new MalformedIntegrationEventException(
+                    "inbound Kafka record is missing required CloudEvents attribute " + name);
+        }
+        return value;
     }
 
     private static String header(ConsumerRecord<String, String> record, String name) {

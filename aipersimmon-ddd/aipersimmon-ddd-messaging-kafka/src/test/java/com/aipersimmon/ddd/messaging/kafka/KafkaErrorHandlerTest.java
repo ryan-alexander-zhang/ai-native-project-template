@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
@@ -58,6 +59,19 @@ class KafkaErrorHandlerTest {
         assertEquals(1, recovered.size(),
                 "a permanent failure is dead-lettered on the first failure, not after 5 retries");
         assertEquals(record, recovered.get(0));
+    }
+
+    @Test
+    void aRecordMissingARequiredAttributeIsRecoveredImmediatelyWithoutRetrying() {
+        ConsumerRecord<String, String> record = record();
+
+        handler.handleRemaining(
+                new ListenerExecutionFailedException("listener failed",
+                        new MalformedIntegrationEventException("missing ce_id")),
+                List.of(record), consumer, container);
+
+        assertEquals(1, recovered.size(),
+                "a malformed record (missing required attribute) is dead-lettered at once");
     }
 
     @Test

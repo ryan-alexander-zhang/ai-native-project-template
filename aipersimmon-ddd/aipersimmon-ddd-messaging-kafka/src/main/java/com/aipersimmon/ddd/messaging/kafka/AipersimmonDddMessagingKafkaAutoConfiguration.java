@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.messaging.kafka;
 
 import com.aipersimmon.ddd.application.Inbox;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
@@ -98,11 +99,14 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
         backOff.setMultiplier(retry.getMultiplier());
         backOff.setMaxInterval(retry.getMaxIntervalMs());
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
-        // No number of retries conjures a local class for an unknown (type, version), nor
-        // reparses a malformed payload — dead-letter them at once (see also boundary #5 of
-        // the integration-event contract: unknown inbound (type, version) -> DLT).
+        // No number of retries conjures a local class for an unknown (type, version),
+        // reparses a malformed payload, or adds a required attribute a record never had —
+        // dead-letter them at once (see also boundary #5 of the integration-event
+        // contract: unknown inbound (type, version) -> DLT).
         handler.addNotRetryableExceptions(
-                UnknownIntegrationEventException.class, JsonProcessingException.class);
+                UnknownIntegrationEventException.class,
+                MalformedIntegrationEventException.class,
+                JsonProcessingException.class);
         return handler;
     }
 }
