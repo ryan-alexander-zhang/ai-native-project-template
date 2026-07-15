@@ -2,7 +2,7 @@
 id: issue-00003-messaging-delivery-reliability
 type: issue
 role: main
-status: open
+status: resolved
 parent: design-00001-aipersimmon-ddd-and-scaffold
 ---
 
@@ -75,7 +75,9 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
 
 ## 落地进度
 
-**生产侧(outbox,对应 H1)已落地**——库反应堆 + multi-module 脚手架全绿:
+两侧均已落地(拆两次提交:先 outbox / H1,后 Kafka / H3);库反应堆全绿,multi-module 脚手架全绿。
+
+**生产侧(outbox,对应 H1)**:
 
 - **`FailureClassifier` SPI + `DefaultFailureClassifier`**(`-outbox`,framework-free):瞬时(默认)/ 永久
   (`UnknownIntegrationEventException`、Jackson `JsonProcessingException`,沿 cause 链识别)分类;可覆盖 bean。
@@ -91,10 +93,22 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
   `OutboxRelayBackoffTest`(退避入未来、下轮跳过);mybatis-plus 对等弹性测试(双后端一致)。
 - 满足 **AC-1 / AC-2 / AC-4**,及 **AC-5** 的 jdbc / mybatis-plus 一致性(以 H2 验证,未引入 Testcontainers)。
 
-**消费侧(Kafka DLT,对应 H3 / AC-3)待后续提交**:`-messaging-kafka` autoconfig 装配
-`DefaultErrorHandler(ExponentialBackOffWithMaxRetries)` + `DeadLetterPublishingRecoverer` → `<topic>.DLT`,并将
-`FailureClassifier` 的永久语义(尤其 `UnknownIntegrationEventException`,承 issue-00005 边界 #5)接入不可重试路由。
-故本 issue 保持 `open` 直至 H3 落地。
+**消费侧(Kafka DLT,对应 H3)**:
+
+- `-messaging-kafka` autoconfig 在消费者启用且有 `KafkaTemplate` 时装配
+  `DefaultErrorHandler(ExponentialBackOffWithMaxRetries)` + `DeadLetterPublishingRecoverer` → `<topic>.DLT`;
+  Spring Boot 的容器工厂 configurer 自动把这唯一的 `CommonErrorHandler` bean 应用到监听容器。取代 Spring Kafka
+  默认的"零退避重试 9 次后静默跳过"。
+- **永久失败即刻 DLT**:`UnknownIntegrationEventException`、Jackson `JsonProcessingException` 标为 not-retryable
+  (沿 cause 链识别),不耗退避直接死信——与 outbox 侧 `DefaultFailureClassifier` 的永久集一致,两传输对"何为不可
+  重试"口径统一;亦落实集成事件契约"未知入站 `(type, version)` → DLT、无 FQCN 回退"这一边界。
+- 配置:`aipersimmon.ddd.messaging.kafka.consumer.retry.{max-retries=3, initial-interval-ms=1000, multiplier=2.0,
+  max-interval-ms=10000}`。
+- 验证:`KafkaErrorHandlerTest`(永久 → 首次即 recover / 瞬时 → 首次不 recover,不接触 broker)+
+  `AutoConfigurationWiringTest`(启用即装配 `DefaultErrorHandler`、禁用则无、可覆盖)。满足 **AC-3**;`inbox` 幂等语义
+  未回归(handler 失败 inbox 记录随事务回滚,重投安全;耗尽后 recover 到 DLT)。
+
+全部 AC(1–5)达成,本 issue `resolved`。
 
 ## 关联
 

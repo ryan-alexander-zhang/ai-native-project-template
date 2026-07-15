@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 
 /**
  * Verifies the auto-configuration wires the Kafka dispatcher as the outbox's
@@ -37,6 +39,21 @@ class AutoConfigurationWiringTest {
     void registersConsumerBridgeWhenEnabled() {
         runner.withPropertyValues("aipersimmon.ddd.messaging.kafka.consumer.enabled=true")
                 .run(context -> assertThat(context).hasSingleBean(KafkaIntegrationEventListener.class));
+    }
+
+    @Test
+    void registersDeadLetteringErrorHandlerWithTheConsumer() {
+        runner.withPropertyValues("aipersimmon.ddd.messaging.kafka.consumer.enabled=true")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(CommonErrorHandler.class);
+                    assertThat(context.getBean(CommonErrorHandler.class))
+                            .isInstanceOf(DefaultErrorHandler.class);
+                });
+    }
+
+    @Test
+    void noErrorHandlerWhenTheConsumerIsDisabled() {
+        runner.run(context -> assertThat(context).doesNotHaveBean(CommonErrorHandler.class));
     }
 
     @Test
