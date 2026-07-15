@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.context.PayloadApplicationEvent;
 
 class SpringIntegrationEventsTest {
 
+    @EventType(name = "com.example.inventory.SampleIntegration", version = 1)
     record SampleIntegrationEvent(String id) implements IntegrationEvent {
     }
 
@@ -33,7 +35,8 @@ class SpringIntegrationEventsTest {
         EventEnvelope<?> envelope = (EventEnvelope<?>) published.getPayload();
         assertSame(event, envelope.payload());
         assertEquals("/inventory", envelope.source());
-        assertEquals("SampleIntegrationEvent", envelope.type(), "logical type defaults to the simple class name");
+        assertEquals("com.example.inventory.SampleIntegration", envelope.type(),
+                "the declared @EventType logical type");
         assertEquals("corr-1", envelope.correlationId(), "inherits the command's correlation");
         assertEquals("cmd-1", envelope.causationId(), "caused by the emitting command");
         assertEquals("trace-1", envelope.traceId());

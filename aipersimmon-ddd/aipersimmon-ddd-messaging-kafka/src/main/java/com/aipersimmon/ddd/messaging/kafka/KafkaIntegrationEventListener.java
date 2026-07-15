@@ -3,7 +3,8 @@ package com.aipersimmon.ddd.messaging.kafka;
 import com.aipersimmon.ddd.application.Inbox;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
-import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
+import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -22,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Consumes CloudEvents-encoded integration events from Kafka and hands them to local
  * handlers. For each record it guards against redelivery with the {@link Inbox}
  * (keyed by the {@code ce_id} header); otherwise it resolves the {@code ce_type}
- * logical type to a local class via the {@link IntegrationEventTypeResolver} — never
- * loading the producer's class by name — reconstructs the {@link EventEnvelope} from
+ * (type, version) pair to a local class via the {@link IntegrationEventCatalog} — never
+ * loading the producer's class by name, dead-lettering an unknown pair — reconstructs the {@link EventEnvelope} from
  * the {@code ce_} headers and JSON payload, and republishes the envelope through
  * Spring's {@link ApplicationEventPublisher}, so beans with {@code @EventListener}
  * handlers for {@code EventEnvelope<TheEvent>} receive it with the full metadata
@@ -40,7 +41,7 @@ public class KafkaIntegrationEventListener {
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
     private final Inbox inbox;
-    private final IntegrationEventTypeResolver typeResolver;
+    private final IntegrationEventCatalog catalog;
     private final Clock clock;
 
     /**
@@ -50,19 +51,19 @@ public class KafkaIntegrationEventListener {
     public KafkaIntegrationEventListener(ApplicationEventPublisher publisher,
                                          ObjectMapper objectMapper,
                                          Inbox inbox,
-                                         IntegrationEventTypeResolver typeResolver) {
-        this(publisher, objectMapper, inbox, typeResolver, Clock.systemUTC());
+                                         IntegrationEventCatalog catalog) {
+        this(publisher, objectMapper, inbox, catalog, Clock.systemUTC());
     }
 
     public KafkaIntegrationEventListener(ApplicationEventPublisher publisher,
                                          ObjectMapper objectMapper,
                                          Inbox inbox,
-                                         IntegrationEventTypeResolver typeResolver,
+                                         IntegrationEventCatalog catalog,
                                          Clock clock) {
         this.publisher = publisher;
         this.objectMapper = objectMapper;
         this.inbox = inbox;
-        this.typeResolver = typeResolver;
+        this.catalog = catalog;
         this.clock = clock;
     }
 
@@ -89,8 +90,10 @@ public class KafkaIntegrationEventListener {
             throw new IllegalStateException(
                     "Kafka record is missing the " + IntegrationEventHeaders.TYPE + " header");
         }
+        int version = parseVersion(header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
+        Class<? extends IntegrationEvent> eventType = catalog.lookup(type, version)
+                .orElseThrow(() -> new UnknownIntegrationEventException(type, version));
         try {
-            Class<? extends IntegrationEvent> eventType = typeResolver.resolve(type);
             IntegrationEvent payload = objectMapper.readValue(record.value(), eventType);
             String eventId = orElse(header(record, IntegrationEventHeaders.ID), UUID.randomUUID().toString());
             String source = orElse(header(record, IntegrationEventHeaders.SOURCE), "unknown");
@@ -98,7 +101,6 @@ public class KafkaIntegrationEventListener {
             String correlationId = orElse(header(record, IntegrationEventHeaders.CORRELATION_ID), eventId);
             String causationId = header(record, IntegrationEventHeaders.CAUSATION_ID);
             String traceId = header(record, IntegrationEventHeaders.TRACE_ID);
-            int version = parseVersion(header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
             Instant occurredAt = parseInstant(header(record, IntegrationEventHeaders.TIME));
             return new EventEnvelope<>(
                     eventId, source, type, version, occurredAt, subject,

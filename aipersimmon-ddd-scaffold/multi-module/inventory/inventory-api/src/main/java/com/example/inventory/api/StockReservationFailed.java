@@ -1,5 +1,6 @@
 package com.example.inventory.api;
 
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
@@ -13,6 +14,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * saga react to it as one of the flow's outcomes — and carrying the code on the event is
  * how a bounded context with no HTTP surface still surfaces a stable error identity.
  */
+@EventType(name = "com.example.inventory.StockReservationFailed", version = 1)
 public record StockReservationFailed(String orderId, String code, String reason) implements IntegrationEvent {
 
     @Override

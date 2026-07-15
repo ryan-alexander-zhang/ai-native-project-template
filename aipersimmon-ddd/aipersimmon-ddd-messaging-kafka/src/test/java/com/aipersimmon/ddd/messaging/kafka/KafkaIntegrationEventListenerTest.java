@@ -6,8 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import com.aipersimmon.ddd.application.Inbox;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
-import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
-import com.aipersimmon.ddd.integration.RegistryIntegrationEventTypeResolver;
+import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -30,15 +31,15 @@ import org.springframework.context.PayloadApplicationEvent;
 class KafkaIntegrationEventListenerTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private final IntegrationEventTypeResolver typeResolver =
-            new RegistryIntegrationEventTypeResolver(Map.of("SampleEvent", SampleEvent.class));
+    private final IntegrationEventCatalog catalog =
+            new RegistryIntegrationEventCatalog(Map.of(new Key("SampleEvent", 1), SampleEvent.class));
 
     @Test
     void reconstructsAndRepublishesThenDeduplicatesRedelivery() throws Exception {
         CapturingPublisher publisher = new CapturingPublisher();
         InMemoryInbox inbox = new InMemoryInbox();
         KafkaIntegrationEventListener listener =
-                new KafkaIntegrationEventListener(publisher, mapper, inbox, typeResolver);
+                new KafkaIntegrationEventListener(publisher, mapper, inbox, catalog);
 
         ConsumerRecord<String, String> record = recordFor(new SampleEvent("o-1", "placed"), "evt-1");
 
@@ -59,7 +60,7 @@ class KafkaIntegrationEventListenerTest {
     void withoutAnInboxEveryRecordIsRepublished() throws Exception {
         CapturingPublisher publisher = new CapturingPublisher();
         KafkaIntegrationEventListener listener =
-                new KafkaIntegrationEventListener(publisher, mapper, null, typeResolver);
+                new KafkaIntegrationEventListener(publisher, mapper, null, catalog);
 
         ConsumerRecord<String, String> record = recordFor(new SampleEvent("o-1", "placed"), "evt-1");
 

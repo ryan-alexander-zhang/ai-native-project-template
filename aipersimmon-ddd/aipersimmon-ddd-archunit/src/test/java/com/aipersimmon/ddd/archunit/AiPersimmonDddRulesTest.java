@@ -261,6 +261,17 @@ class AiPersimmonDddRulesTest {
     }
 
     @Test
+    void integrationEventsShouldDeclareEventType_passesForGood() {
+        assertDoesNotThrow(() -> AiPersimmonDddRules.integrationEventsShouldDeclareEventType().check(GOOD));
+    }
+
+    @Test
+    void integrationEventsShouldDeclareEventType_failsForBad() {
+        assertThrows(AssertionError.class,
+                () -> AiPersimmonDddRules.integrationEventsShouldDeclareEventType().check(BAD));
+    }
+
+    @Test
     void boundedContextsShouldOnlyDependOnEachOthersApi_passesForGood() {
         assertDoesNotThrow(() -> AiPersimmonDddRules
                 .boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_GOOD_BASE).check(CONTEXTS_GOOD));

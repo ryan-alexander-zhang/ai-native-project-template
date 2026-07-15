@@ -2,11 +2,14 @@ package com.aipersimmon.ddd.outbox.jdbc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.util.List;
@@ -50,7 +53,12 @@ class OutboxJdbcTest {
         }
     }
 
+    @EventType(name = "com.example.ordering.Sample", version = 1)
     record SampleEvent(String orderId) implements IntegrationEvent {
+    }
+
+    @EventType(name = "com.example.ordering.OrderPlaced", version = 1)
+    record NamespacedEvent(String orderId) implements IntegrationEvent {
     }
 
     @Autowired
@@ -61,6 +69,8 @@ class OutboxJdbcTest {
     JdbcTemplate jdbc;
     @Autowired
     CapturingDispatcher dispatcher;
+    @Autowired
+    IntegrationEventCatalog catalog;
 
     @BeforeEach
     void reset() {
@@ -79,12 +89,28 @@ class OutboxJdbcTest {
 
         assertEquals(1, dispatcher.messages.size());
         OutboxMessage message = dispatcher.messages.get(0);
-        assertEquals("SampleEvent", message.type(), "the logical event type, not the Java class name");
+        assertEquals("com.example.ordering.Sample", message.type(),
+                "the declared @EventType logical type, not the Java class name");
         assertTrue(message.payload().contains("O-1"));
         assertEquals("cmd-1", message.correlationId(), "correlation propagated from the command");
         assertEquals("cmd-1", message.causationId(), "caused by the emitting command");
         assertEquals(Integer.valueOf(1),
                 jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = TRUE", Integer.class));
+    }
+
+    @Test
+    void annotatedLogicalTypeIsStampedOnTheWireAndResolvesBackToTheLocalClass() {
+        integrationEvents.publish(new NamespacedEvent("O-9"), CommandContext.root("cmd-9", null));
+
+        relay.relay();
+
+        assertEquals(1, dispatcher.messages.size());
+        OutboxMessage message = dispatcher.messages.get(0);
+        assertEquals("com.example.ordering.OrderPlaced", message.type(),
+                "the producer stamps the @EventType logical type on the wire, not the Java class name");
+        assertSame(NamespacedEvent.class, catalog.lookup(message.type(), message.version()).orElseThrow(),
+                "the scanned catalog resolves that same (type, version) back to the local class — "
+                        + "before the fix the registry was keyed by simple name and this threw");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.example.ordering.api;
 
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.util.List;
 
@@ -8,6 +9,7 @@ import java.util.List;
  * cross-context contract. It carries the ids and quantities another context needs
  * (here, so inventory can reserve stock), never the internal domain model.
  */
+@EventType(name = "com.example.ordering.OrderPlaced", version = 1)
 public record OrderPlaced(String orderId, List<Line> lines) implements IntegrationEvent {
 
     @Override

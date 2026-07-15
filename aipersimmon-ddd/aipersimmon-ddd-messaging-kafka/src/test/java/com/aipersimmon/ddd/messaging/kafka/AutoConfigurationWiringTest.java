@@ -20,7 +20,7 @@ class AutoConfigurationWiringTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(
                     AipersimmonDddMessagingKafkaAutoConfiguration.class,
-                    // provides the IntegrationEventTypeResolver the consumer bridge needs
+                    // provides the IntegrationEventCatalog the consumer bridge needs
                     AipersimmonDddOutboxAutoConfiguration.class))
             .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class));
 

@@ -6,27 +6,71 @@ package com.aipersimmon.ddd.integration;
  * event it is a versioned contract — carry only ids and the minimal data
  * consumers need, and evolve it backward-compatibly.
  *
- * <p>Two aspects of the published contract are declared here so the transport never
- * has to reach into the Java class:
- * <ul>
- *   <li>{@link #eventType()} — the CloudEvents {@code type}: a stable, logical name
- *       for the event, decoupled from the Java class name so a consumer maps it to
- *       its own local type rather than depending on the producer's class.
- *   <li>{@link #subject()} — the CloudEvents {@code subject}: the id of the aggregate
- *       the event is about, used as the transport partition/ordering key so one
- *       aggregate's events stay in order.
- * </ul>
+ * <p>The published contract's identity — its logical type and schema version — is
+ * declared with the {@link EventType} annotation and read statically via
+ * {@link #eventTypeOf} / {@link #eventVersionOf}, so the transport never reaches into
+ * the Java class and there is no instance method to override out of sync. It is
+ * <strong>required</strong>: there is no class-name default, because a Java class name
+ * is an implementation detail, not a published contract.
+ *
+ * <p>{@link #subject()} — the CloudEvents {@code subject} — is the one genuinely
+ * per-instance value declared here: the id of the aggregate the event is about, used
+ * as the transport partition/ordering key so one aggregate's events stay in order.
  */
 public interface IntegrationEvent {
 
     /**
-     * The logical event type (CloudEvents {@code type}). Defaults to the simple
-     * class name; override to a versioned, namespaced name that is stable across
-     * refactors and language boundaries — for example
-     * {@code "com.example.ordering.OrderPlaced.v1"}.
+     * The logical event type declared by {@code type}, read statically from its
+     * {@link EventType} annotation's {@code name}. This static reader is the
+     * <strong>single source of truth</strong> for an event's logical type — there is
+     * deliberately no instance {@code eventType()} method to override, so the value a
+     * producer stamps on the wire and the value a consumer's catalogue is keyed by
+     * cannot drift apart. There is likewise no fallback to the simple class name: the
+     * logical type is a published contract that must be declared explicitly, so an
+     * unannotated event is a hard error rather than a silent — and unstable —
+     * derivation from the class name.
+     *
+     * @throws IllegalStateException if {@code type} has no {@link EventType}
+     *     annotation, or its {@code name} is blank
      */
-    default String eventType() {
-        return getClass().getSimpleName();
+    static String eventTypeOf(Class<?> type) {
+        EventType annotation = requireEventType(type);
+        if (annotation.name().isBlank()) {
+            throw new IllegalStateException(type.getName()
+                    + " must declare a non-blank @EventType name, e.g. "
+                    + "@EventType(name = \"com.example.ordering.OrderPlaced\", version = 1); the Java class "
+                    + "name is an implementation detail, not a stable published contract");
+        }
+        return annotation.name();
+    }
+
+    /**
+     * The schema revision declared by {@code type}, read statically from its
+     * {@link EventType} annotation's {@code version}. Like {@link #eventTypeOf} it is
+     * the single source of truth (no overridable instance method), so a producer's
+     * stamped version and a consumer's catalogue key cannot drift apart.
+     *
+     * @throws IllegalStateException if {@code type} has no {@link EventType}
+     *     annotation, or its {@code version} is not {@code >= 1}
+     */
+    static int eventVersionOf(Class<?> type) {
+        EventType annotation = requireEventType(type);
+        if (annotation.version() < 1) {
+            throw new IllegalStateException(type.getName()
+                    + " must declare an @EventType version >= 1 (got " + annotation.version() + ")");
+        }
+        return annotation.version();
+    }
+
+    private static EventType requireEventType(Class<?> type) {
+        EventType annotation = type.getAnnotation(EventType.class);
+        if (annotation == null) {
+            throw new IllegalStateException(type.getName()
+                    + " must be annotated with @EventType, e.g. "
+                    + "@EventType(name = \"com.example.ordering.OrderPlaced\", version = 1); the logical event "
+                    + "type is a published contract that must be declared explicitly");
+        }
+        return annotation;
     }
 
     /**

@@ -18,6 +18,7 @@ import com.aipersimmon.ddd.core.rule.InvariantViolationException;
 import com.aipersimmon.ddd.core.state.IllegalStateTransitionException;
 import com.aipersimmon.ddd.core.state.Transitions;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -27,6 +28,11 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Reusable ArchUnit rules enforcing the DDD layering and building-block
@@ -60,7 +66,8 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
  *   <li><em>Events</em> — {@link #domainEventsShouldStayInDomain()},
  *       {@link #domainEventListenersShouldResideInApplicationOrDomain()},
  *       {@link #integrationEventListenersShouldResideInAdapter()},
- *       {@link #domainEventListenersShouldBeAnnotatedWithDomainEventHandler()}.</li>
+ *       {@link #domainEventListenersShouldBeAnnotatedWithDomainEventHandler()},
+ *       {@link #integrationEventsShouldDeclareEventType()}.</li>
  *   <li><em>CQRS</em> — {@link #commandHandlersShouldNotDependOnOtherCommandHandlers()}.</li>
  *   <li><em>Building blocks</em> — {@link #domainBuildingBlocksShouldResideInDomain()},
  *       {@link #domainServicesShouldResideInDomain()},
@@ -252,6 +259,85 @@ public final class AiPersimmonDddRules {
                 .because("a domain-event subscriber is a first-class application concern, marked as such so "
                         + "its role is explicit and architecture tests can find it by annotation")
                 .allowEmptyShould(true);
+    }
+
+    /**
+     * An {@link IntegrationEvent} declares a valid, unique logical type with the
+     * {@link EventType @EventType} annotation: it is present, its {@code name} is
+     * non-blank, its {@code version} is {@code >= 1}, and no two events share a
+     * {@code name}. The logical type is the event's published identity on the wire —
+     * it must be an explicit, stable, versioned contract, never derived from the Java
+     * class name (an implementation detail that changes on a rename and collides
+     * across contexts). Mirrors the runtime checks in {@link IntegrationEvent#eventTypeOf}
+     * / {@link IntegrationEvent#eventVersionOf} and the type registry, catching them at
+     * build time — before anything is published or a consumer's registry is built. Part
+     * of {@link #all()}; matches nothing (and so passes) in a project that declares no
+     * integration events.
+     */
+    public static ArchRule integrationEventsShouldDeclareEventType() {
+        return classes().that().implement(IntegrationEvent.class)
+                .should(declareAValidUniqueEventType())
+                .as("integration events should declare a valid, unique @EventType (name + version)")
+                .because("the logical event type is a published contract that must be declared explicitly "
+                        + "and unambiguously, not derived from the Java class name")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * Reports a violation for an {@link IntegrationEvent} that is missing {@link EventType},
+     * declares a blank {@code name} or a {@code version < 1}, or shares its
+     * {@code (name, version)} with another event. Two events sharing a name but with
+     * different versions are allowed — that is how a type's revisions coexist. The
+     * {@code (name, version)} collisions are computed once in {@code init} over all the
+     * events being checked, so both classes in a clash are reported.
+     */
+    private static ArchCondition<JavaClass> declareAValidUniqueEventType() {
+        Map<String, List<String>> classesByTypeAndVersion = new HashMap<>();
+        return new ArchCondition<>("declare a valid, unique @EventType (name + version)") {
+            @Override
+            public void init(Collection<JavaClass> events) {
+                classesByTypeAndVersion.clear();
+                for (JavaClass event : events) {
+                    if (event.isAnnotatedWith(EventType.class)) {
+                        EventType annotation = event.getAnnotationOfType(EventType.class);
+                        if (!annotation.name().isBlank()) {
+                            classesByTypeAndVersion
+                                    .computeIfAbsent(key(annotation), key -> new ArrayList<>())
+                                    .add(event.getFullName());
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void check(JavaClass event, ConditionEvents events) {
+                if (!event.isAnnotatedWith(EventType.class)) {
+                    events.add(SimpleConditionEvent.violated(event,
+                            event.getFullName() + " is an IntegrationEvent but is not annotated with @EventType"));
+                    return;
+                }
+                EventType annotation = event.getAnnotationOfType(EventType.class);
+                if (annotation.name().isBlank()) {
+                    events.add(SimpleConditionEvent.violated(event,
+                            event.getFullName() + " declares a blank @EventType name"));
+                }
+                if (annotation.version() < 1) {
+                    events.add(SimpleConditionEvent.violated(event,
+                            event.getFullName() + " declares @EventType version " + annotation.version()
+                                    + ", which must be >= 1"));
+                }
+                List<String> sharing = classesByTypeAndVersion.get(key(annotation));
+                if (sharing != null && sharing.size() > 1) {
+                    events.add(SimpleConditionEvent.violated(event,
+                            event.getFullName() + " shares @EventType (name '" + annotation.name()
+                                    + "', version " + annotation.version() + ") with " + sharing));
+                }
+            }
+
+            private String key(EventType annotation) {
+                return annotation.name() + ' ' + annotation.version();
+            }
+        };
     }
 
     /**
@@ -661,6 +747,7 @@ public final class AiPersimmonDddRules {
                 .and(domainEventListenersShouldResideInApplicationOrDomain())
                 .and(integrationEventListenersShouldResideInAdapter())
                 .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler())
+                .and(integrationEventsShouldDeclareEventType())
                 .and(commandHandlersShouldNotDependOnOtherCommandHandlers())
                 .and(invariantsShouldResideInDomain())
                 .and(invariantViolationsShouldOnlyComeFromCheckInvariant())

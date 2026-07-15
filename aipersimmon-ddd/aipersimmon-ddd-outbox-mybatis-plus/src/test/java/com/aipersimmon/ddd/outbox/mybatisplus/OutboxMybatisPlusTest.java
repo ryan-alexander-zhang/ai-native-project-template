@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
@@ -50,6 +51,7 @@ class OutboxMybatisPlusTest {
         }
     }
 
+    @EventType(name = "com.example.ordering.Sample", version = 1)
     record SampleEvent(String orderId) implements IntegrationEvent {
     }
 
@@ -79,7 +81,8 @@ class OutboxMybatisPlusTest {
 
         assertEquals(1, dispatcher.messages.size());
         OutboxMessage message = dispatcher.messages.get(0);
-        assertEquals("SampleEvent", message.type(), "the logical event type, not the Java class name");
+        assertEquals("com.example.ordering.Sample", message.type(),
+                "the declared @EventType logical type, not the Java class name");
         assertTrue(message.payload().contains("O-1"));
         assertEquals("cmd-1", message.correlationId(), "correlation propagated from the command");
         assertEquals("cmd-1", message.causationId(), "caused by the emitting command");

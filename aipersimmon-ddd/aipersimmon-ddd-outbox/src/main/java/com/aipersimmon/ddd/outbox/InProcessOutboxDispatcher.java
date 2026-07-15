@@ -2,7 +2,8 @@ package com.aipersimmon.ddd.outbox;
 
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
-import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
+import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,13 +27,13 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
 
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
-    private final IntegrationEventTypeResolver typeResolver;
+    private final IntegrationEventCatalog catalog;
 
     public InProcessOutboxDispatcher(ApplicationEventPublisher publisher, ObjectMapper objectMapper,
-                                     IntegrationEventTypeResolver typeResolver) {
+                                     IntegrationEventCatalog catalog) {
         this.publisher = publisher;
         this.objectMapper = objectMapper;
-        this.typeResolver = typeResolver;
+        this.catalog = catalog;
     }
 
     @Override
@@ -46,8 +47,9 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
     }
 
     private EventEnvelope<IntegrationEvent> reconstruct(OutboxMessage message) {
+        Class<? extends IntegrationEvent> type = catalog.lookup(message.type(), message.version())
+                .orElseThrow(() -> new UnknownIntegrationEventException(message.type(), message.version()));
         try {
-            Class<? extends IntegrationEvent> type = typeResolver.resolve(message.type());
             IntegrationEvent payload = objectMapper.readValue(message.payload(), type);
             return new EventEnvelope<>(
                     message.eventId(),

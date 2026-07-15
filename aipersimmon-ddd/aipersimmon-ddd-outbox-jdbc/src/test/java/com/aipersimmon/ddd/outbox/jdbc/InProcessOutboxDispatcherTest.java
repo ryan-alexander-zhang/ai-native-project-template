@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.InProcessOutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
@@ -44,15 +45,16 @@ class InProcessOutboxDispatcherTest {
     }
 
     static class CapturingListener {
-        final List<EventEnvelope<SampleEvent>> received = new CopyOnWriteArrayList<>();
+        final List<EventEnvelope<InProcessSampleEvent>> received = new CopyOnWriteArrayList<>();
 
         @EventListener
-        void on(EventEnvelope<SampleEvent> envelope) {
+        void on(EventEnvelope<InProcessSampleEvent> envelope) {
             received.add(envelope);
         }
     }
 
-    record SampleEvent(String orderId) implements IntegrationEvent {
+    @EventType(name = "com.example.ordering.InProcessSample", version = 1)
+    record InProcessSampleEvent(String orderId) implements IntegrationEvent {
     }
 
     @Autowired
@@ -76,11 +78,11 @@ class InProcessOutboxDispatcherTest {
     void relayRepublishesTheEventInProcess() {
         assertInstanceOf(InProcessOutboxDispatcher.class, dispatcher);
 
-        integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1", null));
+        integrationEvents.publish(new InProcessSampleEvent("O-1"), CommandContext.root("cmd-1", null));
         relay.relay();
 
         assertEquals(1, listener.received.size());
-        EventEnvelope<SampleEvent> envelope = listener.received.get(0);
+        EventEnvelope<InProcessSampleEvent> envelope = listener.received.get(0);
         assertEquals("O-1", envelope.payload().orderId());
         assertEquals("cmd-1", envelope.correlationId(), "correlation survives the outbox round-trip");
     }

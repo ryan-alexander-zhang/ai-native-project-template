@@ -1,7 +1,7 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
 import com.aipersimmon.ddd.application.Inbox;
-import com.aipersimmon.ddd.integration.IntegrationEventTypeResolver;
+import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,9 +46,9 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     @ConditionalOnMissingBean
     public KafkaIntegrationEventListener kafkaIntegrationEventListener(
             ApplicationEventPublisher publisher, ObjectProvider<ObjectMapper> objectMapper,
-            ObjectProvider<Inbox> inbox, IntegrationEventTypeResolver typeResolver) {
+            ObjectProvider<Inbox> inbox, IntegrationEventCatalog catalog) {
         return new KafkaIntegrationEventListener(
                 publisher, objectMapper.getIfAvailable(ObjectMapper::new),
-                inbox.getIfAvailable(), typeResolver);
+                inbox.getIfAvailable(), catalog);
     }
 }

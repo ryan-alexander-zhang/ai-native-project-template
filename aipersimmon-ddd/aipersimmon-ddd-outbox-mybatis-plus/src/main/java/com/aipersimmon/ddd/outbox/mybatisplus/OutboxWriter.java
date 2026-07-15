@@ -12,7 +12,7 @@ import java.util.UUID;
 /**
  * Writes an integration event into the outbox table in the caller's transaction
  * through the MyBatis-Plus {@link OutboxMapper}. It stamps the transport metadata
- * (a random event id, the event's class name as the type, version 1, the current
+ * (a random event id, the event's class name as the type, the event's declared version, the current
  * time) and the causal chain from the emitting command's {@link CommandContext} —
  * correlation, causation (the command's message id), and trace — into an
  * {@link EventEnvelope}, serializes the event payload to JSON, and inserts one
@@ -39,8 +39,8 @@ public class OutboxWriter implements IntegrationEvents {
         EventEnvelope<IntegrationEvent> envelope = new EventEnvelope<>(
                 UUID.randomUUID().toString(),
                 source,
-                event.eventType(),
-                1,
+                IntegrationEvent.eventTypeOf(event.getClass()),
+                IntegrationEvent.eventVersionOf(event.getClass()),
                 clock.instant(),
                 event.subject(),
                 context.correlationId(),

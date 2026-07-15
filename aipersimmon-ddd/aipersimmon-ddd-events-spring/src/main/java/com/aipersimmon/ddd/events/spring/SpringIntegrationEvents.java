@@ -45,8 +45,8 @@ public class SpringIntegrationEvents implements IntegrationEvents {
         EventEnvelope<IntegrationEvent> envelope = new EventEnvelope<>(
                 UUID.randomUUID().toString(),
                 source,
-                event.eventType(),
-                1,
+                IntegrationEvent.eventTypeOf(event.getClass()),
+                IntegrationEvent.eventVersionOf(event.getClass()),
                 clock.instant(),
                 event.subject(),
                 context.correlationId(),

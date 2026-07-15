@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
-import com.aipersimmon.ddd.integration.RegistryIntegrationEventTypeResolver;
+import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
+import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
+import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -18,20 +20,24 @@ import org.springframework.context.PayloadApplicationEvent;
 
 /**
  * Unit-tests the in-process dispatcher's reconstruct-and-republish behavior without
- * a Spring context: it rebuilds the {@link EventEnvelope} from the stored metadata +
- * payload and hands it to the publisher, and fails clearly on an unknown type. The
- * full wiring (writer -> relay -> dispatcher) is covered by each storage starter's
- * own test.
+ * a Spring context: it looks the stored {@code (type, version)} up in the catalog,
+ * rebuilds the {@link EventEnvelope} from the stored metadata + payload, and hands it
+ * to the publisher; an unknown {@code (type, version)} fails as
+ * {@link UnknownIntegrationEventException} (to be dead-lettered), with no class-name
+ * fallback. The full wiring (writer -> relay -> dispatcher) is covered by each storage
+ * starter's own test.
  */
 class InProcessOutboxDispatcherTest {
+
+    private static final String TYPE = "com.example.ordering.Sample";
 
     record SampleEvent(String orderId) implements IntegrationEvent {
     }
 
-    // Empty registry → resolves by the FQCN fallback (shared-classpath case).
-    private final InProcessOutboxDispatcher dispatcher(ApplicationEventPublisher publisher) {
-        return new InProcessOutboxDispatcher(
-                publisher, new ObjectMapper(), new RegistryIntegrationEventTypeResolver(Map.of()));
+    private InProcessOutboxDispatcher dispatcher(ApplicationEventPublisher publisher) {
+        RegistryIntegrationEventCatalog catalog = new RegistryIntegrationEventCatalog(
+                Map.of(new Key(TYPE, 1), SampleEvent.class));
+        return new InProcessOutboxDispatcher(publisher, new ObjectMapper(), catalog);
     }
 
     @Test
@@ -39,7 +45,7 @@ class InProcessOutboxDispatcherTest {
         List<Object> published = new ArrayList<>();
 
         dispatcher(published::add).dispatch(new OutboxMessage(
-                "evt-1", "/orders", SampleEvent.class.getName(), 1, "{\"orderId\":\"O-1\"}",
+                "evt-1", "/orders", TYPE, 1, "{\"orderId\":\"O-1\"}",
                 Instant.EPOCH, "O-1", "corr-1", "cause-1", null));
 
         assertEquals(1, published.size());
@@ -54,8 +60,15 @@ class InProcessOutboxDispatcherTest {
     }
 
     @Test
-    void failsClearlyWhenTypeIsUnknown() {
-        assertThrows(IllegalStateException.class, () -> dispatcher(event -> { }).dispatch(new OutboxMessage(
+    void failsWhenTypeIsUnknown() {
+        assertThrows(UnknownIntegrationEventException.class, () -> dispatcher(event -> { }).dispatch(new OutboxMessage(
                 "evt-2", "/orders", "com.example.DoesNotExist", 1, "{}", Instant.EPOCH, null, "corr-1", null, null)));
+    }
+
+    @Test
+    void failsWhenVersionIsUnknown() {
+        // The type is registered, but only at version 1; a version-2 message is a miss.
+        assertThrows(UnknownIntegrationEventException.class, () -> dispatcher(event -> { }).dispatch(new OutboxMessage(
+                "evt-3", "/orders", TYPE, 2, "{\"orderId\":\"O-1\"}", Instant.EPOCH, "O-1", "corr-1", null, null)));
     }
 }

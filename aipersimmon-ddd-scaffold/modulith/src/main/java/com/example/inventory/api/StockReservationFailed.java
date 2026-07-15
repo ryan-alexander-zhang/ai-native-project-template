@@ -1,5 +1,6 @@
 package com.example.inventory.api;
 
+import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
@@ -9,6 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * the order). Reporting failure as an event, rather than throwing, is what lets the
  * order-fulfilment saga react to it as one of the flow's outcomes.
  */
+@EventType(name = "com.example.inventory.StockReservationFailed", version = 1)
 public record StockReservationFailed(String orderId, String reason) implements IntegrationEvent {
 
     @Override
