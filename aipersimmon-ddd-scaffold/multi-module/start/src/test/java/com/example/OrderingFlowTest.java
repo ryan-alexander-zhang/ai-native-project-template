@@ -1,8 +1,11 @@
 package com.example;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.aipersimmon.ddd.core.error.ErrorCode;
+import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.integration.EventEnvelope;
@@ -59,20 +62,25 @@ class OrderingFlowTest {
     }
 
     @Test
-    void whenSkuIsUnknownTheSagaCancelsWithStockNotFoundCode() {
-        String orderId = commandBus.send(new PlaceOrder(
-                "CUST-1",
-                List.of(new PlaceOrder.Line("SKU-404", 1, 100, "USD"))));
+    void whenSkuIsUnknownTheOrderIsRejectedSynchronouslyByTheInventoryGateway() {
+        // SKU-404 is not carried by inventory. The synchronous availability gateway
+        // (ordering's anti-corruption layer over inventory's StockAvailabilityApi) fails
+        // the order fast, at place time — it is never created and never reaches the saga.
+        DomainException rejected = assertThrows(DomainException.class, () ->
+                commandBus.send(new PlaceOrder(
+                        "CUST-1",
+                        List.of(new PlaceOrder.Line("SKU-404", 1, 100, "USD")))));
 
-        OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
-        assertEquals("CANCELLED", snapshot.status());
-        assertNotNull(failures.last(), "a StockReservationFailed event should have been published");
-        assertEquals("inventory.stock-not-found", failures.last().code());
+        assertEquals("ordering.stock-unavailable",
+                rejected.errorCode().map(ErrorCode::code).orElse(null));
+        assertNull(failures.last(), "no reservation should have been attempted for a rejected order");
     }
 
     @Test
     void whenStockIsInsufficientTheSagaCancelsWithInsufficientStockCode() {
-        // SKU-1 is seeded with 10 units; asking for 999 exceeds it.
+        // SKU-1 is carried and in stock, so it passes the synchronous availability gate;
+        // the exact-quantity check is the reservation's job. SKU-1 has 10 units, so asking
+        // for 999 is reserved asynchronously, fails, and the saga compensates by cancelling.
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 999, 1, "USD"))));

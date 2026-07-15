@@ -17,6 +17,8 @@ public enum OrderingErrorCode implements ErrorCode {
     ORDER_EMPTY("ordering.order-empty", ErrorCategory.DOMAIN_RULE),
     TOO_MANY_LINES("ordering.too-many-lines", ErrorCategory.DOMAIN_RULE),
     DUPLICATE_SKU("ordering.duplicate-sku", ErrorCategory.DOMAIN_RULE),
+    /** An ordered SKU cannot currently be offered by the inventory context (unknown or out of stock). */
+    STOCK_UNAVAILABLE("ordering.stock-unavailable", ErrorCategory.DOMAIN_RULE),
     ORDER_NOT_FOUND("ordering.order-not-found", ErrorCategory.NOT_FOUND),
     CUSTOMER_NOT_FOUND("ordering.customer-not-found", ErrorCategory.NOT_FOUND);
 

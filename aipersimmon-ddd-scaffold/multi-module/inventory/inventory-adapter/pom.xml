@@ -24,6 +24,12 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>inventory-application</artifactId>
     </dependency>
+    <!-- This context's own published contract: the ipc adapter implements the
+         StockAvailabilityApi Open Host Service defined here. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>inventory-api</artifactId>
+    </dependency>
     <!-- Sends the ReserveStock command through the command bus. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

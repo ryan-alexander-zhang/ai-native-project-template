@@ -35,6 +35,13 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-saga</artifactId>
     </dependency>
+    <!-- Cross-context (anti-corruption gateway): calls the inventory context only
+         through its published api. The concrete StockAvailabilityApi bean (in-process
+         now, an HTTP client once inventory is its own service) is wired at runtime. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>inventory-api</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
