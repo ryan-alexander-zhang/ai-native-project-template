@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Application-layer subscriber that bridges the ordering context's own domain events to the
- * {@link OrderFulfilmentProcessManager}. It <em>starts</em> the flow on {@link OrderPlacedEvent},
+ * {@link OrderFulfilmentProcess}. It <em>starts</em> the flow on {@link OrderPlacedEvent},
  * and it feeds the flow's terminal facts back in: {@link OrderConfirmedEvent} and
  * {@link OrderCancelledEvent} are what let the saga reach a terminal status on the confirmed
  * outcome, rather than the moment a confirm/cancel command was merely sent.
@@ -24,24 +24,24 @@ import org.springframework.stereotype.Component;
 @DomainEventHandler
 public class OrderFulfilmentStarter {
 
-    private final OrderFulfilmentProcessManager process;
+    private final OrderFulfilmentProcess process;
 
-    public OrderFulfilmentStarter(OrderFulfilmentProcessManager process) {
+    public OrderFulfilmentStarter(OrderFulfilmentProcess process) {
         this.process = process;
     }
 
     @EventListener
     public void onOrderPlaced(OrderPlacedEvent event) {
-        process.onOrderPlaced(event.orderId().value());
+        process.placed(event.orderId().value());
     }
 
     @EventListener
     public void onOrderConfirmed(OrderConfirmedEvent event) {
-        process.onOrderConfirmed(event.orderId().value());
+        process.orderConfirmed(event.orderId().value());
     }
 
     @EventListener
     public void onOrderCancelled(OrderCancelledEvent event) {
-        process.onOrderCancelled(event.orderId().value());
+        process.orderCancelled(event.orderId().value());
     }
 }

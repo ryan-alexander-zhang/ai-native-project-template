@@ -39,11 +39,6 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-process-manager</artifactId>
     </dependency>
-    <!-- TODO(plan-00003 P4): remove once the old saga process manager is deleted in this module. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-saga</artifactId>
-    </dependency>
     <!-- CQRS contracts: commands, queries, and their handler interfaces. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

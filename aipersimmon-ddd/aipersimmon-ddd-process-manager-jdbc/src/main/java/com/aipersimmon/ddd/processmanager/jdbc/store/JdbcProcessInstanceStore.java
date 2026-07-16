@@ -48,6 +48,13 @@ public final class JdbcProcessInstanceStore {
                 ROW_MAPPER, processType.value(), businessKey.value()).stream().findFirst();
     }
 
+    /** Read-only lookup of an instance by its business key (no lock), for resolving its reference. */
+    public Optional<ProcessInstanceRow> readByBusinessKey(ProcessType processType, ProcessBusinessKey businessKey) {
+        return jdbc.query(
+                "SELECT * FROM aipersimmon_process_instance WHERE process_type = ? AND business_key = ?",
+                ROW_MAPPER, processType.value(), businessKey.value()).stream().findFirst();
+    }
+
     public void insert(ProcessInstanceRow row, Instant now) {
         Timestamp ts = Timestamp.from(now);
         jdbc.update("""

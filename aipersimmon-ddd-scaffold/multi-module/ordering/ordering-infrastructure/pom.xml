@@ -33,7 +33,11 @@
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-saga</artifactId>
+      <artifactId>aipersimmon-ddd-process-manager</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
     </dependency>
     <!-- Cross-context (anti-corruption gateway): calls the inventory context only
          through its published api. The concrete StockAvailabilityApi bean (in-process
