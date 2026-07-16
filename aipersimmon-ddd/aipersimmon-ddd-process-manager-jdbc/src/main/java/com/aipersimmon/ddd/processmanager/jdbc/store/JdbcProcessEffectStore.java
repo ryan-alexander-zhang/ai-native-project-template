@@ -101,11 +101,38 @@ public final class JdbcProcessEffectStore {
                 EffectStatus.DEAD.name(), error, ts, effectId, leaseToken);
     }
 
+    /** Redrive a DEAD effect back to PENDING (reusing its id) for operator recovery. */
+    public int redrive(String effectId, Instant now) {
+        Timestamp ts = Timestamp.from(now);
+        return jdbc.update("""
+                UPDATE aipersimmon_process_effect
+                SET status = ?, next_attempt_at = ?, last_error = NULL, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE effect_id = ? AND status = ?""",
+                EffectStatus.PENDING.name(), ts, ts, effectId, EffectStatus.DEAD.name());
+    }
+
+    /** How many effects on an instance are still DEAD (used to decide whether to resume it). */
+    public long countDead(com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE instance_id = ? AND status = ?",
+                Long.class, instanceId.value(), EffectStatus.DEAD.name());
+    }
+
+    /** Cancel not-yet-dispatched effects when a process is cancelled by an operator. */
+    public int cancelPending(com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId, Instant now) {
+        return jdbc.update("""
+                UPDATE aipersimmon_process_effect SET status = ?, updated_at = ?
+                WHERE instance_id = ? AND status = ?""",
+                EffectStatus.CANCELLED.name(), Timestamp.from(now), instanceId.value(), EffectStatus.PENDING.name());
+    }
+
     /** The lifecycle of a staged effect (design-00004 §4.6). */
     public enum EffectStatus {
         PENDING,
         IN_FLIGHT,
         DELIVERED,
-        DEAD
+        DEAD,
+        CANCELLED
     }
 }

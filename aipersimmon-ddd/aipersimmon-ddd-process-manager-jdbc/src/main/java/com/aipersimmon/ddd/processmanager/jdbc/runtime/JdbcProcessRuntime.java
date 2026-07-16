@@ -19,7 +19,6 @@ import com.aipersimmon.ddd.processmanager.effect.PublishIntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.exception.ProcessAlreadyExistsException;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
-import com.aipersimmon.ddd.processmanager.exception.ProcessSuspendedException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
@@ -29,6 +28,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessDeadlineInsert;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessEffectInsert;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionInsert;
+import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
@@ -167,8 +167,19 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
             return duplicateResult(row, duplicate.get());
         }
         if (row.lifecycle() == ProcessLifecycle.SUSPENDED) {
-            // Parking of inputs to a suspended instance lands in a later slice; for now signal retryable.
-            throw new ProcessSuspendedException(ref);
+            // Do not rebound to the message layer: park the input as an audit transition (deduped by
+            // the UNIQUE input message id) and return, so the transport can ack. It is replayed in
+            // arrival order when the instance resumes (design-00004 §4.6).
+            String parkedId = idGenerator.get();
+            Instant parkedAt = clock.instant();
+            EncodedPayload parkedInput = encodePayload(input);
+            transitions.append(new ProcessTransitionInsert(
+                    parkedId, ref.instanceId(), cause.messageId(),
+                    parkedInput.type().logicalType(), parkedInput.type().version(), parkedInput.data(),
+                    Optional.of(row.lifecycle()), row.lifecycle(), Optional.of(row.step()), row.step(),
+                    new DecisionCode("parked"), "PARKED"), parkedAt);
+            return new ProcessAdvanceResult(
+                    ref, row.revision(), row.lifecycle(), row.step(), false, parkedId);
         }
         if (row.lifecycle().isTerminal()) {
             String latest = transitions.findLatestTransitionId(ref.instanceId())

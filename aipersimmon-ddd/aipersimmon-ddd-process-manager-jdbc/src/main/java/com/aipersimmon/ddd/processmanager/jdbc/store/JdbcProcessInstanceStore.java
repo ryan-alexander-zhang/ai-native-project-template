@@ -121,6 +121,19 @@ public final class JdbcProcessInstanceStore {
                 instanceId.value());
     }
 
+    /**
+     * Resume a suspended instance back to {@code toLifecycle}, clearing the suspension
+     * metadata, without touching the business step (design-00004 §3.9).
+     */
+    public void resume(ProcessInstanceId instanceId, ProcessLifecycle toLifecycle, Instant now) {
+        jdbc.update("""
+                UPDATE aipersimmon_process_instance
+                SET lifecycle = ?, resume_lifecycle = NULL, suspension_reason = NULL,
+                    suspension_source = NULL, suspending_work_id = NULL, updated_at = ?
+                WHERE instance_id = ?""",
+                toLifecycle.name(), Timestamp.from(now), instanceId.value());
+    }
+
     private static final RowMapper<ProcessInstanceRow> ROW_MAPPER = JdbcProcessInstanceStore::mapRow;
 
     private static ProcessInstanceRow mapRow(ResultSet rs, int rowNum) throws SQLException {

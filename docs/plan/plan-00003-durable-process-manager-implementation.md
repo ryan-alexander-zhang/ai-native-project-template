@@ -52,8 +52,12 @@ parent: design-00004-durable-process-manager-runtime
     仅取 active，`FOR UPDATE OF d SKIP LOCKED`）→ 转 `ProcessInput` 重入 `handle` → 同事务标 `FIRED`；superseded
     generation 可审计 no-op；耗尽 → DEAD + 挂起（source=DEADLINE）。deadline store 加 load/markFired/scheduleRetry/
     markDead/cancelClaimed/currentGeneration。3 H2 测试绿（fire 推进流程、superseded no-op、耗尽→DEAD+挂起）。jdbc 模块 21 绿。
-  - ⏳ **P2④**:query/operations（`JdbcProcessOperations` redrive effect/deadline、cancelProcess、timeline、卡死扫描）
-    + 挂起期 `PARKED` 输入落库与恢复重放 + 整体 `max-lifetime` 兜底 deadline。
+  - ✅ **P2④**:挂起期 `PARKED` 输入(runtime SUSPENDED 分支改为落 PARKED transition、按 message id 去重、返回而非抛
+    → 不再向消息层无界回弹)+ `JdbcProcessOperations`(`redriveEffect` DEAD→PENDING + 无其他 DEAD 时 resume 到
+    resumeLifecycle 并按序重放 parked 输入[派生 `parked:<id>` 保证幂等]、`cancelProcess` 终止协调器+取消 pending
+    effect/deadline+审计 operator transition)。store 加 resume/redrive/countDead/cancelPending/appendOperator/
+    findParkedInputs。3 H2 测试绿(park 不回弹+去重、redrive 恢复并重放、cancel)。jdbc 模块 24 绿。
+    **注**:`redriveDeadline`(与 redriveEffect 对称)、timeline/卡死只读查询、`max-lifetime` 兜底 deadline 随 P3 补。
 - ⏳ **P3**（`-process-manager-jdbc-spring-boot-starter`）:autoconfigure、properties（构造期校验）、worker 生命周期、
   Health/最小 SLI、DDL 样例、启动期 fail-fast。Boot 切片测试。
 - ⏳ **P4**（multi-module scaffold sample）:ordering 履约 Definition/codec + Payment 微服务往返 + Inventory/Order

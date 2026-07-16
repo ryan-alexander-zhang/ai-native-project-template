@@ -141,6 +141,15 @@ public final class JdbcProcessDeadlineStore {
                 DeadlineStatus.DEAD.name(), error, ts, deadlineId, leaseToken);
     }
 
+    /** Cancel all pending deadlines of an instance when a process is cancelled by an operator. */
+    public int cancelPending(ProcessInstanceId instanceId, Instant now) {
+        return jdbc.update("""
+                UPDATE aipersimmon_process_deadline SET status = ?, completed_at = ?, updated_at = ?
+                WHERE instance_id = ? AND status = ?""",
+                DeadlineStatus.CANCELLED.name(), Timestamp.from(now), Timestamp.from(now),
+                instanceId.value(), DeadlineStatus.PENDING.name());
+    }
+
     /** Cancel a claimed deadline as an auditable no-op (stale generation, or an ended instance). */
     public int cancelClaimed(String deadlineId, String leaseToken, Instant now) {
         Timestamp ts = Timestamp.from(now);
