@@ -1,9 +1,11 @@
 package com.aipersimmon.ddd.processmanager.jdbc.store;
 
+import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.model.DeadlineName;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -63,6 +65,91 @@ public final class JdbcProcessDeadlineStore {
                 DeadlineStatus.PENDING.name(),
                 instanceId.value(),
                 name.value());
+    }
+
+    /** A claimed deadline loaded for firing: its identity, encoded input, and attempt count. */
+    public record DeadlineRow(
+            String deadlineId,
+            ProcessInstanceId instanceId,
+            DeadlineName name,
+            long generation,
+            PayloadType inputType,
+            byte[] inputPayload,
+            int attempts) {
+
+        public DeadlineRow {
+            inputPayload = inputPayload.clone();
+        }
+
+        @Override
+        public byte[] inputPayload() {
+            return inputPayload.clone();
+        }
+    }
+
+    public Optional<DeadlineRow> load(String deadlineId) {
+        return jdbc.query("SELECT * FROM aipersimmon_process_deadline WHERE deadline_id = ?",
+                (rs, n) -> new DeadlineRow(
+                        rs.getString("deadline_id"),
+                        new ProcessInstanceId(rs.getString("instance_id")),
+                        new DeadlineName(rs.getString("name")),
+                        rs.getLong("generation"),
+                        new PayloadType(rs.getString("input_type"), rs.getInt("input_version")),
+                        Payloads.fromText(rs.getString("input_payload")),
+                        rs.getInt("attempts")),
+                deadlineId).stream().findFirst();
+    }
+
+    /** The current (highest) generation for a name, or 0 if none — to detect a stale fire. */
+    public long currentGeneration(ProcessInstanceId instanceId, DeadlineName name) {
+        Long max = jdbc.queryForObject(
+                "SELECT MAX(generation) FROM aipersimmon_process_deadline WHERE instance_id = ? AND name = ?",
+                Long.class, instanceId.value(), name.value());
+        return max == null ? 0L : max;
+    }
+
+    /** Mark a fired deadline done; fenced by the lease token. */
+    public int markFired(String deadlineId, String leaseToken, Instant now) {
+        Timestamp ts = Timestamp.from(now);
+        return jdbc.update("""
+                UPDATE aipersimmon_process_deadline
+                SET status = ?, completed_at = ?, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE deadline_id = ? AND lease_token = ?""",
+                DeadlineStatus.FIRED.name(), ts, ts, deadlineId, leaseToken);
+    }
+
+    /** Return a deadline to PENDING for a later retry; fenced by the lease token. */
+    public int scheduleRetry(String deadlineId, String leaseToken, Instant nextAttemptAt, String error, Instant now) {
+        return jdbc.update("""
+                UPDATE aipersimmon_process_deadline
+                SET status = ?, next_attempt_at = ?, last_error = ?, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE deadline_id = ? AND lease_token = ?""",
+                DeadlineStatus.PENDING.name(), Timestamp.from(nextAttemptAt), error, Timestamp.from(now),
+                deadlineId, leaseToken);
+    }
+
+    /** Move a deadline to DEAD after exhausting retries; fenced by the lease token. */
+    public int markDead(String deadlineId, String leaseToken, String error, Instant now) {
+        Timestamp ts = Timestamp.from(now);
+        return jdbc.update("""
+                UPDATE aipersimmon_process_deadline
+                SET status = ?, last_error = ?, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE deadline_id = ? AND lease_token = ?""",
+                DeadlineStatus.DEAD.name(), error, ts, deadlineId, leaseToken);
+    }
+
+    /** Cancel a claimed deadline as an auditable no-op (stale generation, or an ended instance). */
+    public int cancelClaimed(String deadlineId, String leaseToken, Instant now) {
+        Timestamp ts = Timestamp.from(now);
+        return jdbc.update("""
+                UPDATE aipersimmon_process_deadline
+                SET status = ?, completed_at = ?, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE deadline_id = ? AND lease_token = ?""",
+                DeadlineStatus.CANCELLED.name(), ts, ts, deadlineId, leaseToken);
     }
 
     /** The lifecycle of a scheduled deadline (design-00004 §4.7). */

@@ -48,4 +48,27 @@ public final class AtomicUpdateProcessDialect implements JdbcProcessDialect {
         }
         return claimed;
     }
+
+    @Override
+    public List<String> claimDueDeadlines(
+            JdbcTemplate jdbc, Instant now, int limit, WorkerId owner, String leaseToken, Instant leaseUntil) {
+        Timestamp ts = Timestamp.from(now);
+        List<String> candidates = jdbc.query(
+                DEADLINE_CANDIDATE_SQL + " LIMIT " + limit, (rs, n) -> rs.getString(1), ts, ts);
+        List<String> claimed = new ArrayList<>();
+        for (String id : candidates) {
+            int won = jdbc.update("""
+                    UPDATE aipersimmon_process_deadline
+                    SET status = 'IN_FLIGHT', attempts = attempts + 1,
+                        lease_owner = ?, lease_token = ?, lease_until = ?, updated_at = ?
+                    WHERE deadline_id = ?
+                      AND ((status = 'PENDING' AND next_attempt_at <= ?)
+                           OR (status = 'IN_FLIGHT' AND lease_until <= ?))""",
+                    owner.value(), leaseToken, Timestamp.from(leaseUntil), ts, id, ts, ts);
+            if (won == 1) {
+                claimed.add(id);
+            }
+        }
+        return claimed;
+    }
 }

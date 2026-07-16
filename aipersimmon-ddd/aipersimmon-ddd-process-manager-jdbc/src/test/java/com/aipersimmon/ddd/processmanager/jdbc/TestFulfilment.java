@@ -69,6 +69,9 @@ final class TestFulfilment {
     record FanOut() implements ProcessInput {
     }
 
+    record ArmPoisonDeadline() implements ProcessInput {
+    }
+
     record DeadlineFired() implements ProcessInput {
     }
 
@@ -130,7 +133,15 @@ final class TestFulfilment {
                         new State("WAIT", state.count()), ProcessLifecycle.RUNNING, new ProcessStep("WAIT"),
                         Optional.empty(), new DecisionCode("armed"),
                         List.of(new ScheduleDeadline(new DeadlineName("REVIEW"),
-                                Instant.parse("2026-07-17T00:00:00Z"), new DeadlineFired())));
+                                context.now(), new DeadlineFired())));
+                case DeadlineFired ignored -> new ProcessDecision<>(
+                        new State("DONE", state.count()), ProcessLifecycle.COMPLETED, new ProcessStep("DONE"),
+                        Optional.of(new ProcessOutcome("REVIEW_EXPIRED")), new DecisionCode("deadline-fired"),
+                        List.of());
+                case ArmPoisonDeadline ignored -> new ProcessDecision<>(
+                        new State("WAIT_POISON", state.count()), ProcessLifecycle.RUNNING,
+                        new ProcessStep("WAIT_POISON"), Optional.empty(), new DecisionCode("armed-poison"),
+                        List.of(new ScheduleDeadline(new DeadlineName("POISON"), context.now(), new Boom())));
                 case FanOut ignored -> new ProcessDecision<>(
                         new State("FAN", state.count()), ProcessLifecycle.RUNNING, new ProcessStep("FAN"),
                         Optional.empty(), new DecisionCode("fanned"),
@@ -179,6 +190,7 @@ final class TestFulfilment {
                 payloadCodec("test.arm-deadline", ArmDeadline.class, a -> "", s -> new ArmDeadline()),
                 payloadCodec("test.deadline-fired", DeadlineFired.class, d -> "", s -> new DeadlineFired()),
                 payloadCodec("test.fan-out", FanOut.class, f -> "", s -> new FanOut()),
+                payloadCodec("test.arm-poison", ArmPoisonDeadline.class, a -> "", s -> new ArmPoisonDeadline()),
                 payloadCodec("test.do-work", DoWork.class, DoWork::reference, DoWork::new));
     }
 

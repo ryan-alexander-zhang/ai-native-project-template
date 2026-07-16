@@ -48,8 +48,12 @@ parent: design-00004-durable-process-manager-runtime
     瞬时失败重试、耗尽→DEAD+挂起、token fencing、lease 过期重认领）+ **1 PostgreSQL Testcontainers SKIP LOCKED gate**
     （两 worker 并发认领 40 effect，每条恰好派发一次）。jdbc 模块 18 测试全绿。**注**:MySQL gate 复用 `SkipLockedProcessDialect`
     同 SQL，随 P3 starter 的 dialect 选择补一个等价 Testcontainers 用例。
-  - ⏳ **P2③**:deadline worker（claim/fire/FIRED、generation、兜底 TTL）+ query/operations（redrive/cancel/timeline/
-    卡死扫描）+ 挂起期 PARKED 输入。
+  - ✅ **P2③**:deadline worker——`JdbcProcessDeadlineWorker` claim（dialect 新增 `claimDueDeadlines`，候选 JOIN 实例
+    仅取 active，`FOR UPDATE OF d SKIP LOCKED`）→ 转 `ProcessInput` 重入 `handle` → 同事务标 `FIRED`；superseded
+    generation 可审计 no-op；耗尽 → DEAD + 挂起（source=DEADLINE）。deadline store 加 load/markFired/scheduleRetry/
+    markDead/cancelClaimed/currentGeneration。3 H2 测试绿（fire 推进流程、superseded no-op、耗尽→DEAD+挂起）。jdbc 模块 21 绿。
+  - ⏳ **P2④**:query/operations（`JdbcProcessOperations` redrive effect/deadline、cancelProcess、timeline、卡死扫描）
+    + 挂起期 `PARKED` 输入落库与恢复重放 + 整体 `max-lifetime` 兜底 deadline。
 - ⏳ **P3**（`-process-manager-jdbc-spring-boot-starter`）:autoconfigure、properties（构造期校验）、worker 生命周期、
   Health/最小 SLI、DDL 样例、启动期 fail-fast。Boot 切片测试。
 - ⏳ **P4**（multi-module scaffold sample）:ordering 履约 Definition/codec + Payment 微服务往返 + Inventory/Order

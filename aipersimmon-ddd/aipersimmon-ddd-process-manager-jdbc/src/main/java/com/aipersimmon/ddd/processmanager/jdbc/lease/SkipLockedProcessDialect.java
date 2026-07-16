@@ -41,4 +41,23 @@ public final class SkipLockedProcessDialect implements JdbcProcessDialect {
         }
         return ids;
     }
+
+    @Override
+    public List<String> claimDueDeadlines(
+            JdbcTemplate jdbc, Instant now, int limit, WorkerId owner, String leaseToken, Instant leaseUntil) {
+        Timestamp ts = Timestamp.from(now);
+        // Lock only the deadline rows (OF d), not the joined instance, and skip contended ones.
+        List<String> ids = jdbc.query(
+                DEADLINE_CANDIDATE_SQL + " LIMIT " + limit + " FOR UPDATE OF d SKIP LOCKED",
+                (rs, n) -> rs.getString(1), ts, ts);
+        for (String id : ids) {
+            jdbc.update("""
+                    UPDATE aipersimmon_process_deadline
+                    SET status = 'IN_FLIGHT', attempts = attempts + 1,
+                        lease_owner = ?, lease_token = ?, lease_until = ?, updated_at = ?
+                    WHERE deadline_id = ?""",
+                    owner.value(), leaseToken, Timestamp.from(leaseUntil), ts, id);
+        }
+        return ids;
+    }
 }

@@ -30,6 +30,17 @@ public interface JdbcProcessDialect {
             JdbcTemplate jdbc, Instant now, int limit, WorkerId owner, String leaseToken, Instant leaseUntil);
 
     /**
+     * Claim up to {@code limit} due deadlines, marking each {@code IN_FLIGHT} with the
+     * lease. Unlike effects, deadlines need no per-instance head-of-line ordering: firing
+     * re-enters {@code handle}, which takes the instance lock, so concurrent fires on one
+     * instance serialize there. Must run inside a transaction.
+     *
+     * @return the claimed deadline ids, earliest {@code due_at} first
+     */
+    List<String> claimDueDeadlines(
+            JdbcTemplate jdbc, Instant now, int limit, WorkerId owner, String leaseToken, Instant leaseUntil);
+
+    /**
      * The claimable-and-unblocked candidate query, shared by all dialects. Two positional
      * parameters, both {@code now}: the {@code PENDING} due bound and the stale-lease
      * bound. Ordered so the per-instance head comes first.
@@ -45,4 +56,18 @@ public interface JdbcProcessDialect {
                     AND (b.created_at < e.created_at
                          OR (b.created_at = e.created_at AND b.effect_index < e.effect_index)))
             ORDER BY e.created_at, e.effect_index""";
+
+    /**
+     * The due-deadline candidate query, shared by all dialects. Two positional {@code now}
+     * params. Only deadlines of active instances are claimable — a suspended or ended
+     * instance's deadlines are skipped and become candidates again after it resumes
+     * (design-00004 §4.7).
+     */
+    String DEADLINE_CANDIDATE_SQL = """
+            SELECT d.deadline_id FROM aipersimmon_process_deadline d
+            JOIN aipersimmon_process_instance i ON i.instance_id = d.instance_id
+            WHERE ((d.status = 'PENDING' AND d.next_attempt_at <= ?)
+                   OR (d.status = 'IN_FLIGHT' AND d.lease_until <= ?))
+              AND i.lifecycle IN ('RUNNING', 'COMPENSATING')
+            ORDER BY d.due_at""";
 }
