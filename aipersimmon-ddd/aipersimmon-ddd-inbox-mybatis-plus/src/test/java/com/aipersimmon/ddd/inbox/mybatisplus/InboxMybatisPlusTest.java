@@ -1,7 +1,9 @@
 package com.aipersimmon.ddd.inbox.mybatisplus;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.application.Inbox;
@@ -56,5 +58,21 @@ class InboxMybatisPlusTest {
     @Test
     void autoConfiguresMybatisPlusInbox() {
         assertInstanceOf(MybatisPlusInbox.class, inbox);
+    }
+
+    @Test
+    void idBasedAccessDoesNotSilentlyIgnoreTheConsumerScope() {
+        // Two consumers recorded the same producer-assigned message id.
+        new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a").alreadyProcessed("evt-1");
+        new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b").alreadyProcessed("evt-1");
+        assertEquals(2L, inboxMapper.selectCount(null), "each consumer has its own dedup row");
+
+        // The record's identity is the composite (consumer, message_key); message_key alone is
+        // NOT a unique id. BaseMapper's id-based methods must therefore not be usable to address
+        // a row by message_key — otherwise deleteById("evt-1") would wipe BOTH consumers' rows,
+        // silently clobbering another service's dedup state.
+        assertThrows(Exception.class, () -> inboxMapper.deleteById("evt-1"),
+                "id-based access must be rejected, not silently scoped to message_key alone");
+        assertEquals(2L, inboxMapper.selectCount(null), "neither consumer's dedup row was clobbered");
     }
 }
