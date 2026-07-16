@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The production JDBC runtime for the durable Process Manager contracts: the
+    four-table store, atomic advance in one REQUIRED transaction, the effect relay,
+    the deadline worker, and the query/operations surfaces.
+
+    Depends on Spring JDBC/Tx (so its REQUIRED transaction composes with an existing
+    Inbox and command-handler transaction) and on the application tier (IntegrationEvents
+    for event effects) — but NOT on Spring Boot: auto-configuration lives in the
+    starter module. It carries no business Definition or codec, and does not create
+    tables. See design-00004-durable-process-manager-runtime §4.
+
+    This slice (plan-00003 P2①) lands the schema, stores, and atomic advance; the
+    relay, deadline worker, dialect claim, and operations land in later slices.
+  -->
+  <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
+  <name>aipersimmon-ddd-process-manager-jdbc</name>
+  <description>Production JDBC runtime for the durable Process Manager: four-table store, atomic advance, effect relay, and deadline worker over Spring JDBC/Tx.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- IntegrationEvents: the integration-event effect dispatcher publishes through it. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -33,9 +33,17 @@ parent: design-00004-durable-process-manager-runtime
   exception（`ProcessException` 基类 + 7 个）。每包 package-info。测试 32 绿:lifecycle 迁移、Decision 不变量（含
   SUSPENDED 禁用、终态⟺outcome、deadline 歧义、effects 防御拷贝）、Definition/codec 注册表冲突、VO 校验。已注册进
   reactor + BOM（22 模块 validate 绿）。注:effect-context 派生属 runtime 语义，其测试落 P2。
-- ⏳ **P2**（`aipersimmon-ddd-process-manager-jdbc`）:四表 store、原子推进、`JdbcProcessDialect`（SKIP LOCKED /
-  原子 UPDATE-claim）、effect relay、deadline worker、query/operations、retry。Testcontainers PG/MySQL + H2 契约测试；
-  **硬性 gate**:每 dialect claim/lease 的 crash-window 不双投故障注入。
+- 🔄 **P2**（`aipersimmon-ddd-process-manager-jdbc`）:
+  - ✅ **P2①**（schema + store + 原子推进 + H2 契约）:四表 H2 schema、四个 JDBC store（instance 乐观更新 / transition
+    append+dedup / effect 暂存 / deadline 调度取消）、`JdbcProcessRuntime` 原子推进（REQUIRED 事务、resolve/dedup/
+    乐观锁+bounded retry/decode/decision/校验合法迁移/暂存 effect 带持久身份 messageId=effectId=transitionId#idx/
+    deadline 持久化）、`JdbcProcessQuery`、`JdbcProcessUnitOfWork`、`DuplicateBusinessKeyPolicy`。11 个 H2 契约测试绿
+    （原子提交、rollback 无残行、重复 input no-op、reject/fold、revision 递增、非法迁移拒绝、终态 no-op、deadline 落库、
+    effect 确定性 id + correlation/causation 派生）。已注册 reactor+BOM。
+  - ⏳ **P2②**:`JdbcProcessDialect`（SKIP LOCKED / 原子 UPDATE-claim）+ effect relay（per-instance 有序、lease/fencing、
+    退避/DEAD、SUSPENDED）+ Testcontainers PG/MySQL + **crash-window 不双投硬性 gate**。
+  - ⏳ **P2③**:deadline worker（claim/fire/FIRED、generation、兜底 TTL）+ query/operations（redrive/cancel/timeline/
+    卡死扫描）+ 挂起期 PARKED 输入。
 - ⏳ **P3**（`-process-manager-jdbc-spring-boot-starter`）:autoconfigure、properties（构造期校验）、worker 生命周期、
   Health/最小 SLI、DDL 样例、启动期 fail-fast。Boot 切片测试。
 - ⏳ **P4**（multi-module scaffold sample）:ordering 履约 Definition/codec + Payment 微服务往返 + Inventory/Order
