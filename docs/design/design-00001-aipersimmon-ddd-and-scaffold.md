@@ -48,7 +48,7 @@ parent:
 1. **库 parent 必须 framework-free**:`aipersimmon-ddd/pom.xml` **不继承** `spring-boot-starter-parent`,只设 Java 21 + 插件 + 内部 dependencyManagement。只有后续 `*-spring` starter 才引 Spring。否则 `-core` 不再零依赖,违反 analysis-00006。
 2. **版本治理**:`-bom` 管住所有 `aipersimmon-ddd-*` 版本;消费者只 `import` 这一个。
 3. **拓扑无关**:同一套库,三种 archetype 复用;差异只在打包与消息传输(analysis-00006 §七)。
-6. **参考项目优先用库能力(不手写替代)**:三套 archetype 源(multi-module / modulith / microservice)是"标准范例",凡库已封装的能力一律采用——domain 词汇(`@AggregateRoot`/`@Entity`/`@ValueObject`/`@Repository`/`@Identity`/`Identifier`/`Transitions`)、分层 stereotype(`@*Layer`)、端口(`DomainEvents`/`IntegrationEvents`)、saga、以及 **CQRS**:写用例经 `CommandBus`(`@UseCase` 具体 `CommandHandler`),读用例经 `QueryBus`(`@ReadModel`)。how-to 反之刻意扁平、聚焦单点,不代表标准结构。
+6. **参考项目优先用库能力(不手写替代)**:三套 archetype 源(multi-module / modulith / microservice)是"标准范例",凡库已封装的能力一律采用——domain 词汇(`@AggregateRoot`/`@Entity`/`@ValueObject`/`@Repository`/`@Identity`/`Identifier`/`Transitions`)、分层 stereotype(`@*Layer`)、端口(`DomainEvents`/`IntegrationEvents`)、Process Manager、以及 **CQRS**:写用例经 `CommandBus`(`@UseCase` 具体 `CommandHandler`),读用例经 `QueryBus`(`@ReadModel`)。how-to 反之刻意扁平、聚焦单点,不代表标准结构。
 4. **Java 21 / Maven 3.9**;编码 UTF-8;`maven.compiler.release=21`。
 5. **每个 Java package 必须有 `package-info.java`**:承载包级 Javadoc 与分层 stereotype 注解(`@DomainLayer` 等标注于此),并让"包意图"显式。由 `-archunit` 校验存在性(§5.4)。适用于库、参考项目与生成项目的所有包。
 
@@ -61,6 +61,7 @@ flowchart TD
     app["aipersimmon-ddd-application"]
     integ["aipersimmon-ddd-integration"]
     cqrs["aipersimmon-ddd-cqrs"]
+    processManager["aipersimmon-ddd-process-manager"]
   end
   subgraph starter["可插拔 starter (Spring/JPA/Kafka)"]
     events["-events-spring"]
@@ -68,7 +69,7 @@ flowchart TD
     inbox["-inbox-jdbc / -inbox-mybatis-plus"]
     msg["-messaging-kafka / -rabbit"]
     cqrsSpring["-cqrs-spring"]
-    saga["-saga / -saga-spring"]
+    processManagerJdbc["-process-manager-jdbc<br/>/ -process-manager-jdbc-spring-boot-starter"]
   end
   arch["aipersimmon-ddd-archunit (test)"]
   bom["aipersimmon-ddd-bom"]
@@ -76,10 +77,15 @@ flowchart TD
   app --> core
   integ --> core
   cqrs --> core
+  processManager --> core
+  processManager --> cqrs
+  processManager --> integ
   events --> app
   outbox --> app
   inbox --> app
   cqrsSpring --> cqrs
+  processManagerJdbc --> processManager
+  processManagerJdbc --> app
   arch --> core
   bom -. 管理版本 .-> core
   bom -. 管理版本 .-> arch
@@ -96,7 +102,7 @@ flowchart TD
 | --- | --- | --- |
 | **Phase 1** | `-bom` → `-core` → `-archunit`(**按此序,一个一个做**)+ `multi-module` archetype + scaffold-samples | 先把"库依赖 + 分层 + arch 校验"跑通;archetype 依赖上述库子集 |
 | Phase 2 | `-application` / `-integration` + `-events-spring` / `-outbox` / `-inbox` | 事件与 outbox/inbox 上移进库 |
-| **Phase 3 ✅** | `-cqrs(+spring)` / `-saga(+spring)` | CQRS 与 saga 构件(**已交付**,见 §5.10–5.13) |
+| **Phase 3 ✅** | `-cqrs(+spring)` / legacy `-saga(+spring)` | CQRS 与旧 saga 基线已交付；durable Process Manager 的 clean-slate 目标见 [[design-00004-durable-process-manager-runtime]] |
 | **Phase 4 ✅** | `modulith` / `microservice` / CI+GitHub Packages | 全部交付并验证生成 `com.acme.shop` 全绿:`modulith`(单模块 modular monolith,边界测试期强制);`microservice`(`contracts` 共享契约 + `ordering-service`/`inventory-service` 独立部署 + `e2e-tests`,跨服务走 outbox→Kafka→inbox,EmbeddedKafka 端到端 2/2);CI(`ci.yml` 构建库+三脚手架+样例)+ 发布(`publish-library.yml` + `distributionManagement` → GitHub Packages) |
 
 **依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写双 BC 参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype 并验证生成/回归;④按需补 `scaffold-samples` 的聚焦 how-to 例子。
@@ -216,25 +222,18 @@ analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction
 - `TransactionTemplateUnitOfWork`(领域事件排空不再依赖任何线程域收集器)。
 - `AipersimmonDddCqrsAutoConfiguration`:`@ConditionalOnMissingBean` 全可覆盖;`@AutoConfiguration(after = {DataSourceTransactionManager/Transaction/ValidationAutoConfiguration})` 以正确评估 `@ConditionalOnBean`。测试:端到端(happy / 失败回滚且不投递事件 / 校验先于事务拒绝 / 查询侧),4/4。
 
-### 5.12 `aipersimmon-ddd-saga`(纯,可选,→ `-core`)
+### 5.12 `aipersimmon-ddd-process-manager`（纯契约）
 
-承接 [[analysis-00007-saga-process-manager]] §六(借 Axon"标记 + 关联路由 + 生命周期 + deadline"四样形态,放弃 ES/Server)。framework-free。
+`aipersimmon-ddd-saga`、`SagaState`、`SagaStore` 与独立 `DeadlineScheduler` 只代表已经交付的历史基线，不再是目标 API，
+也不提供兼容迁移约束。新的 framework-free 核心以 `ProcessDefinition`、`ProcessDecision`、`ProcessEffect`、
+`ProcessRuntime` port 和显式 codec SPI 为边界；规范设计见 [[design-00004-durable-process-manager-runtime]] §三。
 
-- `@ProcessManager` stereotype;`SagaState`(基类:`correlationId` 关联路由 + `SagaStatus` 生命周期守卫 + 乐观锁 `version`;状态 `RUNNING→COMPENSATING→ABORTED` / `RUNNING→COMPLETED`,非法迁移抛错);`SagaStatus`。
-- `Deadline`(correlationId + name + fireAt 的"到点回调");`SagaStore<S>` 按 correlationId 存取(乐观锁语义);`DeadlineScheduler`(登记/取消)+ `DeadlineHandler`(到点回调 SPI)。
-- 测试:`SagaState` 关联/生命周期/乐观锁 version,6/6。
+### 5.13 JDBC Runtime 与 Spring Boot Starter
 
-### 5.13 `aipersimmon-ddd-saga-spring`(starter,可选,→ `-saga` + `spring-boot-starter-jdbc`)
-
-analysis-00007 §六实现侧(把 s2 的 `PendingOrderTimeoutScanner` 抽象成通用 DeadlineManager;SagaStore 含乐观锁)。
-
-- **DeadlineScheduler 两实现,按 `aipersimmon.ddd.saga.deadline.store` 选**:
-  - `SchedulingDeadlineScheduler`(默认 `in-process`):`TaskScheduler` 支撑,到点派发给 `DeadlineHandler`,可按 (correlationId,name) 取消。简单无 broker,但**进程内 = 重启丢定时器**、单节点。
-  - `JdbcDeadlineScheduler`(`jdbc`):把 deadline 存表(`aipersimmon_deadline`),`@Scheduled` 轮询到点行→派发→删除,失败留行下轮重试(**at-least-once**,与 outbox 同构)。**重启不丢、可多实例**;触发有轮询延迟、可能多次触发,故 handler 需幂等——saga 生命周期守卫(`isActive`)天然提供。附非自动执行样例 DDL。
-- `JdbcSagaStore<S>`(**抽象基类**):自持 correlation 查询 + 版本化 upsert + 乐观锁校验(冲突抛 Spring `OptimisticLockingFailureException`);把**具体聚合↔列的映射**(`mapRow`/`serializeData`)留给 BC 子类**手写**(承接 repo `*Po`/`*Mapper` 显式映射哲学,避免泛型反射序列化的脆弱)。附非自动执行样例 DDL。
-- `AipersimmonDddSagaAutoConfiguration`:有 `DeadlineHandler` bean 时装配 scheduler,缺 `TaskScheduler` 时补一个单线程的;`SagaStore` **不自动装配**(BC 子类化后自注册为 bean)。测试:scheduler 触发/取消(2)+ JdbcSagaStore 插入/推进/乐观锁冲突(3),5/5。
-
-> **本阶段落地取舍(诚实记录)**:saga-spring 的 `SagaStore` 实现选**抽象 JDBC 基类 + BC 手写映射**,而非泛型 JSON 自动序列化——因 `SagaState` 子类构造器难被通用反序列化(需 `-parameters`/`@JsonCreator`),泛型全自动 store 脆弱。`DeadlineScheduler` 进程内与 **DB-poll 持久化(`JdbcDeadlineScheduler`,已交付)** 两实现按属性可选。**留待后续**:saga 经 `-cqrs` CommandBus 发命令 + 经 `-outbox` 可靠外发的组合、`-saga-jpa`。
+生产目标拆为 `aipersimmon-ddd-process-manager-jdbc` 与
+`aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`：前者负责四表持久化、原子推进、effect relay、durable deadline、
+租约/围栏、幂等与运维能力；后者只负责 Boot 自动装配、配置、worker 生命周期、可观测性和启动校验。两者的完整边界、
+Temporal/Seata provider 策略及非规范性订单 Sample 统一以 [[design-00004-durable-process-manager-runtime]] 为准。
 
 ### 5.14 `aipersimmon-ddd-messaging-kafka`(starter,可选,→ `-outbox`(core)+ `-application` + spring-kafka)
 
@@ -282,7 +281,7 @@ flowchart LR
   2. `-archunit` 的规则如何参数化消费者的分层包命名(约定 vs 显式传参)?Phase 1 落地时定。
   3. ~~GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)~~ **已交付**:`.github/workflows/ci.yml`(装库→建脚手架/样例)、`publish-library.yml`(release/手动触发 → `mvn deploy` 库到 GitHub Packages,`setup-java` 配 `github` server + `GITHUB_TOKEN`)、库 parent `distributionManagement`(repo id `github`)。消费者需在自己的 Maven 配置加同一 GitHub Packages 仓库并鉴权。
   4. ~~**集成事件方式三(broker)**:`-messaging-kafka`~~ **已交付(§5.14)**:Kafka `OutboxDispatcher` + inbox 守卫的进程内消费桥;实时 broker 端到端集成测试归消费方应用,库内为无 broker 的单元/装配测试。
-  5. **saga 深化(Phase 3 之后)**:~~持久化 `DeadlineScheduler`(DB-poll)~~ **已交付**(`JdbcDeadlineScheduler`,`store=jdbc` 选,at-least-once 轮询,重启不丢/可多实例);~~saga 经 `-cqrs` CommandBus 发命令 + `-outbox` 可靠外发的组合样例~~ **已交付**(scaffold-samples `saga-commands-and-outbox`:process manager 经 CommandBus 发 `ReserveStock`/`ConfirmOrder`/`CancelOrder`,handler 同事务经 outbox 可靠外发,relay 进程内重投闭环;含"失败回滚不外发"原子性验证)。~~outbox/inbox 的可插拔存储变体~~ **已交付 MyBatis-Plus 档**:抽出存储无关的 **`aipersimmon-ddd-outbox`(core)**(`OutboxDispatcher`/`OutboxMessage` + dispatch autoconfig),`-outbox-jdbc` 重构为依赖 core,新增 **`-outbox-mybatis-plus`** 与 **`-inbox-mybatis-plus`**(MyBatis-Plus `BaseMapper`/`@TableName`,`MapperFactoryBean` 精确注册、不劫持消费者 `@MapperScan`,与 jdbc 变体同表结构可互换);`-messaging-kafka` 改依赖 core,可与任一存储组合(消费者显式选一个存储 starter);全库反应堆 + 三套脚手架 + 样例(含 microservice 真 Kafka e2e)全绿。**仍待做:`-saga-jpa`;JPA 变体 `-outbox-jpa` / `-inbox-jpa`**(JPA 需解决库内 `@Entity`/`@EntityScan` 覆盖消费者实体扫描的陷阱)。
+  5. **Process Manager 生产化(Phase 3 之后)**:旧 `-saga/-saga-spring`、JDBC deadline 与 command/outbox 样例均作为已交付基线保留，但不继续扩展 `-saga-jpa`；后续采用 [[design-00004-durable-process-manager-runtime]] 的 clean-slate 三模块设计。JPA 变体 `-outbox-jpa` / `-inbox-jpa` 仍是独立的消息存储开放项，不属于 Process Manager backend。
   7. **`microservice` 拓扑落地要点(已交付)**:每 BC 独立部署,跨服务**只经 Kafka**(outbox→Kafka→inbox 守卫的消费桥→进程内重投)。选**共享 `contracts` 模块**(两服务同依赖 → 事件类 FQN 一致 → 库的消费桥 `Class.forName` 直接可用,无需库改动)。**落地发现**:e2e 同一 JVM 启两服务时,两服务 jar 的 `application.properties` 在同一 classpath 根**冲突**(后启的服务错读前者配置);修法 = e2e 用各服务专属 `spring.config.name`(`ordering-e2e`/`inventory-e2e`),各服务自身的 `application.properties` 保持不变(独立部署/生成项目仍正确)。单主题 + 各服务独立消费组:每方收到全量、只对自己关心的事件反应。
   6. ~~**scaffold-samples 补 how-to**:"接一个 saga""加 CQRS 读模型""集成事件走 Kafka"~~ **已交付**:`add-cqrs-read-model`(命令管道+读模型)、`orchestrate-with-saga`(process manager + deadline + 补偿)、`integration-events-over-kafka`(outbox→Kafka→inbox→进程内,EmbeddedKafka 端到端)。**落地时修了库两处装配缺陷**:saga-spring 的 `DeadlineScheduler`↔`DeadlineHandler` 构造循环(改 scheduler 惰性 `Supplier<DeadlineHandler>` 解析);messaging-kafka autoconfig 未 `after = KafkaAutoConfiguration`,致 `@ConditionalOnBean(KafkaTemplate)` 早评估、Kafka dispatcher 未顶替日志默认(已修)。**`multi-module` 已改为 orchestration saga**(`OrderFulfilment` 过程管理器 + `OrderFulfilmentSaga` 中心状态 + 内存 `SagaStore`,`StockReserved` 确认 / `StockReservationFailed` 补偿取消);archetype 重新派生并验证生成 `com.acme.shop` 全绿(含补偿分支)。**后续再拆分层**:把过程管理器的协调策略下沉到 application 层(`OrderFulfilmentProcessManager`,`@ProcessManager`,依赖 `SagaStore`/`CommandBus` port、只吃 order id),`adapter/messaging` 的 `OrderFulfilment` 收缩为仅绑 `@EventListener` 的瘦投递壳——对齐主流实践(协调在 application、投递在 edge),消除"编排逻辑住在 interface 层"的分层张力。**三套拓扑(`multi-module` / `modulith` / `microservice`)一致落地**,各自测试全绿(microservice 含真 Kafka 的 `MicroserviceFlowE2eTest`)。**archetype 尚未就此改动重新派生**(留待下次重派生一并验证)。
 
@@ -291,6 +290,7 @@ flowchart LR
 内部:
 - [[analysis-00006-ddd-building-blocks-library]] —— 模块切分、参考不依赖、CQRS、§十 `Transitions<S>`。
 - [[analysis-00007-saga-process-manager]] —— saga 分档(Phase 3)。
+- [[design-00004-durable-process-manager-runtime]] —— durable Process Manager 三模块的当前生产目标与迁移边界。
 - [[analysis-00004-bounded-context-module-structure]] —— 三种拓扑与 "ship one worked BC"。
 - [[decision-00005-package-per-aggregate]] —— domain 包结构(archetype 骨架遵循)。
 - [[design-00003-exception-model]] —— `-core`/`-application` 异常体系增量(`ErrorCode`/`Invariant` + 语义子类),扩展本文 §5.3/§5.5。
