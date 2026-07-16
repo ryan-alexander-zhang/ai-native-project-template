@@ -12,8 +12,9 @@ import java.time.Instant;
  *   <li>{@code source} — CloudEvents {@code source}: the context that produced it.
  *   <li>{@code type} — CloudEvents {@code type}: the logical event type (never a Java
  *       class name), so consumers map it to their own local type.
- *   <li>{@code version} — the payload schema version (a {@code dataschemaversion}
- *       extension); bump on a breaking change.
+ *   <li>{@code version} — the payload schema revision (a {@code dataschemaversion}
+ *       extension) and, with {@code type}, the exact resolution key; bump on a payload
+ *       schema change (a change to the business fact is a new {@code type} instead).
  *   <li>{@code occurredAt} — CloudEvents {@code time}.
  *   <li>{@code subject} — CloudEvents {@code subject}: the aggregate id, used as the
  *       transport partition/ordering key ({@code null} if none).

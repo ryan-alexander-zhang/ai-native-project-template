@@ -59,9 +59,10 @@ consumer 建键的值同源,**缺失即硬报错**(不回退简单类名):
 
 1. **`@EventType(name, version)` 注解**(`aipersimmon-ddd-integration`,framework-free,`@Retention(RUNTIME)` /
    `@Target(TYPE)`):`name`(逻辑类型 = 线上 `type` = 注册表键,稳定标识)+ `version`(schema 修订 =
-   CloudEvents `dataschemaversion`,**非**标识的一部分),二者**都必填**。语义:同一 `name` 的 v1/v2 解析到同一类
-   (向后兼容演进、加可选字段、bump `version`);**破坏性变更 = 新 `name`**(新类),不是 bump 版本。版本作为显式
-   结构化字段,也给后续 lint(改了 schema 却没 bump 版本)留了钩子。
+   CloudEvents `dataschemaversion`),二者**都必填**,合成 `(name, version)` 精确解析键。语义:payload schema 变化
+   bump `version`、业务事实语义变化换 `name`;**每个 `(name, version)` 是独立契约、各自一个本地类**(见下方§边界收口
+   #3 按 `(type, version)` 建键——消费者保留旧版本类或经自定义 catalog 映射才能继续消费/重放旧版本,无隐式回退)。
+   版本作为显式结构化字段,也给后续 lint(改了 schema 却没 bump 版本)留了钩子。
 2. **`IntegrationEvent` 读注解 + 抛错**(`IntegrationEvent.java`):`eventTypeOf` 读 `name`(无注解 / 空即抛)、
    `eventVersionOf` 读 `version`(无注解 / `<1` 即抛);`default eventType()` / `eventVersion()` 委托它们。**不回退
    简单类名**。用注解而非覆盖方法:方法覆盖只在运行期实例上可见,类扫描注册表看不到。

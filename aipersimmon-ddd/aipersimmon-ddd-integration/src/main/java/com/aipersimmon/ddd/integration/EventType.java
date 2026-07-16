@@ -25,20 +25,24 @@ import java.lang.annotation.Target;
  * public record OrderPlaced(String orderId) implements IntegrationEvent { }
  * }</pre>
  *
- * <p>{@link #name()} is the stable identity — the CloudEvents {@code type} on the
- * wire and the consumer registry's lookup key. {@link #version()} is a separate
- * schema-revision counter (the CloudEvents {@code dataschemaversion}), <em>not</em>
- * part of the identity: {@code v1} and {@code v2} of one {@code name} resolve to the
- * same class, so evolve compatibly (add optional fields) and bump {@code version}. A
- * <em>breaking</em> change is a new {@code name} (a distinct type/class), never a
- * version bump. Keeping the version out of the name is what lets one handler serve
- * every compatible revision, and gives tooling a structured field to lint (e.g. a
- * schema change without a version bump).
+ * <p>{@link #name()} identifies the business event; {@link #version()} is its payload
+ * schema revision (the CloudEvents {@code dataschemaversion}). Together, {@code (name,
+ * version)} is the <strong>exact</strong> wire resolution key — the value a producer
+ * stamps and the value a consumer's {@link IntegrationEventCatalog} is keyed by. When
+ * the payload schema changes, bump {@code version}; when the business fact the event
+ * asserts changes, use a new {@code name}. Because resolution is exact, each
+ * {@code (name, version)} is a distinct contract: the default scan registers one
+ * annotated class per pair, so to keep consuming (or replaying) an older version after a
+ * newer one ships, keep the older version's class on the consumer — or provide a
+ * catalogue mapping. A custom {@link IntegrationEventCatalog} may map several versions to
+ * one backward-compatible class, but there is no implicit fall back across versions
+ * (an unregistered pair dead-letters). The structured {@code version} also gives tooling
+ * a field to lint (e.g. a schema change without a version bump).
  *
  * <p>{@code name} must be non-blank and should be stable and namespaced so it
  * survives refactors and language boundaries; {@code version} must be {@code >= 1}.
- * {@code name} must be unique across the events a single consumer resolves — the
- * registry rejects two classes that declare the same name.
+ * A single consumer must not have two classes registered under the same {@code (name,
+ * version)} — the registry rejects that clash (one would otherwise shadow the other).
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
@@ -53,8 +57,9 @@ public @interface EventType {
     String name();
 
     /**
-     * The schema revision (CloudEvents {@code dataschemaversion}), starting at 1.
-     * Bump it on a backward-compatible change; a breaking change is a new
+     * The payload schema revision (CloudEvents {@code dataschemaversion}), starting at 1
+     * and part of the exact {@code (name, version)} resolution key. Bump it on any payload
+     * schema change; a change to the business fact the event asserts is a new
      * {@link #name()} instead.
      */
     int version();

@@ -44,9 +44,11 @@ Kafka binding。**有标准,采用标准。**
    **逻辑类型**(不再 FQCN)。新增 `partitionKey()`:`subject` 优先,缺失回退 `eventId`。
 2. **`IntegrationEvent` 声明契约身份**:`eventType()` / `eventVersion()`(逻辑类型 + schema 版本)与 `subject()`
    (聚合 id,可空 default)。逻辑类型与版本**必须以 `@EventType(name, version)` 注解显式声明**(见下方修订):
-   `name` = 线上 `type` = 稳定标识,`version` = `dataschemaversion`(**非**标识,同一 `name` 的 v1/v2 解析到同一
-   类、向后兼容演进;破坏性变更 = 新 `name`)。`eventType()` / `eventVersion()` 读注解、缺失即报错——**无简单类名
-   回退、无硬编码版本**。`subject()` 仍是 default(可空)。**修订说明(见
+   `name` 标识业务事件,`version` = `dataschemaversion` = payload schema 修订;二者合成 **`(name, version)` 精确
+   解析键**(payload schema 变化 → bump `version`;业务事实语义变化 → 换 `name`)。**每个 `(name, version)` 是独立
+   契约**:默认扫描一个注解类注册一个 pair;消费者要继续消费/重放旧版本,须保留旧版本类或经自定义 catalog 提供
+   映射(可把多版本映射到同一兼容类),**无隐式跨版本回退**(未注册的 pair 即 DLT)。`eventType()` / `eventVersion()`
+   读注解、缺失即报错——**无简单类名回退、无硬编码版本**。`subject()` 仍是 default(可空)。**修订说明(见
    [[issue-00005-integration-event-logical-type-resolution]])**:本决策初稿曾定 `eventType()` 默认简单类名、
    可选覆盖,且发布器把信封 `version` 硬编码为 1;前者与命题一自相矛盾(覆盖成命名空间名后默认 resolver 反而解析
    不了),后者使 `dataschemaversion` 恒为 1、与事件无关。故改为 `@EventType(name, version)` 必填,信封 `version`
