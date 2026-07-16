@@ -24,6 +24,7 @@ import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
+import org.apache.kafka.common.TopicPartition;
 
 /**
  * Wires the Kafka integration-event transport. When a {@link KafkaTemplate} is
@@ -80,8 +81,13 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     @ConditionalOnMissingBean(CommonErrorHandler.class)
     public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate,
                                                  KafkaMessagingProperties properties) {
-        return buildErrorHandler(
-                new DeadLetterPublishingRecoverer(kafkaTemplate), properties.getConsumer().getRetry());
+        // Publish to "<topic>.DLT", keyed the same way as the source so an aggregate's
+        // dead letters keep to one partition. The destination is set explicitly (rather
+        // than left to the recoverer's default) so the DLT topic name is the documented
+        // one and does not depend on a library default.
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
+                (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+        return buildErrorHandler(recoverer, properties.getConsumer().getRetry());
     }
 
     /**

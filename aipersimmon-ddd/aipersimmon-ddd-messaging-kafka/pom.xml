@@ -29,9 +29,10 @@
         handlers receive it — the inbox half of the pattern. Enabled with
         aipersimmon.ddd.messaging.kafka.consumer.enabled=true.
 
-    A live-broker integration test belongs to the consuming application; the tests
-    here verify the dispatch, reconstruction, idempotency, and wiring logic without
-    a broker.
+    Most tests verify the dispatch, reconstruction, idempotency, and wiring logic
+    without a broker; one focused test (KafkaDeadLetterIntegrationTest) runs the
+    consumer, error handler, and dead-letter recoverer against an in-JVM embedded
+    broker to prove the poison -> DLT -> offset-advance -> inbox contract end to end.
   -->
   <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
   <name>aipersimmon-ddd-messaging-kafka</name>
@@ -66,6 +67,31 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- One focused end-to-end test runs the consumer + error handler + DLT recoverer
+         against an in-JVM embedded broker (no Docker); the rest stay broker-free. -->
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- A real JDBC inbox (H2) so the DLT test can assert the poison's inbox mark is
+         rolled back while a good message's is committed. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

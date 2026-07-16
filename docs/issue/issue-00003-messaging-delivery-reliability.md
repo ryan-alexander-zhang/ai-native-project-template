@@ -71,7 +71,9 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
 - **AC-2**:瞬时失败的 outbox 消息按退避重试,达 `max-attempts` 后进 `dead_letter`;正常消息不受影响。
 - **AC-3**:Kafka 毒丸记录经退避重试后进 `<topic>.DLT`(而非静默丢弃);inbox 幂等语义不回归。
 - **AC-4**:死信可被工具/人工重放回主流程。
-- **AC-5**:jdbc 与 mybatis-plus 两后端行为一致;以 Testcontainers(Postgres + Kafka)验证 AC-1..4。
+- **AC-5**:jdbc 与 mybatis-plus 两后端行为一致(以 **H2** 验证);Kafka 的 poison → DLT → offset 前进 → inbox 链路
+  以 **Embedded Kafka**(in-JVM,无 Docker)验证。**不含** PostgreSQL / Testcontainers 方言级端到端验证——刻意取舍,
+  避免 Docker 依赖与 CI 变重(见 [[issue-00010-verify-kafka-dlt-with-embedded-broker]])。
 
 ## 落地进度
 
@@ -105,8 +107,12 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
 - 配置:`aipersimmon.ddd.messaging.kafka.consumer.retry.{max-retries=3, initial-interval-ms=1000, multiplier=2.0,
   max-interval-ms=10000}`。
 - 验证:`KafkaErrorHandlerTest`(永久 → 首次即 recover / 瞬时 → 首次不 recover,不接触 broker)+
-  `AutoConfigurationWiringTest`(启用即装配 `DefaultErrorHandler`、禁用则无、可覆盖)。满足 **AC-3**;`inbox` 幂等语义
-  未回归(handler 失败 inbox 记录随事务回滚,重投安全;耗尽后 recover 到 DLT)。
+  `AutoConfigurationWiringTest`(启用即装配 `DefaultErrorHandler`、禁用则无、可覆盖)。
+- **Embedded Kafka 端到端**(`KafkaDeadLetterIntegrationTest`,in-JVM broker,无 Docker):poison(未知 `(type, version)`)
+  → `<topic>.DLT`,消费者越过毒丸继续消费后续正常消息(offset 前进),毒丸的 inbox 标记随事务回滚、正常消息标记
+  提交。此测试当场揪出一个 H3 潜伏缺陷:`DeadLetterPublishingRecoverer` 默认目的地并非文档承诺的 `<topic>.DLT`,
+  已改为**显式目的地解析器**(`<topic>.DLT`,按源分区键),使实际行为与文档一致——单元/mock 测试发现不了这类问题,
+  正是补真实链路测试的价值(见 [[issue-00010-verify-kafka-dlt-with-embedded-broker]])。
 
 全部 AC(1–5)达成,本 issue `resolved`。
 
