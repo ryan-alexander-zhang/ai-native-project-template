@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.messaging.kafka;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.verify;
 
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -64,6 +66,25 @@ class KafkaOutboxDispatcherTest {
         assertEquals("o-1", header(record, IntegrationEventHeaders.PARTITION_KEY));
         assertEquals("application/json", header(record, IntegrationEventHeaders.CONTENT_TYPE));
         assertEquals("2026-01-01T00:00:00Z", header(record, IntegrationEventHeaders.TIME));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void doesNotBlockTheRelayThreadForeverWhenTheBrokerNeverAcknowledges() {
+        KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
+        // A send whose ack never arrives (broker partition unwritable, metadata stall, ...).
+        doReturn(new CompletableFuture<>()).when(template).send(any(ProducerRecord.class));
+
+        KafkaOutboxDispatcher dispatcher =
+                new KafkaOutboxDispatcher(template, "orders", Duration.ofMillis(200));
+
+        // The single relay thread must not be pinned indefinitely on one stuck send: the
+        // bounded await surfaces as a (transient) IllegalStateException — not a permanent
+        // failure — so the relay leaves the row to be retried on the next poll. The outer
+        // preemptive timeout is generous relative to the 200ms send bound; before the fix
+        // (an unbounded get) dispatch never returns and this trips.
+        assertTimeoutPreemptively(Duration.ofSeconds(3), () ->
+                assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message)));
     }
 
     @Test

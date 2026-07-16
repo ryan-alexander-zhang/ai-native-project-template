@@ -12,6 +12,8 @@ public class KafkaMessagingProperties {
     /** Topic that integration events are published to and consumed from. */
     private String topic = "aipersimmon.integration-events";
 
+    private final Producer producer = new Producer();
+
     private final Consumer consumer = new Consumer();
 
     public String getTopic() {
@@ -22,8 +24,35 @@ public class KafkaMessagingProperties {
         this.topic = topic;
     }
 
+    public Producer getProducer() {
+        return producer;
+    }
+
     public Consumer getConsumer() {
         return consumer;
+    }
+
+    /** Settings for the outbox relay's Kafka dispatcher (the producer side). */
+    public static class Producer {
+
+        /**
+         * Upper bound, in milliseconds, on awaiting a broker ack for one send before the
+         * relay gives up and retries the row on the next poll. Bounds the single relay
+         * thread so one stuck send cannot pin it (and stall all delivery on the instance),
+         * and so a wait cannot outlive the relay's {@code lock-at-most-for} and let another
+         * instance dispatch the same rows concurrently. Keep
+         * {@code outbox.batch-size × this} comfortably below the relay's
+         * {@code relay.lock-at-most-for}.
+         */
+        private long sendTimeoutMs = 30000;
+
+        public long getSendTimeoutMs() {
+            return sendTimeoutMs;
+        }
+
+        public void setSendTimeoutMs(long sendTimeoutMs) {
+            this.sendTimeoutMs = sendTimeoutMs;
+        }
     }
 
     /** Settings for the in-process consumer bridge. */

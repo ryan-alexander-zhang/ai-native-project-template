@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -53,7 +54,8 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     @ConditionalOnMissingBean(OutboxDispatcher.class)
     public OutboxDispatcher kafkaOutboxDispatcher(KafkaTemplate<String, String> kafkaTemplate,
                                                   KafkaMessagingProperties properties) {
-        return new KafkaOutboxDispatcher(kafkaTemplate, properties.getTopic());
+        return new KafkaOutboxDispatcher(kafkaTemplate, properties.getTopic(),
+                Duration.ofMillis(properties.getProducer().getSendTimeoutMs()));
     }
 
     @Bean
