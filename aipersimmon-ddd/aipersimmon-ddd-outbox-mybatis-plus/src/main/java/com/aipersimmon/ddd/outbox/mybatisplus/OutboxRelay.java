@@ -85,14 +85,25 @@ public class OutboxRelay {
             }
             try {
                 dispatcher.dispatch(toMessage(record));
+            } catch (RuntimeException e) {
+                if (handleFailure(record, e) && subject != null) {
+                    blockedSubjects.add(subject);
+                }
+                continue;
+            }
+            // The message is delivered (at-least-once satisfied). A failure to record that is
+            // NOT a dispatch failure: never dead-letter or count it against the retry budget —
+            // that would discard or misreport a message the broker already has. Leave the row
+            // unsent so the next poll re-dispatches it (an accepted at-least-once duplicate,
+            // which the consumer's inbox dedups).
+            try {
                 mapper.update(null, new LambdaUpdateWrapper<OutboxRecord>()
                         .eq(OutboxRecord::getEventId, record.getEventId())
                         .set(OutboxRecord::getSent, true)
                         .set(OutboxRecord::getSentAt, clock.instant()));
             } catch (RuntimeException e) {
-                if (handleFailure(record, e) && subject != null) {
-                    blockedSubjects.add(subject);
-                }
+                log.warn("outbox dispatch for eventId={} succeeded but marking it sent failed; "
+                        + "it will be re-dispatched (a duplicate) on the next poll", record.getEventId(), e);
             }
         }
     }
