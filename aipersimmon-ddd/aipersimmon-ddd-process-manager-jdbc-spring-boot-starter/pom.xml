@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring Boot starter that assembles the JDBC Process Manager runtime into an
+    application capability: it collects the consumer's explicitly-registered
+    Definitions, Codecs, and Dispatchers, picks the SQL dialect, wires the runtime,
+    query, relay, and deadline worker, and runs the workers on their own thread pools.
+
+    It carries no business logic, does not scan business packages, and never executes
+    DDL (sample scripts ship under META-INF; apply them via Flyway/Liquibase). Every
+    bean is @ConditionalOnMissingBean, so a consumer can override any of them. See
+    design-00004-durable-process-manager-runtime §5.
+
+    This slice (plan-00003 P3) lands auto-configuration, validated properties, dialect
+    auto-selection, and the worker scheduling lifecycle.
+  -->
+  <artifactId>aipersimmon-ddd-process-manager-jdbc-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-process-manager-jdbc-spring-boot-starter</name>
+  <description>Spring Boot auto-configuration for the JDBC durable Process Manager runtime, query, relay, and deadline worker.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- MySQL SKIP LOCKED gate (the per-dialect no-double-claim check; design-00004 §10). -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>mysql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

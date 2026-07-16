@@ -58,8 +58,14 @@ parent: design-00004-durable-process-manager-runtime
     effect/deadline+审计 operator transition)。store 加 resume/redrive/countDead/cancelPending/appendOperator/
     findParkedInputs。3 H2 测试绿(park 不回弹+去重、redrive 恢复并重放、cancel)。jdbc 模块 24 绿。
     **注**:`redriveDeadline`(与 redriveEffect 对称)、timeline/卡死只读查询、`max-lifetime` 兜底 deadline 随 P3 补。
-- ⏳ **P3**（`-process-manager-jdbc-spring-boot-starter`）:autoconfigure、properties（构造期校验）、worker 生命周期、
-  Health/最小 SLI、DDL 样例、启动期 fail-fast。Boot 切片测试。
+- ✅ **P3**（`-process-manager-jdbc-spring-boot-starter`）:`AipersimmonDddProcessManagerJdbcAutoConfiguration`（收集
+  Definition/Codec/Dispatcher → 注册表，全 bean `@ConditionalOnMissingBean` 可覆盖，不扫描业务包、不建表）、
+  `ProcessManagerJdbcProperties`（构造期 `validate()` fail-fast）、`ProcessDialectFactory`（`auto` 探测
+  DatabaseMetaData / postgresql / mysql / h2）、`ProcessWorkerScheduler`（relay + deadline 各自独立单线程池、异常不杀线程、
+  优雅关停）、`ProcessSchemaValidator`（`@DependsOnDatabaseInitialization` 校验四表存在）、DDL 样例（h2/postgresql/mysql）+
+  imports。测试:Boot 切片(上下文装配 + 端到端 start→relay 逐字身份派发)2 绿 + **MySQL 8 Testcontainers SKIP LOCKED
+  gate**(跑 shipped mysql-schema.sql,两 worker 并发每 effect 恰一次)1 绿。
+  **注**:Actuator/Micrometer Health+最小 SLI、`redriveDeadline`、timeline/卡死只读查询、`max-lifetime` 兜底为 P3② 补强项。
 - ⏳ **P4**（multi-module scaffold sample）:ordering 履约 Definition/codec + Payment 微服务往返 + Inventory/Order
   同进程往返；端到端验收。
 - ⏳ **P5**（清理）:移除 `aipersimmon-ddd-saga` / `-saga-spring`，更新 BOM / 父 pom / README / design-00001 指向。
