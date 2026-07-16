@@ -98,11 +98,14 @@ class AiPersimmonDddRulesTest {
 
     @Test
     void commandHandlersAndApplicationShouldNotCallSendAs_passesForGood() {
-        // Passes vacuously today: CommandBus.sendAs does not exist yet, so no call site matches.
-        // The failsForBad counterpart lands with the sendAs implementation
-        // (decision-00016), together with a bad fixture that calls it from a handler.
         assertDoesNotThrow(() -> AiPersimmonDddRules
                 .commandHandlersAndApplicationShouldNotCallSendAs().check(GOOD));
+    }
+
+    @Test
+    void commandHandlersAndApplicationShouldNotCallSendAs_failsForBad() {
+        assertThrows(AssertionError.class, () -> AiPersimmonDddRules
+                .commandHandlersAndApplicationShouldNotCallSendAs().check(BAD));
     }
 
     @Test

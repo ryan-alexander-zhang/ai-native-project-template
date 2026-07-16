@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.cqrs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
@@ -41,6 +42,15 @@ class CqrsContractsTest {
         CommandContext command = cause.deriveChild("cmd-1");
         assertEquals("corr-3", command.correlationId());
         assertEquals("evt-9", command.causationId());
+    }
+
+    @Test
+    void sendAsIsUnsupportedByDefault() {
+        // A plain bus does not back a durable runtime, so staged dispatch is opt-in:
+        // the default rejects it rather than silently minting a fresh identity.
+        CommandBus bus = new TestBus((c, ctx) -> "x", List.of());
+        assertThrows(UnsupportedOperationException.class,
+                () -> bus.sendAs(new CreateThing("w"), CommandContext.root("effect-1", null)));
     }
 
     @Test
