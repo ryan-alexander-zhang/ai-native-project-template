@@ -66,6 +66,9 @@ final class TestFulfilment {
     record ArmDeadline() implements ProcessInput {
     }
 
+    record FanOut() implements ProcessInput {
+    }
+
     record DeadlineFired() implements ProcessInput {
     }
 
@@ -128,6 +131,11 @@ final class TestFulfilment {
                         Optional.empty(), new DecisionCode("armed"),
                         List.of(new ScheduleDeadline(new DeadlineName("REVIEW"),
                                 Instant.parse("2026-07-17T00:00:00Z"), new DeadlineFired())));
+                case FanOut ignored -> new ProcessDecision<>(
+                        new State("FAN", state.count()), ProcessLifecycle.RUNNING, new ProcessStep("FAN"),
+                        Optional.empty(), new DecisionCode("fanned"),
+                        List.of(new DispatchCommand(new DoWork("first")),
+                                new DispatchCommand(new DoWork("second"))));
                 default -> throw new UnsupportedProcessInputException("unexpected input: " + input);
             };
         }
@@ -170,6 +178,7 @@ final class TestFulfilment {
                 payloadCodec("test.illegal-back", IllegalBack.class, i -> "", s -> new IllegalBack()),
                 payloadCodec("test.arm-deadline", ArmDeadline.class, a -> "", s -> new ArmDeadline()),
                 payloadCodec("test.deadline-fired", DeadlineFired.class, d -> "", s -> new DeadlineFired()),
+                payloadCodec("test.fan-out", FanOut.class, f -> "", s -> new FanOut()),
                 payloadCodec("test.do-work", DoWork.class, DoWork::reference, DoWork::new));
     }
 

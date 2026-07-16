@@ -100,6 +100,27 @@ public final class JdbcProcessInstanceStore {
                 expectedRevision.value());
     }
 
+    /**
+     * Move an instance to {@code SUSPENDED}, preserving the lifecycle to resume to and
+     * why it was suspended, without touching the business step (design-00004 §4.6).
+     */
+    public void suspend(
+            ProcessInstanceId instanceId, ProcessLifecycle resumeLifecycle,
+            String reason, String source, String workId, Instant now) {
+        jdbc.update("""
+                UPDATE aipersimmon_process_instance
+                SET lifecycle = ?, resume_lifecycle = ?, suspension_reason = ?,
+                    suspension_source = ?, suspending_work_id = ?, updated_at = ?
+                WHERE instance_id = ?""",
+                ProcessLifecycle.SUSPENDED.name(),
+                resumeLifecycle.name(),
+                reason,
+                source,
+                workId,
+                Timestamp.from(now),
+                instanceId.value());
+    }
+
     private static final RowMapper<ProcessInstanceRow> ROW_MAPPER = JdbcProcessInstanceStore::mapRow;
 
     private static ProcessInstanceRow mapRow(ResultSet rs, int rowNum) throws SQLException {

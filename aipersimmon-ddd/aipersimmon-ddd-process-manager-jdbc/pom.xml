@@ -64,5 +64,22 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Testcontainers: prove the SKIP LOCKED claim on a real PostgreSQL (the crash-window /
+         concurrent-claim gate; design-00004 §10). Versions managed by the Spring Boot BOM. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

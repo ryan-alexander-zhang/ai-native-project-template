@@ -40,8 +40,14 @@ parent: design-00004-durable-process-manager-runtime
     deadline 持久化）、`JdbcProcessQuery`、`JdbcProcessUnitOfWork`、`DuplicateBusinessKeyPolicy`。11 个 H2 契约测试绿
     （原子提交、rollback 无残行、重复 input no-op、reject/fold、revision 递增、非法迁移拒绝、终态 no-op、deadline 落库、
     effect 确定性 id + correlation/causation 派生）。已注册 reactor+BOM。
-  - ⏳ **P2②**:`JdbcProcessDialect`（SKIP LOCKED / 原子 UPDATE-claim）+ effect relay（per-instance 有序、lease/fencing、
-    退避/DEAD、SUSPENDED）+ Testcontainers PG/MySQL + **crash-window 不双投硬性 gate**。
+  - ✅ **P2②**:`JdbcProcessDialect`（`SkipLockedProcessDialect` PG/MySQL + `AtomicUpdateProcessDialect` H2，共享
+    候选 SQL 含 per-instance head-of-line 谓词）、`retry`（`ExponentialBackoffPolicy` 带 jitter/上限）、
+    `JdbcProcessEffectRelay`（claim→decode→dispatch→DELIVERED/retry/DEAD+SUSPEND，lease token fencing，per-instance
+    串行）、dispatcher SPI（`EffectDispatcherRegistry` + `CommandEffectDispatcher` 走 `sendAs` / `IntegrationEventEffectDispatcher`
+    走 `publish`）+ effect/instance store 完成方法。测试:6 H2 relay 契约（逐字身份派发、per-instance 有序一次一条、
+    瞬时失败重试、耗尽→DEAD+挂起、token fencing、lease 过期重认领）+ **1 PostgreSQL Testcontainers SKIP LOCKED gate**
+    （两 worker 并发认领 40 effect，每条恰好派发一次）。jdbc 模块 18 测试全绿。**注**:MySQL gate 复用 `SkipLockedProcessDialect`
+    同 SQL，随 P3 starter 的 dialect 选择补一个等价 Testcontainers 用例。
   - ⏳ **P2③**:deadline worker（claim/fire/FIRED、generation、兜底 TTL）+ query/operations（redrive/cancel/timeline/
     卡死扫描）+ 挂起期 PARKED 输入。
 - ⏳ **P3**（`-process-manager-jdbc-spring-boot-starter`）:autoconfigure、properties（构造期校验）、worker 生命周期、
