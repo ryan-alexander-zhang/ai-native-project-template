@@ -2,6 +2,7 @@ package com.example;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 /**
  * Boots the full application to prove every layer wires together: the web
@@ -9,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * domain-event publisher all resolve.
  */
 @SpringBootTest
+@Import(TestPostgres.class)
 class ApplicationSmokeTest {
 
     @Test

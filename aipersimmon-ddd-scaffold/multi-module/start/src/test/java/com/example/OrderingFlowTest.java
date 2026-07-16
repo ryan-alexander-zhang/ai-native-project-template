@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
@@ -20,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 
 /**
@@ -34,7 +36,11 @@ import org.springframework.context.event.EventListener;
  * rides the {@link StockReservationFailed} event — inventory has no HTTP surface, so this
  * is how its coded domain errors surface a machine identity to the reacting saga.
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=1h",
+        "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
+})
+@Import(TestPostgres.class)
 class OrderingFlowTest {
 
     @Autowired
@@ -44,6 +50,9 @@ class OrderingFlowTest {
     QueryBus queryBus;
 
     @Autowired
+    JdbcProcessEffectRelay relay;
+
+    @Autowired
     StockReservationFailedRecorder failures;
 
     @BeforeEach
@@ -51,11 +60,19 @@ class OrderingFlowTest {
         failures.clear();
     }
 
+    /** Pump the relay until no effect is dispatched; each dispatch cascades to stage the next. */
+    private void settle() {
+        for (int i = 0; i < 20 && relay.pollOnce() > 0; i++) {
+            // keep draining
+        }
+    }
+
     @Test
-    void placingAnOrderReservesStockAndTheSagaConfirmsTheOrder() {
+    void placingAnOrderReservesStockAndTheProcessConfirmsTheOrder() {
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 2, 100, "USD"))));
+        settle();
 
         OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
         assertEquals("CONFIRMED", snapshot.status());
@@ -84,6 +101,7 @@ class OrderingFlowTest {
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 999, 1, "USD"))));
+        settle();
 
         OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
         assertEquals("CANCELLED", snapshot.status());

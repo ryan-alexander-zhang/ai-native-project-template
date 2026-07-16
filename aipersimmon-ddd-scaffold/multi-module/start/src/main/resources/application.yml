@@ -1,3 +1,8 @@
 spring:
   application:
     name: ordering
+  # The four durable Process Manager tables are created from schema.sql on the DataSource
+  # (docker-compose in dev, Testcontainers in tests). The starter validates they exist at startup.
+  sql:
+    init:
+      mode: always

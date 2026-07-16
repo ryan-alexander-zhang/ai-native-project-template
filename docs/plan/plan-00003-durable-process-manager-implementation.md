@@ -66,8 +66,15 @@ parent: design-00004-durable-process-manager-runtime
   imports。测试:Boot 切片(上下文装配 + 端到端 start→relay 逐字身份派发)2 绿 + **MySQL 8 Testcontainers SKIP LOCKED
   gate**(跑 shipped mysql-schema.sql,两 worker 并发每 effect 恰一次)1 绿。
   **注**:Actuator/Micrometer Health+最小 SLI、`redriveDeadline`、timeline/卡死只读查询、`max-lifetime` 兜底为 P3② 补强项。
-- ⏳ **P4**（multi-module scaffold sample）:ordering 履约 Definition/codec + Payment 微服务往返 + Inventory/Order
-  同进程往返；端到端验收。
+- ✅ **P4**（`aipersimmon-ddd-scaffold/multi-module` —— 核心参考 app,原用 `aipersimmon-ddd-saga`）:把 ordering 履约
+  从旧 saga 迁到 durable process-manager。`OrderFulfilmentDefinition/State/Input`(application)+ `OrderFulfilmentCodecs`
+  (含 `CancelOrder` 的 `CancellationReason` 证据序列化)+ `OrderFulfilmentProcess` 业务口 + `RuntimeOrderFulfilmentProcess`
+  (经 `ProcessRuntime` + `JdbcProcessQuery.findRef` 按 orderId 解析实例);adapter/starter 改接 runtime;删
+  `OrderFulfilmentProcessManager`/`OrderFulfilmentSaga`/`InMemoryOrderFulfilmentSagaStore` 及 saga 依赖。start app 加
+  **docker-compose Postgres**(`compose.yaml` + `spring-boot-docker-compose`)+ 四表 schema + starter;两个验收测试重写为
+  驱动 relay 后断言 `ProcessView` 终态。库侧补 `JdbcProcessQuery.findRef`(businessKey→ref 只读解析)。
+  **start 模块 18 测试全绿(真实 PostgreSQL Testcontainers)**,含支付拒绝补偿全链路。范围:只迁 multi-module;
+  modulith / scaffold-samples 按指示不迁,故本轮**不删** `aipersimmon-ddd-saga`/`-saga-spring`(它们仍被那些消费方使用)。
 - ⏳ **P5**（清理）:移除 `aipersimmon-ddd-saga` / `-saga-spring`，更新 BOM / 父 pom / README / design-00001 指向。
 
 ## Design

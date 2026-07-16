@@ -2,16 +2,20 @@ package com.example;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.integration.EventEnvelope;
-import com.aipersimmon.ddd.saga.SagaStatus;
-import com.aipersimmon.ddd.saga.SagaStore;
+import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery;
+import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
+import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
 import com.example.inventory.api.StockReleased;
 import com.example.inventory.domain.stock.Sku;
 import com.example.inventory.domain.stock.Stocks;
-import com.example.ordering.application.fulfilment.OrderFulfilmentSaga;
+import com.example.ordering.application.fulfilment.OrderFulfilmentDefinition;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
 import com.example.ordering.application.order.PlaceOrder;
@@ -25,35 +29,39 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 
 /**
  * End-to-end across all three bounded contexts (ordering, inventory, payment), driven through the
- * CQRS buses and the order-fulfilment orchestration saga — all synchronous, no broker. It exercises
- * the compensation path the design calls for:
+ * CQRS buses and the durable order-fulfilment process manager over a real PostgreSQL. Placing the
+ * order stages the flow's first command effect; {@link #settle()} pumps the effect relay, and each
+ * dispatch triggers the synchronous cross-context cascade that stages the next — so the whole
+ * compensation path runs:
  *
- * <pre>PaymentDeclined → ReleaseStock → StockReleased → CancelOrder → OrderCancelled → ABORTED</pre>
+ * <pre>PaymentDeclined → ReleaseStock → StockReleased → CancelOrder → OrderCancelled → COMPLETED</pre>
  *
- * <p>It asserts the properties that make the orchestration correct: the order ends CANCELLED with
- * the {@code PAYMENT_DECLINED} category, the held stock is released <em>before</em> the cancellation
- * (and restored idempotently), and the saga reaches {@code ABORTED} only after the order actually
- * cancelled — not when the cancel command was sent.
+ * <p>It asserts the order ends CANCELLED with the {@code PAYMENT_DECLINED} category, the held stock is
+ * released before cancellation (and restored), and the process instance reaches the COMPLETED
+ * lifecycle with the {@code ORDER_CANCELLED} outcome only after the order actually cancelled.
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=1h",
+        "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
+})
+@Import(TestPostgres.class)
 class PaymentCompensationFlowTest {
 
     @Autowired
     CommandBus commandBus;
-
     @Autowired
     QueryBus queryBus;
-
     @Autowired
     Stocks stocks;
-
     @Autowired
-    SagaStore<OrderFulfilmentSaga> sagas;
-
+    JdbcProcessEffectRelay relay;
+    @Autowired
+    JdbcProcessQuery process;
     @Autowired
     CompensationRecorder recorder;
 
@@ -61,15 +69,29 @@ class PaymentCompensationFlowTest {
         return stocks.findBySku(new Sku(sku)).orElseThrow().available();
     }
 
+    /** Pump the relay until no effect is dispatched; each dispatch cascades to stage the next. */
+    private void settle() {
+        for (int i = 0; i < 20 && relay.pollOnce() > 0; i++) {
+            // keep draining
+        }
+    }
+
+    private ProcessView processView(String orderId) {
+        return process.findRef(OrderFulfilmentDefinition.PROCESS_TYPE, new ProcessBusinessKey(orderId))
+                .flatMap(process::find)
+                .orElseThrow();
+    }
+
     @Test
-    void paymentDeclineReleasesStockThenCancelsTheOrderAndAbortsTheSaga() {
+    void paymentDeclineReleasesStockThenCancelsTheOrderAndCompletesCompensation() {
         int stockBefore = available("SKU-1");
 
         // 6 x 10_000 = 60_000: passes the credit limit (100_000) and reserves fine (6 <= 10 in stock),
-        // but exceeds the payment ceiling (50_000), so payment declines and the saga must compensate.
+        // but exceeds the payment ceiling (50_000), so payment declines and the flow must compensate.
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 6, 10_000, "USD"))));
+        settle();
 
         OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
         assertEquals("CANCELLED", snapshot.status());
@@ -85,25 +107,28 @@ class PaymentCompensationFlowTest {
         assertNotNull(recorder.released(orderId), "stock must be released before cancellation");
         assertEquals(stockBefore, available("SKU-1"), "released stock must be handed back exactly once");
 
-        // The saga ended ABORTED, and only via the cancellation step — proving it waited for the
-        // OrderCancelled outcome rather than terminating when the cancel command was sent.
-        OrderFulfilmentSaga saga = sagas.find(orderId).orElseThrow();
-        assertEquals(SagaStatus.ABORTED, saga.status());
-        assertEquals(OrderFulfilmentSaga.Step.AWAITING_ORDER_CANCELLATION, saga.step());
+        // The instance ended COMPLETED with the ORDER_CANCELLED outcome — the compensated business
+        // result — reached only via the cancellation, not when the cancel command was dispatched.
+        ProcessView view = processView(orderId);
+        assertEquals(ProcessLifecycle.COMPLETED, view.lifecycle());
+        assertEquals("ORDER_CANCELLED", view.outcome().orElseThrow().value());
+        assertTrue(view.step().value().equals("CANCELLED"));
     }
 
     @Test
-    void paymentAuthorisedConfirmsTheOrderAndCompletesTheSaga() {
+    void paymentAuthorisedConfirmsTheOrderAndCompletesTheFlow() {
         // 1 x 100 = 100: well under the payment ceiling, so payment authorises and the order confirms.
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 1, 100, "USD"))));
+        settle();
 
         OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
         assertEquals("CONFIRMED", snapshot.status());
 
-        OrderFulfilmentSaga saga = sagas.find(orderId).orElseThrow();
-        assertEquals(SagaStatus.COMPLETED, saga.status());
+        ProcessView view = processView(orderId);
+        assertEquals(ProcessLifecycle.COMPLETED, view.lifecycle());
+        assertEquals("ORDER_CONFIRMED", view.outcome().orElseThrow().value());
     }
 
     /** Captures the flow's cross-context events and the order-cancelled domain event, by order id. */

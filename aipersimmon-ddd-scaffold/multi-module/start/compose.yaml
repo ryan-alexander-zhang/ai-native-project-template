@@ -1,0 +1,11 @@
+# Local infrastructure for `mvn spring-boot:run` — Spring Boot's docker-compose support
+# starts this and wires the DataSource from it. Tests use Testcontainers instead.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ordering
+      POSTGRES_USER: ordering
+      POSTGRES_PASSWORD: ordering
+    ports:
+      - "5432:5432"
