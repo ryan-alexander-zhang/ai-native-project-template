@@ -26,8 +26,13 @@ parent: design-00004-durable-process-manager-runtime
   （不调 idGenerator、不 deriveChild）。测试:`CqrsContractsTest#sendAsIsUnsupportedByDefault`、
   `RegistryCommandBusSendAsTest`（verbatim / 重投同 id / send 仍自铸）、ArchUnit
   `commandHandlersAndApplicationShouldNotCallSendAs` 负向 fixture 转真（cqrs+cqrs-spring+archunit 全绿）。
-- ⏳ **P1**（`aipersimmon-ddd-process-manager`）:framework-free 契约（model/definition/effect/runtime/codec/exception
-  + package-info）。测试:Decision 不变量、lifecycle 合法迁移、codec registry 冲突、effect context 派生。
+- ✅ **P1**（`aipersimmon-ddd-process-manager`）:framework-free 契约全部落地——model（12 VO + `ProcessLifecycle`
+  含合法迁移表）、definition（`ProcessInput`/`ProcessContext`/`ProcessDecision` 自校验不变量/`ProcessDefinition`/
+  `ProcessDefinitionRegistry` 一活跃版本校验）、effect（sealed + 4 record + kind）、runtime（`ProcessRuntime`/
+  `ProcessQuery`/`ProcessAdvanceResult`/`ProcessView`）、codec（`PayloadType`/`EncodedPayload`/两 SPI + 双唯一注册表）、
+  exception（`ProcessException` 基类 + 7 个）。每包 package-info。测试 32 绿:lifecycle 迁移、Decision 不变量（含
+  SUSPENDED 禁用、终态⟺outcome、deadline 歧义、effects 防御拷贝）、Definition/codec 注册表冲突、VO 校验。已注册进
+  reactor + BOM（22 模块 validate 绿）。注:effect-context 派生属 runtime 语义，其测试落 P2。
 - ⏳ **P2**（`aipersimmon-ddd-process-manager-jdbc`）:四表 store、原子推进、`JdbcProcessDialect`（SKIP LOCKED /
   原子 UPDATE-claim）、effect relay、deadline worker、query/operations、retry。Testcontainers PG/MySQL + H2 契约测试；
   **硬性 gate**:每 dialect claim/lease 的 crash-window 不双投故障注入。

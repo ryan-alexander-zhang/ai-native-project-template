@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Durable Process Manager contracts: the framework-free language a business process
+    definition speaks so a durable runtime can execute it — process identity and
+    lifecycle, the Definition/Decision/Effect model, the runtime and query ports, and
+    the codec SPI. No Spring, JDBC, Jackson, scheduler, or business process here; a
+    JDBC runtime and a Spring Boot starter live in separate modules.
+
+    Framework-free. Depends on the pure core tier and the (equally framework-free)
+    cqrs and integration tiers: an effect can carry a Command (cqrs) or an
+    IntegrationEvent (integration), and a ProcessContext carries the CommandContext
+    that caused the current input. See design-00004-durable-process-manager-runtime.
+  -->
+  <artifactId>aipersimmon-ddd-process-manager</artifactId>
+  <name>aipersimmon-ddd-process-manager</name>
+  <description>Framework-free durable Process Manager contracts: process identity/lifecycle, Definition/Decision/Effect, runtime and query ports, and the codec SPI.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Command / CommandContext: a DispatchCommand effect carries a Command; a ProcessContext carries the causing CommandContext. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- IntegrationEvent: a PublishIntegrationEvent effect carries one. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
