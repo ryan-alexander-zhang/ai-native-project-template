@@ -41,11 +41,17 @@ command per event"*)。
 `publishEvent(裸 payload)`,`VERSION/OCCURRED_AT/TRACE_ID` 收到却丢弃,ACL adapter 拿不到任何元数据;
 (2)`traceId` 全链路定义了却在两个 OutboxWriter 都写死 `null`——死字段。
 
+> **增补**:本决策 §1「id 由 bus 铸造」的表述已被 [[decision-00016-durable-runtime-staged-message-identity]] 放宽——
+> 合法铸造方扩展为「`CommandBus`(同步根/子命令)+ durable runtime(staged effect)」,并新增 `CommandBus.sendAs(...)`
+> 逐字派发入口。核心不变式(业务代码/payload 不自造 id、禁 ambient)不变。
+
 ## Decision
 
 1. **`CommandContext`(`aipersimmon-ddd-cqrs`,framework-free、纯值)**:`messageId`、`correlationId`
    (根命令等于自身 messageId)、`causationId`(触发它的上一条消息 id,根命令为 `null`)、`traceId`(可空)。
    id 由 bus 铸造(`root(id, trace)` / `deriveChild(childId)`),`CommandContext` 自身不生成 id,保持纯值。
+   (staged effect 的身份由 durable runtime 铸造并经 `sendAs` 逐字派发,见
+   [[decision-00016-durable-runtime-staged-message-identity]]。)
 2. **写侧契约全部显式携带 context**:`CommandHandler.handle(C, CommandContext)`;`CommandBus` 双重载——
    `send(cmd)`(根,bus 读 MDC `traceId` 播种)与 `send(cmd, cause)`(以 cause 派生子上下文:新 messageId、
    继承 correlation/trace、causation = cause.messageId);`CommandInterceptor.intercept(cmd, ctx, next)`。

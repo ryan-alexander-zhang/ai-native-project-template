@@ -17,6 +17,7 @@ import com.aipersimmon.ddd.core.rule.Invariant;
 import com.aipersimmon.ddd.core.rule.InvariantViolationException;
 import com.aipersimmon.ddd.core.state.IllegalStateTransitionException;
 import com.aipersimmon.ddd.core.state.Transitions;
+import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
@@ -68,7 +69,8 @@ import java.util.Map;
  *       {@link #integrationEventListenersShouldResideInAdapter()},
  *       {@link #domainEventListenersShouldBeAnnotatedWithDomainEventHandler()},
  *       {@link #integrationEventsShouldDeclareEventType()}.</li>
- *   <li><em>CQRS</em> — {@link #commandHandlersShouldNotDependOnOtherCommandHandlers()}.</li>
+ *   <li><em>CQRS</em> — {@link #commandHandlersShouldNotDependOnOtherCommandHandlers()},
+ *       {@link #commandHandlersAndApplicationShouldNotCallSendAs()}.</li>
  *   <li><em>Building blocks</em> — {@link #domainBuildingBlocksShouldResideInDomain()},
  *       {@link #domainServicesShouldResideInDomain()},
  *       {@link #aggregateRootsShouldExtendAbstractAggregateRoot()},
@@ -370,6 +372,47 @@ public final class AiPersimmonDddRules {
      * self-reference from counting. Used with {@code classes().should(...)}, so a
      * {@code violated} event is a rule violation.
      */
+    /**
+     * Command handlers and application code must not call {@code CommandBus.sendAs(..)}.
+     *
+     * <p>{@code sendAs} is the durable-runtime / outbox staged-dispatch entry point: it replays a
+     * command under a message identity that was already minted and persisted upstream (a Process
+     * Manager effect row, an outbox row), using that identity verbatim. It exists so an
+     * at-least-once relay can redeliver the same effect under a stable messageId. A handler or
+     * application class calling it would fabricate message identity outside the sanctioned minting
+     * authorities and bypass the causation chain
+     * (see decision-00016-durable-runtime-staged-message-identity, patch of decision-00013).
+     * Business dispatch uses {@link CommandBus#send(Command)} / {@code send(Command, CommandContext)}.
+     *
+     * <p>Passes vacuously until {@code sendAs} and a violating call site exist; framework-agnostic,
+     * so it is safe in {@link #all()}.
+     */
+    public static ArchRule commandHandlersAndApplicationShouldNotCallSendAs() {
+        return classes().that().implement(CommandHandler.class)
+                .or().resideInAPackage("..application..")
+                .should(notCallCommandBusSendAs())
+                .as("command handlers and application code should not call CommandBus.sendAs(..)")
+                .because("sendAs replays a pre-minted, persisted message identity verbatim and is reserved "
+                        + "for durable infrastructure (effect relay / outbox dispatcher); business code "
+                        + "dispatches with send(..) / send(.., cause) and never mints staged identities")
+                .allowEmptyShould(true);
+    }
+
+    private static ArchCondition<JavaClass> notCallCommandBusSendAs() {
+        return new ArchCondition<>("not call CommandBus.sendAs(..)") {
+            @Override
+            public void check(JavaClass origin, ConditionEvents events) {
+                origin.getMethodCallsFromSelf().forEach(call -> {
+                    boolean callsSendAs = call.getTarget().getName().equals("sendAs")
+                            && call.getTarget().getOwner().isAssignableTo(CommandBus.class);
+                    if (callsSendAs) {
+                        events.add(SimpleConditionEvent.violated(call, call.getDescription()));
+                    }
+                });
+            }
+        };
+    }
+
     private static ArchCondition<JavaClass> notDependOnAnotherCommandHandler() {
         return new ArchCondition<>("not depend on another CommandHandler implementation") {
             @Override
@@ -749,6 +792,7 @@ public final class AiPersimmonDddRules {
                 .and(domainEventListenersShouldBeAnnotatedWithDomainEventHandler())
                 .and(integrationEventsShouldDeclareEventType())
                 .and(commandHandlersShouldNotDependOnOtherCommandHandlers())
+                .and(commandHandlersAndApplicationShouldNotCallSendAs())
                 .and(invariantsShouldResideInDomain())
                 .and(invariantViolationsShouldOnlyComeFromCheckInvariant())
                 .and(invariantsShouldNotBeSpringComponents())
