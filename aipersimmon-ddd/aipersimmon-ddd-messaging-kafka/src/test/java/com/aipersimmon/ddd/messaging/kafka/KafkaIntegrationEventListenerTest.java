@@ -113,7 +113,65 @@ class KafkaIntegrationEventListenerTest {
         record.headers().add(IntegrationEventHeaders.TYPE, "SampleEvent".getBytes(StandardCharsets.UTF_8));
         record.headers().add(IntegrationEventHeaders.ID, eventId.getBytes(StandardCharsets.UTF_8));
         record.headers().add(IntegrationEventHeaders.SOURCE, "/ordering".getBytes(StandardCharsets.UTF_8));
+        record.headers().add(IntegrationEventHeaders.SPEC_VERSION,
+                IntegrationEventHeaders.SPEC_VERSION_VALUE.getBytes(StandardCharsets.UTF_8));
+        record.headers().add(IntegrationEventHeaders.DATA_SCHEMA_VERSION, "1".getBytes(StandardCharsets.UTF_8));
         return record;
+    }
+
+    /** A well-formed record minus one header, or with one header overridden, for the strict-validation tests. */
+    private ConsumerRecord<String, String> recordWithout(String headerToDrop) throws Exception {
+        ConsumerRecord<String, String> record = recordFor(new SampleEvent("o-1", "placed"), "evt-1");
+        record.headers().remove(headerToDrop);
+        return record;
+    }
+
+    private ConsumerRecord<String, String> recordWith(String header, String value) throws Exception {
+        ConsumerRecord<String, String> record = recordFor(new SampleEvent("o-1", "placed"), "evt-1");
+        record.headers().remove(header);
+        record.headers().add(header, value.getBytes(StandardCharsets.UTF_8));
+        return record;
+    }
+
+    private KafkaIntegrationEventListener listener() {
+        return new KafkaIntegrationEventListener(new CapturingPublisher(), mapper, null, catalog);
+    }
+
+    @Test
+    void rejectsAMissingSourceInsteadOfDefaultingToUnknown() throws Exception {
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWithout(IntegrationEventHeaders.SOURCE)));
+    }
+
+    @Test
+    void rejectsAMissingOrUnsupportedSpecVersion() throws Exception {
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWithout(IntegrationEventHeaders.SPEC_VERSION)));
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWith(IntegrationEventHeaders.SPEC_VERSION, "0.3")));
+    }
+
+    @Test
+    void rejectsAMissingOrInvalidSchemaVersion() throws Exception {
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWithout(IntegrationEventHeaders.DATA_SCHEMA_VERSION)));
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWith(IntegrationEventHeaders.DATA_SCHEMA_VERSION, "not-a-number")));
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWith(IntegrationEventHeaders.DATA_SCHEMA_VERSION, "0")));
+    }
+
+    @Test
+    void rejectsAnUnparseableTimeButAcceptsItsAbsence() throws Exception {
+        assertThrows(MalformedIntegrationEventException.class,
+                () -> listener().onMessage(recordWith(IntegrationEventHeaders.TIME, "yesterday")));
+
+        // absent ce_time is tolerated: it falls back to the record timestamp, not a failure
+        CapturingPublisher publisher = new CapturingPublisher();
+        KafkaIntegrationEventListener listener =
+                new KafkaIntegrationEventListener(publisher, mapper, null, catalog);
+        listener.onMessage(recordWithout(IntegrationEventHeaders.TIME));
+        assertEquals(1, publisher.events.size(), "a record without ce_time is still delivered");
     }
 
     private static EventEnvelope<?> envelopeOf(Object published) {
