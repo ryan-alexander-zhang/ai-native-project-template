@@ -106,17 +106,12 @@ public class OutboxRelay {
     private boolean handleFailure(OutboxRecord record, RuntimeException error) {
         int attempts = record.getAttempts() + 1;
         if (failureClassifier.classify(error) == FailureClassifier.Failure.PERMANENT) {
-            deadLetterStore.store(toMessage(record), attempts, DeadLetterStore.Reason.PERMANENT, summarize(error));
-            log.error("outbox dispatch for eventId={} failed permanently; dead-lettered without retry",
-                    record.getEventId(), error);
-            return false;
+            return !deadLetter(record, attempts, DeadLetterStore.Reason.PERMANENT, error,
+                    "failed permanently; dead-lettered without retry");
         }
         if (attempts >= maxAttempts) {
-            deadLetterStore.store(
-                    toMessage(record), attempts, DeadLetterStore.Reason.RETRIES_EXHAUSTED, summarize(error));
-            log.error("outbox dispatch for eventId={} failed {} times; dead-lettered",
-                    record.getEventId(), maxAttempts, error);
-            return false;
+            return !deadLetter(record, attempts, DeadLetterStore.Reason.RETRIES_EXHAUSTED, error,
+                    "failed " + maxAttempts + " times; dead-lettered");
         }
         Duration delay = backoff.nextDelay(attempts);
         mapper.update(null, new LambdaUpdateWrapper<OutboxRecord>()
@@ -126,6 +121,36 @@ public class OutboxRelay {
         log.warn("outbox dispatch failed for eventId={}, retrying in {}ms (attempt {}/{})",
                 record.getEventId(), delay.toMillis(), attempts, maxAttempts, error);
         return true;
+    }
+
+    /**
+     * Moves a given-up row to the {@link DeadLetterStore} (out of the outbox). If that move
+     * fails — the store is unavailable — it does not let the failure propagate and abort the
+     * poll, nor leave the row with no {@code next_attempt_at} (which would have the poll
+     * re-select and re-dispatch it every second). Instead it backs the row off — pushing
+     * {@code next_attempt_at} without counting an attempt, so the row stays selectable — and the
+     * move is retried at the backoff cadence, self-healing once the store recovers.
+     *
+     * @return {@code true} if the row was moved out (its aggregate may proceed); {@code false}
+     *         if the move failed and a backoff was scheduled instead (the row stays live)
+     */
+    private boolean deadLetter(OutboxRecord record, int attempts, DeadLetterStore.Reason reason,
+                               RuntimeException error, String givingUp) {
+        try {
+            deadLetterStore.store(toMessage(record), attempts, reason, summarize(error));
+            log.error("outbox dispatch for eventId={} {}", record.getEventId(), givingUp, error);
+            return true;
+        } catch (RuntimeException storeError) {
+            storeError.addSuppressed(error);
+            Duration delay = backoff.nextDelay(attempts);
+            mapper.update(null, new LambdaUpdateWrapper<OutboxRecord>()
+                    .eq(OutboxRecord::getEventId, record.getEventId())
+                    .set(OutboxRecord::getNextAttemptAt, clock.instant().plus(delay)));
+            log.error("outbox dead-letter move for eventId={} failed; backing off {}ms so it is not "
+                    + "re-dispatched every poll (retried until the dead-letter store recovers)",
+                    record.getEventId(), delay.toMillis(), storeError);
+            return false;
+        }
     }
 
     private static String summarize(Throwable error) {

@@ -71,6 +71,12 @@ public class OutboxRelay {
             "UPDATE aipersimmon_outbox SET sent = TRUE, sent_at = ? WHERE event_id = ?";
     private static final String SCHEDULE_RETRY =
             "UPDATE aipersimmon_outbox SET attempts = attempts + 1, next_attempt_at = ? WHERE event_id = ?";
+    // Backoff without counting an attempt: used when a give-up row cannot be dead-lettered
+    // (the dead-letter store is down). Pushing next_attempt_at spaces the retries; leaving
+    // attempts untouched keeps the row selectable so it keeps trying the move until the store
+    // recovers, rather than crossing max-attempts and being silently stranded.
+    private static final String SCHEDULE_BACKOFF =
+            "UPDATE aipersimmon_outbox SET next_attempt_at = ? WHERE event_id = ?";
 
     private final JdbcTemplate jdbc;
     private final OutboxDispatcher dispatcher;
@@ -131,22 +137,45 @@ public class OutboxRelay {
         OutboxMessage message = pending.message();
         int attempts = pending.attempts() + 1;
         if (failureClassifier.classify(error) == FailureClassifier.Failure.PERMANENT) {
-            deadLetterStore.store(message, attempts, DeadLetterStore.Reason.PERMANENT, summarize(error));
-            log.error("outbox dispatch for eventId={} failed permanently; dead-lettered without retry",
-                    message.eventId(), error);
-            return false;
+            return !deadLetter(message, attempts, DeadLetterStore.Reason.PERMANENT, error,
+                    "failed permanently; dead-lettered without retry");
         }
         if (attempts >= maxAttempts) {
-            deadLetterStore.store(message, attempts, DeadLetterStore.Reason.RETRIES_EXHAUSTED, summarize(error));
-            log.error("outbox dispatch for eventId={} failed {} times; dead-lettered",
-                    message.eventId(), maxAttempts, error);
-            return false;
+            return !deadLetter(message, attempts, DeadLetterStore.Reason.RETRIES_EXHAUSTED, error,
+                    "failed " + maxAttempts + " times; dead-lettered");
         }
         Duration delay = backoff.nextDelay(attempts);
         jdbc.update(SCHEDULE_RETRY, Timestamp.from(clock.instant().plus(delay)), message.eventId());
         log.warn("outbox dispatch failed for eventId={}, retrying in {}ms (attempt {}/{})",
                 message.eventId(), delay.toMillis(), attempts, maxAttempts, error);
         return true;
+    }
+
+    /**
+     * Moves a given-up row to the {@link DeadLetterStore} (out of the outbox). If that move
+     * fails — the store is unavailable — it does not let the failure propagate and abort the
+     * poll, nor leave the row with no {@code next_attempt_at} (which would have the poll
+     * re-select and re-dispatch it every second). Instead it backs the row off, so the move is
+     * retried at the backoff cadence and self-heals once the store recovers.
+     *
+     * @return {@code true} if the row was moved out (its aggregate may proceed); {@code false}
+     *         if the move failed and a backoff was scheduled instead (the row stays live)
+     */
+    private boolean deadLetter(OutboxMessage message, int attempts, DeadLetterStore.Reason reason,
+                               RuntimeException error, String givingUp) {
+        try {
+            deadLetterStore.store(message, attempts, reason, summarize(error));
+            log.error("outbox dispatch for eventId={} {}", message.eventId(), givingUp, error);
+            return true;
+        } catch (RuntimeException storeError) {
+            storeError.addSuppressed(error);
+            Duration delay = backoff.nextDelay(attempts);
+            jdbc.update(SCHEDULE_BACKOFF, Timestamp.from(clock.instant().plus(delay)), message.eventId());
+            log.error("outbox dead-letter move for eventId={} failed; backing off {}ms so it is not "
+                    + "re-dispatched every poll (retried until the dead-letter store recovers)",
+                    message.eventId(), delay.toMillis(), storeError);
+            return false;
+        }
     }
 
     private static String summarize(Throwable error) {
