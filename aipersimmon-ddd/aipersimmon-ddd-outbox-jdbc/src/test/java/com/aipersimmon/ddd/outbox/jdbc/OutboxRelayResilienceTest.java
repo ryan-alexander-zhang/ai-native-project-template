@@ -128,6 +128,43 @@ class OutboxRelayResilienceTest {
         assertEquals(Integer.valueOf(0), attempts("e2"), "the held-back event was not attempted");
     }
 
+    private boolean sent(String eventId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT sent FROM aipersimmon_outbox WHERE event_id = ?", Boolean.class, eventId));
+    }
+
+    @Test
+    void aDeadLetteredEarlierEventReleasesItsAggregate() {
+        insert("e1", "agg-1", 0);
+        insert("e2", "agg-1", 10);
+        dispatcher.permanentlyFailEventIds.add("e1");
+
+        relay.relay();
+
+        assertEquals(1, deadLetterCount(), "e1 is dead-lettered (moved out of the outbox)");
+        assertTrue(dispatcher.dispatched.contains("e2"),
+                "a dead-lettered earlier event must not block its aggregate forever");
+        assertTrue(sent("e2"), "e2 is delivered once e1 no longer blocks it");
+    }
+
+    @Test
+    void aLaterEventProceedsOnlyOnceTheEarlierOneSucceeds() {
+        insert("e1", "agg-1", 0);
+        insert("e2", "agg-1", 10);
+        dispatcher.failEventIds.add("e1");
+
+        relay.relay(); // e1 fails; e2 held behind it
+        assertFalse(dispatcher.dispatched.contains("e2"), "e2 waits while e1 is unsent");
+
+        dispatcher.failEventIds.clear(); // the transient cause clears
+        relay.relay(); // e1 succeeds, then e2 follows in order
+
+        assertTrue(sent("e1"));
+        assertTrue(sent("e2"));
+        assertTrue(dispatcher.dispatched.indexOf("e1") < dispatcher.dispatched.indexOf("e2"),
+                "e1 is delivered before e2");
+    }
+
     @Test
     void movesARowToTheDeadLetterStoreOnceItExhaustsItsRetries() {
         insert("e1", null, 0);

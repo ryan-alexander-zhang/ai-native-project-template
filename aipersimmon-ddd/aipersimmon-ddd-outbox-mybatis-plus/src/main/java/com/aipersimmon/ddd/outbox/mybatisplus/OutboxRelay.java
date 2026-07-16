@@ -5,7 +5,6 @@ import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import java.time.Clock;
 import java.time.Duration;
@@ -75,18 +74,10 @@ public class OutboxRelay {
             lockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT10M}")
     public void relay() {
         java.time.Instant now = clock.instant();
-        LambdaQueryWrapper<OutboxRecord> due = new LambdaQueryWrapper<OutboxRecord>()
-                .eq(OutboxRecord::getSent, false)
-                .lt(OutboxRecord::getAttempts, maxAttempts)
-                .and(w -> w.isNull(OutboxRecord::getNextAttemptAt)
-                        .or().le(OutboxRecord::getNextAttemptAt, now))
-                .orderByAsc(OutboxRecord::getCreatedAt)
-                .orderByAsc(OutboxRecord::getId)
-                .last("LIMIT " + batchSize);
-        List<OutboxRecord> batch = mapper.selectList(due);
+        List<OutboxRecord> batch = mapper.selectDue(maxAttempts, now, batchSize);
         Set<String> blockedSubjects = new HashSet<>();
         for (OutboxRecord record : batch) {
-            String subject = record.getSubject();
+            String subject = orderingKey(record.getSubject());
             if (subject != null && blockedSubjects.contains(subject)) {
                 // An earlier event for this aggregate failed this round; hold its
                 // later events back so they are not delivered out of order.
@@ -139,6 +130,12 @@ public class OutboxRelay {
 
     private static String summarize(Throwable error) {
         return error.getClass().getName() + ": " + error.getMessage();
+    }
+
+    /** A null or blank subject carries no per-aggregate ordering key (matching the query
+     *  and the Kafka partition key), so it never blocks or is blocked. */
+    private static String orderingKey(String subject) {
+        return subject == null || subject.isBlank() ? null : subject;
     }
 
     private static OutboxMessage toMessage(OutboxRecord record) {

@@ -48,11 +48,25 @@ public class OutboxRelay {
     private static final Logger log = LoggerFactory.getLogger(OutboxRelay.class);
 
     private static final String SELECT_DUE =
-            "SELECT event_id, source, type, version, payload, occurred_at, subject, "
-            + "correlation_id, causation_id, trace_id, attempts "
-            + "FROM aipersimmon_outbox WHERE sent = FALSE AND attempts < ? "
-            + "AND (next_attempt_at IS NULL OR next_attempt_at <= ?) "
-            + "ORDER BY created_at ASC, id ASC LIMIT ?";
+            "SELECT o.event_id, o.source, o.type, o.version, o.payload, o.occurred_at, o.subject, "
+            + "o.correlation_id, o.causation_id, o.trace_id, o.attempts "
+            + "FROM aipersimmon_outbox o "
+            + "WHERE o.sent = FALSE AND o.attempts < ? "
+            + "AND (o.next_attempt_at IS NULL OR o.next_attempt_at <= ?) "
+            // Per-aggregate ordering across polls: hold a row back while an EARLIER event
+            // of the same subject is still live (sent=false, attempts<max) but not yet due
+            // — i.e. backing off — because it cannot be dispatched this poll and a later
+            // event must not overtake it. An earlier event that is due is not a blocker
+            // (both ride this batch, ordered, and in-batch failure holds the rest); nor is
+            // a dead-lettered one (moved out) or a legacy abandoned one (attempts>=max).
+            // A null/blank subject has no ordering key, so it never blocks or is blocked.
+            + "AND (o.subject IS NULL OR o.subject = '' OR NOT EXISTS ("
+            + "SELECT 1 FROM aipersimmon_outbox older WHERE older.subject = o.subject "
+            + "AND older.sent = FALSE AND older.attempts < ? "
+            + "AND older.next_attempt_at IS NOT NULL AND older.next_attempt_at > ? "
+            + "AND (older.created_at < o.created_at "
+            + "OR (older.created_at = o.created_at AND older.id < o.id)))) "
+            + "ORDER BY o.created_at ASC, o.id ASC LIMIT ?";
     private static final String MARK_SENT =
             "UPDATE aipersimmon_outbox SET sent = TRUE, sent_at = ? WHERE event_id = ?";
     private static final String SCHEDULE_RETRY =
@@ -86,11 +100,11 @@ public class OutboxRelay {
             lockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT10M}")
     public void relay() {
         Timestamp now = Timestamp.from(clock.instant());
-        List<Pending> batch = jdbc.query(SELECT_DUE, this::mapRow, maxAttempts, now, batchSize);
+        List<Pending> batch = jdbc.query(SELECT_DUE, this::mapRow, maxAttempts, now, maxAttempts, now, batchSize);
         Set<String> blockedSubjects = new HashSet<>();
         for (Pending pending : batch) {
             OutboxMessage message = pending.message();
-            String subject = message.subject();
+            String subject = orderingKey(message.subject());
             if (subject != null && blockedSubjects.contains(subject)) {
                 // An earlier event for this aggregate failed this round; hold its
                 // later events back so they are not delivered out of order.
@@ -137,6 +151,12 @@ public class OutboxRelay {
 
     private static String summarize(Throwable error) {
         return error.getClass().getName() + ": " + error.getMessage();
+    }
+
+    /** A null or blank subject carries no per-aggregate ordering key (matching the SELECT
+     *  and the Kafka partition key), so it never blocks or is blocked. */
+    private static String orderingKey(String subject) {
+        return subject == null || subject.isBlank() ? null : subject;
     }
 
     private Pending mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {

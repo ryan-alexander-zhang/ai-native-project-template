@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS aipersimmon_outbox (
 CREATE INDEX IF NOT EXISTS idx_aipersimmon_outbox_unsent
     ON aipersimmon_outbox (sent, next_attempt_at, created_at);
 
+-- Supports the per-aggregate ordering guard: the relay's poll excludes a row while an
+-- earlier unsent event of the same subject is still backing off (a correlated NOT EXISTS
+-- on subject + sent + created_at/id). Without this index that subquery would scan.
+CREATE INDEX IF NOT EXISTS idx_aipersimmon_outbox_subject_order
+    ON aipersimmon_outbox (subject, sent, created_at, id);
+
 -- Dead letters: messages the relay gave up delivering — a permanent failure, or one
 -- that exhausted its retries. The row is MOVED here (out of aipersimmon_outbox) in one
 -- transaction, so the hot outbox table holds only live work and a spent message is kept
