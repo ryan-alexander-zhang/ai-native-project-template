@@ -31,7 +31,7 @@ public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
                 .orElseThrow(() -> new EntityNotFoundException(
                         OrderingErrorCode.ORDER_NOT_FOUND, "unknown order: " + command.orderId()));
 
-        order.cancel();
+        order.cancel(command.reason());
 
         orders.save(order);
         domainEvents.publishAndClear(order);

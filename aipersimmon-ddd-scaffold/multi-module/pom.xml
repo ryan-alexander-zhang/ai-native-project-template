@@ -37,6 +37,7 @@
   <modules>
     <module>ordering</module>
     <module>inventory</module>
+    <module>payment</module>
     <module>start</module>
   </modules>
 
@@ -61,6 +62,11 @@
       <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-application</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-infrastructure</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-adapter</artifactId><version>${project.version}</version></dependency>
+
+      <dependency><groupId>${project.groupId}</groupId><artifactId>payment-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>payment-domain</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>payment-application</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>payment-adapter</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>
 </project>

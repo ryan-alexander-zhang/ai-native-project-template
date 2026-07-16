@@ -35,6 +35,14 @@ public class Stock extends AbstractAggregateRoot<Sku> {
         this.available -= quantity;
     }
 
+    /** Return a previously reserved quantity to the available pool (the compensation for reserve). */
+    public void release(int quantity) {
+        if (quantity <= 0) {
+            throw new DomainException("quantity must be > 0");
+        }
+        this.available += quantity;
+    }
+
     public int available() {
         return available;
     }

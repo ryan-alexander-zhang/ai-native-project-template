@@ -20,7 +20,10 @@ public enum InventoryErrorCode implements ErrorCode {
     INSUFFICIENT_STOCK("inventory.insufficient-stock", ErrorCategory.DOMAIN_RULE),
 
     /** No stock record exists for the requested SKU. */
-    STOCK_NOT_FOUND("inventory.stock-not-found", ErrorCategory.NOT_FOUND);
+    STOCK_NOT_FOUND("inventory.stock-not-found", ErrorCategory.NOT_FOUND),
+
+    /** No reservation exists for the id a release referred to. */
+    RESERVATION_NOT_FOUND("inventory.reservation-not-found", ErrorCategory.NOT_FOUND);
 
     private final String code;
     private final ErrorCategory category;

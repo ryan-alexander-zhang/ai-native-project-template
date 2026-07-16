@@ -37,10 +37,15 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs</artifactId>
     </dependency>
-    <!-- Cross-context: consumes inventory's published contract to confirm or cancel the order. -->
+    <!-- Cross-context: consumes inventory's published contract (stock reserved/failed/released). -->
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>inventory-api</artifactId>
+    </dependency>
+    <!-- Cross-context: consumes payment's published contract (payment authorised/declined). -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>payment-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

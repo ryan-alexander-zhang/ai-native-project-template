@@ -17,6 +17,7 @@ import com.example.ordering.domain.order.LineData;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.Orders;
+import com.example.ordering.domain.order.ReviewRequirement;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
 import java.util.List;
@@ -82,12 +83,19 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
                 .toList();
 
         OrderId orderId = new OrderId(UUID.randomUUID().toString());
-        Order order = Order.place(orderId, customerId, lines);
+        // This scaffold does not model manual review, so orders are placed review-free and are
+        // immediately eligible for fulfilment. A real ManualReviewPolicy would compute this verdict.
+        Order order = Order.place(orderId, customerId, lines, ReviewRequirement.notRequired());
 
         if (!customer.canAfford(order.total())) {
             throw new CreditExceededException(
                     "customer " + customerId.value() + " cannot afford " + order.total());
         }
+
+        // Placing the order publishes the OrderPlaced integration event below, which asks inventory
+        // to reserve stock — so fulfilment has genuinely begun. Record that fact now (moving past the
+        // customer's self-cancel window) before the async StockReserved/Failed response can arrive.
+        order.beginFulfilment();
 
         orders.save(order);
         domainEvents.publishAndClear(order);

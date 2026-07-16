@@ -26,5 +26,12 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-core</artifactId>
     </dependency>
+
+    <!-- Domain unit tests only; no framework leaks onto the main classpath. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

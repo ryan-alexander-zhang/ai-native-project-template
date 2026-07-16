@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example</groupId>
+    <artifactId>multi-module</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Aggregator for the payment bounded context. Like inventory it has no HTTP surface: it
+    reacts to ordering's PaymentRequested integration event and answers with its own. It is
+    stateless (a pure authorization rule), so it has no infrastructure/persistence module.
+  -->
+  <artifactId>payment</artifactId>
+  <packaging>pom</packaging>
+  <name>payment</name>
+  <description>Payment bounded context.</description>
+
+  <modules>
+    <module>payment-api</module>
+    <module>payment-domain</module>
+    <module>payment-application</module>
+    <module>payment-adapter</module>
+  </modules>
+</project>

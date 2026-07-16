@@ -9,9 +9,15 @@ import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.api.StockReserved;
 import com.example.inventory.domain.stock.InventoryErrorCode;
+import com.example.inventory.domain.stock.Reservation;
+import com.example.inventory.domain.stock.ReservationId;
+import com.example.inventory.domain.stock.Reservations;
 import com.example.inventory.domain.stock.Sku;
 import com.example.inventory.domain.stock.Stock;
 import com.example.inventory.domain.stock.Stocks;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,16 +26,23 @@ import org.springframework.stereotype.Component;
  * reserved. Reporting failure as an event (rather than throwing) lets the ordering
  * context's saga react to it and compensate. It validates every line before
  * reserving any, so a failure leaves no partial reservation.
+ *
+ * <p>On success it also records a {@link Reservation} keyed by a freshly minted
+ * {@link ReservationId}, and publishes that id on the event. That id is what makes the
+ * later release exact and idempotent — the saga hands it back verbatim to release the
+ * same stock it reserved.
  */
 @Component
 @UseCase
 public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
 
     private final Stocks stocks;
+    private final Reservations reservations;
     private final IntegrationEvents integrationEvents;
 
-    public ReserveStockHandler(Stocks stocks, IntegrationEvents integrationEvents) {
+    public ReserveStockHandler(Stocks stocks, Reservations reservations, IntegrationEvents integrationEvents) {
         this.stocks = stocks;
+        this.reservations = reservations;
         this.integrationEvents = integrationEvents;
     }
 
@@ -44,12 +57,16 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
                             "cannot reserve " + line.quantity() + " of " + line.sku());
                 }
             }
+            Map<Sku, Integer> held = new LinkedHashMap<>();
             for (ReserveStock.Line line : command.lines()) {
                 Stock stock = stockFor(line.sku());
                 stock.reserve(line.quantity());
                 stocks.save(stock);
+                held.merge(new Sku(line.sku()), line.quantity(), Integer::sum);
             }
-            integrationEvents.publish(new StockReserved(command.orderId()), context);
+            ReservationId reservationId = new ReservationId(UUID.randomUUID().toString());
+            reservations.save(new Reservation(reservationId, command.orderId(), held));
+            integrationEvents.publish(new StockReserved(command.orderId(), reservationId.value()), context);
         } catch (DomainException failure) {
             // The failing code (if any) rides the event: a BC with no HTTP edge still
             // surfaces a stable machine identity for the reacting saga to branch on.
