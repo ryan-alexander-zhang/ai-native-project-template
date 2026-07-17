@@ -35,6 +35,11 @@ public final class ProcessPayloadCodecRegistry {
         }
     }
 
+    /** All registered codecs, for startup consistency checks (design-00004 §5.6). */
+    public java.util.Collection<ProcessPayloadCodec<?>> codecs() {
+        return java.util.Collections.unmodifiableCollection(byJavaType.values());
+    }
+
     /** The codec for a persisted logical type/version. */
     public ProcessPayloadCodec<?> forType(PayloadType type) {
         ProcessPayloadCodec<?> codec = byPayloadType.get(type);

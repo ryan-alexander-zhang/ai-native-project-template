@@ -271,6 +271,18 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
         return new ProcessSchemaValidator(jdbcTemplate);
     }
 
+    @Bean
+    @ConditionalOnBean(JdbcProcessInstanceStore.class)
+    @ConditionalOnMissingBean
+    public ProcessManagerStartupValidator processManagerStartupValidator(
+            JdbcProcessInstanceStore instances, ProcessDefinitionRegistry definitions,
+            ProcessStateCodecRegistry stateCodecs, ProcessPayloadCodecRegistry payloadCodecs,
+            EffectDispatcherRegistry dispatchers, ProcessManagerJdbcProperties properties) {
+        return new ProcessManagerStartupValidator(
+                instances, definitions, stateCodecs, payloadCodecs, dispatchers,
+                properties.getEffectRelay().isEnabled());
+    }
+
     private static ProcessRetryPolicy backoff(ProcessManagerJdbcProperties.Worker cfg) {
         ProcessManagerJdbcProperties.Backoff b = cfg.getBackoff();
         return new ExponentialBackoffPolicy(
