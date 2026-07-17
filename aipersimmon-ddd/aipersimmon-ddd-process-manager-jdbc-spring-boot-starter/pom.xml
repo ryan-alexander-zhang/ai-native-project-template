@@ -19,11 +19,10 @@
 
     It carries no business logic, does not scan business packages, and never executes
     DDL (sample scripts ship under META-INF; apply them via Flyway/Liquibase). Every
-    bean is @ConditionalOnMissingBean, so a consumer can override any of them. See
-    design-00004-durable-process-manager-runtime §5.
+    bean is @ConditionalOnMissingBean, so a consumer can override any of them.
 
-    This slice (plan-00003 P3) lands auto-configuration, validated properties, dialect
-    auto-selection, and the worker scheduling lifecycle.
+    It lands auto-configuration, validated properties, dialect auto-selection, the
+    worker scheduling lifecycle, observability, and startup fail-fast checks.
   -->
   <artifactId>aipersimmon-ddd-process-manager-jdbc-spring-boot-starter</artifactId>
   <name>aipersimmon-ddd-process-manager-jdbc-spring-boot-starter</name>
@@ -45,7 +44,7 @@
     </dependency>
 
     <!-- Observability seams are optional: metrics bind only when Micrometer is present,
-         the health indicator only when Actuator is present (design-00004 §5.3). -->
+         the health indicator only when Actuator is present. -->
     <dependency>
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-core</artifactId>
@@ -73,7 +72,7 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- MySQL SKIP LOCKED gate (the per-dialect no-double-claim check; design-00004 §10). -->
+    <!-- MySQL SKIP LOCKED gate (the per-dialect no-double-claim check). -->
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>junit-jupiter</artifactId>

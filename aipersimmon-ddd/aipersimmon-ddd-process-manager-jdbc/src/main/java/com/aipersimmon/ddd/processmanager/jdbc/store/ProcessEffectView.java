@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Operator-facing summary of a staged effect (design-00004 §4.10) — its identity, kind, delivery
+ * Operator-facing summary of a staged effect — its identity, kind, delivery
  * status, attempt count, retry schedule, and last error — for a pending/dead worklist. The encoded
  * payload is omitted; the operator addresses the row by {@code effectId} to redrive it.
  */

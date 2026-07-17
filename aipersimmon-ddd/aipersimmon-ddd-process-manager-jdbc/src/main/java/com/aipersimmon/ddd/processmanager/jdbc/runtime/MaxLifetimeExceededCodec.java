@@ -6,8 +6,8 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.definition.MaxLifetimeExceeded;
 
 /**
- * The built-in codec for the runtime's {@link MaxLifetimeExceeded} backstop input (design-00004
- * §4.7). It carries no business fields, so the encoding is empty. Registered by the starter (and
+ * The built-in codec for the runtime's {@link MaxLifetimeExceeded} backstop input.
+ * It carries no business fields, so the encoding is empty. Registered by the starter (and
  * available to consumers) whenever the max-lifetime backstop is used, so the runtime can encode the
  * backstop deadline's input at {@code start} and decode it when the deadline fires.
  */

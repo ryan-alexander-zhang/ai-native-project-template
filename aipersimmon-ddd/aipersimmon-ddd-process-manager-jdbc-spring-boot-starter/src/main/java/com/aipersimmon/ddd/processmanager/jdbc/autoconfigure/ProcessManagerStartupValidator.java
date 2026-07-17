@@ -15,7 +15,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 
 /**
- * Startup consistency checks beyond the four-table existence check (design-00004 §5.6), so a bad
+ * Startup consistency checks beyond the four-table existence check, so a bad
  * deployment fails fast rather than at the first advance or relay. It verifies:
  *
  * <ul>

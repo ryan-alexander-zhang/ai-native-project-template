@@ -8,7 +8,7 @@ import java.time.Duration;
 
 /**
  * A Micrometer-backed {@link ProcessObserver}: it records the relay's claim and dispatch latency
- * distributions and counts revision-conflict retries (design-00004 §5.3). Wired only when a
+ * distributions and counts revision-conflict retries. Wired only when a
  * {@code MeterRegistry} is present; otherwise the runtime and relay use {@link ProcessObserver#NOOP}.
  */
 public final class MicrometerProcessObserver implements ProcessObserver {

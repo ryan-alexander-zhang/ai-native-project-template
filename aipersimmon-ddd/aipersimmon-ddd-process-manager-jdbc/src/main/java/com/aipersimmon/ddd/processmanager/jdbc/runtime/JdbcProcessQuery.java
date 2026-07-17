@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The read-only {@link ProcessQuery} over the four-table store (design-00004 §4.10). Beyond the
+ * The read-only {@link ProcessQuery} over the four-table store. Beyond the
  * single-instance {@link ProcessView} it offers operational reads: paged search by
  * type/businessKey/lifecycle/step/definitionVersion, the transition timeline, pending/dead effect
  * and deadline worklists, and the stuck-instance scan. It exposes runtime metadata (identity,
@@ -64,12 +64,12 @@ public final class JdbcProcessQuery implements ProcessQuery {
         return instances.find(processRef.instanceId()).map(JdbcProcessQuery::toView);
     }
 
-    /** Page instances matching {@code criteria}, oldest first (design-00004 §4.10). */
+    /** Page instances matching {@code criteria}, oldest first. */
     public List<ProcessView> search(ProcessInstanceCriteria criteria, int limit, int offset) {
         return instances.search(criteria, limit, offset).stream().map(JdbcProcessQuery::toView).toList();
     }
 
-    /** The instance's transition timeline, chronological (design-00004 §4.10). */
+    /** The instance's transition timeline, chronological. */
     public List<ProcessTransitionView> timeline(ProcessRef processRef) {
         return transitions.timeline(processRef.instanceId());
     }
@@ -86,7 +86,7 @@ public final class JdbcProcessQuery implements ProcessQuery {
 
     /**
      * Active instances idle past {@code threshold} with no pending work — candidates for a lost
-     * wakeup (design-00004 §4.10), complementary to the §4.7 max-lifetime backstop.
+     * wakeup, complementary to the max-lifetime backstop.
      */
     public List<ProcessView> stuckInstances(Duration threshold, int limit) {
         return instances.findStuck(clock.instant().minus(threshold), limit).stream()

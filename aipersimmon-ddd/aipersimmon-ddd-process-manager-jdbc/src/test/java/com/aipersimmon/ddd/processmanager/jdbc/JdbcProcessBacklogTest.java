@@ -40,7 +40,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Backlog SLI aggregate reads over the four-table store against H2 (plan-00003 P3② item 1). */
+/** Backlog SLI aggregate reads over the four-table store against H2. */
 class JdbcProcessBacklogTest {
 
     private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");

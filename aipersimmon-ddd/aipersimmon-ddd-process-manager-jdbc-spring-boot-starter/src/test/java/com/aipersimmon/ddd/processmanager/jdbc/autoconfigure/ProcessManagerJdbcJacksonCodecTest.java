@@ -26,7 +26,7 @@ import org.springframework.context.annotation.Bean;
 /**
  * Boot slice: with an ObjectMapper and an explicit ProcessSerializationCatalog (and no hand-written
  * codec beans), the Jackson convenience layer generates the payload and state codecs, and an
- * end-to-end start → relay round-trips the command payload through JSON (design-00004 §5.2).
+ * end-to-end start → relay round-trips the command payload through JSON.
  */
 @SpringBootTest(
         classes = ProcessManagerJdbcJacksonCodecTest.TestApp.class,

@@ -29,7 +29,7 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Startup consistency checks: version-in-use, integration-event codec, dispatcher (plan-00003 P3② item 6). */
+/** Startup consistency checks: version-in-use, integration-event codec, dispatcher. */
 class ProcessManagerStartupValidatorTest {
 
     private EmbeddedDatabase db;

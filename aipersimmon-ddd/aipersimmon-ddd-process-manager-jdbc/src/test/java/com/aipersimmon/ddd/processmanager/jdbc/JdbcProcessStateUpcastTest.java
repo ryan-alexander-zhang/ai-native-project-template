@@ -47,8 +47,8 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 /**
- * State-schema upcast against H2 (plan-00003 P3② item 7). A live instance stays pinned to the
- * definition version and state schema it was written with (design-00004 §4.9): the registry keeps
+ * State-schema upcast against H2. A live instance stays pinned to the
+ * definition version and state schema it was written with: the registry keeps
  * the old definition and codec alongside the new active ones, and on the next advance the old codec
  * upcasts the legacy wire shape into the current model on decode — never a decode-failure-then-reopen
  * and never a silent schema bump under a running instance.

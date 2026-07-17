@@ -9,7 +9,7 @@ import java.io.IOException;
 
 /**
  * A Jackson-backed {@link ProcessPayloadCodec} the convenience layer generates from a
- * {@link ProcessSerializationCatalog} entry (design-00004 §5.2). The logical type/version and Java
+ * {@link ProcessSerializationCatalog} entry. The logical type/version and Java
  * type are the catalog's explicit registration, never the class name. Serialization failures are
  * surfaced as {@link ProcessSerializationException}.
  *

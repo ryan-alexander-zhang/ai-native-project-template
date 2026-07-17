@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A consumer-declared registration list the Jackson convenience layer turns into codec beans
- * (design-00004 §5.2). Each entry gives the explicit logical type/version and Java type — a payload
+ * A consumer-declared registration list the Jackson convenience layer turns into codec beans.
+ * Each entry gives the explicit logical type/version and Java type — a payload
  * (command / deadline input / integration-event body) or a process state (also its process type and
  * schema version). There is no classpath scan and no class-name fallback: an application that needs
  * encryption, upcasting, or a non-JSON format declares its own {@code ProcessPayloadCodec} /
@@ -45,7 +45,7 @@ public final class ProcessSerializationCatalog {
             PayloadType type, Class<?> javaType) {
     }
 
-    /** Fluent builder; every entry must be complete (design-00004 §5.2). */
+    /** Fluent builder; every entry must be complete. */
     public static final class Builder {
         private final List<PayloadEntry> payloads = new ArrayList<>();
         private final List<StateEntry> states = new ArrayList<>();

@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Pull-based backlog SLI reads over the four-table store (design-00004 §5.3). It composes the
+ * Pull-based backlog SLI reads over the four-table store. It composes the
  * stores' aggregate queries into the health-facing signals — the redrive backlog, how long the
  * oldest due work has waited, and how many instances are suspended or look stuck — computing ages
  * against a {@link Clock}. Read-only and framework-free; the starter's meter binder and health
@@ -65,7 +65,7 @@ public final class JdbcProcessBacklog {
         return suspendedInstancesBySource().values().stream().mapToLong(Long::longValue).sum();
     }
 
-    /** Active instances last touched more than {@code threshold} ago with no pending work (§4.10). */
+    /** Active instances last touched more than {@code threshold} ago with no pending work. */
     public long stuckInstances(Duration threshold) {
         return instances.countStuck(clock.instant().minus(threshold));
     }

@@ -138,7 +138,7 @@ public final class JdbcProcessEffectStore {
         return Optional.ofNullable(ts).map(Timestamp::toInstant);
     }
 
-    /** List effects in a given status, oldest first, for an operator worklist (design-00004 §4.10). */
+    /** List effects in a given status, oldest first, for an operator worklist. */
     public java.util.List<ProcessEffectView> byStatus(EffectStatus status, int limit) {
         return jdbc.query("""
                 SELECT effect_id, instance_id, effect_kind, status, attempts, message_id,
@@ -167,7 +167,7 @@ public final class JdbcProcessEffectStore {
                 EffectStatus.CANCELLED.name(), Timestamp.from(now), instanceId.value(), EffectStatus.PENDING.name());
     }
 
-    /** The lifecycle of a staged effect (design-00004 §4.6). */
+    /** The lifecycle of a staged effect. */
     public enum EffectStatus {
         PENDING,
         IN_FLIGHT,

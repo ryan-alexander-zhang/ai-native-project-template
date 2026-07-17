@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * Operator recovery independent of the business runtime (design-00004 §4.10). Every
+ * Operator recovery independent of the business runtime. Every
  * action leaves an audited operator transition; none edits state or step arbitrarily.
  *
  * <p>{@link #redriveEffect} returns a DEAD effect to PENDING (reusing its id) and, once

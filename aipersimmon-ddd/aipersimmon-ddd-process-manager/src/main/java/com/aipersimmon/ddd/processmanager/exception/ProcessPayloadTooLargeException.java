@@ -2,7 +2,7 @@ package com.aipersimmon.ddd.processmanager.exception;
 
 /**
  * Thrown when an encoded state, input, or effect payload exceeds the configured size cap
- * (design-00004 §5.4 {@code payload.max-bytes}). The cap is a guardrail against oversized
+ * (the {@code payload.max-bytes} guardrail). The cap is a guardrail against oversized
  * payloads bloating the store and slowing claims; keep payloads minimal and store large
  * artifacts by reference.
  */

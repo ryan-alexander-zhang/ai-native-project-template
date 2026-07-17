@@ -52,10 +52,10 @@ import org.springframework.dao.DuplicateKeyException;
  * The production {@link ProcessRuntime} over the four-table JDBC store. Each
  * {@code start}/{@code handle} runs the pure definition and atomically persists the new
  * snapshot, the appended transition, the staged effects, and the deadline changes in
- * one {@code REQUIRED} transaction (design-00004 §4.3); a relay delivers effects
+ * one {@code REQUIRED} transaction; a relay delivers effects
  * afterwards. Effects are staged with their durable identity — {@code messageId} equal
  * to a deterministic {@code effectId} of {@code transitionId#index} — so at-least-once
- * redelivery keeps one stable id (decision-00016).
+ * redelivery keeps one stable id.
  *
  * <p>Process-level idempotency comes from the {@code UNIQUE(instance_id, input_message_id)}
  * constraint (a repeated input is a duplicate no-op); optimistic concurrency comes from
@@ -195,7 +195,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
 
     /**
      * Arm the whole-instance max-lifetime backstop when configured and the instance is still active
-     * after start (design-00004 §4.7). It is an ordinary deadline the definition can reschedule to
+     * after start. It is an ordinary deadline the definition can reschedule to
      * extend or that fires {@link MaxLifetimeExceeded} into {@code handle} for the definition to
      * decide. A definition may also reschedule the reserved name itself in its start decision, which
      * simply bumps the generation.
@@ -234,7 +234,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         if (row.lifecycle() == ProcessLifecycle.SUSPENDED) {
             // Do not rebound to the message layer: park the input as an audit transition (deduped by
             // the UNIQUE input message id) and return, so the transport can ack. It is replayed in
-            // arrival order when the instance resumes (design-00004 §4.6).
+            // arrival order when the instance resumes.
             String parkedId = idGenerator.get();
             Instant parkedAt = clock.instant();
             EncodedPayload parkedInput = encodePayload(input);
@@ -377,7 +377,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         return enforceSize(codec.encode(state));
     }
 
-    /** Guard the configured {@code payload.max-bytes} cap at encode time (design-00004 §5.4). */
+    /** Guard the configured {@code payload.max-bytes} cap at encode time. */
     private EncodedPayload enforceSize(EncodedPayload encoded) {
         int size = encoded.data().length;
         if (size > maxPayloadBytes) {

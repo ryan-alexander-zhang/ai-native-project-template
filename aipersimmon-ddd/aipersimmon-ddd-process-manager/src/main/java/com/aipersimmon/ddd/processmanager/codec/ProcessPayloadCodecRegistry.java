@@ -7,7 +7,7 @@ import java.util.Map;
 /**
  * Indexes {@link ProcessPayloadCodec}s two ways — by {@link PayloadType} (for
  * decoding a persisted row) and by Java type (for encoding a value) — with both
- * indexes unique. Construction fails fast (design-00004 §3.7) if two codecs claim the
+ * indexes unique. Construction fails fast if two codecs claim the
  * same logical type/version or the same Java type. A lookup miss is a
  * {@link ProcessSerializationException}, never a class-name fallback.
  */
@@ -35,7 +35,7 @@ public final class ProcessPayloadCodecRegistry {
         }
     }
 
-    /** All registered codecs, for startup consistency checks (design-00004 §5.6). */
+    /** All registered codecs, for startup consistency checks. */
     public java.util.Collection<ProcessPayloadCodec<?>> codecs() {
         return java.util.Collections.unmodifiableCollection(byJavaType.values());
     }

@@ -7,7 +7,7 @@ import org.springframework.boot.convert.DurationStyle;
 
 /**
  * Configuration for the JDBC Process Manager runtime, under
- * {@code aipersimmon.ddd.process-manager.jdbc} (design-00004 §5.4). {@link #validate()}
+ * {@code aipersimmon.ddd.process-manager.jdbc}. {@link #validate()}
  * is called by the auto-configuration so illegal values fail fast at startup rather than
  * misbehaving at runtime.
  */
@@ -35,7 +35,7 @@ public class ProcessManagerJdbcProperties {
     private final Instance instance = new Instance();
     private final Payload payload = new Payload();
 
-    /** Whole-instance backstop settings (design-00004 §4.7). */
+    /** Whole-instance backstop settings. */
     public static class Instance {
         /** {@code none} (no backstop) or a duration like {@code 30d}: the max-lifetime TTL. */
         private String maxLifetime = "none";
@@ -65,7 +65,7 @@ public class ProcessManagerJdbcProperties {
         }
     }
 
-    /** Payload size guardrail (design-00004 §5.4). */
+    /** Payload size guardrail. */
     public static class Payload {
         /** Max encoded bytes for a single state/input/effect payload. */
         private long maxBytes = 1_048_576L;
@@ -85,7 +85,7 @@ public class ProcessManagerJdbcProperties {
         }
     }
 
-    /** Thresholds for the health indicator and the stuck-instance SLI (design-00004 §5.3). */
+    /** Thresholds for the health indicator and the stuck-instance SLI. */
     public static class Observability {
         /** An active instance idle (no pending work) longer than this counts as stuck. */
         private Duration stuckThreshold = Duration.ofMinutes(15);

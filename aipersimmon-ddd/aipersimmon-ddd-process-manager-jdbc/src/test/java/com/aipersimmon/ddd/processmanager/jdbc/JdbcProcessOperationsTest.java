@@ -41,7 +41,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Operator recovery + suspended-input parking against H2 (plan-00003 P2④). */
+/** Operator recovery + suspended-input parking against H2. */
 class JdbcProcessOperationsTest {
 
     private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");

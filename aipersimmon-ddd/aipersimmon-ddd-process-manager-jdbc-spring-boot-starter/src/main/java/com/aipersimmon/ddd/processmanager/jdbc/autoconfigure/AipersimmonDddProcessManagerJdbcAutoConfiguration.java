@@ -54,7 +54,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  * registries (which fail fast on a conflict), picks the SQL dialect, wires the runtime,
  * query, relay, deadline worker, and operations, and runs the workers on their own thread
  * pools. Every bean is {@link ConditionalOnMissingBean}, so a consumer overrides any of
- * them. It scans no business packages and never executes DDL (design-00004 §5).
+ * them. It scans no business packages and never executes DDL.
  */
 @AutoConfiguration(after = {
         JdbcTemplateAutoConfiguration.class,
@@ -161,7 +161,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
     /**
      * The built-in codec for the runtime's max-lifetime backstop input, registered so the backstop
      * deadline can be encoded/decoded. It is a framework codec, not a business one; a consumer that
-     * defines their own for the reserved type overrides it (design-00004 §4.7).
+     * defines their own for the reserved type overrides it.
      */
     @Bean
     @ConditionalOnMissingBean(MaxLifetimeExceededCodec.class)

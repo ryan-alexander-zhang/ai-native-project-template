@@ -25,8 +25,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * {@link JdbcProcessDialect}, marking them {@code IN_FLIGHT} with a fresh lease), then
  * for each: decodes the payload, dispatches under the reconstructed context, and — fenced
  * by that lease token — marks it {@code DELIVERED}, schedules a bounded backoff retry, or,
- * once attempts are exhausted, moves it to {@code DEAD} and suspends the instance
- * (design-00004 §4.6). A crash before the delivered mark leaves the row {@code IN_FLIGHT}
+ * once attempts are exhausted, moves it to {@code DEAD} and suspends the instance.
+ * A crash before the delivered mark leaves the row {@code IN_FLIGHT}
  * with an expiring lease, so it is re-claimed and re-delivered under the same id.
  *
  * <p>The scheduling loop that calls {@code pollOnce} on an interval is the starter's

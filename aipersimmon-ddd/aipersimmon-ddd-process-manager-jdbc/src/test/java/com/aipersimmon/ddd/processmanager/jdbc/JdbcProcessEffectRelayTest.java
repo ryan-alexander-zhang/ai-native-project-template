@@ -39,7 +39,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Effect-relay contract against H2: delivery, per-instance ordering, retry/DEAD, fencing (P2②). */
+/** Effect-relay contract against H2: delivery, per-instance ordering, retry/DEAD, fencing. */
 class JdbcProcessEffectRelayTest {
 
     private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");

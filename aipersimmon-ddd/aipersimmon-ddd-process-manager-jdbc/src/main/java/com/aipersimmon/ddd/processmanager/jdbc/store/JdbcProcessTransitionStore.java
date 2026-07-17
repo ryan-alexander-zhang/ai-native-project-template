@@ -107,7 +107,7 @@ public final class JdbcProcessTransitionStore {
         }
     }
 
-    /** The full transition timeline of an instance in chronological order (design-00004 §4.10). */
+    /** The full transition timeline of an instance in chronological order. */
     public List<ProcessTransitionView> timeline(ProcessInstanceId instanceId) {
         return jdbc.query("""
                 SELECT transition_id, input_message_id, from_lifecycle, to_lifecycle,

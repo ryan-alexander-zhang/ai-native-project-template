@@ -4,7 +4,7 @@ import java.time.Duration;
 
 /**
  * A framework-free hook the runtime and relay call to report push-style timing and counter
- * signals — claim/dispatch latency and revision-conflict retries (design-00004 §5.3). It lets
+ * signals — claim/dispatch latency and revision-conflict retries. It lets
  * the JDBC module stay dependency-light (no Micrometer here); the starter binds a
  * Micrometer-backed implementation when a {@code MeterRegistry} is present, otherwise the
  * {@link #NOOP} instance is used so the core carries no metrics cost.

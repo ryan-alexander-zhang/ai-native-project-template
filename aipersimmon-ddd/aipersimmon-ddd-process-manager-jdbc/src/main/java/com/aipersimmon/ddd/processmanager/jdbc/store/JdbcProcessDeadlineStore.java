@@ -178,7 +178,7 @@ public final class JdbcProcessDeadlineStore {
         return Optional.ofNullable(ts).map(Timestamp::toInstant);
     }
 
-    /** List deadlines in a given status, soonest-due first, for an operator worklist (§4.10). */
+    /** List deadlines in a given status, soonest-due first, for an operator worklist. */
     public java.util.List<ProcessDeadlineView> byStatus(DeadlineStatus status, int limit) {
         return jdbc.query("""
                 SELECT deadline_id, instance_id, name, generation, status, due_at,
@@ -219,7 +219,7 @@ public final class JdbcProcessDeadlineStore {
                 DeadlineStatus.CANCELLED.name(), ts, ts, deadlineId, leaseToken);
     }
 
-    /** The lifecycle of a scheduled deadline (design-00004 §4.7). */
+    /** The lifecycle of a scheduled deadline. */
     public enum DeadlineStatus {
         PENDING,
         IN_FLIGHT,

@@ -19,7 +19,7 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** The health indicator's UP / DEGRADED / DOWN branches over an H2 backlog (plan-00003 P3② item 1). */
+/** The health indicator's UP / DEGRADED / DOWN branches over an H2 backlog. */
 class ProcessManagerJdbcHealthIndicatorTest {
 
     private EmbeddedDatabase db;

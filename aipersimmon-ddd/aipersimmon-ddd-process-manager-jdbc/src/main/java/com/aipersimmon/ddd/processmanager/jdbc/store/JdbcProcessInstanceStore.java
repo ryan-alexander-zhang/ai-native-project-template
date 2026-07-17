@@ -112,7 +112,7 @@ public final class JdbcProcessInstanceStore {
 
     /**
      * Move an instance to {@code SUSPENDED}, preserving the lifecycle to resume to and
-     * why it was suspended, without touching the business step (design-00004 §4.6).
+     * why it was suspended, without touching the business step.
      */
     public void suspend(
             ProcessInstanceId instanceId, ProcessLifecycle resumeLifecycle,
@@ -133,7 +133,7 @@ public final class JdbcProcessInstanceStore {
 
     /**
      * Resume a suspended instance back to {@code toLifecycle}, clearing the suspension
-     * metadata, without touching the business step (design-00004 §3.9).
+     * metadata, without touching the business step.
      */
     public void resume(ProcessInstanceId instanceId, ProcessLifecycle toLifecycle, Instant now) {
         jdbc.update("""
@@ -159,8 +159,8 @@ public final class JdbcProcessInstanceStore {
     /**
      * How many active instances look stuck: {@code RUNNING}/{@code COMPENSATING}, last touched
      * before {@code updatedBefore}, and with no pending or in-flight effect or deadline to make
-     * them advance (design-00004 §4.10 — a coordinator that lost its wakeup, complementary to the
-     * §4.7 max-lifetime backstop).
+     * them advance (a coordinator that lost its wakeup, complementary to the
+     * max-lifetime backstop).
      */
     public long countStuck(Instant updatedBefore) {
         return jdbc.queryForObject("""
@@ -178,7 +178,7 @@ public final class JdbcProcessInstanceStore {
 
     /**
      * Page instances matching any subset of type/businessKey/lifecycle/step/definitionVersion,
-     * newest last, for operational search (design-00004 §4.10). Read-only, no lock.
+     * newest last, for operational search. Read-only, no lock.
      */
     public List<ProcessInstanceRow> search(ProcessInstanceCriteria criteria, int limit, int offset) {
         StringBuilder sql = new StringBuilder("SELECT * FROM aipersimmon_process_instance WHERE 1 = 1");
@@ -209,7 +209,7 @@ public final class JdbcProcessInstanceStore {
         return jdbc.query(sql.toString(), ROW_MAPPER, args.toArray());
     }
 
-    /** List active instances that look stuck (design-00004 §4.10); see {@link #countStuck}. */
+    /** List active instances that look stuck; see {@link #countStuck}. */
     public List<ProcessInstanceRow> findStuck(Instant updatedBefore, int limit) {
         return jdbc.query("""
                 SELECT * FROM aipersimmon_process_instance i
@@ -236,7 +236,7 @@ public final class JdbcProcessInstanceStore {
                         new StateSchemaVersion(rs.getInt("state_schema_version"))));
     }
 
-    /** A distinct schema-version pair a live instance depends on, for startup fail-fast (§5.6). */
+    /** A distinct schema-version pair a live instance depends on, for startup fail-fast. */
     public record VersionRef(ProcessType processType, DefinitionVersion definitionVersion,
             StateSchemaVersion stateSchemaVersion) {
     }

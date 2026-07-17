@@ -42,7 +42,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Read-only operational queries over the four-table store against H2 (plan-00003 P3② item 3). */
+/** Read-only operational queries over the four-table store against H2. */
 class JdbcProcessQueryTest {
 
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);

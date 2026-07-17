@@ -7,7 +7,7 @@ import io.micrometer.core.instrument.binder.MeterBinder;
 import java.time.Duration;
 
 /**
- * Exports the pull-based backlog SLIs (design-00004 §5.3) as Micrometer gauges over a
+ * Exports the pull-based backlog SLIs as Micrometer gauges over a
  * {@link JdbcProcessBacklog}: the redrive backlog (dead effects/deadlines), how long the oldest
  * due work has waited, and how many instances are suspended or look stuck. Gauges read the store
  * lazily on scrape, so no background polling is added. Latency and conflict-retry meters are

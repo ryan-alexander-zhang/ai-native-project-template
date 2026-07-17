@@ -11,7 +11,7 @@ import java.io.IOException;
 
 /**
  * A Jackson-backed {@link ProcessStateCodec} the convenience layer generates from a
- * {@link ProcessSerializationCatalog} state entry (design-00004 §5.2). It reads and writes exactly
+ * {@link ProcessSerializationCatalog} state entry. It reads and writes exactly
  * the one schema version registered; a schema upgrade is a new explicit codec with an upcaster,
  * never a decode-then-reopen. Serialization failures surface as {@link ProcessSerializationException}.
  *

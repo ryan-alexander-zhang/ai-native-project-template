@@ -8,7 +8,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import java.util.Optional;
 
 /**
- * Read filter for the operational instance search (design-00004 §4.10): any subset of process
+ * Read filter for the operational instance search: any subset of process
  * type, business key, lifecycle, business step, and definition version. An empty filter matches
  * every instance; {@link #any()} is the starting point for a fluent narrowing.
  */

@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Optional observability wiring (design-00004 §5.3), assembled after the core runtime. Metrics bind
+ * Optional observability wiring, assembled after the core runtime. Metrics bind
  * only when Micrometer is on the classpath and a {@code MeterRegistry} is present; the health
  * indicator only when Actuator is on the classpath. Both read the pull-based
  * {@link JdbcProcessBacklog}; the {@link MicrometerProcessObserver} is registered as a

@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
 
-/** Metric names for the Process Manager SLIs (design-00004 §5.3), under a common prefix. */
+/** Metric names for the Process Manager SLIs, under a common prefix. */
 final class ProcessManagerMeters {
 
     private static final String PREFIX = "aipersimmon.process.manager.";

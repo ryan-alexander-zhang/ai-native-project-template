@@ -37,7 +37,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Max-lifetime backstop deadline and payload.max-bytes enforcement against H2 (plan-00003 P3② item 4). */
+/** Max-lifetime backstop deadline and payload.max-bytes enforcement against H2. */
 class JdbcProcessMaxLifetimeTest {
 
     private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");

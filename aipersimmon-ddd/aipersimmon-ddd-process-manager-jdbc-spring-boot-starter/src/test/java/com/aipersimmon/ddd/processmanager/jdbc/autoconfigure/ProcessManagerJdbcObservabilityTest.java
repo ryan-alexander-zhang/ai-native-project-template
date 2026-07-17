@@ -28,8 +28,8 @@ import org.springframework.context.annotation.Bean;
 
 /**
  * Boot slice: with Micrometer and Actuator on the classpath, the starter wires a
- * Micrometer-backed {@link ProcessObserver}, a backlog meter binder, and a health indicator
- * (design-00004 §5.3). It exercises a start → relay poll and asserts the backlog gauges and the
+ * Micrometer-backed {@link ProcessObserver}, a backlog meter binder, and a health indicator.
+ * It exercises a start → relay poll and asserts the backlog gauges and the
  * claim/dispatch latency timers are recorded, and that health is UP with an empty backlog.
  */
 @SpringBootTest(

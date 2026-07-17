@@ -40,7 +40,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Atomic-advance contract of JdbcProcessRuntime against an in-memory H2 (plan-00003 P2①). */
+/** Atomic-advance contract of JdbcProcessRuntime against an in-memory H2. */
 class JdbcProcessRuntimeTest {
 
     private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");
@@ -104,7 +104,7 @@ class JdbcProcessRuntimeTest {
         Map<String, Object> effect = jdbc.queryForMap("SELECT * FROM aipersimmon_process_effect");
         String expectedEffectId = result.transitionId() + "#0";
         assertEquals(expectedEffectId, effect.get("EFFECT_ID"));
-        assertEquals(expectedEffectId, effect.get("MESSAGE_ID"), "messageId must equal effectId (decision-00016)");
+        assertEquals(expectedEffectId, effect.get("MESSAGE_ID"), "messageId must equal effectId");
         assertEquals("msg-1", effect.get("CORRELATION_ID"), "correlation inherited from the cause");
         assertEquals("msg-1", effect.get("CAUSATION_ID"), "causation is the input message id");
         assertEquals("DISPATCH_COMMAND", effect.get("EFFECT_KIND"));
@@ -182,7 +182,7 @@ class JdbcProcessRuntimeTest {
         ProcessAdvanceResult started = start("msg-1");
         runtime.handle(started.processRef(), new TestFulfilment.EnterCompensating(),
                 CommandContext.root("msg-2", null));
-        // COMPENSATING -> RUNNING is illegal (design-00004 §3.9).
+        // COMPENSATING -> RUNNING is illegal.
         assertThrows(IllegalStateException.class, () -> runtime.handle(
                 started.processRef(), new TestFulfilment.IllegalBack(), CommandContext.root("msg-3", null)));
     }

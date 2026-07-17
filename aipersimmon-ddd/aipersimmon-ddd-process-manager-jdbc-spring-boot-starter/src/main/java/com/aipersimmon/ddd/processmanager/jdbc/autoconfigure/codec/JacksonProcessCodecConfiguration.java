@@ -16,7 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 
 /**
- * Optional Jackson convenience layer (design-00004 §5.2): when an {@link ObjectMapper} and an
+ * Optional Jackson convenience layer: when an {@link ObjectMapper} and an
  * explicit {@link ProcessSerializationCatalog} are both present, it builds the payload and state
  * codec registries from the consumer's explicitly-declared {@code ProcessPayloadCodec} /
  * {@code ProcessStateCodec} beans <em>plus</em> Jackson codecs generated for each catalog entry. It

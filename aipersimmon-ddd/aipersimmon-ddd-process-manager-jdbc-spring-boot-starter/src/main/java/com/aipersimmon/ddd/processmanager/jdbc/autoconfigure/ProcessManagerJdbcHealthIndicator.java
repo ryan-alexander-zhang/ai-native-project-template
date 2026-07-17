@@ -7,7 +7,7 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.actuate.health.Status;
 
 /**
- * Reports Process Manager health from the backlog SLIs (design-00004 §5.3): DOWN when the store is
+ * Reports Process Manager health from the backlog SLIs: DOWN when the store is
  * unreachable, {@code DEGRADED} when there is a redrive backlog, stuck instances, or the oldest due
  * work has waited past the configured warning threshold, and UP otherwise. DEGRADED is a distinct
  * status so a transient backlog surfaces without failing the aggregate readiness probe.
