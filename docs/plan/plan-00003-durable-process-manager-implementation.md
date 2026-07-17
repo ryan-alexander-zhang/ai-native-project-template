@@ -75,7 +75,48 @@ parent: design-00004-durable-process-manager-runtime
   驱动 relay 后断言 `ProcessView` 终态。库侧补 `JdbcProcessQuery.findRef`(businessKey→ref 只读解析)。
   **start 模块 18 测试全绿(真实 PostgreSQL Testcontainers)**,含支付拒绝补偿全链路。范围:只迁 multi-module;
   modulith / scaffold-samples 按指示不迁,故本轮**不删** `aipersimmon-ddd-saga`/`-saga-spring`(它们仍被那些消费方使用)。
+- ⏳ **P3②**（starter 生产化补强,resume 锚点见下）。
 - ⏳ **P5**（清理）:移除 `aipersimmon-ddd-saga` / `-saga-spring`，更新 BOM / 父 pom / README / design-00001 指向。
+  **前置**:modulith 与 scaffold-samples(`orchestrate-with-saga`、`saga-commands-and-outbox`、`scaffold/modulith`)仍用 saga,
+  删库前必须先迁它们(本轮范围外)。
+
+## P3② 待办（fresh-context resume 锚点）
+
+**恢复方式**:代码已全部提交、工作树干净;新会话读本节 + `git log` 即可续做,不需要旧对话上下文。
+
+**踩坑点(务必先知道)**:
+- scaffold(`aipersimmon-ddd-scaffold/multi-module`)从 `~/.m2` 解析库工件。**改动 `aipersimmon-ddd/` 任何库模块后,必须
+  `cd aipersimmon-ddd && mvn -q install -DskipTests` 重装**,否则 scaffold 编到旧版(P4 曾因 `cqrs-spring` 未重装、
+  `sendAs` 用到旧的默认实现而全红)。
+- scaffold 验收测试用 **Testcontainers(需 Docker)**;跑 scaffold 用 `mvn -pl start -am test`(必须 `-am`,否则 sibling
+  模块 payment-*/inventory-* 解析不到)。
+- 库多 DB 测试(PG/MySQL Testcontainers gate)也需 Docker。
+
+**待办(按生产价值排序)**:
+
+1. **可观测性 / 最小 SLI + Health**(design §5.3、§5.5)—— starter 现无任何 Health/Meter bean。
+   新增(条件装配于 Actuator/Micrometer 在 classpath 时):`ProcessManagerJdbcMeterBinder` 导出
+   `oldest_pending_effect_age`、`oldest_pending_deadline_age`、`dead_effects`、`suspended_instances`、`stuck_instances`、
+   `claim_latency`、`advance_conflict_retries`;`ProcessManagerJdbcHealthIndicator`(DB 不可用/积压→DOWN/DEGRADED)。
+   需给 `JdbcProcessQuery`/store 加聚合读查询支撑这些指标。
+2. **`JdbcProcessOperations.redriveDeadline(deadlineId, generation, operator, reason)`**(design §4.10)——
+   与 `redriveEffect` 对称:DEAD→PENDING,复用 deadlineStore;补一个 H2 测试。
+3. **只读运维查询**(design §4.10)—— 扩 `JdbcProcessQuery` / store:按 type/businessKey/lifecycle/step/definitionVersion
+   分页;transition timeline;pending/dead effects + pending deadlines 列表;卡死实例扫描
+   (`lifecycle IN (RUNNING,COMPENSATING)` 且无 pending effect/deadline 且 `updated_at` 超阈值)。
+4. **`max-lifetime` 兜底 deadline**(design §4.7)—— 完全缺失:①给 `ProcessManagerJdbcProperties` 加 `instance.max-lifetime`
+   (默认 none)与 `payload.max-bytes`;②`JdbcProcessRuntime.start` 在配置非 none 时挂一个兜底 deadline(到期转 input 交
+   Definition);③`payload.max-bytes` 在编码时强制。
+5. **Jackson codec 便利装配**(design §5.2)—— 可选:`JacksonProcessCodecConfiguration` + `ProcessSerializationCatalog`
+   (存在 `ObjectMapper` + 显式 catalog bean 时按 catalog 生成 codec)。
+6. **启动期 fail-fast 补齐**(design §5.6)—— 已做:四表存在、注册表冲突。补:①运行中实例引用的
+   DefinitionVersion/StateSchemaVersion 均有实现(扫 `process_instance`);②IntegrationEvent effect 的 codec type/version
+   与 `@EventType` 交叉校验;③每个启用的 effect kind 有且仅有一个 dispatcher 的正向校验。
+7. **测试矩阵补齐**(design §10)—— crash-window 完整矩阵(每个"提交前/后 × 外部副作用前/后")、state schema upcast、
+   parking 多场景。
+
+关键文件:库 `aipersimmon-ddd/aipersimmon-ddd-process-manager-jdbc/**` 与
+`…-jdbc-spring-boot-starter/**`;scaffold `aipersimmon-ddd-scaffold/multi-module/**`。
 
 ## Design
 
