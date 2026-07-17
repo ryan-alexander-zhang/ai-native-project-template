@@ -75,12 +75,33 @@ parent: design-00004-durable-process-manager-runtime
   驱动 relay 后断言 `ProcessView` 终态。库侧补 `JdbcProcessQuery.findRef`(businessKey→ref 只读解析)。
   **start 模块 18 测试全绿(真实 PostgreSQL Testcontainers)**,含支付拒绝补偿全链路。范围:只迁 multi-module;
   modulith / scaffold-samples 按指示不迁,故本轮**不删** `aipersimmon-ddd-saga`/`-saga-spring`(它们仍被那些消费方使用)。
-- ⏳ **P3②**（starter 生产化补强,resume 锚点见下）。
+- ✅ **P3②**（starter 生产化补强,全 7 项落地,test-first）:
+  1. **可观测性**:jdbc 侧 framework-free `observe/`——pull 式 `JdbcProcessBacklog`（dead effects/deadlines、oldest-due dwell、
+     suspended-by-source、stuck）+ push 式 `ProcessObserver`（claim/dispatch latency、advance-conflict-retries,经不破坏既有
+     ctor 的重载注入,默认 NOOP);stores 补聚合读。starter 条件装配 `MicrometerProcessObserver`+`ProcessManagerJdbcMeterBinder`
+     （Micrometer）与 `ProcessManagerJdbcHealthIndicator`（Actuator:DB 不可达→DOWN、积压/卡死/dwell→DEGRADED、否则 UP）。
+     测试:backlog 5(H2)、observability slice 4、health 3。
+  2. **`redriveDeadline`**:与 `redriveEffect` 对称,generation 守卫,`canResume` 现同时校验 dead effect+deadline 才恢复。测试 2。
+  3. **只读运维查询**:`JdbcProcessQuery` 收敛四 store（+clock）——分页 search、timeline、pending/dead effect & deadline 工作队列、
+     卡死扫描;新增 4 个 view record + store 查询。测试 5。
+  4. **max-lifetime 兜底 + payload.max-bytes**:runtime-level `MaxLifetimeExceeded` input + 内置 codec;`start` 挂兜底 deadline
+     到期交 Definition;encode 期强制 `payload.max-bytes`（`ProcessPayloadTooLargeException`）。props 加 `instance.max-lifetime`/
+     `payload.max-bytes`。测试 4。
+  5. **Jackson codec 便利装配**(可选):`JacksonProcessCodecConfiguration`(先于核心装配)+ `ProcessSerializationCatalog`;
+     显式登记、无 classpath 扫描、无类名回退。测试 1(slice)。
+  6. **启动期 fail-fast 补齐**:`ProcessManagerStartupValidator`——运行中实例引用的 Definition/StateSchema 版本均在册、
+     IntegrationEvent codec 与 `@EventType` 交叉校验、启用 effect kind 有 dispatcher（`schema-validation=none` 也执行）。测试 7。
+  7. **测试矩阵补齐**:relay crash-window（丢 ack 后同 id 重投 at-least-once、洁净投递不重投）、state schema upcast（实例固定
+     其 schema、旧 codec decode 期 upcast）、parking 多输入按序重放。
+  **验收**:process-manager 32 / jdbc 43(+PG gate) / starter 17(+MySQL gate) 全绿;库重装后 scaffold `start` 18 测试全绿
+  (真实 PostgreSQL,含支付拒绝补偿全链路),证明生产化补强未回归 P4。
 - ⏳ **P5**（清理）:移除 `aipersimmon-ddd-saga` / `-saga-spring`，更新 BOM / 父 pom / README / design-00001 指向。
   **前置**:modulith 与 scaffold-samples(`orchestrate-with-saga`、`saga-commands-and-outbox`、`scaffold/modulith`)仍用 saga,
   删库前必须先迁它们(本轮范围外)。
 
-## P3② 待办（fresh-context resume 锚点）
+## P3② 待办（✅ 已全部完成 —— 保留作实现索引）
+
+**状态**:7 项全部落地并提交、验收全绿(见上 P3② 条目)。下一步是 **P5**(清理旧 saga,须先迁 modulith/scaffold-samples)。
 
 **恢复方式**:代码已全部提交、工作树干净;新会话读本节 + `git log` 即可续做,不需要旧对话上下文。
 
