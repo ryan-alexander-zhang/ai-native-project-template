@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
+import com.aipersimmon.ddd.processmanager.definition.MaxLifetimeExceeded;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
@@ -19,6 +20,7 @@ import com.aipersimmon.ddd.processmanager.effect.PublishIntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.exception.ProcessAlreadyExistsException;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
+import com.aipersimmon.ddd.processmanager.exception.ProcessPayloadTooLargeException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
@@ -40,6 +42,7 @@ import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -73,6 +76,8 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     private final DuplicateBusinessKeyPolicy duplicatePolicy;
     private final int maxRetries;
     private final ProcessObserver observer;
+    private final Optional<Duration> maxLifetime;
+    private final long maxPayloadBytes;
 
     public JdbcProcessRuntime(
             JdbcProcessInstanceStore instances,
@@ -105,6 +110,27 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
             DuplicateBusinessKeyPolicy duplicatePolicy,
             int maxRetries,
             ProcessObserver observer) {
+        this(instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
+                unitOfWork, clock, idGenerator, duplicatePolicy, maxRetries, observer,
+                Optional.empty(), Long.MAX_VALUE);
+    }
+
+    public JdbcProcessRuntime(
+            JdbcProcessInstanceStore instances,
+            JdbcProcessTransitionStore transitions,
+            JdbcProcessEffectStore effects,
+            JdbcProcessDeadlineStore deadlines,
+            ProcessDefinitionRegistry definitions,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            ProcessStateCodecRegistry stateCodecs,
+            JdbcProcessUnitOfWork unitOfWork,
+            Clock clock,
+            Supplier<String> idGenerator,
+            DuplicateBusinessKeyPolicy duplicatePolicy,
+            int maxRetries,
+            ProcessObserver observer,
+            Optional<Duration> maxLifetime,
+            long maxPayloadBytes) {
         this.instances = instances;
         this.transitions = transitions;
         this.effects = effects;
@@ -118,6 +144,8 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         this.duplicatePolicy = duplicatePolicy;
         this.maxRetries = maxRetries;
         this.observer = observer;
+        this.maxLifetime = maxLifetime;
+        this.maxPayloadBytes = maxPayloadBytes;
     }
 
     @Override
@@ -159,9 +187,25 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
 
         appendTransition(ref, transitionId, cause, input, Optional.empty(), Optional.empty(), decision, "START", now);
         stageEffects(ref, transitionId, decision, cause, now);
+        armMaxLifetimeBackstop(ref, decision, now);
 
         return new ProcessAdvanceResult(
                 ref, revision, decision.lifecycle(), decision.step(), false, transitionId);
+    }
+
+    /**
+     * Arm the whole-instance max-lifetime backstop when configured and the instance is still active
+     * after start (design-00004 §4.7). It is an ordinary deadline the definition can reschedule to
+     * extend or that fires {@link MaxLifetimeExceeded} into {@code handle} for the definition to
+     * decide. A definition may also reschedule the reserved name itself in its start decision, which
+     * simply bumps the generation.
+     */
+    private void armMaxLifetimeBackstop(ProcessRef ref, ProcessDecision<Object> decision, Instant now) {
+        if (maxLifetime.isEmpty() || !decision.lifecycle().isActive()) {
+            return;
+        }
+        scheduleDeadline(ref, new ScheduleDeadline(
+                MaxLifetimeExceeded.DEADLINE_NAME, now.plus(maxLifetime.get()), new MaxLifetimeExceeded()), now);
     }
 
     private ProcessAdvanceResult resolveExistingStart(
@@ -324,13 +368,22 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private EncodedPayload encodePayload(Object value) {
         ProcessPayloadCodec codec = payloadCodecs.forJavaType(value.getClass());
-        return codec.encode(value);
+        return enforceSize(codec.encode(value));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private EncodedPayload encodeState(ProcessType type, StateSchemaVersion schema, Object state) {
         ProcessStateCodec codec = stateCodecs.forState(type, schema);
-        return codec.encode(state);
+        return enforceSize(codec.encode(state));
+    }
+
+    /** Guard the configured {@code payload.max-bytes} cap at encode time (design-00004 §5.4). */
+    private EncodedPayload enforceSize(EncodedPayload encoded) {
+        int size = encoded.data().length;
+        if (size > maxPayloadBytes) {
+            throw new ProcessPayloadTooLargeException(encoded.type().logicalType(), size, maxPayloadBytes);
+        }
+        return encoded;
     }
 
     private Object decodeState(

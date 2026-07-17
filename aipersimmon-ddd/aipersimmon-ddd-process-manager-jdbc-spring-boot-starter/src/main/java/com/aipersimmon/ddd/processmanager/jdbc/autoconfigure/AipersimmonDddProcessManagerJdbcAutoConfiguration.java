@@ -25,6 +25,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolic
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.runtime.MaxLifetimeExceededCodec;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -153,7 +154,19 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
         return new JdbcProcessRuntime(
                 instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
                 unitOfWork, processManagerClock, randomIds(), policy, properties.getConcurrencyMaxRetries(),
-                observer.getIfAvailable(() -> ProcessObserver.NOOP));
+                observer.getIfAvailable(() -> ProcessObserver.NOOP),
+                properties.getInstance().maxLifetimeDuration(), properties.getPayload().getMaxBytes());
+    }
+
+    /**
+     * The built-in codec for the runtime's max-lifetime backstop input, registered so the backstop
+     * deadline can be encoded/decoded. It is a framework codec, not a business one; a consumer that
+     * defines their own for the reserved type overrides it (design-00004 §4.7).
+     */
+    @Bean
+    @ConditionalOnMissingBean(MaxLifetimeExceededCodec.class)
+    public MaxLifetimeExceededCodec maxLifetimeExceededCodec() {
+        return new MaxLifetimeExceededCodec();
     }
 
     @Bean

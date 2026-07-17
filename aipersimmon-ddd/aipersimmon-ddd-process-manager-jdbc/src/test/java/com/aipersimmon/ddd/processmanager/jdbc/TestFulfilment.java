@@ -5,10 +5,12 @@ import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
+import com.aipersimmon.ddd.processmanager.definition.MaxLifetimeExceeded;
 import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
+import com.aipersimmon.ddd.processmanager.jdbc.runtime.MaxLifetimeExceededCodec;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
@@ -147,6 +149,9 @@ final class TestFulfilment {
                         Optional.empty(), new DecisionCode("fanned"),
                         List.of(new DispatchCommand(new DoWork("first")),
                                 new DispatchCommand(new DoWork("second"))));
+                case MaxLifetimeExceeded ignored -> new ProcessDecision<>(
+                        new State("EXPIRED", state.count()), ProcessLifecycle.COMPLETED, new ProcessStep("EXPIRED"),
+                        Optional.of(new ProcessOutcome("MAX_LIFETIME")), new DecisionCode("max-lifetime"), List.of());
                 default -> throw new UnsupportedProcessInputException("unexpected input: " + input);
             };
         }
@@ -191,7 +196,8 @@ final class TestFulfilment {
                 payloadCodec("test.deadline-fired", DeadlineFired.class, d -> "", s -> new DeadlineFired()),
                 payloadCodec("test.fan-out", FanOut.class, f -> "", s -> new FanOut()),
                 payloadCodec("test.arm-poison", ArmPoisonDeadline.class, a -> "", s -> new ArmPoisonDeadline()),
-                payloadCodec("test.do-work", DoWork.class, DoWork::reference, DoWork::new));
+                payloadCodec("test.do-work", DoWork.class, DoWork::reference, DoWork::new),
+                new MaxLifetimeExceededCodec());
     }
 
     static ProcessStateCodec<State> stateCodec() {

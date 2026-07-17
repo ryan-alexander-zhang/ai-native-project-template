@@ -1,7 +1,9 @@
 package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
 
 import java.time.Duration;
+import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.convert.DurationStyle;
 
 /**
  * Configuration for the JDBC Process Manager runtime, under
@@ -30,6 +32,58 @@ public class ProcessManagerJdbcProperties {
     private final Worker effectRelay = new Worker();
     private final Worker deadlineWorker = new Worker();
     private final Observability observability = new Observability();
+    private final Instance instance = new Instance();
+    private final Payload payload = new Payload();
+
+    /** Whole-instance backstop settings (design-00004 §4.7). */
+    public static class Instance {
+        /** {@code none} (no backstop) or a duration like {@code 30d}: the max-lifetime TTL. */
+        private String maxLifetime = "none";
+
+        public String getMaxLifetime() {
+            return maxLifetime;
+        }
+
+        public void setMaxLifetime(String maxLifetime) {
+            this.maxLifetime = maxLifetime;
+        }
+
+        /** The parsed backstop TTL, or empty when {@code none}. */
+        public Optional<Duration> maxLifetimeDuration() {
+            if (maxLifetime == null || maxLifetime.isBlank() || maxLifetime.equalsIgnoreCase("none")) {
+                return Optional.empty();
+            }
+            return Optional.of(DurationStyle.detectAndParse(maxLifetime.trim()));
+        }
+
+        void validate() {
+            maxLifetimeDuration().ifPresent(d -> {
+                if (d.isNegative() || d.isZero()) {
+                    throw new IllegalStateException("instance.max-lifetime must be positive or 'none'");
+                }
+            });
+        }
+    }
+
+    /** Payload size guardrail (design-00004 §5.4). */
+    public static class Payload {
+        /** Max encoded bytes for a single state/input/effect payload. */
+        private long maxBytes = 1_048_576L;
+
+        public long getMaxBytes() {
+            return maxBytes;
+        }
+
+        public void setMaxBytes(long maxBytes) {
+            this.maxBytes = maxBytes;
+        }
+
+        void validate() {
+            if (maxBytes < 1) {
+                throw new IllegalStateException("payload.max-bytes must be >= 1");
+            }
+        }
+    }
 
     /** Thresholds for the health indicator and the stuck-instance SLI (design-00004 §5.3). */
     public static class Observability {
@@ -203,6 +257,8 @@ public class ProcessManagerJdbcProperties {
         effectRelay.validate("effect-relay");
         deadlineWorker.validate("deadline-worker");
         observability.validate();
+        instance.validate();
+        payload.validate();
     }
 
     public boolean isEnabled() {
@@ -271,5 +327,13 @@ public class ProcessManagerJdbcProperties {
 
     public Observability getObservability() {
         return observability;
+    }
+
+    public Instance getInstance() {
+        return instance;
+    }
+
+    public Payload getPayload() {
+        return payload;
     }
 }
