@@ -83,7 +83,7 @@ public final class JdbcProcessOperations {
                     idGenerator.get(), effect.instanceId(), row.lifecycle(), row.lifecycle(),
                     row.step(), row.step(), "OPERATOR_REDRIVE_EFFECT", operator, reason, clock.instant());
 
-            if (row.lifecycle() == ProcessLifecycle.SUSPENDED && effects.countDead(effect.instanceId()) == 0) {
+            if (canResume(row.lifecycle(), effect.instanceId())) {
                 ProcessLifecycle resume = row.resumeLifecycle().orElse(ProcessLifecycle.RUNNING);
                 instances.resume(effect.instanceId(), resume, clock.instant());
                 return row.ref();
@@ -93,6 +93,43 @@ public final class JdbcProcessOperations {
         if (resumed != null) {
             replayParkedInputs(resumed);
         }
+    }
+
+    /** Redrive one DEAD deadline; resumes and replays parked inputs if no dead work remains. */
+    public void redriveDeadline(String deadlineId, long generation, String operator, String reason) {
+        ProcessRef resumed = unitOfWork.execute(() -> {
+            JdbcProcessDeadlineStore.DeadlineRow deadline = deadlines.load(deadlineId)
+                    .orElseThrow(() -> new IllegalArgumentException("no deadline " + deadlineId));
+            if (deadline.generation() != generation) {
+                throw new IllegalStateException("deadline " + deadlineId + " is at generation "
+                        + deadline.generation() + ", not the expected " + generation);
+            }
+            if (deadlines.redrive(deadlineId, clock.instant()) == 0) {
+                throw new IllegalStateException("deadline " + deadlineId + " is not DEAD");
+            }
+            ProcessInstanceRow row = instances.find(deadline.instanceId())
+                    .orElseThrow(() -> new IllegalStateException("deadline without instance"));
+            transitions.appendOperator(
+                    idGenerator.get(), deadline.instanceId(), row.lifecycle(), row.lifecycle(),
+                    row.step(), row.step(), "OPERATOR_REDRIVE_DEADLINE", operator, reason, clock.instant());
+
+            if (canResume(row.lifecycle(), deadline.instanceId())) {
+                ProcessLifecycle resume = row.resumeLifecycle().orElse(ProcessLifecycle.RUNNING);
+                instances.resume(deadline.instanceId(), resume, clock.instant());
+                return row.ref();
+            }
+            return null;
+        });
+        if (resumed != null) {
+            replayParkedInputs(resumed);
+        }
+    }
+
+    /** A suspended instance may resume once no DEAD effect or deadline remains to hold it back. */
+    private boolean canResume(ProcessLifecycle lifecycle, com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId) {
+        return lifecycle == ProcessLifecycle.SUSPENDED
+                && effects.countDead(instanceId) == 0
+                && deadlines.countDead(instanceId) == 0;
     }
 
     private void replayParkedInputs(ProcessRef ref) {

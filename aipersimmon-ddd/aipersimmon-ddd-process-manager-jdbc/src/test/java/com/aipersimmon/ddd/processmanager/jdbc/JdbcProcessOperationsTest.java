@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
 import com.aipersimmon.ddd.processmanager.jdbc.operation.JdbcProcessOperations;
@@ -93,6 +94,19 @@ class JdbcProcessOperationsTest {
         return jdbc.queryForObject("SELECT lifecycle FROM aipersimmon_process_instance", String.class);
     }
 
+    private String suspendViaDeadDeadline() {
+        ProcessAdvanceResult started = start();
+        runtime.handle(started.processRef(), new TestFulfilment.ArmPoisonDeadline(),
+                CommandContext.root("msg-arm", null));
+        JdbcProcessDeadlineWorker worker = new JdbcProcessDeadlineWorker(
+                jdbc, dialect, deadlineStore, instanceStore,
+                new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
+                runtime, unitOfWork, zeroBackoff(1), CLOCK, new WorkerId("dw"), 10,
+                Duration.ofSeconds(30), () -> "dlease-" + tokens.incrementAndGet());
+        worker.pollOnce(); // one failed fire with maxAttempts=1 -> DEAD + SUSPENDED (source DEADLINE)
+        return jdbc.queryForObject("SELECT deadline_id FROM aipersimmon_process_deadline", String.class);
+    }
+
     private void suspendViaDeadEffect() {
         JdbcProcessEffectRelay relay = new JdbcProcessEffectRelay(
                 jdbc, dialect, effectStore, instanceStore,
@@ -143,6 +157,34 @@ class JdbcProcessOperationsTest {
         assertEquals(1L, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'OPERATOR_REDRIVE_EFFECT'",
                 Long.class));
+    }
+
+    @Test
+    void redrivingADeadDeadlineResumesTheInstance() {
+        String deadlineId = suspendViaDeadDeadline();
+        assertEquals("SUSPENDED", lifecycle());
+
+        operations.redriveDeadline(deadlineId, 1L, "operator-1", "poison fixed");
+
+        assertEquals("RUNNING", lifecycle(), "resumed once no dead work remains");
+        assertEquals("PENDING", jdbc.queryForObject(
+                "SELECT status FROM aipersimmon_process_deadline WHERE deadline_id = ?", String.class, deadlineId),
+                "the redriven deadline is back to PENDING for the worker");
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'OPERATOR_REDRIVE_DEADLINE'",
+                Long.class));
+    }
+
+    @Test
+    void redriveDeadlineRejectsAStaleGeneration() {
+        String deadlineId = suspendViaDeadDeadline();
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> operations.redriveDeadline(deadlineId, 99L, "operator-1", "wrong generation"));
+
+        assertEquals("DEAD", jdbc.queryForObject(
+                "SELECT status FROM aipersimmon_process_deadline WHERE deadline_id = ?", String.class, deadlineId),
+                "a mismatched generation leaves the deadline untouched");
     }
 
     @Test

@@ -148,6 +148,24 @@ public final class JdbcProcessDeadlineStore {
                 Long.class, DeadlineStatus.DEAD.name());
     }
 
+    /** How many deadlines on an instance are still DEAD (used to decide whether to resume it). */
+    public long countDead(ProcessInstanceId instanceId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE instance_id = ? AND status = ?",
+                Long.class, instanceId.value(), DeadlineStatus.DEAD.name());
+    }
+
+    /** Redrive a DEAD deadline back to PENDING (reusing its id, due now) for operator recovery. */
+    public int redrive(String deadlineId, Instant now) {
+        Timestamp ts = Timestamp.from(now);
+        return jdbc.update("""
+                UPDATE aipersimmon_process_deadline
+                SET status = ?, next_attempt_at = ?, last_error = NULL, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE deadline_id = ? AND status = ?""",
+                DeadlineStatus.PENDING.name(), ts, ts, deadlineId, DeadlineStatus.DEAD.name());
+    }
+
     /**
      * The earliest due-but-unfired {@code PENDING} deadline's scheduled attempt time, or empty if
      * none is due (SLI: deadline-worker dwell — {@code now - result} is how long the oldest due
