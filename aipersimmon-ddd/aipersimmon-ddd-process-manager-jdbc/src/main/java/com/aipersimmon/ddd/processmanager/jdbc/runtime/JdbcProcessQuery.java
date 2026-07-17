@@ -1,25 +1,53 @@
 package com.aipersimmon.ddd.processmanager.jdbc.runtime;
 
+import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore.DeadlineStatus;
+import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore.EffectStatus;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
+import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessDeadlineView;
+import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessEffectView;
+import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceCriteria;
+import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionView;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessQuery;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * The read-only {@link ProcessQuery} over the instance snapshot. It exposes runtime
- * metadata (identity, versions, lifecycle/step, outcome, revision, and suspension
- * detail) but never the decoded business state, and offers no mutation. Richer paging,
- * timeline, and pending/dead queries land in a later slice.
+ * The read-only {@link ProcessQuery} over the four-table store (design-00004 §4.10). Beyond the
+ * single-instance {@link ProcessView} it offers operational reads: paged search by
+ * type/businessKey/lifecycle/step/definitionVersion, the transition timeline, pending/dead effect
+ * and deadline worklists, and the stuck-instance scan. It exposes runtime metadata (identity,
+ * versions, lifecycle/step, outcome, revision, suspension detail) but never decoded business state,
+ * and offers no mutation — operator changes go through {@code JdbcProcessOperations}.
  */
 public final class JdbcProcessQuery implements ProcessQuery {
 
     private final JdbcProcessInstanceStore instances;
+    private final JdbcProcessTransitionStore transitions;
+    private final JdbcProcessEffectStore effects;
+    private final JdbcProcessDeadlineStore deadlines;
+    private final Clock clock;
 
-    public JdbcProcessQuery(JdbcProcessInstanceStore instances) {
+    public JdbcProcessQuery(
+            JdbcProcessInstanceStore instances,
+            JdbcProcessTransitionStore transitions,
+            JdbcProcessEffectStore effects,
+            JdbcProcessDeadlineStore deadlines,
+            Clock clock) {
         this.instances = instances;
+        this.transitions = transitions;
+        this.effects = effects;
+        this.deadlines = deadlines;
+        this.clock = clock;
     }
 
     /**
@@ -28,12 +56,45 @@ public final class JdbcProcessQuery implements ProcessQuery {
      * {@code handle}. Returns empty if no instance exists for that key.
      */
     public Optional<ProcessRef> findRef(ProcessType processType, ProcessBusinessKey businessKey) {
-        return instances.readByBusinessKey(processType, businessKey).map(row -> row.ref());
+        return instances.readByBusinessKey(processType, businessKey).map(ProcessInstanceRow::ref);
     }
 
     @Override
     public Optional<ProcessView> find(ProcessRef processRef) {
-        return instances.find(processRef.instanceId()).map(row -> new ProcessView(
+        return instances.find(processRef.instanceId()).map(JdbcProcessQuery::toView);
+    }
+
+    /** Page instances matching {@code criteria}, oldest first (design-00004 §4.10). */
+    public List<ProcessView> search(ProcessInstanceCriteria criteria, int limit, int offset) {
+        return instances.search(criteria, limit, offset).stream().map(JdbcProcessQuery::toView).toList();
+    }
+
+    /** The instance's transition timeline, chronological (design-00004 §4.10). */
+    public List<ProcessTransitionView> timeline(ProcessRef processRef) {
+        return transitions.timeline(processRef.instanceId());
+    }
+
+    /** Effects in a given delivery status, oldest first — e.g. a DEAD redrive worklist. */
+    public List<ProcessEffectView> effects(EffectStatus status, int limit) {
+        return effects.byStatus(status, limit);
+    }
+
+    /** Deadlines in a given status, soonest-due first — e.g. a DEAD redrive worklist. */
+    public List<ProcessDeadlineView> deadlines(DeadlineStatus status, int limit) {
+        return deadlines.byStatus(status, limit);
+    }
+
+    /**
+     * Active instances idle past {@code threshold} with no pending work — candidates for a lost
+     * wakeup (design-00004 §4.10), complementary to the §4.7 max-lifetime backstop.
+     */
+    public List<ProcessView> stuckInstances(Duration threshold, int limit) {
+        return instances.findStuck(clock.instant().minus(threshold), limit).stream()
+                .map(JdbcProcessQuery::toView).toList();
+    }
+
+    private static ProcessView toView(ProcessInstanceRow row) {
+        return new ProcessView(
                 row.ref(),
                 row.definitionVersion(),
                 row.stateSchemaVersion(),
@@ -42,6 +103,6 @@ public final class JdbcProcessQuery implements ProcessQuery {
                 row.outcome(),
                 row.revision(),
                 row.resumeLifecycle(),
-                row.suspensionReason()));
+                row.suspensionReason());
     }
 }

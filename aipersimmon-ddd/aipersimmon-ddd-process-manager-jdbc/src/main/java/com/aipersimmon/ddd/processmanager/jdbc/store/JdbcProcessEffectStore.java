@@ -138,6 +138,27 @@ public final class JdbcProcessEffectStore {
         return Optional.ofNullable(ts).map(Timestamp::toInstant);
     }
 
+    /** List effects in a given status, oldest first, for an operator worklist (design-00004 §4.10). */
+    public java.util.List<ProcessEffectView> byStatus(EffectStatus status, int limit) {
+        return jdbc.query("""
+                SELECT effect_id, instance_id, effect_kind, status, attempts, message_id,
+                       next_attempt_at, last_error, created_at
+                FROM aipersimmon_process_effect
+                WHERE status = ?
+                ORDER BY created_at, effect_id LIMIT ?""",
+                (rs, n) -> new ProcessEffectView(
+                        rs.getString("effect_id"),
+                        rs.getString("instance_id"),
+                        rs.getString("effect_kind"),
+                        rs.getString("status"),
+                        rs.getInt("attempts"),
+                        rs.getString("message_id"),
+                        Optional.ofNullable(rs.getTimestamp("next_attempt_at")).map(Timestamp::toInstant),
+                        Optional.ofNullable(rs.getString("last_error")),
+                        rs.getTimestamp("created_at").toInstant()),
+                status.name(), limit);
+    }
+
     /** Cancel not-yet-dispatched effects when a process is cancelled by an operator. */
     public int cancelPending(com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId, Instant now) {
         return jdbc.update("""

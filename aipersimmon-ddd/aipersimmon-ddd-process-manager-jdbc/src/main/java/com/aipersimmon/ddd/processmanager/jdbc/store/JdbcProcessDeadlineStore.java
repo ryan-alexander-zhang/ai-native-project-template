@@ -178,6 +178,27 @@ public final class JdbcProcessDeadlineStore {
         return Optional.ofNullable(ts).map(Timestamp::toInstant);
     }
 
+    /** List deadlines in a given status, soonest-due first, for an operator worklist (§4.10). */
+    public java.util.List<ProcessDeadlineView> byStatus(DeadlineStatus status, int limit) {
+        return jdbc.query("""
+                SELECT deadline_id, instance_id, name, generation, status, due_at,
+                       attempts, next_attempt_at, last_error
+                FROM aipersimmon_process_deadline
+                WHERE status = ?
+                ORDER BY due_at, deadline_id LIMIT ?""",
+                (rs, n) -> new ProcessDeadlineView(
+                        rs.getString("deadline_id"),
+                        rs.getString("instance_id"),
+                        rs.getString("name"),
+                        rs.getLong("generation"),
+                        rs.getString("status"),
+                        rs.getTimestamp("due_at").toInstant(),
+                        rs.getInt("attempts"),
+                        Optional.ofNullable(rs.getTimestamp("next_attempt_at")).map(Timestamp::toInstant),
+                        Optional.ofNullable(rs.getString("last_error"))),
+                status.name(), limit);
+    }
+
     /** Cancel all pending deadlines of an instance when a process is cancelled by an operator. */
     public int cancelPending(ProcessInstanceId instanceId, Instant now) {
         return jdbc.update("""

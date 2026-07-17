@@ -107,6 +107,29 @@ public final class JdbcProcessTransitionStore {
         }
     }
 
+    /** The full transition timeline of an instance in chronological order (design-00004 §4.10). */
+    public List<ProcessTransitionView> timeline(ProcessInstanceId instanceId) {
+        return jdbc.query("""
+                SELECT transition_id, input_message_id, from_lifecycle, to_lifecycle,
+                       from_step, to_step, decision_code, transition_kind, operator_id, operation_reason, created_at
+                FROM aipersimmon_process_transition
+                WHERE instance_id = ?
+                ORDER BY created_at, transition_id""",
+                (rs, n) -> new ProcessTransitionView(
+                        rs.getString("transition_id"),
+                        rs.getString("input_message_id"),
+                        Optional.ofNullable(rs.getString("from_lifecycle")),
+                        rs.getString("to_lifecycle"),
+                        Optional.ofNullable(rs.getString("from_step")),
+                        rs.getString("to_step"),
+                        rs.getString("decision_code"),
+                        rs.getString("transition_kind"),
+                        Optional.ofNullable(rs.getString("operator_id")),
+                        Optional.ofNullable(rs.getString("operation_reason")),
+                        rs.getTimestamp("created_at").toInstant()),
+                instanceId.value());
+    }
+
     /** The inputs parked while the instance was suspended, in arrival order. */
     public List<ParkedInput> findParkedInputs(ProcessInstanceId instanceId) {
         return jdbc.query("""

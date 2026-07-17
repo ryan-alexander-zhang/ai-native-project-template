@@ -176,6 +176,55 @@ public final class JdbcProcessInstanceStore {
                 "PENDING", "IN_FLIGHT", "PENDING", "IN_FLIGHT");
     }
 
+    /**
+     * Page instances matching any subset of type/businessKey/lifecycle/step/definitionVersion,
+     * newest last, for operational search (design-00004 §4.10). Read-only, no lock.
+     */
+    public List<ProcessInstanceRow> search(ProcessInstanceCriteria criteria, int limit, int offset) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM aipersimmon_process_instance WHERE 1 = 1");
+        List<Object> args = new java.util.ArrayList<>();
+        criteria.processType().ifPresent(v -> {
+            sql.append(" AND process_type = ?");
+            args.add(v.value());
+        });
+        criteria.businessKey().ifPresent(v -> {
+            sql.append(" AND business_key = ?");
+            args.add(v.value());
+        });
+        criteria.lifecycle().ifPresent(v -> {
+            sql.append(" AND lifecycle = ?");
+            args.add(v.name());
+        });
+        criteria.step().ifPresent(v -> {
+            sql.append(" AND business_step = ?");
+            args.add(v.value());
+        });
+        criteria.definitionVersion().ifPresent(v -> {
+            sql.append(" AND definition_version = ?");
+            args.add(v.value());
+        });
+        sql.append(" ORDER BY created_at, instance_id LIMIT ? OFFSET ?");
+        args.add(limit);
+        args.add(offset);
+        return jdbc.query(sql.toString(), ROW_MAPPER, args.toArray());
+    }
+
+    /** List active instances that look stuck (design-00004 §4.10); see {@link #countStuck}. */
+    public List<ProcessInstanceRow> findStuck(Instant updatedBefore, int limit) {
+        return jdbc.query("""
+                SELECT * FROM aipersimmon_process_instance i
+                WHERE i.lifecycle IN (?, ?) AND i.updated_at < ?
+                  AND NOT EXISTS (SELECT 1 FROM aipersimmon_process_effect e
+                                  WHERE e.instance_id = i.instance_id AND e.status IN (?, ?))
+                  AND NOT EXISTS (SELECT 1 FROM aipersimmon_process_deadline d
+                                  WHERE d.instance_id = i.instance_id AND d.status IN (?, ?))
+                ORDER BY i.updated_at, i.instance_id LIMIT ?""",
+                ROW_MAPPER,
+                ProcessLifecycle.RUNNING.name(), ProcessLifecycle.COMPENSATING.name(),
+                Timestamp.from(updatedBefore),
+                "PENDING", "IN_FLIGHT", "PENDING", "IN_FLIGHT", limit);
+    }
+
     /** Distinct {@code (definitionVersion, stateSchemaVersion)} pairs referenced by live instances. */
     public List<VersionRef> distinctVersionsInUse() {
         return jdbc.query("""

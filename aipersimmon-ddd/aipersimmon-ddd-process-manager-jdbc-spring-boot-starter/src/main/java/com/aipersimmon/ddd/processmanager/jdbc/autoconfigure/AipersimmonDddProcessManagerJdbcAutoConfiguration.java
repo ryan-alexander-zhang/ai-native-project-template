@@ -167,8 +167,10 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public JdbcProcessQuery jdbcProcessQuery(JdbcProcessInstanceStore instances) {
-        return new JdbcProcessQuery(instances);
+    public JdbcProcessQuery jdbcProcessQuery(
+            JdbcProcessInstanceStore instances, JdbcProcessTransitionStore transitions,
+            JdbcProcessEffectStore effects, JdbcProcessDeadlineStore deadlines, Clock processManagerClock) {
+        return new JdbcProcessQuery(instances, transitions, effects, deadlines, processManagerClock);
     }
 
     @Bean

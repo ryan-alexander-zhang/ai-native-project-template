@@ -55,14 +55,15 @@ class JdbcProcessRuntimeTest {
         var transitions = new JdbcProcessTransitionStore(jdbc);
         var effects = new JdbcProcessEffectStore(jdbc);
         var deadlines = new JdbcProcessDeadlineStore(jdbc);
-        query = new JdbcProcessQuery(instances);
+        Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
+        query = new JdbcProcessQuery(instances, transitions, effects, deadlines, clock);
         return new JdbcProcessRuntime(
                 instances, transitions, effects, deadlines,
                 new ProcessDefinitionRegistry(List.of(new TestFulfilment.Definition())),
                 new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
                 new ProcessStateCodecRegistry(List.of(TestFulfilment.stateCodec())),
                 new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
-                Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC),
+                clock,
                 () -> "id-" + ids.incrementAndGet(),
                 policy,
                 3);
