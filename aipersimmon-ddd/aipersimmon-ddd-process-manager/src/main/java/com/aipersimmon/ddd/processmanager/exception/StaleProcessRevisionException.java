@@ -6,7 +6,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 /**
  * Thrown when an optimistic-concurrency check fails: the instance's revision changed
  * under a concurrent transition. The runtime retries a bounded number of times
- * (reload, re-decide) before surfacing this to the message layer (design-00004 §4.8).
+ * (reload, re-decide) before surfacing this to the message layer.
  */
 public final class StaleProcessRevisionException extends ProcessException {
 

@@ -7,7 +7,7 @@ import java.time.Instant;
 /**
  * One scheduled deadline generation to persist as {@code PENDING}. A reschedule of the
  * same name uses a higher {@code generation}, so a late fire of an older generation is
- * a no-op (design-00004 §4.7). The encoded deadline input is delivered back as an
+ * a no-op. The encoded deadline input is delivered back as an
  * ordinary input when the timer fires.
  */
 public record ProcessDeadlineInsert(

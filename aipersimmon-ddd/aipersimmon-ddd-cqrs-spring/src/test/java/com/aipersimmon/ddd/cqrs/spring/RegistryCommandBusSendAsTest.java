@@ -16,8 +16,7 @@ import org.junit.jupiter.api.Test;
  * {@link RegistryCommandBus#sendAs(Command, CommandContext)} must dispatch under the
  * caller-supplied context <em>verbatim</em>: no id is minted and no child is derived,
  * so the same persisted effect redelivered by a relay reaches the handler under the
- * same messageId. This is the P0-1 staged-dispatch contract
- * (decision-00016-durable-runtime-staged-message-identity).
+ * same messageId. This is the staged-dispatch contract.
  */
 class RegistryCommandBusSendAsTest {
 

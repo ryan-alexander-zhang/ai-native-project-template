@@ -6,8 +6,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Encapsulates the database-specific way to atomically claim due effects for delivery.
- * The claimable set and per-instance ordering are the same across databases (design-00004
- * §4.6); only the concurrency mechanism differs — {@code FOR UPDATE SKIP LOCKED} on
+ * The claimable set and per-instance ordering are the same across databases; only the
+ * concurrency mechanism differs — {@code FOR UPDATE SKIP LOCKED} on
  * PostgreSQL/MySQL, an atomic conditional {@code UPDATE} where that is unavailable.
  *
  * <p>An effect is claimable when it is due ({@code PENDING} past its next attempt, or
@@ -60,8 +60,7 @@ public interface JdbcProcessDialect {
     /**
      * The due-deadline candidate query, shared by all dialects. Two positional {@code now}
      * params. Only deadlines of active instances are claimable — a suspended or ended
-     * instance's deadlines are skipped and become candidates again after it resumes
-     * (design-00004 §4.7).
+     * instance's deadlines are skipped and become candidates again after it resumes.
      */
     String DEADLINE_CANDIDATE_SQL = """
             SELECT d.deadline_id FROM aipersimmon_process_deadline d

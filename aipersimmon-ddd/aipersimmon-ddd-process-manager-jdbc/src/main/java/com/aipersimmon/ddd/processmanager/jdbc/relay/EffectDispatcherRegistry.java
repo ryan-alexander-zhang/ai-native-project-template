@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * Routes a decoded effect to the one {@link ProcessEffectDispatcher} registered for its
  * kind. Construction fails fast if two dispatchers claim the same kind; a dispatch for a
- * kind with no dispatcher is an error (design-00004 §4.6).
+ * kind with no dispatcher is an error.
  */
 public final class EffectDispatcherRegistry {
 

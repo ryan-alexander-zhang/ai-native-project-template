@@ -24,8 +24,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Fires due deadlines by turning each into an ordinary {@link ProcessInput} and
- * re-entering {@link ProcessRuntime#handle} — a deadline is not a separate callback
- * (design-00004 §4.7). Firing and the {@code FIRED} mark commit in one transaction, so a
+ * re-entering {@link ProcessRuntime#handle} — a deadline is not a separate callback.
+ * Firing and the {@code FIRED} mark commit in one transaction, so a
  * crash before commit is safely retried; the deadline's message id is deterministic
  * ({@code deadlineId#generation}), so the re-fire is a duplicate no-op in {@code handle}.
  *

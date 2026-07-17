@@ -7,7 +7,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** The lifecycle state machine matches design-00004 §3.9. */
+/** The lifecycle state machine's transition rules. */
 class ProcessLifecycleTest {
 
     @Test

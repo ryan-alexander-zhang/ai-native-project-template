@@ -6,7 +6,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 /**
  * One staged command/event effect to persist as {@code PENDING}. Its {@code messageId}
  * equals its {@code effectId} — the durable identity minted at creation and replayed
- * verbatim by the relay (design-00004 §3.5; decision-00016). Correlation/causation are
+ * verbatim by the relay. Correlation/causation are
  * derived from the input that produced it.
  */
 public record ProcessEffectInsert(

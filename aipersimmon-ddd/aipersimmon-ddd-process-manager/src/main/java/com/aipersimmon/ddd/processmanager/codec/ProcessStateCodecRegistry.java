@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Indexes {@link ProcessStateCodec}s by {@code (processType, schemaVersion)}, unique.
- * Construction fails fast (design-00004 §3.7) if two codecs claim the same pair. A
+ * Construction fails fast if two codecs claim the same pair. A
  * lookup miss is a {@link ProcessSerializationException} — a running instance whose
  * schema version has no codec fails loudly rather than silently reopening.
  */

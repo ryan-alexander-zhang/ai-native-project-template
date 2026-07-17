@@ -43,7 +43,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * The SKIP LOCKED claim gate on a real MySQL 8 (design-00004 §10), symmetric to the
+ * The SKIP LOCKED claim gate on a real MySQL 8, symmetric to the
  * PostgreSQL gate: two concurrent workers must claim disjoint effects, so each is
  * dispatched exactly once — and it exercises the shipped {@code mysql-schema.sql}.
  */

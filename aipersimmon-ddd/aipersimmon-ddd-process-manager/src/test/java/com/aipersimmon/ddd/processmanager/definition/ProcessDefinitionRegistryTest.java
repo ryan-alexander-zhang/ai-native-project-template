@@ -10,7 +10,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Registry indexing and the one-active-version-per-type startup rule (design-00004 §3.4). */
+/** Registry indexing and the one-active-version-per-type startup rule. */
 class ProcessDefinitionRegistryTest {
 
     private static final ProcessType ORDERING = new ProcessType("ordering.fulfilment");

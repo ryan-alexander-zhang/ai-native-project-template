@@ -32,7 +32,7 @@ public abstract class AbstractAggregateRoot<ID> implements AggregateRoot<ID> {
      * Enforce a business invariant from inside an intention-revealing method: throw an
      * {@link InvariantViolationException} if {@code invariant} is broken, otherwise do
      * nothing. Prefer this over inline {@code if (...) throw} when the invariant is worth
-     * naming and reusing; trivial one-off guards stay as coded {@code throw} (§4.5).
+     * naming and reusing; trivial one-off guards stay as coded {@code throw}.
      */
     protected void checkInvariant(Invariant invariant) {
         if (invariant.isBroken()) {

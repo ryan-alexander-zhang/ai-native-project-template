@@ -7,7 +7,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessType;
  * Thrown when no {@link com.aipersimmon.ddd.processmanager.definition.ProcessDefinition}
  * is registered for a process type (no active version), or for a specific
  * type/version a running instance is pinned to. The latter guards against removing a
- * definition still in use by live instances (design-00004 §4.9).
+ * definition still in use by live instances.
  */
 public final class UnknownProcessDefinitionException extends ProcessException {
 

@@ -16,7 +16,7 @@ import org.springframework.context.SmartLifecycle;
 
 /**
  * Drives the effect relay and deadline worker in the background, each on its own
- * single-thread scheduler (never a shared one, per design-00004 §5.5). A poll's failure
+ * single-thread scheduler (never a shared one). A poll's failure
  * is logged and swallowed so a bad batch never kills the scheduler thread; on shutdown it
  * stops claiming and waits up to the configured graceful timeout for in-flight polls.
  * Multi-instance safety comes from the lease in the claim, not from this scheduler.

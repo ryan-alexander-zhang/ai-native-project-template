@@ -19,8 +19,7 @@ import java.util.Set;
  * when terminal, a {@code decisionCode} for audit, and the ordered {@code effects} to
  * perform after commit.
  *
- * <p>This record enforces the decision invariants that do not need runtime context
- * (design-00004 §3.4):
+ * <p>This record enforces the decision invariants that do not need runtime context:
  * <ul>
  *   <li>a definition may not return {@link ProcessLifecycle#SUSPENDED} — that is an
  *       operational state only the runtime sets;

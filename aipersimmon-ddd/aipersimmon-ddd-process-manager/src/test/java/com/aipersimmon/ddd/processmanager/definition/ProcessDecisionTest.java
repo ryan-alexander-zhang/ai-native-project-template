@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-/** The Decision invariants that need no runtime context (design-00004 §3.4). */
+/** The Decision invariants that need no runtime context. */
 class ProcessDecisionTest {
 
     record State(String value) {

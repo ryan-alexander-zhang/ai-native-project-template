@@ -14,10 +14,10 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
  * which throws an {@link InvariantViolationException} when the invariant is broken.
  *
  * <p>Naming: this is the assertion-style sibling of the decision-style
- * {@code Policy}/{@code Specification} seen in some reference projects (see
- * design-00003 §4.6). It is deliberately <em>not</em> named {@code Validator}: that word
- * belongs to edge input validation (Bean Validation on request DTOs), a separate,
- * non-exceptional concern (see the guard-vs-validate split in §八).
+ * {@code Policy}/{@code Specification} seen in some reference projects. It is
+ * deliberately <em>not</em> named {@code Validator}: that word belongs to edge input
+ * validation (Bean Validation on request DTOs), a separate, non-exceptional concern
+ * (see the guard-vs-validate split).
  */
 public interface Invariant {
 
@@ -30,7 +30,7 @@ public interface Invariant {
     /**
      * The stable, machine-readable code that identifies this invariant. Required: an
      * invariant worth expressing as a first-class object deserves a stable identity that
-     * travels unchanged to the edge (design-00003 §4.5). Trivial one-off guards that need
+     * travels unchanged to the edge. Trivial one-off guards that need
      * no such identity should stay inline {@code coded throw} rather than become an
      * {@code Invariant}.
      */

@@ -7,7 +7,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * a bounded context deployed as a separate service: the target consumes the event and
  * its inbound adapter translates it into a local command. The event's logical
  * type/version comes from its {@code @EventType}; a codec provides the payload
- * serialization (design-00004 §3.5).
+ * serialization.
  *
  * @param event the integration event to publish; non-null, business fields only
  */

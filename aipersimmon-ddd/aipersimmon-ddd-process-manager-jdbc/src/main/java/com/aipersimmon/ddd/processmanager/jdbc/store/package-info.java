@@ -1,5 +1,5 @@
 /**
- * The JDBC data-access layer over the four-table model (design-00004 §4.5):
+ * The JDBC data-access layer over the four-table model:
  * {@link com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore} (the
  * current snapshot, with optimistic update),
  * {@link com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore} (the

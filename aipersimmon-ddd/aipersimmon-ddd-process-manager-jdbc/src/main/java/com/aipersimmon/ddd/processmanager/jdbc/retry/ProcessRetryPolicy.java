@@ -5,7 +5,7 @@ import java.time.Duration;
 /**
  * Bounds redelivery of a failing effect or deadline: how long to wait before attempt
  * {@code attempt}, and the maximum number of attempts before it is dead-lettered. There
- * is no unbounded hot retry (design-00004 §4.6).
+ * is no unbounded hot retry.
  */
 public interface ProcessRetryPolicy {
 

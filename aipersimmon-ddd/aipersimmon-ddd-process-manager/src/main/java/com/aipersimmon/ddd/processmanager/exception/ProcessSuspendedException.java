@@ -6,7 +6,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRef;
  * Thrown by {@code handle} while an instance is {@code SUSPENDED} (delivery or a
  * deadline exhausted its retries and awaits an operator). It is a retryable signal:
  * the runtime parks the input rather than losing it, and the instance resumes on
- * redrive (design-00004 §4.6).
+ * redrive.
  */
 public final class ProcessSuspendedException extends ProcessException {
 

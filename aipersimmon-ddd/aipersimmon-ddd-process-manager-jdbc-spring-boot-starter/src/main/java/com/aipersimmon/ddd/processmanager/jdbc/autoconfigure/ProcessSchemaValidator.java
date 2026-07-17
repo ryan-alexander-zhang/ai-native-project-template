@@ -5,7 +5,7 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Verifies at startup that the four process tables exist (design-00004 §5.6), so a
+ * Verifies at startup that the four process tables exist, so a
  * missing migration fails fast with a clear message instead of at the first advance. It
  * never creates tables — the DDL ships as a sample and is applied via Flyway/Liquibase.
  * Disabled when {@code schema-validation=none}.

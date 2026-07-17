@@ -13,8 +13,8 @@ import java.util.Set;
  * <p>{@link #SUSPENDED} is an operational state the runtime sets when delivery or a
  * deadline exhausts its retries; a {@code ProcessDefinition} must never return it (a
  * business wait such as human review stays {@code RUNNING} with a business step). The
- * legal transitions below mirror design-00004 §3.9; the runtime validates every
- * transition against {@link #canTransitionTo(ProcessLifecycle)}.
+ * legal transitions are defined below; the runtime validates every transition against
+ * {@link #canTransitionTo(ProcessLifecycle)}.
  */
 public enum ProcessLifecycle {
 
@@ -44,8 +44,8 @@ public enum ProcessLifecycle {
     }
 
     /**
-     * Whether a direct transition from this lifecycle to {@code target} is legal
-     * (design-00004 §3.9). A terminal state permits no transition, so ordinary input
+     * Whether a direct transition from this lifecycle to {@code target} is legal.
+     * A terminal state permits no transition, so ordinary input
      * to a finished instance can only be an idempotent no-op.
      */
     public boolean canTransitionTo(ProcessLifecycle target) {

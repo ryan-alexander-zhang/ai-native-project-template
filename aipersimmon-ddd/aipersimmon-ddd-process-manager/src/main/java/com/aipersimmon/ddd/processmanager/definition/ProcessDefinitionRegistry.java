@@ -12,7 +12,7 @@ import java.util.Map;
  * active version for a new instance and the pinned version for a running one. It does
  * not scan or reflect over business classes; the definitions are supplied explicitly.
  *
- * <p>Construction fails fast (design-00004 §3.4, §5.6) when a
+ * <p>Construction fails fast when a
  * {@code (processType, definitionVersion)} pair is registered twice, or when a
  * process type does not have exactly one version with
  * {@link ProcessDefinition#activeForNewInstances()} true.

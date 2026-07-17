@@ -83,8 +83,7 @@ public class RegistryCommandBus implements CommandBus {
      * effect relay, an outbox), using {@code messageContext} verbatim — no
      * {@code idGenerator} call, no {@link CommandContext#deriveChild}. Redelivering
      * the same persisted effect therefore reaches the handler under the same
-     * messageId, so the handler can dedupe. See
-     * decision-00016-durable-runtime-staged-message-identity.
+     * messageId, so the handler can dedupe.
      */
     @Override
     public <R> R sendAs(Command<R> command, CommandContext messageContext) {

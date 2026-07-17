@@ -11,7 +11,7 @@ import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Codec registries index uniquely and fail fast on conflict (design-00004 §3.7). */
+/** Codec registries index uniquely and fail fast on conflict. */
 class ProcessCodecRegistryTest {
 
     /** A trivial UTF-8 String codec parameterised by its logical type. */

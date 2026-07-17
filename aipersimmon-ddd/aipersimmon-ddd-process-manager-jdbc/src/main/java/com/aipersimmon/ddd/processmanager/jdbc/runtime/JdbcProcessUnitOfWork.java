@@ -8,7 +8,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Runs an atomic advance in one {@code PROPAGATION_REQUIRED} transaction: it joins an
  * outer transaction when present (so an Inbox check and a command-handler transaction
- * compose with the advance, as design-00004 §4.8 requires) and opens a local one
+ * compose with the advance) and opens a local one
  * otherwise. Effect delivery deliberately happens outside this transaction.
  */
 public final class JdbcProcessUnitOfWork {

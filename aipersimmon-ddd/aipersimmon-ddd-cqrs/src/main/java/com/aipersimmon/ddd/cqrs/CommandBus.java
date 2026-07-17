@@ -61,7 +61,7 @@ public interface CommandBus {
      * {@link #send(Command, CommandContext)}, which mint identity through the bus.
      * An ArchUnit rule guards against handler/application callers. The default
      * implementation rejects the call; a bus that backs a durable runtime overrides
-     * it. See decision-00016-durable-runtime-staged-message-identity.
+     * it.
      *
      * @param command        the command to handle
      * @param messageContext the already-minted, persisted context to use verbatim

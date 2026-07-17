@@ -43,7 +43,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * The SKIP LOCKED claim gate on a real PostgreSQL (design-00004 §10): two workers polling
+ * The SKIP LOCKED claim gate on a real PostgreSQL: two workers polling
  * concurrently over many due effects must claim disjoint sets, so every effect is
  * dispatched exactly once — no double delivery from a lost race.
  */
