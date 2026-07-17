@@ -14,6 +14,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -139,6 +142,54 @@ public final class JdbcProcessInstanceStore {
                     suspension_source = NULL, suspending_work_id = NULL, updated_at = ?
                 WHERE instance_id = ?""",
                 toLifecycle.name(), Timestamp.from(now), instanceId.value());
+    }
+
+    /** How many instances are {@code SUSPENDED}, grouped by suspension source (SLI, per-source tag). */
+    public Map<String, Long> countSuspendedBySource() {
+        Map<String, Long> bySource = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT COALESCE(suspension_source, 'UNKNOWN') AS src, COUNT(*) AS cnt
+                FROM aipersimmon_process_instance WHERE lifecycle = ?
+                GROUP BY suspension_source""",
+                rs -> { bySource.put(rs.getString("src"), rs.getLong("cnt")); },
+                ProcessLifecycle.SUSPENDED.name());
+        return bySource;
+    }
+
+    /**
+     * How many active instances look stuck: {@code RUNNING}/{@code COMPENSATING}, last touched
+     * before {@code updatedBefore}, and with no pending or in-flight effect or deadline to make
+     * them advance (design-00004 §4.10 — a coordinator that lost its wakeup, complementary to the
+     * §4.7 max-lifetime backstop).
+     */
+    public long countStuck(Instant updatedBefore) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM aipersimmon_process_instance i
+                WHERE i.lifecycle IN (?, ?) AND i.updated_at < ?
+                  AND NOT EXISTS (SELECT 1 FROM aipersimmon_process_effect e
+                                  WHERE e.instance_id = i.instance_id AND e.status IN (?, ?))
+                  AND NOT EXISTS (SELECT 1 FROM aipersimmon_process_deadline d
+                                  WHERE d.instance_id = i.instance_id AND d.status IN (?, ?))""",
+                Long.class,
+                ProcessLifecycle.RUNNING.name(), ProcessLifecycle.COMPENSATING.name(),
+                Timestamp.from(updatedBefore),
+                "PENDING", "IN_FLIGHT", "PENDING", "IN_FLIGHT");
+    }
+
+    /** Distinct {@code (definitionVersion, stateSchemaVersion)} pairs referenced by live instances. */
+    public List<VersionRef> distinctVersionsInUse() {
+        return jdbc.query("""
+                SELECT DISTINCT process_type, definition_version, state_schema_version
+                FROM aipersimmon_process_instance""",
+                (rs, n) -> new VersionRef(
+                        new ProcessType(rs.getString("process_type")),
+                        new DefinitionVersion(rs.getString("definition_version")),
+                        new StateSchemaVersion(rs.getInt("state_schema_version"))));
+    }
+
+    /** A distinct schema-version pair a live instance depends on, for startup fail-fast (§5.6). */
+    public record VersionRef(ProcessType processType, DefinitionVersion definitionVersion,
+            StateSchemaVersion stateSchemaVersion) {
     }
 
     private static final RowMapper<ProcessInstanceRow> ROW_MAPPER = JdbcProcessInstanceStore::mapRow;

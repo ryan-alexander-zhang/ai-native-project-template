@@ -11,6 +11,8 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
 import com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessDialect;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog;
+import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.jdbc.operation.JdbcProcessOperations;
 import com.aipersimmon.ddd.processmanager.jdbc.relay.CommandEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
@@ -145,12 +147,22 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
             JdbcProcessEffectStore effects, JdbcProcessDeadlineStore deadlines,
             ProcessDefinitionRegistry definitions, ProcessPayloadCodecRegistry payloadCodecs,
             ProcessStateCodecRegistry stateCodecs, JdbcProcessUnitOfWork unitOfWork, Clock processManagerClock,
-            ProcessManagerJdbcProperties properties) {
+            ProcessManagerJdbcProperties properties, ObjectProvider<ProcessObserver> observer) {
         DuplicateBusinessKeyPolicy policy = DuplicateBusinessKeyPolicy.valueOf(
                 properties.getStartDuplicateBusinessKey().toUpperCase(Locale.ROOT));
         return new JdbcProcessRuntime(
                 instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
-                unitOfWork, processManagerClock, randomIds(), policy, properties.getConcurrencyMaxRetries());
+                unitOfWork, processManagerClock, randomIds(), policy, properties.getConcurrencyMaxRetries(),
+                observer.getIfAvailable(() -> ProcessObserver.NOOP));
+    }
+
+    @Bean
+    @ConditionalOnBean(JdbcTemplate.class)
+    @ConditionalOnMissingBean
+    public JdbcProcessBacklog jdbcProcessBacklog(
+            JdbcProcessEffectStore effects, JdbcProcessDeadlineStore deadlines,
+            JdbcProcessInstanceStore instances, Clock processManagerClock) {
+        return new JdbcProcessBacklog(effects, deadlines, instances, processManagerClock);
     }
 
     @Bean
@@ -199,12 +211,13 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
             JdbcTemplate jdbcTemplate, JdbcProcessDialect dialect, JdbcProcessEffectStore effects,
             JdbcProcessInstanceStore instances, ProcessPayloadCodecRegistry payloadCodecs,
             EffectDispatcherRegistry dispatchers, JdbcProcessUnitOfWork unitOfWork, Clock processManagerClock,
-            WorkerId processWorkerId, ProcessManagerJdbcProperties properties) {
+            WorkerId processWorkerId, ProcessManagerJdbcProperties properties,
+            ObjectProvider<ProcessObserver> observer) {
         ProcessManagerJdbcProperties.Worker cfg = properties.getEffectRelay();
         return new JdbcProcessEffectRelay(
                 jdbcTemplate, dialect, effects, instances, payloadCodecs, dispatchers, unitOfWork,
                 backoff(cfg), processManagerClock, processWorkerId, cfg.getBatchSize(),
-                cfg.getLeaseDuration(), randomIds());
+                cfg.getLeaseDuration(), randomIds(), observer.getIfAvailable(() -> ProcessObserver.NOOP));
     }
 
     @Bean

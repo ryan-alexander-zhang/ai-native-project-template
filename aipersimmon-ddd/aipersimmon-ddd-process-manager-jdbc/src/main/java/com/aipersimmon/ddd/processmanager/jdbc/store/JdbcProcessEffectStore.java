@@ -119,6 +119,25 @@ public final class JdbcProcessEffectStore {
                 Long.class, instanceId.value(), EffectStatus.DEAD.name());
     }
 
+    /** How many effects are DEAD across all instances (SLI: the redrive backlog). */
+    public long countDead() {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = ?",
+                Long.class, EffectStatus.DEAD.name());
+    }
+
+    /**
+     * The earliest due-but-undelivered {@code PENDING} effect's scheduled attempt time, or empty
+     * if none is due (SLI: relay dwell — {@code now - result} is how long the oldest work has
+     * waited past when it should have been delivered).
+     */
+    public Optional<Instant> oldestDuePending(Instant now) {
+        Timestamp ts = jdbc.queryForObject(
+                "SELECT MIN(next_attempt_at) FROM aipersimmon_process_effect WHERE status = ? AND next_attempt_at <= ?",
+                Timestamp.class, EffectStatus.PENDING.name(), Timestamp.from(now));
+        return Optional.ofNullable(ts).map(Timestamp::toInstant);
+    }
+
     /** Cancel not-yet-dispatched effects when a process is cancelled by an operator. */
     public int cancelPending(com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId, Instant now) {
         return jdbc.update("""

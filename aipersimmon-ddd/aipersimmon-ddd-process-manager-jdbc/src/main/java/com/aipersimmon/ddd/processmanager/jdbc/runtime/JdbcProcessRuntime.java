@@ -22,6 +22,7 @@ import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessDeadlineInsert;
@@ -71,6 +72,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     private final Supplier<String> idGenerator;
     private final DuplicateBusinessKeyPolicy duplicatePolicy;
     private final int maxRetries;
+    private final ProcessObserver observer;
 
     public JdbcProcessRuntime(
             JdbcProcessInstanceStore instances,
@@ -85,6 +87,24 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
             Supplier<String> idGenerator,
             DuplicateBusinessKeyPolicy duplicatePolicy,
             int maxRetries) {
+        this(instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
+                unitOfWork, clock, idGenerator, duplicatePolicy, maxRetries, ProcessObserver.NOOP);
+    }
+
+    public JdbcProcessRuntime(
+            JdbcProcessInstanceStore instances,
+            JdbcProcessTransitionStore transitions,
+            JdbcProcessEffectStore effects,
+            JdbcProcessDeadlineStore deadlines,
+            ProcessDefinitionRegistry definitions,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            ProcessStateCodecRegistry stateCodecs,
+            JdbcProcessUnitOfWork unitOfWork,
+            Clock clock,
+            Supplier<String> idGenerator,
+            DuplicateBusinessKeyPolicy duplicatePolicy,
+            int maxRetries,
+            ProcessObserver observer) {
         this.instances = instances;
         this.transitions = transitions;
         this.effects = effects;
@@ -97,6 +117,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         this.idGenerator = idGenerator;
         this.duplicatePolicy = duplicatePolicy;
         this.maxRetries = maxRetries;
+        this.observer = observer;
     }
 
     @Override
@@ -283,6 +304,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                 return attempt.get();
             } catch (StaleProcessRevisionException | DuplicateKeyException e) {
                 last = e;
+                observer.advanceConflictRetry();
             }
         }
         throw last;

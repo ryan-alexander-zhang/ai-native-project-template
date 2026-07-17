@@ -29,6 +29,40 @@ public class ProcessManagerJdbcProperties {
 
     private final Worker effectRelay = new Worker();
     private final Worker deadlineWorker = new Worker();
+    private final Observability observability = new Observability();
+
+    /** Thresholds for the health indicator and the stuck-instance SLI (design-00004 §5.3). */
+    public static class Observability {
+        /** An active instance idle (no pending work) longer than this counts as stuck. */
+        private Duration stuckThreshold = Duration.ofMinutes(15);
+        /** Oldest due-but-unhandled effect/deadline older than this reports health DEGRADED. */
+        private Duration oldestPendingWarn = Duration.ofSeconds(60);
+
+        public Duration getStuckThreshold() {
+            return stuckThreshold;
+        }
+
+        public void setStuckThreshold(Duration stuckThreshold) {
+            this.stuckThreshold = stuckThreshold;
+        }
+
+        public Duration getOldestPendingWarn() {
+            return oldestPendingWarn;
+        }
+
+        public void setOldestPendingWarn(Duration oldestPendingWarn) {
+            this.oldestPendingWarn = oldestPendingWarn;
+        }
+
+        void validate() {
+            if (stuckThreshold == null || stuckThreshold.isNegative() || stuckThreshold.isZero()) {
+                throw new IllegalStateException("observability.stuck-threshold must be positive");
+            }
+            if (oldestPendingWarn == null || oldestPendingWarn.isNegative() || oldestPendingWarn.isZero()) {
+                throw new IllegalStateException("observability.oldest-pending-warn must be positive");
+            }
+        }
+    }
 
     /** Effect-relay / deadline-worker polling, lease, and retry settings. */
     public static class Worker {
@@ -168,6 +202,7 @@ public class ProcessManagerJdbcProperties {
         }
         effectRelay.validate("effect-relay");
         deadlineWorker.validate("deadline-worker");
+        observability.validate();
     }
 
     public boolean isEnabled() {
@@ -232,5 +267,9 @@ public class ProcessManagerJdbcProperties {
 
     public Worker getDeadlineWorker() {
         return deadlineWorker;
+    }
+
+    public Observability getObservability() {
+        return observability;
     }
 }

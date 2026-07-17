@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessDialect;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ClaimedEffect;
@@ -46,6 +47,7 @@ public final class JdbcProcessEffectRelay {
     private final int batchSize;
     private final Duration leaseDuration;
     private final Supplier<String> leaseTokens;
+    private final ProcessObserver observer;
 
     public JdbcProcessEffectRelay(
             JdbcTemplate jdbc,
@@ -61,6 +63,25 @@ public final class JdbcProcessEffectRelay {
             int batchSize,
             Duration leaseDuration,
             Supplier<String> leaseTokens) {
+        this(jdbc, dialect, effects, instances, payloadCodecs, dispatchers, unitOfWork, retryPolicy,
+                clock, workerId, batchSize, leaseDuration, leaseTokens, ProcessObserver.NOOP);
+    }
+
+    public JdbcProcessEffectRelay(
+            JdbcTemplate jdbc,
+            JdbcProcessDialect dialect,
+            JdbcProcessEffectStore effects,
+            JdbcProcessInstanceStore instances,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            EffectDispatcherRegistry dispatchers,
+            JdbcProcessUnitOfWork unitOfWork,
+            ProcessRetryPolicy retryPolicy,
+            java.time.Clock clock,
+            WorkerId workerId,
+            int batchSize,
+            Duration leaseDuration,
+            Supplier<String> leaseTokens,
+            ProcessObserver observer) {
         this.jdbc = jdbc;
         this.dialect = dialect;
         this.effects = effects;
@@ -74,6 +95,7 @@ public final class JdbcProcessEffectRelay {
         this.batchSize = batchSize;
         this.leaseDuration = leaseDuration;
         this.leaseTokens = leaseTokens;
+        this.observer = observer;
     }
 
     /** Claim and deliver one batch; returns the number delivered successfully. */
@@ -81,8 +103,10 @@ public final class JdbcProcessEffectRelay {
         String leaseToken = leaseTokens.get();
         Instant now = clock.instant();
         Instant leaseUntil = now.plus(leaseDuration);
+        long claimStart = System.nanoTime();
         List<String> claimed = unitOfWork.execute(
                 () -> dialect.claimDueEffects(jdbc, now, batchSize, workerId, leaseToken, leaseUntil));
+        observer.effectClaimed(claimed.size(), Duration.ofNanos(System.nanoTime() - claimStart));
 
         int delivered = 0;
         for (String effectId : claimed) {
@@ -99,6 +123,7 @@ public final class JdbcProcessEffectRelay {
             return false;
         }
         ClaimedEffect effect = loaded.get();
+        long dispatchStart = System.nanoTime();
         try {
             ProcessPayloadCodec<?> codec = payloadCodecs.forType(effect.payloadType());
             Object payload = codec.decode(new EncodedPayload(effect.payloadType(), effect.payload()));
@@ -106,8 +131,10 @@ public final class JdbcProcessEffectRelay {
                     new DecodedProcessEffect(effect.effectId(), effect.instanceId(), effect.kind(), payload),
                     effect.context());
             effects.markDelivered(effectId, leaseToken, clock.instant());
+            observer.effectDispatched(true, Duration.ofNanos(System.nanoTime() - dispatchStart));
             return true;
         } catch (RuntimeException failure) {
+            observer.effectDispatched(false, Duration.ofNanos(System.nanoTime() - dispatchStart));
             onFailure(effect, leaseToken, failure);
             return false;
         }

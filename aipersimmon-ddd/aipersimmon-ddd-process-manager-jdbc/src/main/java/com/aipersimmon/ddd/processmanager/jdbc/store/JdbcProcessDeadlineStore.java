@@ -141,6 +141,25 @@ public final class JdbcProcessDeadlineStore {
                 DeadlineStatus.DEAD.name(), error, ts, deadlineId, leaseToken);
     }
 
+    /** How many deadlines are DEAD across all instances (SLI: the redrive backlog). */
+    public long countDead() {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE status = ?",
+                Long.class, DeadlineStatus.DEAD.name());
+    }
+
+    /**
+     * The earliest due-but-unfired {@code PENDING} deadline's scheduled attempt time, or empty if
+     * none is due (SLI: deadline-worker dwell — {@code now - result} is how long the oldest due
+     * deadline has waited to fire).
+     */
+    public Optional<Instant> oldestDuePending(Instant now) {
+        Timestamp ts = jdbc.queryForObject(
+                "SELECT MIN(next_attempt_at) FROM aipersimmon_process_deadline WHERE status = ? AND next_attempt_at <= ?",
+                Timestamp.class, DeadlineStatus.PENDING.name(), Timestamp.from(now));
+        return Optional.ofNullable(ts).map(Timestamp::toInstant);
+    }
+
     /** Cancel all pending deadlines of an instance when a process is cancelled by an operator. */
     public int cancelPending(ProcessInstanceId instanceId, Instant now) {
         return jdbc.update("""
