@@ -196,6 +196,39 @@ class JdbcProcessEffectRelayTest {
         assertEquals("IN_FLIGHT", status(effectId));
     }
 
+    @Test
+    void redeliversUnderTheSameIdWhenTheAckIsLostAfterASuccessfulDispatch() {
+        ProcessAdvanceResult started = start();
+        String effectId = started.transitionId() + "#0";
+        JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+
+        assertEquals(1, relay.pollOnce(), "first delivery succeeds");
+        assertEquals(1, bus.commands.size());
+
+        // Crash window: the external dispatch happened but the DELIVERED mark was lost, leaving the
+        // row IN_FLIGHT with an expired lease. The relay must re-claim and re-dispatch — at-least-once.
+        jdbc.update("""
+                UPDATE aipersimmon_process_effect
+                SET status = 'IN_FLIGHT', delivered_at = NULL, lease_owner = 'crashed',
+                    lease_token = 'crashed', lease_until = ? WHERE effect_id = ?""",
+                java.sql.Timestamp.from(CLOCK.instant().minusSeconds(1)), effectId);
+
+        assertEquals(1, relay.pollOnce(), "the lost ack is recovered by redelivery");
+        assertEquals(2, bus.commands.size(), "the same effect is dispatched twice (at-least-once)");
+        assertEquals(effectId, bus.contexts.get(1).messageId(), "redelivery keeps the identical message id");
+        assertEquals("DELIVERED", status(effectId));
+    }
+
+    @Test
+    void aCleanlyDeliveredEffectIsNotRedelivered() {
+        start();
+        JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+
+        assertEquals(1, relay.pollOnce());
+        assertEquals(0, relay.pollOnce(), "a DELIVERED effect is never claimed again");
+        assertEquals(1, bus.commands.size());
+    }
+
     private List<String> references() {
         List<String> refs = new ArrayList<>();
         for (Object command : bus.commands) {

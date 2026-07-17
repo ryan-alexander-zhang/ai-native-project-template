@@ -188,6 +188,27 @@ class JdbcProcessOperationsTest {
     }
 
     @Test
+    void multipleParkedInputsAreReplayedInArrivalOrderOnResume() {
+        ProcessAdvanceResult started = start();
+        String deadEffectId = started.transitionId() + "#0";
+        suspendViaDeadEffect();
+
+        // Two distinct inputs arrive while suspended; both are parked, not rebounded.
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv", null));
+        runtime.handle(started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan", null));
+        assertEquals(2L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'PARKED'", Long.class));
+
+        operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
+
+        assertEquals("RUNNING", lifecycle());
+        // Arrival order: Advance (S1->S2) then FanOut (S2->FAN); the reverse would leave step at S2.
+        assertEquals("FAN", jdbc.queryForObject(
+                "SELECT business_step FROM aipersimmon_process_instance", String.class),
+                "parked inputs replayed in arrival order");
+    }
+
+    @Test
     void cancelProcessTerminatesAndCancelsPendingWork() {
         ProcessAdvanceResult started = start();
 
