@@ -21,6 +21,15 @@
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
+    <!--
+      Emit method parameter names (-parameters). Spring Boot's own parent sets this; because this
+      library deliberately does not inherit spring-boot-starter-parent, we set it explicitly. The
+      auto-configurations rely on it: they define named beans (e.g. @ConditionalOnMissingBean(name =
+      "processManagerClock")) and inject them by parameter name (Clock processManagerClock). Without
+      parameter names, by-name disambiguation fails as soon as a second same-type bean exists — e.g.
+      the process-manager and inbox starters each contributing a Clock. See issue-00026.
+    -->
+    <maven.compiler.parameters>true</maven.compiler.parameters>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <junit.version>5.11.4</junit.version>

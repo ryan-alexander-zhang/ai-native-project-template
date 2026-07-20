@@ -45,8 +45,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @EnableScheduling
 public class AipersimmonDddOutboxJdbcAutoConfiguration {
 
+    // Name-scoped so this component always contributes its own named clock and injects it by name,
+    // rather than backing off when another component (process-manager, inbox) already registered a
+    // Clock of the same type — which would leave the by-name `outboxClock` injections unresolved. See
+    // issue-00026.
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = "outboxClock")
     public Clock outboxClock() {
         return Clock.systemUTC();
     }

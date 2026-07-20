@@ -21,8 +21,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @AutoConfiguration(after = JdbcTemplateAutoConfiguration.class)
 public class AipersimmonDddInboxAutoConfiguration {
 
+    // Name-scoped so this component always contributes its own named clock and injects it by name,
+    // rather than backing off when another component already registered a Clock of the same type. See
+    // issue-00026.
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = "inboxClock")
     public Clock inboxClock() {
         return Clock.systemUTC();
     }
