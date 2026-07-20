@@ -34,11 +34,6 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-application</artifactId>
     </dependency>
-    <!-- Durable Process Manager contracts for the order-fulfilment definition. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager</artifactId>
-    </dependency>
     <!-- CQRS contracts: commands, queries, and their handler interfaces. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

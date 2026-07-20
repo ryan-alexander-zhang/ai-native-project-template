@@ -23,5 +23,6 @@
     <module>ordering-application</module>
     <module>ordering-infrastructure</module>
     <module>ordering-adapter</module>
+    <module>ordering-process-jdbc</module>
   </modules>
 </project>

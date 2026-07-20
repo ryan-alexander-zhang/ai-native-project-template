@@ -1,4 +1,4 @@
-package com.example.ordering.application.fulfilment;
+package com.example.ordering.process.fulfilment;
 
 import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
@@ -13,7 +13,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
-import com.example.ordering.application.fulfilment.OrderFulfilmentState.Step;
+import com.example.ordering.process.fulfilment.OrderFulfilmentState.Step;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;

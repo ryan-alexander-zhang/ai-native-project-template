@@ -15,7 +15,7 @@ import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
 import com.example.inventory.api.StockReleased;
 import com.example.inventory.domain.stock.Sku;
 import com.example.inventory.domain.stock.Stocks;
-import com.example.ordering.application.fulfilment.OrderFulfilmentDefinition;
+import com.example.ordering.process.fulfilment.OrderFulfilmentDefinition;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
 import com.example.ordering.application.order.PlaceOrder;

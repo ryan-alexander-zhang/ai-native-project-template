@@ -1,4 +1,4 @@
-package com.example.ordering.application.fulfilment;
+package com.example.ordering.process.fulfilment;
 
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 

@@ -1,4 +1,4 @@
-package com.example.ordering.application.fulfilment;
+package com.example.ordering.process.fulfilment;
 
 /**
  * The business state of one order-fulfilment flow, carried across inputs by the durable runtime. It

@@ -26,18 +26,10 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>ordering-domain</artifactId>
     </dependency>
-    <!-- The in-memory saga store implements a saga port over the application's saga state. -->
+    <!-- The gateway adapter fulfils an application-layer gateway port over another context's api. -->
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>ordering-application</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
     </dependency>
     <!-- Cross-context (anti-corruption gateway): calls the inventory context only
          through its published api. The concrete StockAvailabilityApi bean (in-process

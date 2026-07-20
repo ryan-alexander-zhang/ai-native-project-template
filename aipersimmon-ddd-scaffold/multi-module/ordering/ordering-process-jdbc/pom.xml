@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example</groupId>
+    <artifactId>multi-module</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The ordering context's durable Process Manager provider, on the JDBC (relational)
+    runtime. It owns the order-fulfilment execution code that is specific to this
+    provider — the pure ProcessDefinition policy, its state and inputs, the persistence
+    codecs, and the runtime-backed implementation of the application's business port.
+    The application layer holds only the provider-agnostic contract (the port), so
+    swapping this provider (a Temporal/Seata module, a MyBatis-Plus store) leaves the
+    application untouched. Kept a separate module — not a sub-package of application —
+    so the process-manager framework dependency is compile-fenced out of the
+    application layer (design-00004 §六/§13.1; analysis-00012 §7).
+  -->
+  <artifactId>ordering-process-jdbc</artifactId>
+  <name>ordering-process-jdbc</name>
+  <description>The ordering context's order-fulfilment Process Manager provider (JDBC runtime).</description>
+
+  <dependencies>
+    <!-- The business port this provider implements, plus the ordering commands it dispatches. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>ordering-application</artifactId>
+    </dependency>
+    <!-- Evidence-bearing domain types the compensating CancelOrder command carries. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>ordering-domain</artifactId>
+    </dependency>
+    <!-- Durable Process Manager contracts: ProcessDefinition, effects, codecs, model. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager</artifactId>
+    </dependency>
+    <!-- JDBC runtime: ProcessRuntime is driven and JdbcProcessQuery resolves the instance ref. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
+    </dependency>
+    <!-- CQRS contracts: the CommandContext carried on each fact into the runtime. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+    </dependency>
+    <!-- Spring stereotypes: the definition, codecs, and runtime driver are wired beans. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+  </dependencies>
+</project>

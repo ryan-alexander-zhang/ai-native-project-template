@@ -1,4 +1,4 @@
-package com.example.ordering.infrastructure.process;
+package com.example.ordering.process.fulfilment;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
@@ -7,8 +7,6 @@ import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
-import com.example.ordering.application.fulfilment.OrderFulfilmentDefinition;
-import com.example.ordering.application.fulfilment.OrderFulfilmentInput;
 import com.example.ordering.application.fulfilment.OrderFulfilmentProcess;
 import org.springframework.stereotype.Component;
 

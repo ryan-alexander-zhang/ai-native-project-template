@@ -26,6 +26,7 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-application</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-infrastructure</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-adapter</artifactId></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-process-jdbc</artifactId></dependency>
 
     <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-api</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-domain</artifactId></dependency>
