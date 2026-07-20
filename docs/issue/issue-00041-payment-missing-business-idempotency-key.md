@@ -2,7 +2,7 @@
 id: issue-00041-payment-missing-business-idempotency-key
 type: issue
 role: main
-status: open
+status: resolved
 parent: design-00004-durable-process-manager-runtime
 ---
 
@@ -30,12 +30,23 @@ parent: design-00004-durable-process-manager-runtime
 
 ## 复现(test-first)
 
-提议的失败测试:对 Payment 连投两条**同一业务操作**的 `ChargePayment`(相同 `paymentOperationId`,模拟 at-least-once 重投),断言只产生一次扣款/一条 `PaymentAuthorized`。今日因契约无该键、Payment 侧无处去重,必扣款两次 → 测试失败。修复后应只扣一次。
+`ChargePaymentIdempotencyTest`(`payment-application`,新建,纯单测:录制型 `IntegrationEvents` + 真 `InMemoryPaymentOperations`):
+- `redeliveringTheSameOperationChargesOnceAndAnnouncesOneAuthorization`:对同一 `paymentOperationId` 连投两条 `ChargePayment`(模拟 at-least-once 重投),断言只发一条 `PaymentAuthorized`。修复前无该键、无去重,必发两条。
+- `redeliveringADeclinedOperationAnnouncesOneDeclineOnly`:拒付路径同样只发一条 `PaymentDeclined`。
+- `distinctOperationsAreEachCharged`:不同 operationId 仍各自扣款(证明不是把一切都吞掉)。
 
-## 修复
+## 修复(已实施)
 
-1. 给 `PaymentRequested` / `ChargePayment` 增 `paymentOperationId` 字段,由 process manager 用**稳定的 effect/事实身份**派生(与 [[issue-00042-process-evidence-ids-fabricated-from-business-keys]] 一并纠正证据身份)。
-2. Payment 侧引入按 `paymentOperationId` 去重的**聚合或 operation repository**:首次处理落库该 operation,重投命中即幂等返回既有结果,不再触发扣款。
+1. **契约加业务幂等键**:`PaymentRequested`(`ordering-api`)与 `ChargePayment`(`payment-application`)增 `paymentOperationId` 字段;`RequestPayment`(`ordering-application`)亦增该字段并透传。全链路:process manager → `RequestPayment` → `RequestPaymentHandler` 发 `PaymentRequested` → `PaymentRequestedListener` 发 `ChargePayment`,各调用点一并更新。
+2. **process manager 派生稳定 id**:`OrderFulfilmentDefinition.react()` 在 `StockReserved`→`RequestPayment` 这一步用 `context.cause().messageId()`(触发该扣款的事实身份)作 `paymentOperationId`——该值随 effect payload 持久化并确定性重放,故重投复用同一 id。
+3. **Payment 侧按 operationId 去重**:新增端口 `PaymentOperations` 与 `ChargePaymentHandler` 依赖它;`recordIfFirst(operationId, decision)` 以 `putIfAbsent` 原子认领,首投认领成功→扣款并发事件,重投认领失败→幂等 no-op、不再扣款/不再发事件。
+4. **去重实现的选型(记录)**:采用最轻量而诚实的方案——进程内 `InMemoryPaymentOperations`(`ConcurrentHashMap`),因样例无 payment 数据库;它是真实部署里持久化、带唯一约束的 operations 表(或框架 inbox)的替身,`ChargePaymentHandler` 只依赖 `PaymentOperations` 端口,替换实现不动 handler。与传输层 effectId **互补**(见 [[issue-00032-integration-event-effect-replay-mints-new-eventid]]):effectId 保证同一 effect 重投不铸新传输身份,`paymentOperationId` 保证同一业务扣款经任何路径只生效一次。
+
+## 验证结果
+
+- `ChargePaymentIdempotencyTest`(`payment-application`):3 tests,0 failures/errors。
+- 端到端 `PaymentCompensationFlowTest` / `OrderingFlowTest`(start,Testcontainers PG+Kafka)5 tests 全绿:`paymentOperationId` 贯穿真实 outbox→Kafka→inbox 全链路,happy 与补偿路径均只扣一次。
+- 全 reactor `mvn -o test-compile` 20 模块 SUCCESS。
 
 ## 关联
 

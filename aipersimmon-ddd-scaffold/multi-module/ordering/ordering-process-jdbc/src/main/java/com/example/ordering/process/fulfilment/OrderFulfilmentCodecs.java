@@ -60,13 +60,15 @@ public class OrderFulfilmentCodecs {
             @Override
             public EncodedPayload encode(OrderFulfilmentState s) {
                 return bytes(new PayloadType("ordering.fulfilment.state", 1), String.join(US,
-                        s.orderId(), s.step().name(), nz(s.reservationId()), nz(s.paymentDeclineCode())));
+                        s.orderId(), s.step().name(), nz(s.reservationId()), nz(s.paymentDeclineCode()),
+                        nz(s.paymentDeclineEvidenceId())));
             }
 
             @Override
             public OrderFulfilmentState decode(EncodedPayload p) {
                 String[] f = parts(p);
-                return new OrderFulfilmentState(f[0], Step.valueOf(f[1]), blankToNull(f[2]), blankToNull(f[3]));
+                return new OrderFulfilmentState(
+                        f[0], Step.valueOf(f[1]), blankToNull(f[2]), blankToNull(f[3]), blankToNull(f[4]));
             }
         };
     }
@@ -128,7 +130,8 @@ public class OrderFulfilmentCodecs {
     @Bean
     ProcessPayloadCodec<RequestPayment> requestPaymentCodec() {
         return codec("ordering.fulfilment.request-payment", RequestPayment.class,
-                RequestPayment::orderId, RequestPayment::new);
+                v -> String.join(US, v.orderId(), v.paymentOperationId()),
+                s -> new RequestPayment(parts(s)[0], parts(s)[1]));
     }
 
     @Bean

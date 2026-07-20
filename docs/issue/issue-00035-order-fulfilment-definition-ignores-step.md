@@ -2,7 +2,7 @@
 id: issue-00035-order-fulfilment-definition-ignores-step
 type: issue
 role: main
-status: open
+status: resolved
 parent: design-00004-durable-process-manager-runtime
 ---
 
@@ -29,17 +29,27 @@ parent: design-00004-durable-process-manager-runtime
 
 ## 复现(test-first)
 
-提议 Definition 单测(尚未落地,应随该模块首个 `src/test` 一并建立):
+`ordering-process-jdbc` 首次落地 `src/test`:`OrderFulfilmentDefinitionTest`(纯单测,直接喂 `react` 一个手搭的 `ProcessContext`,无 runtime/DB/Spring)。其中三条乱序用例(嵌套类 `OutOfOrderFactsAreIgnored`)复现了本缺陷,修复前分别误确认 / null 释放 / 抛异常:
 
-1. `AWAITING_STOCK` 态喂 `PaymentAuthorized` → 断言 ignore/park,而非产出 `ConfirmOrder`。
-2. 未预留态喂 `PaymentDeclined` → 断言不产出携 null reservationId 的 `RequestStockRelease`。
-3. 未拒付态喂 `StockReleased` → 断言 reject/ignore,而非抛 `DomainException` 致重投挂死。
+1. `paymentAuthorizedBeforeReservationDoesNotConfirmTheOrder`:`AWAITING_STOCK` 态喂 `PaymentAuthorized` → 断言 ignore(留在 `AWAITING_STOCK`、无 effect),而非产出 `ConfirmOrder`。
+2. `paymentDeclinedBeforeReservationDoesNotReleaseANullHandle`:未预留态喂 `PaymentDeclined` → 断言 ignore,不产出携 null reservationId 的 `RequestStockRelease`。
+3. `stockReleasedBeforeADeclineIsIgnoredAndDoesNotThrow`:未拒付态喂 `StockReleased` → 断言 `assertDoesNotThrow` 且 ignore,而非用 null declineCode 构 `PaymentDeclineRef` 抛 `DomainException` 致毒消息无限重投。
 
-今日三者均失败(误确认 / null 释放 / 抛异常)。
+## 修复(已实施)
 
-## 修复
+将 `react()` 从纯 `switch(in)` 改为**先按 `state.step()` 分派、再按输入类型**的显式 `(step, input)` 转移表(`OrderFulfilmentDefinition.java`,按 step 拆出 `onAwaitingStock`/`onAwaitingPayment`/`onAwaitingStockRelease`/`onAwaitingOrderConfirmation`/`onAwaitingOrderCancellation`)。每个 `(step, 输入)` 组合恰好落到四种语义之一:
 
-改成显式 `(currentStep, input)` 转移表(提议,未实施):为每个 `(step, 输入)` 组合定义 advance / ignore / reject / compensate 语义;并优先补齐 `ordering-process-jdbc` 覆盖完整状态矩阵的单元测试。证据 id 一并按 [[issue-00042-process-evidence-ids-fabricated-from-business-keys]] 修正。
+- **advance / compensate / complete**:该 step 期望的事实,推进流程。
+- **ignore**:幂等 no-op(保持当前 lifecycle 与 step、无 effect)。因 runtime 是 at-least-once 且把 `react` 抛异常当**毒消息无限重投**(`withRetry` 仅捕获 `StaleProcessRevisionException | DuplicateKeyException`),故一切重复/乱序事实**只 ignore、绝不抛**——正是这一点关掉了三个乱序 bug。
+- **reject**:仅 `OrderPlaced`(start-only 输入,正常路径永不进 `react`,抛出不会毒化任何真实重投)。
+
+覆盖完整状态矩阵的单测共 14 例(happy path、两条补偿分支、乱序/重复 ignore、`OrderPlaced` reject、证据 id 来源与互异)。证据 id 一并按 [[issue-00042-process-evidence-ids-fabricated-from-business-keys]] 改为取因果 envelope id。
+
+## 验证结果
+
+- `OrderFulfilmentDefinitionTest`(`ordering-process-jdbc`,新建):14 tests,0 failures/errors。
+- 受影响 reactor `mvn -o -pl ordering/ordering-process-jdbc,payment/payment-application -am test` 全绿;全 reactor `mvn -o test-compile` 20 模块 SUCCESS。
+- 端到端 `PaymentCompensationFlowTest` / `OrderingFlowTest`(start,Testcontainers PG+Kafka)happy+补偿正序仍绿,证明按 step 门控未回归正常流程。
 
 ## 关联
 

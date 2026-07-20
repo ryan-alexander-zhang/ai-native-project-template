@@ -37,7 +37,10 @@ public class RequestPaymentHandler implements CommandHandler<RequestPayment, Voi
                         OrderingErrorCode.ORDER_NOT_FOUND, "unknown order: " + command.orderId()));
         Money total = order.total();
         integrationEvents.publish(
-                new PaymentRequested(command.orderId(), total.amountMinor(), total.currency()), context);
+                new PaymentRequested(
+                        command.orderId(), command.paymentOperationId(),
+                        total.amountMinor(), total.currency()),
+                context);
         return null;
     }
 }

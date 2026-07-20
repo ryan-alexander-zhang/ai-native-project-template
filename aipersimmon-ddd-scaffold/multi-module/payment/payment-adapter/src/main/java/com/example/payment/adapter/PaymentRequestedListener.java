@@ -27,7 +27,9 @@ public class PaymentRequestedListener {
     public void on(EventEnvelope<PaymentRequested> envelope) {
         PaymentRequested event = envelope.payload();
         commandBus.send(
-                new ChargePayment(event.orderId(), event.amountMinor(), event.currency()),
+                new ChargePayment(
+                        event.orderId(), event.paymentOperationId(),
+                        event.amountMinor(), event.currency()),
                 CommandContext.of(envelope));
     }
 }

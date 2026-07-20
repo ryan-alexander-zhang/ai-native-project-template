@@ -2,7 +2,7 @@
 id: issue-00042-process-evidence-ids-fabricated-from-business-keys
 type: issue
 role: main
-status: open
+status: resolved
 parent: design-00004-durable-process-manager-runtime
 ---
 
@@ -35,14 +35,27 @@ parent: design-00004-durable-process-manager-runtime
 
 ## 复现(test-first)
 
-提议 `OrderFulfilmentDefinition` 单测(该模块目前无任何单测,见 [[issue-00035-order-fulfilment-definition-ignores-step]]):
-驱动 `react()` 产生 `ReservationFailureRef`/`PaymentDeclineRef`/`StockReleaseRef`,断言其证据 id
-**源自 `context.cause().messageId()` 且三者互不碰撞**。今日该断言失败:failureId==declineId==orderId、releaseId==reservationId。
+`OrderFulfilmentDefinitionTest`(`ordering-process-jdbc`,新建,与 [[issue-00035-order-fulfilment-definition-ignores-step]] 同一测试类):
+- `reservationFailedCompensatesWithFailureEvidenceIdFromTheCause`:断言 `ReservationFailureRef.failureId == context.cause().messageId()`(而非 orderId)。
+- `stockReleasedCancelsWithTwoDistinctEvidenceIds`:断言 `PaymentDeclineRef.declineId` 取自记住的拒付事件 id、`StockReleaseRef.releaseId` 取自当前 stock-released 事件 id,且 `assertNotEquals` 二者互异。
+- `theThreeEvidenceIdsAcrossAFlowAreAllDistinct`:把三条证据 id 收进 `Set`,断言 size==3。
 
-## 修复
+修复前:failureId==declineId==orderId、releaseId==reservationId,断言必败。
 
-用 `context.cause().messageId()`(真实 envelope id)作证据 ref 的身份,或为每条证据引入各自独立的稳定 id;
-不再以业务键(orderId/reservationId)冒充证据身份。修复后审计链、证据引用与业务幂等各自成立、可区分。
+## 修复(已实施)
+
+`react()` 现读 `context`(此前完全忽略),证据 ref 一律用**因果 envelope id** 而非业务键:
+- `ReservationFailureRef` 首参 `failureId = context.cause().messageId()`(触发 `StockReservationFailed` 那条 envelope)。
+- `StockReleaseRef` 首参 `releaseId = context.cause().messageId()`(当前 `StockReleased` 那条 envelope)。
+- `PaymentDeclineRef` 首参 `declineId`:因它与 `StockReleaseRef` 在**同一** `react()`(`StockReleased` 分支)里构造、共享同一 `context.cause()`,若也取当前 cause 会与 releaseId 碰撞;故在 `PaymentDeclined` 分支把该拒付事件的 `messageId` 存入新增的 `OrderFulfilmentState.paymentDeclineEvidenceId`,到 `StockReleased` 时用它——两条证据遂各指其真实事件、互不碰撞(state codec 与其一并加一字段)。
+
+修复后审计链、证据引用与业务幂等各自成立、可区分。
+
+## 验证结果
+
+- `OrderFulfilmentDefinitionTest`(`ordering-process-jdbc`):14 tests(含上述 3 条证据身份用例),0 failures/errors。
+- 端到端 `PaymentCompensationFlowTest`(start,Testcontainers)绿:补偿路径经真实 CancelOrder 编解码(`OrderFulfilmentCodecs` 已随之处理 evidence id 往返)后仍以 `PAYMENT_DECLINED` 类别落地。
+- 全 reactor `mvn -o test-compile` 20 模块 SUCCESS。
 
 ## 关联
 
