@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.observability.otel;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.context.propagation.TextMapPropagator;
@@ -84,9 +85,20 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
 
     private Scope open(Span span) {
         io.opentelemetry.context.Scope otelScope = span.makeCurrent();
-        return () -> {
-            otelScope.close();
-            span.end();
+        return new Scope() {
+            @Override
+            public void recordFailure(Throwable error) {
+                span.setStatus(StatusCode.ERROR, error == null ? "" : String.valueOf(error.getMessage()));
+                if (error != null) {
+                    span.recordException(error);
+                }
+            }
+
+            @Override
+            public void close() {
+                otelScope.close();
+                span.end();
+            }
         };
     }
 }

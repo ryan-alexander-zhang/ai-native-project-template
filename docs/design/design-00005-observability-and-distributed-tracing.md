@@ -206,13 +206,13 @@ trace_state VARCHAR(512)   -- 可选，可空
 
 全库**无 logback 配置**，MDC 仅 `traceId`（UUID，`TraceIdFilter` 写）与 `correlationId`（`LoggingCommandInterceptor` 写）；`RegistryCommandBus`/`ProblemDetailFactory` 只读 `traceId`。**没有 `span_id`**。闭环要求每条日志可跳 trace：
 
-- OTEL logback MDC instrumentation 自动注入 `trace_id` / `span_id`（32/16 hex，真值而非 UUID）；
+- **由 starter 交付**：`opentelemetry-spring-boot-starter` 传递依赖已带 `opentelemetry-logback-mdc-1.0`，span 活跃时自动把 `trace_id`/`span_id`/`trace_flags`（32/16 hex 真值，非 UUID）注入日志事件的 MDC——无需库代码；
 - 与既有 `correlationId` 并存（业务关联仍有用）；`traceId`（UUID）作为兼容锚点保留、可后续以 `trace_id` 收敛；
-- 库不强加 logback 配置文件，但**提供 MDC key 约定与示例 pattern**（脚手架消费方在自己的 logback 里引用）。
+- 库不强加 logback 配置文件，消费方在自己的 logback pattern 里引用 `%mdc{trace_id}`/`%mdc{span_id}` 即可。
 
 ### 10.2 trace ↔ metric（exemplar）
 
-[[design-00004-durable-process-manager-runtime]] §5.3 已定 SLI（`oldest_pending_effect_age`、`dead_effects`、`suspended_instances`、`claim_latency`、`dispatch_latency`、`advance_conflict_retries` …）。闭环缺的是 **exemplar**——把 `trace_id` 附到指标数据点，从延迟毛刺一键跳到样本 trace。要求：Micrometer/OTLP 指标启用 exemplar，`dispatch_latency`/`claim_latency`/`advance_conflict_retries` 优先带 exemplar。
+[[design-00004-durable-process-manager-runtime]] §5.3 已定 SLI（`oldest_pending_effect_age`、`dead_effects`、`suspended_instances`、`claim_latency`、`dispatch_latency`、`advance_conflict_retries` …）。闭环缺的是 **exemplar**——把 `trace_id` 附到指标数据点，从延迟毛刺一键跳到样本 trace。**由 starter 交付**：`opentelemetry-spring-boot-starter` 传递依赖带 `opentelemetry-micrometer-1.5`，把 Micrometer 指标桥接到 OTLP；只要指标在 span 内记录（如 `dispatch_latency` 在 `effect.dispatch` span 内），exemplar 自动附上 `trace_id`。消费方选支持 exemplar 的后端（OTLP → Prometheus/Tempo）即可。
 
 ### 10.3 span 属性目录（语义约定）
 

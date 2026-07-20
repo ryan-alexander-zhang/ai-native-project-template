@@ -156,11 +156,16 @@ public final class JdbcProcessEffectRelay {
             // Restore the advance's trace context so this dispatch (and any command/event it emits,
             // whose producer instrumentation reads the current context) links back to the span that
             // staged the effect, rather than starting an unrelated trace on the relay thread.
-            try (StoreAndForwardTracer.Scope ignored = storeTracer.restore(
+            try (StoreAndForwardTracer.Scope span = storeTracer.restore(
                     effect.traceparent(), effect.traceState(), "effect.dispatch " + effectId)) {
-                dispatchers.dispatch(
-                        new DecodedProcessEffect(effect.effectId(), effect.instanceId(), effect.kind(), payload),
-                        effect.context());
+                try {
+                    dispatchers.dispatch(
+                            new DecodedProcessEffect(effect.effectId(), effect.instanceId(), effect.kind(), payload),
+                            effect.context());
+                } catch (RuntimeException e) {
+                    span.recordFailure(e);
+                    throw e;
+                }
             }
             effects.markDelivered(effectId, leaseToken, clock.instant());
             observer.effectDispatched(true, Duration.ofNanos(System.nanoTime() - dispatchStart));

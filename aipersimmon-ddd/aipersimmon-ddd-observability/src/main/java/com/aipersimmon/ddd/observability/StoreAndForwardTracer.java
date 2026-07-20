@@ -57,6 +57,14 @@ public interface StoreAndForwardTracer {
     /** An active span scope; closing it ends the span. */
     interface Scope extends AutoCloseable {
 
+        /**
+         * Mark the restored span as failed and record the exception, so a failed dispatch is
+         * visible as an error span (call before {@link #close()}). Default no-op, so the no-op
+         * tracer and simple lambda scopes need not implement it.
+         */
+        default void recordFailure(Throwable error) {
+        }
+
         @Override
         void close();
     }

@@ -119,6 +119,24 @@ class OpenTelemetryObservabilityTest {
     }
 
     @Test
+    void restoreScopeRecordsFailureAsErrorSpan() {
+        StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
+                otelTracer, sdk.getPropagators().getTextMapPropagator());
+
+        try (StoreAndForwardTracer.Scope scope = sf.restore(null, null, "effect.dispatch e1")) {
+            scope.recordFailure(new IllegalStateException("dispatch boom"));
+        }
+
+        SpanData span = exporter.getFinishedSpanItems().stream()
+                .filter(s -> s.getName().startsWith("effect.dispatch"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(io.opentelemetry.api.trace.StatusCode.ERROR, span.getStatus().getStatusCode());
+        assertTrue(span.getEvents().stream().anyMatch(e -> "exception".equals(e.getName())),
+                "the dispatch failure must be recorded on the span");
+    }
+
+    @Test
     void captureWithoutActiveSpanYieldsNone() {
         StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
                 otelTracer, sdk.getPropagators().getTextMapPropagator());

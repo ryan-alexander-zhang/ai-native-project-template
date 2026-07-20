@@ -89,12 +89,13 @@ flowchart TD
     transition 是审计行、非派发跳，不缝。recording-tracer 测试（effect 写捕获 + relay restore）2 绿，process-manager-jdbc 57 绿、PM starter 23 绿。
     **注**：本轮以 trace 缝合为主；[[issue-00025-correlation-propagation-and-scrape-batching]] 的 correlation 断裂是既有 correlation_id 语义问题，与 trace 列正交，留原 issue 单独处理（deadline/effect 行现已一并持久化 traceparent）。
 
-- ⬜ **P3**（三柱闭环）
-  - trace↔log：OTEL logback MDC 注入 `trace_id`/`span_id`；与既有 `correlationId`/`traceId` MDC 并存；提供 MDC key 约定 + 示例 pattern（不强加 logback 文件）。
-  - trace↔metric：[[design-00004-durable-process-manager-runtime]] §5.3 SLI 加 exemplar（优先 `dispatch_latency`/`claim_latency`/`advance_conflict_retries`）。
-  - 属性目录：落实 `ObservabilityAttributes`（§10.3 表），对齐 OTEL `messaging.*`；payload 绝不进属性。
-  - 错误语义（对齐 [[design-00003-exception-model]]）：handler 异常/codec 失败/DEAD→SUSPENDED/revision 冲突/运维 redrive·cancel 的 span error status + event。
-  - 测试：日志含 span_id（capturing appender）、指标带 exemplar、失败路径 span status=ERROR。
+- ✅ **P3**（三柱闭环）
+  - ✅ **trace↔log / trace↔metric 由 starter 交付**（as-built）：`opentelemetry-spring-boot-starter` 传递依赖已带
+    `opentelemetry-logback-mdc-1.0`（span 活跃时把 `trace_id`/`span_id`/`trace_flags` 注入日志事件 MDC）与
+    `opentelemetry-micrometer-1.5`（Micrometer 指标桥接 OTLP，span 内记录即带 **exemplar**）。故这两根柱子是**装 starter 即得**的消费方配置（在 logback pattern 引用 `%mdc{trace_id}`），无需库代码;与既有 `correlationId`/`traceId` MDC 并存。
+  - ✅ **属性目录**：`ObservabilityAttributes`（P0 建）已应用于命令 span（`command.type`/`message.id`/`correlation.id`/`causation.id`）与 `process.advance` span（`process.type`/`business_key`/`instance_id`/`lifecycle`/`step`）；对齐 OTEL `messaging.*`，payload 不进属性。
+  - ✅ **错误语义**：同步 span（命令 P1②、`process.advance` P1③）已 `setStatus(ERROR)`+`recordException`；本轮补齐**异步 dispatch span**——`StoreAndForwardTracer.Scope` 加 `default recordFailure(Throwable)`（default no-op，不破 lambda/NoOp），OTEL 实现标 ERROR+recordException；4 个 relay（outbox×2 / effect / deadline）派发失败时 `recordFailure` 再走既有重试/DEAD 路径。observability-otel 测试断言 dispatch 失败 → ERROR span（5 绿）。
+  - **注**：DEAD→SUSPENDED、revision 冲突、运维 redrive/cancel 的独立 span 属更细粒度审计,归入 P4 可选细化;当前失败已在派发 span + 既有指标/日志中可见。
 
 - ⬜ **P4**（可选增强 + 端到端验收）
   - 可选：baggage（`business_key`/租户，默认关）、tail-sampling collector 示例、日志/错误体以真 `trace_id` 收敛替换 UUID。

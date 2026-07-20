@@ -95,12 +95,17 @@ public class OutboxRelay {
                 // later events back so they are not delivered out of order.
                 continue;
             }
-            try (StoreAndForwardTracer.Scope ignored = tracer.restore(
+            try (StoreAndForwardTracer.Scope span = tracer.restore(
                     record.getTraceparent(), record.getTraceState(),
                     "outbox.publish " + record.getEventId())) {
                 // The restored span is current here, so the Kafka producer instrumentation stamps
                 // the message with this dispatch span, which links back to the span that wrote the row.
-                dispatcher.dispatch(toMessage(record));
+                try {
+                    dispatcher.dispatch(toMessage(record));
+                } catch (RuntimeException e) {
+                    span.recordFailure(e);
+                    throw e;
+                }
             } catch (RuntimeException e) {
                 if (handleFailure(record, e) && subject != null) {
                     blockedSubjects.add(subject);

@@ -128,13 +128,18 @@ public class OutboxRelay {
                 // later events back so they are not delivered out of order.
                 continue;
             }
-            try (StoreAndForwardTracer.Scope ignored =
+            try (StoreAndForwardTracer.Scope span =
                     tracer.restore(pending.traceparent(), pending.traceState(),
                             "outbox.publish " + message.eventId())) {
                 // The restored span is current here, so the Kafka producer instrumentation stamps
                 // the message headers with this dispatch span — which links back to the span that
                 // wrote the row — rather than with the (unrelated) scheduler thread's context.
-                dispatcher.dispatch(message);
+                try {
+                    dispatcher.dispatch(message);
+                } catch (RuntimeException e) {
+                    span.recordFailure(e);
+                    throw e;
+                }
             } catch (RuntimeException e) {
                 if (handleFailure(pending, e) && subject != null) {
                     blockedSubjects.add(subject);

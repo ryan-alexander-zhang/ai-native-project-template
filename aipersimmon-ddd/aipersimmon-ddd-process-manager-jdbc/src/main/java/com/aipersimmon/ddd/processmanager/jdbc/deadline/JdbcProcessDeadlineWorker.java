@@ -153,9 +153,14 @@ public final class JdbcProcessDeadlineWorker {
                         deadline.correlationId(), deadline.causationId(), deadline.traceId());
                 // Restore the scheduling advance's trace context so the timer's own advance links
                 // back to the flow that armed it, rather than starting a fresh trace on the worker thread.
-                try (StoreAndForwardTracer.Scope ignored = storeTracer.restore(
+                try (StoreAndForwardTracer.Scope span = storeTracer.restore(
                         deadline.traceparent(), deadline.traceState(), "deadline.fire " + deadlineId)) {
-                    runtime.handle(instance.get().ref(), input, context);
+                    try {
+                        runtime.handle(instance.get().ref(), input, context);
+                    } catch (RuntimeException e) {
+                        span.recordFailure(e);
+                        throw e;
+                    }
                 }
                 deadlines.markFired(deadlineId, leaseToken, clock.instant());
                 return Boolean.TRUE;
