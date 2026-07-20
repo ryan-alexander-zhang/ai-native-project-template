@@ -28,6 +28,7 @@
     <spring-boot.version>3.5.10</spring-boot.version>
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
     <shedlock.version>6.6.0</shedlock.version>
+    <opentelemetry-instrumentation.version>2.29.0</opentelemetry-instrumentation.version>
   </properties>
 
   <modules>
@@ -36,6 +37,7 @@
     <module>aipersimmon-ddd-bom</module>
     <module>aipersimmon-ddd-core</module>
     <module>aipersimmon-ddd-observability</module>
+    <module>aipersimmon-ddd-observability-otel</module>
     <module>aipersimmon-ddd-application</module>
     <module>aipersimmon-ddd-integration</module>
     <module>aipersimmon-ddd-cqrs</module>
@@ -68,6 +70,19 @@
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
         <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Managed versions for OpenTelemetry API/SDK, the OTEL Spring Boot starter, and
+           sdk-testing (via the core opentelemetry-bom this imports transitively). Only
+           the optional aipersimmon-ddd-observability-otel module pulls these in; the
+           pure tier and the contract module stay OTEL-free. Declared before the Spring
+           Boot BOM so the OTEL versions stay aligned with the OTEL starter rather than
+           whatever Spring Boot happens to manage. -->
+      <dependency>
+        <groupId>io.opentelemetry.instrumentation</groupId>
+        <artifactId>opentelemetry-instrumentation-bom</artifactId>
+        <version>${opentelemetry-instrumentation.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

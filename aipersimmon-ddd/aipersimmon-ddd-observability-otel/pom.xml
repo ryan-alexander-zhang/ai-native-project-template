@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The optional OpenTelemetry implementation of the framework-free observability
+    contract. Pulling this module onto the classpath is what turns tracing on: it
+    binds the no-op SPIs from aipersimmon-ddd-observability to a real OTEL tracer and
+    W3C propagator. Nothing else in the library depends on it, so a build that omits
+    it stays entirely OTEL-free and behaves exactly as before.
+
+    Version alignment for every OpenTelemetry artifact comes from the
+    opentelemetry-instrumentation-bom imported by the parent; this pom pins no OTEL
+    versions of its own.
+  -->
+  <artifactId>aipersimmon-ddd-observability-otel</artifactId>
+  <name>aipersimmon-ddd-observability-otel</name>
+  <description>Optional OpenTelemetry implementation of the aipersimmon-ddd observability SPIs: OTEL-backed domain-span tracer and W3C store-and-forward carrier.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-api</artifactId>
+    </dependency>
+
+    <!-- Test: a real SDK with an in-memory exporter to assert emitted spans/links. -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
