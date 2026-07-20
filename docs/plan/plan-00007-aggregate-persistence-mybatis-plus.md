@@ -2,7 +2,7 @@
 id: plan-00007-aggregate-persistence-mybatis-plus
 type: plan
 role: main
-status: open
+status: resolved
 parent: design-00001-aipersimmon-ddd-and-scaffold
 ---
 
@@ -58,7 +58,7 @@ flowchart LR
   a & o --> commit{一个事务<br/>一起提交/回滚}
 ```
 
-混用 MyBatis-Plus（聚合/outbox/inbox）+ jdbc（PM）不影响原子性——同 DataSource 即同事务。**handler / domain / application 一行不改**。
+混用 MyBatis-Plus（聚合/outbox/inbox）+ jdbc（PM）不影响原子性——同 DataSource 即同事务。**handler / application 不改；domain 仅加纯 Java 重建 API**（见实施记录：Order 无持久化入口，必须加 framework-free 的 `reconstitute`，无框架依赖、无行为变化）。
 
 ### 1.4 领域保持 framework-free
 
@@ -96,7 +96,7 @@ infrastructure；适配器在 DO ↔ 领域聚合之间转换。ArchUnit "domain
 - 不做 CQRS 读模型、事件溯源、JPA/Hibernate。
 - **schema 隔离仅覆盖业务聚合**；outbox/inbox/PM/shedlock 作为共享 infra 留 public，**不逐 BC 拆 outbox、不分库**
   （彻底隔离/拆分就绪属 [[issue-00031-flyway-shared-schema-and-bundled-shedlock-table]] / [[issue-00028-broker-transport-on-single-deployable-monolith]] 范畴）。
-- 不改 `IntegrationEvents` port、不改 handler/domain/application、不新增事务代码（复用既有拦截器）。
+- 不改 `IntegrationEvents` port、不改 handler/application、不新增事务代码（复用既有拦截器）；domain 仅加 framework-free 重建 API（见实施记录）。
 
 ## 五、关联
 
@@ -105,3 +105,31 @@ infrastructure；适配器在 DO ↔ 领域聚合之间转换。ArchUnit "domain
 - [[plan-00006-middleware-integration]]（现场；六.已记为后续 plan-00007）
 - [[decision-00006-integration-event-transport-selection]]（outbox 同事务原子性）
 - reference：`modular-monolith-with-ddd`（每模块独立 schema、禁跨模块 join/FK）
+
+## 六、实施记录（as-built，全部已验证）
+
+`mvn -pl start -am test` 全绿（**19 tests**，跑在真实 Postgres 18.1 + Kafka 容器上），ArchUnit 通过。
+
+- ✅ **P0 全栈 MyBatis-Plus**：`start/pom.xml` outbox/inbox 由 `-jdbc` 换 `-mybatis-plus` 变体 + 加
+  `mybatis-plus-spring-boot3-starter:3.5.15`（scaffold 不管 MP 版本，显式钉）。表结构不变、`flyway.components` 不变，
+  既有 18 tests 保持绿。MP 变体自注册 mapper（MapperFactoryBean），不抢 `@Mapper` 自动扫描。
+- ✅ **P1 schema + DDL**：`start/src/main/resources/db/migration/V1__aggregates.sql`（消费者自有迁移，先于组件迁移）
+  建 `ordering.{customers,orders,order_lines}` / `inventory.{stocks,reservations,reservation_lines}` + 种子（CUST-1、SKU-1/2）。
+- ✅ **P2 适配器**：`infrastructure` 层用 MyBatis-Plus `BaseMapper` + DO（`@TableName("schema.table")`、
+  `@TableId(INPUT)`）实现 4 个端口，删除 4 个 `InMemory*`；两 infra 模块加 `mybatis-plus-core` 编译依赖。
+- ✅ **P3 原子性回归**：`OutboxAtomicityTest`——事务内（order=300 > tx 200）handler 之后抛错，断言 `ordering.orders`
+  与 `aipersimmon_outbox` **计数皆 0**（一起回滚）。这正是 issue-00027 内存态下写不出的测试。
+
+### 与计划的偏差（据实修正）
+
+- **domain 并非"一行不改"**：`Order` 是私有构造 + 包私有 `OrderLine` + 不暴露行明细，**无持久化重建入口**。故给 domain 加了
+  **纯 Java** 的 `Order.reconstitute(id, customerId, List<LineData>, status)`（重建不发事件）+ `Order.lineData()`（读行状态）
+  + `OrderLine` 包级 `quantity()/unitPrice()`。**无框架依赖、无行为变化**，ArchUnit "domain 不依赖 Spring/MyBatis" 仍过。
+  `Reservation` 的 `released` 位复用既有 `markReleased()` 重建，无需改；`Stock`/`Customer` 公开构造直接重建。
+- **未做真实 compose 端到端**：Testcontainers 用的就是 `postgres:18.1` + Kafka 同款引擎，流程/契约/原子性测试已覆盖；
+  未再跑一遍 `docker compose` 手工冒烟（plan-00006 已验证过 compose 装配路径）。
+
+### 后续（本计划已解除的前置）
+
+- [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]] → **resolved**（本计划落地 + 原子性测试守护）。
+- [[design-00006-integration-event-routing]] 的 D4 前置（聚合落 PG）**已满足**，其路由机制可在此之上实现。

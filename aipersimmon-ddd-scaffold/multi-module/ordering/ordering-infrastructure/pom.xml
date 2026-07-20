@@ -42,5 +42,12 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
     </dependency>
+    <!-- MyBatis-Plus for the JDBC persistence adapters (BaseMapper, wrappers, @TableName). Version
+         pinned — the scaffold does not manage MyBatis-Plus (plan-00007). -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-core</artifactId>
+      <version>3.5.15</version>
+    </dependency>
   </dependencies>
 </project>

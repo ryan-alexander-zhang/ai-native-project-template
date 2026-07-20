@@ -87,6 +87,31 @@ public class Order extends AbstractAggregateRoot<OrderId> {
         return order;
     }
 
+    /**
+     * Reconstitute a stored order: sets state directly and registers no events. For persistence
+     * adapters only — application code creates orders through {@link #place}. Framework-free (no
+     * persistence annotations here; the ORM/mapper lives in the infrastructure layer).
+     */
+    public static Order reconstitute(
+            OrderId id, CustomerId customerId, List<LineData> lineData, OrderStatus status) {
+        List<OrderLine> lines = new ArrayList<>();
+        if (lineData != null) {
+            for (LineData line : lineData) {
+                lines.add(new OrderLine(line.sku(), line.quantity(), line.unitPrice()));
+            }
+        }
+        return new Order(id, customerId, lines, status);
+    }
+
+    /** This order's lines as raw {@link LineData}, so a persistence adapter can store them. */
+    public List<LineData> lineData() {
+        List<LineData> out = new ArrayList<>();
+        for (OrderLine line : lines) {
+            out.add(new LineData(line.sku(), line.quantity(), line.unitPrice()));
+        }
+        return out;
+    }
+
     /** Manual review approved the order: it becomes eligible for fulfilment. */
     public void approveReview(ReviewDecisionRef decision) {
         if (decision == null || !decision.belongsTo(id)) {

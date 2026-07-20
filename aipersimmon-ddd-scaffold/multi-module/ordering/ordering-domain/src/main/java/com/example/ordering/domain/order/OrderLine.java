@@ -32,6 +32,14 @@ class OrderLine {
         return sku;
     }
 
+    int quantity() {
+        return quantity;
+    }
+
+    Money unitPrice() {
+        return unitPrice;
+    }
+
     Money subtotal() {
         return unitPrice.times(quantity);
     }

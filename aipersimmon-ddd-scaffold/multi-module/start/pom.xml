@@ -83,20 +83,32 @@
       publisher, and the ShedLock-guarded relay drains it. The Kafka module overrides the
       relay's dispatcher to publish CloudEvents to a topic and (consumer.enabled=true)
       registers the inbox-guarded consumer bridge that republishes in process — so the
-      existing @EventListener handlers are untouched. inbox-jdbc de-dups the consumer side.
+      existing @EventListener handlers are untouched. The inbox de-dups the consumer side.
       All three tables (outbox + dead-letter + shedlock, inbox) come from the flyway starter.
+      Full MyBatis-Plus stack (plan-00007): outbox/inbox use the -mybatis-plus variants so they
+      share one SqlSessionFactory / DataSource with the aggregate mappers — aggregate write and
+      outbox write commit in the same transaction. (Table shapes are identical to the -jdbc
+      variants; flyway.components is unchanged.)
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
+    </dependency>
+    <!-- MyBatis-Plus: provides the SqlSessionFactory the outbox/inbox variants and the aggregate
+         mappers share. Version pinned here — the scaffold inherits spring-boot-starter-parent (not
+         the library parent), which does not manage MyBatis-Plus. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+      <version>3.5.15</version>
     </dependency>
 
     <!--
