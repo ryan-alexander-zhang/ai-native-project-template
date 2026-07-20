@@ -25,4 +25,24 @@ public record EncodedPayload(PayloadType type, byte[] data) {
     public byte[] data() {
         return data.clone();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        return o instanceof EncodedPayload other
+                && type.equals(other.type)
+                && java.util.Arrays.equals(data, other.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * type.hashCode() + java.util.Arrays.hashCode(data);
+    }
+
+    @Override
+    public String toString() {
+        return "EncodedPayload[type=" + type + ", data=" + data.length + " bytes]";
+    }
 }

@@ -44,6 +44,16 @@ public enum ProcessLifecycle {
     }
 
     /**
+     * {@code true} for the states the runtime may move to {@link #SUSPENDED} on retry
+     * exhaustion: {@link #RUNNING} and {@link #COMPENSATING}. Unlike {@link #isActive()}
+     * this excludes {@link #SUSPENDED} itself, so an already-suspended instance is never
+     * re-suspended (which would overwrite its recorded resume lifecycle).
+     */
+    public boolean canSuspend() {
+        return this == RUNNING || this == COMPENSATING;
+    }
+
+    /**
      * Whether a direct transition from this lifecycle to {@code target} is legal.
      * A terminal state permits no transition, so ordinary input
      * to a finished instance can only be an idempotent no-op.

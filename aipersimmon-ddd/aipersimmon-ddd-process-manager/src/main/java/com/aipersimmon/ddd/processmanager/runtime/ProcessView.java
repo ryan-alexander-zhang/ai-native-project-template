@@ -65,5 +65,17 @@ public record ProcessView(
         if (suspensionReason == null) {
             throw new IllegalArgumentException("suspensionReason optional required (use Optional.empty())");
         }
+        if (lifecycle.isTerminal() != outcome.isPresent()) {
+            throw new IllegalArgumentException(
+                    "a terminal lifecycle carries an outcome and a non-terminal one does not; got "
+                            + lifecycle + " with outcome " + outcome);
+        }
+        boolean suspended = lifecycle == ProcessLifecycle.SUSPENDED;
+        if (suspended != resumeLifecycle.isPresent() || suspended != suspensionReason.isPresent()) {
+            throw new IllegalArgumentException(
+                    "resumeLifecycle and suspensionReason are present iff the lifecycle is SUSPENDED; got "
+                            + lifecycle + " with resumeLifecycle " + resumeLifecycle
+                            + " and suspensionReason present=" + suspensionReason.isPresent());
+        }
     }
 }
