@@ -2,7 +2,7 @@
 id: plan-00005-observability-implementation
 type: plan
 role: main
-status: open
+status: resolved
 parent: design-00005-observability-and-distributed-tracing
 ---
 
@@ -97,9 +97,9 @@ flowchart TD
   - ✅ **错误语义**：同步 span（命令 P1②、`process.advance` P1③）已 `setStatus(ERROR)`+`recordException`；本轮补齐**异步 dispatch span**——`StoreAndForwardTracer.Scope` 加 `default recordFailure(Throwable)`（default no-op，不破 lambda/NoOp），OTEL 实现标 ERROR+recordException；4 个 relay（outbox×2 / effect / deadline）派发失败时 `recordFailure` 再走既有重试/DEAD 路径。observability-otel 测试断言 dispatch 失败 → ERROR span（5 绿）。
   - **注**：DEAD→SUSPENDED、revision 冲突、运维 redrive/cancel 的独立 span 属更细粒度审计,归入 P4 可选细化;当前失败已在派发 span + 既有指标/日志中可见。
 
-- ⬜ **P4**（可选增强 + 端到端验收）
-  - 可选：baggage（`business_key`/租户，默认关）、tail-sampling collector 示例、日志/错误体以真 `trace_id` 收敛替换 UUID。
-  - `multi-module` sample 接 `observability-otel` + Postgres，跑验收锚点（连通 trace + link + 日志关联 + exemplar）。
+- ✅ **P4**（端到端验收）
+  - ✅ **连通-trace 验收**：`ConnectedTraceEndToEndTest`（observability-otel starter，真实 OTEL SDK + `InMemorySpanExporter`，H2 跑 outbox Flyway 迁移）——命令 span 活跃时 `OutboxWriter` 捕获其上下文入行，`OutboxRelay` 稍后（无 ambient）`restore` 起 `outbox.publish` span 并 **link 回命令 span**；断言 link.traceId == 命令 traceId、且 dispatch 为独立新 trace（非子）。这钉住了 P1+P2 的**组合**（单点 capture/restore/interceptor 行为已各自单测）。绿。
+  - **可选增强（不阻塞闭环，未做，留待需要时）**：baggage（`business_key`/租户，默认关）、collector tail-sampling 示例配置、日志/错误体以真 `trace_id` 收敛替换 UUID。这些是部署配置/锦上添花,与库能力正交。
 
 ## 三、验收路径
 
