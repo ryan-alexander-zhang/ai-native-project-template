@@ -37,20 +37,35 @@ public final class JdbcProcessTransitionStore {
     public Optional<String> findLatestTransitionId(ProcessInstanceId instanceId) {
         return jdbc.query(
                 "SELECT transition_id FROM aipersimmon_process_transition "
-                        + "WHERE instance_id = ? ORDER BY created_at DESC, transition_id DESC LIMIT 1",
+                        + "WHERE instance_id = ? ORDER BY transition_seq DESC LIMIT 1",
                 (rs, n) -> rs.getString("transition_id"),
                 instanceId.value()).stream().findFirst();
+    }
+
+    /**
+     * The next per-instance ordering sequence: one past the current maximum, or 0. Callers append
+     * inside the advance transaction, which holds the instance row lock, so the maximum is stable and
+     * the assigned seq is monotonic per instance (mirrors the effect {@code seq} and deadline generation).
+     * It gives parked-input replay and the timeline a deterministic order that neither the
+     * millisecond-precision {@code created_at} nor the random {@code transition_id} can guarantee.
+     */
+    public long nextTransitionSeq(ProcessInstanceId instanceId) {
+        Long max = jdbc.queryForObject(
+                "SELECT MAX(transition_seq) FROM aipersimmon_process_transition WHERE instance_id = ?",
+                Long.class, instanceId.value());
+        return max == null ? 0L : max + 1L;
     }
 
     public void append(ProcessTransitionInsert t, Instant now) {
         jdbc.update("""
                 INSERT INTO aipersimmon_process_transition (
-                    transition_id, instance_id, input_message_id, input_type, input_version, input_payload,
-                    from_lifecycle, to_lifecycle, from_step, to_step, decision_code, transition_kind,
-                    correlation_id, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
+                    input_payload, from_lifecycle, to_lifecycle, from_step, to_step, decision_code,
+                    transition_kind, correlation_id, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 t.transitionId(),
                 t.instanceId().value(),
+                nextTransitionSeq(t.instanceId()),
                 t.inputMessageId(),
                 t.inputType(),
                 t.inputVersion(),
@@ -76,12 +91,13 @@ public final class JdbcProcessTransitionStore {
             String kind, String operator, String reason, Instant now) {
         jdbc.update("""
                 INSERT INTO aipersimmon_process_transition (
-                    transition_id, instance_id, input_message_id, input_type, input_version, input_payload,
-                    from_lifecycle, to_lifecycle, from_step, to_step, decision_code, transition_kind,
-                    correlation_id, operator_id, operation_reason, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
+                    input_payload, from_lifecycle, to_lifecycle, from_step, to_step, decision_code,
+                    transition_kind, correlation_id, operator_id, operation_reason, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 transitionId,
                 instanceId.value(),
+                nextTransitionSeq(instanceId),
                 transitionId,
                 "aipersimmon.operator",
                 1,
@@ -119,7 +135,7 @@ public final class JdbcProcessTransitionStore {
                        from_step, to_step, decision_code, transition_kind, operator_id, operation_reason, created_at
                 FROM aipersimmon_process_transition
                 WHERE instance_id = ?
-                ORDER BY created_at, transition_id""",
+                ORDER BY transition_seq""",
                 (rs, n) -> new ProcessTransitionView(
                         rs.getString("transition_id"),
                         rs.getString("input_message_id"),
@@ -141,7 +157,7 @@ public final class JdbcProcessTransitionStore {
                 SELECT input_message_id, input_type, input_version, input_payload, correlation_id
                 FROM aipersimmon_process_transition
                 WHERE instance_id = ? AND transition_kind = 'PARKED'
-                ORDER BY created_at, transition_id""",
+                ORDER BY transition_seq""",
                 (rs, n) -> new ParkedInput(
                         rs.getString("input_message_id"),
                         new PayloadType(rs.getString("input_type"), rs.getInt("input_version")),

@@ -2,7 +2,7 @@
 id: issue-00037-parked-input-replay-order-non-monotonic
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---
 
@@ -36,22 +36,40 @@ parent: plan-00003-durable-process-manager-implementation
 
 ## 复现(test-first)
 
-提议回归测试(尚未编写):同一实例进入 suspension 后,在 `Clock.fixed`(令两次 park 的 `created_at` 完全相等)下
-连续 park 两个不同 input,resume 后断言其按到达/单调序重放。修复前该断言在 tie-break 落到随机 UUID 时不稳定
-(顺序随 `transition_id` 变化);修复后稳定。
+回归测试 `store/JdbcProcessTransitionStoreTest#replaysParkedInputsInInsertionOrderEvenWhenCreatedAtTiesAndIdsSortReverse`
+(`aipersimmon-ddd-process-manager-jdbc`):在 `Clock.fixed`(令两次 park 的 `created_at` 完全相等)下,对同一实例连续
+`append` 两条 PARKED transition,且刻意让两个 `transition_id` 的字典序与插入序**相反**(先 `zzz-transition`、后
+`aaa-transition`)。断言 `findParkedInputs` 按插入序返回(`input-first` 在前、`input-second` 在后)。
+修复前该断言在旧 `ORDER BY created_at, transition_id` 下会翻转(tie-break 落到字典序更小的 `aaa-transition` → 先返回
+`input-second`);修复后稳定按插入序。
 
-## 修复
+## 修复(已实施)
 
-给 `aipersimmon_process_transition`(或 parked input 取回所依赖的表)增加每实例单调列 `transition_seq BIGINT NOT NULL`,
-沿用 effect 表 `seq` 的既有做法:
+给 `aipersimmon_process_transition` 增加每实例单调列 `transition_seq BIGINT NOT NULL`,沿用 effect 表 `seq` 的既有做法:
 
-1. 各库内 transition DDL(h2 / postgresql / mysql,含 starter 与 jdbc 测试 schema,及 scaffold consumer 副本)加
-   `transition_seq`。
-2. `JdbcProcessTransitionStore` 增 `nextTransitionSeq(instanceId)`(`MAX(transition_seq)+1`,推进持有实例行锁故单调安全,
-   同 `nextSeq`/`nextGeneration`),append 时写入。
-3. `findParkedInputs()` 的 `ORDER BY` 改用 `transition_seq`;timeline / latest transition 查询一并对齐。
+1. 三份库内 transition DDL(h2 / postgresql / mysql 的 `V1__aipersimmon_process_manager.sql`)同步加 `transition_seq`
+   列,并加二级索引 `idx_process_transition_instance (instance_id, transition_seq)`(MySQL 用内联 `KEY`,h2/postgresql
+   用独立 `CREATE INDEX`,镜像 effect 表的 `idx_process_effect_instance`)。经复核:process-manager DDL 仅此三份副本
+   声明该四表(scaffold consumer 无自带副本,tests 直接 `addScript` 加载上述 h2/mysql 迁移)。
+2. `JdbcProcessTransitionStore` 增 `nextTransitionSeq(instanceId)`(`MAX(transition_seq)+1`),在 `append` 与
+   `appendOperator` 两条插入路径内计算并写入。所有调用点(runtime 的 park/advance、operation 的 redrive/cancel/
+   deadline-cancel)均在 `instances.findForUpdate(...)` 取得实例行锁之后写 transition,故最大值稳定、每实例单调,
+   与 `nextSeq`/`nextGeneration` 同一保证。**无需改动 `JdbcProcessRuntime`。**
+3. `findParkedInputs()`、`timeline()` 的 `ORDER BY` 改用 `transition_seq`;`findLatestTransitionId()` 改为
+   `ORDER BY transition_seq DESC LIMIT 1`。
 
 (注:多份 DDL 副本须同步变更——见 [[process-manager-schema-copies]]。)
+
+## 验证结果
+
+- 新回归测试通过;经推演,修复前旧 `ORDER BY created_at, transition_id` 会翻转顺序,故该测试是真实守卫。
+- `mvn -o -pl aipersimmon-ddd-process-manager-jdbc -am test`:59 tests,failures/errors 均为 0(含 H2 全套与
+  PostgreSQL Testcontainers 的 `EffectRelayPostgresConcurrencyTest`)。
+- MySQL 8.0 Testcontainers:`EffectRelayMysqlConcurrencyTest`(starter 模块)在加入 `transition_seq` 列 + `KEY` 索引后
+  DDL 应用干净、runtime 经该列写 transition 成功,1 test 通过。
+- 行锁前提**成立**:`append` 的两个调用点(`JdbcProcessRuntime` park `:326` / advance `:383`)与 `appendOperator` 的三个
+  调用点(`JdbcProcessOperations` `:83`/`:114`/`:177`)均在 `findForUpdate` 之后执行,故 `nextTransitionSeq` 单调安全,
+  与 effect `seq` 同一保证——无需 fallback。
 
 ## 关联
 

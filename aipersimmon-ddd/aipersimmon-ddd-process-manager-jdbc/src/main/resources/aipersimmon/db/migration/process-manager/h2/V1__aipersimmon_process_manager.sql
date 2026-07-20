@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_instance (
 CREATE TABLE IF NOT EXISTS aipersimmon_process_transition (
     transition_id     VARCHAR(64)  NOT NULL PRIMARY KEY,
     instance_id       VARCHAR(64)  NOT NULL,
+    transition_seq    BIGINT       NOT NULL,
     input_message_id  VARCHAR(96)  NOT NULL,
     input_type        VARCHAR(255) NOT NULL,
     input_version     INT          NOT NULL,
@@ -47,6 +48,9 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_transition (
     created_at        TIMESTAMP    NOT NULL,
     CONSTRAINT uq_process_transition_input UNIQUE (instance_id, input_message_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_process_transition_instance
+    ON aipersimmon_process_transition (instance_id, transition_seq);
 
 CREATE TABLE IF NOT EXISTS aipersimmon_process_effect (
     effect_id       VARCHAR(96)  NOT NULL PRIMARY KEY,

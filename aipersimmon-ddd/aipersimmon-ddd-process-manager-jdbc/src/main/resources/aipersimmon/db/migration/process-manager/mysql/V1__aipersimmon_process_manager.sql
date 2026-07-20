@@ -1,6 +1,8 @@
 -- MySQL 8+ sample DDL for the durable Process Manager four-table model (design-00004 §4.5).
 -- Sample only: apply via Flyway/Liquibase; the starter never executes it. SKIP LOCKED
--- requires MySQL 8.0+. DATETIME(3) keeps millisecond precision; TEXT holds base64 payloads.
+-- requires MySQL 8.0+. DATETIME(3) keeps millisecond precision. Payload columns are
+-- LONGTEXT: they hold base64 (~+33%), so the default 1 MiB payload.max-bytes limit would
+-- overflow MySQL's 64 KB TEXT ceiling.
 
 CREATE TABLE IF NOT EXISTS aipersimmon_process_instance (
     instance_id          VARCHAR(64)  NOT NULL,
@@ -17,7 +19,7 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_instance (
     outcome              VARCHAR(128),
     revision             BIGINT       NOT NULL,
     state_payload_type   VARCHAR(255) NOT NULL,
-    state_payload        TEXT         NOT NULL,
+    state_payload        LONGTEXT     NOT NULL,
     created_at           DATETIME(3)  NOT NULL,
     updated_at           DATETIME(3)  NOT NULL,
     ended_at             DATETIME(3),
@@ -28,10 +30,11 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_instance (
 CREATE TABLE IF NOT EXISTS aipersimmon_process_transition (
     transition_id     VARCHAR(64)  NOT NULL,
     instance_id       VARCHAR(64)  NOT NULL,
+    transition_seq    BIGINT       NOT NULL,
     input_message_id  VARCHAR(96)  NOT NULL,
     input_type        VARCHAR(255) NOT NULL,
     input_version     INT          NOT NULL,
-    input_payload     TEXT         NOT NULL,
+    input_payload     LONGTEXT     NOT NULL,
     from_lifecycle    VARCHAR(32),
     to_lifecycle      VARCHAR(32)  NOT NULL,
     from_step         VARCHAR(128),
@@ -47,7 +50,8 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_transition (
     failure           TEXT,
     created_at        DATETIME(3)  NOT NULL,
     PRIMARY KEY (transition_id),
-    CONSTRAINT uq_process_transition_input UNIQUE (instance_id, input_message_id)
+    CONSTRAINT uq_process_transition_input UNIQUE (instance_id, input_message_id),
+    KEY idx_process_transition_instance (instance_id, transition_seq)
 ) ENGINE = InnoDB;
 
 CREATE TABLE IF NOT EXISTS aipersimmon_process_effect (
@@ -59,7 +63,7 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_effect (
     effect_kind     VARCHAR(48)  NOT NULL,
     payload_type    VARCHAR(255) NOT NULL,
     payload_version INT          NOT NULL,
-    payload         TEXT         NOT NULL,
+    payload         LONGTEXT     NOT NULL,
     message_id      VARCHAR(96)  NOT NULL,
     correlation_id  VARCHAR(64)  NOT NULL,
     causation_id    VARCHAR(64),
@@ -91,7 +95,7 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_deadline (
     due_at          DATETIME(3)  NOT NULL,
     input_type      VARCHAR(255) NOT NULL,
     input_version   INT          NOT NULL,
-    input_payload   TEXT         NOT NULL,
+    input_payload   LONGTEXT     NOT NULL,
     correlation_id  VARCHAR(64),
     causation_id    VARCHAR(64),
     trace_id        VARCHAR(128),
