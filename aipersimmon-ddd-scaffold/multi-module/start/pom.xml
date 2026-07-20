@@ -75,6 +75,41 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
+
+    <!--
+      Reliable integration-event transport (decision-00006 "方式三": broker + outbox).
+      With an outbox storage on the classpath, the IntegrationEvents port is backed by the
+      transactional OutboxWriter (same-tx write) instead of the in-process events-spring
+      publisher, and the ShedLock-guarded relay drains it. The Kafka module overrides the
+      relay's dispatcher to publish CloudEvents to a topic and (consumer.enabled=true)
+      registers the inbox-guarded consumer bridge that republishes in process — so the
+      existing @EventListener handlers are untouched. inbox-jdbc de-dups the consumer side.
+      All three tables (outbox + dead-letter + shedlock, inbox) come from the flyway starter.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
+    </dependency>
+
+    <!--
+      Observability: binds the framework-free observability SPIs to OpenTelemetry and pulls in the
+      OpenTelemetry Spring Boot starter (boundary auto-instrumentation for HTTP/JDBC/Kafka, plus
+      logback-MDC and Micrometer exemplar bridges). Traces are exported over OTLP to the SigNoz
+      otel-collector (otel.exporter.otlp.endpoint). Activated purely by being on the classpath; the
+      whole domain spine stays no-op if this module is absent.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
+    </dependency>
     <!-- PostgreSQL for the four process tables; started from compose.yaml by spring-boot-docker-compose. -->
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -122,6 +157,12 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Acceptance tests exercise the real broker hop over a Kafka container (@ServiceConnection). -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>kafka</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

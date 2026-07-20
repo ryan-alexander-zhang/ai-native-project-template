@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- Quieter ClickHouse logging for local development. Standard SigNoz local-deploy file. -->
+<clickhouse>
+    <logger>
+        <level>information</level>
+        <console>1</console>
+    </logger>
+</clickhouse>

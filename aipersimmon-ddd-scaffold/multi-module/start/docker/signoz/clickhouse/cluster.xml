@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- SigNoz single-shard ClickHouse cluster named `cluster` (matches
+     SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster). Standard SigNoz local-deploy file. -->
+<clickhouse>
+    <zookeeper>
+        <node index="1">
+            <host>zookeeper-1</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+    </distributed_ddl>
+    <macros>
+        <shard>01</shard>
+        <replica>01</replica>
+    </macros>
+    <remote_servers>
+        <cluster>
+            <shard>
+                <replica>
+                    <host>clickhouse</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </cluster>
+    </remote_servers>
+</clickhouse>

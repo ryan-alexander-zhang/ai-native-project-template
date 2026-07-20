@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Import;
  * domain-event publisher all resolve.
  */
 @SpringBootTest
-@Import(TestPostgres.class)
+@Import(TestInfrastructure.class)
 class ApplicationSmokeTest {
 
     @Test

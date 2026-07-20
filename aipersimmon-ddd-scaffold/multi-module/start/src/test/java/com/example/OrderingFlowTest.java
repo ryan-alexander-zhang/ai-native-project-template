@@ -1,5 +1,6 @@
 package com.example;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -9,11 +10,11 @@ import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.integration.EventEnvelope;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
 import com.example.ordering.application.order.PlaceOrder;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,32 +26,36 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 
 /**
- * End-to-end across both bounded contexts, driven through the CQRS buses and the
- * order-fulfilment orchestration saga. Sending a {@code PlaceOrder} command starts
- * the saga and announces the order; inventory reacts (via its own {@code ReserveStock}
- * command) and reports the outcome as an integration event; the saga then sends a
- * {@code ConfirmOrder} or {@code CancelOrder} command. Reads go through the query
- * bus. All synchronous, no broker.
+ * End-to-end across all bounded contexts, driven through the CQRS buses and the durable
+ * order-fulfilment process manager. Sending a {@code PlaceOrder} command starts the flow and
+ * announces the order; inventory reacts (via its own {@code ReserveStock} command) and reports the
+ * outcome as an integration event; the process manager then sends a {@code ConfirmOrder} or
+ * {@code CancelOrder} command. Reads go through the query bus.
+ *
+ * <p>Unlike the earlier in-process version, the cross-context cascade now rides the real transport:
+ * each integration event is written to the transactional outbox, relayed to a Kafka topic, consumed
+ * back through the inbox-guarded bridge, and republished in process. The flow is therefore fully
+ * asynchronous, so the tests {@code await} the terminal state rather than pumping a relay by hand.
  *
  * <p>The failure cases also assert the stable {@link com.aipersimmon.ddd.core.error.ErrorCode}
- * rides the {@link StockReservationFailed} event — inventory has no HTTP surface, so this
- * is how its coded domain errors surface a machine identity to the reacting saga.
+ * rides the {@link StockReservationFailed} event — inventory has no HTTP surface, so this is how its
+ * coded domain errors surface a machine identity to the reacting process.
  */
 @SpringBootTest(properties = {
-        "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=1h",
+        "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=200ms",
         "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
+        "aipersimmon.ddd.outbox.poll-delay-ms=200",
 })
-@Import(TestPostgres.class)
+@Import(TestInfrastructure.class)
 class OrderingFlowTest {
+
+    private static final Duration SETTLE = Duration.ofSeconds(30);
 
     @Autowired
     CommandBus commandBus;
 
     @Autowired
     QueryBus queryBus;
-
-    @Autowired
-    JdbcProcessEffectRelay relay;
 
     @Autowired
     StockReservationFailedRecorder failures;
@@ -60,11 +65,8 @@ class OrderingFlowTest {
         failures.clear();
     }
 
-    /** Pump the relay until no effect is dispatched; each dispatch cascades to stage the next. */
-    private void settle() {
-        for (int i = 0; i < 20 && relay.pollOnce() > 0; i++) {
-            // keep draining
-        }
+    private String status(String orderId) {
+        return queryBus.ask(new FindOrder(orderId)).orElseThrow().status();
     }
 
     @Test
@@ -72,17 +74,15 @@ class OrderingFlowTest {
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 2, 100, "USD"))));
-        settle();
 
-        OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
-        assertEquals("CONFIRMED", snapshot.status());
+        await().atMost(SETTLE).untilAsserted(() -> assertEquals("CONFIRMED", status(orderId)));
     }
 
     @Test
     void whenSkuIsUnknownTheOrderIsRejectedSynchronouslyByTheInventoryGateway() {
         // SKU-404 is not carried by inventory. The synchronous availability gateway
         // (ordering's anti-corruption layer over inventory's StockAvailabilityApi) fails
-        // the order fast, at place time — it is never created and never reaches the saga.
+        // the order fast, at place time — it is never created and never reaches the process.
         DomainException rejected = assertThrows(DomainException.class, () ->
                 commandBus.send(new PlaceOrder(
                         "CUST-1",
@@ -97,15 +97,14 @@ class OrderingFlowTest {
     void whenStockIsInsufficientTheSagaCancelsWithInsufficientStockCode() {
         // SKU-1 is carried and in stock, so it passes the synchronous availability gate;
         // the exact-quantity check is the reservation's job. SKU-1 has 10 units, so asking
-        // for 999 is reserved asynchronously, fails, and the saga compensates by cancelling.
+        // for 999 is reserved asynchronously, fails, and the process compensates by cancelling.
         String orderId = commandBus.send(new PlaceOrder(
                 "CUST-1",
                 List.of(new PlaceOrder.Line("SKU-1", 999, 1, "USD"))));
-        settle();
 
-        OrderSnapshot snapshot = queryBus.ask(new FindOrder(orderId)).orElseThrow();
-        assertEquals("CANCELLED", snapshot.status());
-        assertEquals("inventory.insufficient-stock", failures.last().code());
+        await().atMost(SETTLE).untilAsserted(() -> assertEquals("CANCELLED", status(orderId)));
+        await().atMost(SETTLE).untilAsserted(() ->
+                assertEquals("inventory.insufficient-stock", failures.last().code()));
     }
 
     /** Captures the last {@link StockReservationFailed} so a test can assert its code. */

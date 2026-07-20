@@ -1,0 +1,4 @@
+# OpAMP manager config for the SigNoz otel-collector. Only used when SIGNOZ_OTEL_COLLECTOR_USE_OPAMP
+# is true (off by default in this compose); it lets the SigNoz server push collector config updates.
+# Standard SigNoz local-deploy file.
+server_endpoint: ws://signoz:4320/v1/opamp

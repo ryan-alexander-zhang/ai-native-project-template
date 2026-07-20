@@ -1,11 +1,212 @@
-# Local infrastructure for `mvn spring-boot:run` — Spring Boot's docker-compose support
-# starts this and wires the DataSource from it. Tests use Testcontainers instead.
+# Local infrastructure for `mvn spring-boot:run`. Spring Boot's docker-compose support
+# (spring.docker.compose.lifecycle-management=start-only) starts the DEFAULT-profile services
+# — postgres, kafka, kafka-ui — and wires the DataSource from the postgres container; it does not
+# stop them on exit. Tests use Testcontainers instead (spring.docker.compose.skip.in-tests=true).
+#
+# The SigNoz observability stack sits behind the `observability` profile so Boot does NOT lifecycle
+# it (it is heavy: clickhouse + zookeeper + migrators). Start it out-of-band when you want traces:
+#     docker compose --profile observability up -d
+# then open SigNoz at http://localhost:48080. The app exports OTLP to the collector on
+# localhost:44317 (see application.yml otel.exporter.otlp.endpoint).
 services:
-  postgres:
-    image: postgres:16-alpine
+  db:
+    image: postgres:18.1
     environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: ordering
-      POSTGRES_USER: ordering
-      POSTGRES_PASSWORD: ordering
     ports:
       - "5432:5432"
+    volumes:
+      - ordering_db_data:/var/lib/postgresql
+      - ./docker/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  kafka:
+    image: bitnamilegacy/kafka:3.7.1-debian-12-r9
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft mode (no Zookeeper)
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,INTERNAL://:29092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    volumes:
+      - ordering_kafka_data:/bitnami/kafka
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+    depends_on:
+      - kafka
+  init-clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    profiles: ["observability"]
+    command:
+      - bash
+      - -c
+      - |
+        version="v0.0.1"
+        node_os=$$(uname -s | tr '[:upper:]' '[:lower:]')
+        node_arch=$$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+        cd /tmp
+        wget -O histogram-quantile.tar.gz "https://github.com/SigNoz/signoz/releases/download/histogram-quantile%2F$${version}/histogram-quantile_$${node_os}_$${node_arch}.tar.gz"
+        tar -xzf histogram-quantile.tar.gz
+        mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
+    restart: on-failure
+    volumes:
+      - ./docker/signoz/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts
+  zookeeper-1:
+    image: signoz/zookeeper:3.7.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      - ZOO_SERVER_ID=1
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_AUTOPURGE_INTERVAL=1
+      - ZOO_ENABLE_PROMETHEUS_METRICS=yes
+      - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=9141
+    volumes:
+      - signoz_zookeeper:/bitnami/zookeeper
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep null
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    profiles: ["observability"]
+    restart: unless-stopped
+    depends_on:
+      init-clickhouse:
+        condition: service_completed_successfully
+      zookeeper-1:
+        condition: service_healthy
+    ports:
+      - "48123:8123"
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
+    volumes:
+      - ./docker/signoz/clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ./docker/signoz/clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml
+      - ./docker/signoz/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml
+      - ./docker/signoz/clickhouse/logging.xml:/etc/clickhouse-server/config.d/logging.xml
+      - ./docker/signoz/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts
+      - signoz_clickhouse:/var/lib/clickhouse
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://localhost:8123/ping
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  signoz-telemetrystore-migrator:
+    image: signoz/signoz-otel-collector:v0.144.2
+    profiles: ["observability"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+    entrypoint:
+      - /bin/sh
+    command:
+      - -c
+      - |
+        /signoz-otel-collector migrate bootstrap &&
+        /signoz-otel-collector migrate sync up &&
+        /signoz-otel-collector migrate async up
+    restart: on-failure
+  signoz:
+    image: signoz/signoz:v0.117.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      signoz-telemetrystore-migrator:
+        condition: service_completed_successfully
+    ports:
+      - "48080:8080"
+    volumes:
+      - signoz_sqlite:/var/lib/signoz
+    environment:
+      - SIGNOZ_ALERTMANAGER_PROVIDER=signoz
+      - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
+      - SIGNOZ_TOKENIZER_JWT_SECRET=local-dev-signoz-tokenizer-secret
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://localhost:8080/api/v1/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  otel-collector:
+    image: signoz/signoz-otel-collector:v0.144.2
+    profiles: ["observability"]
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      signoz-telemetrystore-migrator:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+    command:
+      - -c
+      - |
+        /signoz-otel-collector migrate sync check &&
+        if [ "${SIGNOZ_OTEL_COLLECTOR_USE_OPAMP:-false}" = "true" ]; then
+          exec /signoz-otel-collector --config=/etc/otel-collector-config.yaml --manager-config=/etc/manager-config.yaml --copy-path=/var/tmp/collector-config.yaml
+        fi
+        exec /signoz-otel-collector --config=/etc/otel-collector-config.yaml
+    volumes:
+      - ./docker/signoz/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ./docker/signoz/otel-collector-opamp-config.yaml:/etc/manager-config.yaml
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=host.name=ordering-signoz-host,os.type=linux
+      - LOW_CARDINAL_EXCEPTION_GROUPING=false
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+      - SIGNOZ_OTEL_COLLECTOR_USE_OPAMP=${SIGNOZ_OTEL_COLLECTOR_USE_OPAMP:-false}
+    ports:
+      - "44317:4317"
+      - "44318:4318"
+volumes:
+  ordering_db_data:
+  ordering_kafka_data:
+  signoz_clickhouse:
+  signoz_sqlite:
+  signoz_zookeeper:

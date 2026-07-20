@@ -1,0 +1,70 @@
+# SigNoz otel-collector config (signoz-otel-collector v0.144.x). Receives OTLP from the app on
+# 4317 (gRPC) / 4318 (HTTP) — published to the host as 44317 / 44318 — and writes traces, metrics,
+# and logs to ClickHouse. Standard SigNoz local-deploy file; refresh from the SigNoz repo
+# (deploy/docker/otel-collector-config.yaml) if you bump the collector image.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 16
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 10000
+    send_batch_max_size: 11000
+    timeout: 10s
+  signozspanmetrics/delta:
+    metrics_exporter: signozclickhousemetrics
+    metrics_flush_interval: 60s
+    latency_histogram_buckets: [100us, 1ms, 2ms, 6ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s]
+    dimensions_cache_size: 100000
+    aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA
+    enable_exp_histogram: true
+    dimensions:
+      - name: service.namespace
+        default: default
+      - name: deployment.environment
+        default: default
+      - name: signoz.collector.id
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  zpages:
+    endpoint: 0.0.0.0:55679
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+exporters:
+  clickhousetraces:
+    datasource: ${env:SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN}
+    use_new_schema: true
+  signozclickhousemetrics:
+    dsn: ${env:SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN}
+  clickhouselogsexporter:
+    dsn: ${env:SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN}
+    use_new_schema: true
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      address: 0.0.0.0:8888
+  extensions: [health_check, zpages, pprof]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [signozspanmetrics/delta, batch]
+      exporters: [clickhousetraces]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [signozclickhousemetrics]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [clickhouselogsexporter]

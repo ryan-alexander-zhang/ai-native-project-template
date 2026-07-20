@@ -1,7 +1,63 @@
+# Tomcat runs on 8090: kafka-ui in compose.yaml publishes host port 8080.
+server:
+  port: 8090
+
 spring:
   application:
     name: ordering
-  # The four durable Process Manager tables are applied by the aipersimmon-ddd-flyway starter at
-  # startup (PostgreSQL: docker-compose in dev, Testcontainers in tests), on its own history table
-  # flyway_schema_history_aipersimmon_process_manager. The process-manager starter then validates
-  # they exist.
+  # Local infrastructure (PostgreSQL + Kafka) is started from compose.yaml by Spring Boot's
+  # docker-compose support. start-only means the app boots the containers but does NOT tear them
+  # down on exit, so `mvn spring-boot:run` iterations are fast and the SigNoz stack (behind the
+  # `observability` compose profile, started out-of-band with `docker compose --profile observability
+  # up -d`) is left untouched. The DataSource and Kafka bootstrap-servers are auto-wired from the
+  # running compose services; tests skip compose (spring.docker.compose.skip.in-tests=true) and use
+  # Testcontainers instead.
+  docker:
+    compose:
+      lifecycle-management: start-only
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+aipersimmon:
+  ddd:
+    # CloudEvents `source` stamped on every published integration event (decision-00014).
+    integration:
+      source: ${spring.application.name}
+    # The shared Flyway starter applies each component's schema on its own history table
+    # (flyway_schema_history_aipersimmon_<component>): the four process-manager tables, the
+    # outbox + dead-letter + shedlock tables, and the inbox table. PostgreSQL in dev
+    # (docker-compose), Testcontainers in tests.
+    flyway:
+      components:
+        - process-manager
+        - outbox
+        - inbox
+    # Integration events cross bounded contexts over Kafka (decision-00006 transport "方式三").
+    # A single topic carries every event type; identity/routing rides in ce_* headers, the record
+    # key is the aggregate subject (per-aggregate ordering). consumer.enabled registers the
+    # inbox-guarded consumer bridge that republishes each event in process.
+    messaging:
+      kafka:
+        topic: aipersimmon.integration-events
+        consumer:
+          enabled: true
+
+# OpenTelemetry export to the SigNoz otel-collector. In dev the collector listens on the host at
+# 44317 (gRPC) / 44318 (HTTP) — see compose.yaml (started with the `observability` profile). These
+# are the standard OTel SDK autoconfigure knobs read by the opentelemetry-spring-boot-starter; the
+# aipersimmon observability starter binds the domain spine (command / process.advance / outbox.publish
+# spans) to the same OpenTelemetry instance. Tests disable the SDK (no collector there).
+otel:
+  service:
+    name: ${spring.application.name}
+  exporter:
+    otlp:
+      endpoint: http://localhost:44317
+      protocol: grpc

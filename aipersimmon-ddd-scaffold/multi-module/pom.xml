@@ -12,12 +12,17 @@
   </parent>
 
   <!--
-    Reference multi-module DDD project, one bounded context (ordering) split into
-    api / domain / application / infrastructure / adapter modules plus a start
-    module that assembles them. It is built on the AiPersimmon DDD building blocks
-    (imported via the BOM below) and is the source from which the multi-module
-    archetype is generated. Persistence is in-memory so the project runs and tests
-    without any external database.
+    Reference multi-module DDD project: three bounded contexts (ordering, inventory,
+    payment), each split into api / domain / application / infrastructure / adapter
+    modules, plus ordering's durable process-manager module and a start module that
+    assembles them. It is built on the AiPersimmon DDD building blocks (imported via
+    the BOM below) and is the source from which the multi-module archetype is generated.
+
+    Aggregates persist in memory, but the app integrates real middleware: cross-context
+    integration events ride the transactional outbox to Kafka and back through an
+    idempotent inbox, the durable process manager and outbox/inbox tables live in
+    PostgreSQL (single-source Flyway migrations), and traces export to SigNoz over OTLP.
+    Local infrastructure is in start/compose.yaml; see docs/plan/plan-00006.
 
     Unlike the building-block library, this is an application, so it may inherit
     spring-boot-starter-parent.
