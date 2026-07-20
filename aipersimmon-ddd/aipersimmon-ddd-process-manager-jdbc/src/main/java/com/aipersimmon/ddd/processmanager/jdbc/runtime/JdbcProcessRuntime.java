@@ -33,8 +33,11 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionInsert;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.NoOpTracer;
 import com.aipersimmon.ddd.observability.ObservabilityAttributes;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
 import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
@@ -82,6 +85,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     private final Optional<Duration> maxLifetime;
     private final long maxPayloadBytes;
     private final Tracer tracer;
+    private final StoreAndForwardTracer storeTracer;
 
     public JdbcProcessRuntime(
             JdbcProcessInstanceStore instances,
@@ -157,6 +161,29 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
             Optional<Duration> maxLifetime,
             long maxPayloadBytes,
             Tracer tracer) {
+        this(instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
+                unitOfWork, clock, idGenerator, duplicatePolicy, maxRetries, observer, maxLifetime,
+                maxPayloadBytes, tracer, NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public JdbcProcessRuntime(
+            JdbcProcessInstanceStore instances,
+            JdbcProcessTransitionStore transitions,
+            JdbcProcessEffectStore effects,
+            JdbcProcessDeadlineStore deadlines,
+            ProcessDefinitionRegistry definitions,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            ProcessStateCodecRegistry stateCodecs,
+            JdbcProcessUnitOfWork unitOfWork,
+            Clock clock,
+            Supplier<String> idGenerator,
+            DuplicateBusinessKeyPolicy duplicatePolicy,
+            int maxRetries,
+            ProcessObserver observer,
+            Optional<Duration> maxLifetime,
+            long maxPayloadBytes,
+            Tracer tracer,
+            StoreAndForwardTracer storeTracer) {
         this.instances = instances;
         this.transitions = transitions;
         this.effects = effects;
@@ -173,6 +200,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         this.maxLifetime = maxLifetime;
         this.maxPayloadBytes = maxPayloadBytes;
         this.tracer = tracer;
+        this.storeTracer = storeTracer;
     }
 
     @Override
@@ -384,10 +412,13 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
             ProcessRef ref, String transitionId, int index, long seq, ProcessEffect effect,
             EncodedPayload payload, CommandContext cause, Instant now) {
         String effectId = transitionId + "#" + index;
+        // Capture the advance's trace context so the relay can link effect.dispatch back to it.
+        Captured captured = storeTracer.captureCurrent();
         effects.insert(new ProcessEffectInsert(
                 effectId, ref.instanceId(), transitionId, index, seq, effect.kind(),
                 payload.type().logicalType(), payload.type().version(), payload.data(),
-                effectId, cause.correlationId(), cause.messageId(), cause.traceId()), now);
+                effectId, cause.correlationId(), cause.messageId(), cause.traceId(),
+                captured.traceparent(), captured.traceState()), now);
     }
 
     private void scheduleDeadline(ProcessRef ref, ScheduleDeadline schedule, CommandContext cause, Instant now) {
@@ -395,10 +426,12 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         EncodedPayload input = encodePayload(schedule.input());
         // Persist the scheduling cause's correlation/causation/trace so the timer fires under the same
         // causal chain as the flow that armed it, rather than starting a fresh correlation.
+        Captured captured = storeTracer.captureCurrent();
         deadlines.schedule(new ProcessDeadlineInsert(
                 idGenerator.get(), ref.instanceId(), schedule.name(), generation, schedule.dueAt(),
                 input.type().logicalType(), input.type().version(), input.data(),
-                cause.correlationId(), cause.messageId(), cause.traceId()), now);
+                cause.correlationId(), cause.messageId(), cause.traceId(),
+                captured.traceparent(), captured.traceState()), now);
     }
 
     private ProcessAdvanceResult duplicateResult(ProcessInstanceRow row, String transitionId) {

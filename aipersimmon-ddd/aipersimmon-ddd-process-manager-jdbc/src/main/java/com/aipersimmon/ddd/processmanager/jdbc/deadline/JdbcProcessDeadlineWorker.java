@@ -1,6 +1,8 @@
 package com.aipersimmon.ddd.processmanager.jdbc.deadline;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
@@ -47,6 +49,7 @@ public final class JdbcProcessDeadlineWorker {
     private final int batchSize;
     private final Duration leaseDuration;
     private final Supplier<String> leaseTokens;
+    private final StoreAndForwardTracer storeTracer;
 
     public JdbcProcessDeadlineWorker(
             JdbcTemplate jdbc,
@@ -62,6 +65,25 @@ public final class JdbcProcessDeadlineWorker {
             int batchSize,
             Duration leaseDuration,
             Supplier<String> leaseTokens) {
+        this(jdbc, dialect, deadlines, instances, payloadCodecs, runtime, unitOfWork, retryPolicy,
+                clock, workerId, batchSize, leaseDuration, leaseTokens, NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public JdbcProcessDeadlineWorker(
+            JdbcTemplate jdbc,
+            JdbcProcessDialect dialect,
+            JdbcProcessDeadlineStore deadlines,
+            JdbcProcessInstanceStore instances,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            ProcessRuntime runtime,
+            JdbcProcessUnitOfWork unitOfWork,
+            ProcessRetryPolicy retryPolicy,
+            java.time.Clock clock,
+            WorkerId workerId,
+            int batchSize,
+            Duration leaseDuration,
+            Supplier<String> leaseTokens,
+            StoreAndForwardTracer storeTracer) {
         this.jdbc = jdbc;
         this.dialect = dialect;
         this.deadlines = deadlines;
@@ -75,6 +97,7 @@ public final class JdbcProcessDeadlineWorker {
         this.batchSize = batchSize;
         this.leaseDuration = leaseDuration;
         this.leaseTokens = leaseTokens;
+        this.storeTracer = storeTracer;
     }
 
     /** Claim and fire one batch of due deadlines; returns the number fired. */
@@ -128,7 +151,12 @@ public final class JdbcProcessDeadlineWorker {
                 CommandContext context = new CommandContext(
                         deadline.deadlineId() + "#" + deadline.generation(),
                         deadline.correlationId(), deadline.causationId(), deadline.traceId());
-                runtime.handle(instance.get().ref(), input, context);
+                // Restore the scheduling advance's trace context so the timer's own advance links
+                // back to the flow that armed it, rather than starting a fresh trace on the worker thread.
+                try (StoreAndForwardTracer.Scope ignored = storeTracer.restore(
+                        deadline.traceparent(), deadline.traceState(), "deadline.fire " + deadlineId)) {
+                    runtime.handle(instance.get().ref(), input, context);
+                }
                 deadlines.markFired(deadlineId, leaseToken, clock.instant());
                 return Boolean.TRUE;
             }));

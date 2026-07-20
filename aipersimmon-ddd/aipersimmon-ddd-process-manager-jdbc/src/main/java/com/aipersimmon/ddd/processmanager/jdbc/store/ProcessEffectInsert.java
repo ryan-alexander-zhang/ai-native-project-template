@@ -22,7 +22,9 @@ public record ProcessEffectInsert(
         String messageId,
         String correlationId,
         String causationId,
-        String traceId) {
+        String traceId,
+        String traceparent,
+        String traceState) {
 
     public ProcessEffectInsert {
         payload = payload.clone();

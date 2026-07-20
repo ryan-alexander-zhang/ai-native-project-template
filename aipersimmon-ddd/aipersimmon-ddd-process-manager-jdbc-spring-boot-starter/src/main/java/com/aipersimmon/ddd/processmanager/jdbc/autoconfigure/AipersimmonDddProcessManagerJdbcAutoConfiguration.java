@@ -2,7 +2,9 @@ package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.NoOpTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
@@ -152,7 +154,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
             ProcessDefinitionRegistry definitions, ProcessPayloadCodecRegistry payloadCodecs,
             ProcessStateCodecRegistry stateCodecs, JdbcProcessUnitOfWork unitOfWork, Clock processManagerClock,
             ProcessManagerJdbcProperties properties, ObjectProvider<ProcessObserver> observer,
-            ObjectProvider<Tracer> tracer) {
+            ObjectProvider<Tracer> tracer, ObjectProvider<StoreAndForwardTracer> storeTracer) {
         DuplicateBusinessKeyPolicy policy = DuplicateBusinessKeyPolicy.valueOf(
                 properties.getStartDuplicateBusinessKey().toUpperCase(Locale.ROOT));
         return new JdbcProcessRuntime(
@@ -160,7 +162,8 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
                 unitOfWork, processManagerClock, randomIds(), policy, properties.getConcurrencyMaxRetries(),
                 observer.getIfAvailable(() -> ProcessObserver.NOOP),
                 properties.getInstance().maxLifetimeDuration(), properties.getPayload().getMaxBytes(),
-                tracer.getIfAvailable(() -> NoOpTracer.INSTANCE));
+                tracer.getIfAvailable(() -> NoOpTracer.INSTANCE),
+                storeTracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
     }
 
     /**
@@ -235,12 +238,13 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
             JdbcProcessInstanceStore instances, ProcessPayloadCodecRegistry payloadCodecs,
             EffectDispatcherRegistry dispatchers, JdbcProcessUnitOfWork unitOfWork, Clock processManagerClock,
             WorkerId processWorkerId, ProcessManagerJdbcProperties properties,
-            ObjectProvider<ProcessObserver> observer) {
+            ObjectProvider<ProcessObserver> observer, ObjectProvider<StoreAndForwardTracer> storeTracer) {
         ProcessManagerJdbcProperties.Worker cfg = properties.getEffectRelay();
         return new JdbcProcessEffectRelay(
                 jdbcTemplate, dialect, effects, instances, payloadCodecs, dispatchers, unitOfWork,
                 backoff(cfg), processManagerClock, processWorkerId, cfg.getBatchSize(),
-                cfg.getLeaseDuration(), randomIds(), observer.getIfAvailable(() -> ProcessObserver.NOOP));
+                cfg.getLeaseDuration(), randomIds(), observer.getIfAvailable(() -> ProcessObserver.NOOP),
+                storeTracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
     }
 
     @Bean
@@ -252,12 +256,14 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
             JdbcTemplate jdbcTemplate, JdbcProcessDialect dialect, JdbcProcessDeadlineStore deadlines,
             JdbcProcessInstanceStore instances, ProcessPayloadCodecRegistry payloadCodecs,
             JdbcProcessRuntime runtime, JdbcProcessUnitOfWork unitOfWork, Clock processManagerClock,
-            WorkerId processWorkerId, ProcessManagerJdbcProperties properties) {
+            WorkerId processWorkerId, ProcessManagerJdbcProperties properties,
+            ObjectProvider<StoreAndForwardTracer> storeTracer) {
         ProcessManagerJdbcProperties.Worker cfg = properties.getDeadlineWorker();
         return new JdbcProcessDeadlineWorker(
                 jdbcTemplate, dialect, deadlines, instances, payloadCodecs, runtime, unitOfWork,
                 backoff(cfg), processManagerClock, processWorkerId, cfg.getBatchSize(),
-                cfg.getLeaseDuration(), randomIds());
+                cfg.getLeaseDuration(), randomIds(),
+                storeTracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
     }
 
     @Bean

@@ -27,6 +27,8 @@ public class OutboxRecord {
     private String correlationId;
     private String causationId;
     private String traceId;
+    private String traceparent;
+    private String traceState;
     private Boolean sent;
     private Instant sentAt;
     private Integer attempts;
@@ -119,6 +121,22 @@ public class OutboxRecord {
 
     public void setTraceId(String traceId) {
         this.traceId = traceId;
+    }
+
+    public String getTraceparent() {
+        return traceparent;
+    }
+
+    public void setTraceparent(String traceparent) {
+        this.traceparent = traceparent;
+    }
+
+    public String getTraceState() {
+        return traceState;
+    }
+
+    public void setTraceState(String traceState) {
+        this.traceState = traceState;
     }
 
     public Boolean getSent() {

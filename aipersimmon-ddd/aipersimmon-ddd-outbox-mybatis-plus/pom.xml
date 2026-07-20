@@ -35,6 +35,12 @@
   <description>Transactional-outbox storage over MyBatis-Plus for reliable integration-event delivery.</description>
 
   <dependencies>
+    <!-- Observability SPI (framework-free, no-op default): capture on write, restore on dispatch. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-outbox</artifactId>

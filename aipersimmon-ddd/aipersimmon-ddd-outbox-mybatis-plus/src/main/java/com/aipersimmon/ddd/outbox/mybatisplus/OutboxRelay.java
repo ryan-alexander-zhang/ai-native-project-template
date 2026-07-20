@@ -3,6 +3,8 @@ package com.aipersimmon.ddd.outbox.mybatisplus;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -54,10 +56,19 @@ public class OutboxRelay {
     private final Clock clock;
     private final int batchSize;
     private final int maxAttempts;
+    private final StoreAndForwardTracer tracer;
 
     public OutboxRelay(OutboxMapper mapper, OutboxDispatcher dispatcher,
                        DeadLetterStore deadLetterStore, FailureClassifier failureClassifier,
                        RetryBackoff backoff, Clock clock, int batchSize, int maxAttempts) {
+        this(mapper, dispatcher, deadLetterStore, failureClassifier, backoff, clock, batchSize, maxAttempts,
+                NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public OutboxRelay(OutboxMapper mapper, OutboxDispatcher dispatcher,
+                       DeadLetterStore deadLetterStore, FailureClassifier failureClassifier,
+                       RetryBackoff backoff, Clock clock, int batchSize, int maxAttempts,
+                       StoreAndForwardTracer tracer) {
         this.mapper = mapper;
         this.dispatcher = dispatcher;
         this.deadLetterStore = deadLetterStore;
@@ -66,6 +77,7 @@ public class OutboxRelay {
         this.clock = clock;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
+        this.tracer = tracer;
     }
 
     @Scheduled(fixedDelayString = "${aipersimmon.ddd.outbox.poll-delay-ms:1000}")
@@ -83,7 +95,11 @@ public class OutboxRelay {
                 // later events back so they are not delivered out of order.
                 continue;
             }
-            try {
+            try (StoreAndForwardTracer.Scope ignored = tracer.restore(
+                    record.getTraceparent(), record.getTraceState(),
+                    "outbox.publish " + record.getEventId())) {
+                // The restored span is current here, so the Kafka producer instrumentation stamps
+                // the message with this dispatch span, which links back to the span that wrote the row.
                 dispatcher.dispatch(toMessage(record));
             } catch (RuntimeException e) {
                 if (handleFailure(record, e) && subject != null) {

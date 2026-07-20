@@ -4,6 +4,9 @@ import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
@@ -25,17 +28,27 @@ public class OutboxWriter implements IntegrationEvents {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final String source;
+    private final StoreAndForwardTracer tracer;
 
     public OutboxWriter(OutboxMapper mapper, ObjectMapper objectMapper, Clock clock, String source) {
+        this(mapper, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public OutboxWriter(OutboxMapper mapper, ObjectMapper objectMapper, Clock clock, String source,
+                        StoreAndForwardTracer tracer) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.source = source;
+        this.tracer = tracer;
     }
 
     @Override
     public void publish(IntegrationEvent event, CommandContext context) {
         String payload = serialize(event);
+        // Capture the writing thread's trace context so the relay can restore it when it
+        // dispatches the row later — the outbox hop that ambient context cannot bridge.
+        Captured captured = tracer.captureCurrent();
         EventEnvelope<IntegrationEvent> envelope = new EventEnvelope<>(
                 UUID.randomUUID().toString(),
                 source,
@@ -59,6 +72,8 @@ public class OutboxWriter implements IntegrationEvents {
         record.setCorrelationId(envelope.correlationId());
         record.setCausationId(envelope.causationId());
         record.setTraceId(envelope.traceId());
+        record.setTraceparent(captured.traceparent());
+        record.setTraceState(captured.traceState());
         record.setSent(false);
         record.setAttempts(0);
         record.setCreatedAt(clock.instant());

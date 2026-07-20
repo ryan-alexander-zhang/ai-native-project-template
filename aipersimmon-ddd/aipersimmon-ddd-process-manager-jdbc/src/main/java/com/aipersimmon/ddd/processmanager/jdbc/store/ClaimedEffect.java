@@ -18,7 +18,9 @@ public record ClaimedEffect(
         PayloadType payloadType,
         byte[] payload,
         CommandContext context,
-        int attempts) {
+        int attempts,
+        String traceparent,
+        String traceState) {
 
     public ClaimedEffect {
         payload = payload.clone();

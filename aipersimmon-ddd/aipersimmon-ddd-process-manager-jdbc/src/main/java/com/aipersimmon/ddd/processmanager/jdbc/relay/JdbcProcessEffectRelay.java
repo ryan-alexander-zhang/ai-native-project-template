@@ -1,5 +1,7 @@
 package com.aipersimmon.ddd.processmanager.jdbc.relay;
 
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
@@ -48,6 +50,7 @@ public final class JdbcProcessEffectRelay {
     private final Duration leaseDuration;
     private final Supplier<String> leaseTokens;
     private final ProcessObserver observer;
+    private final StoreAndForwardTracer storeTracer;
 
     public JdbcProcessEffectRelay(
             JdbcTemplate jdbc,
@@ -64,7 +67,8 @@ public final class JdbcProcessEffectRelay {
             Duration leaseDuration,
             Supplier<String> leaseTokens) {
         this(jdbc, dialect, effects, instances, payloadCodecs, dispatchers, unitOfWork, retryPolicy,
-                clock, workerId, batchSize, leaseDuration, leaseTokens, ProcessObserver.NOOP);
+                clock, workerId, batchSize, leaseDuration, leaseTokens, ProcessObserver.NOOP,
+                NoOpStoreAndForwardTracer.INSTANCE);
     }
 
     public JdbcProcessEffectRelay(
@@ -82,6 +86,27 @@ public final class JdbcProcessEffectRelay {
             Duration leaseDuration,
             Supplier<String> leaseTokens,
             ProcessObserver observer) {
+        this(jdbc, dialect, effects, instances, payloadCodecs, dispatchers, unitOfWork, retryPolicy,
+                clock, workerId, batchSize, leaseDuration, leaseTokens, observer,
+                NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public JdbcProcessEffectRelay(
+            JdbcTemplate jdbc,
+            JdbcProcessDialect dialect,
+            JdbcProcessEffectStore effects,
+            JdbcProcessInstanceStore instances,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            EffectDispatcherRegistry dispatchers,
+            JdbcProcessUnitOfWork unitOfWork,
+            ProcessRetryPolicy retryPolicy,
+            java.time.Clock clock,
+            WorkerId workerId,
+            int batchSize,
+            Duration leaseDuration,
+            Supplier<String> leaseTokens,
+            ProcessObserver observer,
+            StoreAndForwardTracer storeTracer) {
         this.jdbc = jdbc;
         this.dialect = dialect;
         this.effects = effects;
@@ -96,6 +121,7 @@ public final class JdbcProcessEffectRelay {
         this.leaseDuration = leaseDuration;
         this.leaseTokens = leaseTokens;
         this.observer = observer;
+        this.storeTracer = storeTracer;
     }
 
     /** Claim and deliver one batch; returns the number delivered successfully. */
@@ -127,9 +153,15 @@ public final class JdbcProcessEffectRelay {
         try {
             ProcessPayloadCodec<?> codec = payloadCodecs.forType(effect.payloadType());
             Object payload = codec.decode(new EncodedPayload(effect.payloadType(), effect.payload()));
-            dispatchers.dispatch(
-                    new DecodedProcessEffect(effect.effectId(), effect.instanceId(), effect.kind(), payload),
-                    effect.context());
+            // Restore the advance's trace context so this dispatch (and any command/event it emits,
+            // whose producer instrumentation reads the current context) links back to the span that
+            // staged the effect, rather than starting an unrelated trace on the relay thread.
+            try (StoreAndForwardTracer.Scope ignored = storeTracer.restore(
+                    effect.traceparent(), effect.traceState(), "effect.dispatch " + effectId)) {
+                dispatchers.dispatch(
+                        new DecodedProcessEffect(effect.effectId(), effect.instanceId(), effect.kind(), payload),
+                        effect.context());
+            }
             effects.markDelivered(effectId, leaseToken, clock.instant());
             observer.effectDispatched(true, Duration.ofNanos(System.nanoTime() - dispatchStart));
             return true;

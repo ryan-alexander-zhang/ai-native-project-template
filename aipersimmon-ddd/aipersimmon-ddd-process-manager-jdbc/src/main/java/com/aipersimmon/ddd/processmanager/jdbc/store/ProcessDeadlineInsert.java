@@ -21,7 +21,9 @@ public record ProcessDeadlineInsert(
         byte[] inputPayload,
         String correlationId,
         String causationId,
-        String traceId) {
+        String traceId,
+        String traceparent,
+        String traceState) {
 
     public ProcessDeadlineInsert {
         inputPayload = inputPayload.clone();

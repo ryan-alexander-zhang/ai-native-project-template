@@ -1,6 +1,8 @@
 package com.aipersimmon.ddd.outbox.mybatisplus;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
@@ -85,9 +87,11 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
     @ConditionalOnMissingBean(IntegrationEvents.class)
     public IntegrationEvents outboxWriter(OutboxMapper outboxMapper, ObjectProvider<ObjectMapper> objectMapper,
             Clock outboxClock,
-            @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}") String source) {
+            @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}") String source,
+            ObjectProvider<StoreAndForwardTracer> tracer) {
         return new OutboxWriter(
-                outboxMapper, objectMapper.getIfAvailable(ObjectMapper::new), outboxClock, source);
+                outboxMapper, objectMapper.getIfAvailable(ObjectMapper::new), outboxClock, source,
+                tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
     }
 
     @Bean
@@ -99,9 +103,11 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
                                    @Value("${aipersimmon.ddd.outbox.batch-size:100}") int batchSize,
                                    @Value("${aipersimmon.ddd.outbox.max-attempts:10}") int maxAttempts,
                                    @Value("${aipersimmon.ddd.outbox.retry.base-backoff-ms:1000}") long baseBackoffMs,
-                                   @Value("${aipersimmon.ddd.outbox.retry.max-backoff-ms:60000}") long maxBackoffMs) {
+                                   @Value("${aipersimmon.ddd.outbox.retry.max-backoff-ms:60000}") long maxBackoffMs,
+                                   ObjectProvider<StoreAndForwardTracer> tracer) {
         return new OutboxRelay(outboxMapper, outboxDispatcher, deadLetterStore, failureClassifier,
-                new RetryBackoff(baseBackoffMs, maxBackoffMs), outboxClock, batchSize, maxAttempts);
+                new RetryBackoff(baseBackoffMs, maxBackoffMs), outboxClock, batchSize, maxAttempts,
+                tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
     }
 
     @Bean
