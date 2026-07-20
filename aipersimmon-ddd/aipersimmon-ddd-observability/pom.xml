@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The framework-free observability contract. It declares the seams the durable
+    infrastructure (outbox relay, process-manager relay/deadline) and the domain
+    spine need in order to be traceable, expressed as plain SPIs plus attribute-key
+    constants — nothing about OpenTelemetry lives here.
+
+    Hard rule: ZERO compile dependencies. Never import OpenTelemetry, Micrometer,
+    Spring, or any tracing implementation, so core/cqrs/process-manager/outbox can
+    depend on it without dragging a tracer onto the classpath. The concrete OTEL
+    wiring lives in the optional aipersimmon-ddd-observability-otel module; when it
+    is absent every SPI here resolves to a no-op and behaviour is unchanged.
+  -->
+  <artifactId>aipersimmon-ddd-observability</artifactId>
+  <name>aipersimmon-ddd-observability</name>
+  <description>Framework-free observability SPIs: store-and-forward trace carrier, domain-span tracer, and the span attribute catalog. No-op by default; OTEL wiring lives in a separate optional module.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

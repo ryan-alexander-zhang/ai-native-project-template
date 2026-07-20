@@ -35,6 +35,7 @@
          (core), then the reusable ArchUnit rule set. -->
     <module>aipersimmon-ddd-bom</module>
     <module>aipersimmon-ddd-core</module>
+    <module>aipersimmon-ddd-observability</module>
     <module>aipersimmon-ddd-application</module>
     <module>aipersimmon-ddd-integration</module>
     <module>aipersimmon-ddd-cqrs</module>
