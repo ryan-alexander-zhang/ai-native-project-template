@@ -57,18 +57,24 @@ class ProblemDetailFactory {
     private ProblemDetail coded(ErrorCode code, String detail, List<FieldError> errors) {
         ProblemDescriptor descriptor = registry.resolve(code);
         ApiError error = ApiError.from(descriptor, code.code(), titleResolver.resolve(descriptor.titleKey()),
-                detail, null, currentTraceId(), errors);
+                detail, null, currentRequestId(), currentTraceId(), errors);
         return ProblemDetailMapper.toProblemDetail(error);
     }
 
     /** Build a plain (code-less) problem with an explicit status and optional field errors. */
     ProblemDetail simple(HttpStatus status, String detail, List<FieldError> errors) {
         ApiError error = new ApiError("about:blank", status.getReasonPhrase(), status.value(),
-                detail, null, null, currentTraceId(), errors);
+                detail, null, null, currentRequestId(), currentTraceId(), errors);
         return ProblemDetailMapper.toProblemDetail(error);
     }
 
+    /** The per-request edge correlation id (set by the request-id filter). */
+    private static String currentRequestId() {
+        return MDC.get(RequestIdFilter.REQUEST_ID_MDC_KEY);
+    }
+
+    /** The real OpenTelemetry trace id, if the observability-otel module put it on the MDC. */
     private static String currentTraceId() {
-        return MDC.get(TraceIdFilter.TRACE_ID_MDC_KEY);
+        return MDC.get(RequestIdFilter.TRACE_ID_MDC_KEY);
     }
 }

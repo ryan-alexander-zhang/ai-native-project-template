@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Configuration for the web layer, under {@code aipersimmon.ddd.web}. The
- * zero-risk concerns (problem details, trace id) default on; the stateful,
+ * zero-risk concerns (problem details, request id) default on; the stateful,
  * opt-in concerns (idempotency, replay, rate limiting) default off, and use the
  * in-memory SPI implementations unless a store backend module is on the classpath.
  */
@@ -15,7 +15,7 @@ import java.util.List;
 public class AipersimmonDddWebProperties {
 
     private final ProblemDetails problemDetails = new ProblemDetails();
-    private final Trace trace = new Trace();
+    private final RequestId requestId = new RequestId();
     private final Idempotency idempotency = new Idempotency();
     private final Replay replay = new Replay();
     private final RateLimit rateLimit = new RateLimit();
@@ -24,8 +24,8 @@ public class AipersimmonDddWebProperties {
         return problemDetails;
     }
 
-    public Trace getTrace() {
-        return trace;
+    public RequestId getRequestId() {
+        return requestId;
     }
 
     public Idempotency getIdempotency() {
@@ -55,16 +55,16 @@ public class AipersimmonDddWebProperties {
         }
     }
 
-    /** Trace-id correlation. */
-    public static class Trace {
+    /** Request-id correlation (a per-request id at the edge, not the distributed-trace id). */
+    public static class RequestId {
 
-        /** Whether the trace-id filter is registered. */
+        /** Whether the request-id filter is registered. */
         private boolean enabled = true;
 
-        /** Request/response header carrying the trace id. */
-        private String header = "X-Trace-Id";
+        /** Request/response header carrying the request id. */
+        private String header = "X-Request-Id";
 
-        /** Generate a trace id when the request does not carry one. */
+        /** Generate a request id when the request does not carry one. */
         private boolean generateIfAbsent = true;
 
         public boolean isEnabled() {

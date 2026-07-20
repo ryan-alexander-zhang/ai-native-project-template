@@ -30,6 +30,9 @@ final class ProblemDetailMapper {
         if (error.code() != null) {
             detail.setProperty("code", error.code());
         }
+        if (error.requestId() != null) {
+            detail.setProperty("requestId", error.requestId());
+        }
         if (error.traceId() != null) {
             detail.setProperty("traceId", error.traceId());
         }

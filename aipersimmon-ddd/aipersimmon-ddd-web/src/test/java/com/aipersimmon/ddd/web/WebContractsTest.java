@@ -35,12 +35,13 @@ class WebContractsTest {
                 new ProblemDescriptor("/problems/credit-exceeded", 422, "ordering.credit-exceeded.title"),
                 "ordering.credit-exceeded",
                 "Credit limit exceeded", "total 5000 exceeds remaining 3000",
-                "/v1/orders", "trace-abc",
+                "/v1/orders", "req-abc", "trace-abc",
                 List.of(new FieldError("/lines/0/qty", "out-of-range", "must be positive")));
 
         assertEquals("/problems/credit-exceeded", error.type());
         assertEquals(422, error.status());
         assertEquals("ordering.credit-exceeded", error.code());
+        assertEquals("req-abc", error.requestId());
         assertEquals("trace-abc", error.traceId());
         assertEquals(1, error.errors().size());
     }
@@ -56,7 +57,7 @@ class WebContractsTest {
     void apiErrorDefaultsBlankTypeToAboutBlankAndCopiesErrors() {
         List<FieldError> mutable = new ArrayList<>();
         mutable.add(new FieldError("f", "missing", null));
-        ApiError error = new ApiError("", "Bad Request", 400, null, null, null, null, mutable);
+        ApiError error = new ApiError("", "Bad Request", 400, null, null, null, null, null, mutable);
 
         assertEquals("about:blank", error.type());
         mutable.clear();
@@ -67,9 +68,9 @@ class WebContractsTest {
     @Test
     void apiErrorRejectsBlankTitleAndOutOfRangeStatus() {
         assertThrows(IllegalArgumentException.class,
-                () -> new ApiError("about:blank", " ", 400, null, null, null, null, null));
+                () -> new ApiError("about:blank", " ", 400, null, null, null, null, null, null));
         assertThrows(IllegalArgumentException.class,
-                () -> new ApiError("about:blank", "x", 99, null, null, null, null, null));
+                () -> new ApiError("about:blank", "x", 99, null, null, null, null, null, null));
     }
 
     @Test

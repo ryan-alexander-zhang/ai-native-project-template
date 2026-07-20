@@ -54,6 +54,23 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
     </dependency>
+    <!-- Optional: only used to surface the real trace_id on the MDC in a servlet app, so the
+         web error body can carry it. Guarded by @ConditionalOnClass, so non-web apps skip it. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- MDC (the trace-id-to-MDC filter). Provided by the app's logging stack at runtime. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
 
     <!-- Test: real SDK + in-memory exporter to assert emitted spans. -->
     <dependency>

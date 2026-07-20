@@ -68,9 +68,9 @@ class WebLayerTest {
                 .andExpect(jsonPath("$.status").value(422))
                 .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"))
                 .andExpect(jsonPath("$.title").value(notNullValue()))
-                .andExpect(jsonPath("$.traceId").value(notNullValue()))
+                .andExpect(jsonPath("$.requestId").value(notNullValue()))
                 .andExpect(jsonPath("$.errors[0].field").value("/lines/0/qty"))
-                .andExpect(header().exists("X-Trace-Id"));
+                .andExpect(header().exists("X-Request-Id"));
     }
 
     @Test

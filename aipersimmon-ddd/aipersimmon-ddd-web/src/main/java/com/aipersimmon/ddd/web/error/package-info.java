@@ -9,7 +9,7 @@
  * or a {@link com.aipersimmon.ddd.web.error.ProblemCatalog} override for the few codes that
  * warrant their own problem type. {@link com.aipersimmon.ddd.web.error.ApiError} is the
  * value model a starter renders to {@code application/problem+json}: the five standard
- * members plus the extension members {@code code}, {@code traceId} and a
+ * members plus the extension members {@code code}, {@code requestId}, {@code traceId} and a
  * {@link com.aipersimmon.ddd.web.error.FieldError} list.
  * {@link com.aipersimmon.ddd.web.error.ApiException} lets application code raise a
  * catalogued error directly, carrying an {@code ErrorCode}.

@@ -8,7 +8,9 @@ import io.opentelemetry.api.OpenTelemetry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Binds the framework-free observability SPIs to OpenTelemetry and registers the
@@ -46,5 +48,17 @@ public class AipersimmonDddObservabilityOtelAutoConfiguration {
     @ConditionalOnMissingBean
     TracingCommandInterceptor tracingCommandInterceptor(Tracer tracer) {
         return new TracingCommandInterceptor(tracer);
+    }
+
+    /**
+     * Puts the real trace id on the MDC for each request so the web error body can surface it.
+     * Only in a servlet web app with {@code OncePerRequestFilter} on the classpath.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(OncePerRequestFilter.class)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    TraceIdMdcFilter aipersimmonTraceIdMdcFilter() {
+        return new TraceIdMdcFilter();
     }
 }

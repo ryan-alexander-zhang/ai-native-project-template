@@ -95,12 +95,12 @@ public class AipersimmonDddWebAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(name = "aipersimmonDddTraceIdFilter")
-    @ConditionalOnProperty(prefix = "aipersimmon.ddd.web.trace", name = "enabled", matchIfMissing = true)
-    public FilterRegistrationBean<TraceIdFilter> aipersimmonDddTraceIdFilter(AipersimmonDddWebProperties properties) {
-        AipersimmonDddWebProperties.Trace trace = properties.getTrace();
-        FilterRegistrationBean<TraceIdFilter> registration = new FilterRegistrationBean<>(
-                new TraceIdFilter(trace.getHeader(), trace.isGenerateIfAbsent()));
+    @ConditionalOnMissingBean(name = "aipersimmonDddRequestIdFilter")
+    @ConditionalOnProperty(prefix = "aipersimmon.ddd.web.request-id", name = "enabled", matchIfMissing = true)
+    public FilterRegistrationBean<RequestIdFilter> aipersimmonDddRequestIdFilter(AipersimmonDddWebProperties properties) {
+        AipersimmonDddWebProperties.RequestId requestId = properties.getRequestId();
+        FilterRegistrationBean<RequestIdFilter> registration = new FilterRegistrationBean<>(
+                new RequestIdFilter(requestId.getHeader(), requestId.isGenerateIfAbsent()));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;
     }

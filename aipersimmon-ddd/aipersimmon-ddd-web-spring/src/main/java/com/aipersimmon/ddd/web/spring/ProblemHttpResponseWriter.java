@@ -35,7 +35,11 @@ public class ProblemHttpResponseWriter {
         if (detail != null) {
             body.put("detail", detail);
         }
-        String traceId = MDC.get(TraceIdFilter.TRACE_ID_MDC_KEY);
+        String requestId = MDC.get(RequestIdFilter.REQUEST_ID_MDC_KEY);
+        if (requestId != null) {
+            body.put("requestId", requestId);
+        }
+        String traceId = MDC.get(RequestIdFilter.TRACE_ID_MDC_KEY);
         if (traceId != null) {
             body.put("traceId", traceId);
         }
