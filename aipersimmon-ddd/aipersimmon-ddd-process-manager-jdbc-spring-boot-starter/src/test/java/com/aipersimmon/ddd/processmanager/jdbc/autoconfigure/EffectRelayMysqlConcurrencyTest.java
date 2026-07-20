@@ -75,7 +75,7 @@ class EffectRelayMysqlConcurrencyTest {
         jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_deadline");
         jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_instance");
         new ResourceDatabasePopulator(new ClassPathResource(
-                "META-INF/aipersimmon-ddd/process-manager/mysql-schema.sql")).execute(ds);
+                "aipersimmon/db/migration/process-manager/mysql/V1__aipersimmon_process_manager.sql")).execute(ds);
 
         instanceStore = new JdbcProcessInstanceStore(jdbc);
         JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);

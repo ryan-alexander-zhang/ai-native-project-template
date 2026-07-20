@@ -52,8 +52,11 @@
     <module>aipersimmon-ddd-outbox</module>
     <module>aipersimmon-ddd-outbox-jdbc</module>
     <module>aipersimmon-ddd-outbox-mybatis-plus</module>
+    <module>aipersimmon-ddd-inbox</module>
     <module>aipersimmon-ddd-inbox-jdbc</module>
     <module>aipersimmon-ddd-inbox-mybatis-plus</module>
+    <!-- Shared, schema-agnostic Flyway runner for every storage component (opt-in). -->
+    <module>aipersimmon-ddd-flyway</module>
     <module>aipersimmon-ddd-messaging-kafka</module>
     <module>aipersimmon-ddd-web</module>
     <module>aipersimmon-ddd-web-spring</module>

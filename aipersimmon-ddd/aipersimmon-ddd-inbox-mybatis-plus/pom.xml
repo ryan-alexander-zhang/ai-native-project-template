@@ -37,6 +37,12 @@
       <artifactId>aipersimmon-ddd-application</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Shared inbox table schema (Flyway migrations); the single source of the inbox DDL. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-spring-boot3-starter</artifactId>

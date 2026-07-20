@@ -114,12 +114,22 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-inbox</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-flyway</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

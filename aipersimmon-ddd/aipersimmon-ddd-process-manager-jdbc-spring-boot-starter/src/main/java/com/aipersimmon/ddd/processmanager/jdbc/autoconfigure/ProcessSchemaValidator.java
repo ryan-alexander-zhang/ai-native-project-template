@@ -34,7 +34,8 @@ public final class ProcessSchemaValidator implements InitializingBean {
             } catch (RuntimeException missing) {
                 throw new IllegalStateException(
                         "process-manager table '" + table + "' is missing or unreadable; apply the schema "
-                                + "(see META-INF/aipersimmon-ddd/process-manager) via Flyway/Liquibase, or set "
+                                + "(see aipersimmon/db/migration/process-manager) via the aipersimmon-ddd-flyway "
+                                + "starter or your own Flyway/Liquibase, or set "
                                 + "aipersimmon.ddd.process-manager.jdbc.schema-validation=none", missing);
             }
         }

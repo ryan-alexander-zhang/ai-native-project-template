@@ -59,7 +59,7 @@ class JdbcProcessRuntimeTracingTest {
         dataSource = new EmbeddedDatabaseBuilder()
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
-                .addScript("classpath:process-schema-h2.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
                 .build();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);

@@ -19,7 +19,10 @@
 
     Deliberately JDBC, not JPA: it defines no @Entity and touches no @EntityScan,
     so it never overrides a consumer's own entity scanning. The consumer creates
-    the outbox table (a documented DDL; via Flyway/Liquibase in production).
+    the outbox table. The DDL ships (in aipersimmon-ddd-outbox) as vendor-templated
+    Flyway migrations under aipersimmon/db/migration/outbox/{vendor} (the single
+    source) — apply them via the optional shared aipersimmon-ddd-flyway starter, or
+    copy them into your own Flyway/Liquibase.
 
     Delivery is at-least-once: a crash between dispatch and marking a row sent
     causes a redelivery, so consumers must be idempotent.

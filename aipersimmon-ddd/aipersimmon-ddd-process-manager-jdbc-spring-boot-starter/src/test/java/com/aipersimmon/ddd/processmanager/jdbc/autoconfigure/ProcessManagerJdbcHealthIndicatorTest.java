@@ -31,7 +31,7 @@ class ProcessManagerJdbcHealthIndicatorTest {
         db = new EmbeddedDatabaseBuilder()
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
-                .addScript("classpath:schema.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
                 .build();
         jdbc = new JdbcTemplate(db);
         JdbcProcessBacklog backlog = new JdbcProcessBacklog(

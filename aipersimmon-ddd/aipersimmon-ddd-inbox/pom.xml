@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Shared inbox schema module. Unlike outbox, the inbox has no storage-agnostic core with
+    contracts, yet the -inbox-jdbc and -inbox-mybatis-plus adapters use an IDENTICAL table.
+    This module is the single home for that DDL: it ships the vendor-templated Flyway
+    migrations (aipersimmon/db/migration/inbox/{vendor}) that both adapters depend on, so the
+    schema lives in exactly one place and is on the classpath whichever adapter is used. It
+    carries no code. Applied automatically by the optional aipersimmon-ddd-flyway starter, or
+    copied into the consumer's own Flyway/Liquibase.
+  -->
+  <artifactId>aipersimmon-ddd-inbox</artifactId>
+  <name>aipersimmon-ddd-inbox</name>
+  <description>Shared inbox table schema (vendor-templated Flyway migrations) for the JDBC and MyBatis-Plus inbox adapters.</description>
+
+</project>

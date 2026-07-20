@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Opt-in, schema-agnostic Flyway integration for the whole aipersimmon-ddd family
+    (Scheme B, shared). Adding this one module to the classpath makes the tables of
+    whichever aipersimmon storage modules are present (outbox, inbox, web-store, saga,
+    process-manager) apply themselves at startup with zero consumer configuration.
+
+    It carries NO schema of its own and depends on no storage module. At startup it scans
+    the classpath for aipersimmon/db/migration/{component}/{vendor} migration sets and runs
+    a DEDICATED Flyway instance per discovered component, each against its own history table
+    (flyway_schema_history_aipersimmon_{component}), so nothing shares a version space with
+    the consumer's own migrations. It deliberately exposes no org.flywaydb.core.Flyway bean,
+    so Spring Boot's FlywayAutoConfiguration still manages the consumer's default Flyway. A
+    DatabaseInitializerDetector makes @DependsOnDatabaseInitialization beans (e.g. the
+    process-manager schema validator) wait for these migrations.
+  -->
+  <artifactId>aipersimmon-ddd-flyway</artifactId>
+  <name>aipersimmon-ddd-flyway</name>
+  <description>Opt-in, schema-agnostic Flyway runner that auto-applies every aipersimmon-ddd component schema on its own history table.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+
+    <!-- Flyway 10+ ships per-database support as separate modules. flyway-core covers H2;
+         PostgreSQL and MySQL consumers add the matching module. Declared optional so they
+         are not forced onto every consumer. -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-mysql</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- A real component migration set to discover in tests (ships the outbox migrations). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
