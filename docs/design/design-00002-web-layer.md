@@ -16,6 +16,13 @@ parent: decision-00007-web-api-response-envelope
 确定性装配"骨架**(见 [[design-00001-aipersimmon-ddd-and-scaffold]] §5.8)。本设计是 design-00001 §5 之外的
 新增量,design-00001 §三依赖图与 §5 清单应加一处指针引用本文。
 
+> **增补(traceId → requestId 正名)**:[[design-00005-observability-and-distributed-tracing]] 落地后,本文的 §5.2 "traceId"
+> 已正名为 **requestId**:`TraceIdFilter`→`RequestIdFilter`、header `X-Trace-Id`→`X-Request-Id`、MDC/`ApiError` 字段 `traceId`→
+> `requestId`、config 前缀 `aipersimmon.ddd.web.trace.*`→`request-id.*`。它就是"边缘请求关联 id"(不是 OTEL trace)。**另外**,
+> `ApiError` 新增一个 `traceId` 字段承载**真正的 OTEL trace-id**:仅当装了 `aipersimmon-ddd-observability-otel-spring-boot-starter`
+> 时,其 `TraceIdMdcFilter` 从活跃 span 取真 trace-id 写入 MDC `trace_id`,ProblemDetail 读之回显(未装则为 null,可回查追踪)。
+> 下文 §5.2 及契约示例里的 `traceId` 字段/`X-Trace-Id`,以本增补为准读作 `requestId`/`X-Request-Id`(外加可选的真 `traceId`)。
+
 ## 一、范围:v1 做什么、什么留后
 
 | 分类 | 条目 |

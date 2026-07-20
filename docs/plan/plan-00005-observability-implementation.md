@@ -99,7 +99,16 @@ flowchart TD
 
 - ✅ **P4**（端到端验收）
   - ✅ **连通-trace 验收**：`ConnectedTraceEndToEndTest`（observability-otel starter，真实 OTEL SDK + `InMemorySpanExporter`，H2 跑 outbox Flyway 迁移）——命令 span 活跃时 `OutboxWriter` 捕获其上下文入行，`OutboxRelay` 稍后（无 ambient）`restore` 起 `outbox.publish` span 并 **link 回命令 span**；断言 link.traceId == 命令 traceId、且 dispatch 为独立新 trace（非子）。这钉住了 P1+P2 的**组合**（单点 capture/restore/interceptor 行为已各自单测）。绿。
-  - **可选增强（不阻塞闭环，未做，留待需要时）**：baggage（`business_key`/租户，默认关）、collector tail-sampling 示例配置、日志/错误体以真 `trace_id` 收敛替换 UUID。这些是部署配置/锦上添花,与库能力正交。
+  - **可选增强（部署配置/锦上添花，未做）**：baggage（`business_key`/租户，默认关）、collector tail-sampling 示例配置。与库能力正交。
+
+- ✅ **P5**（后续:自制 traceId 正名 + 冗余移除——闭环收尾)
+  - **动机**:那个自制 `traceId` 是命名错误(实为 HTTP 边缘请求 id、且是查不到真 trace 的 UUID),且作为"追踪身份"在 `traceparent` 落地后已冗余。
+  - ✅ **正名**:web 边缘 `TraceIdFilter`→`RequestIdFilter`、`X-Trace-Id`→`X-Request-Id`、MDC/`ApiError` `traceId`→`requestId`、config `web.trace.*`→`web.request-id.*`。
+  - ✅ **移除冗余**:`CommandContext`(`root(messageId)` 单参)/`EventEnvelope`/`OutboxMessage` 去 `traceId` 字段;PM 三 store 的 `*Insert`/row + 两套 outbox writer/dead-letter 去 `trace_id`;Kafka 去 `ce_traceid`;**Flyway V2 `drop_trace_id`**(h2/mysql/pg × outbox 两表 + PM 三表),测试 schema 加载 V1+V2。
+  - ✅ **错误体回查**:`ApiError` 新增真 OTEL `traceId` 字段;observability-otel starter 新增 `TraceIdMdcFilter`(从活跃 span 取真 trace-id 写 MDC `trace_id`),ProblemDetail 读之——错误 id 现可粘进 Tempo 直达 trace。
+  - **信息取舍**:`requestId` 现为**边缘专属、不随异步链传播**;不装 OTEL 的消费方失去"下游事件源自哪次请求"的跨异步关联(`correlationId` 仍关联因果流,装 OTEL 则 span link 复原)。记于 [[decision-00013-command-context-and-causation-propagation]] 移除增补。
+  - **保留**:`traceparent`/`trace_state` 列 + P1–P4 全部 span 逻辑不变。全 reactor 绿(27 模块,含真实 MySQL/PG Testcontainers)。提交 `e37cc92`(移除) + `3cf4444`(正名)。
+  - **注**:dead-letter 行从不带 `traceparent`(过去只有旧 `trace_id`,已随之删)——终态行无可复原追踪上下文,可接受。
 
 ## 三、验收路径
 

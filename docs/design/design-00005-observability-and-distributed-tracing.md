@@ -14,6 +14,8 @@ parent:
 
 本文承接 [[decision-00013-command-context-and-causation-propagation]]（`CommandContext` / `EventEnvelope` 显式因果传播）、[[design-00004-durable-process-manager-runtime]]（Process Manager 的异步 relay/deadline 与 SLI 指标）、[[design-00003-exception-model]]（异常模型，本文的 span 错误语义与之对齐），并回收 [[issue-00025-correlation-propagation-and-scrape-batching]]（deadline/replay 处的链路断裂）为其 trace 投影。
 
+> **落地增补（最终标识模型）**：实现完成后，那个"自制 `traceId`"被**拆成两件正确的事**——① 它的本质是 HTTP 边缘请求 id，正名为 **`requestId`**（`X-Request-Id`，仅存在于 web 边缘，见 [[design-00002-web-layer]]）；② 作为"可观测追踪身份"它已**冗余并删除**（`CommandContext`/`EventEnvelope`/`OutboxMessage` 去字段、DB `trace_id` 列 Flyway V2 drop、Kafka `ce_traceid` 取消），因为真身份由 **`traceparent`** 承担、因果流由 **`correlationId`** 承担。所以最终四组标识为：`requestId`（边缘）/ `correlationId`·`causationId`（因果流）/ `traceparent`·`trace_state`（机器追踪，含真 trace-id）/ 真 `trace_id`（仅错误响应回显 + 日志 MDC，从活跃 span 现取、不落库）。下文凡称"保留 `traceId` 为日志锚点"处，以本增补为准（该锚点即 `requestId` + 真 `trace_id`）。详见 [[decision-00013-command-context-and-causation-propagation]] 的移除增补。
+
 ## 一、结论
 
 1. **只存 `traceId` 无法复原一条 OTEL trace。** 可续接的最小单元是 `SpanContext`（`trace-id + span-id + trace-flags`，+ `tracestate`）；只留 trace-id 会丢父 span 身份与采样决策。**存 W3C 标准序列化 `traceparent`**（+ `tracestate`），用 `TextMapPropagator` 读写，禁止手工拼接。附带纠正：当前 `traceId` 是 `UUID`，并非合法 OTEL trace-id，引入 OTEL 后只能降级为日志锚点。
@@ -66,7 +68,7 @@ flowchart TD
 | **Outbox relay → 发送** | **异步 `@Scheduled`** | ❌ **断链** → capture/restore | ❌ 无 → **✅ link span** | **本仓**：SPI（§五/§七） |
 | **PM effect relay / deadline worker** | **异步 `@Scheduled`** | ❌ **断链** → capture/restore | ❌ 无 → **✅ link span** | **本仓**：SPI（§五/§七） |
 | Projection（经 outbox 集成事件驱动） | 异步（继承 outbox 跳） | 随 outbox 缝合 | 随 outbox | 同上 |
-| trace ↔ log | — | — | ❌ 仅 `traceId`/`correlationId`、无 span-id、无 logback 配置 → **✅ MDC 注入**（§十） | 本仓 |
+| trace ↔ log | — | — | ❌ 仅自制 `traceId`/`correlationId`、无 span-id → **✅ 真 `trace_id`/`span_id` 入 MDC + `requestId`**（§十） | starter + 本仓 |
 | trace ↔ metric | — | — | ❌ SLI 无 exemplar → **✅ exemplar**（§十） | 本仓 |
 | span 属性目录 | — | — | ❌ 无 → **✅ 目录**（§十） | 本仓 |
 | 失败可见性 | — | — | ❌ 无 error 语义 → **✅**（§十一） | 本仓 |
@@ -91,7 +93,7 @@ W3C Trace Context 中可续接的上下文是 `SpanContext`：
 版本-  trace-id (32 hex)             -span-id (16 hex) -flags(2 hex)
 ```
 
-存一列 `traceparent` 即补齐三处缺失。缺 `span-id` → 异步重建 span 挂不上父/关联；缺 `trace-flags`（最隐蔽）→ 丢采样位后复原段大概率不导出、链路空洞；缺 `tracestate` → 头部采样跨边界失真。`traceId`（UUID）保留为日志锚点，与 `traceparent` 并存。
+存一列 `traceparent` 即补齐三处缺失。缺 `span-id` → 异步重建 span 挂不上父/关联；缺 `trace-flags`（最隐蔽）→ 丢采样位后复原段大概率不导出、链路空洞；缺 `tracestate` → 头部采样跨边界失真。那个自制 `traceId`（UUID）**不再作为追踪身份保留**：其边缘请求关联的职责归 `requestId`，可观测追踪身份归 `traceparent`（见本文顶部落地增补）。
 
 ## 五、传播模型：同步 ambient，durable 跳手动缝合
 
@@ -176,7 +178,7 @@ sequenceDiagram
 | 载体 | 谁负责 | 说明 |
 | --- | --- | --- |
 | HTTP 入站/出站 | **OTEL 自动** | server/client span、`traceparent` header 自动 extract/inject；`TraceIdFilter` 退居纯 `X-Trace-Id`/MDC 供人类关联 |
-| Kafka 直发 | **OTEL 自动** | 自动注入/抽取标准 `traceparent`，取代自制 `ce_traceid`（保留一版灰度） |
+| Kafka 直发 | **OTEL 自动** | 自动注入/抽取标准 `traceparent`；自制 `ce_traceid` 已删除 |
 | **Outbox → Kafka** | **手动 capture/restore** | producer 自动埋点会注入 dispatcher 线程 context（错误 span）；须写行存 `traceparent`、发送前 `restore()` |
 | **PM effect/deadline** | **手动 capture/restore** | 同上（§五/§七） |
 
@@ -204,11 +206,12 @@ trace_state VARCHAR(512)   -- 可选，可空
 
 ### 10.1 trace ↔ log（当前完全缺失）
 
-全库**无 logback 配置**，MDC 仅 `traceId`（UUID，`TraceIdFilter` 写）与 `correlationId`（`LoggingCommandInterceptor` 写）；`RegistryCommandBus`/`ProblemDetailFactory` 只读 `traceId`。**没有 `span_id`**。闭环要求每条日志可跳 trace：
+改造前全库**无 logback 配置**，MDC 仅自制 `traceId`（UUID）与 `correlationId`，**没有 `span_id`**、且那个 UUID 查不到真 trace。闭环要求每条日志/错误可跳 trace，最终形态：
 
-- **由 starter 交付**：`opentelemetry-spring-boot-starter` 传递依赖已带 `opentelemetry-logback-mdc-1.0`，span 活跃时自动把 `trace_id`/`span_id`/`trace_flags`（32/16 hex 真值，非 UUID）注入日志事件的 MDC——无需库代码；
-- 与既有 `correlationId` 并存（业务关联仍有用）；`traceId`（UUID）作为兼容锚点保留、可后续以 `trace_id` 收敛；
-- 库不强加 logback 配置文件，消费方在自己的 logback pattern 里引用 `%mdc{trace_id}`/`%mdc{span_id}` 即可。
+- **真 trace_id 由 starter 交付**：`opentelemetry-spring-boot-starter` 传递依赖带 `opentelemetry-logback-mdc-1.0`，span 活跃时自动把 `trace_id`/`span_id`/`trace_flags`（32/16 hex 真值）注入日志事件 MDC——无需库代码；
+- **边缘请求 id 正名 `requestId`**：`RequestIdFilter` 写 MDC `requestId`（原 `traceId` UUID 的正确身份），与 `correlationId` 并存；
+- **错误响应携带二者**：`ApiError` 有 `requestId`（边缘，恒有）+ `traceId`（真 OTEL trace-id，装了 observability-otel 时由其 `TraceIdMdcFilter` 从活跃 span 现取写入 MDC `trace_id`，`ProblemDetailFactory` 读之；未装则为 null）——于是"客户报错 id → 运维粘进 Tempo 直达 trace"这条链打通；
+- 库不强加 logback 配置文件，消费方在自己的 logback pattern 里引用 `%mdc{trace_id}`/`%mdc{span_id}`/`%mdc{requestId}` 即可。
 
 ### 10.2 trace ↔ metric（exemplar）
 
@@ -292,7 +295,7 @@ flowchart TD
 2. **边界自动埋点 + 领域主干 span**：建 `aipersimmon-ddd-observability-otel`，接 `opentelemetry-spring-boot-starter`（边界白拿）；上 `TracingCommandInterceptor` 及 Query/DomainEvent/ACL/推进 span（§六）。此时同步全链路可见。
 3. **durable 跳缝合**：outbox（两实现）+ PM 写行 `captureCurrent()`、捞起 `restore()` link（§五/§七）；回收 [[issue-00025-correlation-propagation-and-scrape-batching]] correlation 断裂。
 4. **三柱闭环**：MDC 注入 `trace_id`/`span_id`（§10.1）、SLI 加 exemplar（§10.2）、落实属性目录（§10.3）、错误语义（§十一）。
-5. **收敛（可选）**：日志/错误体以真 `trace_id` 逐步替换 UUID `traceId`；按需开 baggage、配 tail sampling。
+5. **收敛（已做）**：自制 `traceId` 拆解——边缘正名 `requestId`、追踪身份删除归于 `traceparent`、错误体回显真 `trace_id`（详见顶部落地增补与 [[decision-00013-command-context-and-causation-propagation]]）。**仍可选**：baggage、collector tail-sampling。
 
 各阶段增量、可独立回滚；OTEL 未装配时全程 no-op。
 

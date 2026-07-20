@@ -44,6 +44,17 @@ command per event"*)。
 > **增补**:本决策 §1「id 由 bus 铸造」的表述已被 [[decision-00016-durable-runtime-staged-message-identity]] 放宽——
 > 合法铸造方扩展为「`CommandBus`(同步根/子命令)+ durable runtime(staged effect)」,并新增 `CommandBus.sendAs(...)`
 > 逐字派发入口。核心不变式(业务代码/payload 不自造 id、禁 ambient)不变。
+>
+> **增补(traceId 已移除)**:本决策当初引入的 `traceId`(彼时是唯一可观测锚点、且实为 HTTP 边缘生成的 UUID)已在
+> [[design-00005-observability-and-distributed-tracing]] 落地后**从因果模型中删除**——`CommandContext` / `EventEnvelope` /
+> `OutboxMessage` 不再有 `traceId` 字段(`root(String messageId)` 单参),DB `trace_id` 列经 Flyway V2 drop,Kafka `ce_traceid`
+> header 取消。原因:它现已冗余——**机器可复原的追踪身份由 `traceparent`(W3C SpanContext,含真 trace-id)承担**,**因果流关联由
+> `correlationId` 承担**;那个 UUID 的真正身份是**边缘请求 id**,已正名为 `requestId`(`X-Request-Id`,见 [[design-00002-web-layer]]),
+> 且**仅存在于 web 边缘、不再随异步链传播**。
+>
+> **信息取舍(需知晓)**:删除后,**不装 OTEL 可观测模块**的消费方,失去"某下游异步事件源自哪次原始请求"的跨异步关联——
+> `correlationId` 仍关联整条因果流,装了 OTEL 则由 span link 复原该关联。这是"删冗余"的必然结果,符合脚手架口径:因果流用
+> `correlationId`、边缘用 `requestId`、要全链路追踪就装 OTEL。核心不变式(元数据不进 payload、禁 ambient)不变。
 
 ## Decision
 
