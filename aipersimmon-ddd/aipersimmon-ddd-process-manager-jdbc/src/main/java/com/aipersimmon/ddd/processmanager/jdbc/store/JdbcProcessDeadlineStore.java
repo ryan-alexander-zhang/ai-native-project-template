@@ -64,19 +64,26 @@ public final class JdbcProcessDeadlineStore {
      * turns the fire into an auditable no-op.
      */
     public void cancelCurrent(ProcessInstanceId instanceId, DeadlineName name, Instant now) {
+        // Resolve the current generation first, then cancel it by value — do NOT read
+        // MAX(generation) from this table in a subquery of the same UPDATE: MySQL rejects that
+        // with ERROR 1093 ("can't specify target table for update in FROM clause"), even though
+        // H2/PostgreSQL allow it. This runs inside the advance transaction that holds the
+        // instance row lock, and a name's generation only ever grows within such a transaction,
+        // so reading then updating is race-free.
+        long current = currentGeneration(instanceId, name);
+        if (current == 0L) {
+            return;
+        }
         jdbc.update("""
                 UPDATE aipersimmon_process_deadline SET status = ?, updated_at = ?
-                WHERE instance_id = ? AND name = ? AND status IN (?, ?)
-                  AND generation = (SELECT MAX(generation) FROM aipersimmon_process_deadline
-                                    WHERE instance_id = ? AND name = ?)""",
+                WHERE instance_id = ? AND name = ? AND generation = ? AND status IN (?, ?)""",
                 DeadlineStatus.CANCELLED.name(),
                 Timestamp.from(now),
                 instanceId.value(),
                 name.value(),
+                current,
                 DeadlineStatus.PENDING.name(),
-                DeadlineStatus.IN_FLIGHT.name(),
-                instanceId.value(),
-                name.value());
+                DeadlineStatus.IN_FLIGHT.name());
     }
 
     /** Lock a deadline row and read its current status, for the worker's pre-fire re-check. */

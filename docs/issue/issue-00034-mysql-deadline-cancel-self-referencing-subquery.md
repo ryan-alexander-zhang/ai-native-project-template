@@ -2,7 +2,7 @@
 id: issue-00034-mysql-deadline-cancel-self-referencing-subquery
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---
 
@@ -26,16 +26,19 @@ parent: plan-00003-durable-process-manager-implementation
 
 ## 复现(test-first)
 
-提议测试(尚未落地):在 MySQL Testcontainers(`mysql:8.0`)下调度一个 deadline,再对同一实例/保留名调 `cancelCurrent()`;断言不抛 `SQLException`。今日该断言会因 ERROR 1093 失败。此测试同时补上"deadline schedule/cancel 的 MySQL 覆盖"这一现有缺口。
+新增 `DeadlineCancelMysqlTest`(`aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`,MySQL 8.0 Testcontainers,跑 shipped `mysql/V1__…sql`):`schedule` 两代同名 deadline(generation 1、2),再调 `cancelCurrent`;断言不抛异常、且**只**把当前代(gen 2)置 `CANCELLED`、旧代(gen 1)仍 `PENDING`。修复前该 UPDATE 在 MySQL 上因自引用子查询抛 ERROR 1093。此测试同时补上原本缺失的"deadline schedule/cancel 的 MySQL 覆盖"。
 
-## 修复
+## 修复(已实施)
 
-将 cancel 变成 **dialect 操作**(提议,未实施),二选一:
+采纳方案 2(彻底消除自引用子查询,且无需 dialect 分支):`cancelCurrent`(`JdbcProcessDeadlineStore.java`)改为**两步**——先用既有的 `currentGeneration(instanceId, name)` 读出当前代(为 0 即无 deadline,直接返回),再 `UPDATE … WHERE generation = ?` 按值取消。新语句**完全没有子查询**,故在任何数据库上都不可能触发 1093。
 
-1. MySQL 用 UPDATE JOIN 或**物化派生表**:`... AND generation = (SELECT g FROM (SELECT MAX(generation) g FROM aipersimmon_process_deadline WHERE instance_id = ? AND name = ?) x)`——派生表被物化后即绕开 1093。
-2. 或先在实例锁保护下 `SELECT` 出当前代的 `deadlineId`,再按主键 `UPDATE`,彻底消除自引用子查询。
+竞态安全:`cancelCurrent` 仅由 `stageEffects`(`JdbcProcessRuntime`)在 advance 事务内调用,该事务持有实例行锁(`doHandle` 的 `findForUpdate`;`doStart` 新建实例),而某个 name 的 generation 只会在这种事务内递增,故"先读后写"之间无并发写者能插入更高代——读-改无竞态。语义与原 SQL 一致(取消 `PENDING`/`IN_FLIGHT` 的最高代)。
 
-任一方案都应补一个覆盖 deadline schedule/cancel 的 MySQL Testcontainers 回归测试。
+## 验证结果
+
+- `DeadlineCancelMysqlTest`(新建,MySQL 8.0 Testcontainers):1 test 绿(~7s),证明取消路径在真实 MySQL 上执行成功、无 1093,且只取消当前代。
+- 既有 H2 覆盖 `JdbcProcessDeadlineWorkerTest`:5 tests 不回归,证明改写后功能行为不变。
+- `mvn -o -pl aipersimmon-ddd-process-manager-jdbc-spring-boot-starter -am test`:BUILD SUCCESS,0 failures/errors。
 
 ## 关联
 
