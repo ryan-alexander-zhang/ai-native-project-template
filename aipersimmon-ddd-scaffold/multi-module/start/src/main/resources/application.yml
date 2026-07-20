@@ -1,8 +1,7 @@
 spring:
   application:
     name: ordering
-  # The four durable Process Manager tables are created from schema.sql on the DataSource
-  # (docker-compose in dev, Testcontainers in tests). The starter validates they exist at startup.
-  sql:
-    init:
-      mode: always
+  # The four durable Process Manager tables are applied by the aipersimmon-ddd-flyway starter at
+  # startup (PostgreSQL: docker-compose in dev, Testcontainers in tests), on its own history table
+  # flyway_schema_history_aipersimmon_process_manager. The process-manager starter then validates
+  # they exist.
