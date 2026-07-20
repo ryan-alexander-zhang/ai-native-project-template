@@ -119,6 +119,33 @@ class OutboxJdbcTest {
     }
 
     @Test
+    void publishAsReusesTheEffectIdAsEventIdAndIsIdempotentAcrossRedelivery() {
+        // The relay reconstructs an effect context whose messageId IS the persisted effect id.
+        // publishAs must stamp that as the event id verbatim (not a fresh random one) and tolerate
+        // a redelivery of the same effect — so a crash between the outbox insert and the effect's
+        // delivered-mark cannot leave two rows with two different event ids, which would defeat the
+        // downstream inbox's dedupe. Before the fix, the effect path used publish() and each
+        // redelivery minted a new random event id.
+        CommandContext effectContext = new CommandContext("txn-1#0", "corr-1", "cause-1");
+
+        integrationEvents.publishAs(new SampleEvent("O-7"), effectContext);
+        integrationEvents.publishAs(new SampleEvent("O-7"), effectContext); // relay redelivers the same effect
+
+        assertEquals(Integer.valueOf(1),
+                jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox", Integer.class),
+                "a redelivered effect must collapse to one outbox row, not two");
+        assertEquals("txn-1#0",
+                jdbc.queryForObject("SELECT event_id FROM aipersimmon_outbox", String.class),
+                "the event id must be the persisted effect id, verbatim — the stable dedupe key downstream");
+        assertEquals("corr-1",
+                jdbc.queryForObject("SELECT correlation_id FROM aipersimmon_outbox", String.class),
+                "publishAs carries the effect context's correlation verbatim");
+        assertEquals("cause-1",
+                jdbc.queryForObject("SELECT causation_id FROM aipersimmon_outbox", String.class),
+                "publishAs carries the effect context's causation verbatim, not the effect id");
+    }
+
+    @Test
     void relayPollIsGuardedByShedLock() {
         relay.relay();
 

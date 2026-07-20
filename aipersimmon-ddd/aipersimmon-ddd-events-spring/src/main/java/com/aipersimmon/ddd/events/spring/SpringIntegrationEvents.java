@@ -42,15 +42,29 @@ public class SpringIntegrationEvents implements IntegrationEvents {
 
     @Override
     public void publish(IntegrationEvent event, CommandContext context) {
+        // A brand-new event caused by the command described by context: mint a fresh event
+        // id and record the command (context.messageId()) as the cause.
+        publish(event, UUID.randomUUID().toString(), context.correlationId(), context.messageId());
+    }
+
+    @Override
+    public void publishAs(IntegrationEvent event, CommandContext context) {
+        // A staged effect replayed by the durable relay: stamp the persisted identity verbatim —
+        // event id = the effect id (context.messageId()), cause = context.causationId() — so a
+        // redelivery reaches in-process listeners under the same event id and an inbox dedupes it.
+        publish(event, context.messageId(), context.correlationId(), context.causationId());
+    }
+
+    private void publish(IntegrationEvent event, String eventId, String correlationId, String causationId) {
         EventEnvelope<IntegrationEvent> envelope = new EventEnvelope<>(
-                UUID.randomUUID().toString(),
+                eventId,
                 source,
                 IntegrationEvent.eventTypeOf(event.getClass()),
                 IntegrationEvent.eventVersionOf(event.getClass()),
                 clock.instant(),
                 event.subject(),
-                context.correlationId(),
-                context.messageId(),
+                correlationId,
+                causationId,
                 event);
         // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
         // match despite erasure.

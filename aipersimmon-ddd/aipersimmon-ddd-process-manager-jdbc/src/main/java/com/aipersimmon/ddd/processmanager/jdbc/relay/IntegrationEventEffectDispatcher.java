@@ -6,10 +6,14 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 
 /**
- * Delivers a {@code PublishIntegrationEvent} effect through {@link IntegrationEvents},
- * which stamps the causal metadata from the reconstructed context onto the outbound
- * envelope. Used to reach a bounded context deployed as a separate service; its own inbox
- * dedupes redeliveries by the event id.
+ * Delivers a {@code PublishIntegrationEvent} effect through
+ * {@link IntegrationEvents#publishAs(com.aipersimmon.ddd.integration.IntegrationEvent, CommandContext)}
+ * — under the effect's persisted identity, verbatim, so the outbound event id equals the
+ * effect id and every at-least-once redelivery of the same staged effect reaches the
+ * downstream context under the same event id. That stable id is what lets the target's
+ * inbox dedupe redeliveries; publishing through the plain {@code publish} path would mint
+ * a fresh id per redelivery and defeat that dedupe. Used to reach a bounded context
+ * deployed as a separate service.
  */
 public final class IntegrationEventEffectDispatcher implements ProcessEffectDispatcher {
 
@@ -26,6 +30,6 @@ public final class IntegrationEventEffectDispatcher implements ProcessEffectDisp
 
     @Override
     public void dispatch(DecodedProcessEffect effect, CommandContext context) {
-        integrationEvents.publish((IntegrationEvent) effect.payload(), context);
+        integrationEvents.publishAs((IntegrationEvent) effect.payload(), context);
     }
 }
