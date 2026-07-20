@@ -1,6 +1,8 @@
 package com.aipersimmon.ddd.observability.otel.autoconfigure;
 
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.Tracer;
+import com.aipersimmon.ddd.observability.otel.OpenTelemetryStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.otel.OpenTelemetryTracer;
 import io.opentelemetry.api.OpenTelemetry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -30,6 +32,14 @@ public class AipersimmonDddObservabilityOtelAutoConfiguration {
     @ConditionalOnMissingBean
     Tracer aipersimmonDomainTracer(OpenTelemetry openTelemetry) {
         return new OpenTelemetryTracer(openTelemetry.getTracer(INSTRUMENTATION_SCOPE));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    StoreAndForwardTracer aipersimmonStoreAndForwardTracer(OpenTelemetry openTelemetry) {
+        return new OpenTelemetryStoreAndForwardTracer(
+                openTelemetry.getTracer(INSTRUMENTATION_SCOPE),
+                openTelemetry.getPropagators().getTextMapPropagator());
     }
 
     @Bean

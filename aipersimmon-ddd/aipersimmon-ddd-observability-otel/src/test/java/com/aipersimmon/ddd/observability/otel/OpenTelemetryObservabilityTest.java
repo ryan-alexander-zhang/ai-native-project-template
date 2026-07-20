@@ -70,7 +70,7 @@ class OpenTelemetryObservabilityTest {
     void captureSerialisesActiveContextIncludingSampledFlag() {
         Span creating = otelTracer.spanBuilder("command PlaceOrder").startSpan();
         StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator(), "effect.dispatch");
+                otelTracer, sdk.getPropagators().getTextMapPropagator());
 
         Captured captured;
         try (Scope ignored = creating.makeCurrent()) {
@@ -92,7 +92,7 @@ class OpenTelemetryObservabilityTest {
     void restoreLinksBackToCreatingSpanAsNewTrace() {
         Span creating = otelTracer.spanBuilder("command PlaceOrder").startSpan();
         StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator(), "effect.dispatch");
+                otelTracer, sdk.getPropagators().getTextMapPropagator());
         Captured captured;
         try (Scope ignored = creating.makeCurrent()) {
             captured = sf.captureCurrent();
@@ -100,7 +100,7 @@ class OpenTelemetryObservabilityTest {
         creating.end();
 
         try (StoreAndForwardTracer.Scope ignored =
-                sf.restore(captured.traceparent(), captured.traceState(), "effect-1")) {
+                sf.restore(captured.traceparent(), captured.traceState(), "effect.dispatch effect-1")) {
             // dispatch happens here
         }
 
@@ -121,7 +121,7 @@ class OpenTelemetryObservabilityTest {
     @Test
     void captureWithoutActiveSpanYieldsNone() {
         StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator(), "effect.dispatch");
+                otelTracer, sdk.getPropagators().getTextMapPropagator());
 
         Captured captured = sf.captureCurrent();
 

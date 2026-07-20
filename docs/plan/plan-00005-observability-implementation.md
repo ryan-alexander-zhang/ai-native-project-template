@@ -76,12 +76,15 @@ flowchart TD
     **取舍**：QueryBus / DomainEvents / 入站 ACL 的装饰式子 span **暂缓**——领域事件/投影同步跑在命令 span 内（已覆盖，仅细化）、查询在 HTTP+JDBC span 内、
     且三者需 BeanPostProcessor/AOP 装饰，边际价值低于成本；`process.advance` 才是唯一「不在任何既有 span 下」（relay/deadline 异步驱动）的真缺口。若后续需要，作为 P3 后可选细化项补。
 
-- ⬜ **P2**（durable 跳缝合：capture/restore + Span Link）
-  - `StoreAndForwardTracer` OTEL 实现：`captureCurrent()` = `inject(Context.current())`；`restore()` = `extract` + 起 LINK span。
-  - 写侧接入：`JdbcProcessRuntime`（effect/deadline/transition）、`OutboxWriter`（jdbc + mybatis-plus）写行前 `captureCurrent()` 存列。
-  - 读侧接入：PM `JdbcProcessEffectRelay`/`JdbcProcessDeadlineWorker`、`OutboxRelay`（两实现）捞起后 `restore()` link 再派发；`process.advance` span。
-  - 回收 [[issue-00025-correlation-propagation-and-scrape-batching]] 第 1 条：deadline 触发 / parked 重放同批贯穿 `correlation_id` + `traceparent`。
-  - 测试：H2/内存 exporter——写行存 traceparent、relay 派发的 span 含 link 回创建者且 traceId 一致、采样位透传；outbox 两实现各一。
+- 🔄 **P2**（durable 跳缝合：capture/restore + Span Link）
+  - **SPI 精化**：`StoreAndForwardTracer.restore(traceparent, traceState, spanName)` 第三参改为「调用方给全名」（`outbox.publish <id>` / `effect.dispatch <id>`），
+    使**单个** `StoreAndForwardTracer` bean 可服务所有 seam；OTEL 实现去掉 prefix 构造参；observability-otel starter 装配该 bean（`@ConditionalOnMissingBean`）。
+  - ✅ **P2①**（outbox-jdbc）：`OutboxWriter` 写行前 `captureCurrent()` → 新增 `traceparent`/`trace_state` 两列写入；`OutboxRelay` SELECT 两列、
+    派发前 `restore(...,"outbox.publish "+eventId)` 起 link span（Kafka producer 埋点据此把 header 盖成本 span，link 回写行 span）；autoconfig 经 `ObjectProvider<StoreAndForwardTracer>` 注入（NOOP 默认）。
+    新旧 ctor 重载保持兼容。测试：recording tracer 验证「写行存 tp / relay 以 outbox.publish 名 restore」2 绿，outbox-jdbc 共 18 绿；OTEL link 行为已由 observability-otel 覆盖。
+  - ⬜ **P2②**（outbox-mybatis-plus）：同构接入 writer/relay/autoconfig。
+  - ⬜ **P2③**（PM）：`JdbcProcessRuntime` 持久化 effect/deadline/transition 时 `captureCurrent()` 存列；`JdbcProcessEffectRelay`/`JdbcProcessDeadlineWorker` 捞起 `restore("effect.dispatch"/"deadline.fire" ...)` link 再派发；
+    一并回收 [[issue-00025-correlation-propagation-and-scrape-batching]] 第 1 条（deadline/parked 处贯穿 `correlation_id`+`traceparent`）。
 
 - ⬜ **P3**（三柱闭环）
   - trace↔log：OTEL logback MDC 注入 `trace_id`/`span_id`；与既有 `correlationId`/`traceId` MDC 并存；提供 MDC key 约定 + 示例 pattern（不强加 logback 文件）。

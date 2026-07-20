@@ -4,6 +4,9 @@ import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
@@ -25,24 +28,35 @@ public class OutboxWriter implements IntegrationEvents {
     private static final String INSERT =
             "INSERT INTO aipersimmon_outbox "
             + "(event_id, source, type, version, payload, occurred_at, subject, "
-            + "correlation_id, causation_id, trace_id, sent, attempts, created_at) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "correlation_id, causation_id, trace_id, traceparent, trace_state, sent, attempts, created_at) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final String source;
+    private final StoreAndForwardTracer tracer;
 
     public OutboxWriter(JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock, String source) {
+        this(jdbc, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public OutboxWriter(JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock, String source,
+                        StoreAndForwardTracer tracer) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.source = source;
+        this.tracer = tracer;
     }
 
     @Override
     public void publish(IntegrationEvent event, CommandContext context) {
         String payload = serialize(event);
+        // Capture the trace context active on this (writing) thread so the relay can restore it
+        // when it dispatches the row later on the scheduler thread — the one hop ambient context
+        // and Kafka producer auto-instrumentation cannot bridge across the outbox table.
+        Captured captured = tracer.captureCurrent();
         EventEnvelope<IntegrationEvent> envelope = new EventEnvelope<>(
                 UUID.randomUUID().toString(),
                 source,
@@ -65,6 +79,8 @@ public class OutboxWriter implements IntegrationEvents {
                 envelope.correlationId(),
                 envelope.causationId(),
                 envelope.traceId(),
+                captured.traceparent(),
+                captured.traceState(),
                 false,
                 0,
                 Timestamp.from(clock.instant()));

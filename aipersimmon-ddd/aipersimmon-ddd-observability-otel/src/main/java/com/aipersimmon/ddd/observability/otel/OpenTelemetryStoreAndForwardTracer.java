@@ -38,20 +38,16 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
 
     private final io.opentelemetry.api.trace.Tracer tracer;
     private final TextMapPropagator propagator;
-    private final String spanNamePrefix;
 
     /**
      * @param tracer the OTEL tracer that opens the restored (linked) span
      * @param propagator the text-map propagator (W3C by default) used to inject/extract
-     * @param spanNamePrefix prefix for the restored span name, e.g. {@code "effect.dispatch"}
      */
     public OpenTelemetryStoreAndForwardTracer(
             io.opentelemetry.api.trace.Tracer tracer,
-            TextMapPropagator propagator,
-            String spanNamePrefix) {
+            TextMapPropagator propagator) {
         this.tracer = tracer;
         this.propagator = propagator;
-        this.spanNamePrefix = spanNamePrefix;
     }
 
     @Override
@@ -66,10 +62,10 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
     }
 
     @Override
-    public Scope restore(String traceparent, String traceState, String workItemId) {
+    public Scope restore(String traceparent, String traceState, String spanName) {
         if (traceparent == null) {
             // Nothing to link to — open a plain span so the dispatch is still visible.
-            return open(tracer.spanBuilder(spanName(workItemId)).startSpan());
+            return open(tracer.spanBuilder(spanName).startSpan());
         }
         Map<String, String> carrier = new HashMap<>();
         carrier.put(TRACEPARENT, traceparent);
@@ -79,7 +75,7 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
         Context creating = propagator.extract(Context.current(), carrier, GETTER);
         SpanContext creatingSpan = Span.fromContext(creating).getSpanContext();
 
-        var builder = tracer.spanBuilder(spanName(workItemId));
+        var builder = tracer.spanBuilder(spanName);
         if (creatingSpan.isValid()) {
             builder.addLink(creatingSpan);
         }
@@ -92,9 +88,5 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
             otelScope.close();
             span.end();
         };
-    }
-
-    private String spanName(String workItemId) {
-        return workItemId == null ? spanNamePrefix : spanNamePrefix + " " + workItemId;
     }
 }

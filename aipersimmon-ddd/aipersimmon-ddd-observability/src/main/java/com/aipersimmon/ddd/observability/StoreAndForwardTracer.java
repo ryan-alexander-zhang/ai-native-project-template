@@ -40,12 +40,12 @@ public interface StoreAndForwardTracer {
      *
      * @param traceparent the stored W3C traceparent, may be {@code null}
      * @param traceState the stored W3C tracestate, may be {@code null}
-     * @param workItemId identifier of the item being dispatched, for the span name
-     *     and attributes (e.g. an effect id or outbox message id)
+     * @param spanName the full name for the restored span; the caller owns it so one tracer
+     *     serves every seam (e.g. {@code "outbox.publish <eventId>"}, {@code "effect.dispatch <id>"})
      * @return a scope keeping the restored span active; close it when dispatch ends.
      *     Never {@code null}.
      */
-    Scope restore(String traceparent, String traceState, String workItemId);
+    Scope restore(String traceparent, String traceState, String spanName);
 
     /** The opaque, storable serialisation of a trace context. */
     record Captured(String traceparent, String traceState) {

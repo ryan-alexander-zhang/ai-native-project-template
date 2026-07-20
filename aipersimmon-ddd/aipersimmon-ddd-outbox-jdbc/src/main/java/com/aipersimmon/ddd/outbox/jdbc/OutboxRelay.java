@@ -5,6 +5,8 @@ import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
+import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
+import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -49,7 +51,7 @@ public class OutboxRelay {
 
     private static final String SELECT_DUE =
             "SELECT o.event_id, o.source, o.type, o.version, o.payload, o.occurred_at, o.subject, "
-            + "o.correlation_id, o.causation_id, o.trace_id, o.attempts "
+            + "o.correlation_id, o.causation_id, o.trace_id, o.traceparent, o.trace_state, o.attempts "
             + "FROM aipersimmon_outbox o "
             + "WHERE o.sent = FALSE AND o.attempts < ? "
             + "AND (o.next_attempt_at IS NULL OR o.next_attempt_at <= ?) "
@@ -86,10 +88,19 @@ public class OutboxRelay {
     private final Clock clock;
     private final int batchSize;
     private final int maxAttempts;
+    private final StoreAndForwardTracer tracer;
 
     public OutboxRelay(JdbcTemplate jdbc, OutboxDispatcher dispatcher,
                        DeadLetterStore deadLetterStore, FailureClassifier failureClassifier,
                        RetryBackoff backoff, Clock clock, int batchSize, int maxAttempts) {
+        this(jdbc, dispatcher, deadLetterStore, failureClassifier, backoff, clock, batchSize, maxAttempts,
+                NoOpStoreAndForwardTracer.INSTANCE);
+    }
+
+    public OutboxRelay(JdbcTemplate jdbc, OutboxDispatcher dispatcher,
+                       DeadLetterStore deadLetterStore, FailureClassifier failureClassifier,
+                       RetryBackoff backoff, Clock clock, int batchSize, int maxAttempts,
+                       StoreAndForwardTracer tracer) {
         this.jdbc = jdbc;
         this.dispatcher = dispatcher;
         this.deadLetterStore = deadLetterStore;
@@ -98,6 +109,7 @@ public class OutboxRelay {
         this.clock = clock;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
+        this.tracer = tracer;
     }
 
     @Scheduled(fixedDelayString = "${aipersimmon.ddd.outbox.poll-delay-ms:1000}")
@@ -116,7 +128,12 @@ public class OutboxRelay {
                 // later events back so they are not delivered out of order.
                 continue;
             }
-            try {
+            try (StoreAndForwardTracer.Scope ignored =
+                    tracer.restore(pending.traceparent(), pending.traceState(),
+                            "outbox.publish " + message.eventId())) {
+                // The restored span is current here, so the Kafka producer instrumentation stamps
+                // the message headers with this dispatch span — which links back to the span that
+                // wrote the row — rather than with the (unrelated) scheduler thread's context.
                 dispatcher.dispatch(message);
             } catch (RuntimeException e) {
                 if (handleFailure(pending, e) && subject != null) {
@@ -211,10 +228,14 @@ public class OutboxRelay {
                 rs.getString("correlation_id"),
                 rs.getString("causation_id"),
                 rs.getString("trace_id"));
-        return new Pending(message, rs.getInt("attempts"));
+        return new Pending(message, rs.getInt("attempts"),
+                rs.getString("traceparent"), rs.getString("trace_state"));
     }
 
-    /** A selected outbox row: the dispatcher-facing message plus its current attempt count. */
-    private record Pending(OutboxMessage message, int attempts) {
+    /**
+     * A selected outbox row: the dispatcher-facing message, its current attempt count, and the
+     * captured trace context ({@code traceparent}/{@code trace_state}) to restore on dispatch.
+     */
+    private record Pending(OutboxMessage message, int attempts, String traceparent, String traceState) {
     }
 }
