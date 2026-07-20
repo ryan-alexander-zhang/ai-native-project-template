@@ -38,6 +38,7 @@
     <module>aipersimmon-ddd-core</module>
     <module>aipersimmon-ddd-observability</module>
     <module>aipersimmon-ddd-observability-otel</module>
+    <module>aipersimmon-ddd-observability-otel-spring-boot-starter</module>
     <module>aipersimmon-ddd-application</module>
     <module>aipersimmon-ddd-integration</module>
     <module>aipersimmon-ddd-cqrs</module>

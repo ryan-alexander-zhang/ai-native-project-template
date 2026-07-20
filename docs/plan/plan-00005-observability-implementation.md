@@ -61,13 +61,15 @@ flowchart TD
   - ✅ 回归验证：PM-jdbc 114 / outbox-jdbc 16 / outbox-mybatis-plus 11 / PM starter 23（含**真实 MySQL Testcontainers SKIP LOCKED gate**）全绿；
     scaffold `multi-module` 18（含 `PaymentCompensationFlowTest`/`OrderingFlowTest` **真实 Postgres**）全绿。H2/MySQL/Postgres 三库均验证。
 
-- ⬜ **P1**（`aipersimmon-ddd-observability-otel` + 领域主干 span）
-  - 新模块：依赖 `opentelemetry-spring-boot-starter`（边界自动埋点白拿）+ framework-free 契约模块；Boot 自动装配、全 `@ConditionalOn...` 可覆盖。
-  - `TracingCommandInterceptor`（`CommandInterceptor`，最外层）：每命令开 span `command <type>`，属性 `command.type`/`message.id`/`correlation.id`/`causation.id`。
-  - QueryBus 装饰器（QueryBus 无拦截器链）：span `query <type>`。
-  - `DomainEvents` 装饰 + 每 handler span、入站 ACL（`@EventListener EventEnvelope`）span。
-  - `Tracer` SPI 的 OTEL 实现 bean，供 P2 的 `process.advance` span。
-  - 测试：内存 `InMemorySpanExporter` slice——单命令产出 `command` span 且属性齐；query/domain-event/ACL span 各一；未装配模块时零 span（no-op 回归）。
+- 🔄 **P1**（OTEL 实现 + 领域主干 span）
+  - **模块拆分决定**：design §十五 原设想单模块 `observability-otel`；落地时按本仓一贯的「impl 模块 + `*-spring-boot-starter`」约定拆为两个——
+    `aipersimmon-ddd-observability-otel`（纯 OTEL SPI 实现，仅依赖 `opentelemetry-api`，无 Spring）+ `aipersimmon-ddd-observability-otel-spring-boot-starter`
+    （Boot 装配 + `opentelemetry-spring-boot-starter` 边界自动埋点 + 领域 span bean）。OTEL 版本统一由父 pom 的 `opentelemetry-instrumentation-bom` 2.29.0 管理（置于 Spring Boot BOM 之前，解析得 starter 2.29.0 / api 1.63.0）。
+  - ✅ **P1①**（`observability-otel`）：`OpenTelemetryTracer`（域 span）、`OpenTelemetryStoreAndForwardTracer`（`captureCurrent`=inject / `restore`=extract+**Span Link**）。
+    测试用真实 SDK + `InMemorySpanExporter`：域 span 名/属性、capture 带 traceId + sampled 位、restore 以 link 回创建者为新 trace、无活跃 span→NONE。4 绿。
+  - ✅ **P1②**（`observability-otel-spring-boot-starter`）：`TracingCommandInterceptor`（`CommandInterceptor`，`order=-100` 最外层，wrap 整条链；span `command <type>` + 4 属性；异常 `setStatus(ERROR)`+`recordException`）；
+    `AipersimmonDddObservabilityOtelAutoConfiguration`（`@ConditionalOnClass`，注入 `OpenTelemetry` bean 构造 `Tracer` + 拦截器，全 `@ConditionalOnMissingBean` 可覆盖）。测试：拦截器单测（成功/失败）2 + 装配 context-runner（present/override）2，共 4 绿。
+  - ⬜ **P1③**（剩余领域主干 span）：QueryBus 装饰器（无拦截器链，需单独包）、`DomainEvents`+每 handler span、入站 ACL span、`ProcessRuntime.start/handle` 的 `process.advance` span（经 framework-free `Tracer` SPI，保持 jdbc 模块 OTEL-free）。测试 slice 各覆盖；未装配模块时零 span（no-op 回归）。
 
 - ⬜ **P2**（durable 跳缝合：capture/restore + Span Link）
   - `StoreAndForwardTracer` OTEL 实现：`captureCurrent()` = `inject(Context.current())`；`restore()` = `extract` + 起 LINK span。

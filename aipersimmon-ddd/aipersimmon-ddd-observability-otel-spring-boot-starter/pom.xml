@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring Boot wiring for observability. Adding this starter to an application turns
+    tracing on end to end: it pulls in the OpenTelemetry Spring Boot starter (boundary
+    auto-instrumentation for HTTP/JDBC/Kafka, and the OpenTelemetry bean), then binds the
+    framework-free observability SPIs to OTEL and registers the domain-spine spans the
+    auto-instrumentation cannot see (starting with the command span). Every bean is
+    ConditionalOnMissingBean; omitting the starter leaves the app OTEL-free and unchanged.
+  -->
+  <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-observability-otel-spring-boot-starter</name>
+  <description>Spring Boot auto-configuration that binds the observability SPIs to OpenTelemetry, pulls in boundary auto-instrumentation, and registers the domain-spine spans.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability-otel</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- CommandInterceptor SPI for the command span; framework-free. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-api</artifactId>
+    </dependency>
+    <!-- Boundary auto-instrumentation (HTTP/JDBC/Kafka) + the OpenTelemetry bean. -->
+    <dependency>
+      <groupId>io.opentelemetry.instrumentation</groupId>
+      <artifactId>opentelemetry-spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <!-- Test: real SDK + in-memory exporter to assert emitted spans. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
