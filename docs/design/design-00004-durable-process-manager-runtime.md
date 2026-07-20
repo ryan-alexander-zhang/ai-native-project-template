@@ -859,13 +859,14 @@ com.aipersimmon.ddd.processmanager.jdbc.autoconfigure
 META-INF/spring/
 └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
 
-META-INF/aipersimmon-ddd/process-manager/
-├── postgresql-schema.sql
-├── mysql-schema.sql
-└── h2-schema.sql
+aipersimmon/db/migration/process-manager/{postgresql,mysql,h2}/
+└── V1__aipersimmon_process_manager.sql
 ```
 
-DDL 是非自动执行样例；生产应用必须通过 Flyway/Liquibase 管理。
+DDL 以分方言 Flyway migration 为单一来源。可选的共享 `aipersimmon-ddd-flyway` starter
+在启动时用独立历史表 `flyway_schema_history_aipersimmon_process_manager` 自动建表(排在
+`@DependsOnDatabaseInitialization` 的 `ProcessSchemaValidator` 之前,校验器仍保留作双保险);
+不启用该 starter 的生产应用仍须自行通过 Flyway/Liquibase 管理这份 migration。
 
 Jackson 支持只位于 Starter 的条件装配层：仅当存在 `ObjectMapper` 和消费方显式声明的
 `ProcessSerializationCatalog` 时，才按 catalog 生成 codec bean。Catalog 必须逐项给出 logical type/version、Java type，

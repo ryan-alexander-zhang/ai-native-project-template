@@ -184,7 +184,7 @@ com.aipersimmon.ddd.core
 
 - **事务性 outbox**:集成事件与聚合变更**同事务**写入 `aipersimmon_outbox` 表;relay 轮询未发送行,发到 broker,置 `sent`。**at-least-once**(dispatch 后置 sent 前崩溃会重投 → 消费方需幂等)。
 - 组件:
-  - 表 `aipersimmon_outbox`:`id`/`event_id`(唯一)/`type`/`version`/`payload`(JSON)/`occurred_at`/`trace_id`/`sent`/`sent_at`/`attempts`/`created_at`。建表由消费者(Flyway/Liquibase)负责;主包附**非自动执行**的样例 DDL(`META-INF/aipersimmon-ddd/outbox-schema.sql`),测试用 `schema.sql`(H2)。
+  - 表 `aipersimmon_outbox`:`id`/`event_id`(唯一)/`type`/`version`/`payload`(JSON)/`occurred_at`/`trace_id`/`sent`/`sent_at`/`attempts`/`created_at`。建表由消费者(Flyway/Liquibase)负责。全库各存储组件的 DDL 以**分方言 Flyway migration** 为**单一来源**(`aipersimmon/db/migration/{component}/{vendor}`,h2/postgresql/mysql),既是可执行迁移也是参考 DDL。outbox 的 migration 放在 `aipersimmon-ddd-outbox` core,`-outbox-jdbc` 与 `-outbox-mybatis-plus` 共享同一份(两者表结构一致)。可选模块 **`aipersimmon-ddd-flyway`**(与 schema 无关的共享 starter)在启动时扫描 classpath,为发现的每个组件用**独立历史表**(`flyway_schema_history_aipersimmon_{component}`)自动应用(见其 README),或复制进消费者自己的 Flyway/Liquibase;各模块测试直接复用对应 H2 migration(不再单独维护 `schema.sql`)。
   - `OutboxWriter implements IntegrationEvents`:盖章 `EventEnvelope`(eventId=UUID、type=类全名、version=1、occurredAt=now)→ Jackson 序列化 payload → **当前事务** `JdbcTemplate` 插入一行。
   - `OutboxRelay`:`@Scheduled` 轮询未发送行 → 交给 **broker 发布 port `OutboxDispatcher`** → 逐行置 `sent`;失败留待下轮 + `attempts++`。
   - `OutboxDispatcher` port,三个实现选一(决定方式二/三):
@@ -199,7 +199,7 @@ com.aipersimmon.ddd.core
 > 与 outbox 同理,做成 JDBC(无 `@Entity`/`@EntityScan`,零扫描冲突);`-inbox-jpa` 后续变体。**已交付 MyBatis-Plus 变体 `-inbox-mybatis-plus`**:`Inbox` port 的 MyBatis-Plus 实现(`BaseMapper` insert,重复 key → 已处理),只经 `MapperFactoryBean` 注册自己的 mapper、不劫持消费者 `@MapperScan`,无 JPA `@Entity`,与 jdbc 变体同表结构可互换。`Inbox` 契约在 `-application`,故 inbox 两变体彼此独立、无需 outbox core。
 
 - **幂等消费**:`aipersimmon_inbox` 表以 `message_key` 为唯一主键记录已处理消息;消费在**同事务**内先调 `Inbox.alreadyProcessed(key)`——首次插入成功(返回 false,继续处理),重投时唯一键冲突(返回 true,跳过)。失败回滚则记录一并回滚,可重试。
-- 组件:`Inbox` port(放 `-application`);`JdbcInbox`(靠唯一键 + `DuplicateKeyException` 判重);`AipersimmonDddInboxAutoConfiguration`(`@ConditionalOnBean(JdbcTemplate)`/`@ConditionalOnMissingBean`)。建表由消费者负责,主包附非自动执行样例 DDL。
+- 组件:`Inbox` port(放 `-application`);`JdbcInbox`(靠唯一键 + `DuplicateKeyException` 判重);`AipersimmonDddInboxAutoConfiguration`(`@ConditionalOnBean(JdbcTemplate)`/`@ConditionalOnMissingBean`)。建表由消费者负责。inbox 无存储无关的 core,故新增 **`aipersimmon-ddd-inbox`** 模块承载共享的 inbox 表 DDL(`aipersimmon/db/migration/inbox/{vendor}` migration,单一来源),`-inbox-jdbc` 与 `-inbox-mybatis-plus` 都依赖它;由 `aipersimmon-ddd-flyway` 自动应用。
 - 去重键 = 集成事件 `eventId`(来自 `EventEnvelope`)。
 
 > **参考项目采纳(留待决定,倾向)**:`multi-module` base 保持内存 + 进程内(精简、可跑);starter 的用法由 `scaffold-samples` 的聚焦 how-to 演示("迁移到 outbox / events / inbox"),不把 base 参考项目复杂化。

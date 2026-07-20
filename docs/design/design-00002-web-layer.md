@@ -218,7 +218,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
 
 ### 6.2 `-web-store-jdbc`(→ `-web` + `spring-boot-starter-jdbc`)
 
-- 表(建表由消费者负责,主包附**非自动执行**样例 DDL `META-INF/aipersimmon-ddd/web-store-schema.sql`,承 outbox 惯例):
+- 表(建表由消费者负责;DDL 以**分方言 Flyway migration** 为单一来源 `aipersimmon/db/migration/web-store/{vendor}`,由共享 `aipersimmon-ddd-flyway` starter 自动应用,或复制进消费者自己的 Flyway/Liquibase,承 outbox 惯例):
   - `aipersimmon_web_idempotency`:`idempotency_key`(PK)/`response_status`/`response_body`/`response_headers`/`created_at`/`expires_at`
   - `aipersimmon_web_nonce`:`nonce`(PK)/`created_at`/`expires_at`
   - `aipersimmon_web_rate_limit`:`bucket_key`+`window_start`(PK)/`count`(固定窗口计数)
