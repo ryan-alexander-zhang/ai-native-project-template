@@ -48,14 +48,18 @@ flowchart TD
 
 ## 二、进度
 
-- ⬜ **P0**（`aipersimmon-ddd-observability` 契约 + durable 列，**无行为变化**）
-  - 新模块 `aipersimmon-ddd-observability`：`StoreAndForwardTracer`（`captureCurrent()`/`restore()` + `Captured`/`Scope`）、
-    领域埋点用抽象 `Tracer`/`SpanScope`、`ObservabilityAttributes` 属性键常量；全部 no-op 默认实现（`NoOpTracer` 等）。
-    零 OTEL/Spring 依赖；每包 package-info。注册进 reactor + BOM。
-  - DDL：PM `{h2,mysql,postgresql}` 生产 schema + 测试副本 + scaffold 消费方副本 + `outbox-jdbc`/`outbox-mybatis-plus`
-    schema，`process_{transition,effect,deadline}` 与 `aipersimmon_outbox`/`_dead_letter` 加两列（MySQL 内联、PG/H2 无索引）。
-  - 记录/store 层加 `traceparent`/`traceState` 字段与读写，默认写 `null`（此阶段不接捕获，值恒空 → 行为不变）。
-  - 测试：SPI no-op 契约（capture 返 null-pair、restore 返 no-op scope）、store 读写新列往返（H2）。回归：全 reactor validate/test 绿。
+- ✅ **P0**（`aipersimmon-ddd-observability` 契约 + durable 列，**无行为变化**）
+  - ✅ 新模块 `aipersimmon-ddd-observability`：`StoreAndForwardTracer`（`captureCurrent()`/`restore()` + `Captured`/`Scope`）、
+    领域埋点用抽象 `Tracer`/`SpanScope`、`ObservabilityAttributes` 属性键常量；全部 no-op 默认（`NoOpStoreAndForwardTracer`/`NoOpTracer`）。
+    零 OTEL/Spring 依赖；package-info。注册进 reactor + BOM。`NoOpObservabilityTest` 3 绿。
+  - ✅ DDL：所有含这些表的 schema 副本加 `traceparent VARCHAR(55)` + `trace_state VARCHAR(512)`（可空、无索引，紧邻 `trace_id`）——
+    PM `{h2,mysql,postgresql}` 生产 + PM-jdbc 测试 + PM starter 测试；`outbox-jdbc`/`outbox-mybatis-plus` 主+测试；scaffold
+    `multi-module/start`、`microservice/{inventory,ordering}-service`、`scaffold-samples/{integration-events-over-kafka,
+    reliable-integration-events,saga-commands-and-outbox}` 共 16 文件。**所有消费方副本一并加**，避免 P2 store 写列时打穿未迁移消费方。
+  - ✅ **store 层不改**：INSERT 用显式列名、SELECT 按名映射，加可空列对现有 SQL 零影响 → P0 纯 DDL、真正无行为变化；`traceparent`/`traceState`
+    的字段读写与捕获**下沉到 P2 一起做**（此前计划的"写 null"步骤取消，因无必要且会引入死字段）。
+  - ✅ 回归验证：PM-jdbc 114 / outbox-jdbc 16 / outbox-mybatis-plus 11 / PM starter 23（含**真实 MySQL Testcontainers SKIP LOCKED gate**）全绿；
+    scaffold `multi-module` 18（含 `PaymentCompensationFlowTest`/`OrderingFlowTest` **真实 Postgres**）全绿。H2/MySQL/Postgres 三库均验证。
 
 - ⬜ **P1**（`aipersimmon-ddd-observability-otel` + 领域主干 span）
   - 新模块：依赖 `opentelemetry-spring-boot-starter`（边界自动埋点白拿）+ framework-free 契约模块；Boot 自动装配、全 `@ConditionalOn...` 可覆盖。

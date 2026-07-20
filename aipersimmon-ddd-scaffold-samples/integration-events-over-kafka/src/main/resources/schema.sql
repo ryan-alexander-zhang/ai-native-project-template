@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS aipersimmon_outbox (
     payload     CLOB         NOT NULL,
     occurred_at TIMESTAMP    NOT NULL,
     trace_id    VARCHAR(128),
+    traceparent VARCHAR(55),
+    trace_state VARCHAR(512),
     sent        BOOLEAN      NOT NULL DEFAULT FALSE,
     sent_at     TIMESTAMP,
     attempts    INT          NOT NULL DEFAULT 0,
