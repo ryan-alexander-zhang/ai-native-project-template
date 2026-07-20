@@ -23,6 +23,12 @@ parent: design-00004-durable-process-manager-runtime
 
 ## 1. 结论：它没有"整体挪到 infra"，而是被沿六边形接缝拆开了
 
+> **时态说明（后补）**：§1–§6 是对**三个重写提交**（`dd3214a`/`0861cc2`/`bf051e9`）当时代码的忠实梳理，
+> 彼时 `OrderFulfilmentDefinition`/`OrderFulfilmentInput` 位于 `ordering-application`。该落点此后已按 **§7 的决策执行**，
+> 迁入独立 provider 模块 `ordering-process-jdbc`（`package com.example.ordering.process.fulfilment`）。
+> 因此本节结论与组件表中"Definition 在 application 层"属**历史现状**，当前落点以 §7 为准——
+> §1–§6 描述决策落地前的状态，与 §7 并非矛盾（另见文末 §6 结尾 blockquote 的桥接）。
+
 重写前，`OrderFulfilmentProcessManager` 是 application 层里**一个类**，同时干四件事：
 持有 saga 状态、决定下一步、通过 `CommandBus` 发命令、通过 `SagaStore` 持久化。
 
@@ -53,7 +59,7 @@ parent: design-00004-durable-process-manager-runtime
 | 组件 | 层 / 模块 | 角色 | 为什么在这层 |
 |------|-----------|------|--------------|
 | `OrderFulfilmentProcess`（interface） | application | **业务端口**：`placed / stockReserved / paymentAuthorized …` 等意图化方法 | 它的调用方（Starter、入站 adapter）在 application 侧；表达的是业务能力 |
-| `OrderFulfilmentDefinition` | application | **协调策略（纯决策函数）**：`start()/react()` → 返回下一个 state+lifecycle+effects | 无 I/O、无框架、确定性；这就是"saga 的大脑" |
+| `OrderFulfilmentDefinition` | application（历史；现已按 §7 迁入 `ordering-process-jdbc`） | **协调策略（纯决策函数）**：`start()/react()` → 返回下一个 state+lifecycle+effects | 无 I/O、无框架、确定性；这就是"saga 的大脑" |
 | `OrderFulfilmentState` | application | 流程业务状态（不可变 record，含 `reservationId`、`paymentDeclineCode`） | 业务数据 |
 | `OrderFulfilmentInput` | application | sealed 输入集合（下单 + 跨上下文结果事实 + 本上下文终态事实） | 业务输入 |
 | `OrderFulfilmentStarter` | application | `@DomainEventHandler`：把**本上下文**领域事件桥接进 Process | 领域事件订阅属于 application，adapter 不应碰本上下文领域类型 |

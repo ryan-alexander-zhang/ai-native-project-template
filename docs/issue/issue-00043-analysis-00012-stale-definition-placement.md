@@ -2,7 +2,7 @@
 id: issue-00043-analysis-00012-stale-definition-placement
 type: issue
 role: main
-status: open
+status: resolved
 parent: analysis-00012-multi-module-process-manager-layering
 ---
 
@@ -36,12 +36,19 @@ parent: analysis-00012-multi-module-process-manager-layering
   二者并置即为漂移证据。
 - 该交叉核读可作为轻量回归守卫：只要 §1 现在时结论与 `OrderFulfilmentDefinition` 真实所在模块不一致，即判定文档过期。
 
-## 修复
+## 修复（已实施）
 
 文档侧对齐，不动代码：
 
-1. 给 §1 结论与组件表 `:56` 加时态/前言标注，如“（历史现状，已按 §7 迁至 `ordering-process-jdbc`）”，或直接把描述改为过去时，使读者不再把 §1 误读为当前落点。
-2. 可选：在 §1 顶部一句话前言指明“§1–§6 为决策落地前的现状梳理，最终落点见 §7”，与 `:281-282` 的桥接呼应，避免同类漂移再次被误读为矛盾。
+1. 在 §1 结论标题下新增一段**”时态说明（后补）” blockquote**：点明 §1–§6 是对三个重写提交当时代码的梳理，`OrderFulfilmentDefinition`/`OrderFulfilmentInput` 彼时在 `ordering-application`，该落点此后已按 §7 执行、迁入 `ordering-process-jdbc`（`package com.example.ordering.process.fulfilment`），故本节”在 application 层”属历史现状、当前落点以 §7 为准，并申明 §1–§6 与 §7 非矛盾。
+2. 组件表 Definition 行的”层 / 模块”由 `application` 改为 `application（历史；现已按 §7 迁入 ordering-process-jdbc）`，避免读者把该行误读为当前落点。
+
+代码零改动;`OrderFulfilmentDefinition` 的真实 package/路径未动。
+
+## 验证结果
+
+- doc ↔ code 交叉核读通过:`analysis-00012` §1 preamble 与组件表 Definition 行现均标注”历史/已迁 `ordering-process-jdbc`”,与该文件真实所在的 provider 模块一致;§1 现在时结论不再被误读为当前落点,亦与 §7/文末桥接自洽。
+- 纯文档改动,无可执行测试;上述交叉核读即 `README.md` 允许的替代验证。
 
 ## 关联
 
