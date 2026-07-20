@@ -69,7 +69,12 @@ flowchart TD
     测试用真实 SDK + `InMemorySpanExporter`：域 span 名/属性、capture 带 traceId + sampled 位、restore 以 link 回创建者为新 trace、无活跃 span→NONE。4 绿。
   - ✅ **P1②**（`observability-otel-spring-boot-starter`）：`TracingCommandInterceptor`（`CommandInterceptor`，`order=-100` 最外层，wrap 整条链；span `command <type>` + 4 属性；异常 `setStatus(ERROR)`+`recordException`）；
     `AipersimmonDddObservabilityOtelAutoConfiguration`（`@ConditionalOnClass`，注入 `OpenTelemetry` bean 构造 `Tracer` + 拦截器，全 `@ConditionalOnMissingBean` 可覆盖）。测试：拦截器单测（成功/失败）2 + 装配 context-runner（present/override）2，共 4 绿。
-  - ⬜ **P1③**（剩余领域主干 span）：QueryBus 装饰器（无拦截器链，需单独包）、`DomainEvents`+每 handler span、入站 ACL span、`ProcessRuntime.start/handle` 的 `process.advance` span（经 framework-free `Tracer` SPI，保持 jdbc 模块 OTEL-free）。测试 slice 各覆盖；未装配模块时零 span（no-op 回归）。
+  - ✅ **P1③**（`process.advance` span——真正的覆盖缺口）：`JdbcProcessRuntime` 经 framework-free `Tracer` SPI 在 `start`/`handle` 外层开
+    `process.advance <type>` span（属性 `process.type`/`business_key`/`instance_id`/`lifecycle`，失败 `error`+`recordException`），wrap 重试与事务；
+    新增 16-参 canonical ctor（15-参委派 `NoOpTracer.INSTANCE`，既有 ctor/测试不破）；PM starter 经 `ObjectProvider<Tracer>` 注入（缺省 NOOP）。
+    `process-manager-jdbc` 仅依赖 framework-free `observability`、**不引入 OTEL**——测试用 recording `Tracer` 断言（无需 OTEL），55 绿；PM starter 23 绿。
+    **取舍**：QueryBus / DomainEvents / 入站 ACL 的装饰式子 span **暂缓**——领域事件/投影同步跑在命令 span 内（已覆盖，仅细化）、查询在 HTTP+JDBC span 内、
+    且三者需 BeanPostProcessor/AOP 装饰，边际价值低于成本；`process.advance` 才是唯一「不在任何既有 span 下」（relay/deadline 异步驱动）的真缺口。若后续需要，作为 P3 后可选细化项补。
 
 - ⬜ **P2**（durable 跳缝合：capture/restore + Span Link）
   - `StoreAndForwardTracer` OTEL 实现：`captureCurrent()` = `inject(Context.current())`；`restore()` = `extract` + 起 LINK span。

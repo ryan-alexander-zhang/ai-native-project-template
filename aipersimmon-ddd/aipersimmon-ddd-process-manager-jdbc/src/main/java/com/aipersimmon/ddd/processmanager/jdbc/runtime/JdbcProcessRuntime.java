@@ -33,6 +33,9 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionInsert;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.observability.NoOpTracer;
+import com.aipersimmon.ddd.observability.ObservabilityAttributes;
+import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
@@ -78,6 +81,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     private final ProcessObserver observer;
     private final Optional<Duration> maxLifetime;
     private final long maxPayloadBytes;
+    private final Tracer tracer;
 
     public JdbcProcessRuntime(
             JdbcProcessInstanceStore instances,
@@ -131,6 +135,28 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
             ProcessObserver observer,
             Optional<Duration> maxLifetime,
             long maxPayloadBytes) {
+        this(instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
+                unitOfWork, clock, idGenerator, duplicatePolicy, maxRetries, observer, maxLifetime,
+                maxPayloadBytes, NoOpTracer.INSTANCE);
+    }
+
+    public JdbcProcessRuntime(
+            JdbcProcessInstanceStore instances,
+            JdbcProcessTransitionStore transitions,
+            JdbcProcessEffectStore effects,
+            JdbcProcessDeadlineStore deadlines,
+            ProcessDefinitionRegistry definitions,
+            ProcessPayloadCodecRegistry payloadCodecs,
+            ProcessStateCodecRegistry stateCodecs,
+            JdbcProcessUnitOfWork unitOfWork,
+            Clock clock,
+            Supplier<String> idGenerator,
+            DuplicateBusinessKeyPolicy duplicatePolicy,
+            int maxRetries,
+            ProcessObserver observer,
+            Optional<Duration> maxLifetime,
+            long maxPayloadBytes,
+            Tracer tracer) {
         this.instances = instances;
         this.transitions = transitions;
         this.effects = effects;
@@ -146,17 +172,47 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         this.observer = observer;
         this.maxLifetime = maxLifetime;
         this.maxPayloadBytes = maxPayloadBytes;
+        this.tracer = tracer;
     }
 
     @Override
     public ProcessAdvanceResult start(
             ProcessType processType, ProcessBusinessKey businessKey, ProcessInput input, CommandContext cause) {
-        return withRetry(() -> unitOfWork.execute(() -> doStart(processType, businessKey, input, cause)));
+        return traced(processType.value(), businessKey.value(),
+                () -> withRetry(() -> unitOfWork.execute(() -> doStart(processType, businessKey, input, cause))));
     }
 
     @Override
     public ProcessAdvanceResult handle(ProcessRef processRef, ProcessInput input, CommandContext cause) {
-        return withRetry(() -> unitOfWork.execute(() -> doHandle(processRef, input, cause)));
+        return traced(processRef.processType().value(), processRef.businessKey().value(),
+                () -> withRetry(() -> unitOfWork.execute(() -> doHandle(processRef, input, cause))));
+    }
+
+    /**
+     * Opens a {@code process.advance} span around one advance so the decision is visible in
+     * traces — both under a command and, once a relay or deadline worker drives it, under the
+     * restored (linked) context where nothing else would name it. The span wraps retries and
+     * the transaction; result lifecycle/step are stamped on success, the exception on failure.
+     */
+    private ProcessAdvanceResult traced(
+            String processType, String businessKey, Supplier<ProcessAdvanceResult> advance) {
+        try (Tracer.SpanScope span = tracer.startSpan("process.advance " + processType)) {
+            span.attribute(ObservabilityAttributes.PROCESS_TYPE, processType)
+                    .attribute(ObservabilityAttributes.PROCESS_BUSINESS_KEY, businessKey);
+            try {
+                ProcessAdvanceResult result = advance.get();
+                span.attribute(ObservabilityAttributes.PROCESS_INSTANCE_ID,
+                                result.processRef().instanceId().value())
+                        .attribute(ObservabilityAttributes.LIFECYCLE, result.lifecycle().name());
+                if (result.step() != null) {
+                    span.attribute(ObservabilityAttributes.STEP, result.step().value());
+                }
+                return result;
+            } catch (RuntimeException e) {
+                span.error(e);
+                throw e;
+            }
+        }
     }
 
     private ProcessAdvanceResult doStart(

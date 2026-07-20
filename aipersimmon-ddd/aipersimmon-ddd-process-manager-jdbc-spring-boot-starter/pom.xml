@@ -34,6 +34,12 @@
       <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Observability SPI: the runtime bean is wired with an optional Tracer (no-op default). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>

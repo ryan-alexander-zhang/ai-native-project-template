@@ -2,6 +2,8 @@ package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.observability.NoOpTracer;
+import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
@@ -149,14 +151,16 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
             JdbcProcessEffectStore effects, JdbcProcessDeadlineStore deadlines,
             ProcessDefinitionRegistry definitions, ProcessPayloadCodecRegistry payloadCodecs,
             ProcessStateCodecRegistry stateCodecs, JdbcProcessUnitOfWork unitOfWork, Clock processManagerClock,
-            ProcessManagerJdbcProperties properties, ObjectProvider<ProcessObserver> observer) {
+            ProcessManagerJdbcProperties properties, ObjectProvider<ProcessObserver> observer,
+            ObjectProvider<Tracer> tracer) {
         DuplicateBusinessKeyPolicy policy = DuplicateBusinessKeyPolicy.valueOf(
                 properties.getStartDuplicateBusinessKey().toUpperCase(Locale.ROOT));
         return new JdbcProcessRuntime(
                 instances, transitions, effects, deadlines, definitions, payloadCodecs, stateCodecs,
                 unitOfWork, processManagerClock, randomIds(), policy, properties.getConcurrencyMaxRetries(),
                 observer.getIfAvailable(() -> ProcessObserver.NOOP),
-                properties.getInstance().maxLifetimeDuration(), properties.getPayload().getMaxBytes());
+                properties.getInstance().maxLifetimeDuration(), properties.getPayload().getMaxBytes(),
+                tracer.getIfAvailable(() -> NoOpTracer.INSTANCE));
     }
 
     /**

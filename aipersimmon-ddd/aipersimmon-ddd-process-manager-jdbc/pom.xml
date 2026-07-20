@@ -35,6 +35,13 @@
       <artifactId>aipersimmon-ddd-process-manager</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Observability SPI (framework-free, no-op by default): the runtime opens a
+         process.advance span through it, so relay/deadline-driven advances are visible. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- IntegrationEvents: the integration-event effect dispatcher publishes through it. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
