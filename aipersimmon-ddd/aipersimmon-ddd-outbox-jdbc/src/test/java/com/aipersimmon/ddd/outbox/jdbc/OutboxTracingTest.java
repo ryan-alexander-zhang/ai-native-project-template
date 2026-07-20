@@ -29,7 +29,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(
         classes = OutboxTracingTest.TestApp.class,
-        properties = "aipersimmon.ddd.outbox.poll-delay-ms=3600000")
+        properties = {
+                "aipersimmon.ddd.outbox.poll-delay-ms=3600000",
+                // A lock name unique to this test so its relay() is never skipped by a ShedLock
+                // lock held from another test class in the same JVM run.
+                "aipersimmon.ddd.outbox.relay.lock-name=outbox-jdbc-tracing-test"})
 class OutboxTracingTest {
 
     @SpringBootConfiguration
