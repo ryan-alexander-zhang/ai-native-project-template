@@ -1,0 +1,102 @@
+---
+id: plan-00005-observability-implementation
+type: plan
+role: main
+status: open
+parent: design-00005-observability-and-distributed-tracing
+---
+
+# 可观测性闭环落地计划
+
+把 [[design-00005-observability-and-distributed-tracing]] 落成代码：为 `aipersimmon-ddd` 脚手架建立
+Trace / Log / Metric 全链路闭环——同步链路骑 OTEL ambient、两处异步跳（outbox relay、PM relay/deadline）
+capture/restore 缝合、领域主干（命令/查询/领域事件/入站 ACL/推进）由脚手架自带 span、并打通三柱互通。
+
+**验收锚点**：`aipersimmon-ddd-scaffold/multi-module` 的订单履约 sample 端到端跑通后，用内存 `SpanExporter`
+断言 **一条请求产出一棵连通的 trace**——`command OrderPlaced` → `domain-event ...` → 跨异步跳的 `outbox.publish`
+/ `process.advance` / `effect.dispatch` 经 **Span Link** 关联回创建者、下游 command 串上；每条相关日志带
+`trace_id`/`span_id`；一个 SLI 指标带 exemplar 指回该 trace。当前跑不出即未完成。
+
+全程 test-first。铁律：`aipersimmon-ddd-observability` framework-free、零 OTEL/Spring 依赖；`core`/`cqrs`/
+`integration`/`process-manager`/`outbox` **不得**新增 OTEL 依赖；OTEL 只落 `aipersimmon-ddd-observability-otel`；
+**未装配该可选模块时全链路 no-op、行为与今天逐字一致**（每阶段以此为回归红线）。
+
+## 一、Design
+
+详见 [[design-00005-observability-and-distributed-tracing]]。落地关键结构：
+
+```mermaid
+flowchart TD
+  obs["aipersimmon-ddd-observability（新, framework-free）<br/>StoreAndForwardTracer / Tracer / SpanScope（no-op 默认）+ 属性常量"]
+  otel["aipersimmon-ddd-observability-otel（新, 可选）<br/>opentelemetry-spring-boot-starter + SPI 的 OTEL 实现<br/>+ Tracing 拦截器/装饰 + MDC + exemplar"]
+  cqrs["cqrs / cqrs-spring"]
+  pm["process-manager-jdbc"]
+  ob["outbox-jdbc / outbox-mybatis-plus"]
+  spring["events-spring / web-spring / messaging-kafka"]
+
+  cqrs --> obs
+  pm --> obs
+  ob --> obs
+  otel --> obs
+  otel -. 装配/实现 SPI .-> cqrs
+  otel -. 实现 SPI .-> pm
+  otel -. 实现 SPI .-> ob
+  otel -. 装配 .-> spring
+```
+
+新增 durable 列（PM 三表 + 两套 outbox 表，全 DDL 副本）：`traceparent VARCHAR(55)`、`trace_state VARCHAR(512)`，均可空、无索引，紧邻既有 `trace_id`。
+
+## 二、进度
+
+- ⬜ **P0**（`aipersimmon-ddd-observability` 契约 + durable 列，**无行为变化**）
+  - 新模块 `aipersimmon-ddd-observability`：`StoreAndForwardTracer`（`captureCurrent()`/`restore()` + `Captured`/`Scope`）、
+    领域埋点用抽象 `Tracer`/`SpanScope`、`ObservabilityAttributes` 属性键常量；全部 no-op 默认实现（`NoOpTracer` 等）。
+    零 OTEL/Spring 依赖；每包 package-info。注册进 reactor + BOM。
+  - DDL：PM `{h2,mysql,postgresql}` 生产 schema + 测试副本 + scaffold 消费方副本 + `outbox-jdbc`/`outbox-mybatis-plus`
+    schema，`process_{transition,effect,deadline}` 与 `aipersimmon_outbox`/`_dead_letter` 加两列（MySQL 内联、PG/H2 无索引）。
+  - 记录/store 层加 `traceparent`/`traceState` 字段与读写，默认写 `null`（此阶段不接捕获，值恒空 → 行为不变）。
+  - 测试：SPI no-op 契约（capture 返 null-pair、restore 返 no-op scope）、store 读写新列往返（H2）。回归：全 reactor validate/test 绿。
+
+- ⬜ **P1**（`aipersimmon-ddd-observability-otel` + 领域主干 span）
+  - 新模块：依赖 `opentelemetry-spring-boot-starter`（边界自动埋点白拿）+ framework-free 契约模块；Boot 自动装配、全 `@ConditionalOn...` 可覆盖。
+  - `TracingCommandInterceptor`（`CommandInterceptor`，最外层）：每命令开 span `command <type>`，属性 `command.type`/`message.id`/`correlation.id`/`causation.id`。
+  - QueryBus 装饰器（QueryBus 无拦截器链）：span `query <type>`。
+  - `DomainEvents` 装饰 + 每 handler span、入站 ACL（`@EventListener EventEnvelope`）span。
+  - `Tracer` SPI 的 OTEL 实现 bean，供 P2 的 `process.advance` span。
+  - 测试：内存 `InMemorySpanExporter` slice——单命令产出 `command` span 且属性齐；query/domain-event/ACL span 各一；未装配模块时零 span（no-op 回归）。
+
+- ⬜ **P2**（durable 跳缝合：capture/restore + Span Link）
+  - `StoreAndForwardTracer` OTEL 实现：`captureCurrent()` = `inject(Context.current())`；`restore()` = `extract` + 起 LINK span。
+  - 写侧接入：`JdbcProcessRuntime`（effect/deadline/transition）、`OutboxWriter`（jdbc + mybatis-plus）写行前 `captureCurrent()` 存列。
+  - 读侧接入：PM `JdbcProcessEffectRelay`/`JdbcProcessDeadlineWorker`、`OutboxRelay`（两实现）捞起后 `restore()` link 再派发；`process.advance` span。
+  - 回收 [[issue-00025-correlation-propagation-and-scrape-batching]] 第 1 条：deadline 触发 / parked 重放同批贯穿 `correlation_id` + `traceparent`。
+  - 测试：H2/内存 exporter——写行存 traceparent、relay 派发的 span 含 link 回创建者且 traceId 一致、采样位透传；outbox 两实现各一。
+
+- ⬜ **P3**（三柱闭环）
+  - trace↔log：OTEL logback MDC 注入 `trace_id`/`span_id`；与既有 `correlationId`/`traceId` MDC 并存；提供 MDC key 约定 + 示例 pattern（不强加 logback 文件）。
+  - trace↔metric：[[design-00004-durable-process-manager-runtime]] §5.3 SLI 加 exemplar（优先 `dispatch_latency`/`claim_latency`/`advance_conflict_retries`）。
+  - 属性目录：落实 `ObservabilityAttributes`（§10.3 表），对齐 OTEL `messaging.*`；payload 绝不进属性。
+  - 错误语义（对齐 [[design-00003-exception-model]]）：handler 异常/codec 失败/DEAD→SUSPENDED/revision 冲突/运维 redrive·cancel 的 span error status + event。
+  - 测试：日志含 span_id（capturing appender）、指标带 exemplar、失败路径 span status=ERROR。
+
+- ⬜ **P4**（可选增强 + 端到端验收）
+  - 可选：baggage（`business_key`/租户，默认关）、tail-sampling collector 示例、日志/错误体以真 `trace_id` 收敛替换 UUID。
+  - `multi-module` sample 接 `observability-otel` + Postgres，跑验收锚点（连通 trace + link + 日志关联 + exemplar）。
+
+## 三、验收路径
+
+1. 全 reactor `mvn -q verify` 绿；`aipersimmon-ddd-observability` 零 OTEL/Spring 依赖（ArchUnit/enforcer 守护）。
+2. 未装配 `observability-otel`：无任何 span/MDC-span/exemplar，既有测试逐字全绿（no-op 回归）。
+3. 装配后单元/切片：`command`/`query`/`domain-event`/`acl`/`process.advance` span 属性齐；durable 跳的派发 span 经 **Span Link** 关联回创建者、`trace_id` 一致、`sampled` 位透传（outbox jdbc + mybatis-plus + PM 各覆盖）。
+4. 失败路径 span `status=ERROR` + `recordException`；DEAD→SUSPENDED 打 `process.suspended` event。
+5. 日志行含 `trace_id`/`span_id`；SLI 指标带 exemplar 可回跳 trace。
+6. **端到端**：`multi-module` 订单履约（含支付拒绝补偿）跑通，内存 exporter 断言全链路一棵连通 trace（跨同进程 command 往返 + 跨异步 outbox/PM 跳 + Span Link）。
+
+## 四、关联
+
+- [[design-00005-observability-and-distributed-tracing]]（父）
+- [[design-00004-durable-process-manager-runtime]]（异步 relay/deadline、SLI）
+- [[decision-00013-command-context-and-causation-propagation]]（因果传播、元数据不进 payload）
+- [[design-00003-exception-model]]（span 错误语义对齐）
+- [[issue-00025-correlation-propagation-and-scrape-batching]]（P2 一并回收）
+- [[process-manager-schema-copies]]（DDL 多副本同步）
