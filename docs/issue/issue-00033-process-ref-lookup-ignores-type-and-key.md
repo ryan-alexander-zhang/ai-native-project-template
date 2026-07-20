@@ -2,7 +2,7 @@
 id: issue-00033-process-ref-lookup-ignores-type-and-key
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---
 
@@ -24,22 +24,34 @@ parent: plan-00003-durable-process-manager-implementation
 2. **最小机制**:所有 store 查询的键都是 `instanceId` 单列,加载后代码直接采信**调用方**的 `ref.processType()` 去选 Definition/codec(`JdbcProcessRuntime.java:340-341`),而非采信行内持久化的 type。
 3. **为何降级(排除高危)**:`instanceId` 是**全局唯一随机 UUID 且为主键**(`ProcessInstanceId` javadoc;`new ProcessInstanceId(idGenerator.get())` `JdbcProcessRuntime.java:255`,默认生成器 `() -> UUID.randomUUID().toString()`)。且 `ProcessRef` **永远由 runtime 从行铸造并回传**——`findRef` 用 `.map(ProcessInstanceRow::ref)`,各 `ProcessAdvanceResult` 携带 `row.ref()`。正常 API 路径下 `(instanceId, processType, businessKey)` 三元组内部天然一致;"真 instanceId + 错 type" 的 ref **不是 API 能产生的形态**,只能来自手工拼装、数据损坏或程序错误。故这是**加固缺口 / fail-fast 缺失**,而非活的可利用高危 correctness bug。真根因:身份校验与身份构造耦合在同一来源(runtime),缺一道独立的 load 后自校验。
 
-## 复现(test-first)
+## 复现(已落地)
 
-提议单测(尚未落地):构造一个持有**真实存在实例的 instanceId**、但 `processType`/`businessKey` **故意写错**的 `ProcessRef`,分别喂给 `doHandle(...)` 与 `cancelProcess(...)`。
+三个回归测试,各构造一个持有**真实存在实例的 instanceId**、但 `processType` **故意写错**的 `ProcessRef`,喂给三个入口:
 
-- 期望修复后:两者在 load 后立即抛 type/key mismatch。
-- 修复前:`doHandle` 用错误 codec 解码/推进真实行、`cancelProcess` 取消该真实行——均不报错(暴露缺口)。
+- `JdbcProcessRuntimeTest#handleWithARealInstanceIdButWrongProcessTypeIsRejected`:错 type 的 ref → `handle` 抛
+  `IllegalArgumentException`;并断言真实行未被推进(仍一条 transition、revision 仍为 1)。
+- `JdbcProcessOperationsTest#cancelProcessWithARealInstanceIdButWrongProcessTypeIsRejected`:错 type 的 ref →
+  `cancelProcess` 抛 `IllegalArgumentException`;真实行 lifecycle 仍 `RUNNING`,无 `OPERATOR_CANCEL` transition。
+- `JdbcProcessQueryTest#findWithARealInstanceIdButWrongProcessTypeIsRejected`:错 type 的 ref → `find` 抛
+  `IllegalArgumentException`,而非静默返回不匹配的实例。
 
-## 修复
+修复前三者都不报错(`doHandle` 用错误 codec 推进真实行、`cancelProcess` 取消真实行、`find` 返回不匹配视图)。
 
-对症"身份校验缺失",库侧加一道 load 后自校验:
+## 修复(已实施)
 
-1. 在 `doHandle`/`cancelProcess`/`find` 加载 `row` 后立即 `if (!row.ref().equals(ref)) throw new ...`(type/key mismatch,fail-fast);或
-2. 让 store 查询同时带 `(instanceId, processType, businessKey)` 三字段做 WHERE,行不存在即视为 mismatch。
-3. 新增 type/key mismatch 回归测试作为守卫。
+对症"身份校验缺失",在 load 边界统一加一道自校验:身份从行铸造、绝不采信调用方的 type/key。
 
-> 注:**不要**逐个注入点散加 `@Qualifier`/临时判断;应在 load 边界统一自校验,语义集中且可测。
+1. **`JdbcProcessRuntime`**:新增私有静态 `requireRefMatch(ref, row)`,在 `doHandle` 加载 `row`(`findForUpdate`)后
+   立即调用;`!row.ref().equals(ref)` 即抛 `IllegalArgumentException`,附上 supplied vs stored 的 type/key。
+2. **`JdbcProcessOperations#cancelProcess`**:`findForUpdate` 后、revision 守卫前调同一形态的 `requireRefMatch`。
+3. **`JdbcProcessQuery#find`**:在 `map` 内对读到的行做同一比对,不匹配即抛;实例不存在仍返回 `Optional.empty()`。
+
+选方案 1(load 后自校验)而非"三字段 WHERE",语义集中、可测,且错 type 与"实例不存在"能区分开(前者 fail-fast、后者按各入口既有语义)。`withRetry` 只吞 `StaleProcessRevisionException`/`DuplicateKeyException`,故该 `IllegalArgumentException` 直接向上抛出。
+
+## 验证结果
+
+- 三个新回归测试通过;`handleOnUnknownInstanceThrowsNotFound` 等既有测试不回归(不存在的 instanceId 仍抛 `ProcessNotFoundException`,与"存在但 type 不符"区分清楚)。
+- `mvn -o -pl aipersimmon-ddd-process-manager-jdbc -am test` 与 `-pl ...-spring-boot-starter -am test` 均 BUILD SUCCESS,失败/错误计数为 0。
 
 ## 关联
 

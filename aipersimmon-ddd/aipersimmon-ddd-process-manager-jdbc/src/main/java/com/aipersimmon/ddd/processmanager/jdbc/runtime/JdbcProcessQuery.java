@@ -61,7 +61,20 @@ public final class JdbcProcessQuery implements ProcessQuery {
 
     @Override
     public Optional<ProcessView> find(ProcessRef processRef) {
-        return instances.find(processRef.instanceId()).map(JdbcProcessQuery::toView);
+        return instances.find(processRef.instanceId()).map(row -> {
+            // Fail fast on a ref that names a real instanceId but the wrong processType/businessKey,
+            // rather than silently returning a mismatched instance (the same guard the runtime's
+            // handle and the operator cancel apply at the load boundary).
+            if (!row.ref().equals(processRef)) {
+                throw new IllegalArgumentException(
+                        "process ref mismatch for instance " + processRef.instanceId().value()
+                                + ": supplied " + processRef.processType().value()
+                                + "/" + processRef.businessKey().value()
+                                + " but the stored instance is "
+                                + row.ref().processType().value() + "/" + row.ref().businessKey().value());
+            }
+            return toView(row);
+        });
     }
 
     /** Page instances matching {@code criteria}, oldest first. */

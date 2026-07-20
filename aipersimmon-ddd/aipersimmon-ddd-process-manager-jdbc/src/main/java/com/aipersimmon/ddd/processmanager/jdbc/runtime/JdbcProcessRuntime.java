@@ -279,18 +279,37 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
 
     /**
      * Arm the whole-instance max-lifetime backstop when configured and the instance is still active
-     * after start. It is an ordinary deadline the definition can reschedule to
-     * extend or that fires {@link MaxLifetimeExceeded} into {@code handle} for the definition to
-     * decide. A definition may also reschedule the reserved name itself in its start decision, which
-     * simply bumps the generation.
+     * after start. It is an ordinary deadline the definition can later reschedule to extend, or that
+     * fires {@link MaxLifetimeExceeded} into {@code handle} for the definition to decide. A definition
+     * that schedules or cancels the reserved name in its own start decision owns that timer: the
+     * default backstop steps aside rather than clobbering it with a higher generation, so the
+     * definition's decision (a custom due time, or an outright cancellation) is what stands.
      */
     private void armMaxLifetimeBackstop(
             ProcessRef ref, ProcessDecision<Object> decision, CommandContext cause, Instant now) {
         if (maxLifetime.isEmpty() || !decision.lifecycle().isActive()) {
             return;
         }
+        if (decisionTouchesReservedDeadline(decision)) {
+            return;
+        }
         scheduleDeadline(ref, new ScheduleDeadline(
                 MaxLifetimeExceeded.DEADLINE_NAME, now.plus(maxLifetime.get()), new MaxLifetimeExceeded()), cause, now);
+    }
+
+    /** Whether the decision already schedules or cancels the reserved max-lifetime deadline name. */
+    private static boolean decisionTouchesReservedDeadline(ProcessDecision<Object> decision) {
+        for (ProcessEffect effect : decision.effects()) {
+            boolean touches = switch (effect) {
+                case ScheduleDeadline schedule -> schedule.name().equals(MaxLifetimeExceeded.DEADLINE_NAME);
+                case CancelDeadline cancel -> cancel.name().equals(MaxLifetimeExceeded.DEADLINE_NAME);
+                default -> false;
+            };
+            if (touches) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ProcessAdvanceResult resolveExistingStart(
@@ -311,6 +330,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     private ProcessAdvanceResult doHandle(ProcessRef ref, ProcessInput input, CommandContext cause) {
         ProcessInstanceRow row = instances.findForUpdate(ref.instanceId())
                 .orElseThrow(() -> new ProcessNotFoundException(ref));
+        requireRefMatch(ref, row);
 
         Optional<String> duplicate = transitions.findTransitionIdByInput(ref.instanceId(), cause.messageId());
         if (duplicate.isPresent()) {
@@ -373,6 +393,22 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
 
         return new ProcessAdvanceResult(
                 ref, revision, decision.lifecycle(), decision.step(), false, transitionId);
+    }
+
+    /**
+     * Fail fast when a ref carries a real instanceId but a processType/businessKey that disagrees with
+     * the stored row. Identity is loaded from the row, never trusted from the caller, so a mismatched
+     * ref cannot silently drive the wrong definition/codec against a real instance (the same guard sits
+     * on the read query and the operator cancel).
+     */
+    private static void requireRefMatch(ProcessRef ref, ProcessInstanceRow row) {
+        if (!row.ref().equals(ref)) {
+            throw new IllegalArgumentException(
+                    "process ref mismatch for instance " + ref.instanceId().value()
+                            + ": supplied " + ref.processType().value() + "/" + ref.businessKey().value()
+                            + " but the stored instance is "
+                            + row.ref().processType().value() + "/" + row.ref().businessKey().value());
+        }
     }
 
     private void appendTransition(

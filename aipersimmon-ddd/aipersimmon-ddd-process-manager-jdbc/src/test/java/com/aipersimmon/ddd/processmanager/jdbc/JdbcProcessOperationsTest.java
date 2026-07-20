@@ -26,6 +26,8 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.processmanager.model.ProcessRef;
+import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import java.time.Clock;
 import java.time.Duration;
@@ -240,6 +242,22 @@ class JdbcProcessOperationsTest {
                 "SELECT status FROM aipersimmon_process_effect", String.class),
                 "the not-yet-dispatched effect is cancelled");
         assertEquals(1L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'OPERATOR_CANCEL'",
+                Long.class));
+    }
+
+    @Test
+    void cancelProcessWithARealInstanceIdButWrongProcessTypeIsRejected() {
+        ProcessAdvanceResult started = start();
+        // A ref with the real instanceId but a wrong processType must not cancel the real instance.
+        ProcessRef mismatched = new ProcessRef(
+                started.processRef().instanceId(), new ProcessType("test.other"), ORDER);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> operations.cancelProcess(
+                        mismatched, started.revision().value(), "operator-1", "wrong type"));
+
+        assertEquals("RUNNING", lifecycle(), "the real instance is not cancelled");
+        assertEquals(0L, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'OPERATOR_CANCEL'",
                 Long.class));
     }

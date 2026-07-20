@@ -225,15 +225,24 @@ public final class JdbcProcessInstanceStore {
                 "PENDING", "IN_FLIGHT", "PENDING", "IN_FLIGHT", limit);
     }
 
-    /** Distinct {@code (definitionVersion, stateSchemaVersion)} pairs referenced by live instances. */
+    /**
+     * Distinct {@code (definitionVersion, stateSchemaVersion)} pairs referenced by live instances.
+     * Only {@code RUNNING}/{@code COMPENSATING}/{@code SUSPENDED} instances pin a version; terminal
+     * history ({@code COMPLETED}/{@code FAILED}/{@code CANCELLED}) does not, so an old definition can
+     * be retired once no live instance depends on it (aligns with the startup validator's "live
+     * instance" wording).
+     */
     public List<VersionRef> distinctVersionsInUse() {
         return jdbc.query("""
                 SELECT DISTINCT process_type, definition_version, state_schema_version
-                FROM aipersimmon_process_instance""",
+                FROM aipersimmon_process_instance
+                WHERE lifecycle IN (?, ?, ?)""",
                 (rs, n) -> new VersionRef(
                         new ProcessType(rs.getString("process_type")),
                         new DefinitionVersion(rs.getString("definition_version")),
-                        new StateSchemaVersion(rs.getInt("state_schema_version"))));
+                        new StateSchemaVersion(rs.getInt("state_schema_version"))),
+                ProcessLifecycle.RUNNING.name(), ProcessLifecycle.COMPENSATING.name(),
+                ProcessLifecycle.SUSPENDED.name());
     }
 
     /** A distinct schema-version pair a live instance depends on, for startup fail-fast. */

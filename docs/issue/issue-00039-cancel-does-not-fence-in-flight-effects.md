@@ -2,7 +2,7 @@
 id: issue-00039-cancel-does-not-fence-in-flight-effects
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---
 
@@ -35,21 +35,31 @@ parent: plan-00003-durable-process-manager-implementation
    IN_FLIGHT 仍会投递" 明确写进文档/API,要么引入 cancellation epoch/fencing 并在 dispatch 前复查实例状态。
    当前实现踩在两者之间:既宣称取消"尚未派发"的 effect,又漏掉了 IN_FLIGHT 这段窗口。
 
-## 复现(test-first)
+## 复现(已落地)
 
-提议一个并发回归测试:令某个 effect 处于 **IN_FLIGHT**(已被 `pollOnce` 认领、尚未 `deliver`),
-在该窗口内对其实例调用 `cancelProcess(...)`,随后放行投递;断言该 effect **不再**对外 `dispatch`
-(可用一个记账式 `EffectDispatcher` 桩计数)。修复前该 effect 仍会被 dispatch → 测试失败,复现问题。
+`JdbcProcessEffectRelayTest#doesNotDispatchAnInFlightEffectWhoseInstanceWasCancelled`:令 start 的 command effect
+被认领为 **IN_FLIGHT**(`dialect.claimDueEffects` 打上租约 `token-A`),随后把实例 lifecycle 直接置 `CANCELLED`
+(模拟 `cancelProcess` 提交——`cancelPending` 只动 PENDING,IN_FLIGHT 那行原样留下),再让租约过期触发 relay 重认领并
+`pollOnce`。断言:`pollOnce` 返回 0、记账式 `RecordingCommandBus` 未收到任何 command、effect 落到终态 `CANCELLED`。
+修复前 relay 会解码并 `dispatch`(bus 收到 1 条、effect 变 `DELIVERED`)→ 测试失败,复现"cancel 返回后仍对外发副作用"。
 
-## 修复
+## 修复(已实施)
 
-需先明确语义,二选一并落到文档 + API + 测试:
+采用 strict 语义("cancel 返回后不再产生新的对外副作用"),用实例 lifecycle 作 fencing、无需新增 epoch 列:
 
-1. **best-effort(维持现状语义)**:在 `cancelProcess` 的 javadoc、`ProcessOperations` API 文档与
-   design-00004 中明确 "cancel 只取消尚未认领(PENDING)的 effect;已认领为 IN_FLIGHT 的 effect 仍会投递",
-   并同步修正当前声称取消"尚未派发"的措辞,消除自相矛盾。
-2. **strict(返回后不得再产生新副作用)**:引入 cancellation epoch / fencing —— `cancelProcess` 记录取消位点,
-   `deliver()` 在 dispatch 前复查实例是否已 CANCELLED,若是则跳过对外投递并把该 effect 记为取消 / 作废。
+1. **`JdbcProcessEffectRelay.deliver()`** 在对外 dispatch **之前**加 cancellation fence:`instances.find(effect.instanceId())`
+   复查 owning 实例,若 lifecycle 为终态 `CANCELLED`,则跳过 dispatch,调用 `effects.markCancelled(effectId, leaseToken, ...)`
+   把该 effect 记为终态 `CANCELLED` 并 `return false`——扣款/库存命令永不发出。
+2. **`JdbcProcessEffectStore` 新增 `markCancelled(effectId, leaseToken, now)`**:把行置 `CANCELLED` 并清租约,谓词
+   `WHERE effect_id = ? AND lease_token = ?`——与 `markDelivered` 一样由**租约令牌 fence**,只有当前 owner 能作废,清 stale
+   owner 无法误伤。
+3. **文档**:修正 `JdbcProcessOperations` 类/`cancelProcess` javadoc 与 `JdbcProcessEffectRelay` 类 javadoc,明确 cancel
+   现在也 fence 已认领为 IN_FLIGHT 的 effect(relay 派发前复查),兑现"cancel 返回后无新副作用",消除原先自相矛盾的措辞。
+
+## 验证结果
+
+- 新回归测试通过;relay 既有 11 条(at-least-once 重投、租约 fence、DEAD+suspend 等)不回归——非 CANCELLED 实例的 effect 仍照常投递。
+- `mvn -o -pl aipersimmon-ddd-process-manager-jdbc -am test` 与 `-pl ...-spring-boot-starter -am test` 均 BUILD SUCCESS,失败/错误计数为 0。
 
 ## 关联
 

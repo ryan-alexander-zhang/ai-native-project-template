@@ -23,6 +23,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
+import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
 import java.time.Clock;
@@ -162,6 +163,20 @@ class JdbcProcessRuntimeTest {
                 new ProcessInstanceId("nope"), TestFulfilment.TYPE, ORDER);
         assertThrows(ProcessNotFoundException.class,
                 () -> runtime.handle(ghost, new TestFulfilment.Advance(), CommandContext.root("m")));
+    }
+
+    @Test
+    void handleWithARealInstanceIdButWrongProcessTypeIsRejected() {
+        ProcessAdvanceResult started = start("msg-1");
+        // A ref carrying the real instanceId but a different processType must fail fast at the load
+        // boundary rather than driving the real instance under the wrong definition/codec.
+        ProcessRef mismatched = new ProcessRef(
+                started.processRef().instanceId(), new ProcessType("test.other"), ORDER);
+        assertThrows(IllegalArgumentException.class,
+                () -> runtime.handle(mismatched, new TestFulfilment.Advance(), CommandContext.root("msg-2")));
+        // The real instance is untouched: still one transition, revision 1.
+        assertEquals(1L, count("aipersimmon_process_transition"));
+        assertEquals(1L, query.find(started.processRef()).orElseThrow().revision().value());
     }
 
     @Test

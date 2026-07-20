@@ -14,6 +14,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.ClaimedEffect;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -30,6 +31,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * once attempts are exhausted, moves it to {@code DEAD} and suspends the instance.
  * A crash before the delivered mark leaves the row {@code IN_FLIGHT}
  * with an expiring lease, so it is re-claimed and re-delivered under the same id.
+ *
+ * <p>Before external dispatch it re-checks the owning instance's lifecycle: if an operator
+ * cancel landed while the effect was in flight, the instance is now {@code CANCELLED}, so the
+ * dispatch is skipped and the effect is fenced to a terminal {@code CANCELLED} state under its
+ * lease — no charge/reserve command escapes. This makes operator cancel honour "no new external
+ * side effect after cancel returns", not merely "cancel the not-yet-claimed effects".
  *
  * <p>The scheduling loop that calls {@code pollOnce} on an interval is the starter's
  * concern; this class is the directly testable unit of work.
@@ -149,6 +156,14 @@ public final class JdbcProcessEffectRelay {
             return false;
         }
         ClaimedEffect effect = loaded.get();
+        // Cancellation fence: if an operator cancel landed while this effect was in flight, its instance
+        // is now terminally CANCELLED. Skip the external dispatch and retire the effect under our lease,
+        // so no side effect escapes after cancel returned.
+        Optional<ProcessInstanceRow> owner = instances.find(effect.instanceId());
+        if (owner.isPresent() && owner.get().lifecycle() == ProcessLifecycle.CANCELLED) {
+            effects.markCancelled(effectId, leaseToken, clock.instant());
+            return false;
+        }
         long dispatchStart = System.nanoTime();
         try {
             ProcessPayloadCodec<?> codec = payloadCodecs.forType(effect.payloadType());

@@ -2,7 +2,7 @@
 id: issue-00036-max-lifetime-backstop-overwrites-definition-deadline
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---
 
@@ -23,18 +23,30 @@ parent: plan-00003-durable-process-manager-implementation
 3. **真根因**:默认 backstop 与 Definition 对**同一个保留名**的调度之间缺少让位规则——要么顺序错(应先挂默认、再让 Definition 覆盖),要么缺条件(backstop 应在保留名已被本次 decision 操作时退避)。
 4. **措辞误导**:`armMaxLifetimeBackstop` 的 javadoc 把"definition 也可 reschedule 保留名、只是 bump generation"描述得像无害,实则 backstop 会再 bump 一次把它盖掉。
 
-## 复现(test-first)
+## 复现(已落地)
 
-提议单测(尚未落地):让一个 Definition 在 `start` 中对 `MaxLifetimeExceeded.DEADLINE_NAME` 下达 `CancelDeadline`(或改期到自定义 dueAt),推进 start 后查询该实例保留名的当前有效 deadline;断言其为 Definition 的决定(已取消 / 自定义 dueAt),而非默认 `aipersimmon.max-lifetime`。今日该断言会失败——默认 backstop 以更高 generation 覆盖。
+新增 `JdbcProcessMaxLifetimeReservedDeadlineTest`(配 30 天 `maxLifetime`,自带一个在 `start` 中操作保留名的 Definition):
 
-## 修复
+- `aDefinitionReschedulingTheReservedNameInStartWinsOverTheDefaultBackstop`:Definition 在 start 中对
+  `MaxLifetimeExceeded.DEADLINE_NAME` 下达自定义 dueAt(T0+5 天)的 `ScheduleDeadline`;断言保留名 deadline **只有一行**且其
+  `due_at` 逐字等于自定义 dueAt,而非默认 T0+30 天。修复前会有两行,最高 generation(backstop)持默认 dueAt。
+- `aDefinitionCancellingTheReservedNameInStartWinsOverTheDefaultBackstop`:Definition 在 start 中对保留名下达
+  `CancelDeadline`;断言保留名 deadline 行数为 **0**(取消生效、默认 backstop 不再补挂)。修复前会剩一行默认 backstop。
 
-二选一(提议,未实施):
+## 修复(已实施)
 
-1. **调序**:先 `armMaxLifetimeBackstop`(挂默认),再 `stageEffects` 应用 Definition effects,使 Definition 对保留名的调度以更高 generation 覆盖默认值。
-2. **条件退避**:`armMaxLifetimeBackstop` 前先探测本次 decision 是否已对 `MaxLifetimeExceeded.DEADLINE_NAME` 产出 `ScheduleDeadline`/`CancelDeadline`,已操作则跳过默认调度。
+采用方案 2(条件退避):
 
-任一方案都应补上"Definition 对保留名的调度胜出"的回归测试,并修正 `armMaxLifetimeBackstop` 的 javadoc。
+1. `armMaxLifetimeBackstop` 在挂默认 backstop 前,先调新增的私有静态 `decisionTouchesReservedDeadline(decision)`——
+   遍历 decision effects,若已有 `ScheduleDeadline`/`CancelDeadline` 的 `name` 等于 `MaxLifetimeExceeded.DEADLINE_NAME`
+   即返回 `true`,此时 backstop 直接退避(`return`),不再以更高 generation 覆盖 Definition 的决定。
+2. 修正 `armMaxLifetimeBackstop` 的 javadoc:去掉"definition 也可 reschedule、只是 bump generation"的误导措辞,明确
+   "Definition 在 start 中调度/取消保留名即拥有该 timer,默认 backstop 让位"。
+
+## 验证结果
+
+- 两个新回归测试通过;`JdbcProcessMaxLifetimeTest` 既有四条(未操作保留名时仍正常挂默认 backstop、firing 让 Definition 决定等)不回归。
+- `mvn -o -pl aipersimmon-ddd-process-manager-jdbc -am test` 与 `-pl ...-spring-boot-starter -am test` 均 BUILD SUCCESS,失败/错误计数为 0。
 
 ## 关联
 

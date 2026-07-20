@@ -32,8 +32,10 @@ import java.util.function.Supplier;
  * the instance has no other DEAD effect, resumes it to its recorded resume lifecycle and
  * replays the inputs parked while it was suspended, in arrival order.
  * {@link #cancelProcess} terminates the coordinator and cancels its not-yet-dispatched
- * effects and deadlines — it does not send compensation; business cancellation stays a
- * process input decided by the definition.
+ * effects and deadlines. It also fences effects already claimed IN_FLIGHT: the relay
+ * re-checks the owning instance before external dispatch and skips any whose instance is
+ * cancelled, so after cancel returns no new external side effect is emitted. It does not
+ * send compensation; business cancellation stays a process input decided by the definition.
  */
 public final class JdbcProcessOperations {
 
@@ -154,11 +156,16 @@ public final class JdbcProcessOperations {
         }
     }
 
-    /** Cancel the coordinator: terminate it and cancel pending effects/deadlines. No compensation. */
+    /**
+     * Cancel the coordinator: terminate it and cancel pending effects/deadlines. Effects already
+     * claimed IN_FLIGHT are fenced by the relay's pre-dispatch lifecycle re-check, so no new external
+     * side effect is emitted after this returns. No compensation.
+     */
     public void cancelProcess(ProcessRef ref, long expectedRevision, String operator, String reason) {
         unitOfWork.execute(() -> {
             ProcessInstanceRow row = instances.findForUpdate(ref.instanceId())
                     .orElseThrow(() -> new ProcessNotFoundException(ref));
+            requireRefMatch(ref, row);
             if (row.revision().value() != expectedRevision) {
                 throw new StaleProcessRevisionException(
                         ref, new ProcessRevision(expectedRevision), row.revision());
@@ -179,5 +186,20 @@ public final class JdbcProcessOperations {
                     row.step(), row.step(), "OPERATOR_CANCEL", operator, reason, clock.instant());
             return null;
         });
+    }
+
+    /**
+     * Fail fast when a ref carries a real instanceId but a processType/businessKey that disagrees with
+     * the stored row, so an operator cancel never terminates the wrong instance (the same load-boundary
+     * guard the runtime applies to handle).
+     */
+    private static void requireRefMatch(ProcessRef ref, ProcessInstanceRow row) {
+        if (!row.ref().equals(ref)) {
+            throw new IllegalArgumentException(
+                    "process ref mismatch for instance " + ref.instanceId().value()
+                            + ": supplied " + ref.processType().value() + "/" + ref.businessKey().value()
+                            + " but the stored instance is "
+                            + row.ref().processType().value() + "/" + row.ref().businessKey().value());
+        }
     }
 }

@@ -27,6 +27,8 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceCriteria;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.processmanager.model.ProcessRef;
+import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import java.time.Clock;
 import java.time.Duration;
@@ -143,6 +145,18 @@ class JdbcProcessQueryTest {
                 new JdbcProcessDeadlineStore(jdbc), Clock.fixed(CLOCK.instant().plus(Duration.ofHours(1)), ZoneOffset.UTC));
         assertEquals(0, later.stuckInstances(Duration.ofHours(2), 10).size());
         assertEquals(1, later.stuckInstances(Duration.ofMinutes(30), 10).size());
+    }
+
+    @Test
+    void findWithARealInstanceIdButWrongProcessTypeIsRejected() {
+        ProcessAdvanceResult started = start("order-1");
+        // A ref with the real instanceId but a wrong processType must fail fast, not silently return
+        // the mismatched instance.
+        ProcessRef mismatched = new ProcessRef(
+                started.processRef().instanceId(), new ProcessType("test.other"),
+                new ProcessBusinessKey("order-1"));
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class, () -> query.find(mismatched));
     }
 
     private JdbcProcessEffectRelay relay(CommandBus bus, int maxAttempts) {

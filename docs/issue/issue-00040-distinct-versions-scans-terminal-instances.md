@@ -2,7 +2,7 @@
 id: issue-00040-distinct-versions-scans-terminal-instances
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---
 
@@ -33,25 +33,30 @@ parent: plan-00003-durable-process-manager-implementation
 3. **真根因**:查询语义与其消费方(startup validator)所声明的 "live" 契约不一致——SQL 说"所有实例",
    代码与文案说"活动实例"。不是并发/时钟问题,就是缺一个 `WHERE lifecycle IN (...)` 过滤。
 
-## 复现(test-first)
+## 复现(已落地)
 
-提议回归单测(store 层):
+新增 `JdbcProcessInstanceStoreVersionTest`(store 层,H2):
 
-1. 插入一条 `COMPLETED` 且使用**旧** `(process_type, definition_version, state_schema_version)` 的实例行;
-   容器内不存在任何 `RUNNING`/`COMPENSATING`/`SUSPENDED` 实例。
-2. 断言 `distinctVersionsInUse()` **不**返回该旧版本三元组。
-3. 修复前该断言失败(今日会返回,从而在 `ProcessManagerStartupValidator` 里阻止下线旧 Definition);
-   修复后通过。可再补一条:插入一条 `RUNNING` 的当前版本实例,断言其版本仍被返回。
+1. `aCompletedInstancesVersionIsNotReturned`:插入一条 `COMPLETED` 且用旧版本 `v0` 的实例行,容器内无任何
+   `RUNNING`/`COMPENSATING`/`SUSPENDED`;断言 `distinctVersionsInUse()` **不含** `v0`,且结果为空。修复前会返回 `v0`。
+2. `aLiveInstancesVersionIsStillReturned`:再插入 `RUNNING`(`v1`)与 `SUSPENDED`(`v2`)各一;断言结果恰为
+   `{v1, v2}`——挂起实例仍需其 Definition/codec 可恢复,故纳入;终态 `v0` 不返回。
 
-## 修复
+## 修复(已实施)
 
-对症 SQL 与文案不一致,库侧一处根治:
+对症 SQL 与"live instance"文案不一致,库侧一处根治:
 
-1. 给 `distinctVersionsInUse()` 加 `WHERE lifecycle IN ('RUNNING','COMPENSATING','SUSPENDED')`,与
-   `ProcessManagerStartupValidator` 的 "live instance" 措辞对齐(是否纳入 `SUSPENDED` 取决于挂起实例是否仍需其
-   Definition/codec 可恢复——按当前语义应纳入)。
-2. 为该 live-version 查询加合适索引(如 `(lifecycle, process_type, definition_version, state_schema_version)`
-   或至少 `lifecycle`),避免启动扫描随实例表增长而线性变慢。
+1. `distinctVersionsInUse()` 的 SQL 加 `WHERE lifecycle IN (?, ?, ?)`,参数取
+   `ProcessLifecycle.RUNNING/COMPENSATING/SUSPENDED.name()`,与 `ProcessManagerStartupValidator` 的 "live instance"
+   措辞对齐;`SUSPENDED` 纳入(挂起实例仍需其 Definition/codec 可恢复)。
+2. 同步更新该方法 javadoc,写明只有活动实例拴住版本、终态历史不再永久绑住旧 Definition/codec。
+
+> 索引一项属 `*.sql` schema 归他方所有,本次未改;SQL 谓词修正已消除"终态历史绑住旧版本"的功能性缺陷。
+
+## 验证结果
+
+- 两个新回归测试通过;`ProcessManagerStartupValidatorTest`(starter,7 条)不回归。
+- `mvn -o -pl aipersimmon-ddd-process-manager-jdbc -am test` 与 `-pl ...-spring-boot-starter -am test` 均 BUILD SUCCESS,失败/错误计数为 0。
 
 ## 关联
 

@@ -281,6 +281,30 @@ class JdbcProcessEffectRelayTest {
     }
 
     @Test
+    void doesNotDispatchAnInFlightEffectWhoseInstanceWasCancelled() {
+        ProcessAdvanceResult started = start();
+        String effectId = started.transitionId() + "#0";
+        Instant now = CLOCK.instant();
+
+        // The relay claims the effect (IN_FLIGHT) — the window in which an operator cancel can land.
+        unitOfWork.execute(() -> dialect.claimDueEffects(
+                jdbc, now, 10, new WorkerId("owner-A"), "token-A", now.plusSeconds(30)));
+
+        // An operator cancels the instance mid-flight. cancelPending only touches PENDING rows, so the
+        // already-claimed IN_FLIGHT effect is left in place — exactly the fencing gap this guards.
+        jdbc.update("UPDATE aipersimmon_process_instance SET lifecycle = 'CANCELLED' WHERE instance_id = ?",
+                started.processRef().instanceId().value());
+
+        // The lease expires and the relay re-claims to redeliver; the pre-dispatch fence must now win.
+        jdbc.update("UPDATE aipersimmon_process_effect SET lease_until = ? WHERE effect_id = ?",
+                java.sql.Timestamp.from(now.minusSeconds(1)), effectId);
+
+        assertEquals(0, relay(zeroBackoff(3)).pollOnce(), "a cancelled instance's effect is not delivered");
+        assertEquals(0, bus.commands.size(), "no external command is emitted after cancel");
+        assertEquals("CANCELLED", status(effectId), "the fenced effect moves to a terminal CANCELLED state");
+    }
+
+    @Test
     void aCleanlyDeliveredEffectIsNotRedelivered() {
         start();
         JdbcProcessEffectRelay relay = relay(zeroBackoff(3));

@@ -183,6 +183,21 @@ public final class JdbcProcessEffectStore {
                 EffectStatus.CANCELLED.name(), Timestamp.from(now), instanceId.value(), EffectStatus.PENDING.name());
     }
 
+    /**
+     * Fence an in-flight effect to CANCELLED without dispatching it, when its owning instance was
+     * cancelled after the effect was claimed. Fenced by the lease token like {@link #markDelivered},
+     * so only the current owner can retire it; the external side effect is never emitted.
+     */
+    public int markCancelled(String effectId, String leaseToken, Instant now) {
+        Timestamp ts = Timestamp.from(now);
+        return jdbc.update("""
+                UPDATE aipersimmon_process_effect
+                SET status = ?, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE effect_id = ? AND lease_token = ?""",
+                EffectStatus.CANCELLED.name(), ts, effectId, leaseToken);
+    }
+
     /** The lifecycle of a staged effect. */
     public enum EffectStatus {
         PENDING,
