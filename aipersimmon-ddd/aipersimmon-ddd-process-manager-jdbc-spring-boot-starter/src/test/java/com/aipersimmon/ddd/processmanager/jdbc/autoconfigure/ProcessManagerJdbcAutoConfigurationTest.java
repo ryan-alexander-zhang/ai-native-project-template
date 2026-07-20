@@ -86,7 +86,7 @@ class ProcessManagerJdbcAutoConfigurationTest {
     void startsAProcessAndTheRelayDeliversTheCommandUnderTheEffectIdentity() {
         ProcessAdvanceResult started = runtime.start(
                 StarterTestProcess.TYPE, new ProcessBusinessKey("order-1"),
-                new StarterTestProcess.Begin("order-1"), CommandContext.root("msg-1", null));
+                new StarterTestProcess.Begin("order-1"), CommandContext.root("msg-1"));
 
         ProcessView view = query.find(started.processRef()).orElseThrow();
         assertEquals("GO", view.step().value());

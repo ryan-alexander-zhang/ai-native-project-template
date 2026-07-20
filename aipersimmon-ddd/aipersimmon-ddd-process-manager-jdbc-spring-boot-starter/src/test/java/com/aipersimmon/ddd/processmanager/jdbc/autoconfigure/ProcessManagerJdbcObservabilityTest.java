@@ -107,7 +107,7 @@ class ProcessManagerJdbcObservabilityTest {
     void relayRecordsClaimAndDispatchLatencyThroughTheObserver() {
         ProcessAdvanceResult started = runtime.start(
                 StarterTestProcess.TYPE, new ProcessBusinessKey("order-obs"),
-                new StarterTestProcess.Begin("order-obs"), CommandContext.root("msg-1", null));
+                new StarterTestProcess.Begin("order-obs"), CommandContext.root("msg-1"));
         assertEquals(1, relay.pollOnce(), "the staged effect is delivered");
 
         assertTrue(registry.get("aipersimmon.process.manager.claim.latency").timer().count() >= 1,

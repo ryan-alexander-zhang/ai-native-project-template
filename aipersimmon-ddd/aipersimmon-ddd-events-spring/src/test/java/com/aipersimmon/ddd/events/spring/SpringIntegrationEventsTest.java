@@ -27,7 +27,7 @@ class SpringIntegrationEventsTest {
         IntegrationEvents events = new SpringIntegrationEvents(publisher, "/inventory");
 
         SampleIntegrationEvent event = new SampleIntegrationEvent("1");
-        CommandContext context = new CommandContext("cmd-1", "corr-1", "cause-0", "trace-1");
+        CommandContext context = new CommandContext("cmd-1", "corr-1", "cause-0");
         events.publish(event, context);
 
         assertEquals(1, captured.size());
@@ -39,6 +39,5 @@ class SpringIntegrationEventsTest {
                 "the declared @EventType logical type");
         assertEquals("corr-1", envelope.correlationId(), "inherits the command's correlation");
         assertEquals("cmd-1", envelope.causationId(), "caused by the emitting command");
-        assertEquals("trace-1", envelope.traceId());
     }
 }

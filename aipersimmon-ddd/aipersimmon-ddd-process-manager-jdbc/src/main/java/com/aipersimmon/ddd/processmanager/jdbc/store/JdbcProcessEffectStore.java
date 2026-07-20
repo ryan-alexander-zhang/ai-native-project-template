@@ -41,10 +41,10 @@ public final class JdbcProcessEffectStore {
         jdbc.update("""
                 INSERT INTO aipersimmon_process_effect (
                     effect_id, instance_id, transition_id, effect_index, seq, effect_kind,
-                    payload_type, payload_version, payload, message_id, correlation_id, causation_id, trace_id,
+                    payload_type, payload_version, payload, message_id, correlation_id, causation_id,
                     traceparent, trace_state,
                     status, attempts, next_attempt_at, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 e.effectId(),
                 e.instanceId().value(),
                 e.transitionId(),
@@ -57,7 +57,6 @@ public final class JdbcProcessEffectStore {
                 e.messageId(),
                 e.correlationId(),
                 e.causationId(),
-                e.traceId(),
                 e.traceparent(),
                 e.traceState(),
                 EffectStatus.PENDING.name(),
@@ -78,8 +77,7 @@ public final class JdbcProcessEffectStore {
                         new CommandContext(
                                 rs.getString("message_id"),
                                 rs.getString("correlation_id"),
-                                rs.getString("causation_id"),
-                                rs.getString("trace_id")),
+                                rs.getString("causation_id")),
                         rs.getInt("attempts"),
                         rs.getString("traceparent"),
                         rs.getString("trace_state")),

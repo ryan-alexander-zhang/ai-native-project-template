@@ -69,6 +69,7 @@ class JdbcProcessStateUpcastTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         runtime = new JdbcProcessRuntime(
@@ -96,7 +97,7 @@ class JdbcProcessStateUpcastTest {
                 "RUNNING", "S1", 1L, "upcast.state", base64("OLD"), now, now);
         ProcessRef ref = new ProcessRef(new ProcessInstanceId("inst-1"), TYPE, ORDER);
 
-        runtime.handle(ref, new Advance(), CommandContext.root("msg-adv", null));
+        runtime.handle(ref, new Advance(), CommandContext.root("msg-adv"));
 
         assertEquals(1, jdbc.queryForObject(
                 "SELECT state_schema_version FROM aipersimmon_process_instance", Integer.class),

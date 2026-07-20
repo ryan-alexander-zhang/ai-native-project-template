@@ -68,6 +68,7 @@ class ConnectedTraceEndToEndTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/outbox/h2/V1__aipersimmon_outbox.sql")
+                .addScript("classpath:aipersimmon/db/migration/outbox/h2/V2__drop_trace_id.sql")
                 .build();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 
@@ -95,7 +96,7 @@ class ConnectedTraceEndToEndTest {
     void outboxDispatchSpanLinksBackToTheCommandSpanAcrossTheHop() {
         // A command is being handled: its span is active while the handler publishes an event.
         try (Tracer.SpanScope ignored = domainTracer.startSpan("command PlaceOrder")) {
-            writer.publish(new OrderPlaced("order-1"), CommandContext.root("msg-1", null));
+            writer.publish(new OrderPlaced("order-1"), CommandContext.root("msg-1"));
         }
 
         // Later, on the scheduler thread with no ambient context, the relay dispatches the row.

@@ -21,7 +21,6 @@ public record ProcessDeadlineInsert(
         byte[] inputPayload,
         String correlationId,
         String causationId,
-        String traceId,
         String traceparent,
         String traceState) {
 

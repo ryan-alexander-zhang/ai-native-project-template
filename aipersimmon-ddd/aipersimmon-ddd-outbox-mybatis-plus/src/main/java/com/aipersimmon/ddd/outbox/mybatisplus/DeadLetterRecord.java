@@ -26,7 +26,6 @@ public class DeadLetterRecord {
     private String subject;
     private String correlationId;
     private String causationId;
-    private String traceId;
     private Integer attempts;
     private String reason;
     private String lastError;
@@ -110,14 +109,6 @@ public class DeadLetterRecord {
 
     public void setCausationId(String causationId) {
         this.causationId = causationId;
-    }
-
-    public String getTraceId() {
-        return traceId;
-    }
-
-    public void setTraceId(String traceId) {
-        this.traceId = traceId;
     }
 
     public Integer getAttempts() {

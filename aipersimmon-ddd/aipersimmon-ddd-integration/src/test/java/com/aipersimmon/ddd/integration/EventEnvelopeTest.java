@@ -17,7 +17,7 @@ class EventEnvelopeTest {
 
     private static EventEnvelope<SampleEvent> envelope(String eventId, String source, String type,
                                                        String subject, String correlationId) {
-        return new EventEnvelope<>(eventId, source, type, 1, WHEN, subject, correlationId, "cause-1", "trace-1", PAYLOAD);
+        return new EventEnvelope<>(eventId, source, type, 1, WHEN, subject, correlationId, "cause-1", PAYLOAD);
     }
 
     @Test
@@ -26,9 +26,9 @@ class EventEnvelopeTest {
     }
 
     @Test
-    void allowsNullSubjectCausationAndTrace() {
+    void allowsNullSubjectAndCausation() {
         assertDoesNotThrow(() ->
-                new EventEnvelope<>("evt-1", "/ordering", "OrderPlaced", 1, WHEN, null, "corr-1", null, null, PAYLOAD));
+                new EventEnvelope<>("evt-1", "/ordering", "OrderPlaced", 1, WHEN, null, "corr-1", null, PAYLOAD));
     }
 
     @Test
@@ -55,6 +55,6 @@ class EventEnvelopeTest {
     @Test
     void rejectsNullPayload() {
         assertThrows(IllegalArgumentException.class, () ->
-                new EventEnvelope<SampleEvent>("evt-1", "/ordering", "OrderPlaced", 1, WHEN, "O-1", "corr-1", null, null, null));
+                new EventEnvelope<SampleEvent>("evt-1", "/ordering", "OrderPlaced", 1, WHEN, "O-1", "corr-1", null, null));
     }
 }

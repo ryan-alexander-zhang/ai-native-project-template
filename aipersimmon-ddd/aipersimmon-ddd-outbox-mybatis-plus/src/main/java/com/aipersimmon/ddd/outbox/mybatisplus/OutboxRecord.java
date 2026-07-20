@@ -26,7 +26,6 @@ public class OutboxRecord {
     private String subject;
     private String correlationId;
     private String causationId;
-    private String traceId;
     private String traceparent;
     private String traceState;
     private Boolean sent;
@@ -113,14 +112,6 @@ public class OutboxRecord {
 
     public void setCausationId(String causationId) {
         this.causationId = causationId;
-    }
-
-    public String getTraceId() {
-        return traceId;
-    }
-
-    public void setTraceId(String traceId) {
-        this.traceId = traceId;
     }
 
     public String getTraceparent() {

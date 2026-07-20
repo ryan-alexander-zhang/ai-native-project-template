@@ -327,7 +327,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                     parkedId, ref.instanceId(), cause.messageId(),
                     parkedInput.type().logicalType(), parkedInput.type().version(), parkedInput.data(),
                     Optional.of(row.lifecycle()), row.lifecycle(), Optional.of(row.step()), row.step(),
-                    new DecisionCode("parked"), "PARKED", cause.correlationId(), cause.traceId()), parkedAt);
+                    new DecisionCode("parked"), "PARKED", cause.correlationId()), parkedAt);
             return new ProcessAdvanceResult(
                     ref, row.revision(), row.lifecycle(), row.step(), false, parkedId);
         }
@@ -384,7 +384,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                 transitionId, ref.instanceId(), cause.messageId(),
                 encodedInput.type().logicalType(), encodedInput.type().version(), encodedInput.data(),
                 fromLifecycle, decision.lifecycle(), fromStep, decision.step(),
-                decision.decisionCode(), kind, cause.correlationId(), cause.traceId()), now);
+                decision.decisionCode(), kind, cause.correlationId()), now);
     }
 
     private void stageEffects(
@@ -417,20 +417,20 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         effects.insert(new ProcessEffectInsert(
                 effectId, ref.instanceId(), transitionId, index, seq, effect.kind(),
                 payload.type().logicalType(), payload.type().version(), payload.data(),
-                effectId, cause.correlationId(), cause.messageId(), cause.traceId(),
+                effectId, cause.correlationId(), cause.messageId(),
                 captured.traceparent(), captured.traceState()), now);
     }
 
     private void scheduleDeadline(ProcessRef ref, ScheduleDeadline schedule, CommandContext cause, Instant now) {
         long generation = deadlines.nextGeneration(ref.instanceId(), schedule.name());
         EncodedPayload input = encodePayload(schedule.input());
-        // Persist the scheduling cause's correlation/causation/trace so the timer fires under the same
+        // Persist the scheduling cause's correlation/causation so the timer fires under the same
         // causal chain as the flow that armed it, rather than starting a fresh correlation.
         Captured captured = storeTracer.captureCurrent();
         deadlines.schedule(new ProcessDeadlineInsert(
                 idGenerator.get(), ref.instanceId(), schedule.name(), generation, schedule.dueAt(),
                 input.type().logicalType(), input.type().version(), input.data(),
-                cause.correlationId(), cause.messageId(), cause.traceId(),
+                cause.correlationId(), cause.messageId(),
                 captured.traceparent(), captured.traceState()), now);
     }
 

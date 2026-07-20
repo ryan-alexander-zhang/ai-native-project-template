@@ -72,7 +72,9 @@ class EffectRelayPostgresConcurrencyTest {
         jdbc = new JdbcTemplate(ds);
         jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_effect, aipersimmon_process_transition, "
                 + "aipersimmon_process_deadline, aipersimmon_process_instance");
-        new ResourceDatabasePopulator(new ClassPathResource("aipersimmon/db/migration/process-manager/postgresql/V1__aipersimmon_process_manager.sql")).execute(ds);
+        new ResourceDatabasePopulator(
+                new ClassPathResource("aipersimmon/db/migration/process-manager/postgresql/V1__aipersimmon_process_manager.sql"),
+                new ClassPathResource("aipersimmon/db/migration/process-manager/postgresql/V2__drop_trace_id.sql")).execute(ds);
 
         instanceStore = new JdbcProcessInstanceStore(jdbc);
         JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
@@ -93,7 +95,7 @@ class EffectRelayPostgresConcurrencyTest {
         int total = 40;
         for (int i = 0; i < total; i++) {
             runtime.start(TestFulfilment.TYPE, new ProcessBusinessKey("order-" + i),
-                    new TestFulfilment.Started("order-" + i), CommandContext.root("msg-" + i, null));
+                    new TestFulfilment.Started("order-" + i), CommandContext.root("msg-" + i));
         }
         assertEquals((long) total, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = 'PENDING'", Long.class));

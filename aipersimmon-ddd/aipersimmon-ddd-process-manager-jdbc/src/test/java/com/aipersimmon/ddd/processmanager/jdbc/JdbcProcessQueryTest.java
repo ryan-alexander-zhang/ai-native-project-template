@@ -63,6 +63,7 @@ class JdbcProcessQueryTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -82,7 +83,7 @@ class JdbcProcessQueryTest {
 
     private ProcessAdvanceResult start(String order) {
         return runtime.start(TestFulfilment.TYPE, new ProcessBusinessKey(order),
-                new TestFulfilment.Started(order), CommandContext.root("start-" + order, null));
+                new TestFulfilment.Started(order), CommandContext.root("start-" + order));
     }
 
     @Test
@@ -101,7 +102,7 @@ class JdbcProcessQueryTest {
     @Test
     void returnsTheTransitionTimelineInOrder() {
         ProcessAdvanceResult started = start("order-1");
-        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("adv", null));
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("adv"));
 
         var timeline = query.timeline(started.processRef());
         assertEquals(List.of("START", "ADVANCE"), timeline.stream().map(t -> t.transitionKind()).toList());
@@ -124,7 +125,7 @@ class JdbcProcessQueryTest {
     @Test
     void listsPendingDeadlineWorklist() {
         ProcessAdvanceResult started = start("order-1");
-        runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("arm", null));
+        runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("arm"));
 
         var pending = query.deadlines(DeadlineStatus.PENDING, 10);
         assertEquals(1, pending.size());

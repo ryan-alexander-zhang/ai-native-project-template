@@ -93,10 +93,10 @@ class OutboxRelayDeadLetterFailureTest {
     private void insert(String eventId) {
         jdbc.update(
                 "INSERT INTO aipersimmon_outbox (event_id, source, type, version, payload, occurred_at, "
-                + "subject, correlation_id, causation_id, trace_id, sent, attempts, created_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                + "subject, correlation_id, causation_id, sent, attempts, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 eventId, "test", "SampleEvent", 1, "{}", Timestamp.from(Instant.now()),
-                null, "corr", null, null, false, 0, Timestamp.from(Instant.now()));
+                null, "corr", null, false, 0, Timestamp.from(Instant.now()));
     }
 
     @Test

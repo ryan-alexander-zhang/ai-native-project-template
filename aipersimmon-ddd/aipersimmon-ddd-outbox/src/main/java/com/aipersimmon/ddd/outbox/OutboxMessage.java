@@ -17,6 +17,5 @@ public record OutboxMessage(
         Instant occurredAt,
         String subject,
         String correlationId,
-        String causationId,
-        String traceId) {
+        String causationId) {
 }

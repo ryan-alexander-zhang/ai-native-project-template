@@ -31,12 +31,11 @@ class CqrsContractsTest {
     void ofEnvelopeMakesTheInboundEventTheCause() {
         EventEnvelope<ThingImported> envelope = new EventEnvelope<>(
                 "evt-9", "/test", "ThingImported", 1, Instant.EPOCH,
-                "subj-1", "corr-3", "upstream-cause", "trace-y", new ThingImported("t-1"));
+                "subj-1", "corr-3", "upstream-cause", new ThingImported("t-1"));
 
         CommandContext cause = CommandContext.of(envelope);
         assertEquals("evt-9", cause.messageId(), "the event's id becomes the cause's message id");
         assertEquals("corr-3", cause.correlationId());
-        assertEquals("trace-y", cause.traceId());
 
         // A command dispatched from this cause records the event as its causation.
         CommandContext command = cause.deriveChild("cmd-1");
@@ -50,7 +49,7 @@ class CqrsContractsTest {
         // the default rejects it rather than silently minting a fresh identity.
         CommandBus bus = new TestBus((c, ctx) -> "x", List.of());
         assertThrows(UnsupportedOperationException.class,
-                () -> bus.sendAs(new CreateThing("w"), CommandContext.root("effect-1", null)));
+                () -> bus.sendAs(new CreateThing("w"), CommandContext.root("effect-1")));
     }
 
     @Test
@@ -79,7 +78,7 @@ class CqrsContractsTest {
     }
 
     @Test
-    void causedCommandInheritsCorrelationAndTraceAndRecordsItsCauser() {
+    void causedCommandInheritsCorrelationAndRecordsItsCauser() {
         List<CommandContext> seen = new ArrayList<>();
         CommandBus bus = new TestBus((c, ctx) -> {
             seen.add(ctx);
@@ -87,13 +86,12 @@ class CqrsContractsTest {
         }, List.of());
 
         // e.g. an inbound integration event mapped to a cause context.
-        CommandContext cause = CommandContext.root("evt-1", "trace-9");
+        CommandContext cause = CommandContext.root("evt-1");
         bus.send(new CreateThing("y"), cause);
 
         CommandContext ctx = seen.get(0);
         assertEquals("evt-1", ctx.correlationId(), "inherits the cause's correlation");
         assertEquals("evt-1", ctx.causationId(), "records the cause as its causation");
-        assertEquals("trace-9", ctx.traceId(), "propagates the trace");
     }
 
     @Test
@@ -167,7 +165,7 @@ class CqrsContractsTest {
 
         @Override
         public <R> R send(Command<R> command) {
-            return dispatch(command, CommandContext.root(nextId(), null));
+            return dispatch(command, CommandContext.root(nextId()));
         }
 
         @Override

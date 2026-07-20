@@ -28,8 +28,8 @@ public class OutboxWriter implements IntegrationEvents {
     private static final String INSERT =
             "INSERT INTO aipersimmon_outbox "
             + "(event_id, source, type, version, payload, occurred_at, subject, "
-            + "correlation_id, causation_id, trace_id, traceparent, trace_state, sent, attempts, created_at) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "correlation_id, causation_id, traceparent, trace_state, sent, attempts, created_at) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -66,7 +66,6 @@ public class OutboxWriter implements IntegrationEvents {
                 event.subject(),
                 context.correlationId(),
                 context.messageId(),
-                context.traceId(),
                 event);
         jdbc.update(INSERT,
                 envelope.eventId(),
@@ -78,7 +77,6 @@ public class OutboxWriter implements IntegrationEvents {
                 envelope.subject(),
                 envelope.correlationId(),
                 envelope.causationId(),
-                envelope.traceId(),
                 captured.traceparent(),
                 captured.traceState(),
                 false,

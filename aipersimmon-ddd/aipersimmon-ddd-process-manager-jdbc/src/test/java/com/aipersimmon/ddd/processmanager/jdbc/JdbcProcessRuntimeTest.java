@@ -77,6 +77,7 @@ class JdbcProcessRuntimeTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         runtime = build(DuplicateBusinessKeyPolicy.REJECT);
@@ -84,7 +85,7 @@ class JdbcProcessRuntimeTest {
 
     private ProcessAdvanceResult start(String messageId) {
         return runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root(messageId, "trace-1"));
+                new TestFulfilment.Started("order-1"), CommandContext.root(messageId));
     }
 
     private long count(String table) {
@@ -145,7 +146,7 @@ class JdbcProcessRuntimeTest {
     void handleAdvancesAndIncrementsRevision() {
         ProcessAdvanceResult started = start("msg-1");
         ProcessAdvanceResult advanced = runtime.handle(
-                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-2", null));
+                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-2"));
 
         assertFalse(advanced.duplicate());
         assertEquals(2L, advanced.revision().value());
@@ -160,14 +161,14 @@ class JdbcProcessRuntimeTest {
         ProcessRef ghost = new ProcessRef(
                 new ProcessInstanceId("nope"), TestFulfilment.TYPE, ORDER);
         assertThrows(ProcessNotFoundException.class,
-                () -> runtime.handle(ghost, new TestFulfilment.Advance(), CommandContext.root("m", null)));
+                () -> runtime.handle(ghost, new TestFulfilment.Advance(), CommandContext.root("m")));
     }
 
     @Test
     void aFailingDecisionRollsBackTheWholeAdvance() {
         ProcessAdvanceResult started = start("msg-1");
         assertThrows(IllegalStateException.class, () -> runtime.handle(
-                started.processRef(), new TestFulfilment.Boom(), CommandContext.root("msg-2", null)));
+                started.processRef(), new TestFulfilment.Boom(), CommandContext.root("msg-2")));
 
         // Nothing from the failed advance persisted: still one transition, one effect, revision 1.
         assertEquals(1L, count("aipersimmon_process_transition"));
@@ -181,19 +182,19 @@ class JdbcProcessRuntimeTest {
     void anIllegalLifecycleTransitionIsRejected() {
         ProcessAdvanceResult started = start("msg-1");
         runtime.handle(started.processRef(), new TestFulfilment.EnterCompensating(),
-                CommandContext.root("msg-2", null));
+                CommandContext.root("msg-2"));
         // COMPENSATING -> RUNNING is illegal.
         assertThrows(IllegalStateException.class, () -> runtime.handle(
-                started.processRef(), new TestFulfilment.IllegalBack(), CommandContext.root("msg-3", null)));
+                started.processRef(), new TestFulfilment.IllegalBack(), CommandContext.root("msg-3")));
     }
 
     @Test
     void ordinaryInputToATerminalInstanceIsAnIdempotentNoOp() {
         ProcessAdvanceResult started = start("msg-1");
-        runtime.handle(started.processRef(), new TestFulfilment.Finish(), CommandContext.root("msg-2", null));
+        runtime.handle(started.processRef(), new TestFulfilment.Finish(), CommandContext.root("msg-2"));
 
         ProcessAdvanceResult afterDone = runtime.handle(
-                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-3", null));
+                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-3"));
 
         assertTrue(afterDone.duplicate());
         assertEquals(ProcessLifecycle.COMPLETED, afterDone.lifecycle());
@@ -203,7 +204,7 @@ class JdbcProcessRuntimeTest {
     @Test
     void schedulingADeadlinePersistsAPendingDeadlineRow() {
         ProcessAdvanceResult started = start("msg-1");
-        runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-2", null));
+        runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-2"));
 
         Map<String, Object> deadline = jdbc.queryForMap("SELECT * FROM aipersimmon_process_deadline");
         assertEquals("REVIEW", deadline.get("NAME"));

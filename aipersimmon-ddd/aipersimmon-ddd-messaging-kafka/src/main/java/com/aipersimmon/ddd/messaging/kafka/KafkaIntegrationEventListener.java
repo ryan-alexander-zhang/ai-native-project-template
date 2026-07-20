@@ -112,10 +112,9 @@ public class KafkaIntegrationEventListener {
             String subject = header(record, IntegrationEventHeaders.SUBJECT);
             String correlationId = orElse(header(record, IntegrationEventHeaders.CORRELATION_ID), eventId);
             String causationId = header(record, IntegrationEventHeaders.CAUSATION_ID);
-            String traceId = header(record, IntegrationEventHeaders.TRACE_ID);
             return new EventEnvelope<>(
                     eventId, source, type, version, occurredAt, subject,
-                    correlationId, causationId, traceId, payload);
+                    correlationId, causationId, payload);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(
                     "failed to reconstruct integration event of type " + type, e);

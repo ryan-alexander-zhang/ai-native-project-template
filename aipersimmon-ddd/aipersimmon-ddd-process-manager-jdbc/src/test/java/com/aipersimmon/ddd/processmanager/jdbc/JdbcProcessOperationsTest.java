@@ -66,6 +66,7 @@ class JdbcProcessOperationsTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -87,7 +88,7 @@ class JdbcProcessOperationsTest {
 
     private ProcessAdvanceResult start() {
         return runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", null));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
     }
 
     private String lifecycle() {
@@ -97,7 +98,7 @@ class JdbcProcessOperationsTest {
     private String suspendViaDeadDeadline() {
         ProcessAdvanceResult started = start();
         runtime.handle(started.processRef(), new TestFulfilment.ArmPoisonDeadline(),
-                CommandContext.root("msg-arm", null));
+                CommandContext.root("msg-arm"));
         JdbcProcessDeadlineWorker worker = new JdbcProcessDeadlineWorker(
                 jdbc, dialect, deadlineStore, instanceStore,
                 new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -125,14 +126,14 @@ class JdbcProcessOperationsTest {
 
         // handle returns normally (parked), so the transport can ack instead of retrying forever.
         ProcessAdvanceResult parked = runtime.handle(
-                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv", null));
+                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
         assertFalse(parked.duplicate());
         assertEquals(1L, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'PARKED'", Long.class));
 
         // A redelivery of the same input while suspended is a duplicate no-op — it is not parked twice.
         ProcessAdvanceResult again = runtime.handle(
-                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv", null));
+                started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
         assertTrue(again.duplicate());
         assertEquals(1L, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'PARKED'", Long.class));
@@ -143,7 +144,7 @@ class JdbcProcessOperationsTest {
         ProcessAdvanceResult started = start();
         String deadEffectId = started.transitionId() + "#0";
         suspendViaDeadEffect();
-        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv", null));
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
 
         operations.redriveEffect(deadEffectId, "operator-1", "transient outage cleared");
 
@@ -194,8 +195,8 @@ class JdbcProcessOperationsTest {
         suspendViaDeadEffect();
 
         // Two distinct inputs arrive while suspended; both are parked, not rebounded.
-        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv", null));
-        runtime.handle(started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan", null));
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
+        runtime.handle(started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan"));
         assertEquals(2L, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM aipersimmon_process_transition WHERE transition_kind = 'PARKED'", Long.class));
 
@@ -213,18 +214,17 @@ class JdbcProcessOperationsTest {
         ProcessAdvanceResult started = start();
         String deadEffectId = started.transitionId() + "#0";
         suspendViaDeadEffect();
-        // Park an input under a specific correlation/trace while suspended.
+        // Park an input under a specific correlation while suspended.
         runtime.handle(started.processRef(), new TestFulfilment.Advance(),
-                CommandContext.root("msg-adv", "trace-adv"));
+                CommandContext.root("msg-adv"));
 
         operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
 
         // The replay runs under a synthetic message id but must keep the parked input's causal chain.
         var replayed = jdbc.queryForMap(
-                "SELECT correlation_id, trace_id FROM aipersimmon_process_transition "
+                "SELECT correlation_id FROM aipersimmon_process_transition "
                         + "WHERE input_message_id = 'parked:msg-adv'");
         assertEquals("msg-adv", replayed.get("CORRELATION_ID"), "replay stays on the parked input's correlation");
-        assertEquals("trace-adv", replayed.get("TRACE_ID"));
     }
 
     @Test

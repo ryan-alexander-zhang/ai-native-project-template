@@ -143,11 +143,11 @@ public final class JdbcProcessOperations {
             ProcessPayloadCodec<?> codec = payloadCodecs.forType(parked.inputType());
             ProcessInput input = (ProcessInput) codec.decode(
                     new EncodedPayload(parked.inputType(), parked.inputPayload()));
-            // Replay under the parked input's original correlation/trace so the resumed work stays on the
+            // Replay under the parked input's original correlation so the resumed work stays on the
             // same causal chain (fall back to the replay id for rows parked before correlation was stored).
             String correlationId = parked.correlationId() != null ? parked.correlationId() : replayId;
             CommandContext context = new CommandContext(
-                    replayId, correlationId, parked.inputMessageId(), parked.traceId());
+                    replayId, correlationId, parked.inputMessageId());
             // If a concurrent worker re-suspended the instance mid-replay, handle() simply re-parks this
             // input (it never throws), so the remaining inputs stay parked for the next redrive.
             runtime.handle(ref, input, context);

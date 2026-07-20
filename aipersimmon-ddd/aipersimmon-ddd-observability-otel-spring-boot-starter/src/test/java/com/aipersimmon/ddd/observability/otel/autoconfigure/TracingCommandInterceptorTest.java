@@ -43,7 +43,7 @@ class TracingCommandInterceptorTest {
 
     @Test
     void wrapsSuccessfulCommandInASpanWithAttributes() {
-        CommandContext context = CommandContext.root("msg-1", null);
+        CommandContext context = CommandContext.root("msg-1");
 
         String result = interceptor.intercept(new PlaceOrder(), context, () -> "done");
 
@@ -60,7 +60,7 @@ class TracingCommandInterceptorTest {
 
     @Test
     void marksSpanFailedWhenHandlerThrows() {
-        CommandContext context = CommandContext.root("msg-2", null);
+        CommandContext context = CommandContext.root("msg-2");
         RuntimeException boom = new IllegalStateException("boom");
 
         RuntimeException thrown = assertThrows(RuntimeException.class,

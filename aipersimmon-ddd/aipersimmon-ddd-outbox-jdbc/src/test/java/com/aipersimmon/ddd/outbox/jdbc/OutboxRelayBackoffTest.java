@@ -76,10 +76,10 @@ class OutboxRelayBackoffTest {
     private void insert(String eventId, String subject, long createdOffsetSeconds) {
         jdbc.update(
                 "INSERT INTO aipersimmon_outbox (event_id, source, type, version, payload, occurred_at, "
-                + "subject, correlation_id, causation_id, trace_id, sent, attempts, created_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                + "subject, correlation_id, causation_id, sent, attempts, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 eventId, "test", "SampleEvent", 1, "{}", Timestamp.from(Instant.now()),
-                subject, "corr", null, null, false, 0,
+                subject, "corr", null, false, 0,
                 Timestamp.from(Instant.now().plusSeconds(createdOffsetSeconds)));
     }
 

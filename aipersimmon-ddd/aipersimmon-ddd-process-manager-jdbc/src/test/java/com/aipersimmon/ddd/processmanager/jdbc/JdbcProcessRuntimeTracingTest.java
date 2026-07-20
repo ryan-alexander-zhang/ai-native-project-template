@@ -60,6 +60,7 @@ class JdbcProcessRuntimeTracingTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
@@ -78,7 +79,7 @@ class JdbcProcessRuntimeTracingTest {
     @Test
     void startOpensProcessAdvanceSpanWithAttributes() {
         runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("m1", "trace-1"));
+                new TestFulfilment.Started("order-1"), CommandContext.root("m1"));
 
         assertEquals(1, tracer.spans.size());
         RecordingTracer.RecordedSpan span = tracer.spans.get(0);
@@ -97,7 +98,7 @@ class JdbcProcessRuntimeTracingTest {
                 new ProcessInstanceId("ghost"), TestFulfilment.TYPE, new ProcessBusinessKey("missing"));
 
         assertThrows(RuntimeException.class, () -> runtime.handle(
-                ghost, new TestFulfilment.Advance(), CommandContext.root("m2", null)));
+                ghost, new TestFulfilment.Advance(), CommandContext.root("m2")));
 
         assertEquals(1, tracer.spans.size());
         RecordingTracer.RecordedSpan span = tracer.spans.get(0);

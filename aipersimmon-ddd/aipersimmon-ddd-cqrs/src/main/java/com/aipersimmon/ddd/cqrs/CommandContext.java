@@ -16,19 +16,19 @@ import com.aipersimmon.ddd.integration.EventEnvelope;
  *   <li>{@code causationId} — the id of the message that directly caused this one
  *       (the inbound integration event, or the parent command). {@code null} for a
  *       root command with no upstream cause.
- *   <li>{@code traceId} — an observability trace id, propagated when present.
- *       {@code null} when no trace context exists.
  * </ul>
  *
+ * <p>Distributed-trace identity is carried out of band by the OpenTelemetry context
+ * (a W3C {@code traceparent}), not by this value: it needs no trace-id field.
+ *
  * <p>Framework-free and immutable. Ids are minted by the {@link CommandBus}, not by
- * this type, so it stays a pure value; use {@link #root(String, String)} and
+ * this type, so it stays a pure value; use {@link #root(String)} and
  * {@link #deriveChild(String)} to build the chain from a bus-supplied id.
  */
 public record CommandContext(
         String messageId,
         String correlationId,
-        String causationId,
-        String traceId) {
+        String causationId) {
 
     public CommandContext {
         if (messageId == null || messageId.isBlank()) {
@@ -37,7 +37,7 @@ public record CommandContext(
         if (correlationId == null || correlationId.isBlank()) {
             throw new IllegalArgumentException("correlationId required");
         }
-        // causationId is null for a root command; traceId is optional.
+        // causationId is null for a root command.
     }
 
     /**
@@ -45,22 +45,20 @@ public record CommandContext(
      * request or a scheduled job): correlationId is seeded to the command's own id.
      *
      * @param messageId the bus-minted id for this command
-     * @param traceId   the ambient trace id, or {@code null} if none
      */
-    public static CommandContext root(String messageId, String traceId) {
-        return new CommandContext(messageId, messageId, null, traceId);
+    public static CommandContext root(String messageId) {
+        return new CommandContext(messageId, messageId, null);
     }
 
     /**
      * The context for a message caused by this one — a follow-up command dispatched
      * while handling this command, or an integration event emitted from it. The
-     * child keeps this context's correlation and trace, and records this message as
-     * its cause.
+     * child keeps this context's correlation, and records this message as its cause.
      *
      * @param childMessageId the bus-minted id for the caused message
      */
     public CommandContext deriveChild(String childMessageId) {
-        return new CommandContext(childMessageId, correlationId, messageId, traceId);
+        return new CommandContext(childMessageId, correlationId, messageId);
     }
 
     /**
@@ -68,15 +66,14 @@ public record CommandContext(
      * when an anti-corruption adapter translates the event into a command
      * ({@code commandBus.send(command, CommandContext.of(envelope))}). The event's id
      * becomes this context's {@code messageId}, so the dispatched command records the
-     * event as its causation and inherits its correlation and trace. This is the one
-     * place inbound adapters convert an {@link EventEnvelope} to a context — they do
-     * not each re-map its fields.
+     * event as its causation and inherits its correlation. This is the one place
+     * inbound adapters convert an {@link EventEnvelope} to a context — they do not
+     * each re-map its fields.
      */
     public static CommandContext of(EventEnvelope<?> envelope) {
         return new CommandContext(
                 envelope.eventId(),
                 envelope.correlationId(),
-                envelope.causationId(),
-                envelope.traceId());
+                envelope.causationId());
     }
 }

@@ -51,7 +51,6 @@ public class SpringIntegrationEvents implements IntegrationEvents {
                 event.subject(),
                 context.correlationId(),
                 context.messageId(),
-                context.traceId(),
                 event);
         // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
         // match despite erasure.

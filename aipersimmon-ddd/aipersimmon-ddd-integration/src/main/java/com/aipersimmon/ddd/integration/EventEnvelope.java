@@ -18,9 +18,12 @@ import java.time.Instant;
  *   <li>{@code occurredAt} — CloudEvents {@code time}.
  *   <li>{@code subject} — CloudEvents {@code subject}: the aggregate id, used as the
  *       transport partition/ordering key ({@code null} if none).
- *   <li>{@code correlationId} / {@code causationId} / {@code traceId} — the causal
- *       chain, as CloudEvents extension attributes.
+ *   <li>{@code correlationId} / {@code causationId} — the causal chain, as CloudEvents
+ *       extension attributes.
  * </ul>
+ *
+ * <p>Distributed-trace identity travels in the transport's own trace headers (a W3C
+ * {@code traceparent}), not on this envelope: it carries no trace-id field.
  *
  * <p>A pure data holder: it performs no serialization and reads no clock or random
  * source. An infrastructure component stamps {@code eventId}, {@code source},
@@ -37,7 +40,6 @@ public record EventEnvelope<T extends IntegrationEvent>(
         String subject,
         String correlationId,
         String causationId,
-        String traceId,
         T payload) {
 
     public EventEnvelope {
@@ -62,7 +64,7 @@ public record EventEnvelope<T extends IntegrationEvent>(
         if (payload == null) {
             throw new IllegalArgumentException("payload required");
         }
-        // subject, causationId, traceId are optional.
+        // subject and causationId are optional.
     }
 
     /**

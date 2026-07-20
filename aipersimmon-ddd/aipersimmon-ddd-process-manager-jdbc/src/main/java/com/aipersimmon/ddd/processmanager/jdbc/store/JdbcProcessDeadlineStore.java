@@ -35,9 +35,9 @@ public final class JdbcProcessDeadlineStore {
         jdbc.update("""
                 INSERT INTO aipersimmon_process_deadline (
                     deadline_id, instance_id, name, generation, due_at, input_type, input_version, input_payload,
-                    correlation_id, causation_id, trace_id, traceparent, trace_state,
+                    correlation_id, causation_id, traceparent, trace_state,
                     status, attempts, next_attempt_at, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 d.deadlineId(),
                 d.instanceId().value(),
                 d.name().value(),
@@ -48,7 +48,6 @@ public final class JdbcProcessDeadlineStore {
                 Payloads.toText(d.inputPayload()),
                 d.correlationId(),
                 d.causationId(),
-                d.traceId(),
                 d.traceparent(),
                 d.traceState(),
                 DeadlineStatus.PENDING.name(),
@@ -97,7 +96,6 @@ public final class JdbcProcessDeadlineStore {
             byte[] inputPayload,
             String correlationId,
             String causationId,
-            String traceId,
             int attempts,
             String traceparent,
             String traceState) {
@@ -123,7 +121,6 @@ public final class JdbcProcessDeadlineStore {
                         Payloads.fromText(rs.getString("input_payload")),
                         rs.getString("correlation_id"),
                         rs.getString("causation_id"),
-                        rs.getString("trace_id"),
                         rs.getInt("attempts"),
                         rs.getString("traceparent"),
                         rs.getString("trace_state")),

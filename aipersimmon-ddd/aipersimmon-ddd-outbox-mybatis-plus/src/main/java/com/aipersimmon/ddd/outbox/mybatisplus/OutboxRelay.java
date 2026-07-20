@@ -205,7 +205,6 @@ public class OutboxRelay {
                 record.getOccurredAt(),
                 record.getSubject(),
                 record.getCorrelationId(),
-                record.getCausationId(),
-                record.getTraceId());
+                record.getCausationId());
     }
 }

@@ -78,7 +78,7 @@ class InProcessOutboxDispatcherTest {
     void relayRepublishesTheEventInProcess() {
         assertInstanceOf(InProcessOutboxDispatcher.class, dispatcher);
 
-        integrationEvents.publish(new InProcessSampleEvent("O-1"), CommandContext.root("cmd-1", null));
+        integrationEvents.publish(new InProcessSampleEvent("O-1"), CommandContext.root("cmd-1"));
         relay.relay();
 
         assertEquals(1, listener.received.size());

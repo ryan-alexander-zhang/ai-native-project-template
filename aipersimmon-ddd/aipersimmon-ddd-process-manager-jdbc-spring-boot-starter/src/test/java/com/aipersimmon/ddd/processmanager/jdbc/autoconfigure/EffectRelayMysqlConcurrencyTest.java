@@ -74,8 +74,9 @@ class EffectRelayMysqlConcurrencyTest {
         jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_transition");
         jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_deadline");
         jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_instance");
-        new ResourceDatabasePopulator(new ClassPathResource(
-                "aipersimmon/db/migration/process-manager/mysql/V1__aipersimmon_process_manager.sql")).execute(ds);
+        new ResourceDatabasePopulator(
+                new ClassPathResource("aipersimmon/db/migration/process-manager/mysql/V1__aipersimmon_process_manager.sql"),
+                new ClassPathResource("aipersimmon/db/migration/process-manager/mysql/V2__drop_trace_id.sql")).execute(ds);
 
         instanceStore = new JdbcProcessInstanceStore(jdbc);
         JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
@@ -97,7 +98,7 @@ class EffectRelayMysqlConcurrencyTest {
         int total = 30;
         for (int i = 0; i < total; i++) {
             runtime.start(StarterTestProcess.TYPE, new ProcessBusinessKey("order-" + i),
-                    new StarterTestProcess.Begin("order-" + i), CommandContext.root("msg-" + i, null));
+                    new StarterTestProcess.Begin("order-" + i), CommandContext.root("msg-" + i));
         }
 
         AtomicInteger delivered = new AtomicInteger();

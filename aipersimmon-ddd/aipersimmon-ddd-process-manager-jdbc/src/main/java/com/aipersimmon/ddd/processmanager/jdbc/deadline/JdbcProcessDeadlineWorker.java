@@ -146,11 +146,11 @@ public final class JdbcProcessDeadlineWorker {
                 ProcessPayloadCodec<?> codec = payloadCodecs.forType(deadline.inputType());
                 ProcessInput input = (ProcessInput) codec.decode(
                         new EncodedPayload(deadline.inputType(), deadline.inputPayload()));
-                // Fire under the correlation/causation/trace persisted when the timer was scheduled, so the
+                // Fire under the correlation/causation persisted when the timer was scheduled, so the
                 // timeout stays on the same causal chain as the flow that armed it.
                 CommandContext context = new CommandContext(
                         deadline.deadlineId() + "#" + deadline.generation(),
-                        deadline.correlationId(), deadline.causationId(), deadline.traceId());
+                        deadline.correlationId(), deadline.causationId());
                 // Restore the scheduling advance's trace context so the timer's own advance links
                 // back to the flow that armed it, rather than starting a fresh trace on the worker thread.
                 try (StoreAndForwardTracer.Scope span = storeTracer.restore(

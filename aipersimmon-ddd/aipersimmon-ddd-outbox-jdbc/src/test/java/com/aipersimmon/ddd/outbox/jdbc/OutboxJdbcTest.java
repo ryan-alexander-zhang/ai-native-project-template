@@ -80,7 +80,7 @@ class OutboxJdbcTest {
 
     @Test
     void writesUnsentRowThenRelayDispatchesAndMarksSent() {
-        integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1", null));
+        integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1"));
 
         assertEquals(Integer.valueOf(1),
                 jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = FALSE", Integer.class));
@@ -100,7 +100,7 @@ class OutboxJdbcTest {
 
     @Test
     void annotatedLogicalTypeIsStampedOnTheWireAndResolvesBackToTheLocalClass() {
-        integrationEvents.publish(new NamespacedEvent("O-9"), CommandContext.root("cmd-9", null));
+        integrationEvents.publish(new NamespacedEvent("O-9"), CommandContext.root("cmd-9"));
 
         relay.relay();
 

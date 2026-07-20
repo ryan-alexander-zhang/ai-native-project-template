@@ -46,7 +46,7 @@ class InProcessOutboxDispatcherTest {
 
         dispatcher(published::add).dispatch(new OutboxMessage(
                 "evt-1", "/orders", TYPE, 1, "{\"orderId\":\"O-1\"}",
-                Instant.EPOCH, "O-1", "corr-1", "cause-1", null));
+                Instant.EPOCH, "O-1", "corr-1", "cause-1"));
 
         assertEquals(1, published.size());
         PayloadApplicationEvent<?> event = assertInstanceOf(PayloadApplicationEvent.class, published.get(0));
@@ -62,13 +62,13 @@ class InProcessOutboxDispatcherTest {
     @Test
     void failsWhenTypeIsUnknown() {
         assertThrows(UnknownIntegrationEventException.class, () -> dispatcher(event -> { }).dispatch(new OutboxMessage(
-                "evt-2", "/orders", "com.example.DoesNotExist", 1, "{}", Instant.EPOCH, null, "corr-1", null, null)));
+                "evt-2", "/orders", "com.example.DoesNotExist", 1, "{}", Instant.EPOCH, null, "corr-1", null)));
     }
 
     @Test
     void failsWhenVersionIsUnknown() {
         // The type is registered, but only at version 1; a version-2 message is a miss.
         assertThrows(UnknownIntegrationEventException.class, () -> dispatcher(event -> { }).dispatch(new OutboxMessage(
-                "evt-3", "/orders", TYPE, 2, "{\"orderId\":\"O-1\"}", Instant.EPOCH, "O-1", "corr-1", null, null)));
+                "evt-3", "/orders", TYPE, 2, "{\"orderId\":\"O-1\"}", Instant.EPOCH, "O-1", "corr-1", null)));
     }
 }

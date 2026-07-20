@@ -27,8 +27,6 @@ public final class IntegrationEventHeaders {
     public static final String CORRELATION_ID = "ce_correlationid";
     /** Extension: causation id (the message that caused this one). */
     public static final String CAUSATION_ID = "ce_causationid";
-    /** Extension: observability trace id. */
-    public static final String TRACE_ID = "ce_traceid";
     /** CloudEvents Partitioning extension {@code partitionkey} — the Kafka message key. */
     public static final String PARTITION_KEY = "ce_partitionkey";
     /** Standard header carrying the CloudEvents {@code datacontenttype}. */

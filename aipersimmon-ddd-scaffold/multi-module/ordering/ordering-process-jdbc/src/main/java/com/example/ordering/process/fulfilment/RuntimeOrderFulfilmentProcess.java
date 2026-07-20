@@ -83,6 +83,6 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
     }
 
     private static CommandContext rootContext(String fact, String orderId) {
-        return CommandContext.root(fact + ":" + orderId, null);
+        return CommandContext.root(fact + ":" + orderId);
     }
 }

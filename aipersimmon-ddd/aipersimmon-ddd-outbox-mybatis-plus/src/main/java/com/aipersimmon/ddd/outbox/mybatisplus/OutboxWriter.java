@@ -58,7 +58,6 @@ public class OutboxWriter implements IntegrationEvents {
                 event.subject(),
                 context.correlationId(),
                 context.messageId(),
-                context.traceId(),
                 event);
 
         OutboxRecord record = new OutboxRecord();
@@ -71,7 +70,6 @@ public class OutboxWriter implements IntegrationEvents {
         record.setSubject(envelope.subject());
         record.setCorrelationId(envelope.correlationId());
         record.setCausationId(envelope.causationId());
-        record.setTraceId(envelope.traceId());
         record.setTraceparent(captured.traceparent());
         record.setTraceState(captured.traceState());
         record.setSent(false);

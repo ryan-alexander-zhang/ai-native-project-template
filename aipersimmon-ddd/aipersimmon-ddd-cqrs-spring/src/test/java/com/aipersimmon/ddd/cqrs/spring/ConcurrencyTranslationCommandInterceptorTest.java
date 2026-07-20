@@ -23,7 +23,7 @@ class ConcurrencyTranslationCommandInterceptorTest {
         OptimisticLockingFailureException cause = new OptimisticLockingFailureException("stale");
 
         ConcurrencyConflictException ex = assertThrows(ConcurrencyConflictException.class,
-                () -> interceptor.intercept(new Ping(), CommandContext.root("m1", null), () -> {
+                () -> interceptor.intercept(new Ping(), CommandContext.root("m1"), () -> {
                     throw cause;
                 }));
 
@@ -33,7 +33,7 @@ class ConcurrencyTranslationCommandInterceptorTest {
     @Test
     void passesThroughWhenNoConflict() {
         assertEquals("ok",
-                interceptor.intercept(new StringCommand(), CommandContext.root("m2", null), () -> "ok"));
+                interceptor.intercept(new StringCommand(), CommandContext.root("m2"), () -> "ok"));
     }
 
     private record StringCommand() implements Command<String> {

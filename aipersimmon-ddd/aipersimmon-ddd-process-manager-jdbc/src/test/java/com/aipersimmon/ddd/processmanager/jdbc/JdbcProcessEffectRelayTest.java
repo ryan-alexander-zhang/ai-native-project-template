@@ -62,6 +62,7 @@ class JdbcProcessEffectRelayTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -91,7 +92,7 @@ class JdbcProcessEffectRelayTest {
 
     private ProcessAdvanceResult start() {
         return runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", "trace-1"));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
     }
 
     private String status(String effectId) {
@@ -119,7 +120,7 @@ class JdbcProcessEffectRelayTest {
 
         // Deliver the start's single effect first, so the fan-out effects become the head.
         relay.pollOnce();
-        runtime.handle(started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan", null));
+        runtime.handle(started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan"));
 
         int firstRound = relay.pollOnce();
         assertEquals(1, firstRound, "only the head of the two fan-out effects is delivered");
@@ -136,7 +137,7 @@ class JdbcProcessEffectRelayTest {
         // rows share created_at and both are effect_index=0 — so ordering must rest on a monotonic seq,
         // not on (created_at, effect_index), or the per-instance serial guarantee is broken.
         ProcessAdvanceResult started = start();
-        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-advance", null));
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-advance"));
         JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
 
         assertEquals(1, relay.pollOnce(), "only the head effect is delivered; the later one waits");

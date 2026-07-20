@@ -62,6 +62,7 @@ class JdbcProcessBacklogTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -80,7 +81,7 @@ class JdbcProcessBacklogTest {
 
     private ProcessAdvanceResult start() {
         return runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", null));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
     }
 
     private JdbcProcessBacklog backlogAt(Instant at) {
@@ -113,7 +114,7 @@ class JdbcProcessBacklogTest {
     void oldestPendingAgesReflectDwellPastTheScheduledTime() {
         ProcessAdvanceResult started = start(); // stages one due command effect
         runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(),
-                CommandContext.root("msg-arm", null)); // schedules a due REVIEW deadline
+                CommandContext.root("msg-arm")); // schedules a due REVIEW deadline
 
         JdbcProcessBacklog backlog = backlogAt(CLOCK.instant().plusSeconds(5));
         assertEquals(Duration.ofSeconds(5), backlog.oldestPendingEffectAge());

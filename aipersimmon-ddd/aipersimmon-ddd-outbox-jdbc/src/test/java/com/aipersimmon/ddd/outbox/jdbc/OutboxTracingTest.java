@@ -102,7 +102,7 @@ class OutboxTracingTest {
 
     @Test
     void writerCapturesTraceContextOntoTheRow() {
-        integrationEvents.publish(new SampleEvent("o1"), CommandContext.root("m1", "trace-1"));
+        integrationEvents.publish(new SampleEvent("o1"), CommandContext.root("m1"));
 
         String traceparent = jdbc.queryForObject(
                 "SELECT traceparent FROM aipersimmon_outbox", String.class);
@@ -114,7 +114,7 @@ class OutboxTracingTest {
 
     @Test
     void relayRestoresTheCapturedContextAroundDispatch() {
-        integrationEvents.publish(new SampleEvent("o1"), CommandContext.root("m1", "trace-1"));
+        integrationEvents.publish(new SampleEvent("o1"), CommandContext.root("m1"));
 
         relay.relay();
 

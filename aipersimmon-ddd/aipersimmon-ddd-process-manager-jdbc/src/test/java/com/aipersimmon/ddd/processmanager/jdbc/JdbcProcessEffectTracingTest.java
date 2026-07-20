@@ -68,6 +68,7 @@ class JdbcProcessEffectTracingTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -97,7 +98,7 @@ class JdbcProcessEffectTracingTest {
     @Test
     void runtimeCapturesTraceContextOntoTheEffectRow() {
         runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", "trace-1"));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
 
         String traceparent = jdbc.queryForObject(
                 "SELECT traceparent FROM aipersimmon_process_effect", String.class);
@@ -107,7 +108,7 @@ class JdbcProcessEffectTracingTest {
     @Test
     void relayRestoresTheCapturedContextAroundDispatch() {
         runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", "trace-1"));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
 
         int delivered = relay().pollOnce();
 

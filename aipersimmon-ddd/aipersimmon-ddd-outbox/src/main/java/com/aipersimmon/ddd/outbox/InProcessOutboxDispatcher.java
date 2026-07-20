@@ -16,7 +16,7 @@ import org.springframework.core.ResolvableType;
  * stored row and republishes the envelope through Spring's
  * {@link ApplicationEventPublisher}, so in-process consumers with
  * {@code @EventListener} handlers for {@code EventEnvelope<TheEvent>} receive it with
- * the full metadata (event id, correlation, causation, trace) intact.
+ * the full metadata (event id, correlation, causation) intact.
  *
  * <p>This turns the outbox into an in-process asynchronous transport: the producer
  * commits fast (only the outbox row, in its transaction), and the scheduled relay
@@ -60,7 +60,6 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
                     message.subject(),
                     message.correlationId(),
                     message.causationId(),
-                    message.traceId(),
                     payload);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(

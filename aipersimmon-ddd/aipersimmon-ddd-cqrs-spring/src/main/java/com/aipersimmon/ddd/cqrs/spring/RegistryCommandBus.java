@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
-import org.slf4j.MDC;
 import org.springframework.core.ResolvableType;
 
 /**
@@ -22,19 +21,16 @@ import org.springframework.core.ResolvableType;
  * {@link CommandInterceptor#order()} wraps the others (outermost).
  *
  * <p>The bus mints each command's {@link CommandContext} id. A root
- * {@link #send(Command)} seeds a fresh correlation and picks up the ambient trace id
- * from the {@code traceId} MDC key (set by the web trace-id filter); a
+ * {@link #send(Command)} seeds a fresh correlation; a
  * {@link #send(Command, CommandContext)} derives a child of the triggering message,
- * so correlation and causation propagate down the chain.
+ * so correlation and causation propagate down the chain. Distributed-trace identity is
+ * handled out of band by the OpenTelemetry context, not seeded here.
  *
  * <p>{@link #sendAs(Command, CommandContext)} is the exception: it dispatches under a
  * context minted upstream by a durable store (effect relay / outbox), verbatim, so a
  * redelivered effect keeps its messageId. It mints no id.
  */
 public class RegistryCommandBus implements CommandBus {
-
-    /** MDC key populated by the web trace-id filter; read to seed a root command's trace. */
-    static final String TRACE_ID_MDC_KEY = "traceId";
 
     private final Map<Class<?>, CommandHandler<?, ?>> handlers = new HashMap<>();
     private final List<CommandInterceptor> interceptors;
@@ -70,7 +66,7 @@ public class RegistryCommandBus implements CommandBus {
 
     @Override
     public <R> R send(Command<R> command) {
-        return dispatch(command, CommandContext.root(idGenerator.get(), MDC.get(TRACE_ID_MDC_KEY)));
+        return dispatch(command, CommandContext.root(idGenerator.get()));
     }
 
     @Override

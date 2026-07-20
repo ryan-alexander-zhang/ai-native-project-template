@@ -70,7 +70,6 @@ public class KafkaOutboxDispatcher implements OutboxDispatcher {
         addHeader(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION, Integer.toString(message.version()));
         addHeader(record, IntegrationEventHeaders.CORRELATION_ID, message.correlationId());
         addHeader(record, IntegrationEventHeaders.CAUSATION_ID, message.causationId());
-        addHeader(record, IntegrationEventHeaders.TRACE_ID, message.traceId());
         addHeader(record, IntegrationEventHeaders.PARTITION_KEY, partitionKey);
         addHeader(record, IntegrationEventHeaders.CONTENT_TYPE, IntegrationEventHeaders.CONTENT_TYPE_JSON);
         Future<?> send = kafkaTemplate.send(record);

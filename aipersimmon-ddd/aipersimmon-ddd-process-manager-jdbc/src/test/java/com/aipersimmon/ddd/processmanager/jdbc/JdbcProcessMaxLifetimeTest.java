@@ -61,6 +61,7 @@ class JdbcProcessMaxLifetimeTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -82,7 +83,7 @@ class JdbcProcessMaxLifetimeTest {
 
     private ProcessAdvanceResult start(JdbcProcessRuntime runtime) {
         return runtime.start(TestFulfilment.TYPE, ORDER,
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", null));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
     }
 
     @Test

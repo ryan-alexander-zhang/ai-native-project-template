@@ -85,7 +85,7 @@ class ProcessManagerJdbcJacksonCodecTest {
     void generatesJacksonCodecsFromTheCatalogAndRoundTripsThroughJson() {
         ProcessAdvanceResult started = runtime.start(
                 StarterTestProcess.TYPE, new ProcessBusinessKey("order-json"),
-                new StarterTestProcess.Begin("order-json"), CommandContext.root("msg-1", null));
+                new StarterTestProcess.Begin("order-json"), CommandContext.root("msg-1"));
 
         ProcessView view = query.find(started.processRef()).orElseThrow();
         assertEquals("GO", view.step().value(), "start encoded the state through the Jackson state codec");

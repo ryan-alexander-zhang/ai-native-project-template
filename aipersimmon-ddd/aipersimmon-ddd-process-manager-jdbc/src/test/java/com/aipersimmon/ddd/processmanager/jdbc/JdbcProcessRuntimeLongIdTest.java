@@ -43,6 +43,7 @@ class JdbcProcessRuntimeLongIdTest {
                 .setType(EmbeddedDatabaseType.H2)
                 .generateUniqueName(true)
                 .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
                 .build();
         jdbc = new JdbcTemplate(dataSource);
         runtime = new JdbcProcessRuntime(
@@ -59,12 +60,12 @@ class JdbcProcessRuntimeLongIdTest {
     void acceptsAMessageIdUpToTheIdColumnWidth() {
         ProcessAdvanceResult started = runtime.start(
                 TestFulfilment.TYPE, new ProcessBusinessKey("order-1"),
-                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start", null));
+                new TestFulfilment.Started("order-1"), CommandContext.root("msg-start"));
 
         // A no-effect transition (Finish) whose input carries an id longer than the old 64-char column
         // width but within the 96-char id-column width; only input_message_id is exercised.
         String longMessageId = "m".repeat(80);
-        CommandContext cause = new CommandContext(longMessageId, "corr-1", null, null);
+        CommandContext cause = new CommandContext(longMessageId, "corr-1", null);
         ProcessAdvanceResult finished = runtime.handle(
                 started.processRef(), new TestFulfilment.Finish(), cause);
 
