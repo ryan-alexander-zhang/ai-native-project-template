@@ -34,7 +34,7 @@ public final class SkipLockedProcessDialect implements JdbcProcessDialect {
         for (String id : ids) {
             jdbc.update("""
                     UPDATE aipersimmon_process_effect
-                    SET status = 'IN_FLIGHT', attempts = attempts + 1,
+                    SET status = 'IN_FLIGHT',
                         lease_owner = ?, lease_token = ?, lease_until = ?, updated_at = ?
                     WHERE effect_id = ?""",
                     owner.value(), leaseToken, Timestamp.from(leaseUntil), ts, id);
@@ -53,7 +53,7 @@ public final class SkipLockedProcessDialect implements JdbcProcessDialect {
         for (String id : ids) {
             jdbc.update("""
                     UPDATE aipersimmon_process_deadline
-                    SET status = 'IN_FLIGHT', attempts = attempts + 1,
+                    SET status = 'IN_FLIGHT',
                         lease_owner = ?, lease_token = ?, lease_until = ?, updated_at = ?
                     WHERE deadline_id = ?""",
                     owner.value(), leaseToken, Timestamp.from(leaseUntil), ts, id);

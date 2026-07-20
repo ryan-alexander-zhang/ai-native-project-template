@@ -142,6 +142,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean
     public JdbcProcessRuntime jdbcProcessRuntime(
             JdbcProcessInstanceStore instances, JdbcProcessTransitionStore transitions,
@@ -179,6 +180,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean
     public JdbcProcessQuery jdbcProcessQuery(
             JdbcProcessInstanceStore instances, JdbcProcessTransitionStore transitions,
@@ -187,6 +189,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean
     public JdbcProcessOperations jdbcProcessOperations(
             JdbcProcessInstanceStore instances, JdbcProcessTransitionStore transitions,
@@ -219,6 +222,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "aipersimmon.ddd.process-manager.jdbc.effect-relay",
             name = "enabled", matchIfMissing = true)
@@ -236,6 +240,7 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "aipersimmon.ddd.process-manager.jdbc.deadline-worker",
             name = "enabled", matchIfMissing = true)

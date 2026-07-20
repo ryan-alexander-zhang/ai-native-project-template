@@ -11,6 +11,7 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.MaxLifetimeExceededCodec;
+import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
@@ -72,6 +73,9 @@ final class TestFulfilment {
     }
 
     record ArmPoisonDeadline() implements ProcessInput {
+    }
+
+    record CancelReview() implements ProcessInput {
     }
 
     record DeadlineFired() implements ProcessInput {
@@ -144,6 +148,10 @@ final class TestFulfilment {
                         new State("WAIT_POISON", state.count()), ProcessLifecycle.RUNNING,
                         new ProcessStep("WAIT_POISON"), Optional.empty(), new DecisionCode("armed-poison"),
                         List.of(new ScheduleDeadline(new DeadlineName("POISON"), context.now(), new Boom())));
+                case CancelReview ignored -> new ProcessDecision<>(
+                        new State("NO_WAIT", state.count()), ProcessLifecycle.RUNNING, new ProcessStep("NO_WAIT"),
+                        Optional.empty(), new DecisionCode("review-cancelled"),
+                        List.of(new CancelDeadline(new DeadlineName("REVIEW"))));
                 case FanOut ignored -> new ProcessDecision<>(
                         new State("FAN", state.count()), ProcessLifecycle.RUNNING, new ProcessStep("FAN"),
                         Optional.empty(), new DecisionCode("fanned"),
@@ -196,6 +204,7 @@ final class TestFulfilment {
                 payloadCodec("test.deadline-fired", DeadlineFired.class, d -> "", s -> new DeadlineFired()),
                 payloadCodec("test.fan-out", FanOut.class, f -> "", s -> new FanOut()),
                 payloadCodec("test.arm-poison", ArmPoisonDeadline.class, a -> "", s -> new ArmPoisonDeadline()),
+                payloadCodec("test.cancel-review", CancelReview.class, c -> "", s -> new CancelReview()),
                 payloadCodec("test.do-work", DoWork.class, DoWork::reference, DoWork::new),
                 new MaxLifetimeExceededCodec());
     }

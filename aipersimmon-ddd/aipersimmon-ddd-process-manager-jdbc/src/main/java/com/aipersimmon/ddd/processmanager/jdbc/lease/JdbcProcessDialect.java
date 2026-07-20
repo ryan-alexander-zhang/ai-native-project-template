@@ -13,7 +13,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <p>An effect is claimable when it is due ({@code PENDING} past its next attempt, or
  * {@code IN_FLIGHT} past a stale lease) and not blocked by an earlier-ordered,
  * not-yet-delivered effect on the same instance — so dispatch is serial per instance.
- * A claim marks the row {@code IN_FLIGHT}, bumps {@code attempts}, and writes the lease.
+ * A claim marks the row {@code IN_FLIGHT} and writes the lease; {@code attempts} is bumped
+ * only on a failed delivery (by the store's retry/dead transition), never by a claim, so a
+ * lease-expiry reclaim does not consume the retry budget.
  */
 public interface JdbcProcessDialect {
 
@@ -24,7 +26,7 @@ public interface JdbcProcessDialect {
      * Claim up to {@code limit} due, unblocked effects, marking each {@code IN_FLIGHT}
      * with the given lease. Must run inside a transaction.
      *
-     * @return the claimed effect ids, in dispatch order ({@code created_at, effect_index})
+     * @return the claimed effect ids, in dispatch order (per-instance {@code seq})
      */
     List<String> claimDueEffects(
             JdbcTemplate jdbc, Instant now, int limit, WorkerId owner, String leaseToken, Instant leaseUntil);
@@ -43,7 +45,9 @@ public interface JdbcProcessDialect {
     /**
      * The claimable-and-unblocked candidate query, shared by all dialects. Two positional
      * parameters, both {@code now}: the {@code PENDING} due bound and the stale-lease
-     * bound. Ordered so the per-instance head comes first.
+     * bound. Ordered by the per-instance monotonic {@code seq} so the head comes first, and
+     * an effect is blocked by any earlier-{@code seq}, not-yet-delivered effect on the same
+     * instance — a durable key, not the wall-clock {@code created_at}.
      */
     String CANDIDATE_SQL = """
             SELECT e.effect_id FROM aipersimmon_process_effect e
@@ -53,9 +57,8 @@ public interface JdbcProcessDialect {
                   SELECT 1 FROM aipersimmon_process_effect b
                   WHERE b.instance_id = e.instance_id
                     AND b.status <> 'DELIVERED'
-                    AND (b.created_at < e.created_at
-                         OR (b.created_at = e.created_at AND b.effect_index < e.effect_index)))
-            ORDER BY e.created_at, e.effect_index""";
+                    AND b.seq < e.seq)
+            ORDER BY e.seq""";
 
     /**
      * The due-deadline candidate query, shared by all dialects. Two positional {@code now}

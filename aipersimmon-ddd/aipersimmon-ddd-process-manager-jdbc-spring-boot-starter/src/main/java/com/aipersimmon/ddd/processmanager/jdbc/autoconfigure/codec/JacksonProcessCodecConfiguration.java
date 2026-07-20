@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -25,7 +26,9 @@ import org.springframework.context.annotation.Bean;
  * entry. An application needing encryption, upcasting, or a non-JSON format simply declares its own
  * codec beans and omits the catalog.
  */
-@AutoConfiguration(before = AipersimmonDddProcessManagerJdbcAutoConfiguration.class)
+@AutoConfiguration(
+        after = JacksonAutoConfiguration.class,
+        before = AipersimmonDddProcessManagerJdbcAutoConfiguration.class)
 @ConditionalOnClass(ObjectMapper.class)
 @ConditionalOnBean({ObjectMapper.class, ProcessSerializationCatalog.class})
 public class JacksonProcessCodecConfiguration {

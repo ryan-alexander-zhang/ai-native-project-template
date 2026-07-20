@@ -70,11 +70,11 @@ class ProcessManagerJdbcHealthIndicatorTest {
         Timestamp now = Timestamp.from(Instant.parse("2026-07-16T00:00:00Z"));
         jdbc.update("""
                 INSERT INTO aipersimmon_process_effect (
-                    effect_id, instance_id, transition_id, effect_index, effect_kind,
+                    effect_id, instance_id, transition_id, effect_index, seq, effect_kind,
                     payload_type, payload_version, payload, message_id, correlation_id,
                     status, attempts, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                "eff-1", "inst-1", "tr-1", 0, "DISPATCH_COMMAND",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                "eff-1", "inst-1", "tr-1", 0, 0L, "DISPATCH_COMMAND",
                 "some.command", 1, "{}", "eff-1", "corr-1",
                 "DEAD", 12, now, now);
     }

@@ -131,6 +131,22 @@ class JdbcProcessEffectRelayTest {
     }
 
     @Test
+    void twoUndeliveredEffectsOfOneInstanceAreDeliveredOneAtATime() {
+        // Two transitions, each staging one effect, both left PENDING. Under the fixed test clock both
+        // rows share created_at and both are effect_index=0 — so ordering must rest on a monotonic seq,
+        // not on (created_at, effect_index), or the per-instance serial guarantee is broken.
+        ProcessAdvanceResult started = start();
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-advance", null));
+        JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+
+        assertEquals(1, relay.pollOnce(), "only the head effect is delivered; the later one waits");
+        assertEquals(List.of("order-1"), references());
+
+        assertEquals(1, relay.pollOnce(), "the second effect is delivered only after the first");
+        assertEquals(List.of("order-1", "again"), references());
+    }
+
+    @Test
     void aTransientFailureIsRetriedThenSucceeds() {
         ProcessAdvanceResult started = start();
         bus.failTimes = 1;
@@ -161,6 +177,50 @@ class JdbcProcessEffectRelayTest {
         assertEquals("SUSPENDED", instance.get("LIFECYCLE"));
         assertEquals("EFFECT", instance.get("SUSPENSION_SOURCE"));
         assertEquals(effectId, instance.get("SUSPENDING_WORK_ID"));
+    }
+
+    @Test
+    void aDeadEffectDoesNotReSuspendAnAlreadySuspendedInstance() {
+        // The instance is already SUSPENDED by a prior deadline exhaustion (resume target RUNNING).
+        ProcessAdvanceResult started = start();
+        String instanceId = started.processRef().instanceId().value();
+        instanceStore.suspend(
+                started.processRef().instanceId(), com.aipersimmon.ddd.processmanager.model.ProcessLifecycle.RUNNING,
+                "deadline exhausted", "DEADLINE", "deadline-1", CLOCK.instant());
+
+        // A failing effect on the same instance is claimed (effects are not lifecycle-filtered) and goes DEAD.
+        bus.failTimes = Integer.MAX_VALUE;
+        JdbcProcessEffectRelay relay = relay(zeroBackoff(2));
+        relay.pollOnce(); // attempt 1 -> retry
+        relay.pollOnce(); // attempt 2 -> DEAD
+
+        String effectId = started.transitionId() + "#0";
+        assertEquals("DEAD", status(effectId));
+        // The prior resume target must survive; a re-suspend would clobber it to SUSPENDED and wedge the instance.
+        assertEquals("RUNNING", jdbc.queryForObject(
+                "SELECT resume_lifecycle FROM aipersimmon_process_instance WHERE instance_id = ?",
+                String.class, instanceId), "an already-suspended instance is not re-suspended");
+        assertEquals("DEADLINE", jdbc.queryForObject(
+                "SELECT suspension_source FROM aipersimmon_process_instance WHERE instance_id = ?",
+                String.class, instanceId), "the original suspension source is preserved");
+    }
+
+    @Test
+    void anExpiredLeaseReclaimDoesNotConsumeTheRetryBudget() {
+        ProcessAdvanceResult started = start();
+        String effectId = started.transitionId() + "#0";
+        Instant now = CLOCK.instant();
+
+        // Three successive expired-lease reclaims (slow workers), with no delivery failure in between.
+        for (int i = 0; i < 3; i++) {
+            String token = "tok-" + i;
+            unitOfWork.execute(() -> dialect.claimDueEffects(
+                    jdbc, now, 10, new WorkerId("owner"), token, now.minusSeconds(1)));
+        }
+
+        assertEquals(0, (int) jdbc.queryForObject(
+                "SELECT attempts FROM aipersimmon_process_effect WHERE effect_id = ?", Integer.class, effectId),
+                "a lease-expiry reclaim is not a failed attempt and must not consume the retry budget");
     }
 
     @Test

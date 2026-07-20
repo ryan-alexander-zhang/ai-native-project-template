@@ -248,8 +248,14 @@ public class ProcessManagerJdbcProperties {
         if (concurrencyMaxRetries < 0) {
             throw new IllegalStateException("concurrency.max-retries must be >= 0");
         }
-        if (!startDuplicateBusinessKey.equals("reject") && !startDuplicateBusinessKey.equals("fold")) {
+        if (!startDuplicateBusinessKey.equalsIgnoreCase("reject")
+                && !startDuplicateBusinessKey.equalsIgnoreCase("fold")) {
             throw new IllegalStateException("start.duplicate-business-key must be 'reject' or 'fold'");
+        }
+        // Case-sensitive to match the @ConditionalOnProperty(havingValue="validate") gate on the
+        // schema validator: a typo like "Validate" would silently disable the check, so reject it here.
+        if (!schemaValidation.equals("validate") && !schemaValidation.equals("none")) {
+            throw new IllegalStateException("schema-validation must be 'validate' or 'none'");
         }
         if (shutdownTimeout == null || shutdownTimeout.isNegative()) {
             throw new IllegalStateException("shutdown-timeout must be >= 0");

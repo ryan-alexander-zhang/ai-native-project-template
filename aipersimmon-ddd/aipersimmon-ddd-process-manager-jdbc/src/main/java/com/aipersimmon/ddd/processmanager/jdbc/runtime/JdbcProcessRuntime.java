@@ -187,7 +187,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
 
         appendTransition(ref, transitionId, cause, input, Optional.empty(), Optional.empty(), decision, "START", now);
         stageEffects(ref, transitionId, decision, cause, now);
-        armMaxLifetimeBackstop(ref, decision, now);
+        armMaxLifetimeBackstop(ref, decision, cause, now);
 
         return new ProcessAdvanceResult(
                 ref, revision, decision.lifecycle(), decision.step(), false, transitionId);
@@ -200,12 +200,13 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
      * decide. A definition may also reschedule the reserved name itself in its start decision, which
      * simply bumps the generation.
      */
-    private void armMaxLifetimeBackstop(ProcessRef ref, ProcessDecision<Object> decision, Instant now) {
+    private void armMaxLifetimeBackstop(
+            ProcessRef ref, ProcessDecision<Object> decision, CommandContext cause, Instant now) {
         if (maxLifetime.isEmpty() || !decision.lifecycle().isActive()) {
             return;
         }
         scheduleDeadline(ref, new ScheduleDeadline(
-                MaxLifetimeExceeded.DEADLINE_NAME, now.plus(maxLifetime.get()), new MaxLifetimeExceeded()), now);
+                MaxLifetimeExceeded.DEADLINE_NAME, now.plus(maxLifetime.get()), new MaxLifetimeExceeded()), cause, now);
     }
 
     private ProcessAdvanceResult resolveExistingStart(
@@ -242,7 +243,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                     parkedId, ref.instanceId(), cause.messageId(),
                     parkedInput.type().logicalType(), parkedInput.type().version(), parkedInput.data(),
                     Optional.of(row.lifecycle()), row.lifecycle(), Optional.of(row.step()), row.step(),
-                    new DecisionCode("parked"), "PARKED"), parkedAt);
+                    new DecisionCode("parked"), "PARKED", cause.correlationId(), cause.traceId()), parkedAt);
             return new ProcessAdvanceResult(
                     ref, row.revision(), row.lifecycle(), row.step(), false, parkedId);
         }
@@ -299,19 +300,24 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                 transitionId, ref.instanceId(), cause.messageId(),
                 encodedInput.type().logicalType(), encodedInput.type().version(), encodedInput.data(),
                 fromLifecycle, decision.lifecycle(), fromStep, decision.step(),
-                decision.decisionCode(), kind), now);
+                decision.decisionCode(), kind, cause.correlationId(), cause.traceId()), now);
     }
 
     private void stageEffects(
             ProcessRef ref, String transitionId, ProcessDecision<Object> decision, CommandContext cause, Instant now) {
+        // One monotonic base per transition; the per-instance ordering key is seqBase + index. This runs
+        // under the instance row lock, so the base is stable across concurrent advances of the instance.
+        long seqBase = effects.nextSeq(ref.instanceId());
         int index = 0;
         for (ProcessEffect effect : decision.effects()) {
             switch (effect) {
                 case DispatchCommand dispatch ->
-                        stageMessageEffect(ref, transitionId, index, dispatch, encodePayload(dispatch.command()), cause, now);
+                        stageMessageEffect(ref, transitionId, index, seqBase + index, dispatch,
+                                encodePayload(dispatch.command()), cause, now);
                 case PublishIntegrationEvent publish ->
-                        stageMessageEffect(ref, transitionId, index, publish, encodePayload(publish.event()), cause, now);
-                case ScheduleDeadline schedule -> scheduleDeadline(ref, schedule, now);
+                        stageMessageEffect(ref, transitionId, index, seqBase + index, publish,
+                                encodePayload(publish.event()), cause, now);
+                case ScheduleDeadline schedule -> scheduleDeadline(ref, schedule, cause, now);
                 case CancelDeadline cancel -> deadlines.cancelCurrent(ref.instanceId(), cancel.name(), now);
             }
             index++;
@@ -319,21 +325,24 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     }
 
     private void stageMessageEffect(
-            ProcessRef ref, String transitionId, int index, ProcessEffect effect,
+            ProcessRef ref, String transitionId, int index, long seq, ProcessEffect effect,
             EncodedPayload payload, CommandContext cause, Instant now) {
         String effectId = transitionId + "#" + index;
         effects.insert(new ProcessEffectInsert(
-                effectId, ref.instanceId(), transitionId, index, effect.kind(),
+                effectId, ref.instanceId(), transitionId, index, seq, effect.kind(),
                 payload.type().logicalType(), payload.type().version(), payload.data(),
                 effectId, cause.correlationId(), cause.messageId(), cause.traceId()), now);
     }
 
-    private void scheduleDeadline(ProcessRef ref, ScheduleDeadline schedule, Instant now) {
+    private void scheduleDeadline(ProcessRef ref, ScheduleDeadline schedule, CommandContext cause, Instant now) {
         long generation = deadlines.nextGeneration(ref.instanceId(), schedule.name());
         EncodedPayload input = encodePayload(schedule.input());
+        // Persist the scheduling cause's correlation/causation/trace so the timer fires under the same
+        // causal chain as the flow that armed it, rather than starting a fresh correlation.
         deadlines.schedule(new ProcessDeadlineInsert(
                 idGenerator.get(), ref.instanceId(), schedule.name(), generation, schedule.dueAt(),
-                input.type().logicalType(), input.type().version(), input.data()), now);
+                input.type().logicalType(), input.type().version(), input.data(),
+                cause.correlationId(), cause.messageId(), cause.traceId()), now);
     }
 
     private ProcessAdvanceResult duplicateResult(ProcessInstanceRow row, String transitionId) {

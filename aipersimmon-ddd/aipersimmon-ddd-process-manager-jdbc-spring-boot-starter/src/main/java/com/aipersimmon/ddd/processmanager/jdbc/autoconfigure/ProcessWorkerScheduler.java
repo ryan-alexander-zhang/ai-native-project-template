@@ -85,8 +85,12 @@ public final class ProcessWorkerScheduler implements SmartLifecycle {
         for (ScheduledExecutorService executor : executors) {
             try {
                 long remaining = deadline - System.nanoTime();
-                executor.awaitTermination(Math.max(0L, remaining), TimeUnit.NANOSECONDS);
+                if (!executor.awaitTermination(Math.max(0L, remaining), TimeUnit.NANOSECONDS)) {
+                    // Grace window elapsed with a poll still running: interrupt it so the timeout is real.
+                    executor.shutdownNow();
+                }
             } catch (InterruptedException e) {
+                executor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
         }

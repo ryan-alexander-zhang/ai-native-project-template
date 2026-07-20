@@ -1,11 +1,16 @@
 package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
+import com.aipersimmon.ddd.processmanager.codec.PayloadType;
+import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
+import com.aipersimmon.ddd.processmanager.exception.ProcessSerializationException;
 import com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.codec.ProcessSerializationCatalog;
 import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
@@ -73,6 +78,8 @@ class ProcessManagerJdbcJacksonCodecTest {
     JdbcProcessEffectRelay relay;
     @Autowired
     CommandBus commandBus;
+    @Autowired
+    ProcessPayloadCodecRegistry payloadCodecs;
 
     @Test
     void generatesJacksonCodecsFromTheCatalogAndRoundTripsThroughJson() {
@@ -87,6 +94,15 @@ class ProcessManagerJdbcJacksonCodecTest {
         RecordingCommandBus bus = (RecordingCommandBus) commandBus;
         assertEquals("order-json", ((StarterTestProcess.DoThing) bus.commands.get(0)).reference(),
                 "the command payload round-tripped through the Jackson payload codec");
+    }
+
+    @Test
+    void mapsADecodeFailureToProcessSerializationException() {
+        var codec = payloadCodecs.forType(new PayloadType("starter.begin", 1));
+        EncodedPayload garbage = new EncodedPayload(
+                new PayloadType("starter.begin", 1), "not json".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThrows(ProcessSerializationException.class, () -> codec.decode(garbage),
+                "a Jackson failure surfaces as the framework serialization exception");
     }
 
     static final class RecordingCommandBus implements CommandBus {

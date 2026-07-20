@@ -209,6 +209,25 @@ class JdbcProcessOperationsTest {
     }
 
     @Test
+    void aReplayedParkedInputKeepsItsOriginalCorrelation() {
+        ProcessAdvanceResult started = start();
+        String deadEffectId = started.transitionId() + "#0";
+        suspendViaDeadEffect();
+        // Park an input under a specific correlation/trace while suspended.
+        runtime.handle(started.processRef(), new TestFulfilment.Advance(),
+                CommandContext.root("msg-adv", "trace-adv"));
+
+        operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
+
+        // The replay runs under a synthetic message id but must keep the parked input's causal chain.
+        var replayed = jdbc.queryForMap(
+                "SELECT correlation_id, trace_id FROM aipersimmon_process_transition "
+                        + "WHERE input_message_id = 'parked:msg-adv'");
+        assertEquals("msg-adv", replayed.get("CORRELATION_ID"), "replay stays on the parked input's correlation");
+        assertEquals("trace-adv", replayed.get("TRACE_ID"));
+    }
+
+    @Test
     void cancelProcessTerminatesAndCancelsPendingWork() {
         ProcessAdvanceResult started = start();
 

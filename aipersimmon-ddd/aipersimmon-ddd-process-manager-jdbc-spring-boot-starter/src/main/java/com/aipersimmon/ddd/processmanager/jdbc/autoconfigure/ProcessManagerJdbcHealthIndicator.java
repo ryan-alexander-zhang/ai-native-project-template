@@ -30,34 +30,24 @@ public final class ProcessManagerJdbcHealthIndicator implements HealthIndicator 
 
     @Override
     public Health health() {
-        long deadEffects;
-        long deadDeadlines;
-        long suspended;
-        long stuck;
-        Duration oldestEffect;
-        Duration oldestDeadline;
+        JdbcProcessBacklog.BacklogSnapshot s;
         try {
-            deadEffects = backlog.deadEffects();
-            deadDeadlines = backlog.deadDeadlines();
-            suspended = backlog.suspendedInstances();
-            stuck = backlog.stuckInstances(stuckThreshold);
-            oldestEffect = backlog.oldestPendingEffectAge();
-            oldestDeadline = backlog.oldestPendingDeadlineAge();
+            s = backlog.snapshot(stuckThreshold); // one coherent read instead of a query per detail
         } catch (RuntimeException storeUnavailable) {
             return Health.down(storeUnavailable).build();
         }
 
-        boolean degraded = deadEffects > 0 || deadDeadlines > 0 || stuck > 0
-                || oldestEffect.compareTo(oldestPendingWarn) > 0
-                || oldestDeadline.compareTo(oldestPendingWarn) > 0;
+        boolean degraded = s.deadEffects() > 0 || s.deadDeadlines() > 0 || s.stuckInstances() > 0
+                || s.oldestPendingEffectAge().compareTo(oldestPendingWarn) > 0
+                || s.oldestPendingDeadlineAge().compareTo(oldestPendingWarn) > 0;
 
         return new Health.Builder(degraded ? DEGRADED : Status.UP)
-                .withDetail("deadEffects", deadEffects)
-                .withDetail("deadDeadlines", deadDeadlines)
-                .withDetail("suspendedInstances", suspended)
-                .withDetail("stuckInstances", stuck)
-                .withDetail("oldestPendingEffectSeconds", oldestEffect.toSeconds())
-                .withDetail("oldestPendingDeadlineSeconds", oldestDeadline.toSeconds())
+                .withDetail("deadEffects", s.deadEffects())
+                .withDetail("deadDeadlines", s.deadDeadlines())
+                .withDetail("suspendedInstances", s.suspendedInstances())
+                .withDetail("stuckInstances", s.stuckInstances())
+                .withDetail("oldestPendingEffectSeconds", s.oldestPendingEffectAge().toSeconds())
+                .withDetail("oldestPendingDeadlineSeconds", s.oldestPendingDeadlineAge().toSeconds())
                 .build();
     }
 }

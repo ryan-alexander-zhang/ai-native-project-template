@@ -142,12 +142,15 @@ public final class JdbcProcessEffectRelay {
 
     private void onFailure(ClaimedEffect effect, String leaseToken, RuntimeException failure) {
         String error = describe(failure);
-        if (effect.attempts() >= retryPolicy.maxAttempts()) {
+        // attempts is bumped by scheduleRetry/markDead (a failed attempt), not by claiming, so a slow
+        // worker's lease-expiry reclaim never consumes the retry budget. This failure is attempt N+1.
+        int attempt = effect.attempts() + 1;
+        if (attempt >= retryPolicy.maxAttempts()) {
             unitOfWork.execute(() -> {
                 int dead = effects.markDead(effect.effectId(), leaseToken, error, clock.instant());
                 if (dead == 1) {
-                    ProcessInstanceRow row = instances.find(effect.instanceId()).orElse(null);
-                    if (row != null && row.lifecycle().isActive()) {
+                    ProcessInstanceRow row = instances.findForUpdate(effect.instanceId()).orElse(null);
+                    if (row != null && row.lifecycle().canSuspend()) {
                         instances.suspend(
                                 effect.instanceId(), row.lifecycle(),
                                 "effect " + effect.effectId() + " exhausted retries", "EFFECT",
@@ -157,7 +160,7 @@ public final class JdbcProcessEffectRelay {
                 return null;
             });
         } else {
-            Instant nextAttempt = clock.instant().plus(retryPolicy.backoff(effect.attempts()));
+            Instant nextAttempt = clock.instant().plus(retryPolicy.backoff(attempt));
             effects.scheduleRetry(effect.effectId(), leaseToken, nextAttempt, error, clock.instant());
         }
     }

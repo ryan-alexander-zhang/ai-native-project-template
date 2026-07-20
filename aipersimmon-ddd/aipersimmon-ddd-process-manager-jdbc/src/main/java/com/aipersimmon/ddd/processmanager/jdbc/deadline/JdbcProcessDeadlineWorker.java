@@ -5,7 +5,6 @@ import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
-import com.aipersimmon.ddd.processmanager.exception.ProcessSuspendedException;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessDialect;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
 import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
@@ -101,34 +100,38 @@ public final class JdbcProcessDeadlineWorker {
             return false;
         }
         DeadlineRow deadline = loaded.get();
-        Optional<ProcessInstanceRow> instance = instances.find(deadline.instanceId());
-        if (instance.isEmpty()) {
-            deadlines.cancelClaimed(deadlineId, leaseToken, clock.instant());
-            return false;
-        }
-        if (deadline.generation() != deadlines.currentGeneration(deadline.instanceId(), deadline.name())) {
-            // A later reschedule superseded this generation: an auditable no-op.
-            deadlines.cancelClaimed(deadlineId, leaseToken, clock.instant());
-            return false;
-        }
-
         try {
-            unitOfWork.execute(() -> {
+            // Everything runs in one fire transaction: locking the instance row first serializes any
+            // concurrent CancelDeadline/reschedule advance, and re-reading the deadline status under its
+            // own lock means a cancel or supersede that landed after the claim is observed here — so a
+            // cancelled or superseded timer becomes an auditable no-op rather than firing anyway.
+            return Boolean.TRUE.equals(unitOfWork.execute(() -> {
+                Optional<ProcessInstanceRow> instance = instances.findForUpdate(deadline.instanceId());
+                if (instance.isEmpty()) {
+                    deadlines.cancelClaimed(deadlineId, leaseToken, clock.instant());
+                    return Boolean.FALSE;
+                }
+                Optional<JdbcProcessDeadlineStore.DeadlineStatus> status = deadlines.statusForUpdate(deadlineId);
+                if (status.isEmpty() || status.get() != JdbcProcessDeadlineStore.DeadlineStatus.IN_FLIGHT) {
+                    // Cancelled (or otherwise settled) between claim and fire: nothing to do.
+                    return Boolean.FALSE;
+                }
+                if (deadline.generation() != deadlines.currentGeneration(deadline.instanceId(), deadline.name())) {
+                    deadlines.cancelClaimed(deadlineId, leaseToken, clock.instant());
+                    return Boolean.FALSE;
+                }
                 ProcessPayloadCodec<?> codec = payloadCodecs.forType(deadline.inputType());
                 ProcessInput input = (ProcessInput) codec.decode(
                         new EncodedPayload(deadline.inputType(), deadline.inputPayload()));
-                CommandContext context = CommandContext.root(
-                        deadline.deadlineId() + "#" + deadline.generation(), null);
+                // Fire under the correlation/causation/trace persisted when the timer was scheduled, so the
+                // timeout stays on the same causal chain as the flow that armed it.
+                CommandContext context = new CommandContext(
+                        deadline.deadlineId() + "#" + deadline.generation(),
+                        deadline.correlationId(), deadline.causationId(), deadline.traceId());
                 runtime.handle(instance.get().ref(), input, context);
                 deadlines.markFired(deadlineId, leaseToken, clock.instant());
-                return null;
-            });
-            return true;
-        } catch (ProcessSuspendedException suspended) {
-            // The instance was suspended between claim and fire: release for after resume.
-            deadlines.scheduleRetry(deadlineId, leaseToken,
-                    clock.instant().plus(leaseDuration), "instance suspended", clock.instant());
-            return false;
+                return Boolean.TRUE;
+            }));
         } catch (RuntimeException failure) {
             onFailure(deadline, leaseToken, failure);
             return false;
@@ -137,12 +140,15 @@ public final class JdbcProcessDeadlineWorker {
 
     private void onFailure(DeadlineRow deadline, String leaseToken, RuntimeException failure) {
         String error = describe(failure);
-        if (deadline.attempts() >= retryPolicy.maxAttempts()) {
+        // attempts is bumped on failure (scheduleRetry/markDead), not on claim, so a lease-expiry
+        // reclaim never consumes the retry budget. This failure is attempt N+1.
+        int attempt = deadline.attempts() + 1;
+        if (attempt >= retryPolicy.maxAttempts()) {
             unitOfWork.execute(() -> {
                 int dead = deadlines.markDead(deadline.deadlineId(), leaseToken, error, clock.instant());
                 if (dead == 1) {
-                    ProcessInstanceRow row = instances.find(deadline.instanceId()).orElse(null);
-                    if (row != null && row.lifecycle().isActive()) {
+                    ProcessInstanceRow row = instances.findForUpdate(deadline.instanceId()).orElse(null);
+                    if (row != null && row.lifecycle().canSuspend()) {
                         instances.suspend(
                                 deadline.instanceId(), row.lifecycle(),
                                 "deadline " + deadline.deadlineId() + " exhausted retries", "DEADLINE",
@@ -152,7 +158,7 @@ public final class JdbcProcessDeadlineWorker {
                 return null;
             });
         } else {
-            Instant nextAttempt = clock.instant().plus(retryPolicy.backoff(deadline.attempts()));
+            Instant nextAttempt = clock.instant().plus(retryPolicy.backoff(attempt));
             deadlines.scheduleRetry(deadline.deadlineId(), leaseToken, nextAttempt, error, clock.instant());
         }
     }

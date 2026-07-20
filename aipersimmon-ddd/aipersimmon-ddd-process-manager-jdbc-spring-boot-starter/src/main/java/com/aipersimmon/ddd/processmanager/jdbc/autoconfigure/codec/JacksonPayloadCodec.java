@@ -41,7 +41,7 @@ final class JacksonPayloadCodec<T> implements ProcessPayloadCodec<T> {
     public EncodedPayload encode(T value) {
         try {
             return new EncodedPayload(type, mapper.writeValueAsBytes(value));
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new ProcessSerializationException("cannot encode payload of type " + type.logicalType(), e);
         }
     }
@@ -50,7 +50,7 @@ final class JacksonPayloadCodec<T> implements ProcessPayloadCodec<T> {
     public T decode(EncodedPayload payload) {
         try {
             return mapper.readValue(payload.data(), javaType);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new ProcessSerializationException("cannot decode payload of type " + type.logicalType(), e);
         }
     }

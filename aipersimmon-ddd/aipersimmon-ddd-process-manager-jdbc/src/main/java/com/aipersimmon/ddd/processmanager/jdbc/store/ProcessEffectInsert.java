@@ -14,6 +14,7 @@ public record ProcessEffectInsert(
         ProcessInstanceId instanceId,
         String transitionId,
         int effectIndex,
+        long seq,
         ProcessEffectKind kind,
         String payloadType,
         int payloadVersion,

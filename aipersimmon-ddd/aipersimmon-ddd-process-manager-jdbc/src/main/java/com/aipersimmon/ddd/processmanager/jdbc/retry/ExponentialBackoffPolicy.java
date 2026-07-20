@@ -31,6 +31,11 @@ public final class ExponentialBackoffPolicy implements ProcessRetryPolicy {
         if (initial == null || initial.isNegative() || initial.isZero()) {
             throw new IllegalArgumentException("initial backoff must be positive");
         }
+        if (initial.toMillis() == 0) {
+            // The backoff computes in milliseconds; a sub-millisecond initial would truncate to a
+            // zero delay and degenerate into a hot retry loop. Require at least 1ms.
+            throw new IllegalArgumentException("initial backoff must be at least 1ms");
+        }
         if (max == null || max.compareTo(initial) < 0) {
             throw new IllegalArgumentException("max backoff must be >= initial");
         }

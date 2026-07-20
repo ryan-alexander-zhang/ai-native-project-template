@@ -46,8 +46,9 @@ public final class JdbcProcessTransitionStore {
         jdbc.update("""
                 INSERT INTO aipersimmon_process_transition (
                     transition_id, instance_id, input_message_id, input_type, input_version, input_payload,
-                    from_lifecycle, to_lifecycle, from_step, to_step, decision_code, transition_kind, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    from_lifecycle, to_lifecycle, from_step, to_step, decision_code, transition_kind,
+                    correlation_id, trace_id, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 t.transitionId(),
                 t.instanceId().value(),
                 t.inputMessageId(),
@@ -60,6 +61,8 @@ public final class JdbcProcessTransitionStore {
                 t.toStep().value(),
                 t.decisionCode().value(),
                 t.transitionKind(),
+                t.correlationId(),
+                t.traceId(),
                 Timestamp.from(now));
     }
 
@@ -76,8 +79,8 @@ public final class JdbcProcessTransitionStore {
                 INSERT INTO aipersimmon_process_transition (
                     transition_id, instance_id, input_message_id, input_type, input_version, input_payload,
                     from_lifecycle, to_lifecycle, from_step, to_step, decision_code, transition_kind,
-                    operator_id, operation_reason, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    correlation_id, trace_id, operator_id, operation_reason, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 transitionId,
                 instanceId.value(),
                 transitionId,
@@ -90,13 +93,17 @@ public final class JdbcProcessTransitionStore {
                 toStep.value(),
                 kind.toLowerCase(java.util.Locale.ROOT),
                 kind,
+                null,
+                null,
                 operator,
                 reason,
                 Timestamp.from(now));
     }
 
-    /** A parked input awaiting replay after the instance resumes. */
-    public record ParkedInput(String inputMessageId, PayloadType inputType, byte[] inputPayload) {
+    /** A parked input awaiting replay after the instance resumes, with the causal context to replay under. */
+    public record ParkedInput(
+            String inputMessageId, PayloadType inputType, byte[] inputPayload,
+            String correlationId, String traceId) {
         public ParkedInput {
             inputPayload = inputPayload.clone();
         }
@@ -133,14 +140,16 @@ public final class JdbcProcessTransitionStore {
     /** The inputs parked while the instance was suspended, in arrival order. */
     public List<ParkedInput> findParkedInputs(ProcessInstanceId instanceId) {
         return jdbc.query("""
-                SELECT input_message_id, input_type, input_version, input_payload
+                SELECT input_message_id, input_type, input_version, input_payload, correlation_id, trace_id
                 FROM aipersimmon_process_transition
                 WHERE instance_id = ? AND transition_kind = 'PARKED'
                 ORDER BY created_at, transition_id""",
                 (rs, n) -> new ParkedInput(
                         rs.getString("input_message_id"),
                         new PayloadType(rs.getString("input_type"), rs.getInt("input_version")),
-                        Payloads.fromText(rs.getString("input_payload"))),
+                        Payloads.fromText(rs.getString("input_payload")),
+                        rs.getString("correlation_id"),
+                        rs.getString("trace_id")),
                 instanceId.value());
     }
 }

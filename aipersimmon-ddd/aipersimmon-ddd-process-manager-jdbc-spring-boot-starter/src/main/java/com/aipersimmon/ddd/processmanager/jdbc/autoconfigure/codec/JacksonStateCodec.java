@@ -48,7 +48,7 @@ final class JacksonStateCodec<S> implements ProcessStateCodec<S> {
     public EncodedPayload encode(S state) {
         try {
             return new EncodedPayload(type, mapper.writeValueAsBytes(state));
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new ProcessSerializationException("cannot encode state of type " + type.logicalType(), e);
         }
     }
@@ -57,7 +57,7 @@ final class JacksonStateCodec<S> implements ProcessStateCodec<S> {
     public S decode(EncodedPayload payload) {
         try {
             return mapper.readValue(payload.data(), javaType);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new ProcessSerializationException("cannot decode state of type " + type.logicalType(), e);
         }
     }

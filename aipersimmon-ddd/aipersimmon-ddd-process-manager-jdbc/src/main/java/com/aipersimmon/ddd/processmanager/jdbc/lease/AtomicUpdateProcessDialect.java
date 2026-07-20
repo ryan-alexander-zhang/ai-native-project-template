@@ -36,7 +36,7 @@ public final class AtomicUpdateProcessDialect implements JdbcProcessDialect {
         for (String id : candidates) {
             int won = jdbc.update("""
                     UPDATE aipersimmon_process_effect
-                    SET status = 'IN_FLIGHT', attempts = attempts + 1,
+                    SET status = 'IN_FLIGHT',
                         lease_owner = ?, lease_token = ?, lease_until = ?, updated_at = ?
                     WHERE effect_id = ?
                       AND ((status = 'PENDING' AND next_attempt_at <= ?)
@@ -59,7 +59,7 @@ public final class AtomicUpdateProcessDialect implements JdbcProcessDialect {
         for (String id : candidates) {
             int won = jdbc.update("""
                     UPDATE aipersimmon_process_deadline
-                    SET status = 'IN_FLIGHT', attempts = attempts + 1,
+                    SET status = 'IN_FLIGHT',
                         lease_owner = ?, lease_token = ?, lease_until = ?, updated_at = ?
                     WHERE deadline_id = ?
                       AND ((status = 'PENDING' AND next_attempt_at <= ?)

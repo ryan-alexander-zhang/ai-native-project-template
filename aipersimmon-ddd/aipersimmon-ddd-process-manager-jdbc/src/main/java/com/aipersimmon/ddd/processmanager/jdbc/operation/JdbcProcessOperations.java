@@ -6,7 +6,6 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
-import com.aipersimmon.ddd.processmanager.exception.ProcessSuspendedException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ClaimedEffect;
@@ -77,7 +76,9 @@ public final class JdbcProcessOperations {
             if (effects.redrive(effectId, clock.instant()) == 0) {
                 throw new IllegalStateException("effect " + effectId + " is not DEAD");
             }
-            ProcessInstanceRow row = instances.find(effect.instanceId())
+            // Lock the instance so a concurrent redrive of another DEAD item on the same instance can't
+            // race the dead-count check and leave the instance SUSPENDED with no DEAD work remaining.
+            ProcessInstanceRow row = instances.findForUpdate(effect.instanceId())
                     .orElseThrow(() -> new IllegalStateException("effect without instance"));
             transitions.appendOperator(
                     idGenerator.get(), effect.instanceId(), row.lifecycle(), row.lifecycle(),
@@ -107,7 +108,8 @@ public final class JdbcProcessOperations {
             if (deadlines.redrive(deadlineId, clock.instant()) == 0) {
                 throw new IllegalStateException("deadline " + deadlineId + " is not DEAD");
             }
-            ProcessInstanceRow row = instances.find(deadline.instanceId())
+            // Lock the instance so a concurrent redrive of another DEAD item can't race the dead-count check.
+            ProcessInstanceRow row = instances.findForUpdate(deadline.instanceId())
                     .orElseThrow(() -> new IllegalStateException("deadline without instance"));
             transitions.appendOperator(
                     idGenerator.get(), deadline.instanceId(), row.lifecycle(), row.lifecycle(),
@@ -141,12 +143,14 @@ public final class JdbcProcessOperations {
             ProcessPayloadCodec<?> codec = payloadCodecs.forType(parked.inputType());
             ProcessInput input = (ProcessInput) codec.decode(
                     new EncodedPayload(parked.inputType(), parked.inputPayload()));
-            CommandContext context = new CommandContext(replayId, replayId, parked.inputMessageId(), null);
-            try {
-                runtime.handle(ref, input, context);
-            } catch (ProcessSuspendedException reSuspended) {
-                break; // a replayed input re-suspended the instance; stop and await the next redrive
-            }
+            // Replay under the parked input's original correlation/trace so the resumed work stays on the
+            // same causal chain (fall back to the replay id for rows parked before correlation was stored).
+            String correlationId = parked.correlationId() != null ? parked.correlationId() : replayId;
+            CommandContext context = new CommandContext(
+                    replayId, correlationId, parked.inputMessageId(), parked.traceId());
+            // If a concurrent worker re-suspended the instance mid-replay, handle() simply re-parks this
+            // input (it never throws), so the remaining inputs stay parked for the next redrive.
+            runtime.handle(ref, input, context);
         }
     }
 

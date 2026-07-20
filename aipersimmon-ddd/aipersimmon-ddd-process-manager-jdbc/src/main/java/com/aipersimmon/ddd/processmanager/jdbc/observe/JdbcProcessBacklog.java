@@ -73,4 +73,33 @@ public final class JdbcProcessBacklog {
     private static Duration nonNegative(Duration d) {
         return d.isNegative() ? Duration.ZERO : d;
     }
+
+    /**
+     * A coherent one-pass read of every backlog signal, so a health probe or a metrics scrape samples
+     * the store once instead of firing a query per gauge/detail (and {@code suspendedInstancesBySource}
+     * once, not once per source).
+     */
+    public BacklogSnapshot snapshot(Duration stuckThreshold) {
+        Instant now = clock.instant();
+        Map<String, Long> bySource = instances.countSuspendedBySource();
+        long suspended = bySource.values().stream().mapToLong(Long::longValue).sum();
+        Duration oldestEffect = effects.oldestDuePending(now)
+                .map(due -> nonNegative(Duration.between(due, now))).orElse(Duration.ZERO);
+        Duration oldestDeadline = deadlines.oldestDuePending(now)
+                .map(due -> nonNegative(Duration.between(due, now))).orElse(Duration.ZERO);
+        return new BacklogSnapshot(
+                effects.countDead(), deadlines.countDead(), bySource, suspended,
+                instances.countStuck(now.minus(stuckThreshold)), oldestEffect, oldestDeadline);
+    }
+
+    /** An immutable point-in-time read of the backlog SLIs. */
+    public record BacklogSnapshot(
+            long deadEffects,
+            long deadDeadlines,
+            Map<String, Long> suspendedBySource,
+            long suspendedInstances,
+            long stuckInstances,
+            Duration oldestPendingEffectAge,
+            Duration oldestPendingDeadlineAge) {
+    }
 }

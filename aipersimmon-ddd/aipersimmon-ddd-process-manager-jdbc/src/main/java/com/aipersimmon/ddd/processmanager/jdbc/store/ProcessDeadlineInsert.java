@@ -18,7 +18,10 @@ public record ProcessDeadlineInsert(
         Instant dueAt,
         String inputType,
         int inputVersion,
-        byte[] inputPayload) {
+        byte[] inputPayload,
+        String correlationId,
+        String causationId,
+        String traceId) {
 
     public ProcessDeadlineInsert {
         inputPayload = inputPayload.clone();

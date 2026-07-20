@@ -35,8 +35,9 @@ public final class JdbcProcessDeadlineStore {
         jdbc.update("""
                 INSERT INTO aipersimmon_process_deadline (
                     deadline_id, instance_id, name, generation, due_at, input_type, input_version, input_payload,
+                    correlation_id, causation_id, trace_id,
                     status, attempts, next_attempt_at, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 d.deadlineId(),
                 d.instanceId().value(),
                 d.name().value(),
@@ -45,17 +46,26 @@ public final class JdbcProcessDeadlineStore {
                 d.inputType(),
                 d.inputVersion(),
                 Payloads.toText(d.inputPayload()),
+                d.correlationId(),
+                d.causationId(),
+                d.traceId(),
                 DeadlineStatus.PENDING.name(),
                 0,
                 Timestamp.from(d.dueAt()),
                 ts, ts);
     }
 
-    /** Cancel the current (highest) still-pending generation of a name. */
+    /**
+     * Cancel the current (highest) generation of a name while it is still live — {@code PENDING}
+     * or already claimed {@code IN_FLIGHT}. Covering {@code IN_FLIGHT} is what lets a
+     * {@code CancelDeadline} win against a timer a worker has already picked up: the deadline
+     * worker re-checks the status under its lock before firing, so a cancel that lands first
+     * turns the fire into an auditable no-op.
+     */
     public void cancelCurrent(ProcessInstanceId instanceId, DeadlineName name, Instant now) {
         jdbc.update("""
                 UPDATE aipersimmon_process_deadline SET status = ?, updated_at = ?
-                WHERE instance_id = ? AND name = ? AND status = ?
+                WHERE instance_id = ? AND name = ? AND status IN (?, ?)
                   AND generation = (SELECT MAX(generation) FROM aipersimmon_process_deadline
                                     WHERE instance_id = ? AND name = ?)""",
                 DeadlineStatus.CANCELLED.name(),
@@ -63,11 +73,19 @@ public final class JdbcProcessDeadlineStore {
                 instanceId.value(),
                 name.value(),
                 DeadlineStatus.PENDING.name(),
+                DeadlineStatus.IN_FLIGHT.name(),
                 instanceId.value(),
                 name.value());
     }
 
-    /** A claimed deadline loaded for firing: its identity, encoded input, and attempt count. */
+    /** Lock a deadline row and read its current status, for the worker's pre-fire re-check. */
+    public Optional<DeadlineStatus> statusForUpdate(String deadlineId) {
+        return jdbc.query(
+                "SELECT status FROM aipersimmon_process_deadline WHERE deadline_id = ? FOR UPDATE",
+                (rs, n) -> DeadlineStatus.valueOf(rs.getString("status")), deadlineId).stream().findFirst();
+    }
+
+    /** A claimed deadline loaded for firing: its identity, encoded input, causal context, and attempt count. */
     public record DeadlineRow(
             String deadlineId,
             ProcessInstanceId instanceId,
@@ -75,6 +93,9 @@ public final class JdbcProcessDeadlineStore {
             long generation,
             PayloadType inputType,
             byte[] inputPayload,
+            String correlationId,
+            String causationId,
+            String traceId,
             int attempts) {
 
         public DeadlineRow {
@@ -96,6 +117,9 @@ public final class JdbcProcessDeadlineStore {
                         rs.getLong("generation"),
                         new PayloadType(rs.getString("input_type"), rs.getInt("input_version")),
                         Payloads.fromText(rs.getString("input_payload")),
+                        rs.getString("correlation_id"),
+                        rs.getString("causation_id"),
+                        rs.getString("trace_id"),
                         rs.getInt("attempts")),
                 deadlineId).stream().findFirst();
     }
@@ -119,23 +143,23 @@ public final class JdbcProcessDeadlineStore {
                 DeadlineStatus.FIRED.name(), ts, ts, deadlineId, leaseToken);
     }
 
-    /** Return a deadline to PENDING for a later retry; fenced by the lease token. */
+    /** Return a deadline to PENDING for a later retry, counting the failed attempt; fenced by the lease token. */
     public int scheduleRetry(String deadlineId, String leaseToken, Instant nextAttemptAt, String error, Instant now) {
         return jdbc.update("""
                 UPDATE aipersimmon_process_deadline
-                SET status = ?, next_attempt_at = ?, last_error = ?, updated_at = ?,
+                SET status = ?, attempts = attempts + 1, next_attempt_at = ?, last_error = ?, updated_at = ?,
                     lease_owner = NULL, lease_token = NULL, lease_until = NULL
                 WHERE deadline_id = ? AND lease_token = ?""",
                 DeadlineStatus.PENDING.name(), Timestamp.from(nextAttemptAt), error, Timestamp.from(now),
                 deadlineId, leaseToken);
     }
 
-    /** Move a deadline to DEAD after exhausting retries; fenced by the lease token. */
+    /** Move a deadline to DEAD after exhausting retries, counting the final failed attempt; fenced by the lease token. */
     public int markDead(String deadlineId, String leaseToken, String error, Instant now) {
         Timestamp ts = Timestamp.from(now);
         return jdbc.update("""
                 UPDATE aipersimmon_process_deadline
-                SET status = ?, last_error = ?, updated_at = ?,
+                SET status = ?, attempts = attempts + 1, last_error = ?, updated_at = ?,
                     lease_owner = NULL, lease_token = NULL, lease_until = NULL
                 WHERE deadline_id = ? AND lease_token = ?""",
                 DeadlineStatus.DEAD.name(), error, ts, deadlineId, leaseToken);

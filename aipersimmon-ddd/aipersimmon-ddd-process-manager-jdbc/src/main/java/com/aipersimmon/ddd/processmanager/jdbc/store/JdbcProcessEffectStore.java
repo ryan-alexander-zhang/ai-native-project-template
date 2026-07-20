@@ -24,18 +24,31 @@ public final class JdbcProcessEffectStore {
         this.jdbc = jdbc;
     }
 
+    /**
+     * The next per-instance ordering sequence: one past the current maximum, or 0. Callers stage
+     * effects inside the advance transaction, which holds the instance row lock, so the maximum is
+     * stable and the assigned seq is monotonic per instance (mirrors the deadline generation).
+     */
+    public long nextSeq(ProcessInstanceId instanceId) {
+        Long max = jdbc.queryForObject(
+                "SELECT MAX(seq) FROM aipersimmon_process_effect WHERE instance_id = ?",
+                Long.class, instanceId.value());
+        return max == null ? 0L : max + 1L;
+    }
+
     public void insert(ProcessEffectInsert e, Instant now) {
         Timestamp ts = Timestamp.from(now);
         jdbc.update("""
                 INSERT INTO aipersimmon_process_effect (
-                    effect_id, instance_id, transition_id, effect_index, effect_kind,
+                    effect_id, instance_id, transition_id, effect_index, seq, effect_kind,
                     payload_type, payload_version, payload, message_id, correlation_id, causation_id, trace_id,
                     status, attempts, next_attempt_at, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 e.effectId(),
                 e.instanceId().value(),
                 e.transitionId(),
                 e.effectIndex(),
+                e.seq(),
                 e.kind().name(),
                 e.payloadType(),
                 e.payloadVersion(),
@@ -79,23 +92,23 @@ public final class JdbcProcessEffectStore {
                 EffectStatus.DELIVERED.name(), ts, ts, effectId, leaseToken);
     }
 
-    /** Return an effect to PENDING for a later retry; fenced by the lease token. */
+    /** Return an effect to PENDING for a later retry, counting the failed attempt; fenced by the lease token. */
     public int scheduleRetry(String effectId, String leaseToken, Instant nextAttemptAt, String error, Instant now) {
         return jdbc.update("""
                 UPDATE aipersimmon_process_effect
-                SET status = ?, next_attempt_at = ?, last_error = ?, updated_at = ?,
+                SET status = ?, attempts = attempts + 1, next_attempt_at = ?, last_error = ?, updated_at = ?,
                     lease_owner = NULL, lease_token = NULL, lease_until = NULL
                 WHERE effect_id = ? AND lease_token = ?""",
                 EffectStatus.PENDING.name(), Timestamp.from(nextAttemptAt), error, Timestamp.from(now),
                 effectId, leaseToken);
     }
 
-    /** Move an effect to DEAD after exhausting retries; fenced by the lease token. */
+    /** Move an effect to DEAD after exhausting retries, counting the final failed attempt; fenced by the lease token. */
     public int markDead(String effectId, String leaseToken, String error, Instant now) {
         Timestamp ts = Timestamp.from(now);
         return jdbc.update("""
                 UPDATE aipersimmon_process_effect
-                SET status = ?, last_error = ?, updated_at = ?,
+                SET status = ?, attempts = attempts + 1, last_error = ?, updated_at = ?,
                     lease_owner = NULL, lease_token = NULL, lease_until = NULL
                 WHERE effect_id = ? AND lease_token = ?""",
                 EffectStatus.DEAD.name(), error, ts, effectId, leaseToken);

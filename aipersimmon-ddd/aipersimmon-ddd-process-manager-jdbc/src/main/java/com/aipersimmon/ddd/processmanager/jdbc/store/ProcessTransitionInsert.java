@@ -23,7 +23,9 @@ public record ProcessTransitionInsert(
         Optional<ProcessStep> fromStep,
         ProcessStep toStep,
         DecisionCode decisionCode,
-        String transitionKind) {
+        String transitionKind,
+        String correlationId,
+        String traceId) {
 
     public ProcessTransitionInsert {
         inputPayload = inputPayload.clone();

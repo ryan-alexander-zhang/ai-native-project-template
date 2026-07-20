@@ -36,9 +36,10 @@ public class ProcessManagerJdbcObservabilityConfiguration {
         @ConditionalOnBean(JdbcProcessBacklog.class)
         @ConditionalOnMissingBean
         public ProcessManagerJdbcMeterBinder processManagerJdbcMeterBinder(
-                JdbcProcessBacklog backlog, ProcessManagerJdbcProperties properties) {
+                JdbcProcessBacklog backlog, ProcessManagerJdbcProperties properties,
+                java.time.Clock processManagerClock) {
             return new ProcessManagerJdbcMeterBinder(
-                    backlog, properties.getObservability().getStuckThreshold());
+                    backlog, properties.getObservability().getStuckThreshold(), processManagerClock);
         }
     }
 

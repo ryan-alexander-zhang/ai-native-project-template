@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_transition (
     to_step           VARCHAR(128) NOT NULL,
     decision_code     VARCHAR(128) NOT NULL,
     transition_kind   VARCHAR(48)  NOT NULL,
+    correlation_id    VARCHAR(64),
+    trace_id          VARCHAR(128),
     operator_id       VARCHAR(64),
     operation_reason  VARCHAR(512),
     failure           TEXT,
@@ -51,6 +53,7 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_effect (
     instance_id     VARCHAR(64)  NOT NULL,
     transition_id   VARCHAR(64)  NOT NULL,
     effect_index    INT          NOT NULL,
+    seq             BIGINT       NOT NULL,
     effect_kind     VARCHAR(48)  NOT NULL,
     payload_type    VARCHAR(255) NOT NULL,
     payload_version INT          NOT NULL,
@@ -72,7 +75,8 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_effect (
     PRIMARY KEY (effect_id),
     CONSTRAINT uq_process_effect_index UNIQUE (transition_id, effect_index),
     KEY idx_process_effect_due (status, next_attempt_at),
-    KEY idx_process_effect_instance (instance_id, effect_index)
+    KEY idx_process_effect_instance (instance_id, seq),
+    KEY idx_process_effect_lease (status, lease_until)
 ) ENGINE = InnoDB;
 
 CREATE TABLE IF NOT EXISTS aipersimmon_process_deadline (
@@ -84,6 +88,9 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_deadline (
     input_type      VARCHAR(255) NOT NULL,
     input_version   INT          NOT NULL,
     input_payload   TEXT         NOT NULL,
+    correlation_id  VARCHAR(64),
+    causation_id    VARCHAR(64),
+    trace_id        VARCHAR(128),
     status          VARCHAR(16)  NOT NULL,
     attempts        INT          NOT NULL DEFAULT 0,
     next_attempt_at DATETIME(3),
@@ -96,5 +103,6 @@ CREATE TABLE IF NOT EXISTS aipersimmon_process_deadline (
     completed_at    DATETIME(3),
     PRIMARY KEY (deadline_id),
     CONSTRAINT uq_process_deadline_generation UNIQUE (instance_id, name, generation),
-    KEY idx_process_deadline_due (status, next_attempt_at, due_at)
+    KEY idx_process_deadline_due (status, next_attempt_at, due_at),
+    KEY idx_process_deadline_lease (status, lease_until)
 ) ENGINE = InnoDB;

@@ -140,6 +140,46 @@ class JdbcProcessDeadlineWorkerTest {
         assertEquals("DEADLINE", instance.get("SUSPENSION_SOURCE"));
     }
 
+    @Test
+    void aFiredDeadlineKeepsTheCorrelationOfTheFlowThatArmedIt() {
+        ProcessAdvanceResult started = start();
+        // Arm the deadline under a specific correlation/trace; the fire must stay on that chain.
+        runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(),
+                CommandContext.root("msg-arm", "trace-arm"));
+
+        assertEquals(1, worker(zeroBackoff(3)).pollOnce());
+
+        var fired = jdbc.queryForMap(
+                "SELECT correlation_id, trace_id FROM aipersimmon_process_transition WHERE decision_code = 'deadline-fired'");
+        assertEquals("msg-arm", fired.get("CORRELATION_ID"), "the timeout fires under the arming flow's correlation");
+        assertEquals("trace-arm", fired.get("TRACE_ID"));
+    }
+
+    @Test
+    void aDeadlineCancelledWhileInFlightDoesNotFire() {
+        ProcessAdvanceResult started = start();
+        runtime.handle(started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-arm", null));
+
+        // A worker claimed the deadline (IN_FLIGHT) and its lease has since expired (crash/slow worker).
+        Instant now = CLOCK.instant();
+        unitOfWork.execute(() -> dialect.claimDueDeadlines(
+                jdbc, now, 10, new WorkerId("owner-A"), "token-A", now.minusSeconds(1)));
+        assertEquals("IN_FLIGHT", jdbc.queryForObject(
+                "SELECT status FROM aipersimmon_process_deadline", String.class));
+
+        // The business cancels the deadline while it is in flight.
+        runtime.handle(started.processRef(), new TestFulfilment.CancelReview(), CommandContext.root("msg-cancel", null));
+
+        int fired = worker(zeroBackoff(3)).pollOnce();
+
+        assertEquals(0, fired, "a cancelled deadline is not fired");
+        assertEquals("CANCELLED", jdbc.queryForObject(
+                "SELECT status FROM aipersimmon_process_deadline", String.class));
+        assertEquals("RUNNING", instanceLifecycle(), "the timeout did not drive the instance");
+        assertEquals("NO_WAIT", jdbc.queryForObject(
+                "SELECT business_step FROM aipersimmon_process_instance", String.class));
+    }
+
     private static ProcessRetryPolicy zeroBackoff(int maxAttempts) {
         return new ProcessRetryPolicy() {
             @Override
