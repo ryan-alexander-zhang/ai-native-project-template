@@ -34,10 +34,10 @@ parent: design-00007-code-quality-gates
 - [x] 填 `DEVELOPMENT.md` 的命令 + 写入"提交前跑完整 `spotless:apply`，勿用 `-DspotlessFiles`"坑。
 - 验收：库 `spotless:check` 全绿；core `verify` 触发 check 且 BUILD SUCCESS。（脚手架/样例格式门禁 P8。）
 
-### P2 — JaCoCo report-only（domain + pure tier）
-- [ ] `prepare-agent`@test + `report`@verify，作用于库 pure tier（core/application/integration/cqrs）+ 脚手架 `*-domain`（5 行 opt-in）。
-- [ ] 收集真实基线（行/分支/方法），记录到本 plan。
-- 验收：报告生成，基线可读；暂不 fail。
+### P2 — JaCoCo report-only（库 pure tier；脚手架 domain 延到 P8）
+- [x] `prepare-agent`@test + `report`@verify，作用于库 pure tier（core/application/integration/cqrs 各加 5 行 opt-in）。
+- [x] 收集真实基线（见下）。脚手架 `*-domain` 随 P8 一起接。
+- 验收：报告生成、基线可读、不 fail。`mvn verify` 四模块 BUILD SUCCESS。
 
 ### P3 — PMD + CPD report-only（全仓库）
 - [ ] ruleset 落 build-tools：认知/圈复杂度、NPath、方法体量、坏味道 + CPD。
@@ -69,4 +69,16 @@ parent: design-00007-code-quality-gates
 
 ## 落地基线记录
 
-（P2/P5/P6 执行时回填真实覆盖率与变异分数。）
+### P2 覆盖率基线（2026-07-21，pure tier，report-only）
+
+| 模块 | LINE | BRANCH | METHOD | 备注 |
+| --- | --- | --- | --- | --- |
+| aipersimmon-ddd-core | 79.5% | 100% | 76.2% | 6 测试 |
+| aipersimmon-ddd-integration | 60.0% | 66.7% | 41.7% | 11 测试 |
+| aipersimmon-ddd-cqrs | 53.3% | 50.0% | 62.5% | 7 测试 |
+| aipersimmon-ddd-application | 0% | 0% | 0% | **10 主类、0 测试** |
+
+结论：pure tier 全部低于 90% 门禁，`application` 完全无测试。**P5（覆盖率）/ P6（变异）到 90% 需要大量补测试**，
+是本计划最重的一步，需单独安排。P3/P4（PMD/CPD/SpotBugs report-only）可先行，不依赖补测试。
+
+（P5/P6 执行时回填达标后的覆盖率与变异分数。）

@@ -46,4 +46,16 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <!-- Coverage opt-in (design-00007 / plan-00009 P2). prepare-agent + report are
+       inherited from the parent pluginManagement (report-only); the 90% check is added
+       at ratchet (P5). This module is part of the framework-free pure tier. -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
 </project>
