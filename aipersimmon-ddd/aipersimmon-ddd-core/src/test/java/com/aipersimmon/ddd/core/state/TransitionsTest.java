@@ -2,6 +2,8 @@ package com.aipersimmon.ddd.core.state;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,5 +43,17 @@ class TransitionsTest {
   void checkThrowsForIllegalTransition() {
     assertThrows(
         IllegalStateTransitionException.class, () -> RULES.check(Status.CONFIRMED, Status.PENDING));
+  }
+
+  @Test
+  void ofReturnsAUsableTableAndAllowChainsAndRecords() {
+    Transitions<Status> table = Transitions.of();
+    assertNotNull(table);
+
+    // allow() returns the same table (fluent chaining) ...
+    assertSame(table, table.allow(Status.PENDING, Status.CONFIRMED));
+    // ... and actually records the transition into a real mutable set.
+    assertTrue(table.permits(Status.PENDING, Status.CONFIRMED));
+    assertFalse(table.permits(Status.PENDING, Status.CANCELLED));
   }
 }
