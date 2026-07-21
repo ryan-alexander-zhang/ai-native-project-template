@@ -18,7 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.PayloadApplicationEvent;
 import org.springframework.core.ResolvableType;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Consumes CloudEvents-encoded integration events from Kafka and hands them to local
@@ -39,16 +39,11 @@ import org.springframework.transaction.support.TransactionOperations;
  * handlers for {@code EventEnvelope<TheEvent>} receive it with the full metadata
  * intact — the inbound adapter is the anti-corruption layer and needs that metadata.
  *
- * <p>The inbox check and the handling run in one transaction — bound to the
- * {@link TransactionOperations} the auto-configuration resolves to the database
- * transaction manager the inbox writes to — so if a handler fails the inbox record
- * rolls back and Kafka can redeliver the record; because delivery is at-least-once,
- * the inbox is what makes reprocessing safe. Binding the transaction manager
- * explicitly (rather than via a bare {@code @Transactional}, which would resolve to
- * whichever manager is primary) keeps the inbox insert and the handler's writes in the
- * <em>same</em> database transaction even when several transaction managers exist. If no
- * {@code Inbox} is configured, every record is republished (no deduplication), which is
- * only safe when the handlers are themselves idempotent.
+ * <p>The inbox check and the handling run in one transaction, so if a handler
+ * fails the inbox record rolls back and Kafka can redeliver the record; because
+ * delivery is at-least-once, the inbox is what makes reprocessing safe. If no
+ * {@code Inbox} is configured, every record is republished (no deduplication),
+ * which is only safe when the handlers are themselves idempotent.
  */
 public class KafkaIntegrationEventListener {
 
@@ -56,13 +51,9 @@ public class KafkaIntegrationEventListener {
     private final ObjectMapper objectMapper;
     private final Inbox inbox;
     private final IntegrationEventCatalog catalog;
-    private final TransactionOperations transactionOperations;
     private final Clock clock;
 
     /**
-     * Test convenience: runs each record without a surrounding transaction
-     * ({@link TransactionOperations#withoutTransaction()}).
-     *
      * @param inbox the idempotency guard, or {@code null} to republish every record
      *              without deduplication
      */
@@ -70,53 +61,26 @@ public class KafkaIntegrationEventListener {
                                          ObjectMapper objectMapper,
                                          Inbox inbox,
                                          IntegrationEventCatalog catalog) {
-        this(publisher, objectMapper, inbox, catalog,
-                TransactionOperations.withoutTransaction(), Clock.systemUTC());
-    }
-
-    /**
-     * @param transactionOperations wraps the inbox check and handling in one transaction,
-     *                              bound to the database transaction manager the inbox writes
-     *                              to; {@link TransactionOperations#withoutTransaction()} runs
-     *                              them with no transaction (only safe without an inbox)
-     */
-    public KafkaIntegrationEventListener(ApplicationEventPublisher publisher,
-                                         ObjectMapper objectMapper,
-                                         Inbox inbox,
-                                         IntegrationEventCatalog catalog,
-                                         TransactionOperations transactionOperations) {
-        this(publisher, objectMapper, inbox, catalog, transactionOperations, Clock.systemUTC());
+        this(publisher, objectMapper, inbox, catalog, Clock.systemUTC());
     }
 
     public KafkaIntegrationEventListener(ApplicationEventPublisher publisher,
                                          ObjectMapper objectMapper,
                                          Inbox inbox,
                                          IntegrationEventCatalog catalog,
-                                         TransactionOperations transactionOperations,
                                          Clock clock) {
         this.publisher = publisher;
         this.objectMapper = objectMapper;
         this.inbox = inbox;
         this.catalog = catalog;
-        this.transactionOperations = transactionOperations;
         this.clock = clock;
     }
 
-    // containerFactory pins this listener to the transport's own container factory
-    // (which carries the dead-lettering error handler), so the error handling never
-    // leaks onto — nor is displaced by — the application's other Kafka listeners.
     @KafkaListener(
-            containerFactory = AipersimmonDddMessagingKafkaAutoConfiguration.LISTENER_CONTAINER_FACTORY,
             topics = "#{@externalizedRoutes.topics()}",
             groupId = "${aipersimmon.ddd.messaging.kafka.consumer.group-id:${spring.application.name:aipersimmon}}")
+    @Transactional
     public void onMessage(ConsumerRecord<String, String> record) {
-        // The inbox mark and the handling commit or roll back together, on the resolved
-        // database transaction manager, so a handler failure rolls the inbox mark back and
-        // the record is redelivered (at-least-once + inbox = effectively once).
-        transactionOperations.executeWithoutResult(status -> handle(record));
-    }
-
-    private void handle(ConsumerRecord<String, String> record) {
         // ce_id is a required CloudEvents attribute and the inbox key. A record without
         // it cannot be deduplicated; fabricating an id would make every redelivery look
         // like a new event and silently defeat the inbox — so reject it (permanent

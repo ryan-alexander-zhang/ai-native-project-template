@@ -118,7 +118,7 @@ outbox core 之前——沿用今天"Kafka 顶替默认"的确定性装配，只
 - [[decision-00006-integration-event-transport-selection]]（三传输、单 dispatcher；路由器是其"自定义 composite"叙述的内置化）
 - [[decision-00014-cloudevents-integration-event-contract]]（`@EventType`/subject=key/`ce_*`；§7 topic 路由扩展点在此落地）
 - [[plan-00006-middleware-integration]]（现场：single-topic 全外发，本 plan 迁移之）、[[plan-00007-aggregate-persistence-mybatis-plus]]（D4 前置，已 resolved）
-- issue-00028、[[issue-00030-single-topic-fanout-all-consumers-see-all-events]]（驱动，本 plan 解）
+- [[issue-00028-broker-transport-on-single-deployable-monolith]]、[[issue-00030-single-topic-fanout-all-consumers-see-all-events]]（驱动，本 plan 解）
 - [[samples-not-reference]]（样例仅演示，非设计权威；但须随库默认变更保持绿）
 
 ## 五、已定 / 开放决策

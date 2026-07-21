@@ -44,11 +44,13 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
  */
 @SpringBootTest(
         classes = EventRoutingIntegrationTest.TestApp.class,
-        // No spring.kafka.*-serializer here either: the transport's own String factories
-        // (issue-00029 (a)) carry the wire format end to end.
         properties = {
                 "spring.application.name=routing-test",
                 "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+                "spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer",
+                "spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer",
+                "spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
+                "spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
                 "spring.kafka.consumer.auto-offset-reset=earliest",
                 "aipersimmon.ddd.messaging.kafka.consumer.enabled=true"})
 @EmbeddedKafka(topics = {"routing.a", "routing.a.DLT", "routing.b", "routing.b.DLT"}, partitions = 1)

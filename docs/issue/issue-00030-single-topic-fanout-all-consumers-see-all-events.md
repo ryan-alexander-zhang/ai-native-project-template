@@ -35,7 +35,7 @@ n/a(设计观察:单体自消费下每个 `@EventListener` 都会看到全部类
 ## 修复/建议(增强)
 
 把路由做成一等配置:出站按 `@EventType`(或上下文)映射到 topic(`OrderPlaced → ordering.events` 等),入站按需
-订阅相应 topic;保留"单 topic"为默认以兼容 monolith-first。这与 issue-00028
+订阅相应 topic;保留"单 topic"为默认以兼容 monolith-first。这与 [[issue-00028-broker-transport-on-single-deployable-monolith]]
 讨论中提到的"混合传输/按事件路由"缺口同源——两者可合并到一份 `messaging-kafka` 路由设计里(出站分流 + 入站选择性
 重投 + inbox 统一去重)。
 
@@ -43,4 +43,4 @@ n/a(设计观察:单体自消费下每个 `@EventListener` 都会看到全部类
 
 - [[plan-00006-middleware-integration]]
 - [[decision-00014-cloudevents-integration-event-contract]](§7 路由为未落地扩展点)
-- issue-00028
+- [[issue-00028-broker-transport-on-single-deployable-monolith]]

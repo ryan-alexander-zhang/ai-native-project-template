@@ -23,7 +23,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,12 +45,13 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
  */
 @SpringBootTest(
         classes = KafkaDeadLetterIntegrationTest.TestApp.class,
-        // Deliberately sets NO spring.kafka.*-serializer: the transport owns its String
-        // (de)serializers on its own factories (issue-00029 (a)), so it works end to end without
-        // the application configuring them.
         properties = {
                 "spring.application.name=kdlt-test",
                 "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+                "spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer",
+                "spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer",
+                "spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
+                "spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
                 "spring.kafka.consumer.auto-offset-reset=earliest",
                 "aipersimmon.ddd.messaging.kafka.topic=it-events",
                 "aipersimmon.ddd.messaging.kafka.consumer.enabled=true",
@@ -118,10 +118,7 @@ class KafkaDeadLetterIntegrationTest {
         }
     }
 
-    // The transport's own String template (there is also Boot's default KafkaTemplate); this
-    // test uses aipersimmon's to send the raw CloudEvents records an external producer would.
     @Autowired
-    @Qualifier("aipersimmonKafkaTemplate")
     KafkaTemplate<String, String> kafkaTemplate;
     @Autowired
     EmbeddedKafkaBroker broker;
