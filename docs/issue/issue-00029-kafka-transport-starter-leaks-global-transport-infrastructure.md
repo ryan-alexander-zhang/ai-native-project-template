@@ -98,32 +98,25 @@ starter **拥有并隔离**自己的传输基础设施,全部 `@ConditionalOnMis
 
 ## 解决(已实现)
 
-**隔离的本质不是再建一套 Kafka,而是不与宿主争抢同一组全局策略。** `AipersimmonDddMessagingKafkaAutoConfiguration`
-现**共享**宿主的连接与运维能力,只**隔离**由 aipersimmon 协议决定的三处,dispatcher/listener 按名注入专属 bean:
+**隔离的本质不是再建一套 Kafka,而是不与宿主争抢同一组全局策略——且不过度隔离。** 连接、SSL/SASL、listener 并发/
+ack/poll/observation 等**沿用宿主/Boot 默认**;只**覆盖**由 aipersimmon 协议决定的三处:
 
-| 配置 | 归属 | 处理 |
-|---|---|---|
-| bootstrap / SSL / SASL | 宿主/部署环境 | **共享**:`KafkaProperties` + `KafkaConnectionDetails`(service connection) |
-| producer/consumer 运维定制 | Boot | **共享**:`DefaultKafka{Producer,Consumer}FactoryCustomizer` |
-| listener 并发/ack/poll/observation | Boot | **共享**:`ConcurrentKafkaListenerContainerFactoryConfigurer` |
-| String + `ce_*` 线格式 | aipersimmon | **隔离**:专属工厂固定 String (de)serializer |
-| 重试/不可重试/`.DLT` | aipersimmon | **隔离**:只 `setCommonErrorHandler` 到专属容器工厂 |
-| inbox 的 DB 事务管理器 | 宿主 | **不新建,但显式选择** |
+- **(a) 线格式**:`aipersimmonKafkaTemplate` 与专属容器工厂的 consumer factory **复用应用自己的 `ProducerFactory`/
+  `ConsumerFactory` 配置**(`getConfigurationProperties()` 拷一份——因此天然继承其连接,含 service connection 的
+  bootstrap servers,不会退回 `localhost:9092`),只把 (de)serializer **覆盖为 String**。dispatcher 注入
+  `@Qualifier("aipersimmonKafkaTemplate")`。样例 `multi-module/start/application.yml` 与切片测试均**不再**配
+  `spring.kafka.*-serializer`,`KafkaDeadLetterIntegrationTest`/`EventRoutingIntegrationTest` 在零 serializer 配置下端到端通过。
+- **(b) 错误处理**:专属 `aipersimmonKafkaListenerContainerFactory` 只 `setCommonErrorHandler` 到自己身上,**不再**暴露
+  全局 `CommonErrorHandler` bean;`@KafkaListener(containerFactory = "aipersimmonKafkaListenerContainerFactory")` 固定绑定。
+  其余容器设置沿用 spring-kafka 默认。`AutoConfigurationWiringTest` 断言无全局 `CommonErrorHandler`、专属工厂存在。
+- **(c) 事务边界**:listener 用 `TransactionOperations`(**不新建 TM,只显式解析宿主已有的**)包裹 inbox+处理,去掉裸
+  `@Transactional`。解析:属性 `consumer.transaction-manager` > 唯一 TM > **有 inbox 但无 TM 则启动失败**(inbox 插入必须
+  事务化)/ 无 inbox 才 `withoutTransaction` > 多 TM 且未指定则**启动失败**。`AutoConfigurationWiringTest` 覆盖「多 TM
+  fail-loud」「按名解析」「有 inbox 无 TM fail-loud」。
 
-- **(a)** `aipersimmonKafkaProducerFactory` / `aipersimmonKafkaTemplate` 与 `aipersimmonKafkaConsumerFactory`:连接参数取自
-  `KafkaProperties`,并在存在 `KafkaConnectionDetails`(Testcontainers / Docker Compose service connection)时**用它覆盖
-  bootstrap servers**(否则会漏掉服务连接、退回 `localhost:9092`);应用 Boot 的 factory customizer;仅把 (de)serializer
-  **固定为 String**。dispatcher 注入 `@Qualifier("aipersimmonKafkaTemplate")`。样例 `multi-module/start/application.yml`
-  与切片测试均**不再**配 `spring.kafka.*-serializer`,`KafkaDeadLetterIntegrationTest`/`EventRoutingIntegrationTest` 在零
-  serializer 配置下端到端通过。
-- **(b)** 专属 `aipersimmonKafkaListenerContainerFactory`:先经 Boot `ConcurrentKafkaListenerContainerFactoryConfigurer`
-  装上并发/ack/poll/observation,**最后** `setCommonErrorHandler` 覆盖为 aipersimmon 的 DLT handler;**不再**暴露全局
-  `CommonErrorHandler` bean;`@KafkaListener(containerFactory = "aipersimmonKafkaListenerContainerFactory")` 固定绑定。
-  `AutoConfigurationWiringTest` 断言无全局 `CommonErrorHandler`、专属工厂存在。
-- **(c)** listener 用 `TransactionOperations` 包裹 inbox+处理,去掉裸 `@Transactional`。auto-config 解析:属性
-  `consumer.transaction-manager` > 唯一 TM > **无 TM 且有 inbox 则启动失败**(inbox 插入必须事务化)/ 无 inbox 才
-  `withoutTransaction` > 多 TM 且未指定则**启动失败**。`AutoConfigurationWiringTest` 覆盖「多 TM fail-loud」「按名解析」
-  「有 inbox 无 TM fail-loud」。
+> 注:早期实现曾手搭 ProducerFactory/ConsumerFactory 并引入 `KafkaConnectionDetails`/customizer/
+> `ConcurrentKafkaListenerContainerFactoryConfigurer`,属**过度隔离**——既增加面又会漏掉服务连接。最终改为「复用宿主
+> 工厂配置、只覆盖三处」,风险最小。
 
 ## 关联
 

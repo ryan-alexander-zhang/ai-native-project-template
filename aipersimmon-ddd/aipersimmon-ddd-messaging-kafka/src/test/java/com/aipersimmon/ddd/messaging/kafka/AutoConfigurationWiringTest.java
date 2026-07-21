@@ -5,12 +5,16 @@ import static org.mockito.Mockito.mock;
 
 import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -31,12 +35,12 @@ class AutoConfigurationWiringTest {
                     AipersimmonDddMessagingKafkaAutoConfiguration.class,
                     // provides the IntegrationEventCatalog the consumer bridge needs
                     AipersimmonDddOutboxAutoConfiguration.class))
+            // The mock KafkaTemplate is the "a Kafka transport is present" gate; the transport
+            // reuses the application's own producer/consumer factories (as Boot's
+            // KafkaAutoConfiguration would supply them) and overrides only their serializers.
             .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class))
-            // KafkaProperties is the connection-settings source the transport builds its own
-            // String producer/consumer factories from (Boot's KafkaAutoConfiguration would
-            // supply it in production); the mock KafkaTemplate above is the "a Kafka transport
-            // is present" gate.
-            .withBean(KafkaProperties.class, KafkaProperties::new)
+            .withBean(ProducerFactory.class, () -> new DefaultKafkaProducerFactory<>(Map.of()))
+            .withBean(ConsumerFactory.class, () -> new DefaultKafkaConsumerFactory<>(Map.of()))
             .withPropertyValues("aipersimmon.ddd.integration.scan-packages=" + FIXTURES);
 
     @Test
@@ -63,7 +67,8 @@ class AutoConfigurationWiringTest {
                         AipersimmonDddMessagingKafkaAutoConfiguration.class,
                         AipersimmonDddOutboxAutoConfiguration.class))
                 .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class))
-                .withBean(KafkaProperties.class, KafkaProperties::new)
+                .withBean(ProducerFactory.class, () -> new DefaultKafkaProducerFactory<>(Map.of()))
+                .withBean(ConsumerFactory.class, () -> new DefaultKafkaConsumerFactory<>(Map.of()))
                 .withPropertyValues(
                         "aipersimmon.ddd.integration.scan-packages=com.aipersimmon.ddd.messaging.kafka.nonesuch",
                         "aipersimmon.ddd.messaging.kafka.consumer.enabled=true")
@@ -93,7 +98,6 @@ class AutoConfigurationWiringTest {
         runner.run(context -> {
             assertThat(context).doesNotHaveBean(CommonErrorHandler.class);
             assertThat(context).doesNotHaveBean("aipersimmonKafkaListenerContainerFactory");
-            assertThat(context).doesNotHaveBean("aipersimmonKafkaConsumerFactory");
         });
     }
 
