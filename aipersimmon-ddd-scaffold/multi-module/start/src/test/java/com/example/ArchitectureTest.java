@@ -1,6 +1,10 @@
 package com.example;
 
 import com.aipersimmon.ddd.archunit.AiPersimmonDddRules;
+import com.aipersimmon.ddd.archunit.BoundedContextRules;
+import com.aipersimmon.ddd.archunit.EventRules;
+import com.aipersimmon.ddd.archunit.LayeringRules;
+import com.aipersimmon.ddd.archunit.RepositoryRules;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -32,7 +36,7 @@ class ArchitectureTest {
    */
   @ArchTest
   static final ArchRule repositoryImplementations =
-      AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories();
+      RepositoryRules.repositoryImplementationsShouldBeSpringRepositories();
 
   /**
    * Integration events — the facts each context publishes for others — live in that context's
@@ -40,8 +44,7 @@ class ArchitectureTest {
    * convention this layout uses.
    */
   @ArchTest
-  static final ArchRule integrationEvents =
-      AiPersimmonDddRules.integrationEventsShouldResideInApi();
+  static final ArchRule integrationEvents = EventRules.integrationEventsShouldResideInApi();
 
   /**
    * Every context depends on another only through that context's {@code ..api..} package, never by
@@ -51,7 +54,7 @@ class ArchitectureTest {
    */
   @ArchTest
   static final ArchRule contextsAreIsolated =
-      AiPersimmonDddRules.boundedContextsShouldOnlyDependOnEachOthersApi("com.example");
+      BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi("com.example");
 
   /**
    * No inbound adapter depends on a domain directly. An inbound adapter translates a transport
@@ -63,5 +66,5 @@ class ArchitectureTest {
    */
   @ArchTest
   static final ArchRule adaptersDoNotDependOnDomain =
-      AiPersimmonDddRules.adapterShouldNotDependOnDomain();
+      LayeringRules.adapterShouldNotDependOnDomain();
 }
