@@ -26,220 +26,235 @@ class AiPersimmonDddRulesTest {
 
   @Test
   void domainShouldNotDependOnOuterLayers_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.domainShouldNotDependOnOuterLayers().check(GOOD));
+    assertDoesNotThrow(() -> LayeringRules.domainShouldNotDependOnOuterLayers().check(GOOD));
   }
 
   @Test
   void domainShouldNotDependOnOuterLayers_failsForBad() {
     assertThrows(
-        AssertionError.class,
-        () -> AiPersimmonDddRules.domainShouldNotDependOnOuterLayers().check(BAD));
+        AssertionError.class, () -> LayeringRules.domainShouldNotDependOnOuterLayers().check(BAD));
   }
 
   @Test
   void domainEventsShouldStayInDomain_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.domainEventsShouldStayInDomain().check(GOOD));
+    assertDoesNotThrow(() -> EventRules.domainEventsShouldStayInDomain().check(GOOD));
   }
 
   @Test
   void domainEventsShouldStayInDomain_failsForBad() {
     assertThrows(
-        AssertionError.class,
-        () -> AiPersimmonDddRules.domainEventsShouldStayInDomain().check(BAD));
+        AssertionError.class, () -> EventRules.domainEventsShouldStayInDomain().check(BAD));
   }
 
   @Test
   void domainEventsShouldStayInDomain_catchesAnnotatedEventOutsideDomain() {
     assertThrows(
         AssertionError.class,
-        () ->
-            AiPersimmonDddRules.domainEventsShouldStayInDomain().check(ANNOTATED_EVENT_IN_ADAPTER));
+        () -> EventRules.domainEventsShouldStayInDomain().check(ANNOTATED_EVENT_IN_ADAPTER));
   }
 
   @Test
   void domainEventListenersShouldResideInApplicationOrDomain_passesForGood() {
     assertDoesNotThrow(
-        () ->
-            AiPersimmonDddRules.domainEventListenersShouldResideInApplicationOrDomain()
-                .check(GOOD));
+        () -> EventRules.domainEventListenersShouldResideInApplicationOrDomain().check(GOOD));
   }
 
   @Test
   void domainEventListenersShouldResideInApplicationOrDomain_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () ->
-            AiPersimmonDddRules.domainEventListenersShouldResideInApplicationOrDomain().check(BAD));
+        () -> EventRules.domainEventListenersShouldResideInApplicationOrDomain().check(BAD));
   }
 
   @Test
   void integrationEventListenersShouldResideInAdapter_passesForGood() {
     assertDoesNotThrow(
-        () -> AiPersimmonDddRules.integrationEventListenersShouldResideInAdapter().check(GOOD));
+        () -> EventRules.integrationEventListenersShouldResideInAdapter().check(GOOD));
   }
 
   @Test
   void integrationEventListenersShouldResideInAdapter_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.integrationEventListenersShouldResideInAdapter().check(BAD));
+        () -> EventRules.integrationEventListenersShouldResideInAdapter().check(BAD));
   }
 
   @Test
   void domainEventListenersShouldBeAnnotatedWithDomainEventHandler_passesForGood() {
     assertDoesNotThrow(
-        () ->
-            AiPersimmonDddRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler()
-                .check(GOOD));
+        () -> EventRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler().check(GOOD));
   }
 
   @Test
   void domainEventListenersShouldBeAnnotatedWithDomainEventHandler_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () ->
-            AiPersimmonDddRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler()
-                .check(BAD));
+        () -> EventRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler().check(BAD));
   }
 
   @Test
   void commandHandlersShouldNotDependOnOtherCommandHandlers_passesForGood() {
     assertDoesNotThrow(
-        () ->
-            AiPersimmonDddRules.commandHandlersShouldNotDependOnOtherCommandHandlers().check(GOOD));
+        () -> CqrsRules.commandHandlersShouldNotDependOnOtherCommandHandlers().check(GOOD));
   }
 
   @Test
   void commandHandlersShouldNotDependOnOtherCommandHandlers_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () ->
-            AiPersimmonDddRules.commandHandlersShouldNotDependOnOtherCommandHandlers().check(BAD));
+        () -> CqrsRules.commandHandlersShouldNotDependOnOtherCommandHandlers().check(BAD));
   }
 
   @Test
   void commandHandlersAndApplicationShouldNotCallSendAs_passesForGood() {
     assertDoesNotThrow(
-        () -> AiPersimmonDddRules.commandHandlersAndApplicationShouldNotCallSendAs().check(GOOD));
+        () -> CqrsRules.commandHandlersAndApplicationShouldNotCallSendAs().check(GOOD));
   }
 
   @Test
   void commandHandlersAndApplicationShouldNotCallSendAs_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.commandHandlersAndApplicationShouldNotCallSendAs().check(BAD));
+        () -> CqrsRules.commandHandlersAndApplicationShouldNotCallSendAs().check(BAD));
+  }
+
+  @Test
+  void commandAndQueryHandlersShouldResideInApplication_passesForGood() {
+    assertDoesNotThrow(
+        () -> CqrsRules.commandAndQueryHandlersShouldResideInApplication().check(GOOD));
+  }
+
+  @Test
+  void commandAndQueryHandlersShouldResideInApplication_failsForBad() {
+    assertThrows(
+        AssertionError.class,
+        () -> CqrsRules.commandAndQueryHandlersShouldResideInApplication().check(BAD));
+  }
+
+  @Test
+  void useCasesShouldResideInApplication_passesForGood() {
+    assertDoesNotThrow(() -> CqrsRules.useCasesShouldResideInApplication().check(GOOD));
+  }
+
+  @Test
+  void useCasesShouldResideInApplication_failsForBad() {
+    assertThrows(
+        AssertionError.class, () -> CqrsRules.useCasesShouldResideInApplication().check(BAD));
   }
 
   @Test
   void domainShouldBeFrameworkFree_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.domainShouldBeFrameworkFree().check(GOOD));
+    assertDoesNotThrow(() -> LayeringRules.domainShouldBeFrameworkFree().check(GOOD));
   }
 
   @Test
   void adapterShouldNotDependOnDomain_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.adapterShouldNotDependOnDomain().check(GOOD));
+    assertDoesNotThrow(() -> LayeringRules.adapterShouldNotDependOnDomain().check(GOOD));
   }
 
   @Test
   void adapterShouldNotDependOnDomain_failsForBad() {
     assertThrows(
-        AssertionError.class,
-        () -> AiPersimmonDddRules.adapterShouldNotDependOnDomain().check(BAD));
+        AssertionError.class, () -> LayeringRules.adapterShouldNotDependOnDomain().check(BAD));
   }
 
   @Test
   void invariantsShouldResideInDomain_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.invariantsShouldResideInDomain().check(GOOD));
+    assertDoesNotThrow(() -> InvariantAndErrorRules.invariantsShouldResideInDomain().check(GOOD));
   }
 
   @Test
   void invariantsShouldResideInDomain_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.invariantsShouldResideInDomain().check(BAD));
+        () -> InvariantAndErrorRules.invariantsShouldResideInDomain().check(BAD));
   }
 
   @Test
   void invariantViolationsShouldOnlyComeFromCheckInvariant_passesForGood() {
     assertDoesNotThrow(
         () ->
-            AiPersimmonDddRules.invariantViolationsShouldOnlyComeFromCheckInvariant().check(GOOD));
+            InvariantAndErrorRules.invariantViolationsShouldOnlyComeFromCheckInvariant()
+                .check(GOOD));
   }
 
   @Test
   void invariantViolationsShouldOnlyComeFromCheckInvariant_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.invariantViolationsShouldOnlyComeFromCheckInvariant().check(BAD));
+        () ->
+            InvariantAndErrorRules.invariantViolationsShouldOnlyComeFromCheckInvariant()
+                .check(BAD));
   }
 
   @Test
   void invariantsShouldNotBeSpringComponents_passesForGood() {
     assertDoesNotThrow(
-        () -> AiPersimmonDddRules.invariantsShouldNotBeSpringComponents().check(GOOD));
+        () -> InvariantAndErrorRules.invariantsShouldNotBeSpringComponents().check(GOOD));
   }
 
   @Test
   void invariantsShouldNotBeSpringComponents_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.invariantsShouldNotBeSpringComponents().check(BAD));
+        () -> InvariantAndErrorRules.invariantsShouldNotBeSpringComponents().check(BAD));
   }
 
   @Test
   void domainBuildingBlocksShouldResideInDomain_passesForGood() {
     assertDoesNotThrow(
-        () -> AiPersimmonDddRules.domainBuildingBlocksShouldResideInDomain().check(GOOD));
+        () -> BuildingBlockRules.domainBuildingBlocksShouldResideInDomain().check(GOOD));
   }
 
   @Test
   void domainBuildingBlocksShouldResideInDomain_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.domainBuildingBlocksShouldResideInDomain().check(BAD));
+        () -> BuildingBlockRules.domainBuildingBlocksShouldResideInDomain().check(BAD));
   }
 
   @Test
   void domainServicesShouldResideInDomain_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.domainServicesShouldResideInDomain().check(GOOD));
+    assertDoesNotThrow(() -> BuildingBlockRules.domainServicesShouldResideInDomain().check(GOOD));
   }
 
   @Test
   void domainServicesShouldResideInDomain_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.domainServicesShouldResideInDomain().check(BAD));
+        () -> BuildingBlockRules.domainServicesShouldResideInDomain().check(BAD));
   }
 
   @Test
   void aggregateRootsShouldExtendAbstractAggregateRoot_passesForGood() {
     assertDoesNotThrow(
-        () -> AiPersimmonDddRules.aggregateRootsShouldExtendAbstractAggregateRoot().check(GOOD));
+        () -> BuildingBlockRules.aggregateRootsShouldExtendAbstractAggregateRoot().check(GOOD));
   }
 
   @Test
   void aggregateRootsShouldExtendAbstractAggregateRoot_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.aggregateRootsShouldExtendAbstractAggregateRoot().check(BAD));
+        () -> BuildingBlockRules.aggregateRootsShouldExtendAbstractAggregateRoot().check(BAD));
   }
 
   @Test
   void valueObjectsShouldBeImmutable_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.valueObjectsShouldBeImmutable().check(GOOD));
+    assertDoesNotThrow(() -> BuildingBlockRules.valueObjectsShouldBeImmutable().check(GOOD));
   }
 
   @Test
   void valueObjectsShouldBeImmutable_failsForBad() {
     assertThrows(
-        AssertionError.class, () -> AiPersimmonDddRules.valueObjectsShouldBeImmutable().check(BAD));
+        AssertionError.class, () -> BuildingBlockRules.valueObjectsShouldBeImmutable().check(BAD));
   }
 
   @Test
   void illegalStateTransitionsShouldOnlyComeFromTransitions_passesForGood() {
     assertDoesNotThrow(
         () ->
-            AiPersimmonDddRules.illegalStateTransitionsShouldOnlyComeFromTransitions().check(GOOD));
+            InvariantAndErrorRules.illegalStateTransitionsShouldOnlyComeFromTransitions()
+                .check(GOOD));
   }
 
   @Test
@@ -247,93 +262,88 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () ->
-            AiPersimmonDddRules.illegalStateTransitionsShouldOnlyComeFromTransitions().check(BAD));
+            InvariantAndErrorRules.illegalStateTransitionsShouldOnlyComeFromTransitions()
+                .check(BAD));
   }
 
   @Test
   void errorCodesShouldBeEnums_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.errorCodesShouldBeEnums().check(GOOD));
+    assertDoesNotThrow(() -> InvariantAndErrorRules.errorCodesShouldBeEnums().check(GOOD));
   }
 
   @Test
   void errorCodesShouldBeEnums_failsForBad() {
     assertThrows(
-        AssertionError.class, () -> AiPersimmonDddRules.errorCodesShouldBeEnums().check(BAD));
+        AssertionError.class, () -> InvariantAndErrorRules.errorCodesShouldBeEnums().check(BAD));
   }
 
   @Test
   void repositoryPortsShouldBeInterfacesInDomain_passesForGood() {
     assertDoesNotThrow(
-        () -> AiPersimmonDddRules.repositoryPortsShouldBeInterfacesInDomain().check(GOOD));
+        () -> RepositoryRules.repositoryPortsShouldBeInterfacesInDomain().check(GOOD));
   }
 
   @Test
   void repositoryPortsShouldBeInterfacesInDomain_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.repositoryPortsShouldBeInterfacesInDomain().check(BAD));
+        () -> RepositoryRules.repositoryPortsShouldBeInterfacesInDomain().check(BAD));
   }
 
   @Test
   void repositoryImplementationsShouldResideInInfrastructure_passesForGood() {
     assertDoesNotThrow(
-        () ->
-            AiPersimmonDddRules.repositoryImplementationsShouldResideInInfrastructure()
-                .check(GOOD));
+        () -> RepositoryRules.repositoryImplementationsShouldResideInInfrastructure().check(GOOD));
   }
 
   @Test
   void repositoryImplementationsShouldResideInInfrastructure_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () ->
-            AiPersimmonDddRules.repositoryImplementationsShouldResideInInfrastructure().check(BAD));
+        () -> RepositoryRules.repositoryImplementationsShouldResideInInfrastructure().check(BAD));
   }
 
   @Test
   void repositoryImplementationsShouldBeSpringRepositories_passesForGood() {
     assertDoesNotThrow(
-        () ->
-            AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories().check(GOOD));
+        () -> RepositoryRules.repositoryImplementationsShouldBeSpringRepositories().check(GOOD));
   }
 
   @Test
   void repositoryImplementationsShouldBeSpringRepositories_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.repositoryImplementationsShouldBeSpringRepositories().check(BAD));
+        () -> RepositoryRules.repositoryImplementationsShouldBeSpringRepositories().check(BAD));
   }
 
   @Test
   void integrationEventsShouldResideInApi_passesForGood() {
-    assertDoesNotThrow(() -> AiPersimmonDddRules.integrationEventsShouldResideInApi().check(GOOD));
+    assertDoesNotThrow(() -> EventRules.integrationEventsShouldResideInApi().check(GOOD));
   }
 
   @Test
   void integrationEventsShouldResideInApi_failsForBad() {
     assertThrows(
-        AssertionError.class,
-        () -> AiPersimmonDddRules.integrationEventsShouldResideInApi().check(BAD));
+        AssertionError.class, () -> EventRules.integrationEventsShouldResideInApi().check(BAD));
   }
 
   @Test
   void integrationEventsShouldDeclareEventType_passesForGood() {
-    assertDoesNotThrow(
-        () -> AiPersimmonDddRules.integrationEventsShouldDeclareEventType().check(GOOD));
+    assertDoesNotThrow(() -> EventRules.integrationEventsShouldDeclareEventType().check(GOOD));
   }
 
   @Test
   void integrationEventsShouldDeclareEventType_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> AiPersimmonDddRules.integrationEventsShouldDeclareEventType().check(BAD));
+        () -> EventRules.integrationEventsShouldDeclareEventType().check(BAD));
   }
 
   @Test
   void boundedContextsShouldOnlyDependOnEachOthersApi_passesForGood() {
     assertDoesNotThrow(
         () ->
-            AiPersimmonDddRules.boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_GOOD_BASE)
+            BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_GOOD_BASE)
                 .check(CONTEXTS_GOOD));
   }
 
@@ -342,7 +352,7 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () ->
-            AiPersimmonDddRules.boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_BAD_BASE)
+            BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_BAD_BASE)
                 .check(CONTEXTS_BAD));
   }
 
