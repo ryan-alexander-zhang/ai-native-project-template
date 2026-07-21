@@ -26,4 +26,8 @@ public record ProcessDeadlineInsert(
   public ProcessDeadlineInsert {
     inputPayload = inputPayload.clone();
   }
+
+  public byte[] inputPayload() {
+    return inputPayload.clone();
+  }
 }

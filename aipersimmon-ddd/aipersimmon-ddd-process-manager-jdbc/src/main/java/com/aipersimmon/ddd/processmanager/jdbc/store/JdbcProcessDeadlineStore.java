@@ -220,19 +220,23 @@ public final class JdbcProcessDeadlineStore {
 
   /** How many deadlines are DEAD across all instances (SLI: the redrive backlog). */
   public long countDead() {
-    return jdbc.queryForObject(
-        "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE status = ?",
-        Long.class,
-        DeadlineStatus.DEAD.name());
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE status = ?",
+            Long.class,
+            DeadlineStatus.DEAD.name());
+    return count == null ? 0L : count;
   }
 
   /** How many deadlines on an instance are still DEAD (used to decide whether to resume it). */
   public long countDead(ProcessInstanceId instanceId) {
-    return jdbc.queryForObject(
-        "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE instance_id = ? AND status = ?",
-        Long.class,
-        instanceId.value(),
-        DeadlineStatus.DEAD.name());
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE instance_id = ? AND status = ?",
+            Long.class,
+            instanceId.value(),
+            DeadlineStatus.DEAD.name());
+    return count == null ? 0L : count;
   }
 
   /** Redrive a DEAD deadline back to PENDING (reusing its id, due now) for operator recovery. */

@@ -27,4 +27,8 @@ public record ProcessEffectInsert(
   public ProcessEffectInsert {
     payload = payload.clone();
   }
+
+  public byte[] payload() {
+    return payload.clone();
+  }
 }

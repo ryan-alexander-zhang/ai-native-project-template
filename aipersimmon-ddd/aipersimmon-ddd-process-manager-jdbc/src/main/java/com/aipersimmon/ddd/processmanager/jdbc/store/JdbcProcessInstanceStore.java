@@ -200,22 +200,24 @@ public final class JdbcProcessInstanceStore {
    * (a coordinator that lost its wakeup, complementary to the max-lifetime backstop).
    */
   public long countStuck(Instant updatedBefore) {
-    return jdbc.queryForObject(
-        """
+    Long count =
+        jdbc.queryForObject(
+            """
                 SELECT COUNT(*) FROM aipersimmon_process_instance i
                 WHERE i.lifecycle IN (?, ?) AND i.updated_at < ?
                   AND NOT EXISTS (SELECT 1 FROM aipersimmon_process_effect e
                                   WHERE e.instance_id = i.instance_id AND e.status IN (?, ?))
                   AND NOT EXISTS (SELECT 1 FROM aipersimmon_process_deadline d
                                   WHERE d.instance_id = i.instance_id AND d.status IN (?, ?))""",
-        Long.class,
-        ProcessLifecycle.RUNNING.name(),
-        ProcessLifecycle.COMPENSATING.name(),
-        Timestamp.from(updatedBefore),
-        "PENDING",
-        "IN_FLIGHT",
-        "PENDING",
-        "IN_FLIGHT");
+            Long.class,
+            ProcessLifecycle.RUNNING.name(),
+            ProcessLifecycle.COMPENSATING.name(),
+            Timestamp.from(updatedBefore),
+            "PENDING",
+            "IN_FLIGHT",
+            "PENDING",
+            "IN_FLIGHT");
+    return count == null ? 0L : count;
   }
 
   /**

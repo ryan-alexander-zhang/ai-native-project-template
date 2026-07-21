@@ -29,4 +29,8 @@ public record ProcessTransitionInsert(
   public ProcessTransitionInsert {
     inputPayload = inputPayload.clone();
   }
+
+  public byte[] inputPayload() {
+    return inputPayload.clone();
+  }
 }

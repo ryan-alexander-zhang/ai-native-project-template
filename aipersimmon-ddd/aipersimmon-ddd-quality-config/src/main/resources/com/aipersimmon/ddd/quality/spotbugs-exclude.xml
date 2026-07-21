@@ -32,4 +32,69 @@
   <Match>
     <Bug pattern="CT_CONSTRUCTOR_THROW"/>
   </Match>
+
+  <!--
+    EI_EXPOSE_REP / EI_EXPOSE_REP2 on @ConfigurationProperties holders. Spring binds these
+    mutable config objects field-by-field and their getters intentionally hand back the live
+    nested holder so binding can populate it; that is how relaxed binding works, not a leak.
+    Matched by the *Properties naming convention (the only such types in the library). Genuine
+    value carriers still copy their arrays/collections defensively, so EI_EXPOSE stays live for
+    them (e.g. ProcessEffectInsert/ProcessDeadlineInsert/ProcessTransitionInsert clone their
+    byte[]; BacklogSnapshot copies its Map).
+  -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Class name="~.*Properties(\$.*)?"/>
+  </Match>
+
+  <!--
+    EI_EXPOSE_REP2 on infrastructure beans that hold an injected collaborator by reference
+    (NamedParameterJdbcTemplate/JdbcTemplate, Clock, KafkaTemplate, TransactionTemplate,
+    ObjectMapper, StringRedisTemplate, other stores). Sharing the injected reference is the
+    intent of constructor injection, not a defect — and these objects cannot be meaningfully
+    copied. Listed explicitly rather than by package so that a future value carrier added to
+    the same package is NOT silently masked; a rename simply re-surfaces the finding for
+    re-triage (fail-visible, not fail-masked).
+  -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Or>
+      <Class name="com.aipersimmon.ddd.cqrs.spring.TransactionTemplateUnitOfWork"/>
+      <Class name="com.aipersimmon.ddd.flyway.AipersimmonFlywayMigrator"/>
+      <Class name="com.aipersimmon.ddd.inbox.jdbc.InboxCleanup"/>
+      <Class name="com.aipersimmon.ddd.inbox.jdbc.JdbcInbox"/>
+      <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaIntegrationEventListener"/>
+      <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaOutboxDispatcher"/>
+      <Class name="com.aipersimmon.ddd.outbox.InProcessOutboxDispatcher"/>
+      <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore"/>
+      <Class name="com.aipersimmon.ddd.outbox.jdbc.OutboxCleanup"/>
+      <Class name="com.aipersimmon.ddd.outbox.jdbc.OutboxRelay"/>
+      <Class name="com.aipersimmon.ddd.outbox.jdbc.OutboxWriter"/>
+      <Class name="com.aipersimmon.ddd.outbox.mybatisplus.MybatisDeadLetterStore"/>
+      <Class name="com.aipersimmon.ddd.outbox.mybatisplus.OutboxWriter"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.ProcessManagerStartupValidator"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.ProcessSchemaValidator"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.operation.JdbcProcessOperations"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore"/>
+      <Class name="com.aipersimmon.ddd.saga.spring.JdbcDeadlineScheduler"/>
+      <Class name="com.aipersimmon.ddd.web.spring.IdempotencyFilter"/>
+      <Class name="com.aipersimmon.ddd.web.spring.ProblemHttpResponseWriter"/>
+      <Class name="com.aipersimmon.ddd.web.spring.RateLimitFilter"/>
+      <Class name="com.aipersimmon.ddd.web.spring.ReplayProtectionFilter"/>
+      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcIdempotencyStore"/>
+      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcRateLimiter"/>
+      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcReplayGuard"/>
+      <Class name="com.aipersimmon.ddd.web.store.redis.RedisIdempotencyStore"/>
+      <Class name="com.aipersimmon.ddd.web.store.redis.RedisRateLimiter"/>
+      <Class name="com.aipersimmon.ddd.web.store.redis.RedisReplayGuard"/>
+    </Or>
+  </Match>
 </FindBugsFilter>

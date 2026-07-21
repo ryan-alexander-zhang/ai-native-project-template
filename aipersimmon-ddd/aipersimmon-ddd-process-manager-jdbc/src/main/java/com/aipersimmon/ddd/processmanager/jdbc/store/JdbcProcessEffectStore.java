@@ -165,19 +165,23 @@ public final class JdbcProcessEffectStore {
 
   /** How many effects on an instance are still DEAD (used to decide whether to resume it). */
   public long countDead(com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId) {
-    return jdbc.queryForObject(
-        "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE instance_id = ? AND status = ?",
-        Long.class,
-        instanceId.value(),
-        EffectStatus.DEAD.name());
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE instance_id = ? AND status = ?",
+            Long.class,
+            instanceId.value(),
+            EffectStatus.DEAD.name());
+    return count == null ? 0L : count;
   }
 
   /** How many effects are DEAD across all instances (SLI: the redrive backlog). */
   public long countDead() {
-    return jdbc.queryForObject(
-        "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = ?",
-        Long.class,
-        EffectStatus.DEAD.name());
+    Long count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = ?",
+            Long.class,
+            EffectStatus.DEAD.name());
+    return count == null ? 0L : count;
   }
 
   /**

@@ -122,5 +122,11 @@ public final class JdbcProcessBacklog {
       long suspendedInstances,
       long stuckInstances,
       Duration oldestPendingEffectAge,
-      Duration oldestPendingDeadlineAge) {}
+      Duration oldestPendingDeadlineAge) {
+    public BacklogSnapshot {
+      // Defensive copy so this immutable snapshot cannot be mutated through the caller's
+      // map reference; Map.copyOf also makes the accessor's returned map unmodifiable.
+      suspendedBySource = suspendedBySource == null ? null : Map.copyOf(suspendedBySource);
+    }
+  }
 }
