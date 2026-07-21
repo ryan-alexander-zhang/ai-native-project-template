@@ -16,13 +16,20 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -30,18 +37,27 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.env.Environment;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
-import org.apache.kafka.common.TopicPartition;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 /**
  * Wires the Kafka integration-event transport with <strong>per-event</strong> routing.
@@ -55,16 +71,34 @@ import org.apache.kafka.common.TopicPartition;
  * placeholders. If the starter is present but no event is {@code @Externalized}, a WARN is
  * logged and everything stays LOCAL — the transport is idle, startup is not failed.
  *
+ * <p><strong>The transport owns and isolates its own Kafka infrastructure</strong> rather
+ * than reusing the application's global beans, so it is self-contained and cannot interfere
+ * with the application's other Kafka usage:
+ * <ul>
+ *   <li>a dedicated {@link ProducerFactory}/{@link KafkaTemplate} and (for the consumer) a
+ *       dedicated {@link ConsumerFactory}, both with the key/value serializer fixed to
+ *       {@code String} — the transport owns the wire format (already-serialized JSON values
+ *       with {@code ce_} headers), so it must not depend on the application configuring
+ *       {@code spring.kafka.*} serializers (and a {@code JsonSerializer} there would
+ *       double-encode the value);</li>
+ *   <li>a dedicated {@link ConcurrentKafkaListenerContainerFactory} carrying the
+ *       dead-lettering error handler, so the retry/DLT policy is scoped to this listener and
+ *       is neither imposed on the application's other listeners nor displaced by an error
+ *       handler the application defines;</li>
+ *   <li>a {@link TransactionOperations} bound to an explicitly resolved database transaction
+ *       manager, so the consumer's inbox check and handling commit or roll back together even
+ *       when several transaction managers exist.</li>
+ * </ul>
+ *
  * <p>When {@code aipersimmon.ddd.messaging.kafka.consumer.enabled=true} <em>and</em> at
  * least one event is {@code @Externalized}, it also registers the
  * {@link KafkaIntegrationEventListener} consumer bridge (subscribed to the externalized
- * topic set), wiring in the {@link Inbox} if one is available, plus a
- * {@link DefaultErrorHandler} that gives a failed consume bounded exponential-backoff
- * retries and then dead-letters the record to {@code <topic>.DLT} — instead of Spring
- * Kafka's default of retrying with no backoff and then silently skipping. A permanent
- * failure (an unknown event type, a malformed payload) is not retried; it goes straight to
- * the DLT. Boot applies the single {@link CommonErrorHandler} bean to the default listener
- * container. Every bean is overridable by the application.
+ * topic set) on the dedicated container factory, wiring in the {@link Inbox} if one is
+ * available. A failed consume gets bounded exponential-backoff retries and is then
+ * dead-lettered to {@code <topic>.DLT} — instead of Spring Kafka's default of retrying with
+ * no backoff and then silently skipping. A permanent failure (an unknown event type, a
+ * malformed payload) is not retried; it goes straight to the DLT. Every bean is overridable
+ * by the application.
  */
 @AutoConfiguration(
         after = KafkaAutoConfiguration.class,
@@ -72,6 +106,19 @@ import org.apache.kafka.common.TopicPartition;
 @ConditionalOnClass(KafkaTemplate.class)
 @EnableConfigurationProperties(KafkaMessagingProperties.class)
 public class AipersimmonDddMessagingKafkaAutoConfiguration {
+
+    /** The transport's own producer factory bean — String serializers, not the app's. */
+    static final String PRODUCER_FACTORY = "aipersimmonKafkaProducerFactory";
+    /** The transport's own {@link KafkaTemplate} bean — the dispatcher publishes through it. */
+    static final String KAFKA_TEMPLATE = "aipersimmonKafkaTemplate";
+    /** The transport's own consumer factory bean — String deserializers, not the app's. */
+    static final String CONSUMER_FACTORY = "aipersimmonKafkaConsumerFactory";
+    /**
+     * The transport's own listener container factory bean, carrying the dead-lettering error
+     * handler. Referenced from {@link KafkaIntegrationEventListener}'s {@code @KafkaListener}
+     * so the transport's error handling never touches the application's other listeners.
+     */
+    static final String LISTENER_CONTAINER_FACTORY = "aipersimmonKafkaListenerContainerFactory";
 
     private static final Logger log =
             LoggerFactory.getLogger(AipersimmonDddMessagingKafkaAutoConfiguration.class);
@@ -147,15 +194,45 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     }
 
     /**
+     * The transport's own producer factory: connection settings come from Boot's
+     * {@link KafkaProperties} (bootstrap servers, security, ...), but the key/value serializer
+     * is fixed to {@link StringSerializer}. The dispatcher hands the factory an
+     * already-serialized JSON string with {@code ce_} headers, so the transport must not
+     * inherit whatever serializer the application set for its own {@code spring.kafka} usage —
+     * a {@code JsonSerializer} in particular would double-encode the value.
+     */
+    @Bean(PRODUCER_FACTORY)
+    @ConditionalOnBean(KafkaTemplate.class)
+    @ConditionalOnMissingBean(name = PRODUCER_FACTORY)
+    public ProducerFactory<String, String> aipersimmonKafkaProducerFactory(
+            KafkaProperties kafkaProperties, ObjectProvider<SslBundles> sslBundles) {
+        Map<String, Object> config = kafkaProperties.buildProducerProperties(sslBundles.getIfAvailable());
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
+    /** The transport's own {@link KafkaTemplate} over its String producer factory. */
+    @Bean(KAFKA_TEMPLATE)
+    @ConditionalOnBean(KafkaTemplate.class)
+    @ConditionalOnMissingBean(name = KAFKA_TEMPLATE)
+    public KafkaTemplate<String, String> aipersimmonKafkaTemplate(
+            @Qualifier(PRODUCER_FACTORY) ProducerFactory<String, String> producerFactory) {
+        return new KafkaTemplate<>(producerFactory);
+    }
+
+    /**
      * The single {@link OutboxDispatcher} the relay uses: a {@link RoutingOutboxDispatcher}
      * that keeps LOCAL events in process (an {@link InProcessOutboxDispatcher} leg) and
      * sends {@code @Externalized} events to their topic (a {@link KafkaOutboxDispatcher}
-     * leg). {@code @ConditionalOnMissingBean} so an application can still supply its own.
+     * leg over the transport's own {@link KafkaTemplate}). {@code @ConditionalOnMissingBean}
+     * so an application can still supply its own.
      */
     @Bean
     @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnMissingBean(OutboxDispatcher.class)
-    public OutboxDispatcher routingOutboxDispatcher(KafkaTemplate<String, String> kafkaTemplate,
+    public OutboxDispatcher routingOutboxDispatcher(
+            @Qualifier(KAFKA_TEMPLATE) KafkaTemplate<String, String> kafkaTemplate,
             KafkaMessagingProperties properties, ExternalizedRoutes routes,
             ApplicationEventPublisher publisher, ObjectProvider<ObjectMapper> objectMapper,
             IntegrationEventCatalog catalog) {
@@ -166,40 +243,104 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
         return new RoutingOutboxDispatcher(localLeg, externalLeg, routes);
     }
 
+    /**
+     * The transport's own consumer factory: connection settings from Boot's
+     * {@link KafkaProperties}, but the key/value deserializer fixed to
+     * {@link StringDeserializer} to match the String wire format the consumer reconstructs
+     * from ({@code ce_} headers + JSON body).
+     */
+    @Bean(CONSUMER_FACTORY)
+    @ConditionalOnBean(KafkaTemplate.class)
+    @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
+    @Conditional(OnExternalizedEventsCondition.class)
+    @ConditionalOnMissingBean(name = CONSUMER_FACTORY)
+    public ConsumerFactory<String, String> aipersimmonKafkaConsumerFactory(
+            KafkaProperties kafkaProperties, ObjectProvider<SslBundles> sslBundles) {
+        Map<String, Object> config = kafkaProperties.buildConsumerProperties(sslBundles.getIfAvailable());
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+    /**
+     * The transport's own listener container factory, carrying the dead-lettering error
+     * handler. The error handler is set on this factory only — not published as a global
+     * {@code CommonErrorHandler} bean — so Boot does not apply it to the application's other
+     * Kafka listeners on the default factory, and an error handler the application defines
+     * does not displace this one (which would silently drop the transport's own DLT).
+     */
+    @Bean(LISTENER_CONTAINER_FACTORY)
+    @ConditionalOnBean(KafkaTemplate.class)
+    @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
+    @Conditional(OnExternalizedEventsCondition.class)
+    @ConditionalOnMissingBean(name = LISTENER_CONTAINER_FACTORY)
+    public ConcurrentKafkaListenerContainerFactory<String, String> aipersimmonKafkaListenerContainerFactory(
+            @Qualifier(CONSUMER_FACTORY) ConsumerFactory<String, String> consumerFactory,
+            @Qualifier(KAFKA_TEMPLATE) KafkaTemplate<String, String> kafkaTemplate,
+            KafkaMessagingProperties properties) {
+        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        // Publish to "<topic>.DLT", keyed the same way as the source so an aggregate's dead
+        // letters keep to one partition. The destination is set explicitly (rather than left to
+        // the recoverer's default) so the DLT topic name is the documented one.
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
+                (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+        factory.setCommonErrorHandler(buildErrorHandler(recoverer, properties.getConsumer().getRetry()));
+        return factory;
+    }
+
     @Bean
+    @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
     @Conditional(OnExternalizedEventsCondition.class)
     @ConditionalOnMissingBean
     public KafkaIntegrationEventListener kafkaIntegrationEventListener(
             ApplicationEventPublisher publisher, ObjectProvider<ObjectMapper> objectMapper,
-            ObjectProvider<Inbox> inbox, IntegrationEventCatalog catalog) {
+            ObjectProvider<Inbox> inbox, IntegrationEventCatalog catalog,
+            ObjectProvider<PlatformTransactionManager> transactionManagers,
+            @Value("${aipersimmon.ddd.messaging.kafka.consumer.transaction-manager:}") String transactionManagerName,
+            BeanFactory beanFactory) {
+        TransactionOperations transaction =
+                resolveConsumerTransaction(transactionManagerName, transactionManagers, beanFactory);
         return new KafkaIntegrationEventListener(
                 publisher, objectMapper.getIfAvailable(ObjectMapper::new),
-                inbox.getIfAvailable(), catalog);
+                inbox.getIfAvailable(), catalog, transaction);
     }
 
     /**
-     * The consumer's error handler: retry a failed consume with bounded exponential
-     * backoff, then hand the record to the {@link DeadLetterPublishingRecoverer}, which
-     * publishes it to {@code <topic>.DLT}. Only present when the consumer is enabled and
-     * a {@link KafkaTemplate} exists to publish to the dead-letter topic. Boot's
-     * container-factory configurer applies this single {@link CommonErrorHandler} bean to
-     * the listener container automatically.
+     * Resolves the transaction manager the consumer's inbox check and handling run in, so the
+     * inbox insert and the handler's writes commit or roll back together. Explicit resolution
+     * (rather than a bare {@code @Transactional}, which binds to whichever manager is primary)
+     * is what fixes the multi-manager footgun: with several managers and none chosen, the
+     * inbox could commit on one while the side effect rolls back on another, silently losing
+     * the event.
+     *
+     * <ul>
+     *   <li>a configured bean name wins (the explicit choice for a multi-manager application);</li>
+     *   <li>otherwise the single manager is used;</li>
+     *   <li>none present -> no surrounding transaction (only safe without an inbox);</li>
+     *   <li>several present and none chosen -> fail loud, naming the property to set.</li>
+     * </ul>
      */
-    @Bean
-    @ConditionalOnBean(KafkaTemplate.class)
-    @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
-    @Conditional(OnExternalizedEventsCondition.class)
-    @ConditionalOnMissingBean(CommonErrorHandler.class)
-    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate,
-                                                 KafkaMessagingProperties properties) {
-        // Publish to "<topic>.DLT", keyed the same way as the source so an aggregate's
-        // dead letters keep to one partition. The destination is set explicitly (rather
-        // than left to the recoverer's default) so the DLT topic name is the documented
-        // one and does not depend on a library default.
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
-                (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
-        return buildErrorHandler(recoverer, properties.getConsumer().getRetry());
+    private static TransactionOperations resolveConsumerTransaction(String transactionManagerName,
+            ObjectProvider<PlatformTransactionManager> transactionManagers, BeanFactory beanFactory) {
+        if (StringUtils.hasText(transactionManagerName)) {
+            return new TransactionTemplate(
+                    beanFactory.getBean(transactionManagerName, PlatformTransactionManager.class));
+        }
+        List<PlatformTransactionManager> present = transactionManagers.stream().toList();
+        if (present.isEmpty()) {
+            return TransactionOperations.withoutTransaction();
+        }
+        if (present.size() == 1) {
+            return new TransactionTemplate(present.get(0));
+        }
+        throw new IllegalStateException(
+                "aipersimmon-ddd-messaging-kafka: the consumer's inbox check and handling must run in one "
+                + "database transaction, but " + present.size() + " PlatformTransactionManager beans are present "
+                + "and none was selected. Set aipersimmon.ddd.messaging.kafka.consumer.transaction-manager to the "
+                + "bean name of the database transaction manager the inbox writes to.");
     }
 
     /**

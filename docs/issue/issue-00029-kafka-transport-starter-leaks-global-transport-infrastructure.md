@@ -2,7 +2,7 @@
 id: issue-00029-kafka-transport-starter-leaks-global-transport-infrastructure
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00006-middleware-integration
 ---
 
@@ -91,6 +91,21 @@ starter **拥有并隔离**自己的传输基础设施,全部 `@ConditionalOnMis
 
 如此:aipersimmon 通道自洽、开箱即用;且与应用自身其它 Kafka 用途(可能用别的序列化器/错误策略/事务管理器)
 **互不干扰**。
+
+## 解决(已实现)
+
+`AipersimmonDddMessagingKafkaAutoConfiguration` 现注册一整套**专属**基础设施,dispatcher/listener 按名注入:
+
+- **(a)** `aipersimmonKafkaProducerFactory` / `aipersimmonKafkaTemplate` 与 `aipersimmonKafkaConsumerFactory`,连接参数取自
+  Boot `KafkaProperties`,但 (de)serializer **固定为 String**;dispatcher 注入 `@Qualifier("aipersimmonKafkaTemplate")`。
+  样例 `multi-module/start/application.yml` 与切片测试均**不再**配 `spring.kafka.*-serializer`,`KafkaDeadLetterIntegrationTest`/
+  `EventRoutingIntegrationTest` 在零 serializer 配置下端到端通过。
+- **(b)** 错误处理器只 `setCommonErrorHandler` 到专属 `aipersimmonKafkaListenerContainerFactory`,**不再**暴露全局
+  `CommonErrorHandler` bean;`@KafkaListener(containerFactory = "aipersimmonKafkaListenerContainerFactory")` 固定绑定。
+  `AutoConfigurationWiringTest` 断言无全局 `CommonErrorHandler`、专属工厂存在。
+- **(c)** listener 用 `TransactionOperations`(auto-config 解析:属性 `consumer.transaction-manager` > 唯一 TM > 无 TM 则
+  `withoutTransaction`;多 TM 且未指定则**启动失败**)包裹 inbox+处理,去掉裸 `@Transactional`。`AutoConfigurationWiringTest`
+  覆盖「多 TM fail-loud」与「按名解析」。
 
 ## 关联
 

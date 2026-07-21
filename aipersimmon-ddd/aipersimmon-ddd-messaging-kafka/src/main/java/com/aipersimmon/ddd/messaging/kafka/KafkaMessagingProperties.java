@@ -71,6 +71,16 @@ public class KafkaMessagingProperties {
          */
         private boolean enabled = false;
 
+        /**
+         * Bean name of the database transaction manager the consumer's inbox check and
+         * handling run in, so the inbox insert and the handler's writes commit or roll back
+         * together. Leave unset when the application has exactly one transaction manager (it
+         * is used automatically); set it only when several transaction managers exist and the
+         * database one must be chosen explicitly — otherwise startup fails loud rather than
+         * risk binding to the wrong manager and losing an event.
+         */
+        private String transactionManager;
+
         private final Retry retry = new Retry();
 
         public boolean isEnabled() {
@@ -79,6 +89,14 @@ public class KafkaMessagingProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public String getTransactionManager() {
+            return transactionManager;
+        }
+
+        public void setTransactionManager(String transactionManager) {
+            this.transactionManager = transactionManager;
         }
 
         public Retry getRetry() {

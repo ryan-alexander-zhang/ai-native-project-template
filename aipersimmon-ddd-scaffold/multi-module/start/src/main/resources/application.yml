@@ -17,12 +17,10 @@ spring:
       lifecycle-management: start-only
   kafka:
     bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    # No key/value (de)serializers here: aipersimmon-ddd-messaging-kafka owns the wire format and
+    # registers its own String producer/consumer factories, so the application does not configure
+    # (and cannot double-encode) the transport's serializers (issue-00029 (a)).
     consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
 
 aipersimmon:
