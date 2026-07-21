@@ -4,13 +4,6 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.10</version>
-    <relativePath/>
-  </parent>
-
   <!--
     Reference multi-module DDD project: three bounded contexts (ordering, inventory,
     payment), each split into api / domain / application / infrastructure / adapter
@@ -24,8 +17,11 @@
     PostgreSQL (single-source Flyway migrations), and traces export to SigNoz over OTLP.
     Local infrastructure is in start/compose.yaml; see docs/plan/plan-00006.
 
-    Unlike the building-block library, this is an application, so it may inherit
-    spring-boot-starter-parent.
+    Like the building-block library, it deliberately inherits NO parent POM: it manages
+    versions purely by importing BOMs (spring-boot-dependencies + aipersimmon-ddd-bom), so
+    nothing opinionated is inherited from spring-boot-starter-parent. The few build settings
+    that parent used to supply — Java release, -parameters, UTF-8, and the
+    spring-boot-maven-plugin repackage binding — are set explicitly below.
   -->
   <groupId>com.example</groupId>
   <artifactId>multi-module</artifactId>
@@ -35,7 +31,14 @@
   <description>Reference multi-module DDD project built on the AiPersimmon DDD building blocks.</description>
 
   <properties>
-    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
+    <!-- Spring Boot's parent enables this; since we do not inherit it, set it explicitly.
+         Spring needs parameter names for @ConfigurationProperties binding, MVC, etc. -->
+    <maven.compiler.parameters>true</maven.compiler.parameters>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <spring-boot.version>3.5.10</spring-boot.version>
+    <mybatis-plus.version>3.5.15</mybatis-plus.version>
     <aipersimmon-ddd.version>0.1.0-SNAPSHOT</aipersimmon-ddd.version>
   </properties>
 
@@ -48,6 +51,23 @@
 
   <dependencyManagement>
     <dependencies>
+      <!-- Replaces spring-boot-starter-parent: import the Spring Boot BOM for versions
+           without inheriting the opinionated parent. -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- MyBatis-Plus is not managed by spring-boot-dependencies; import its own BOM. -->
+      <dependency>
+        <groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-bom</artifactId>
+        <version>${mybatis-plus.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-bom</artifactId>
@@ -75,4 +95,35 @@
       <dependency><groupId>${project.groupId}</groupId><artifactId>payment-adapter</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>
+
+  <!--
+    Build settings the Spring Boot parent used to supply. spring-boot-maven-plugin needs an
+    explicit version (no parent to manage it) and the repackage execution so `start` builds a
+    runnable jar; declared in pluginManagement so the child's plugin entry stays bare. Surefire
+    is pinned for deterministic JUnit 5 runs.
+  -->
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring-boot.version}</version>
+          <executions>
+            <execution>
+              <id>repackage</id>
+              <goals>
+                <goal>repackage</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.2.5</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
 </project>

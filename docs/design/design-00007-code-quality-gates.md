@@ -6,7 +6,7 @@ status: active
 parent:
 ---
 
-# 代码质量管控：domain 层强制 90% 单元覆盖 + 90% 变异门禁，工具链经 provider parent 下发
+# 代码质量管控：domain 层强制 90% 单元覆盖 + 90% 变异门禁，无 opinionated parent（纯 BOM + 各项目自声明）
 
 把质量门禁从"文档声明、无人执行"变成"构建强制"。核心目标：**任何从本脚手架生成的项目，其 domain 层都强制满足
 单元测试覆盖率 ≥90% 且变异测试（PIT）≥90%**；其余工具（格式、架构、静态分析）按各自合适的作用域接入。承接
@@ -14,20 +14,26 @@ parent:
 
 ## 一、结论先行
 
-> **domain 层双门禁（行/分支/方法覆盖 ≥90% via JaCoCo + 变异 ≥90% via PIT），经一个新发布的 provider parent
-> `aipersimmon-ddd-build` 统一下发**——该 parent 自身继承 `spring-boot-starter-parent`，脚手架 root 改认它作
-> parent，门禁沿父链到达每个 `*-domain` 模块，并由 archetype 默认烘焙 + CI 强制。
-> **格式门禁 Spotless(google-java-format) 全仓库；ArchUnit 架构门禁保留；PMD/CPD + SpotBugs 全仓库、先 report 后
-> gate。不引入 SonarQube、不引入 Checkstyle（其职责由 Spotless 覆盖）。** 另建 test-support（Testcontainers 单例
-> 复用）testkit 模块，收敛现有分散的容器样板。
+> **domain 层双门禁（行/分支/方法覆盖 ≥90% via JaCoCo + 变异 ≥90% via PIT），只作用于领域层**：库 pure tier
+> （core/application/integration/cqrs）已落地；脚手架 `*-domain` 由 archetype 默认烘焙 opt-in + CI 强制。
+> **全仓库不继承任何 opinionated parent（尤其 `spring-boot-starter-parent`）——版本一律 BOM 导入
+> （`spring-boot-dependencies` + `aipersimmon-ddd-bom`）。** 质量插件的 `pluginManagement` 无法经 BOM 共享，故由
+> **每个可构建项目各自声明**（库 `aipersimmon-ddd-parent` 已声明；脚手架 root 各自声明），共享的只有
+> `aipersimmon-ddd-build-tools` 里的规则集。
+> **格式门禁 Spotless(google-java-format) 全仓库；ArchUnit 保留；PMD/CPD + SpotBugs 先 report 后 gate。不引入
+> SonarQube、不引入 Checkstyle。** 另建 test-support（Testcontainers 单例复用）testkit 模块。
+
+> **纠正记录（2026-07-21）**：本设计初版曾引入一个 provider parent `aipersimmon-ddd-build`（且 `extends
+> spring-boot-starter-parent`）来"沿父链下发门禁"。该做法违背仓库"框架无关、绝不继承 opinionated parent、版本靠
+> BOM"的立身原则，已**废弃并删除**该模块。取而代之：无任何 provider/父级下发，pluginManagement 各项目自声明。见 §四、§十 D1。
 
 作用域一览：
 
 | 门禁 | 作用域 | 阶段 | 强制点 |
 | --- | --- | --- | --- |
-| 单元覆盖 90%（行/分支/方法） | **仅 domain 层** | JaCoCo `check` @ `verify` | provider parent + archetype 默认 + CI |
+| 单元覆盖 90%（行/分支/方法） | **仅 domain 层** | JaCoCo `check` @ `verify` | 各项目 root 自声明 + archetype 默认 + CI |
 | 变异 90% | **仅 domain 层** | PIT `mutationCoverage` @ `verify` | 同上 |
-| 代码格式（Google Style） | 全仓库所有模块 | Spotless `check` @ `verify` | provider / 各 reactor root |
+| 代码格式（Google Style） | 全仓库所有模块 | Spotless `check` @ `verify` | 各 reactor root 自声明 |
 | 架构分层/边界 | 有分层的模块 | ArchUnit `@ArchTest` @ `test` | 已有 `aipersimmon-ddd-archunit`（不动） |
 | 复杂度 + 重复 | 全仓库 | PMD/CPD `check` @ `verify` | 先 report-only → ratchet |
 | 字节码缺陷 | 全仓库 | SpotBugs `check` @ `verify` | 先 report-only → gate |
@@ -61,62 +67,58 @@ parent:
 
 一句话：**domain 层是业务逻辑与不变量所在，值得最高、最贵的质量投入；框架接线层用架构测试 + 集成测试守正确性。**
 
-## 四、交付机制：provider parent 如何下发 domain 门禁
+## 四、交付机制：无 provider parent，pluginManagement 各项目自声明
 
-### 4.1 硬约束：Maven 单继承
+### 4.1 原则：不继承 opinionated parent，版本一律 BOM
 
-现状父子链（已核实）：
+仓库立身之本：**任何可构建工程都不 `<parent>` 到 `spring-boot-starter-parent`（或任何 opinionated parent），版本管理
+一律靠 BOM `import`。** 库 `aipersimmon-ddd-parent` 一直如此（刻意不继承 spring-boot-parent，只 import
+`spring-boot-dependencies`）；脚手架 `multi-module` 也**去掉 parent**，改为 import
+`spring-boot-dependencies` + `mybatis-plus-bom` + `aipersimmon-ddd-bom`，并显式补齐 Spring Boot parent 原本提供的少数
+构建设置（`maven.compiler.release`、`-parameters`、UTF-8、`spring-boot-maven-plugin` 的 `repackage` 绑定）。
 
-```
-ordering-domain ──parent──▶ multi-module（脚手架 root）──parent──▶ spring-boot-starter-parent
-```
+> 子模块仍以各自 **reactor root** 为 `<parent>`（库模块 → `aipersimmon-ddd-parent`；脚手架模块 → `multi-module`）。
+> 这是 reactor 聚合/继承，不是 opinionated parent，保留不动。
 
-- 脚手架 root 的 parent 槽被 `spring-boot-starter-parent` 占用；domain 模块的 parent 槽被脚手架 root 占用。
-- 因此"让 domain 模块直接 `<parent>` 到某个质量 parent"**不可行**。
-- 且 Maven 的 `<build>`/`<profiles>` **不能像 dependencyManagement 那样 `import`**——插件配置只能靠**继承**下发。
+### 4.2 约束与取舍：pluginManagement 只能各项目自声明
 
-### 4.2 方案：把 provider 插到父链中间
-
-新增一个由本库发布的构建 parent **`aipersimmon-ddd-build`**（D1 已定），它**自己继承 `spring-boot-starter-parent`**，
-携带全部质量插件的 `pluginManagement` 与 domain 门禁；脚手架 root 改认它作 parent：
+- **BOM 只共享 `dependencyManagement`（依赖版本），共享不了 `build/pluginManagement`（插件配置）。** 插件配置的复用
+  只能靠 parent 继承。
+- 但在"不继承任何 opinionated parent"的原则下，不能为了共享插件配置去引一个 parent：那个 parent 要么继承
+  spring-boot-parent（违背原则），要么成为脚手架唯一的 opinionated parent（同样被否）。
+- **结论**：不做任何 provider/父级下发。质量插件的版本+配置由**每个可构建工程各自声明**——库 `aipersimmon-ddd-parent`
+  的 `pluginManagement` 一份；每个脚手架 root 一份。接受这点"块级重复"，换取"零 opinionated parent 继承"。
 
 ```mermaid
 flowchart TD
-  sb["spring-boot-starter-parent 3.5.x"]
-  bp["aipersimmon-ddd-build （新, provider）<br/>parent = spring-boot-starter-parent<br/>pluginManagement: Spotless / JaCoCo / PIT / PMD / SpotBugs<br/>+ dependencyManagement: import aipersimmon-ddd-bom"]
-  root["multi-module / modulith / microservice （脚手架 root）"]
-  dom["*-domain 模块<br/>烘焙门禁 opt-in → JaCoCo+PIT 生效"]
-  other["*-application / *-adapter / *-infrastructure / start"]
-  sb --> bp --> root
-  root --> dom
-  root --> other
+  bt["aipersimmon-ddd-build-tools<br/>（规则集单一来源：pmd-ruleset.xml / spotbugs-exclude.xml）"]
+  lib["aipersimmon-ddd-parent<br/>无 parent；import spring-boot-dependencies BOM<br/>自声明质量 pluginManagement"]
+  mm["multi-module（脚手架 root）<br/>无 parent；import spring-boot-dependencies + mybatis-plus-bom + aipersimmon-ddd-bom<br/>自声明质量 pluginManagement"]
+  bt -. 插件 classpath 引用规则 .-> lib
+  bt -. 插件 classpath 引用规则 .-> mm
 ```
 
-（箭头 = parent 关系。）这样：
-
-- 脚手架**不丢** `spring-boot-starter-parent` 的一切（它是 provider 的父，透传）。
-- 质量插件版本、规则、阈值集中在**一个已发布 artifact**——改一处，三套脚手架 + 所有生成项目一起变。这直接对冲本仓库
-  已有的"配置跨多文件复制导致漂移"债（见 [[process-manager-schema-copies]]）。
-- provider 顺带 `import` `aipersimmon-ddd-bom`，脚手架 root 的 dependencyManagement 可简化。
-
-**代价**：三套脚手架 root 各改一次 `<parent>`（从 `spring-boot-starter-parent` → `aipersimmon-ddd-build`），archetype
-模板同步一次。一次性、可控。
+- **抗漂移**：真正易漂的"规则集"（PMD/SpotBugs XML）集中在 `aipersimmon-ddd-build-tools` 一份（§六）；插件版本用属性；
+  各 root 的 pluginManagement 块保持一致，由模板 + review 保证。这比"配置散落且无单一规则来源"已大幅收敛。
 
 ### 4.3 domain 层如何"只在 domain 生效"且强制
 
-`pluginManagement` 只提供"版本 + 配置"，不激活。domain 模块用**最小 opt-in（约 5 行）**激活门禁，配置全部继承：
+本项目 root（库 → `aipersimmon-ddd-parent`；脚手架 → `multi-module`）的 `pluginManagement` 只提供"版本 + 配置"，不激活。
+领域模块用**最小 opt-in（约 5 行）**激活门禁，完整配置与阈值继承自**本 reactor root 的 pluginManagement**：
 
 ```xml
-<!-- 仅出现在 *-domain 模块。JaCoCo/PIT 的完整配置与阈值继承自 aipersimmon-ddd-build 的 pluginManagement -->
+<!-- 仅出现在 domain 模块（库 pure tier / 脚手架 *-domain）。JaCoCo/PIT 的完整配置继承自本 reactor root。 -->
 <build>
   <plugins>
-    <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId></plugin>
-    <plugin><groupId>org.pitest</groupId><artifactId>pitest-maven</artifactId></plugin>
+    <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId>
+      <!-- check execution + 90% rules 在此声明（库侧已落地，见 aipersimmon-ddd-core 等） --></plugin>
+    <plugin><groupId>org.pitest</groupId><artifactId>pitest-maven</artifactId>
+      <!-- mutationCoverage@verify --></plugin>
   </plugins>
 </build>
 ```
 
-- 这 5 行由 **archetype 默认烘焙进每个 `*-domain` 模块** → 所有生成项目自带门禁，无需使用者手工加。
+- 脚手架侧这段由 **archetype 默认烘焙进每个 `*-domain` 模块** → 所有生成项目自带门禁，无需使用者手工加。
 - "所有项目都被强制"的真正保证 = **archetype 默认 + CI 跑 `verify`**，不是 Maven 魔法。任何删掉这段的改动会在 CI 暴露。
 - **D2 已定：采用上面的显式 opt-in**（最直白、最可靠、archetype 好烘焙）。曾考虑的 marker 文件激活 profile
   （`<activation><file><exists>${basedir}/.ddd-domain</exists></file></activation>`）不采用——显式 5 行更透明、diff 里一眼可见，
@@ -124,11 +126,11 @@ flowchart TD
 
 ### 4.4 库自身（`aipersimmon-ddd/*`）的处理
 
-库没有单一 domain 模块，其"领域层"是框架无关的 pure tier（core/application/integration/cqrs）。库不继承
-`spring-boot-starter-parent`（见其 parent POM 注释），故**不通过 `aipersimmon-ddd-build` 下发**。库的 pure-tier 门禁在
-`aipersimmon-ddd-parent` 的 `pluginManagement` 里直接定义、由 pure-tier 模块 opt-in 激活。阈值与配置**引用同一份
-config-artifact（§六）**，与脚手架 domain 层保持同一套规则。**D4 已定：库 pure tier（core/application/integration/cqrs）
-同步上 90% 变异门禁**——它是框架无关的领域内核，与脚手架 domain 层同一质量标准，且是"零依赖领域逻辑"最理想的 PIT 目标。
+库没有单一 domain 模块，其"领域层"是框架无关的 pure tier（core/application/integration/cqrs）。库的 pure-tier 门禁在
+`aipersimmon-ddd-parent` 的 `pluginManagement` 里直接定义、由 pure-tier 模块 opt-in 激活（与脚手架同一套机制，只是各自
+声明）。规则集**引用同一份 config-artifact（§六）**。**D4 已定：库 pure tier（core/application/integration/cqrs）同步上
+90% 覆盖 + 90% 变异**——它是框架无关的领域内核，与脚手架 domain 层同一质量标准，且是"零依赖领域逻辑"最理想的 PIT 目标。
+**（已落地，见 P5/P6。）**
 
 ## 五、工具矩阵（逐项定位）
 
@@ -142,7 +144,7 @@ config-artifact（§六）**，与脚手架 domain 层保持同一套规则。**
 | **JaCoCo** | 行/分支/方法覆盖 | jacoco-maven-plugin 最新 | **仅 domain** | `prepare-agent`@`test` + `report`+`check` @ `verify` |
 | **PIT** | 变异测试（测试有效性） | pitest-maven + `pitest-junit5-plugin` | **仅 domain** | `mutationCoverage` @ `verify` |
 
-关键门禁配置（写进 provider `pluginManagement`）：
+关键门禁配置（写进各 reactor root 的 `pluginManagement`）：
 
 - **JaCoCo `check`**：三条 rule，`LINE` / `BRANCH` / `METHOD` 各 `minimum 0.90`（对应 [[TESTING.md]] 的行/分支/函数三项）。
 - **PIT（D3 已定：从严）**：三个阈值同时 ≥90——`<mutationThreshold>90`（变异体被杀比例）、`<testStrengthThreshold>90`
@@ -190,7 +192,7 @@ artifact，不污染框架无关约束。
 已知风险：部分下游脚手架/样例在 HEAD 已是 RED（见 [[downstream-scaffolds-migration-debt]]），且门禁一上会暴露真实覆盖缺口。
 故分批：
 
-1. `aipersimmon-ddd-build`（provider parent）+ `aipersimmon-ddd-build-tools`（config-artifact）+ 各 reactor 的 Spotless 骨架。
+1. `aipersimmon-ddd-build-tools`（规则集 config-artifact）+ 库 `aipersimmon-ddd-parent` 自声明质量 pluginManagement + Spotless 骨架。
 2. **Spotless** 全仓库 `apply` 一次 + 接 `check`（填掉 Lint 占位符）。风险最低、信息量最大，宜作首个 PR。
 3. **JaCoCo report-only** 只在 domain 模块跑，拿真实基线。
 4. **PMD + CPD** report-only → 阈值调到当前能过 → 逐步收紧。
@@ -203,10 +205,12 @@ artifact，不污染框架无关约束。
 
 四项决策已定（2026-07-21）：
 
-- **D1 = `aipersimmon-ddd-build`**：provider parent 的 artifactId 定为 `aipersimmon-ddd-build`（继承 spring-boot-starter-parent，
-  携带质量 pluginManagement + 导入 aipersimmon-ddd-bom）。
-- **D2 = 显式 opt-in**：`*-domain` 模块用最小 5 行 `<build><plugins>` 激活 JaCoCo+PIT（配置继承自 provider），archetype 烘焙；
-  不用 marker 文件激活 profile——显式更透明、diff 可见、不依赖 profile 激活的版本行为。
+- **D1（修订 2026-07-21）= 无 provider parent，纯 BOM + 各项目自声明**：初版的 provider parent `aipersimmon-ddd-build`
+  （`extends spring-boot-starter-parent`）已**废弃删除**——它违背"绝不继承 opinionated parent、版本靠 BOM"的原则。
+  改为：全仓库不继承 opinionated parent；版本靠 BOM 导入；质量 `pluginManagement` 由库 `aipersimmon-ddd-parent` 与每个
+  脚手架 root 各自声明（块级重复换取零 opinionated 继承），规则集共享自 `aipersimmon-ddd-build-tools`。
+- **D2 = 显式 opt-in**：domain 模块用最小 5 行 `<build><plugins>` 激活 JaCoCo+PIT（配置继承自**本 reactor root**），脚手架侧由
+  archetype 烘焙；不用 marker 文件激活 profile——显式更透明、diff 可见、不依赖 profile 激活的版本行为。
 - **D3 = PIT 从严**：domain 需要非常严格的测试保障质量，PIT 三阈值同时 ≥90——`mutationThreshold` +
   `testStrengthThreshold` + `coverageThreshold`，堵住"高覆盖但弱断言"。
 - **D4 = pure tier 同标准**：库 pure tier（core/application/integration/cqrs）与脚手架 domain 层同上 90% 覆盖 + 90% 变异，

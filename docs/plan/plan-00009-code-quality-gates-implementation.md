@@ -22,10 +22,11 @@ parent: design-00007-code-quality-gates
 ## 任务
 
 ### P0 — 基础设施骨架
-- [ ] 新增 `aipersimmon-ddd-build-tools`（resource-only）：`pmd-ruleset.xml`、`spotbugs-exclude.xml`（先空/宽松），进 parent `<modules>` 与 BOM。
-- [ ] 新增 `aipersimmon-ddd-build`（packaging=pom，parent=spring-boot-starter-parent）：质量插件 `pluginManagement` + 导入 `aipersimmon-ddd-bom`。**暂不**被任何脚手架采用（P8 才切）。
-- [ ] `aipersimmon-ddd-parent` 增质量插件 `pluginManagement`（版本 + 引用 build-tools 规则），供库内 opt-in。
-- 验收：`mvn -f aipersimmon-ddd/pom.xml install` 绿；两个新模块产物存在。
+- [x] 新增 `aipersimmon-ddd-build-tools`（resource-only）：`pmd-ruleset.xml`、`spotbugs-exclude.xml`，进 parent `<modules>` 与 BOM。
+- [x] `aipersimmon-ddd-parent` 增质量插件 `pluginManagement`（版本 + 引用 build-tools 规则），供库内 opt-in。
+- ~~曾新增 `aipersimmon-ddd-build`（provider parent，extends spring-boot-starter-parent）~~ → **已删除**（2026-07-21）：违背
+  "绝不继承 opinionated parent、版本靠 BOM"原则；改为无 provider、各项目自声明（见 design-00007 §四 / D1 修订）。
+- 验收：库 reactor `validate`/`install` 绿。
 
 ### P1 — Spotless（首个门禁；范围=仅库，脚手架/样例延到 P8）
 - [x] Spotless 3.6.0 + google-java-format 1.35.0（GOOGLE）写入 parent `pluginManagement`，`check` 绑 `verify`。
@@ -75,11 +76,17 @@ parent: design-00007-code-quality-gates
 - 验收：JDK 21 下真实容器 BUILD SUCCESS；MySQL 单例复用生效（同模块两测试共享一容器，第二个 0.7s 不再重启）。
 - 注：process-manager 测试 schema 仍由各测试的 `ResourceDatabasePopulator` 加载（集中到 testkit 会引入对 process-manager-jdbc 的反向依赖，且牵涉 schema-copies 债，留作后续）。
 
-### P8 — 脚手架采用 provider + archetype 烘焙
-- [ ] 三脚手架 root `<parent>` 切到 `aipersimmon-ddd-build`；`*-domain` 加 5 行 opt-in。
-- [ ] archetype 生成模板同步（`*-domain` 默认带 opt-in）。
-- [ ] `ci.yml`：库 `install`→`verify`，脚手架 `test`→`verify`。
-- 验收：CI 全绿；新生成项目 domain 默认带 90%/90% 门禁。
+### P8 — 脚手架 BOM-only + domain 门禁（仅 multi-module）
+范围收窄到 **multi-module**（modulith/microservice 暂不动）。**不使用 provider parent**（D1 修订）。
+- [x] **P8a 结构改造**：multi-module root 去掉 `spring-boot-starter-parent`，改为无 parent、纯 BOM
+  （import `spring-boot-dependencies` + `mybatis-plus-bom` + `aipersimmon-ddd-bom`），显式补 `maven.compiler.release=21`
+  / `-parameters` / UTF-8 / `spring-boot-maven-plugin` repackage 绑定。子模块仍以 `multi-module` 为 reactor parent。
+  验收：`mvn -DskipTests package` 全 20 模块 BUILD SUCCESS，`start` repackage 出可运行 jar。✅
+- [ ] **P8b 质量门禁**：multi-module root 自声明 Spotless + 质量 pluginManagement（引用 build-tools 规则）；`*-domain`
+  加 5 行 opt-in；`ci.yml` 脚手架 `test`→`verify`。**前置**：`*-domain` 需补测试到 90%/90%（ordering-domain 28 类/1 测试、
+  inventory 7/0、payment 2/0——大工作量，单独排期）。
+- [ ] archetype 生成模板同步。
+- 验收：multi-module `verify` 门禁全绿；新生成项目 domain 默认带 90%/90%。
 
 ## 落地基线记录
 

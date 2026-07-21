@@ -88,10 +88,6 @@
     <!-- Reusable Testcontainers support (singleton containers + Spring Boot
          @ServiceConnection configs); consumers add it at test scope. See design-00007. -->
     <module>aipersimmon-ddd-test-support</module>
-    <!-- Provider build parent for scaffold applications (Spring Boot parent + BOM +
-         quality gates). Aggregated here so it is versioned and released with the library;
-         it inherits spring-boot-starter-parent, not this parent. See design-00007. -->
-    <module>aipersimmon-ddd-build</module>
   </modules>
 
   <dependencyManagement>

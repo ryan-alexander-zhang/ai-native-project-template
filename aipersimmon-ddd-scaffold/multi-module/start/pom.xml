@@ -103,12 +103,10 @@
       <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
     </dependency>
     <!-- MyBatis-Plus: provides the SqlSessionFactory the outbox/inbox variants and the aggregate
-         mappers share. Version pinned here — the scaffold inherits spring-boot-starter-parent (not
-         the library parent), which does not manage MyBatis-Plus. -->
+         mappers share. Version comes from the mybatis-plus-bom imported by the reactor root. -->
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-      <version>3.5.15</version>
     </dependency>
 
     <!--
