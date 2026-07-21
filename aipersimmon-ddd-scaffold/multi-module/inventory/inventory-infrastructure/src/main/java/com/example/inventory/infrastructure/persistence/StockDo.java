@@ -8,23 +8,24 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @TableName("inventory.stocks")
 public class StockDo {
 
-    @TableId(type = IdType.INPUT)
-    private String sku;
-    private Integer available;
+  @TableId(type = IdType.INPUT)
+  private String sku;
 
-    public String getSku() {
-        return sku;
-    }
+  private Integer available;
 
-    public void setSku(String sku) {
-        this.sku = sku;
-    }
+  public String getSku() {
+    return sku;
+  }
 
-    public Integer getAvailable() {
-        return available;
-    }
+  public void setSku(String sku) {
+    this.sku = sku;
+  }
 
-    public void setAvailable(Integer available) {
-        this.available = available;
-    }
+  public Integer getAvailable() {
+    return available;
+  }
+
+  public void setAvailable(Integer available) {
+    this.available = available;
+  }
 }

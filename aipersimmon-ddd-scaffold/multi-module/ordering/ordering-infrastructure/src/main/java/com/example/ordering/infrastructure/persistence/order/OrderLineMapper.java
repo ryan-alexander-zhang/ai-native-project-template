@@ -5,5 +5,4 @@ import org.apache.ibatis.annotations.Mapper;
 
 /** MyBatis-Plus mapper for order lines. */
 @Mapper
-public interface OrderLineMapper extends BaseMapper<OrderLineDo> {
-}
+public interface OrderLineMapper extends BaseMapper<OrderLineDo> {}

@@ -8,5 +8,4 @@ import jakarta.validation.constraints.NotBlank;
  * addressed by its {@code reservationId}. Releasing by the reservation handle — not by re-listing
  * the SKUs — is what lets inventory hand back exactly what it held, and only once. No result.
  */
-public record ReleaseStock(@NotBlank String reservationId) implements Command<Void> {
-}
+public record ReleaseStock(@NotBlank String reservationId) implements Command<Void> {}

@@ -10,31 +10,31 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class MyBatisStocks implements Stocks {
 
-    private final StockMapper stocks;
+  private final StockMapper stocks;
 
-    public MyBatisStocks(StockMapper stocks) {
-        this.stocks = stocks;
-    }
+  public MyBatisStocks(StockMapper stocks) {
+    this.stocks = stocks;
+  }
 
-    @Override
-    public void save(Stock stock) {
-        String sku = stock.id().value();
-        StockDo row = new StockDo();
-        row.setSku(sku);
-        row.setAvailable(stock.available());
-        if (stocks.selectById(sku) == null) {
-            stocks.insert(row);
-        } else {
-            stocks.updateById(row);
-        }
+  @Override
+  public void save(Stock stock) {
+    String sku = stock.id().value();
+    StockDo row = new StockDo();
+    row.setSku(sku);
+    row.setAvailable(stock.available());
+    if (stocks.selectById(sku) == null) {
+      stocks.insert(row);
+    } else {
+      stocks.updateById(row);
     }
+  }
 
-    @Override
-    public Optional<Stock> findBySku(Sku sku) {
-        StockDo row = stocks.selectById(sku.value());
-        if (row == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new Stock(new Sku(row.getSku()), row.getAvailable()));
+  @Override
+  public Optional<Stock> findBySku(Sku sku) {
+    StockDo row = stocks.selectById(sku.value());
+    if (row == null) {
+      return Optional.empty();
     }
+    return Optional.of(new Stock(new Sku(row.getSku()), row.getAvailable()));
+  }
 }

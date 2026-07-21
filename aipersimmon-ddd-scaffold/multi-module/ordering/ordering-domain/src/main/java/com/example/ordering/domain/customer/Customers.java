@@ -7,5 +7,5 @@ import java.util.Optional;
 @Repository
 public interface Customers {
 
-    Optional<Customer> findById(CustomerId id);
+  Optional<Customer> findById(CustomerId id);
 }

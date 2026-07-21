@@ -12,10 +12,11 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  */
 @EventType(name = "com.example.payment.PaymentDeclined", version = 1)
 @Externalized("payment.events")
-public record PaymentDeclined(String orderId, String code, String reason) implements IntegrationEvent {
+public record PaymentDeclined(String orderId, String code, String reason)
+    implements IntegrationEvent {
 
-    @Override
-    public String subject() {
-        return orderId();
-    }
+  @Override
+  public String subject() {
+    return orderId();
+  }
 }

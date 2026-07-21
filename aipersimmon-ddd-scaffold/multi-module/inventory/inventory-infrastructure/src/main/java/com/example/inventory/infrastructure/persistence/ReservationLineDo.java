@@ -6,31 +6,31 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @TableName("inventory.reservation_lines")
 public class ReservationLineDo {
 
-    private String reservationId;
-    private String sku;
-    private Integer quantity;
+  private String reservationId;
+  private String sku;
+  private Integer quantity;
 
-    public String getReservationId() {
-        return reservationId;
-    }
+  public String getReservationId() {
+    return reservationId;
+  }
 
-    public void setReservationId(String reservationId) {
-        this.reservationId = reservationId;
-    }
+  public void setReservationId(String reservationId) {
+    this.reservationId = reservationId;
+  }
 
-    public String getSku() {
-        return sku;
-    }
+  public String getSku() {
+    return sku;
+  }
 
-    public void setSku(String sku) {
-        this.sku = sku;
-    }
+  public void setSku(String sku) {
+    this.sku = sku;
+  }
 
-    public Integer getQuantity() {
-        return quantity;
-    }
+  public Integer getQuantity() {
+    return quantity;
+  }
 
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
-    }
+  public void setQuantity(Integer quantity) {
+    this.quantity = quantity;
+  }
 }

@@ -6,58 +6,58 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @TableName("ordering.order_lines")
 public class OrderLineDo {
 
-    private String orderId;
-    private Integer lineNo;
-    private String sku;
-    private Integer quantity;
-    private Long unitMinor;
-    private String currency;
+  private String orderId;
+  private Integer lineNo;
+  private String sku;
+  private Integer quantity;
+  private Long unitMinor;
+  private String currency;
 
-    public String getOrderId() {
-        return orderId;
-    }
+  public String getOrderId() {
+    return orderId;
+  }
 
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
-    }
+  public void setOrderId(String orderId) {
+    this.orderId = orderId;
+  }
 
-    public Integer getLineNo() {
-        return lineNo;
-    }
+  public Integer getLineNo() {
+    return lineNo;
+  }
 
-    public void setLineNo(Integer lineNo) {
-        this.lineNo = lineNo;
-    }
+  public void setLineNo(Integer lineNo) {
+    this.lineNo = lineNo;
+  }
 
-    public String getSku() {
-        return sku;
-    }
+  public String getSku() {
+    return sku;
+  }
 
-    public void setSku(String sku) {
-        this.sku = sku;
-    }
+  public void setSku(String sku) {
+    this.sku = sku;
+  }
 
-    public Integer getQuantity() {
-        return quantity;
-    }
+  public Integer getQuantity() {
+    return quantity;
+  }
 
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
-    }
+  public void setQuantity(Integer quantity) {
+    this.quantity = quantity;
+  }
 
-    public Long getUnitMinor() {
-        return unitMinor;
-    }
+  public Long getUnitMinor() {
+    return unitMinor;
+  }
 
-    public void setUnitMinor(Long unitMinor) {
-        this.unitMinor = unitMinor;
-    }
+  public void setUnitMinor(Long unitMinor) {
+    this.unitMinor = unitMinor;
+  }
 
-    public String getCurrency() {
-        return currency;
-    }
+  public String getCurrency() {
+    return currency;
+  }
 
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
+  public void setCurrency(String currency) {
+    this.currency = currency;
+  }
 }

@@ -5,5 +5,4 @@ import org.apache.ibatis.annotations.Mapper;
 
 /** MyBatis-Plus mapper for the reservation header. */
 @Mapper
-public interface ReservationMapper extends BaseMapper<ReservationDo> {
-}
+public interface ReservationMapper extends BaseMapper<ReservationDo> {}

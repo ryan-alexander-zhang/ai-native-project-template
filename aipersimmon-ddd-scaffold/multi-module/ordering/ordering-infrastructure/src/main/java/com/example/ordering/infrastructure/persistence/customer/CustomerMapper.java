@@ -5,5 +5,4 @@ import org.apache.ibatis.annotations.Mapper;
 
 /** MyBatis-Plus mapper for customers (read-only in this app; seeded by Flyway). */
 @Mapper
-public interface CustomerMapper extends BaseMapper<CustomerDo> {
-}
+public interface CustomerMapper extends BaseMapper<CustomerDo> {}

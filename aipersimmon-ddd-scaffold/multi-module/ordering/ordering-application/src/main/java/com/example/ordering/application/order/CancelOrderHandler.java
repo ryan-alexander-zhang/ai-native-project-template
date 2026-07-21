@@ -16,25 +16,29 @@ import org.springframework.stereotype.Component;
 @UseCase
 public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
 
-    private final Orders orders;
-    private final DomainEvents domainEvents;
+  private final Orders orders;
+  private final DomainEvents domainEvents;
 
-    public CancelOrderHandler(Orders orders, DomainEvents domainEvents) {
-        this.orders = orders;
-        this.domainEvents = domainEvents;
-    }
+  public CancelOrderHandler(Orders orders, DomainEvents domainEvents) {
+    this.orders = orders;
+    this.domainEvents = domainEvents;
+  }
 
-    @Override
-    public Void handle(CancelOrder command, CommandContext context) {
-        OrderId id = new OrderId(command.orderId());
-        Order order = orders.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(
+  @Override
+  public Void handle(CancelOrder command, CommandContext context) {
+    OrderId id = new OrderId(command.orderId());
+    Order order =
+        orders
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException(
                         OrderingErrorCode.ORDER_NOT_FOUND, "unknown order: " + command.orderId()));
 
-        order.cancel(command.reason());
+    order.cancel(command.reason());
 
-        orders.save(order);
-        domainEvents.publishAndClear(order);
-        return null;
-    }
+    orders.save(order);
+    domainEvents.publishAndClear(order);
+    return null;
+  }
 }

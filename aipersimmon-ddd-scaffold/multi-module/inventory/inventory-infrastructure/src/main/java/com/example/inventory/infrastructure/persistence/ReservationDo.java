@@ -8,32 +8,33 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @TableName("inventory.reservations")
 public class ReservationDo {
 
-    @TableId(type = IdType.INPUT)
-    private String id;
-    private String orderId;
-    private Boolean released;
+  @TableId(type = IdType.INPUT)
+  private String id;
 
-    public String getId() {
-        return id;
-    }
+  private String orderId;
+  private Boolean released;
 
-    public void setId(String id) {
-        this.id = id;
-    }
+  public String getId() {
+    return id;
+  }
 
-    public String getOrderId() {
-        return orderId;
-    }
+  public void setId(String id) {
+    this.id = id;
+  }
 
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
-    }
+  public String getOrderId() {
+    return orderId;
+  }
 
-    public Boolean getReleased() {
-        return released;
-    }
+  public void setOrderId(String orderId) {
+    this.orderId = orderId;
+  }
 
-    public void setReleased(Boolean released) {
-        this.released = released;
-    }
+  public Boolean getReleased() {
+    return released;
+  }
+
+  public void setReleased(Boolean released) {
+    this.released = released;
+  }
 }

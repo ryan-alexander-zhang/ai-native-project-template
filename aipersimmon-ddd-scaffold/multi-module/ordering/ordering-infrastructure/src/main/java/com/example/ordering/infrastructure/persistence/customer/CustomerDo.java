@@ -8,41 +8,42 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @TableName("ordering.customers")
 public class CustomerDo {
 
-    @TableId(type = IdType.INPUT)
-    private String id;
-    private String name;
-    private Long creditMinor;
-    private String currency;
+  @TableId(type = IdType.INPUT)
+  private String id;
 
-    public String getId() {
-        return id;
-    }
+  private String name;
+  private Long creditMinor;
+  private String currency;
 
-    public void setId(String id) {
-        this.id = id;
-    }
+  public String getId() {
+    return id;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public void setId(String id) {
+    this.id = id;
+  }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+  public String getName() {
+    return name;
+  }
 
-    public Long getCreditMinor() {
-        return creditMinor;
-    }
+  public void setName(String name) {
+    this.name = name;
+  }
 
-    public void setCreditMinor(Long creditMinor) {
-        this.creditMinor = creditMinor;
-    }
+  public Long getCreditMinor() {
+    return creditMinor;
+  }
 
-    public String getCurrency() {
-        return currency;
-    }
+  public void setCreditMinor(Long creditMinor) {
+    this.creditMinor = creditMinor;
+  }
 
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
+  public String getCurrency() {
+    return currency;
+  }
+
+  public void setCurrency(String currency) {
+    this.currency = currency;
+  }
 }

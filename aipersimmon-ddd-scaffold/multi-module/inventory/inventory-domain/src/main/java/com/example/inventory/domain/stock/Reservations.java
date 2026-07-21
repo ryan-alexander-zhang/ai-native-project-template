@@ -7,7 +7,7 @@ import java.util.Optional;
 @Repository
 public interface Reservations {
 
-    void save(Reservation reservation);
+  void save(Reservation reservation);
 
-    Optional<Reservation> findById(ReservationId id);
+  Optional<Reservation> findById(ReservationId id);
 }

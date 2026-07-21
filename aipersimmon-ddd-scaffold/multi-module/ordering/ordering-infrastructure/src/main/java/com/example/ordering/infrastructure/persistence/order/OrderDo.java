@@ -8,32 +8,33 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @TableName("ordering.orders")
 public class OrderDo {
 
-    @TableId(type = IdType.INPUT)
-    private String id;
-    private String customerId;
-    private String status;
+  @TableId(type = IdType.INPUT)
+  private String id;
 
-    public String getId() {
-        return id;
-    }
+  private String customerId;
+  private String status;
 
-    public void setId(String id) {
-        this.id = id;
-    }
+  public String getId() {
+    return id;
+  }
 
-    public String getCustomerId() {
-        return customerId;
-    }
+  public void setId(String id) {
+    this.id = id;
+  }
 
-    public void setCustomerId(String customerId) {
-        this.customerId = customerId;
-    }
+  public String getCustomerId() {
+    return customerId;
+  }
 
-    public String getStatus() {
-        return status;
-    }
+  public void setCustomerId(String customerId) {
+    this.customerId = customerId;
+  }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
+  }
 }

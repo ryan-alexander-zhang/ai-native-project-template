@@ -22,25 +22,29 @@ import org.springframework.stereotype.Component;
 @UseCase
 public class RequestPaymentHandler implements CommandHandler<RequestPayment, Void> {
 
-    private final Orders orders;
-    private final IntegrationEvents integrationEvents;
+  private final Orders orders;
+  private final IntegrationEvents integrationEvents;
 
-    public RequestPaymentHandler(Orders orders, IntegrationEvents integrationEvents) {
-        this.orders = orders;
-        this.integrationEvents = integrationEvents;
-    }
+  public RequestPaymentHandler(Orders orders, IntegrationEvents integrationEvents) {
+    this.orders = orders;
+    this.integrationEvents = integrationEvents;
+  }
 
-    @Override
-    public Void handle(RequestPayment command, CommandContext context) {
-        Order order = orders.findById(new OrderId(command.orderId()))
-                .orElseThrow(() -> new EntityNotFoundException(
+  @Override
+  public Void handle(RequestPayment command, CommandContext context) {
+    Order order =
+        orders
+            .findById(new OrderId(command.orderId()))
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException(
                         OrderingErrorCode.ORDER_NOT_FOUND, "unknown order: " + command.orderId()));
-        Money total = order.total();
-        integrationEvents.publish(
-                new PaymentRequested(
-                        command.orderId(), command.paymentOperationId(),
-                        total.amountMinor(), total.currency()),
-                context);
-        return null;
-    }
+    Money total = order.total();
+    integrationEvents.publish(
+        new PaymentRequested(
+            command.orderId(), command.paymentOperationId(),
+            total.amountMinor(), total.currency()),
+        context);
+    return null;
+  }
 }

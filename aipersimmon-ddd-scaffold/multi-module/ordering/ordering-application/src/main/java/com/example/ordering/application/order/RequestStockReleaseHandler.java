@@ -16,16 +16,16 @@ import org.springframework.stereotype.Component;
 @UseCase
 public class RequestStockReleaseHandler implements CommandHandler<RequestStockRelease, Void> {
 
-    private final IntegrationEvents integrationEvents;
+  private final IntegrationEvents integrationEvents;
 
-    public RequestStockReleaseHandler(IntegrationEvents integrationEvents) {
-        this.integrationEvents = integrationEvents;
-    }
+  public RequestStockReleaseHandler(IntegrationEvents integrationEvents) {
+    this.integrationEvents = integrationEvents;
+  }
 
-    @Override
-    public Void handle(RequestStockRelease command, CommandContext context) {
-        integrationEvents.publish(
-                new StockReleaseRequested(command.orderId(), command.reservationId()), context);
-        return null;
-    }
+  @Override
+  public Void handle(RequestStockRelease command, CommandContext context) {
+    integrationEvents.publish(
+        new StockReleaseRequested(command.orderId(), command.reservationId()), context);
+    return null;
+  }
 }

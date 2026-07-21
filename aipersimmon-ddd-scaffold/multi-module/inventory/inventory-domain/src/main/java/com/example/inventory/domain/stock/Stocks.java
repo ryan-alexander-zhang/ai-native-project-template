@@ -7,7 +7,7 @@ import java.util.Optional;
 @Repository
 public interface Stocks {
 
-    void save(Stock stock);
+  void save(Stock stock);
 
-    Optional<Stock> findBySku(Sku sku);
+  Optional<Stock> findBySku(Sku sku);
 }

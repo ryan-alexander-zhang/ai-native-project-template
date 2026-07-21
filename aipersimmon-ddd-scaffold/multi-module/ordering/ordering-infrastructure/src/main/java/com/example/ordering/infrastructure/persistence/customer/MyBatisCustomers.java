@@ -11,19 +11,22 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class MyBatisCustomers implements Customers {
 
-    private final CustomerMapper customers;
+  private final CustomerMapper customers;
 
-    public MyBatisCustomers(CustomerMapper customers) {
-        this.customers = customers;
-    }
+  public MyBatisCustomers(CustomerMapper customers) {
+    this.customers = customers;
+  }
 
-    @Override
-    public Optional<Customer> findById(CustomerId id) {
-        CustomerDo row = customers.selectById(id.value());
-        if (row == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new Customer(
-                new CustomerId(row.getId()), row.getName(), Money.of(row.getCreditMinor(), row.getCurrency())));
+  @Override
+  public Optional<Customer> findById(CustomerId id) {
+    CustomerDo row = customers.selectById(id.value());
+    if (row == null) {
+      return Optional.empty();
     }
+    return Optional.of(
+        new Customer(
+            new CustomerId(row.getId()),
+            row.getName(),
+            Money.of(row.getCreditMinor(), row.getCurrency())));
+  }
 }
