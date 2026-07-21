@@ -14,20 +14,21 @@
   </description>
 
   <!--
-    Complexity policy (plan-00009 ratchet). CognitiveComplexity is kept at its default (15) as
-    the real readability guard. CyclomaticComplexity / NPathComplexity / ExcessiveParameterList
-    are raised well above their defaults on purpose: in this codebase their high counts come from
-    patterns that are correct, not tangled — flat guard-clause validation (each `if…throw`
-    inflates cyclomatic/NPath) and DI-heavy constructors/@Bean factories (many injected
-    collaborators, not data). Gating on those would push toward artificial splitting; genuine
-    difficulty is still caught by CognitiveComplexity. TooManyMethods is raised to fit the
-    per-item classes here (config @Bean factories, DAO-per-query stores, one-@ExceptionHandler
-    -per-exception, codec/state-machine handlers).
+    Complexity policy (plan-00009 ratchet). Two rules stay strict as the real readability guards:
+    CognitiveComplexity at its default 15, and CyclomaticComplexity at 15 (the widely-accepted
+    upper bound; the classic default is 10). A method that exceeds these is refactored, not tuned
+    around. ExcessiveParameterList and TooManyMethods are raised because their high counts come
+    from patterns that are correct rather than tangled — DI-heavy constructors / @Bean factories
+    (many injected collaborators, not data) and per-item classes (config @Bean factories,
+    DAO-per-query stores, one-@ExceptionHandler-per-exception, codec / state-machine handlers).
+    NPathComplexity is raised because it multiplies independent branches, so even a flat
+    guard-clause chain explodes numerically without being hard to read; CyclomaticComplexity +
+    CognitiveComplexity cover genuine difficulty.
   -->
   <rule ref="category/java/design.xml/CognitiveComplexity"/>
   <rule ref="category/java/design.xml/CyclomaticComplexity">
     <properties>
-      <property name="methodReportLevel" value="18"/>
+      <property name="methodReportLevel" value="15"/>
     </properties>
   </rule>
   <rule ref="category/java/design.xml/NPathComplexity">

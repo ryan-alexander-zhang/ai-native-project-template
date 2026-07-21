@@ -37,6 +37,15 @@ public final class ExponentialBackoffPolicy implements ProcessRetryPolicy {
       double jitter,
       int maxAttempts,
       DoubleSupplier randomizer) {
+    this.initial = validInitial(initial);
+    this.max = validMax(max, this.initial);
+    this.multiplier = validMultiplier(multiplier);
+    this.jitter = validJitter(jitter);
+    this.maxAttempts = validMaxAttempts(maxAttempts);
+    this.randomizer = randomizer;
+  }
+
+  private static Duration validInitial(Duration initial) {
     if (initial == null || initial.isNegative() || initial.isZero()) {
       throw new IllegalArgumentException("initial backoff must be positive");
     }
@@ -45,24 +54,35 @@ public final class ExponentialBackoffPolicy implements ProcessRetryPolicy {
       // zero delay and degenerate into a hot retry loop. Require at least 1ms.
       throw new IllegalArgumentException("initial backoff must be at least 1ms");
     }
+    return initial;
+  }
+
+  private static Duration validMax(Duration max, Duration initial) {
     if (max == null || max.compareTo(initial) < 0) {
       throw new IllegalArgumentException("max backoff must be >= initial");
     }
+    return max;
+  }
+
+  private static double validMultiplier(double multiplier) {
     if (multiplier < 1.0) {
       throw new IllegalArgumentException("multiplier must be >= 1.0");
     }
+    return multiplier;
+  }
+
+  private static double validJitter(double jitter) {
     if (jitter < 0.0 || jitter > 1.0) {
       throw new IllegalArgumentException("jitter must be within [0, 1]");
     }
+    return jitter;
+  }
+
+  private static int validMaxAttempts(int maxAttempts) {
     if (maxAttempts < 1) {
       throw new IllegalArgumentException("maxAttempts must be >= 1");
     }
-    this.initial = initial;
-    this.max = max;
-    this.multiplier = multiplier;
-    this.jitter = jitter;
-    this.maxAttempts = maxAttempts;
-    this.randomizer = randomizer;
+    return maxAttempts;
   }
 
   @Override
