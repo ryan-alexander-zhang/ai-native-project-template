@@ -95,7 +95,7 @@ infrastructure；适配器在 DO ↔ 领域聚合之间转换。ArchUnit "domain
 
 - 不做 CQRS 读模型、事件溯源、JPA/Hibernate。
 - **schema 隔离仅覆盖业务聚合**；outbox/inbox/PM/shedlock 作为共享 infra 留 public，**不逐 BC 拆 outbox、不分库**
-  （彻底隔离/拆分就绪属 [[issue-00031-flyway-shared-schema-and-bundled-shedlock-table]] / [[issue-00028-broker-transport-on-single-deployable-monolith]] 范畴）。
+  （彻底隔离/拆分就绪属 [[issue-00031-flyway-shared-schema-and-bundled-shedlock-table]] / issue-00028 范畴）。
 - 不改 `IntegrationEvents` port、不改 handler/application、不新增事务代码（复用既有拦截器）；domain 仅加 framework-free 重建 API（见实施记录）。
 
 ## 五、关联
