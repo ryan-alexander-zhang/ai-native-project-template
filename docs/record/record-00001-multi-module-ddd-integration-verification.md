@@ -147,6 +147,12 @@ HTTP `POST /orders`、JDBC(`INSERT/SELECT/UPDATE ordering.aipersimmon_outbox/inb
 单条 trace 的 span 树 `POST /orders(SERVER)→command PlaceOrder(INTERNAL)→SELECT customers/stocks(CLIENT)`
 与 SigNoz UI 呈现一致。启动前发现并修复了 collector 配置不兼容(见 **F-3**)。
 
+**边缘 request id 可检索(issue-00046 补齐)** — 起初 `X-Request-Id` 只在响应头/体与 MDC,没上报到 trace,
+SigNoz 里按它搜不到。已在 observability-otel starter 的 `TraceIdMdcFilter` 把边缘 requestId 以 span 属性
+`request.id` 打到 server span(读已解析的 MDC 值,客户端传入与服务端生成两种情况都覆盖)。实测:按
+`request.id`(客户端传入 `rid-verify-38d801ac…` / 服务端生成 `4fe92345…`)在 SigNoz 均定位到对应 trace
+(`2ddb0e38…` / `b7c5af77…`)—— 即"按 X-Request-Id 搜 → 拿 trace → 全局钻取"的标准闭环成立。
+
 > 复现:`docker compose -f compose.yaml --profile observability up -d db kafka otel-collector signoz`;
 > 应用参数去掉 `--otel.sdk.disabled=true`;SigNoz UI `http://localhost:48080`。验证查询(SigNoz ClickHouse):
 > `SELECT name,count(*) FROM signoz_traces.distributed_signoz_index_v3 WHERE serviceName='ordering' GROUP BY name`。
