@@ -6,340 +6,353 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.convert.DurationStyle;
 
 /**
- * Configuration for the JDBC Process Manager runtime, under
- * {@code aipersimmon.ddd.process-manager.jdbc}. {@link #validate()}
- * is called by the auto-configuration so illegal values fail fast at startup rather than
- * misbehaving at runtime.
+ * Configuration for the JDBC Process Manager runtime, under {@code
+ * aipersimmon.ddd.process-manager.jdbc}. {@link #validate()} is called by the auto-configuration so
+ * illegal values fail fast at startup rather than misbehaving at runtime.
  */
 @ConfigurationProperties(prefix = "aipersimmon.ddd.process-manager.jdbc")
 public class ProcessManagerJdbcProperties {
 
-    /** Enable the JDBC runtime auto-configuration. */
-    private boolean enabled = true;
-    /** {@code auto} (probe the DataSource), or {@code postgresql} / {@code mysql} / {@code h2}. */
-    private String dialect = "auto";
-    /** {@code reject} or {@code fold}: a start for an existing business key with a new message id. */
-    private String startDuplicateBusinessKey = "reject";
-    /** The transaction-level retry limit for a revision conflict. */
-    private int concurrencyMaxRetries = 3;
-    /** Explicit node lease identity; a random one is generated when blank. Not a business identity. */
-    private String workerId = "";
-    /** {@code validate} (verify the tables exist) or {@code none}. Never creates tables. */
-    private String schemaValidation = "validate";
-    /** Time to wait for in-flight worker tasks after shutdown stops claiming. */
-    private Duration shutdownTimeout = Duration.ofSeconds(30);
+  /** Enable the JDBC runtime auto-configuration. */
+  private boolean enabled = true;
 
-    private final Worker effectRelay = new Worker();
-    private final Worker deadlineWorker = new Worker();
-    private final Observability observability = new Observability();
-    private final Instance instance = new Instance();
-    private final Payload payload = new Payload();
+  /** {@code auto} (probe the DataSource), or {@code postgresql} / {@code mysql} / {@code h2}. */
+  private String dialect = "auto";
 
-    /** Whole-instance backstop settings. */
-    public static class Instance {
-        /** {@code none} (no backstop) or a duration like {@code 30d}: the max-lifetime TTL. */
-        private String maxLifetime = "none";
+  /** {@code reject} or {@code fold}: a start for an existing business key with a new message id. */
+  private String startDuplicateBusinessKey = "reject";
 
-        public String getMaxLifetime() {
-            return maxLifetime;
-        }
+  /** The transaction-level retry limit for a revision conflict. */
+  private int concurrencyMaxRetries = 3;
 
-        public void setMaxLifetime(String maxLifetime) {
-            this.maxLifetime = maxLifetime;
-        }
+  /**
+   * Explicit node lease identity; a random one is generated when blank. Not a business identity.
+   */
+  private String workerId = "";
 
-        /** The parsed backstop TTL, or empty when {@code none}. */
-        public Optional<Duration> maxLifetimeDuration() {
-            if (maxLifetime == null || maxLifetime.isBlank() || maxLifetime.equalsIgnoreCase("none")) {
-                return Optional.empty();
-            }
-            return Optional.of(DurationStyle.detectAndParse(maxLifetime.trim()));
-        }
+  /** {@code validate} (verify the tables exist) or {@code none}. Never creates tables. */
+  private String schemaValidation = "validate";
 
-        void validate() {
-            maxLifetimeDuration().ifPresent(d -> {
+  /** Time to wait for in-flight worker tasks after shutdown stops claiming. */
+  private Duration shutdownTimeout = Duration.ofSeconds(30);
+
+  private final Worker effectRelay = new Worker();
+  private final Worker deadlineWorker = new Worker();
+  private final Observability observability = new Observability();
+  private final Instance instance = new Instance();
+  private final Payload payload = new Payload();
+
+  /** Whole-instance backstop settings. */
+  public static class Instance {
+    /** {@code none} (no backstop) or a duration like {@code 30d}: the max-lifetime TTL. */
+    private String maxLifetime = "none";
+
+    public String getMaxLifetime() {
+      return maxLifetime;
+    }
+
+    public void setMaxLifetime(String maxLifetime) {
+      this.maxLifetime = maxLifetime;
+    }
+
+    /** The parsed backstop TTL, or empty when {@code none}. */
+    public Optional<Duration> maxLifetimeDuration() {
+      if (maxLifetime == null || maxLifetime.isBlank() || maxLifetime.equalsIgnoreCase("none")) {
+        return Optional.empty();
+      }
+      return Optional.of(DurationStyle.detectAndParse(maxLifetime.trim()));
+    }
+
+    void validate() {
+      maxLifetimeDuration()
+          .ifPresent(
+              d -> {
                 if (d.isNegative() || d.isZero()) {
-                    throw new IllegalStateException("instance.max-lifetime must be positive or 'none'");
+                  throw new IllegalStateException(
+                      "instance.max-lifetime must be positive or 'none'");
                 }
-            });
-        }
+              });
+    }
+  }
+
+  /** Payload size guardrail. */
+  public static class Payload {
+    /** Max encoded bytes for a single state/input/effect payload. */
+    private long maxBytes = 1_048_576L;
+
+    public long getMaxBytes() {
+      return maxBytes;
     }
 
-    /** Payload size guardrail. */
-    public static class Payload {
-        /** Max encoded bytes for a single state/input/effect payload. */
-        private long maxBytes = 1_048_576L;
-
-        public long getMaxBytes() {
-            return maxBytes;
-        }
-
-        public void setMaxBytes(long maxBytes) {
-            this.maxBytes = maxBytes;
-        }
-
-        void validate() {
-            if (maxBytes < 1) {
-                throw new IllegalStateException("payload.max-bytes must be >= 1");
-            }
-        }
+    public void setMaxBytes(long maxBytes) {
+      this.maxBytes = maxBytes;
     }
 
-    /** Thresholds for the health indicator and the stuck-instance SLI. */
-    public static class Observability {
-        /** An active instance idle (no pending work) longer than this counts as stuck. */
-        private Duration stuckThreshold = Duration.ofMinutes(15);
-        /** Oldest due-but-unhandled effect/deadline older than this reports health DEGRADED. */
-        private Duration oldestPendingWarn = Duration.ofSeconds(60);
+    void validate() {
+      if (maxBytes < 1) {
+        throw new IllegalStateException("payload.max-bytes must be >= 1");
+      }
+    }
+  }
 
-        public Duration getStuckThreshold() {
-            return stuckThreshold;
-        }
+  /** Thresholds for the health indicator and the stuck-instance SLI. */
+  public static class Observability {
+    /** An active instance idle (no pending work) longer than this counts as stuck. */
+    private Duration stuckThreshold = Duration.ofMinutes(15);
 
-        public void setStuckThreshold(Duration stuckThreshold) {
-            this.stuckThreshold = stuckThreshold;
-        }
+    /** Oldest due-but-unhandled effect/deadline older than this reports health DEGRADED. */
+    private Duration oldestPendingWarn = Duration.ofSeconds(60);
 
-        public Duration getOldestPendingWarn() {
-            return oldestPendingWarn;
-        }
-
-        public void setOldestPendingWarn(Duration oldestPendingWarn) {
-            this.oldestPendingWarn = oldestPendingWarn;
-        }
-
-        void validate() {
-            if (stuckThreshold == null || stuckThreshold.isNegative() || stuckThreshold.isZero()) {
-                throw new IllegalStateException("observability.stuck-threshold must be positive");
-            }
-            if (oldestPendingWarn == null || oldestPendingWarn.isNegative() || oldestPendingWarn.isZero()) {
-                throw new IllegalStateException("observability.oldest-pending-warn must be positive");
-            }
-        }
+    public Duration getStuckThreshold() {
+      return stuckThreshold;
     }
 
-    /** Effect-relay / deadline-worker polling, lease, and retry settings. */
-    public static class Worker {
-        private boolean enabled = true;
-        private Duration pollDelay = Duration.ofMillis(500);
-        private int batchSize = 100;
-        private Duration leaseDuration = Duration.ofSeconds(30);
-        private int maxAttempts = 12;
-        private final Backoff backoff = new Backoff();
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public Duration getPollDelay() {
-            return pollDelay;
-        }
-
-        public void setPollDelay(Duration pollDelay) {
-            this.pollDelay = pollDelay;
-        }
-
-        public int getBatchSize() {
-            return batchSize;
-        }
-
-        public void setBatchSize(int batchSize) {
-            this.batchSize = batchSize;
-        }
-
-        public Duration getLeaseDuration() {
-            return leaseDuration;
-        }
-
-        public void setLeaseDuration(Duration leaseDuration) {
-            this.leaseDuration = leaseDuration;
-        }
-
-        public int getMaxAttempts() {
-            return maxAttempts;
-        }
-
-        public void setMaxAttempts(int maxAttempts) {
-            this.maxAttempts = maxAttempts;
-        }
-
-        public Backoff getBackoff() {
-            return backoff;
-        }
-
-        void validate(String name) {
-            if (pollDelay == null || pollDelay.isNegative() || pollDelay.isZero()) {
-                throw new IllegalStateException(name + ".poll-delay must be positive");
-            }
-            if (batchSize < 1) {
-                throw new IllegalStateException(name + ".batch-size must be >= 1");
-            }
-            if (leaseDuration == null || leaseDuration.isNegative() || leaseDuration.isZero()) {
-                throw new IllegalStateException(name + ".lease-duration must be positive");
-            }
-            if (maxAttempts < 1) {
-                throw new IllegalStateException(name + ".max-attempts must be >= 1");
-            }
-            backoff.validate(name + ".backoff");
-        }
+    public void setStuckThreshold(Duration stuckThreshold) {
+      this.stuckThreshold = stuckThreshold;
     }
 
-    /** Capped, jittered exponential backoff settings. */
-    public static class Backoff {
-        private Duration initial = Duration.ofSeconds(1);
-        private Duration max = Duration.ofMinutes(5);
-        private double multiplier = 2.0;
-        private double jitter = 0.2;
-
-        public Duration getInitial() {
-            return initial;
-        }
-
-        public void setInitial(Duration initial) {
-            this.initial = initial;
-        }
-
-        public Duration getMax() {
-            return max;
-        }
-
-        public void setMax(Duration max) {
-            this.max = max;
-        }
-
-        public double getMultiplier() {
-            return multiplier;
-        }
-
-        public void setMultiplier(double multiplier) {
-            this.multiplier = multiplier;
-        }
-
-        public double getJitter() {
-            return jitter;
-        }
-
-        public void setJitter(double jitter) {
-            this.jitter = jitter;
-        }
-
-        void validate(String name) {
-            if (initial == null || initial.isNegative() || initial.isZero()) {
-                throw new IllegalStateException(name + ".initial must be positive");
-            }
-            if (max == null || max.compareTo(initial) < 0) {
-                throw new IllegalStateException(name + ".max must be >= initial");
-            }
-            if (multiplier < 1.0) {
-                throw new IllegalStateException(name + ".multiplier must be >= 1.0");
-            }
-            if (jitter < 0.0 || jitter > 1.0) {
-                throw new IllegalStateException(name + ".jitter must be within [0, 1]");
-            }
-        }
+    public Duration getOldestPendingWarn() {
+      return oldestPendingWarn;
     }
 
-    /** Validate the whole configuration; called during auto-configuration. */
-    public void validate() {
-        if (concurrencyMaxRetries < 0) {
-            throw new IllegalStateException("concurrency.max-retries must be >= 0");
-        }
-        if (!startDuplicateBusinessKey.equalsIgnoreCase("reject")
-                && !startDuplicateBusinessKey.equalsIgnoreCase("fold")) {
-            throw new IllegalStateException("start.duplicate-business-key must be 'reject' or 'fold'");
-        }
-        // Case-sensitive to match the @ConditionalOnProperty(havingValue="validate") gate on the
-        // schema validator: a typo like "Validate" would silently disable the check, so reject it here.
-        if (!schemaValidation.equals("validate") && !schemaValidation.equals("none")) {
-            throw new IllegalStateException("schema-validation must be 'validate' or 'none'");
-        }
-        if (shutdownTimeout == null || shutdownTimeout.isNegative()) {
-            throw new IllegalStateException("shutdown-timeout must be >= 0");
-        }
-        effectRelay.validate("effect-relay");
-        deadlineWorker.validate("deadline-worker");
-        observability.validate();
-        instance.validate();
-        payload.validate();
+    public void setOldestPendingWarn(Duration oldestPendingWarn) {
+      this.oldestPendingWarn = oldestPendingWarn;
     }
+
+    void validate() {
+      if (stuckThreshold == null || stuckThreshold.isNegative() || stuckThreshold.isZero()) {
+        throw new IllegalStateException("observability.stuck-threshold must be positive");
+      }
+      if (oldestPendingWarn == null
+          || oldestPendingWarn.isNegative()
+          || oldestPendingWarn.isZero()) {
+        throw new IllegalStateException("observability.oldest-pending-warn must be positive");
+      }
+    }
+  }
+
+  /** Effect-relay / deadline-worker polling, lease, and retry settings. */
+  public static class Worker {
+    private boolean enabled = true;
+    private Duration pollDelay = Duration.ofMillis(500);
+    private int batchSize = 100;
+    private Duration leaseDuration = Duration.ofSeconds(30);
+    private int maxAttempts = 12;
+    private final Backoff backoff = new Backoff();
 
     public boolean isEnabled() {
-        return enabled;
+      return enabled;
     }
 
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+      this.enabled = enabled;
     }
 
-    public String getDialect() {
-        return dialect;
+    public Duration getPollDelay() {
+      return pollDelay;
     }
 
-    public void setDialect(String dialect) {
-        this.dialect = dialect;
+    public void setPollDelay(Duration pollDelay) {
+      this.pollDelay = pollDelay;
     }
 
-    public String getStartDuplicateBusinessKey() {
-        return startDuplicateBusinessKey;
+    public int getBatchSize() {
+      return batchSize;
     }
 
-    public void setStartDuplicateBusinessKey(String startDuplicateBusinessKey) {
-        this.startDuplicateBusinessKey = startDuplicateBusinessKey;
+    public void setBatchSize(int batchSize) {
+      this.batchSize = batchSize;
     }
 
-    public int getConcurrencyMaxRetries() {
-        return concurrencyMaxRetries;
+    public Duration getLeaseDuration() {
+      return leaseDuration;
     }
 
-    public void setConcurrencyMaxRetries(int concurrencyMaxRetries) {
-        this.concurrencyMaxRetries = concurrencyMaxRetries;
+    public void setLeaseDuration(Duration leaseDuration) {
+      this.leaseDuration = leaseDuration;
     }
 
-    public String getWorkerId() {
-        return workerId;
+    public int getMaxAttempts() {
+      return maxAttempts;
     }
 
-    public void setWorkerId(String workerId) {
-        this.workerId = workerId;
+    public void setMaxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
     }
 
-    public String getSchemaValidation() {
-        return schemaValidation;
+    public Backoff getBackoff() {
+      return backoff;
     }
 
-    public void setSchemaValidation(String schemaValidation) {
-        this.schemaValidation = schemaValidation;
+    void validate(String name) {
+      if (pollDelay == null || pollDelay.isNegative() || pollDelay.isZero()) {
+        throw new IllegalStateException(name + ".poll-delay must be positive");
+      }
+      if (batchSize < 1) {
+        throw new IllegalStateException(name + ".batch-size must be >= 1");
+      }
+      if (leaseDuration == null || leaseDuration.isNegative() || leaseDuration.isZero()) {
+        throw new IllegalStateException(name + ".lease-duration must be positive");
+      }
+      if (maxAttempts < 1) {
+        throw new IllegalStateException(name + ".max-attempts must be >= 1");
+      }
+      backoff.validate(name + ".backoff");
+    }
+  }
+
+  /** Capped, jittered exponential backoff settings. */
+  public static class Backoff {
+    private Duration initial = Duration.ofSeconds(1);
+    private Duration max = Duration.ofMinutes(5);
+    private double multiplier = 2.0;
+    private double jitter = 0.2;
+
+    public Duration getInitial() {
+      return initial;
     }
 
-    public Duration getShutdownTimeout() {
-        return shutdownTimeout;
+    public void setInitial(Duration initial) {
+      this.initial = initial;
     }
 
-    public void setShutdownTimeout(Duration shutdownTimeout) {
-        this.shutdownTimeout = shutdownTimeout;
+    public Duration getMax() {
+      return max;
     }
 
-    public Worker getEffectRelay() {
-        return effectRelay;
+    public void setMax(Duration max) {
+      this.max = max;
     }
 
-    public Worker getDeadlineWorker() {
-        return deadlineWorker;
+    public double getMultiplier() {
+      return multiplier;
     }
 
-    public Observability getObservability() {
-        return observability;
+    public void setMultiplier(double multiplier) {
+      this.multiplier = multiplier;
     }
 
-    public Instance getInstance() {
-        return instance;
+    public double getJitter() {
+      return jitter;
     }
 
-    public Payload getPayload() {
-        return payload;
+    public void setJitter(double jitter) {
+      this.jitter = jitter;
     }
+
+    void validate(String name) {
+      if (initial == null || initial.isNegative() || initial.isZero()) {
+        throw new IllegalStateException(name + ".initial must be positive");
+      }
+      if (max == null || max.compareTo(initial) < 0) {
+        throw new IllegalStateException(name + ".max must be >= initial");
+      }
+      if (multiplier < 1.0) {
+        throw new IllegalStateException(name + ".multiplier must be >= 1.0");
+      }
+      if (jitter < 0.0 || jitter > 1.0) {
+        throw new IllegalStateException(name + ".jitter must be within [0, 1]");
+      }
+    }
+  }
+
+  /** Validate the whole configuration; called during auto-configuration. */
+  public void validate() {
+    if (concurrencyMaxRetries < 0) {
+      throw new IllegalStateException("concurrency.max-retries must be >= 0");
+    }
+    if (!startDuplicateBusinessKey.equalsIgnoreCase("reject")
+        && !startDuplicateBusinessKey.equalsIgnoreCase("fold")) {
+      throw new IllegalStateException("start.duplicate-business-key must be 'reject' or 'fold'");
+    }
+    // Case-sensitive to match the @ConditionalOnProperty(havingValue="validate") gate on the
+    // schema validator: a typo like "Validate" would silently disable the check, so reject it here.
+    if (!schemaValidation.equals("validate") && !schemaValidation.equals("none")) {
+      throw new IllegalStateException("schema-validation must be 'validate' or 'none'");
+    }
+    if (shutdownTimeout == null || shutdownTimeout.isNegative()) {
+      throw new IllegalStateException("shutdown-timeout must be >= 0");
+    }
+    effectRelay.validate("effect-relay");
+    deadlineWorker.validate("deadline-worker");
+    observability.validate();
+    instance.validate();
+    payload.validate();
+  }
+
+  public boolean isEnabled() {
+    return enabled;
+  }
+
+  public void setEnabled(boolean enabled) {
+    this.enabled = enabled;
+  }
+
+  public String getDialect() {
+    return dialect;
+  }
+
+  public void setDialect(String dialect) {
+    this.dialect = dialect;
+  }
+
+  public String getStartDuplicateBusinessKey() {
+    return startDuplicateBusinessKey;
+  }
+
+  public void setStartDuplicateBusinessKey(String startDuplicateBusinessKey) {
+    this.startDuplicateBusinessKey = startDuplicateBusinessKey;
+  }
+
+  public int getConcurrencyMaxRetries() {
+    return concurrencyMaxRetries;
+  }
+
+  public void setConcurrencyMaxRetries(int concurrencyMaxRetries) {
+    this.concurrencyMaxRetries = concurrencyMaxRetries;
+  }
+
+  public String getWorkerId() {
+    return workerId;
+  }
+
+  public void setWorkerId(String workerId) {
+    this.workerId = workerId;
+  }
+
+  public String getSchemaValidation() {
+    return schemaValidation;
+  }
+
+  public void setSchemaValidation(String schemaValidation) {
+    this.schemaValidation = schemaValidation;
+  }
+
+  public Duration getShutdownTimeout() {
+    return shutdownTimeout;
+  }
+
+  public void setShutdownTimeout(Duration shutdownTimeout) {
+    this.shutdownTimeout = shutdownTimeout;
+  }
+
+  public Worker getEffectRelay() {
+    return effectRelay;
+  }
+
+  public Worker getDeadlineWorker() {
+    return deadlineWorker;
+  }
+
+  public Observability getObservability() {
+    return observability;
+  }
+
+  public Instance getInstance() {
+    return instance;
+  }
+
+  public Payload getPayload() {
+    return payload;
+  }
 }

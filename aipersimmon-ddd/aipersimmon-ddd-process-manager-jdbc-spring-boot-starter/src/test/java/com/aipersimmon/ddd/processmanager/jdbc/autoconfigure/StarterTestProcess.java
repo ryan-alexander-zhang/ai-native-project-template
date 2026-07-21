@@ -23,112 +23,115 @@ import java.util.Optional;
 /** A minimal process used by the starter Boot slice test. */
 final class StarterTestProcess {
 
-    private StarterTestProcess() {
+  private StarterTestProcess() {}
+
+  static final ProcessType TYPE = new ProcessType("starter.test");
+
+  record St(String step) {}
+
+  record Begin(String reference) implements ProcessInput {}
+
+  record DoThing(String reference) implements Command<Void> {}
+
+  static final class Definition implements ProcessDefinition<St> {
+    @Override
+    public ProcessType processType() {
+      return TYPE;
     }
 
-    static final ProcessType TYPE = new ProcessType("starter.test");
-
-    record St(String step) {
+    @Override
+    public DefinitionVersion definitionVersion() {
+      return new DefinitionVersion("v1");
     }
 
-    record Begin(String reference) implements ProcessInput {
+    @Override
+    public boolean activeForNewInstances() {
+      return true;
     }
 
-    record DoThing(String reference) implements Command<Void> {
+    @Override
+    public StateSchemaVersion stateSchemaVersion() {
+      return new StateSchemaVersion(1);
     }
 
-    static final class Definition implements ProcessDefinition<St> {
-        @Override
-        public ProcessType processType() {
-            return TYPE;
-        }
-
-        @Override
-        public DefinitionVersion definitionVersion() {
-            return new DefinitionVersion("v1");
-        }
-
-        @Override
-        public boolean activeForNewInstances() {
-            return true;
-        }
-
-        @Override
-        public StateSchemaVersion stateSchemaVersion() {
-            return new StateSchemaVersion(1);
-        }
-
-        @Override
-        public ProcessDecision<St> start(ProcessInput input, ProcessContext context) {
-            Begin begin = (Begin) input;
-            return new ProcessDecision<>(
-                    new St("GO"), ProcessLifecycle.RUNNING, new ProcessStep("GO"),
-                    Optional.empty(), new DecisionCode("begun"),
-                    List.of(new DispatchCommand(new DoThing(begin.reference()))));
-        }
-
-        @Override
-        public ProcessDecision<St> react(St state, ProcessInput input, ProcessContext context) {
-            throw new UnsupportedOperationException("no react in the starter smoke test");
-        }
+    @Override
+    public ProcessDecision<St> start(ProcessInput input, ProcessContext context) {
+      Begin begin = (Begin) input;
+      return new ProcessDecision<>(
+          new St("GO"),
+          ProcessLifecycle.RUNNING,
+          new ProcessStep("GO"),
+          Optional.empty(),
+          new DecisionCode("begun"),
+          List.of(new DispatchCommand(new DoThing(begin.reference()))));
     }
 
-    static ProcessPayloadCodec<Begin> beginCodec() {
-        return codec("starter.begin", Begin.class, Begin::reference, Begin::new);
+    @Override
+    public ProcessDecision<St> react(St state, ProcessInput input, ProcessContext context) {
+      throw new UnsupportedOperationException("no react in the starter smoke test");
     }
+  }
 
-    static ProcessPayloadCodec<DoThing> doThingCodec() {
-        return codec("starter.do-thing", DoThing.class, DoThing::reference, DoThing::new);
-    }
+  static ProcessPayloadCodec<Begin> beginCodec() {
+    return codec("starter.begin", Begin.class, Begin::reference, Begin::new);
+  }
 
-    static ProcessStateCodec<St> stateCodec() {
-        return new ProcessStateCodec<>() {
-            @Override
-            public ProcessType processType() {
-                return TYPE;
-            }
+  static ProcessPayloadCodec<DoThing> doThingCodec() {
+    return codec("starter.do-thing", DoThing.class, DoThing::reference, DoThing::new);
+  }
 
-            @Override
-            public StateSchemaVersion schemaVersion() {
-                return new StateSchemaVersion(1);
-            }
+  static ProcessStateCodec<St> stateCodec() {
+    return new ProcessStateCodec<>() {
+      @Override
+      public ProcessType processType() {
+        return TYPE;
+      }
 
-            @Override
-            public EncodedPayload encode(St state) {
-                return new EncodedPayload(new PayloadType("starter.test.state", 1),
-                        state.step().getBytes(StandardCharsets.UTF_8));
-            }
+      @Override
+      public StateSchemaVersion schemaVersion() {
+        return new StateSchemaVersion(1);
+      }
 
-            @Override
-            public St decode(EncodedPayload payload) {
-                return new St(new String(payload.data(), StandardCharsets.UTF_8));
-            }
-        };
-    }
+      @Override
+      public EncodedPayload encode(St state) {
+        return new EncodedPayload(
+            new PayloadType("starter.test.state", 1),
+            state.step().getBytes(StandardCharsets.UTF_8));
+      }
 
-    private static <T> ProcessPayloadCodec<T> codec(
-            String logicalType, Class<T> javaType,
-            java.util.function.Function<T, String> encode, java.util.function.Function<String, T> decode) {
-        return new ProcessPayloadCodec<>() {
-            @Override
-            public PayloadType payloadType() {
-                return new PayloadType(logicalType, 1);
-            }
+      @Override
+      public St decode(EncodedPayload payload) {
+        return new St(new String(payload.data(), StandardCharsets.UTF_8));
+      }
+    };
+  }
 
-            @Override
-            public Class<T> javaType() {
-                return javaType;
-            }
+  private static <T> ProcessPayloadCodec<T> codec(
+      String logicalType,
+      Class<T> javaType,
+      java.util.function.Function<T, String> encode,
+      java.util.function.Function<String, T> decode) {
+    return new ProcessPayloadCodec<>() {
+      @Override
+      public PayloadType payloadType() {
+        return new PayloadType(logicalType, 1);
+      }
 
-            @Override
-            public EncodedPayload encode(T value) {
-                return new EncodedPayload(payloadType(), encode.apply(value).getBytes(StandardCharsets.UTF_8));
-            }
+      @Override
+      public Class<T> javaType() {
+        return javaType;
+      }
 
-            @Override
-            public T decode(EncodedPayload payload) {
-                return decode.apply(new String(payload.data(), StandardCharsets.UTF_8));
-            }
-        };
-    }
+      @Override
+      public EncodedPayload encode(T value) {
+        return new EncodedPayload(
+            payloadType(), encode.apply(value).getBytes(StandardCharsets.UTF_8));
+      }
+
+      @Override
+      public T decode(EncodedPayload payload) {
+        return decode.apply(new String(payload.data(), StandardCharsets.UTF_8));
+      }
+    };
+  }
 }

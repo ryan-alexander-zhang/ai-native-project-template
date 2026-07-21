@@ -7,11 +7,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks the field or accessor that holds the identity of an entity or aggregate
- * root, making the identifier explicit to tooling and readers.
+ * Marks the field or accessor that holds the identity of an entity or aggregate root, making the
+ * identifier explicit to tooling and readers.
  */
 @Documented
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Identity {
-}
+public @interface Identity {}

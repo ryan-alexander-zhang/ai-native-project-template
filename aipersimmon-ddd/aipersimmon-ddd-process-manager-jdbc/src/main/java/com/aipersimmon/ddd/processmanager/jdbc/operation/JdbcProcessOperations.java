@@ -25,181 +25,246 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * Operator recovery independent of the business runtime. Every
- * action leaves an audited operator transition; none edits state or step arbitrarily.
+ * Operator recovery independent of the business runtime. Every action leaves an audited operator
+ * transition; none edits state or step arbitrarily.
  *
- * <p>{@link #redriveEffect} returns a DEAD effect to PENDING (reusing its id) and, once
- * the instance has no other DEAD effect, resumes it to its recorded resume lifecycle and
- * replays the inputs parked while it was suspended, in arrival order.
- * {@link #cancelProcess} terminates the coordinator and cancels its not-yet-dispatched
- * effects and deadlines. It also fences effects already claimed IN_FLIGHT: the relay
- * re-checks the owning instance before external dispatch and skips any whose instance is
- * cancelled, so after cancel returns no new external side effect is emitted. It does not
- * send compensation; business cancellation stays a process input decided by the definition.
+ * <p>{@link #redriveEffect} returns a DEAD effect to PENDING (reusing its id) and, once the
+ * instance has no other DEAD effect, resumes it to its recorded resume lifecycle and replays the
+ * inputs parked while it was suspended, in arrival order. {@link #cancelProcess} terminates the
+ * coordinator and cancels its not-yet-dispatched effects and deadlines. It also fences effects
+ * already claimed IN_FLIGHT: the relay re-checks the owning instance before external dispatch and
+ * skips any whose instance is cancelled, so after cancel returns no new external side effect is
+ * emitted. It does not send compensation; business cancellation stays a process input decided by
+ * the definition.
  */
 public final class JdbcProcessOperations {
 
-    private final JdbcProcessInstanceStore instances;
-    private final JdbcProcessTransitionStore transitions;
-    private final JdbcProcessEffectStore effects;
-    private final JdbcProcessDeadlineStore deadlines;
-    private final ProcessRuntime runtime;
-    private final ProcessPayloadCodecRegistry payloadCodecs;
-    private final JdbcProcessUnitOfWork unitOfWork;
-    private final Clock clock;
-    private final Supplier<String> idGenerator;
+  private final JdbcProcessInstanceStore instances;
+  private final JdbcProcessTransitionStore transitions;
+  private final JdbcProcessEffectStore effects;
+  private final JdbcProcessDeadlineStore deadlines;
+  private final ProcessRuntime runtime;
+  private final ProcessPayloadCodecRegistry payloadCodecs;
+  private final JdbcProcessUnitOfWork unitOfWork;
+  private final Clock clock;
+  private final Supplier<String> idGenerator;
 
-    public JdbcProcessOperations(
-            JdbcProcessInstanceStore instances,
-            JdbcProcessTransitionStore transitions,
-            JdbcProcessEffectStore effects,
-            JdbcProcessDeadlineStore deadlines,
-            ProcessRuntime runtime,
-            ProcessPayloadCodecRegistry payloadCodecs,
-            JdbcProcessUnitOfWork unitOfWork,
-            Clock clock,
-            Supplier<String> idGenerator) {
-        this.instances = instances;
-        this.transitions = transitions;
-        this.effects = effects;
-        this.deadlines = deadlines;
-        this.runtime = runtime;
-        this.payloadCodecs = payloadCodecs;
-        this.unitOfWork = unitOfWork;
-        this.clock = clock;
-        this.idGenerator = idGenerator;
-    }
+  public JdbcProcessOperations(
+      JdbcProcessInstanceStore instances,
+      JdbcProcessTransitionStore transitions,
+      JdbcProcessEffectStore effects,
+      JdbcProcessDeadlineStore deadlines,
+      ProcessRuntime runtime,
+      ProcessPayloadCodecRegistry payloadCodecs,
+      JdbcProcessUnitOfWork unitOfWork,
+      Clock clock,
+      Supplier<String> idGenerator) {
+    this.instances = instances;
+    this.transitions = transitions;
+    this.effects = effects;
+    this.deadlines = deadlines;
+    this.runtime = runtime;
+    this.payloadCodecs = payloadCodecs;
+    this.unitOfWork = unitOfWork;
+    this.clock = clock;
+    this.idGenerator = idGenerator;
+  }
 
-    /** Redrive one DEAD effect; resumes and replays parked inputs if it was the last one. */
-    public void redriveEffect(String effectId, String operator, String reason) {
-        ProcessRef resumed = unitOfWork.execute(() -> {
-            ClaimedEffect effect = effects.load(effectId)
-                    .orElseThrow(() -> new IllegalArgumentException("no effect " + effectId));
-            if (effects.redrive(effectId, clock.instant()) == 0) {
+  /** Redrive one DEAD effect; resumes and replays parked inputs if it was the last one. */
+  public void redriveEffect(String effectId, String operator, String reason) {
+    ProcessRef resumed =
+        unitOfWork.execute(
+            () -> {
+              ClaimedEffect effect =
+                  effects
+                      .load(effectId)
+                      .orElseThrow(() -> new IllegalArgumentException("no effect " + effectId));
+              if (effects.redrive(effectId, clock.instant()) == 0) {
                 throw new IllegalStateException("effect " + effectId + " is not DEAD");
-            }
-            // Lock the instance so a concurrent redrive of another DEAD item on the same instance can't
-            // race the dead-count check and leave the instance SUSPENDED with no DEAD work remaining.
-            ProcessInstanceRow row = instances.findForUpdate(effect.instanceId())
-                    .orElseThrow(() -> new IllegalStateException("effect without instance"));
-            transitions.appendOperator(
-                    idGenerator.get(), effect.instanceId(), row.lifecycle(), row.lifecycle(),
-                    row.step(), row.step(), "OPERATOR_REDRIVE_EFFECT", operator, reason, clock.instant());
+              }
+              // Lock the instance so a concurrent redrive of another DEAD item on the same instance
+              // can't
+              // race the dead-count check and leave the instance SUSPENDED with no DEAD work
+              // remaining.
+              ProcessInstanceRow row =
+                  instances
+                      .findForUpdate(effect.instanceId())
+                      .orElseThrow(() -> new IllegalStateException("effect without instance"));
+              transitions.appendOperator(
+                  idGenerator.get(),
+                  effect.instanceId(),
+                  row.lifecycle(),
+                  row.lifecycle(),
+                  row.step(),
+                  row.step(),
+                  "OPERATOR_REDRIVE_EFFECT",
+                  operator,
+                  reason,
+                  clock.instant());
 
-            if (canResume(row.lifecycle(), effect.instanceId())) {
+              if (canResume(row.lifecycle(), effect.instanceId())) {
                 ProcessLifecycle resume = row.resumeLifecycle().orElse(ProcessLifecycle.RUNNING);
                 instances.resume(effect.instanceId(), resume, clock.instant());
                 return row.ref();
-            }
-            return null;
-        });
-        if (resumed != null) {
-            replayParkedInputs(resumed);
-        }
+              }
+              return null;
+            });
+    if (resumed != null) {
+      replayParkedInputs(resumed);
     }
+  }
 
-    /** Redrive one DEAD deadline; resumes and replays parked inputs if no dead work remains. */
-    public void redriveDeadline(String deadlineId, long generation, String operator, String reason) {
-        ProcessRef resumed = unitOfWork.execute(() -> {
-            JdbcProcessDeadlineStore.DeadlineRow deadline = deadlines.load(deadlineId)
-                    .orElseThrow(() -> new IllegalArgumentException("no deadline " + deadlineId));
-            if (deadline.generation() != generation) {
-                throw new IllegalStateException("deadline " + deadlineId + " is at generation "
-                        + deadline.generation() + ", not the expected " + generation);
-            }
-            if (deadlines.redrive(deadlineId, clock.instant()) == 0) {
+  /** Redrive one DEAD deadline; resumes and replays parked inputs if no dead work remains. */
+  public void redriveDeadline(String deadlineId, long generation, String operator, String reason) {
+    ProcessRef resumed =
+        unitOfWork.execute(
+            () -> {
+              JdbcProcessDeadlineStore.DeadlineRow deadline =
+                  deadlines
+                      .load(deadlineId)
+                      .orElseThrow(() -> new IllegalArgumentException("no deadline " + deadlineId));
+              if (deadline.generation() != generation) {
+                throw new IllegalStateException(
+                    "deadline "
+                        + deadlineId
+                        + " is at generation "
+                        + deadline.generation()
+                        + ", not the expected "
+                        + generation);
+              }
+              if (deadlines.redrive(deadlineId, clock.instant()) == 0) {
                 throw new IllegalStateException("deadline " + deadlineId + " is not DEAD");
-            }
-            // Lock the instance so a concurrent redrive of another DEAD item can't race the dead-count check.
-            ProcessInstanceRow row = instances.findForUpdate(deadline.instanceId())
-                    .orElseThrow(() -> new IllegalStateException("deadline without instance"));
-            transitions.appendOperator(
-                    idGenerator.get(), deadline.instanceId(), row.lifecycle(), row.lifecycle(),
-                    row.step(), row.step(), "OPERATOR_REDRIVE_DEADLINE", operator, reason, clock.instant());
+              }
+              // Lock the instance so a concurrent redrive of another DEAD item can't race the
+              // dead-count check.
+              ProcessInstanceRow row =
+                  instances
+                      .findForUpdate(deadline.instanceId())
+                      .orElseThrow(() -> new IllegalStateException("deadline without instance"));
+              transitions.appendOperator(
+                  idGenerator.get(),
+                  deadline.instanceId(),
+                  row.lifecycle(),
+                  row.lifecycle(),
+                  row.step(),
+                  row.step(),
+                  "OPERATOR_REDRIVE_DEADLINE",
+                  operator,
+                  reason,
+                  clock.instant());
 
-            if (canResume(row.lifecycle(), deadline.instanceId())) {
+              if (canResume(row.lifecycle(), deadline.instanceId())) {
                 ProcessLifecycle resume = row.resumeLifecycle().orElse(ProcessLifecycle.RUNNING);
                 instances.resume(deadline.instanceId(), resume, clock.instant());
                 return row.ref();
-            }
-            return null;
+              }
+              return null;
+            });
+    if (resumed != null) {
+      replayParkedInputs(resumed);
+    }
+  }
+
+  /** A suspended instance may resume once no DEAD effect or deadline remains to hold it back. */
+  private boolean canResume(
+      ProcessLifecycle lifecycle,
+      com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId) {
+    return lifecycle == ProcessLifecycle.SUSPENDED
+        && effects.countDead(instanceId) == 0
+        && deadlines.countDead(instanceId) == 0;
+  }
+
+  private void replayParkedInputs(ProcessRef ref) {
+    for (ParkedInput parked : transitions.findParkedInputs(ref.instanceId())) {
+      String replayId = "parked:" + parked.inputMessageId();
+      if (transitions.findTransitionIdByInput(ref.instanceId(), replayId).isPresent()) {
+        continue; // already replayed (idempotent)
+      }
+      ProcessPayloadCodec<?> codec = payloadCodecs.forType(parked.inputType());
+      ProcessInput input =
+          (ProcessInput)
+              codec.decode(new EncodedPayload(parked.inputType(), parked.inputPayload()));
+      // Replay under the parked input's original correlation so the resumed work stays on the
+      // same causal chain (fall back to the replay id for rows parked before correlation was
+      // stored).
+      String correlationId = parked.correlationId() != null ? parked.correlationId() : replayId;
+      CommandContext context = new CommandContext(replayId, correlationId, parked.inputMessageId());
+      // If a concurrent worker re-suspended the instance mid-replay, handle() simply re-parks this
+      // input (it never throws), so the remaining inputs stay parked for the next redrive.
+      runtime.handle(ref, input, context);
+    }
+  }
+
+  /**
+   * Cancel the coordinator: terminate it and cancel pending effects/deadlines. Effects already
+   * claimed IN_FLIGHT are fenced by the relay's pre-dispatch lifecycle re-check, so no new external
+   * side effect is emitted after this returns. No compensation.
+   */
+  public void cancelProcess(ProcessRef ref, long expectedRevision, String operator, String reason) {
+    unitOfWork.execute(
+        () -> {
+          ProcessInstanceRow row =
+              instances
+                  .findForUpdate(ref.instanceId())
+                  .orElseThrow(() -> new ProcessNotFoundException(ref));
+          requireRefMatch(ref, row);
+          if (row.revision().value() != expectedRevision) {
+            throw new StaleProcessRevisionException(
+                ref, new ProcessRevision(expectedRevision), row.revision());
+          }
+          if (row.lifecycle().isTerminal()) {
+            return null; // already ended: idempotent no-op
+          }
+          ProcessRevision next = row.revision().next();
+          ProcessInstanceRow cancelled =
+              new ProcessInstanceRow(
+                  ref,
+                  row.definitionVersion(),
+                  row.stateSchemaVersion(),
+                  ProcessLifecycle.CANCELLED,
+                  row.step(),
+                  Optional.of(new ProcessOutcome("PROCESS_CANCELLED")),
+                  next,
+                  row.statePayloadType(),
+                  row.statePayload(),
+                  Optional.empty(),
+                  Optional.empty());
+          instances.updateSnapshot(cancelled, row.revision(), clock.instant());
+          effects.cancelPending(ref.instanceId(), clock.instant());
+          deadlines.cancelPending(ref.instanceId(), clock.instant());
+          transitions.appendOperator(
+              idGenerator.get(),
+              ref.instanceId(),
+              row.lifecycle(),
+              ProcessLifecycle.CANCELLED,
+              row.step(),
+              row.step(),
+              "OPERATOR_CANCEL",
+              operator,
+              reason,
+              clock.instant());
+          return null;
         });
-        if (resumed != null) {
-            replayParkedInputs(resumed);
-        }
-    }
+  }
 
-    /** A suspended instance may resume once no DEAD effect or deadline remains to hold it back. */
-    private boolean canResume(ProcessLifecycle lifecycle, com.aipersimmon.ddd.processmanager.model.ProcessInstanceId instanceId) {
-        return lifecycle == ProcessLifecycle.SUSPENDED
-                && effects.countDead(instanceId) == 0
-                && deadlines.countDead(instanceId) == 0;
+  /**
+   * Fail fast when a ref carries a real instanceId but a processType/businessKey that disagrees
+   * with the stored row, so an operator cancel never terminates the wrong instance (the same
+   * load-boundary guard the runtime applies to handle).
+   */
+  private static void requireRefMatch(ProcessRef ref, ProcessInstanceRow row) {
+    if (!row.ref().equals(ref)) {
+      throw new IllegalArgumentException(
+          "process ref mismatch for instance "
+              + ref.instanceId().value()
+              + ": supplied "
+              + ref.processType().value()
+              + "/"
+              + ref.businessKey().value()
+              + " but the stored instance is "
+              + row.ref().processType().value()
+              + "/"
+              + row.ref().businessKey().value());
     }
-
-    private void replayParkedInputs(ProcessRef ref) {
-        for (ParkedInput parked : transitions.findParkedInputs(ref.instanceId())) {
-            String replayId = "parked:" + parked.inputMessageId();
-            if (transitions.findTransitionIdByInput(ref.instanceId(), replayId).isPresent()) {
-                continue; // already replayed (idempotent)
-            }
-            ProcessPayloadCodec<?> codec = payloadCodecs.forType(parked.inputType());
-            ProcessInput input = (ProcessInput) codec.decode(
-                    new EncodedPayload(parked.inputType(), parked.inputPayload()));
-            // Replay under the parked input's original correlation so the resumed work stays on the
-            // same causal chain (fall back to the replay id for rows parked before correlation was stored).
-            String correlationId = parked.correlationId() != null ? parked.correlationId() : replayId;
-            CommandContext context = new CommandContext(
-                    replayId, correlationId, parked.inputMessageId());
-            // If a concurrent worker re-suspended the instance mid-replay, handle() simply re-parks this
-            // input (it never throws), so the remaining inputs stay parked for the next redrive.
-            runtime.handle(ref, input, context);
-        }
-    }
-
-    /**
-     * Cancel the coordinator: terminate it and cancel pending effects/deadlines. Effects already
-     * claimed IN_FLIGHT are fenced by the relay's pre-dispatch lifecycle re-check, so no new external
-     * side effect is emitted after this returns. No compensation.
-     */
-    public void cancelProcess(ProcessRef ref, long expectedRevision, String operator, String reason) {
-        unitOfWork.execute(() -> {
-            ProcessInstanceRow row = instances.findForUpdate(ref.instanceId())
-                    .orElseThrow(() -> new ProcessNotFoundException(ref));
-            requireRefMatch(ref, row);
-            if (row.revision().value() != expectedRevision) {
-                throw new StaleProcessRevisionException(
-                        ref, new ProcessRevision(expectedRevision), row.revision());
-            }
-            if (row.lifecycle().isTerminal()) {
-                return null; // already ended: idempotent no-op
-            }
-            ProcessRevision next = row.revision().next();
-            ProcessInstanceRow cancelled = new ProcessInstanceRow(
-                    ref, row.definitionVersion(), row.stateSchemaVersion(),
-                    ProcessLifecycle.CANCELLED, row.step(), Optional.of(new ProcessOutcome("PROCESS_CANCELLED")),
-                    next, row.statePayloadType(), row.statePayload(), Optional.empty(), Optional.empty());
-            instances.updateSnapshot(cancelled, row.revision(), clock.instant());
-            effects.cancelPending(ref.instanceId(), clock.instant());
-            deadlines.cancelPending(ref.instanceId(), clock.instant());
-            transitions.appendOperator(
-                    idGenerator.get(), ref.instanceId(), row.lifecycle(), ProcessLifecycle.CANCELLED,
-                    row.step(), row.step(), "OPERATOR_CANCEL", operator, reason, clock.instant());
-            return null;
-        });
-    }
-
-    /**
-     * Fail fast when a ref carries a real instanceId but a processType/businessKey that disagrees with
-     * the stored row, so an operator cancel never terminates the wrong instance (the same load-boundary
-     * guard the runtime applies to handle).
-     */
-    private static void requireRefMatch(ProcessRef ref, ProcessInstanceRow row) {
-        if (!row.ref().equals(ref)) {
-            throw new IllegalArgumentException(
-                    "process ref mismatch for instance " + ref.instanceId().value()
-                            + ": supplied " + ref.processType().value() + "/" + ref.businessKey().value()
-                            + " but the stored instance is "
-                            + row.ref().processType().value() + "/" + row.ref().businessKey().value());
-        }
-    }
+  }
 }

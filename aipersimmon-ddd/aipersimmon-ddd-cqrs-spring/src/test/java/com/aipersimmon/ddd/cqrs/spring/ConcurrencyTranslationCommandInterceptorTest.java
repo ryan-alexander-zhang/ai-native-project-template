@@ -12,30 +12,34 @@ import org.springframework.dao.OptimisticLockingFailureException;
 
 class ConcurrencyTranslationCommandInterceptorTest {
 
-    private record Ping() implements Command<Void> {
-    }
+  private record Ping() implements Command<Void> {}
 
-    private final ConcurrencyTranslationCommandInterceptor interceptor =
-            new ConcurrencyTranslationCommandInterceptor();
+  private final ConcurrencyTranslationCommandInterceptor interceptor =
+      new ConcurrencyTranslationCommandInterceptor();
 
-    @Test
-    void translatesOptimisticLockFailureToConcurrencyConflict() {
-        OptimisticLockingFailureException cause = new OptimisticLockingFailureException("stale");
+  @Test
+  void translatesOptimisticLockFailureToConcurrencyConflict() {
+    OptimisticLockingFailureException cause = new OptimisticLockingFailureException("stale");
 
-        ConcurrencyConflictException ex = assertThrows(ConcurrencyConflictException.class,
-                () -> interceptor.intercept(new Ping(), CommandContext.root("m1"), () -> {
-                    throw cause;
-                }));
+    ConcurrencyConflictException ex =
+        assertThrows(
+            ConcurrencyConflictException.class,
+            () ->
+                interceptor.intercept(
+                    new Ping(),
+                    CommandContext.root("m1"),
+                    () -> {
+                      throw cause;
+                    }));
 
-        assertSame(cause, ex.getCause());
-    }
+    assertSame(cause, ex.getCause());
+  }
 
-    @Test
-    void passesThroughWhenNoConflict() {
-        assertEquals("ok",
-                interceptor.intercept(new StringCommand(), CommandContext.root("m2"), () -> "ok"));
-    }
+  @Test
+  void passesThroughWhenNoConflict() {
+    assertEquals(
+        "ok", interceptor.intercept(new StringCommand(), CommandContext.root("m2"), () -> "ok"));
+  }
 
-    private record StringCommand() implements Command<String> {
-    }
+  private record StringCommand() implements Command<String> {}
 }

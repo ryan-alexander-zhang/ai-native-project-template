@@ -7,13 +7,13 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 @EventType(name = "com.example.ordering.StockReserved", version = 1)
 public class GoodStockReserved implements IntegrationEvent {
 
-    private final String orderId;
+  private final String orderId;
 
-    public GoodStockReserved(String orderId) {
-        this.orderId = orderId;
-    }
+  public GoodStockReserved(String orderId) {
+    this.orderId = orderId;
+  }
 
-    public String orderId() {
-        return orderId;
-    }
+  public String orderId() {
+    return orderId;
+  }
 }

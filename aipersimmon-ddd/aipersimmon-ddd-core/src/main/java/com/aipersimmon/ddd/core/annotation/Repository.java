@@ -7,12 +7,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a type as a repository: the collection-like abstraction for storing and
- * retrieving aggregate roots. The interface belongs to the domain; its technical
- * implementation lives in the infrastructure layer.
+ * Marks a type as a repository: the collection-like abstraction for storing and retrieving
+ * aggregate roots. The interface belongs to the domain; its technical implementation lives in the
+ * infrastructure layer.
  */
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Repository {
-}
+public @interface Repository {}

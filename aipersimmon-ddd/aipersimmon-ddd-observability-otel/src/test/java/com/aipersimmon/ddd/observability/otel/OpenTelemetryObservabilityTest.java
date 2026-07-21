@@ -26,130 +26,154 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Drives the OTEL SPI implementations against a real SDK with an in-memory exporter, so
- * the assertions are on actually-emitted spans, links and context — not mocks.
+ * Drives the OTEL SPI implementations against a real SDK with an in-memory exporter, so the
+ * assertions are on actually-emitted spans, links and context — not mocks.
  */
 class OpenTelemetryObservabilityTest {
 
-    private InMemorySpanExporter exporter;
-    private io.opentelemetry.api.trace.Tracer otelTracer;
-    private OpenTelemetrySdk sdk;
+  private InMemorySpanExporter exporter;
+  private io.opentelemetry.api.trace.Tracer otelTracer;
+  private OpenTelemetrySdk sdk;
 
-    @BeforeEach
-    void setUp() {
-        exporter = InMemorySpanExporter.create();
-        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
-                .setSampler(Sampler.alwaysOn())
-                .addSpanProcessor(SimpleSpanProcessor.create(exporter))
-                .build();
-        sdk = OpenTelemetrySdk.builder()
-                .setTracerProvider(tracerProvider)
-                .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
-                .build();
-        otelTracer = sdk.getTracer("test");
+  @BeforeEach
+  void setUp() {
+    exporter = InMemorySpanExporter.create();
+    SdkTracerProvider tracerProvider =
+        SdkTracerProvider.builder()
+            .setSampler(Sampler.alwaysOn())
+            .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+            .build();
+    sdk =
+        OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+            .build();
+    otelTracer = sdk.getTracer("test");
+  }
+
+  @Test
+  void domainSpanCarriesNameAndAttributes() {
+    Tracer tracer = new OpenTelemetryTracer(otelTracer);
+
+    try (Tracer.SpanScope span = tracer.startSpan("command PlaceOrder")) {
+      span.attribute(ObservabilityAttributes.COMMAND_TYPE, "PlaceOrder")
+          .attribute(ObservabilityAttributes.RETRY_ATTEMPT, 2L);
     }
 
-    @Test
-    void domainSpanCarriesNameAndAttributes() {
-        Tracer tracer = new OpenTelemetryTracer(otelTracer);
+    SpanData span = single();
+    assertEquals("command PlaceOrder", span.getName());
+    assertEquals(
+        "PlaceOrder",
+        span.getAttributes()
+            .get(
+                io.opentelemetry.api.common.AttributeKey.stringKey(
+                    ObservabilityAttributes.COMMAND_TYPE)));
+    assertEquals(
+        2L,
+        span.getAttributes()
+            .get(
+                io.opentelemetry.api.common.AttributeKey.longKey(
+                    ObservabilityAttributes.RETRY_ATTEMPT)));
+  }
 
-        try (Tracer.SpanScope span = tracer.startSpan("command PlaceOrder")) {
-            span.attribute(ObservabilityAttributes.COMMAND_TYPE, "PlaceOrder")
-                    .attribute(ObservabilityAttributes.RETRY_ATTEMPT, 2L);
-        }
+  @Test
+  void captureSerialisesActiveContextIncludingSampledFlag() {
+    Span creating = otelTracer.spanBuilder("command PlaceOrder").startSpan();
+    StoreAndForwardTracer sf =
+        new OpenTelemetryStoreAndForwardTracer(
+            otelTracer, sdk.getPropagators().getTextMapPropagator());
 
-        SpanData span = single();
-        assertEquals("command PlaceOrder", span.getName());
-        assertEquals("PlaceOrder", span.getAttributes().get(io.opentelemetry.api.common.AttributeKey.stringKey(
-                ObservabilityAttributes.COMMAND_TYPE)));
-        assertEquals(2L, span.getAttributes().get(io.opentelemetry.api.common.AttributeKey.longKey(
-                ObservabilityAttributes.RETRY_ATTEMPT)));
+    Captured captured;
+    try (Scope ignored = creating.makeCurrent()) {
+      captured = sf.captureCurrent();
+    }
+    creating.end();
+
+    assertNotNull(captured.traceparent());
+    assertTrue(
+        captured.traceparent().contains(creating.getSpanContext().getTraceId()),
+        "traceparent must carry the creating span's trace id");
+    // W3C trace-flags is the last hex pair; the sampled bit (0x01) must survive so the
+    // restored span is exported (recent OTEL also sets the random-trace-id bit 0x02).
+    String flags = captured.traceparent().substring(captured.traceparent().lastIndexOf('-') + 1);
+    assertEquals(
+        1,
+        Integer.parseInt(flags, 16) & 0x01,
+        "sampled flag must survive; traceparent was " + captured.traceparent());
+  }
+
+  @Test
+  void restoreLinksBackToCreatingSpanAsNewTrace() {
+    Span creating = otelTracer.spanBuilder("command PlaceOrder").startSpan();
+    StoreAndForwardTracer sf =
+        new OpenTelemetryStoreAndForwardTracer(
+            otelTracer, sdk.getPropagators().getTextMapPropagator());
+    Captured captured;
+    try (Scope ignored = creating.makeCurrent()) {
+      captured = sf.captureCurrent();
+    }
+    creating.end();
+
+    try (StoreAndForwardTracer.Scope ignored =
+        sf.restore(captured.traceparent(), captured.traceState(), "effect.dispatch effect-1")) {
+      // dispatch happens here
     }
 
-    @Test
-    void captureSerialisesActiveContextIncludingSampledFlag() {
-        Span creating = otelTracer.spanBuilder("command PlaceOrder").startSpan();
-        StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator());
+    SpanData restored =
+        exporter.getFinishedSpanItems().stream()
+            .filter(s -> s.getName().startsWith("effect.dispatch"))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("effect.dispatch effect-1", restored.getName());
 
-        Captured captured;
-        try (Scope ignored = creating.makeCurrent()) {
-            captured = sf.captureCurrent();
-        }
-        creating.end();
+    List<LinkData> links = restored.getLinks();
+    assertEquals(1, links.size(), "restored span must link to the creating span");
+    assertEquals(
+        creating.getSpanContext().getTraceId(),
+        links.get(0).getSpanContext().getTraceId(),
+        "link must point at the creating trace");
+    assertNotEquals(
+        creating.getSpanContext().getTraceId(),
+        restored.getSpanContext().getTraceId(),
+        "restored dispatch is a new trace linked to (not a child of) the creating span");
+  }
 
-        assertNotNull(captured.traceparent());
-        assertTrue(captured.traceparent().contains(creating.getSpanContext().getTraceId()),
-                "traceparent must carry the creating span's trace id");
-        // W3C trace-flags is the last hex pair; the sampled bit (0x01) must survive so the
-        // restored span is exported (recent OTEL also sets the random-trace-id bit 0x02).
-        String flags = captured.traceparent().substring(captured.traceparent().lastIndexOf('-') + 1);
-        assertEquals(1, Integer.parseInt(flags, 16) & 0x01,
-                "sampled flag must survive; traceparent was " + captured.traceparent());
+  @Test
+  void restoreScopeRecordsFailureAsErrorSpan() {
+    StoreAndForwardTracer sf =
+        new OpenTelemetryStoreAndForwardTracer(
+            otelTracer, sdk.getPropagators().getTextMapPropagator());
+
+    try (StoreAndForwardTracer.Scope scope = sf.restore(null, null, "effect.dispatch e1")) {
+      scope.recordFailure(new IllegalStateException("dispatch boom"));
     }
 
-    @Test
-    void restoreLinksBackToCreatingSpanAsNewTrace() {
-        Span creating = otelTracer.spanBuilder("command PlaceOrder").startSpan();
-        StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator());
-        Captured captured;
-        try (Scope ignored = creating.makeCurrent()) {
-            captured = sf.captureCurrent();
-        }
-        creating.end();
+    SpanData span =
+        exporter.getFinishedSpanItems().stream()
+            .filter(s -> s.getName().startsWith("effect.dispatch"))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(io.opentelemetry.api.trace.StatusCode.ERROR, span.getStatus().getStatusCode());
+    assertTrue(
+        span.getEvents().stream().anyMatch(e -> "exception".equals(e.getName())),
+        "the dispatch failure must be recorded on the span");
+  }
 
-        try (StoreAndForwardTracer.Scope ignored =
-                sf.restore(captured.traceparent(), captured.traceState(), "effect.dispatch effect-1")) {
-            // dispatch happens here
-        }
+  @Test
+  void captureWithoutActiveSpanYieldsNone() {
+    StoreAndForwardTracer sf =
+        new OpenTelemetryStoreAndForwardTracer(
+            otelTracer, sdk.getPropagators().getTextMapPropagator());
 
-        SpanData restored = exporter.getFinishedSpanItems().stream()
-                .filter(s -> s.getName().startsWith("effect.dispatch"))
-                .findFirst()
-                .orElseThrow();
-        assertEquals("effect.dispatch effect-1", restored.getName());
+    Captured captured = sf.captureCurrent();
 
-        List<LinkData> links = restored.getLinks();
-        assertEquals(1, links.size(), "restored span must link to the creating span");
-        assertEquals(creating.getSpanContext().getTraceId(), links.get(0).getSpanContext().getTraceId(),
-                "link must point at the creating trace");
-        assertNotEquals(creating.getSpanContext().getTraceId(), restored.getSpanContext().getTraceId(),
-                "restored dispatch is a new trace linked to (not a child of) the creating span");
-    }
+    assertNull(captured.traceparent());
+    assertEquals(Captured.NONE, captured);
+  }
 
-    @Test
-    void restoreScopeRecordsFailureAsErrorSpan() {
-        StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator());
-
-        try (StoreAndForwardTracer.Scope scope = sf.restore(null, null, "effect.dispatch e1")) {
-            scope.recordFailure(new IllegalStateException("dispatch boom"));
-        }
-
-        SpanData span = exporter.getFinishedSpanItems().stream()
-                .filter(s -> s.getName().startsWith("effect.dispatch"))
-                .findFirst()
-                .orElseThrow();
-        assertEquals(io.opentelemetry.api.trace.StatusCode.ERROR, span.getStatus().getStatusCode());
-        assertTrue(span.getEvents().stream().anyMatch(e -> "exception".equals(e.getName())),
-                "the dispatch failure must be recorded on the span");
-    }
-
-    @Test
-    void captureWithoutActiveSpanYieldsNone() {
-        StoreAndForwardTracer sf = new OpenTelemetryStoreAndForwardTracer(
-                otelTracer, sdk.getPropagators().getTextMapPropagator());
-
-        Captured captured = sf.captureCurrent();
-
-        assertNull(captured.traceparent());
-        assertEquals(Captured.NONE, captured);
-    }
-
-    private SpanData single() {
-        List<SpanData> spans = exporter.getFinishedSpanItems();
-        assertEquals(1, spans.size());
-        return spans.get(0);
-    }
+  private SpanData single() {
+    List<SpanData> spans = exporter.getFinishedSpanItems();
+    assertEquals(1, spans.size());
+    return spans.get(0);
+  }
 }

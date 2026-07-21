@@ -21,73 +21,73 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Auto-configures the CQRS command and query buses and the built-in interceptor
- * chain when the application does not define its own. The command bus gathers all
- * {@link CommandHandler} beans and {@link CommandInterceptor} beans; the built-in
- * interceptors are logging (always) and transaction (when a transaction manager is
- * present), with validation added when a Bean Validation provider is on the
- * classpath. Applications can add their own interceptors as beans or replace any
- * bean here.
+ * Auto-configures the CQRS command and query buses and the built-in interceptor chain when the
+ * application does not define its own. The command bus gathers all {@link CommandHandler} beans and
+ * {@link CommandInterceptor} beans; the built-in interceptors are logging (always) and transaction
+ * (when a transaction manager is present), with validation added when a Bean Validation provider is
+ * on the classpath. Applications can add their own interceptors as beans or replace any bean here.
  */
-@AutoConfiguration(after = {
-        DataSourceTransactionManagerAutoConfiguration.class,
-        TransactionAutoConfiguration.class,
-        ValidationAutoConfiguration.class
-})
+@AutoConfiguration(
+    after = {
+      DataSourceTransactionManagerAutoConfiguration.class,
+      TransactionAutoConfiguration.class,
+      ValidationAutoConfiguration.class
+    })
 public class AipersimmonDddCqrsAutoConfiguration {
 
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnBean(PlatformTransactionManager.class)
-    public UnitOfWork unitOfWork(PlatformTransactionManager transactionManager) {
-        return new TransactionTemplateUnitOfWork(new TransactionTemplate(transactionManager));
-    }
+  @Bean
+  @ConditionalOnMissingBean
+  @ConditionalOnBean(PlatformTransactionManager.class)
+  public UnitOfWork unitOfWork(PlatformTransactionManager transactionManager) {
+    return new TransactionTemplateUnitOfWork(new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public LoggingCommandInterceptor loggingCommandInterceptor() {
+    return new LoggingCommandInterceptor();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public ConcurrencyTranslationCommandInterceptor concurrencyTranslationCommandInterceptor() {
+    return new ConcurrencyTranslationCommandInterceptor();
+  }
+
+  @Bean
+  @ConditionalOnBean(UnitOfWork.class)
+  @ConditionalOnMissingBean
+  public TransactionCommandInterceptor transactionCommandInterceptor(UnitOfWork unitOfWork) {
+    return new TransactionCommandInterceptor(unitOfWork);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public CommandBus commandBus(
+      ObjectProvider<CommandHandler<?, ?>> handlers,
+      ObjectProvider<CommandInterceptor> interceptors) {
+    return new RegistryCommandBus(handlers.stream().toList(), interceptors.stream().toList());
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public QueryBus queryBus(ObjectProvider<QueryHandler<?, ?>> handlers) {
+    return new RegistryQueryBus(handlers.stream().toList());
+  }
+
+  /**
+   * Wires the validation interceptor only when a Bean Validation provider is on the classpath and a
+   * {@link Validator} bean is available.
+   */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnClass(Validator.class)
+  static class ValidationConfiguration {
 
     @Bean
+    @ConditionalOnBean(Validator.class)
     @ConditionalOnMissingBean
-    public LoggingCommandInterceptor loggingCommandInterceptor() {
-        return new LoggingCommandInterceptor();
+    public ValidationCommandInterceptor validationCommandInterceptor(Validator validator) {
+      return new ValidationCommandInterceptor(validator);
     }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public ConcurrencyTranslationCommandInterceptor concurrencyTranslationCommandInterceptor() {
-        return new ConcurrencyTranslationCommandInterceptor();
-    }
-
-    @Bean
-    @ConditionalOnBean(UnitOfWork.class)
-    @ConditionalOnMissingBean
-    public TransactionCommandInterceptor transactionCommandInterceptor(UnitOfWork unitOfWork) {
-        return new TransactionCommandInterceptor(unitOfWork);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public CommandBus commandBus(ObjectProvider<CommandHandler<?, ?>> handlers,
-                                 ObjectProvider<CommandInterceptor> interceptors) {
-        return new RegistryCommandBus(handlers.stream().toList(), interceptors.stream().toList());
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public QueryBus queryBus(ObjectProvider<QueryHandler<?, ?>> handlers) {
-        return new RegistryQueryBus(handlers.stream().toList());
-    }
-
-    /**
-     * Wires the validation interceptor only when a Bean Validation provider is on
-     * the classpath and a {@link Validator} bean is available.
-     */
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(Validator.class)
-    static class ValidationConfiguration {
-
-        @Bean
-        @ConditionalOnBean(Validator.class)
-        @ConditionalOnMissingBean
-        public ValidationCommandInterceptor validationCommandInterceptor(Validator validator) {
-            return new ValidationCommandInterceptor(validator);
-        }
-    }
+  }
 }

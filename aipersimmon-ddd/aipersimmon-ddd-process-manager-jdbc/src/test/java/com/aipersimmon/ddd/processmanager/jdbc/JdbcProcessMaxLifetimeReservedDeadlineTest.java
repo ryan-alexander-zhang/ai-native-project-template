@@ -19,6 +19,7 @@ import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
+import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
 import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
@@ -27,7 +28,6 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
@@ -57,155 +57,179 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
  */
 class JdbcProcessMaxLifetimeReservedDeadlineTest {
 
-    private static final ProcessType TYPE = new ProcessType("test.maxlife");
-    private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");
-    private static final Instant T0 = Instant.parse("2026-07-16T00:00:00Z");
-    private static final Clock CLOCK = Clock.fixed(T0, ZoneOffset.UTC);
-    private static final Duration MAX_LIFETIME = Duration.ofDays(30);
-    private static final Instant CUSTOM_DUE = T0.plus(Duration.ofDays(5)); // != T0 + 30d default
+  private static final ProcessType TYPE = new ProcessType("test.maxlife");
+  private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");
+  private static final Instant T0 = Instant.parse("2026-07-16T00:00:00Z");
+  private static final Clock CLOCK = Clock.fixed(T0, ZoneOffset.UTC);
+  private static final Duration MAX_LIFETIME = Duration.ofDays(30);
+  private static final Instant CUSTOM_DUE = T0.plus(Duration.ofDays(5)); // != T0 + 30d default
 
-    private JdbcTemplate jdbc;
-    private JdbcProcessInstanceStore instanceStore;
-    private JdbcProcessTransitionStore transitionStore;
-    private JdbcProcessEffectStore effectStore;
-    private JdbcProcessDeadlineStore deadlineStore;
-    private JdbcProcessUnitOfWork unitOfWork;
-    private final AtomicInteger ids = new AtomicInteger();
+  private JdbcTemplate jdbc;
+  private JdbcProcessInstanceStore instanceStore;
+  private JdbcProcessTransitionStore transitionStore;
+  private JdbcProcessEffectStore effectStore;
+  private JdbcProcessDeadlineStore deadlineStore;
+  private JdbcProcessUnitOfWork unitOfWork;
+  private final AtomicInteger ids = new AtomicInteger();
 
-    @BeforeEach
-    void setUp() {
-        DataSource dataSource = new EmbeddedDatabaseBuilder()
-                .setType(EmbeddedDatabaseType.H2)
-                .generateUniqueName(true)
-                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
-                .addScript("classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
-                .build();
-        jdbc = new JdbcTemplate(dataSource);
-        instanceStore = new JdbcProcessInstanceStore(jdbc);
-        transitionStore = new JdbcProcessTransitionStore(jdbc);
-        effectStore = new JdbcProcessEffectStore(jdbc);
-        deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-        unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+  @BeforeEach
+  void setUp() {
+    DataSource dataSource =
+        new EmbeddedDatabaseBuilder()
+            .setType(EmbeddedDatabaseType.H2)
+            .generateUniqueName(true)
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
+            .build();
+    jdbc = new JdbcTemplate(dataSource);
+    instanceStore = new JdbcProcessInstanceStore(jdbc);
+    transitionStore = new JdbcProcessTransitionStore(jdbc);
+    effectStore = new JdbcProcessEffectStore(jdbc);
+    deadlineStore = new JdbcProcessDeadlineStore(jdbc);
+    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+  }
+
+  private JdbcProcessRuntime runtime() {
+    return new JdbcProcessRuntime(
+        instanceStore,
+        transitionStore,
+        effectStore,
+        deadlineStore,
+        new ProcessDefinitionRegistry(List.of(new Definition())),
+        new ProcessPayloadCodecRegistry(codecs()),
+        new ProcessStateCodecRegistry(List.of(stateCodec())),
+        unitOfWork,
+        CLOCK,
+        () -> "id-" + ids.incrementAndGet(),
+        DuplicateBusinessKeyPolicy.REJECT,
+        3,
+        ProcessObserver.NOOP,
+        Optional.of(MAX_LIFETIME),
+        Long.MAX_VALUE);
+  }
+
+  private long reservedDeadlineCount() {
+    return jdbc.queryForObject(
+        "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE name = 'aipersimmon.max-lifetime'",
+        Long.class);
+  }
+
+  @Test
+  void aDefinitionReschedulingTheReservedNameInStartWinsOverTheDefaultBackstop() {
+    runtime().start(TYPE, ORDER, new Reschedule(), CommandContext.root("msg-start"));
+
+    assertEquals(
+        1L,
+        reservedDeadlineCount(),
+        "the default backstop steps aside; only the definition's schedule stands");
+    assertEquals(
+        CUSTOM_DUE,
+        jdbc.queryForObject(
+                "SELECT due_at FROM aipersimmon_process_deadline WHERE name = 'aipersimmon.max-lifetime'",
+                java.sql.Timestamp.class)
+            .toInstant(),
+        "the effective deadline is the definition's custom due time, not the default TTL");
+  }
+
+  @Test
+  void aDefinitionCancellingTheReservedNameInStartWinsOverTheDefaultBackstop() {
+    runtime().start(TYPE, ORDER, new Cancel(), CommandContext.root("msg-start"));
+
+    assertEquals(
+        0L,
+        reservedDeadlineCount(),
+        "the definition cancelled the reserved name; the default backstop does not re-arm it");
+  }
+
+  // Inputs driving the two start decisions.
+  record Reschedule() implements ProcessInput {}
+
+  record Cancel() implements ProcessInput {}
+
+  record State(int n) {}
+
+  private static final class Definition implements ProcessDefinition<State> {
+    @Override
+    public ProcessType processType() {
+      return TYPE;
     }
 
-    private JdbcProcessRuntime runtime() {
-        return new JdbcProcessRuntime(
-                instanceStore, transitionStore, effectStore, deadlineStore,
-                new ProcessDefinitionRegistry(List.of(new Definition())),
-                new ProcessPayloadCodecRegistry(codecs()),
-                new ProcessStateCodecRegistry(List.of(stateCodec())),
-                unitOfWork, CLOCK, () -> "id-" + ids.incrementAndGet(),
-                DuplicateBusinessKeyPolicy.REJECT, 3, ProcessObserver.NOOP,
-                Optional.of(MAX_LIFETIME), Long.MAX_VALUE);
+    @Override
+    public DefinitionVersion definitionVersion() {
+      return new DefinitionVersion("v1");
     }
 
-    private long reservedDeadlineCount() {
-        return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM aipersimmon_process_deadline WHERE name = 'aipersimmon.max-lifetime'",
-                Long.class);
+    @Override
+    public boolean activeForNewInstances() {
+      return true;
     }
 
-    @Test
-    void aDefinitionReschedulingTheReservedNameInStartWinsOverTheDefaultBackstop() {
-        runtime().start(TYPE, ORDER, new Reschedule(), CommandContext.root("msg-start"));
-
-        assertEquals(1L, reservedDeadlineCount(),
-                "the default backstop steps aside; only the definition's schedule stands");
-        assertEquals(CUSTOM_DUE, jdbc.queryForObject(
-                        "SELECT due_at FROM aipersimmon_process_deadline WHERE name = 'aipersimmon.max-lifetime'",
-                        java.sql.Timestamp.class).toInstant(),
-                "the effective deadline is the definition's custom due time, not the default TTL");
+    @Override
+    public StateSchemaVersion stateSchemaVersion() {
+      return new StateSchemaVersion(1);
     }
 
-    @Test
-    void aDefinitionCancellingTheReservedNameInStartWinsOverTheDefaultBackstop() {
-        runtime().start(TYPE, ORDER, new Cancel(), CommandContext.root("msg-start"));
-
-        assertEquals(0L, reservedDeadlineCount(),
-                "the definition cancelled the reserved name; the default backstop does not re-arm it");
-    }
-
-    // Inputs driving the two start decisions.
-    record Reschedule() implements ProcessInput {
-    }
-
-    record Cancel() implements ProcessInput {
-    }
-
-    record State(int n) {
-    }
-
-    private static final class Definition implements ProcessDefinition<State> {
-        @Override
-        public ProcessType processType() {
-            return TYPE;
-        }
-
-        @Override
-        public DefinitionVersion definitionVersion() {
-            return new DefinitionVersion("v1");
-        }
-
-        @Override
-        public boolean activeForNewInstances() {
-            return true;
-        }
-
-        @Override
-        public StateSchemaVersion stateSchemaVersion() {
-            return new StateSchemaVersion(1);
-        }
-
-        @Override
-        public ProcessDecision<State> start(ProcessInput input, ProcessContext context) {
-            List<ProcessEffect> effects = switch (input) {
-                case Reschedule ignored -> List.of(new ScheduleDeadline(
+    @Override
+    public ProcessDecision<State> start(ProcessInput input, ProcessContext context) {
+      List<ProcessEffect> effects =
+          switch (input) {
+            case Reschedule ignored ->
+                List.of(
+                    new ScheduleDeadline(
                         MaxLifetimeExceeded.DEADLINE_NAME, CUSTOM_DUE, new MaxLifetimeExceeded()));
-                case Cancel ignored -> List.of(new CancelDeadline(MaxLifetimeExceeded.DEADLINE_NAME));
-                default -> throw new UnsupportedProcessInputException("unexpected start input: " + input);
-            };
-            return new ProcessDecision<>(
-                    new State(0), ProcessLifecycle.RUNNING, new ProcessStep("S1"),
-                    Optional.empty(), new DecisionCode("started"), effects);
-        }
-
-        @Override
-        public ProcessDecision<State> react(State state, ProcessInput input, ProcessContext context) {
-            throw new UnsupportedProcessInputException("unexpected input: " + input);
-        }
+            case Cancel ignored -> List.of(new CancelDeadline(MaxLifetimeExceeded.DEADLINE_NAME));
+            default ->
+                throw new UnsupportedProcessInputException("unexpected start input: " + input);
+          };
+      return new ProcessDecision<>(
+          new State(0),
+          ProcessLifecycle.RUNNING,
+          new ProcessStep("S1"),
+          Optional.empty(),
+          new DecisionCode("started"),
+          effects);
     }
 
-    private static List<ProcessPayloadCodec<?>> codecs() {
-        return List.of(
-                TestFulfilment.payloadCodec("test.maxlife.reschedule", Reschedule.class,
-                        r -> "", s -> new Reschedule()),
-                TestFulfilment.payloadCodec("test.maxlife.cancel", Cancel.class,
-                        c -> "", s -> new Cancel()),
-                new MaxLifetimeExceededCodec());
+    @Override
+    public ProcessDecision<State> react(State state, ProcessInput input, ProcessContext context) {
+      throw new UnsupportedProcessInputException("unexpected input: " + input);
     }
+  }
 
-    private static ProcessStateCodec<State> stateCodec() {
-        return new ProcessStateCodec<>() {
-            @Override
-            public ProcessType processType() {
-                return TYPE;
-            }
+  private static List<ProcessPayloadCodec<?>> codecs() {
+    return List.of(
+        TestFulfilment.payloadCodec(
+            "test.maxlife.reschedule", Reschedule.class, r -> "", s -> new Reschedule()),
+        TestFulfilment.payloadCodec(
+            "test.maxlife.cancel", Cancel.class, c -> "", s -> new Cancel()),
+        new MaxLifetimeExceededCodec());
+  }
 
-            @Override
-            public StateSchemaVersion schemaVersion() {
-                return new StateSchemaVersion(1);
-            }
+  private static ProcessStateCodec<State> stateCodec() {
+    return new ProcessStateCodec<>() {
+      @Override
+      public ProcessType processType() {
+        return TYPE;
+      }
 
-            @Override
-            public EncodedPayload encode(State state) {
-                return new EncodedPayload(new PayloadType("test.maxlife.state", 1),
-                        Integer.toString(state.n()).getBytes(StandardCharsets.UTF_8));
-            }
+      @Override
+      public StateSchemaVersion schemaVersion() {
+        return new StateSchemaVersion(1);
+      }
 
-            @Override
-            public State decode(EncodedPayload payload) {
-                return new State(Integer.parseInt(new String(payload.data(), StandardCharsets.UTF_8)));
-            }
-        };
-    }
+      @Override
+      public EncodedPayload encode(State state) {
+        return new EncodedPayload(
+            new PayloadType("test.maxlife.state", 1),
+            Integer.toString(state.n()).getBytes(StandardCharsets.UTF_8));
+      }
+
+      @Override
+      public State decode(EncodedPayload payload) {
+        return new State(Integer.parseInt(new String(payload.data(), StandardCharsets.UTF_8)));
+      }
+    };
+  }
 }

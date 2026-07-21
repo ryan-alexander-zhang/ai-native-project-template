@@ -20,84 +20,91 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
- * Verifies the Kafka leg maps an outbox message onto a producer record for the
- * given topic — key, value, and envelope headers — and that a broker send failure
- * surfaces so the outbox relay leaves the row to be retried.
+ * Verifies the Kafka leg maps an outbox message onto a producer record for the given topic — key,
+ * value, and envelope headers — and that a broker send failure surfaces so the outbox relay leaves
+ * the row to be retried.
  */
 class KafkaOutboxDispatcherTest {
 
-    private final OutboxMessage message = new OutboxMessage(
-            "evt-1",
-            "/ordering",
-            "OrderPlaced",
-            1,
-            "{\"orderId\":\"o-1\"}",
-            Instant.parse("2026-01-01T00:00:00Z"),
-            "o-1",
-            "corr-1",
-            "cause-1");
+  private final OutboxMessage message =
+      new OutboxMessage(
+          "evt-1",
+          "/ordering",
+          "OrderPlaced",
+          1,
+          "{\"orderId\":\"o-1\"}",
+          Instant.parse("2026-01-01T00:00:00Z"),
+          "o-1",
+          "corr-1",
+          "cause-1");
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void publishesPayloadAsValueWithEnvelopeHeaders() {
-        KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
-        doReturn(CompletableFuture.completedFuture(null)).when(template).send(any(ProducerRecord.class));
+  @Test
+  @SuppressWarnings("unchecked")
+  void publishesPayloadAsValueWithEnvelopeHeaders() {
+    KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
+    doReturn(CompletableFuture.completedFuture(null))
+        .when(template)
+        .send(any(ProducerRecord.class));
 
-        new KafkaOutboxDispatcher(template).dispatch(message, "orders");
+    new KafkaOutboxDispatcher(template).dispatch(message, "orders");
 
-        ArgumentCaptor<ProducerRecord<String, String>> captor =
-                ArgumentCaptor.forClass(ProducerRecord.class);
-        verify(template).send(captor.capture());
-        ProducerRecord<String, String> record = captor.getValue();
+    ArgumentCaptor<ProducerRecord<String, String>> captor =
+        ArgumentCaptor.forClass(ProducerRecord.class);
+    verify(template).send(captor.capture());
+    ProducerRecord<String, String> record = captor.getValue();
 
-        assertEquals("orders", record.topic());
-        assertEquals("o-1", record.key(), "the aggregate subject is the partition key, not the event id");
-        assertEquals("{\"orderId\":\"o-1\"}", record.value());
-        assertEquals("evt-1", header(record, IntegrationEventHeaders.ID));
-        assertEquals("/ordering", header(record, IntegrationEventHeaders.SOURCE));
-        assertEquals("1.0", header(record, IntegrationEventHeaders.SPEC_VERSION));
-        assertEquals("OrderPlaced", header(record, IntegrationEventHeaders.TYPE));
-        assertEquals("o-1", header(record, IntegrationEventHeaders.SUBJECT));
-        assertEquals("1", header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
-        assertEquals("corr-1", header(record, IntegrationEventHeaders.CORRELATION_ID));
-        assertEquals("cause-1", header(record, IntegrationEventHeaders.CAUSATION_ID));
-        assertEquals("o-1", header(record, IntegrationEventHeaders.PARTITION_KEY));
-        assertEquals("application/json", header(record, IntegrationEventHeaders.CONTENT_TYPE));
-        assertEquals("2026-01-01T00:00:00Z", header(record, IntegrationEventHeaders.TIME));
-    }
+    assertEquals("orders", record.topic());
+    assertEquals(
+        "o-1", record.key(), "the aggregate subject is the partition key, not the event id");
+    assertEquals("{\"orderId\":\"o-1\"}", record.value());
+    assertEquals("evt-1", header(record, IntegrationEventHeaders.ID));
+    assertEquals("/ordering", header(record, IntegrationEventHeaders.SOURCE));
+    assertEquals("1.0", header(record, IntegrationEventHeaders.SPEC_VERSION));
+    assertEquals("OrderPlaced", header(record, IntegrationEventHeaders.TYPE));
+    assertEquals("o-1", header(record, IntegrationEventHeaders.SUBJECT));
+    assertEquals("1", header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
+    assertEquals("corr-1", header(record, IntegrationEventHeaders.CORRELATION_ID));
+    assertEquals("cause-1", header(record, IntegrationEventHeaders.CAUSATION_ID));
+    assertEquals("o-1", header(record, IntegrationEventHeaders.PARTITION_KEY));
+    assertEquals("application/json", header(record, IntegrationEventHeaders.CONTENT_TYPE));
+    assertEquals("2026-01-01T00:00:00Z", header(record, IntegrationEventHeaders.TIME));
+  }
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void doesNotBlockTheRelayThreadForeverWhenTheBrokerNeverAcknowledges() {
-        KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
-        // A send whose ack never arrives (broker partition unwritable, metadata stall, ...).
-        doReturn(new CompletableFuture<>()).when(template).send(any(ProducerRecord.class));
+  @Test
+  @SuppressWarnings("unchecked")
+  void doesNotBlockTheRelayThreadForeverWhenTheBrokerNeverAcknowledges() {
+    KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
+    // A send whose ack never arrives (broker partition unwritable, metadata stall, ...).
+    doReturn(new CompletableFuture<>()).when(template).send(any(ProducerRecord.class));
 
-        KafkaOutboxDispatcher dispatcher =
-                new KafkaOutboxDispatcher(template, Duration.ofMillis(200));
+    KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template, Duration.ofMillis(200));
 
-        // The single relay thread must not be pinned indefinitely on one stuck send: the
-        // bounded await surfaces as a (transient) IllegalStateException — not a permanent
-        // failure — so the relay leaves the row to be retried on the next poll. The outer
-        // preemptive timeout is generous relative to the 200ms send bound; before the fix
-        // (an unbounded get) dispatch never returns and this trips.
-        assertTimeoutPreemptively(Duration.ofSeconds(3), () ->
-                assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message, "orders")));
-    }
+    // The single relay thread must not be pinned indefinitely on one stuck send: the
+    // bounded await surfaces as a (transient) IllegalStateException — not a permanent
+    // failure — so the relay leaves the row to be retried on the next poll. The outer
+    // preemptive timeout is generous relative to the 200ms send bound; before the fix
+    // (an unbounded get) dispatch never returns and this trips.
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(3),
+        () ->
+            assertThrows(
+                IllegalStateException.class, () -> dispatcher.dispatch(message, "orders")));
+  }
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void surfacesBrokerFailureSoTheRowIsRetried() {
-        KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
-        doReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")))
-                .when(template).send(any(ProducerRecord.class));
+  @Test
+  @SuppressWarnings("unchecked")
+  void surfacesBrokerFailureSoTheRowIsRetried() {
+    KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
+    doReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")))
+        .when(template)
+        .send(any(ProducerRecord.class));
 
-        KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template);
-        assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message, "orders"));
-    }
+    KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template);
+    assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message, "orders"));
+  }
 
-    private static String header(ProducerRecord<String, String> record, String name) {
-        Header header = record.headers().lastHeader(name);
-        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
-    }
+  private static String header(ProducerRecord<String, String> record, String name) {
+    Header header = record.headers().lastHeader(name);
+    return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+  }
 }

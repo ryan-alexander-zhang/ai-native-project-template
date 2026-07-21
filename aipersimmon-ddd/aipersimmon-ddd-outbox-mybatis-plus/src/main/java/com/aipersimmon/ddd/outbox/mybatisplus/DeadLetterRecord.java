@@ -6,140 +6,140 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.Instant;
 
 /**
- * One dead-lettered message in the {@code aipersimmon_dead_letter} table: the same
- * transport metadata and payload as the outbox row it was moved from, plus the triage
- * fields (attempts made, reason given up on, the last error, when). Uses MyBatis-Plus
- * {@code @TableName}/{@code @TableId} like {@link OutboxRecord}, so it never affects a
- * consumer's JPA entity scanning.
+ * One dead-lettered message in the {@code aipersimmon_dead_letter} table: the same transport
+ * metadata and payload as the outbox row it was moved from, plus the triage fields (attempts made,
+ * reason given up on, the last error, when). Uses MyBatis-Plus {@code @TableName}/{@code @TableId}
+ * like {@link OutboxRecord}, so it never affects a consumer's JPA entity scanning.
  */
 @TableName("aipersimmon_dead_letter")
 public class DeadLetterRecord {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    private String eventId;
-    private String source;
-    private String type;
-    private Integer version;
-    private String payload;
-    private Instant occurredAt;
-    private String subject;
-    private String correlationId;
-    private String causationId;
-    private Integer attempts;
-    private String reason;
-    private String lastError;
-    private Instant failedAt;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    public Long getId() {
-        return id;
-    }
+  private String eventId;
+  private String source;
+  private String type;
+  private Integer version;
+  private String payload;
+  private Instant occurredAt;
+  private String subject;
+  private String correlationId;
+  private String causationId;
+  private Integer attempts;
+  private String reason;
+  private String lastError;
+  private Instant failedAt;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getEventId() {
-        return eventId;
-    }
+  public void setId(Long id) {
+    this.id = id;
+  }
 
-    public void setEventId(String eventId) {
-        this.eventId = eventId;
-    }
+  public String getEventId() {
+    return eventId;
+  }
 
-    public String getSource() {
-        return source;
-    }
+  public void setEventId(String eventId) {
+    this.eventId = eventId;
+  }
 
-    public void setSource(String source) {
-        this.source = source;
-    }
+  public String getSource() {
+    return source;
+  }
 
-    public String getType() {
-        return type;
-    }
+  public void setSource(String source) {
+    this.source = source;
+  }
 
-    public void setType(String type) {
-        this.type = type;
-    }
+  public String getType() {
+    return type;
+  }
 
-    public Integer getVersion() {
-        return version;
-    }
+  public void setType(String type) {
+    this.type = type;
+  }
 
-    public void setVersion(Integer version) {
-        this.version = version;
-    }
+  public Integer getVersion() {
+    return version;
+  }
 
-    public String getPayload() {
-        return payload;
-    }
+  public void setVersion(Integer version) {
+    this.version = version;
+  }
 
-    public void setPayload(String payload) {
-        this.payload = payload;
-    }
+  public String getPayload() {
+    return payload;
+  }
 
-    public Instant getOccurredAt() {
-        return occurredAt;
-    }
+  public void setPayload(String payload) {
+    this.payload = payload;
+  }
 
-    public void setOccurredAt(Instant occurredAt) {
-        this.occurredAt = occurredAt;
-    }
+  public Instant getOccurredAt() {
+    return occurredAt;
+  }
 
-    public String getSubject() {
-        return subject;
-    }
+  public void setOccurredAt(Instant occurredAt) {
+    this.occurredAt = occurredAt;
+  }
 
-    public void setSubject(String subject) {
-        this.subject = subject;
-    }
+  public String getSubject() {
+    return subject;
+  }
 
-    public String getCorrelationId() {
-        return correlationId;
-    }
+  public void setSubject(String subject) {
+    this.subject = subject;
+  }
 
-    public void setCorrelationId(String correlationId) {
-        this.correlationId = correlationId;
-    }
+  public String getCorrelationId() {
+    return correlationId;
+  }
 
-    public String getCausationId() {
-        return causationId;
-    }
+  public void setCorrelationId(String correlationId) {
+    this.correlationId = correlationId;
+  }
 
-    public void setCausationId(String causationId) {
-        this.causationId = causationId;
-    }
+  public String getCausationId() {
+    return causationId;
+  }
 
-    public Integer getAttempts() {
-        return attempts;
-    }
+  public void setCausationId(String causationId) {
+    this.causationId = causationId;
+  }
 
-    public void setAttempts(Integer attempts) {
-        this.attempts = attempts;
-    }
+  public Integer getAttempts() {
+    return attempts;
+  }
 
-    public String getReason() {
-        return reason;
-    }
+  public void setAttempts(Integer attempts) {
+    this.attempts = attempts;
+  }
 
-    public void setReason(String reason) {
-        this.reason = reason;
-    }
+  public String getReason() {
+    return reason;
+  }
 
-    public String getLastError() {
-        return lastError;
-    }
+  public void setReason(String reason) {
+    this.reason = reason;
+  }
 
-    public void setLastError(String lastError) {
-        this.lastError = lastError;
-    }
+  public String getLastError() {
+    return lastError;
+  }
 
-    public Instant getFailedAt() {
-        return failedAt;
-    }
+  public void setLastError(String lastError) {
+    this.lastError = lastError;
+  }
 
-    public void setFailedAt(Instant failedAt) {
-        this.failedAt = failedAt;
-    }
+  public Instant getFailedAt() {
+    return failedAt;
+  }
+
+  public void setFailedAt(Instant failedAt) {
+    this.failedAt = failedAt;
+  }
 }

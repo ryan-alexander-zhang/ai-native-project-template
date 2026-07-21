@@ -7,12 +7,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a type as an entity: a domain object with a distinct identity that runs
- * through its lifecycle, so two instances are equal when their identities match,
- * not their attribute values.
+ * Marks a type as an entity: a domain object with a distinct identity that runs through its
+ * lifecycle, so two instances are equal when their identities match, not their attribute values.
  */
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Entity {
-}
+public @interface Entity {}

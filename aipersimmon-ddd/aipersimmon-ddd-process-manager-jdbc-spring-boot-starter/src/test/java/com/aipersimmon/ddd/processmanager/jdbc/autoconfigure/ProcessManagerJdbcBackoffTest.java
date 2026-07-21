@@ -13,14 +13,17 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
  */
 class ProcessManagerJdbcBackoffTest {
 
-    private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(AipersimmonDddProcessManagerJdbcAutoConfiguration.class));
+  private final ApplicationContextRunner runner =
+      new ApplicationContextRunner()
+          .withConfiguration(
+              AutoConfigurations.of(AipersimmonDddProcessManagerJdbcAutoConfiguration.class));
 
-    @Test
-    void backsOffCleanlyWithoutADataSource() {
-        runner.run(context -> {
-            assertThat(context).hasNotFailed();
-            assertThat(context).doesNotHaveBean(JdbcProcessRuntime.class);
+  @Test
+  void backsOffCleanlyWithoutADataSource() {
+    runner.run(
+        context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context).doesNotHaveBean(JdbcProcessRuntime.class);
         });
-    }
+  }
 }

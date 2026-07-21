@@ -22,86 +22,88 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Exercises the MyBatis-Plus outbox end to end against an in-memory H2 database: a
- * published integration event lands as an unsent row, and the relay dispatches it
- * and marks it sent. The poll delay is set very high so the background scheduler
- * does not fire during the test; the relay is invoked directly instead.
+ * Exercises the MyBatis-Plus outbox end to end against an in-memory H2 database: a published
+ * integration event lands as an unsent row, and the relay dispatches it and marks it sent. The poll
+ * delay is set very high so the background scheduler does not fire during the test; the relay is
+ * invoked directly instead.
  */
 @SpringBootTest(
-        classes = OutboxMybatisPlusTest.TestApp.class,
-        properties = "aipersimmon.ddd.outbox.poll-delay-ms=3600000")
+    classes = OutboxMybatisPlusTest.TestApp.class,
+    properties = "aipersimmon.ddd.outbox.poll-delay-ms=3600000")
 class OutboxMybatisPlusTest {
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    static class TestApp {
+  @SpringBootConfiguration
+  @EnableAutoConfiguration
+  static class TestApp {
 
-        @Bean
-        CapturingDispatcher capturingDispatcher() {
-            return new CapturingDispatcher();
-        }
+    @Bean
+    CapturingDispatcher capturingDispatcher() {
+      return new CapturingDispatcher();
     }
+  }
 
-    static class CapturingDispatcher implements OutboxDispatcher {
-        final List<OutboxMessage> messages = new CopyOnWriteArrayList<>();
+  static class CapturingDispatcher implements OutboxDispatcher {
+    final List<OutboxMessage> messages = new CopyOnWriteArrayList<>();
 
-        @Override
-        public void dispatch(OutboxMessage message) {
-            messages.add(message);
-        }
+    @Override
+    public void dispatch(OutboxMessage message) {
+      messages.add(message);
     }
+  }
 
-    @EventType(name = "com.example.ordering.Sample", version = 1)
-    record SampleEvent(String orderId) implements IntegrationEvent {
-    }
+  @EventType(name = "com.example.ordering.Sample", version = 1)
+  record SampleEvent(String orderId) implements IntegrationEvent {}
 
-    @Autowired
-    IntegrationEvents integrationEvents;
-    @Autowired
-    OutboxRelay relay;
-    @Autowired
-    JdbcTemplate jdbc;
-    @Autowired
-    CapturingDispatcher dispatcher;
+  @Autowired IntegrationEvents integrationEvents;
+  @Autowired OutboxRelay relay;
+  @Autowired JdbcTemplate jdbc;
+  @Autowired CapturingDispatcher dispatcher;
 
-    @BeforeEach
-    void reset() {
-        jdbc.update("DELETE FROM aipersimmon_outbox");
-        dispatcher.messages.clear();
-    }
+  @BeforeEach
+  void reset() {
+    jdbc.update("DELETE FROM aipersimmon_outbox");
+    dispatcher.messages.clear();
+  }
 
-    @Test
-    void writesUnsentRowThenRelayDispatchesAndMarksSent() {
-        integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1"));
+  @Test
+  void writesUnsentRowThenRelayDispatchesAndMarksSent() {
+    integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1"));
 
-        assertEquals(Integer.valueOf(1),
-                jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = FALSE", Integer.class));
+    assertEquals(
+        Integer.valueOf(1),
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = FALSE", Integer.class));
 
-        relay.relay();
+    relay.relay();
 
-        assertEquals(1, dispatcher.messages.size());
-        OutboxMessage message = dispatcher.messages.get(0);
-        assertEquals("com.example.ordering.Sample", message.type(),
-                "the declared @EventType logical type, not the Java class name");
-        assertTrue(message.payload().contains("O-1"));
-        assertEquals("cmd-1", message.correlationId(), "correlation propagated from the command");
-        assertEquals("cmd-1", message.causationId(), "caused by the emitting command");
-        assertEquals(Integer.valueOf(1),
-                jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = TRUE", Integer.class));
-    }
+    assertEquals(1, dispatcher.messages.size());
+    OutboxMessage message = dispatcher.messages.get(0);
+    assertEquals(
+        "com.example.ordering.Sample",
+        message.type(),
+        "the declared @EventType logical type, not the Java class name");
+    assertTrue(message.payload().contains("O-1"));
+    assertEquals("cmd-1", message.correlationId(), "correlation propagated from the command");
+    assertEquals("cmd-1", message.causationId(), "caused by the emitting command");
+    assertEquals(
+        Integer.valueOf(1),
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_outbox WHERE sent = TRUE", Integer.class));
+  }
 
-    @Test
-    void autoConfiguresWriterAsIntegrationEventsPublisher() {
-        assertInstanceOf(OutboxWriter.class, integrationEvents);
-    }
+  @Test
+  void autoConfiguresWriterAsIntegrationEventsPublisher() {
+    assertInstanceOf(OutboxWriter.class, integrationEvents);
+  }
 
-    @Test
-    void relayPollIsGuardedByShedLock() {
-        relay.relay();
+  @Test
+  void relayPollIsGuardedByShedLock() {
+    relay.relay();
 
-        assertEquals(Integer.valueOf(1),
-                jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM shedlock WHERE name = 'aipersimmon-outbox-relay'", Integer.class),
-                "the relay poll must acquire a ShedLock lock so only one instance polls at a time");
-    }
+    assertEquals(
+        Integer.valueOf(1),
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM shedlock WHERE name = 'aipersimmon-outbox-relay'", Integer.class),
+        "the relay poll must acquire a ShedLock lock so only one instance polls at a time");
+  }
 }

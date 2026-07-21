@@ -43,139 +43,172 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * The SKIP LOCKED claim gate on a real PostgreSQL: two workers polling
- * concurrently over many due effects must claim disjoint sets, so every effect is
- * dispatched exactly once — no double delivery from a lost race.
+ * The SKIP LOCKED claim gate on a real PostgreSQL: two workers polling concurrently over many due
+ * effects must claim disjoint sets, so every effect is dispatched exactly once — no double delivery
+ * from a lost race.
  */
 @Testcontainers
 class EffectRelayPostgresConcurrencyTest {
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  @Container
+  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    private JdbcTemplate jdbc;
-    private JdbcProcessRuntime runtime;
-    private JdbcProcessEffectStore effectStore;
-    private JdbcProcessInstanceStore instanceStore;
-    private JdbcProcessUnitOfWork unitOfWork;
-    private final SkipLockedProcessDialect dialect = new SkipLockedProcessDialect("postgresql");
-    private final ConcurrentDispatchBus bus = new ConcurrentDispatchBus();
-    private final AtomicInteger ids = new AtomicInteger();
-    private final AtomicInteger tokens = new AtomicInteger();
-    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
+  private JdbcTemplate jdbc;
+  private JdbcProcessRuntime runtime;
+  private JdbcProcessEffectStore effectStore;
+  private JdbcProcessInstanceStore instanceStore;
+  private JdbcProcessUnitOfWork unitOfWork;
+  private final SkipLockedProcessDialect dialect = new SkipLockedProcessDialect("postgresql");
+  private final ConcurrentDispatchBus bus = new ConcurrentDispatchBus();
+  private final AtomicInteger ids = new AtomicInteger();
+  private final AtomicInteger tokens = new AtomicInteger();
+  private static final Clock CLOCK =
+      Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
 
-    @BeforeEach
-    void setUp() {
-        SimpleDriverDataSource ds = new SimpleDriverDataSource(
-                new org.postgresql.Driver(),
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
-        jdbc = new JdbcTemplate(ds);
-        jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_effect, aipersimmon_process_transition, "
-                + "aipersimmon_process_deadline, aipersimmon_process_instance");
-        new ResourceDatabasePopulator(
-                new ClassPathResource("aipersimmon/db/migration/process-manager/postgresql/V1__aipersimmon_process_manager.sql"),
-                new ClassPathResource("aipersimmon/db/migration/process-manager/postgresql/V2__drop_trace_id.sql")).execute(ds);
+  @BeforeEach
+  void setUp() {
+    SimpleDriverDataSource ds =
+        new SimpleDriverDataSource(
+            new org.postgresql.Driver(),
+            POSTGRES.getJdbcUrl(),
+            POSTGRES.getUsername(),
+            POSTGRES.getPassword());
+    jdbc = new JdbcTemplate(ds);
+    jdbc.execute(
+        "DROP TABLE IF EXISTS aipersimmon_process_effect, aipersimmon_process_transition, "
+            + "aipersimmon_process_deadline, aipersimmon_process_instance");
+    new ResourceDatabasePopulator(
+            new ClassPathResource(
+                "aipersimmon/db/migration/process-manager/postgresql/V1__aipersimmon_process_manager.sql"),
+            new ClassPathResource(
+                "aipersimmon/db/migration/process-manager/postgresql/V2__drop_trace_id.sql"))
+        .execute(ds);
 
-        instanceStore = new JdbcProcessInstanceStore(jdbc);
-        JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
-        effectStore = new JdbcProcessEffectStore(jdbc);
-        JdbcProcessDeadlineStore deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-        unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(ds));
-        runtime = new JdbcProcessRuntime(
-                instanceStore, transitionStore, effectStore, deadlineStore,
-                new ProcessDefinitionRegistry(List.of(new TestFulfilment.Definition())),
-                new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
-                new ProcessStateCodecRegistry(List.of(TestFulfilment.stateCodec())),
-                unitOfWork, CLOCK, () -> "id-" + ids.incrementAndGet(),
-                DuplicateBusinessKeyPolicy.REJECT, 3);
+    instanceStore = new JdbcProcessInstanceStore(jdbc);
+    JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
+    effectStore = new JdbcProcessEffectStore(jdbc);
+    JdbcProcessDeadlineStore deadlineStore = new JdbcProcessDeadlineStore(jdbc);
+    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(ds));
+    runtime =
+        new JdbcProcessRuntime(
+            instanceStore,
+            transitionStore,
+            effectStore,
+            deadlineStore,
+            new ProcessDefinitionRegistry(List.of(new TestFulfilment.Definition())),
+            new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
+            new ProcessStateCodecRegistry(List.of(TestFulfilment.stateCodec())),
+            unitOfWork,
+            CLOCK,
+            () -> "id-" + ids.incrementAndGet(),
+            DuplicateBusinessKeyPolicy.REJECT,
+            3);
+  }
+
+  @Test
+  void twoWorkersClaimingConcurrentlyDeliverEachEffectExactlyOnce() throws InterruptedException {
+    int total = 40;
+    for (int i = 0; i < total; i++) {
+      runtime.start(
+          TestFulfilment.TYPE,
+          new ProcessBusinessKey("order-" + i),
+          new TestFulfilment.Started("order-" + i),
+          CommandContext.root("msg-" + i));
     }
+    assertEquals(
+        (long) total,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = 'PENDING'",
+            Long.class));
 
-    @Test
-    void twoWorkersClaimingConcurrentlyDeliverEachEffectExactlyOnce() throws InterruptedException {
-        int total = 40;
-        for (int i = 0; i < total; i++) {
-            runtime.start(TestFulfilment.TYPE, new ProcessBusinessKey("order-" + i),
-                    new TestFulfilment.Started("order-" + i), CommandContext.root("msg-" + i));
+    AtomicInteger delivered = new AtomicInteger();
+    Runnable worker = worker(delivered, total);
+    Thread a = new Thread(worker, "relay-A");
+    Thread b = new Thread(worker, "relay-B");
+    a.start();
+    b.start();
+    a.join(Duration.ofSeconds(30).toMillis());
+    b.join(Duration.ofSeconds(30).toMillis());
+
+    assertEquals(total, bus.deliveredMessageIds.size(), "every effect dispatched exactly once");
+    Set<String> distinct = new HashSet<>(bus.deliveredMessageIds);
+    assertEquals(
+        total, distinct.size(), "no effect dispatched twice (SKIP LOCKED claimed disjoint sets)");
+    assertEquals(
+        (long) total,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = 'DELIVERED'",
+            Long.class));
+  }
+
+  private Runnable worker(AtomicInteger delivered, int total) {
+    return () -> {
+      JdbcProcessEffectRelay relay =
+          new JdbcProcessEffectRelay(
+              jdbc,
+              dialect,
+              effectStore,
+              instanceStore,
+              new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
+              new EffectDispatcherRegistry(List.of(new CommandEffectDispatcher(bus))),
+              unitOfWork,
+              zeroBackoff(),
+              CLOCK,
+              new WorkerId("worker-" + Thread.currentThread().getName()),
+              5,
+              Duration.ofSeconds(30),
+              () -> "lease-" + tokens.incrementAndGet());
+      int idleRounds = 0;
+      while (delivered.get() < total && idleRounds < 200) {
+        int n = relay.pollOnce();
+        if (n == 0) {
+          idleRounds++;
+          try {
+            Thread.sleep(3);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+        } else {
+          delivered.addAndGet(n);
+          idleRounds = 0;
         }
-        assertEquals((long) total, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = 'PENDING'", Long.class));
+      }
+    };
+  }
 
-        AtomicInteger delivered = new AtomicInteger();
-        Runnable worker = worker(delivered, total);
-        Thread a = new Thread(worker, "relay-A");
-        Thread b = new Thread(worker, "relay-B");
-        a.start();
-        b.start();
-        a.join(Duration.ofSeconds(30).toMillis());
-        b.join(Duration.ofSeconds(30).toMillis());
+  private static ProcessRetryPolicy zeroBackoff() {
+    return new ProcessRetryPolicy() {
+      @Override
+      public Duration backoff(int attempt) {
+        return Duration.ZERO;
+      }
 
-        assertEquals(total, bus.deliveredMessageIds.size(), "every effect dispatched exactly once");
-        Set<String> distinct = new HashSet<>(bus.deliveredMessageIds);
-        assertEquals(total, distinct.size(), "no effect dispatched twice (SKIP LOCKED claimed disjoint sets)");
-        assertEquals((long) total, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status = 'DELIVERED'", Long.class));
+      @Override
+      public int maxAttempts() {
+        return 5;
+      }
+    };
+  }
+
+  /** Thread-safe bus that records the messageId of every dispatched command. */
+  static final class ConcurrentDispatchBus implements CommandBus {
+    final ConcurrentLinkedQueue<String> deliveredMessageIds = new ConcurrentLinkedQueue<>();
+
+    @Override
+    public <R> R send(Command<R> command) {
+      throw new UnsupportedOperationException();
     }
 
-    private Runnable worker(AtomicInteger delivered, int total) {
-        return () -> {
-            JdbcProcessEffectRelay relay = new JdbcProcessEffectRelay(
-                    jdbc, dialect, effectStore, instanceStore,
-                    new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
-                    new EffectDispatcherRegistry(List.of(new CommandEffectDispatcher(bus))),
-                    unitOfWork, zeroBackoff(), CLOCK,
-                    new WorkerId("worker-" + Thread.currentThread().getName()), 5,
-                    Duration.ofSeconds(30), () -> "lease-" + tokens.incrementAndGet());
-            int idleRounds = 0;
-            while (delivered.get() < total && idleRounds < 200) {
-                int n = relay.pollOnce();
-                if (n == 0) {
-                    idleRounds++;
-                    try {
-                        Thread.sleep(3);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                } else {
-                    delivered.addAndGet(n);
-                    idleRounds = 0;
-                }
-            }
-        };
+    @Override
+    public <R> R send(Command<R> command, CommandContext cause) {
+      throw new UnsupportedOperationException();
     }
 
-    private static ProcessRetryPolicy zeroBackoff() {
-        return new ProcessRetryPolicy() {
-            @Override
-            public Duration backoff(int attempt) {
-                return Duration.ZERO;
-            }
-
-            @Override
-            public int maxAttempts() {
-                return 5;
-            }
-        };
+    @Override
+    public <R> R sendAs(Command<R> command, CommandContext messageContext) {
+      deliveredMessageIds.add(messageContext.messageId());
+      return null;
     }
-
-    /** Thread-safe bus that records the messageId of every dispatched command. */
-    static final class ConcurrentDispatchBus implements CommandBus {
-        final ConcurrentLinkedQueue<String> deliveredMessageIds = new ConcurrentLinkedQueue<>();
-
-        @Override
-        public <R> R send(Command<R> command) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <R> R send(Command<R> command, CommandContext cause) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <R> R sendAs(Command<R> command, CommandContext messageContext) {
-            deliveredMessageIds.add(messageContext.messageId());
-            return null;
-        }
-    }
+  }
 }

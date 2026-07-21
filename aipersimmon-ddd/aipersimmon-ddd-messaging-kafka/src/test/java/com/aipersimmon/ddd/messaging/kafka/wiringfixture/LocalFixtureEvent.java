@@ -7,8 +7,8 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 @EventType(name = "com.example.wiring.Local", version = 1)
 public record LocalFixtureEvent(String id) implements IntegrationEvent {
 
-    @Override
-    public String subject() {
-        return id;
-    }
+  @Override
+  public String subject() {
+    return id;
+  }
 }

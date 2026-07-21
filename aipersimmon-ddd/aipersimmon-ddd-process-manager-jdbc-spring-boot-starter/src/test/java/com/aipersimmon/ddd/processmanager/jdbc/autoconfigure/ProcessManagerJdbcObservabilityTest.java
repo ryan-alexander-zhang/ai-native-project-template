@@ -27,115 +27,122 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 
 /**
- * Boot slice: with Micrometer and Actuator on the classpath, the starter wires a
- * Micrometer-backed {@link ProcessObserver}, a backlog meter binder, and a health indicator.
- * It exercises a start → relay poll and asserts the backlog gauges and the
- * claim/dispatch latency timers are recorded, and that health is UP with an empty backlog.
+ * Boot slice: with Micrometer and Actuator on the classpath, the starter wires a Micrometer-backed
+ * {@link ProcessObserver}, a backlog meter binder, and a health indicator. It exercises a start →
+ * relay poll and asserts the backlog gauges and the claim/dispatch latency timers are recorded, and
+ * that health is UP with an empty backlog.
  */
 @SpringBootTest(
-        classes = ProcessManagerJdbcObservabilityTest.TestApp.class,
-        properties = {
-                "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=1h",
-                "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
-        })
+    classes = ProcessManagerJdbcObservabilityTest.TestApp.class,
+    properties = {
+      "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=1h",
+      "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
+    })
 class ProcessManagerJdbcObservabilityTest {
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    static class TestApp {
-        @Bean
-        ProcessDefinition<?> starterDefinition() {
-            return new StarterTestProcess.Definition();
-        }
-
-        @Bean
-        ProcessPayloadCodec<?> beginCodec() {
-            return StarterTestProcess.beginCodec();
-        }
-
-        @Bean
-        ProcessPayloadCodec<?> doThingCodec() {
-            return StarterTestProcess.doThingCodec();
-        }
-
-        @Bean
-        ProcessStateCodec<?> stateCodec() {
-            return StarterTestProcess.stateCodec();
-        }
-
-        @Bean
-        CommandBus commandBus() {
-            return new RecordingCommandBus();
-        }
-
-        @Bean
-        MeterRegistry meterRegistry() {
-            return new SimpleMeterRegistry();
-        }
+  @SpringBootConfiguration
+  @EnableAutoConfiguration
+  static class TestApp {
+    @Bean
+    ProcessDefinition<?> starterDefinition() {
+      return new StarterTestProcess.Definition();
     }
 
-    @Autowired
-    ProcessRuntime runtime;
-    @Autowired
-    JdbcProcessEffectRelay relay;
-    @Autowired
-    MeterRegistry registry;
-    @Autowired
-    ProcessObserver observer;
-    @Autowired
-    ProcessManagerJdbcMeterBinder meterBinder;
-    @Autowired
-    ProcessManagerJdbcHealthIndicator health;
-
-    @Test
-    void wiresAMicrometerBackedObserver() {
-        assertInstanceOf(MicrometerProcessObserver.class, observer);
+    @Bean
+    ProcessPayloadCodec<?> beginCodec() {
+      return StarterTestProcess.beginCodec();
     }
 
-    @Test
-    void meterBinderRegistersTheBacklogGauges() {
-        meterBinder.bindTo(registry);
-        assertNotNull(registry.find("aipersimmon.process.manager.dead.effects").gauge());
-        assertNotNull(registry.find("aipersimmon.process.manager.dead.deadlines").gauge());
-        assertNotNull(registry.find("aipersimmon.process.manager.oldest.pending.effect.age").gauge());
-        assertNotNull(registry.find("aipersimmon.process.manager.oldest.pending.deadline.age").gauge());
-        assertNotNull(registry.find("aipersimmon.process.manager.stuck.instances").gauge());
-        assertNotNull(registry.find("aipersimmon.process.manager.suspended.instances").tag("source", "EFFECT").gauge());
+    @Bean
+    ProcessPayloadCodec<?> doThingCodec() {
+      return StarterTestProcess.doThingCodec();
     }
 
-    @Test
-    void relayRecordsClaimAndDispatchLatencyThroughTheObserver() {
-        ProcessAdvanceResult started = runtime.start(
-                StarterTestProcess.TYPE, new ProcessBusinessKey("order-obs"),
-                new StarterTestProcess.Begin("order-obs"), CommandContext.root("msg-1"));
-        assertEquals(1, relay.pollOnce(), "the staged effect is delivered");
-
-        assertTrue(registry.get("aipersimmon.process.manager.claim.latency").timer().count() >= 1,
-                "a claim was timed");
-        assertEquals(1, registry.get("aipersimmon.process.manager.dispatch.latency")
-                .tag("outcome", "success").timer().count());
-        assertNotNull(started.transitionId());
+    @Bean
+    ProcessStateCodec<?> stateCodec() {
+      return StarterTestProcess.stateCodec();
     }
 
-    @Test
-    void healthIsUpWithAnEmptyBacklog() {
-        assertEquals(Status.UP, health.health().getStatus());
+    @Bean
+    CommandBus commandBus() {
+      return new RecordingCommandBus();
     }
 
-    static final class RecordingCommandBus implements CommandBus {
-        @Override
-        public <R> R send(Command<R> command) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <R> R send(Command<R> command, CommandContext cause) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <R> R sendAs(Command<R> command, CommandContext messageContext) {
-            return null;
-        }
+    @Bean
+    MeterRegistry meterRegistry() {
+      return new SimpleMeterRegistry();
     }
+  }
+
+  @Autowired ProcessRuntime runtime;
+  @Autowired JdbcProcessEffectRelay relay;
+  @Autowired MeterRegistry registry;
+  @Autowired ProcessObserver observer;
+  @Autowired ProcessManagerJdbcMeterBinder meterBinder;
+  @Autowired ProcessManagerJdbcHealthIndicator health;
+
+  @Test
+  void wiresAMicrometerBackedObserver() {
+    assertInstanceOf(MicrometerProcessObserver.class, observer);
+  }
+
+  @Test
+  void meterBinderRegistersTheBacklogGauges() {
+    meterBinder.bindTo(registry);
+    assertNotNull(registry.find("aipersimmon.process.manager.dead.effects").gauge());
+    assertNotNull(registry.find("aipersimmon.process.manager.dead.deadlines").gauge());
+    assertNotNull(registry.find("aipersimmon.process.manager.oldest.pending.effect.age").gauge());
+    assertNotNull(registry.find("aipersimmon.process.manager.oldest.pending.deadline.age").gauge());
+    assertNotNull(registry.find("aipersimmon.process.manager.stuck.instances").gauge());
+    assertNotNull(
+        registry
+            .find("aipersimmon.process.manager.suspended.instances")
+            .tag("source", "EFFECT")
+            .gauge());
+  }
+
+  @Test
+  void relayRecordsClaimAndDispatchLatencyThroughTheObserver() {
+    ProcessAdvanceResult started =
+        runtime.start(
+            StarterTestProcess.TYPE,
+            new ProcessBusinessKey("order-obs"),
+            new StarterTestProcess.Begin("order-obs"),
+            CommandContext.root("msg-1"));
+    assertEquals(1, relay.pollOnce(), "the staged effect is delivered");
+
+    assertTrue(
+        registry.get("aipersimmon.process.manager.claim.latency").timer().count() >= 1,
+        "a claim was timed");
+    assertEquals(
+        1,
+        registry
+            .get("aipersimmon.process.manager.dispatch.latency")
+            .tag("outcome", "success")
+            .timer()
+            .count());
+    assertNotNull(started.transitionId());
+  }
+
+  @Test
+  void healthIsUpWithAnEmptyBacklog() {
+    assertEquals(Status.UP, health.health().getStatus());
+  }
+
+  static final class RecordingCommandBus implements CommandBus {
+    @Override
+    public <R> R send(Command<R> command) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public <R> R send(Command<R> command, CommandContext cause) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public <R> R sendAs(Command<R> command, CommandContext messageContext) {
+      return null;
+    }
+  }
 }

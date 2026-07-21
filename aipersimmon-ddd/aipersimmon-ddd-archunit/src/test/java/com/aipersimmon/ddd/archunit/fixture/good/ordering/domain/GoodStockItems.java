@@ -4,14 +4,14 @@ import com.aipersimmon.ddd.core.annotation.Repository;
 import java.util.Optional;
 
 /**
- * A well-formed repository port: the core {@code @Repository} on an interface in the
- * domain layer. Exercises the good path of {@code repositoryPortsShouldBeInterfacesInDomain};
- * its implementation lives in the infrastructure layer (see {@code GoodInMemoryStockItems}).
+ * A well-formed repository port: the core {@code @Repository} on an interface in the domain layer.
+ * Exercises the good path of {@code repositoryPortsShouldBeInterfacesInDomain}; its implementation
+ * lives in the infrastructure layer (see {@code GoodInMemoryStockItems}).
  */
 @Repository
 public interface GoodStockItems {
 
-    Optional<GoodStockItem> findBySku(String sku);
+  Optional<GoodStockItem> findBySku(String sku);
 
-    void save(GoodStockItem item);
+  void save(GoodStockItem item);
 }

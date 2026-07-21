@@ -12,29 +12,29 @@ import org.junit.jupiter.api.io.TempDir;
 
 class PackageInfoChecksTest {
 
-    @Test
-    void reportsPackageMissingPackageInfo(@TempDir Path root) throws IOException {
-        Path pkg = Files.createDirectories(root.resolve("com/example/domain"));
-        Files.writeString(pkg.resolve("Foo.java"), "package com.example.domain; class Foo {}");
+  @Test
+  void reportsPackageMissingPackageInfo(@TempDir Path root) throws IOException {
+    Path pkg = Files.createDirectories(root.resolve("com/example/domain"));
+    Files.writeString(pkg.resolve("Foo.java"), "package com.example.domain; class Foo {}");
 
-        assertEquals(1, PackageInfoChecks.packagesMissingPackageInfo(root).size());
-        assertThrows(AssertionError.class,
-                () -> PackageInfoChecks.assertEveryPackageHasPackageInfo(root));
-    }
+    assertEquals(1, PackageInfoChecks.packagesMissingPackageInfo(root).size());
+    assertThrows(
+        AssertionError.class, () -> PackageInfoChecks.assertEveryPackageHasPackageInfo(root));
+  }
 
-    @Test
-    void passesWhenPackageInfoPresent(@TempDir Path root) throws IOException {
-        Path pkg = Files.createDirectories(root.resolve("com/example/domain"));
-        Files.writeString(pkg.resolve("Foo.java"), "package com.example.domain; class Foo {}");
-        Files.writeString(pkg.resolve("package-info.java"), "package com.example.domain;");
+  @Test
+  void passesWhenPackageInfoPresent(@TempDir Path root) throws IOException {
+    Path pkg = Files.createDirectories(root.resolve("com/example/domain"));
+    Files.writeString(pkg.resolve("Foo.java"), "package com.example.domain; class Foo {}");
+    Files.writeString(pkg.resolve("package-info.java"), "package com.example.domain;");
 
-        assertDoesNotThrow(() -> PackageInfoChecks.assertEveryPackageHasPackageInfo(root));
-    }
+    assertDoesNotThrow(() -> PackageInfoChecks.assertEveryPackageHasPackageInfo(root));
+  }
 
-    @Test
-    void ignoresDirectoryWithoutJavaSources(@TempDir Path root) throws IOException {
-        Files.createDirectories(root.resolve("com/example"));
+  @Test
+  void ignoresDirectoryWithoutJavaSources(@TempDir Path root) throws IOException {
+    Files.createDirectories(root.resolve("com/example"));
 
-        assertDoesNotThrow(() -> PackageInfoChecks.assertEveryPackageHasPackageInfo(root));
-    }
+    assertDoesNotThrow(() -> PackageInfoChecks.assertEveryPackageHasPackageInfo(root));
+  }
 }

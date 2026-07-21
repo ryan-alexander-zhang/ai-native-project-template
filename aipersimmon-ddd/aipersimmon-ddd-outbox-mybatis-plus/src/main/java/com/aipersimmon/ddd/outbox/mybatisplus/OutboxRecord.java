@@ -6,167 +6,168 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.Instant;
 
 /**
- * One stored integration event in the outbox table: the transport metadata, the
- * serialized JSON payload, and the delivery bookkeeping (sent flag, sent time,
- * attempt count). Uses MyBatis-Plus {@code @TableName}/{@code @TableId}, not a JPA
- * {@code @Entity}, so it never affects a consumer's JPA entity scanning. Column
- * names are the snake_case of the field names (MyBatis-Plus maps them by default).
+ * One stored integration event in the outbox table: the transport metadata, the serialized JSON
+ * payload, and the delivery bookkeeping (sent flag, sent time, attempt count). Uses MyBatis-Plus
+ * {@code @TableName}/{@code @TableId}, not a JPA {@code @Entity}, so it never affects a consumer's
+ * JPA entity scanning. Column names are the snake_case of the field names (MyBatis-Plus maps them
+ * by default).
  */
 @TableName("aipersimmon_outbox")
 public class OutboxRecord {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    private String eventId;
-    private String source;
-    private String type;
-    private Integer version;
-    private String payload;
-    private Instant occurredAt;
-    private String subject;
-    private String correlationId;
-    private String causationId;
-    private String traceparent;
-    private String traceState;
-    private Boolean sent;
-    private Instant sentAt;
-    private Integer attempts;
-    private Instant nextAttemptAt;
-    private Instant createdAt;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    public Long getId() {
-        return id;
-    }
+  private String eventId;
+  private String source;
+  private String type;
+  private Integer version;
+  private String payload;
+  private Instant occurredAt;
+  private String subject;
+  private String correlationId;
+  private String causationId;
+  private String traceparent;
+  private String traceState;
+  private Boolean sent;
+  private Instant sentAt;
+  private Integer attempts;
+  private Instant nextAttemptAt;
+  private Instant createdAt;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getEventId() {
-        return eventId;
-    }
+  public void setId(Long id) {
+    this.id = id;
+  }
 
-    public void setEventId(String eventId) {
-        this.eventId = eventId;
-    }
+  public String getEventId() {
+    return eventId;
+  }
 
-    public String getSource() {
-        return source;
-    }
+  public void setEventId(String eventId) {
+    this.eventId = eventId;
+  }
 
-    public void setSource(String source) {
-        this.source = source;
-    }
+  public String getSource() {
+    return source;
+  }
 
-    public String getType() {
-        return type;
-    }
+  public void setSource(String source) {
+    this.source = source;
+  }
 
-    public void setType(String type) {
-        this.type = type;
-    }
+  public String getType() {
+    return type;
+  }
 
-    public Integer getVersion() {
-        return version;
-    }
+  public void setType(String type) {
+    this.type = type;
+  }
 
-    public void setVersion(Integer version) {
-        this.version = version;
-    }
+  public Integer getVersion() {
+    return version;
+  }
 
-    public String getPayload() {
-        return payload;
-    }
+  public void setVersion(Integer version) {
+    this.version = version;
+  }
 
-    public void setPayload(String payload) {
-        this.payload = payload;
-    }
+  public String getPayload() {
+    return payload;
+  }
 
-    public Instant getOccurredAt() {
-        return occurredAt;
-    }
+  public void setPayload(String payload) {
+    this.payload = payload;
+  }
 
-    public void setOccurredAt(Instant occurredAt) {
-        this.occurredAt = occurredAt;
-    }
+  public Instant getOccurredAt() {
+    return occurredAt;
+  }
 
-    public String getSubject() {
-        return subject;
-    }
+  public void setOccurredAt(Instant occurredAt) {
+    this.occurredAt = occurredAt;
+  }
 
-    public void setSubject(String subject) {
-        this.subject = subject;
-    }
+  public String getSubject() {
+    return subject;
+  }
 
-    public String getCorrelationId() {
-        return correlationId;
-    }
+  public void setSubject(String subject) {
+    this.subject = subject;
+  }
 
-    public void setCorrelationId(String correlationId) {
-        this.correlationId = correlationId;
-    }
+  public String getCorrelationId() {
+    return correlationId;
+  }
 
-    public String getCausationId() {
-        return causationId;
-    }
+  public void setCorrelationId(String correlationId) {
+    this.correlationId = correlationId;
+  }
 
-    public void setCausationId(String causationId) {
-        this.causationId = causationId;
-    }
+  public String getCausationId() {
+    return causationId;
+  }
 
-    public String getTraceparent() {
-        return traceparent;
-    }
+  public void setCausationId(String causationId) {
+    this.causationId = causationId;
+  }
 
-    public void setTraceparent(String traceparent) {
-        this.traceparent = traceparent;
-    }
+  public String getTraceparent() {
+    return traceparent;
+  }
 
-    public String getTraceState() {
-        return traceState;
-    }
+  public void setTraceparent(String traceparent) {
+    this.traceparent = traceparent;
+  }
 
-    public void setTraceState(String traceState) {
-        this.traceState = traceState;
-    }
+  public String getTraceState() {
+    return traceState;
+  }
 
-    public Boolean getSent() {
-        return sent;
-    }
+  public void setTraceState(String traceState) {
+    this.traceState = traceState;
+  }
 
-    public void setSent(Boolean sent) {
-        this.sent = sent;
-    }
+  public Boolean getSent() {
+    return sent;
+  }
 
-    public Instant getSentAt() {
-        return sentAt;
-    }
+  public void setSent(Boolean sent) {
+    this.sent = sent;
+  }
 
-    public void setSentAt(Instant sentAt) {
-        this.sentAt = sentAt;
-    }
+  public Instant getSentAt() {
+    return sentAt;
+  }
 
-    public Integer getAttempts() {
-        return attempts;
-    }
+  public void setSentAt(Instant sentAt) {
+    this.sentAt = sentAt;
+  }
 
-    public void setAttempts(Integer attempts) {
-        this.attempts = attempts;
-    }
+  public Integer getAttempts() {
+    return attempts;
+  }
 
-    public Instant getNextAttemptAt() {
-        return nextAttemptAt;
-    }
+  public void setAttempts(Integer attempts) {
+    this.attempts = attempts;
+  }
 
-    public void setNextAttemptAt(Instant nextAttemptAt) {
-        this.nextAttemptAt = nextAttemptAt;
-    }
+  public Instant getNextAttemptAt() {
+    return nextAttemptAt;
+  }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+  public void setNextAttemptAt(Instant nextAttemptAt) {
+    this.nextAttemptAt = nextAttemptAt;
+  }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public void setCreatedAt(Instant createdAt) {
+    this.createdAt = createdAt;
+  }
 }

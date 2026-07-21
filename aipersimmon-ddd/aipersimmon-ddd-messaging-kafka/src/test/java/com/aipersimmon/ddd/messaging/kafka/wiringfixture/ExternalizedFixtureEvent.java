@@ -9,8 +9,8 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 @Externalized("wiring.events")
 public record ExternalizedFixtureEvent(String id) implements IntegrationEvent {
 
-    @Override
-    public String subject() {
-        return id;
-    }
+  @Override
+  public String subject() {
+    return id;
+  }
 }

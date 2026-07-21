@@ -6,8 +6,8 @@ import com.aipersimmon.ddd.cqrs.CommandHandler;
 /** A perfectly ordinary command handler — the one {@link BadCancelOrderHandler} wrongly reuses. */
 public class BadConfirmOrderHandler implements CommandHandler<BadConfirmOrder, Void> {
 
-    @Override
-    public Void handle(BadConfirmOrder command, CommandContext context) {
-        return null;
-    }
+  @Override
+  public Void handle(BadConfirmOrder command, CommandContext context) {
+    return null;
+  }
 }

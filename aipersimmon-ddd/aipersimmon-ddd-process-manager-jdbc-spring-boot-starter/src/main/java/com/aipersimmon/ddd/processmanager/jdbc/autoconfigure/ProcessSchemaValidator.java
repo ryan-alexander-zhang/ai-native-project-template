@@ -5,39 +5,41 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Verifies at startup that the four process tables exist, so a
- * missing migration fails fast with a clear message instead of at the first advance. It
- * never creates tables — the DDL ships as a sample and is applied via Flyway/Liquibase.
- * Disabled when {@code schema-validation=none}.
+ * Verifies at startup that the four process tables exist, so a missing migration fails fast with a
+ * clear message instead of at the first advance. It never creates tables — the DDL ships as a
+ * sample and is applied via Flyway/Liquibase. Disabled when {@code schema-validation=none}.
  */
 @DependsOnDatabaseInitialization
 public final class ProcessSchemaValidator implements InitializingBean {
 
-    private static final String[] TABLES = {
-            "aipersimmon_process_instance",
-            "aipersimmon_process_transition",
-            "aipersimmon_process_effect",
-            "aipersimmon_process_deadline",
-    };
+  private static final String[] TABLES = {
+    "aipersimmon_process_instance",
+    "aipersimmon_process_transition",
+    "aipersimmon_process_effect",
+    "aipersimmon_process_deadline",
+  };
 
-    private final JdbcTemplate jdbc;
+  private final JdbcTemplate jdbc;
 
-    public ProcessSchemaValidator(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+  public ProcessSchemaValidator(JdbcTemplate jdbc) {
+    this.jdbc = jdbc;
+  }
+
+  @Override
+  public void afterPropertiesSet() {
+    for (String table : TABLES) {
+      try {
+        jdbc.execute("SELECT 1 FROM " + table + " WHERE 1 = 0");
+      } catch (RuntimeException missing) {
+        throw new IllegalStateException(
+            "process-manager table '"
+                + table
+                + "' is missing or unreadable; apply the schema "
+                + "(see aipersimmon/db/migration/process-manager) via the aipersimmon-ddd-flyway "
+                + "starter or your own Flyway/Liquibase, or set "
+                + "aipersimmon.ddd.process-manager.jdbc.schema-validation=none",
+            missing);
+      }
     }
-
-    @Override
-    public void afterPropertiesSet() {
-        for (String table : TABLES) {
-            try {
-                jdbc.execute("SELECT 1 FROM " + table + " WHERE 1 = 0");
-            } catch (RuntimeException missing) {
-                throw new IllegalStateException(
-                        "process-manager table '" + table + "' is missing or unreadable; apply the schema "
-                                + "(see aipersimmon/db/migration/process-manager) via the aipersimmon-ddd-flyway "
-                                + "starter or your own Flyway/Liquibase, or set "
-                                + "aipersimmon.ddd.process-manager.jdbc.schema-validation=none", missing);
-            }
-        }
-    }
+  }
 }

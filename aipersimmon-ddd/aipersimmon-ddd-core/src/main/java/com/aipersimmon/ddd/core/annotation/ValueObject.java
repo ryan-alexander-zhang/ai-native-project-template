@@ -7,12 +7,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a type as a value object: it has no identity, is immutable, and is
- * compared by the equality of its attributes. Prefer value objects for concepts
- * measured or described rather than tracked.
+ * Marks a type as a value object: it has no identity, is immutable, and is compared by the equality
+ * of its attributes. Prefer value objects for concepts measured or described rather than tracked.
  */
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface ValueObject {
-}
+public @interface ValueObject {}

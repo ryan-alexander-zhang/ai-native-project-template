@@ -20,59 +20,58 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(classes = InboxMybatisPlusTest.TestApp.class)
 class InboxMybatisPlusTest {
 
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    static class TestApp {
-    }
+  @SpringBootConfiguration
+  @EnableAutoConfiguration
+  static class TestApp {}
 
-    @Autowired
-    Inbox inbox;
-    @Autowired
-    JdbcTemplate jdbc;
-    @Autowired
-    InboxMapper inboxMapper;
+  @Autowired Inbox inbox;
+  @Autowired JdbcTemplate jdbc;
+  @Autowired InboxMapper inboxMapper;
 
-    @BeforeEach
-    void reset() {
-        jdbc.update("DELETE FROM aipersimmon_inbox");
-    }
+  @BeforeEach
+  void reset() {
+    jdbc.update("DELETE FROM aipersimmon_inbox");
+  }
 
-    @Test
-    void recordsFirstKeyThenDetectsDuplicate() {
-        assertFalse(inbox.alreadyProcessed("k1"), "first delivery should be new");
-        assertTrue(inbox.alreadyProcessed("k1"), "redelivery of the same key should be detected");
-        assertFalse(inbox.alreadyProcessed("k2"), "a different key should be new");
-    }
+  @Test
+  void recordsFirstKeyThenDetectsDuplicate() {
+    assertFalse(inbox.alreadyProcessed("k1"), "first delivery should be new");
+    assertTrue(inbox.alreadyProcessed("k1"), "redelivery of the same key should be detected");
+    assertFalse(inbox.alreadyProcessed("k2"), "a different key should be new");
+  }
 
-    @Test
-    void dedupIsScopedPerConsumer() {
-        MybatisPlusInbox serviceA = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a");
-        MybatisPlusInbox serviceB = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b");
+  @Test
+  void dedupIsScopedPerConsumer() {
+    MybatisPlusInbox serviceA = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a");
+    MybatisPlusInbox serviceB = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b");
 
-        assertFalse(serviceA.alreadyProcessed("evt-1"), "first delivery to service-a is new");
-        assertTrue(serviceA.alreadyProcessed("evt-1"), "redelivery to service-a is a duplicate");
-        assertFalse(serviceB.alreadyProcessed("evt-1"),
-                "the same message id under a different consumer must be handled independently");
-    }
+    assertFalse(serviceA.alreadyProcessed("evt-1"), "first delivery to service-a is new");
+    assertTrue(serviceA.alreadyProcessed("evt-1"), "redelivery to service-a is a duplicate");
+    assertFalse(
+        serviceB.alreadyProcessed("evt-1"),
+        "the same message id under a different consumer must be handled independently");
+  }
 
-    @Test
-    void autoConfiguresMybatisPlusInbox() {
-        assertInstanceOf(MybatisPlusInbox.class, inbox);
-    }
+  @Test
+  void autoConfiguresMybatisPlusInbox() {
+    assertInstanceOf(MybatisPlusInbox.class, inbox);
+  }
 
-    @Test
-    void idBasedAccessDoesNotSilentlyIgnoreTheConsumerScope() {
-        // Two consumers recorded the same producer-assigned message id.
-        new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a").alreadyProcessed("evt-1");
-        new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b").alreadyProcessed("evt-1");
-        assertEquals(2L, inboxMapper.selectCount(null), "each consumer has its own dedup row");
+  @Test
+  void idBasedAccessDoesNotSilentlyIgnoreTheConsumerScope() {
+    // Two consumers recorded the same producer-assigned message id.
+    new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a").alreadyProcessed("evt-1");
+    new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b").alreadyProcessed("evt-1");
+    assertEquals(2L, inboxMapper.selectCount(null), "each consumer has its own dedup row");
 
-        // The record's identity is the composite (consumer, message_key); message_key alone is
-        // NOT a unique id. BaseMapper's id-based methods must therefore not be usable to address
-        // a row by message_key — otherwise deleteById("evt-1") would wipe BOTH consumers' rows,
-        // silently clobbering another service's dedup state.
-        assertThrows(Exception.class, () -> inboxMapper.deleteById("evt-1"),
-                "id-based access must be rejected, not silently scoped to message_key alone");
-        assertEquals(2L, inboxMapper.selectCount(null), "neither consumer's dedup row was clobbered");
-    }
+    // The record's identity is the composite (consumer, message_key); message_key alone is
+    // NOT a unique id. BaseMapper's id-based methods must therefore not be usable to address
+    // a row by message_key — otherwise deleteById("evt-1") would wipe BOTH consumers' rows,
+    // silently clobbering another service's dedup state.
+    assertThrows(
+        Exception.class,
+        () -> inboxMapper.deleteById("evt-1"),
+        "id-based access must be rejected, not silently scoped to message_key alone");
+    assertEquals(2L, inboxMapper.selectCount(null), "neither consumer's dedup row was clobbered");
+  }
 }
