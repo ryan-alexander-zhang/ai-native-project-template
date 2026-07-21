@@ -64,6 +64,14 @@ aipersimmon:
 otel:
   service:
     name: ${spring.application.name}
+  # Bridge the app's Micrometer meters onto the OpenTelemetry SDK so they export over OTLP alongside
+  # the traces. Without this the OTEL starter exports only its own instrumentation metrics (jvm.*,
+  # http.server.*), and the library's Micrometer SLIs — notably the process-manager gauges
+  # (aipersimmon.process.manager.*) the "Aipersimmon DDD · Process Manager" dashboard reads — never
+  # reach SigNoz. Also brings hikaricp/executor/tomcat meters across.
+  instrumentation:
+    micrometer:
+      enabled: true
   exporter:
     otlp:
       endpoint: http://localhost:44317
