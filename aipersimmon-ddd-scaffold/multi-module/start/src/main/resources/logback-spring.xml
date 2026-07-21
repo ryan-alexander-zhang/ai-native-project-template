@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Two appenders on root: structured ECS JSON to the console, and an OTLP log bridge to the
+  collector (SigNoz). ECS structured logging is Spring Boot 3.4+ built-in (StructuredLogEncoder,
+  format=ecs) — no logstash/ecs-logging-java dependency. The OTEL appender comes from
+  aipersimmon-ddd-observability-otel-spring-boot-starter, which also installs the SDK into it
+  (OpenTelemetryAppender.install) so each record carries the active trace_id/span_id — that is what
+  correlates a log line to its trace in SigNoz. When OTel is disabled (e.g. tests), the appender has
+  no SDK and simply drops records; the console still logs.
+-->
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>${CONSOLE_LOG_THRESHOLD}</level>
+    </filter>
+    <encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+      <format>ecs</format>
+      <charset>${CONSOLE_LOG_CHARSET}</charset>
+    </encoder>
+  </appender>
+
+  <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+    <!-- Whitelist of MDC keys carried out as OTLP log attributes: the edge correlation id set by
+         web-spring's RequestIdFilter. trace_id/span_id are deliberately NOT listed here — the
+         appender already stamps the active span context onto the LogRecord's native trace_id/span_id,
+         which is how SigNoz links a log to its trace. -->
+    <captureMdcAttributes>requestId</captureMdcAttributes>
+    <!-- Carry self-contained event fields attached per line via SLF4J addKeyValue as typed OTLP
+         attributes (e.g. audit/domain facts), so they are retrievable in SigNoz. -->
+    <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="OTEL"/>
+  </root>
+</configuration>

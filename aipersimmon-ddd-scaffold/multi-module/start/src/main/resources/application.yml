@@ -62,3 +62,19 @@ otel:
     otlp:
       endpoint: http://localhost:44317
       protocol: grpc
+  # Export logs as OTLP too (not just traces): the logback OpenTelemetryAppender (attached in
+  # logback-spring.xml, SDK installed by the aipersimmon observability starter) emits each log as a
+  # LogRecord to the same collector endpoint above, stamped with the active trace_id/span_id so logs
+  # correlate to traces in SigNoz. Tests disable the SDK, so nothing is exported there.
+  logs:
+    exporter: otlp
+
+# Console logs are structured ECS JSON (Elastic Common Schema) — Spring Boot 3.4+ built-in
+# StructuredLogEncoder (see logback-spring.xml). These labels ride on every record so SigNoz / any
+# ECS-aware store can filter by service + environment + node.
+logging:
+  structured:
+    ecs:
+      service:
+        environment: local
+        node-name: ${HOSTNAME:localhost}

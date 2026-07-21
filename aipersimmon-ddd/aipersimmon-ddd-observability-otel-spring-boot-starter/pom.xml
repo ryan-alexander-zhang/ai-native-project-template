@@ -50,6 +50,24 @@
       <groupId>io.opentelemetry.instrumentation</groupId>
       <artifactId>opentelemetry-spring-boot-starter</artifactId>
     </dependency>
+    <!-- Logback -> OTLP log bridge: provides OpenTelemetryAppender, which the app's
+         logback-spring.xml attaches so each log becomes an OTLP LogRecord stamped with the
+         active trace_id/span_id. This is an -alpha instrumentation artifact (not in the stable
+         instrumentation BOM), so pin it to the same release train as the OTEL starter via the
+         shared version property — mismatched versions -> AbstractMethodError at runtime. -->
+    <dependency>
+      <groupId>io.opentelemetry.instrumentation</groupId>
+      <artifactId>opentelemetry-logback-appender-1.0</artifactId>
+      <version>${opentelemetry-instrumentation.version}-alpha</version>
+    </dependency>
+    <!-- Compile-only: OpenTelemetryAppender extends a logback base class, so the starter needs
+         logback on the compile classpath to reference it. optional=true keeps it off consumers'
+         transitive classpath — any Spring Boot app already has logback via spring-boot-starter-logging. -->
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>

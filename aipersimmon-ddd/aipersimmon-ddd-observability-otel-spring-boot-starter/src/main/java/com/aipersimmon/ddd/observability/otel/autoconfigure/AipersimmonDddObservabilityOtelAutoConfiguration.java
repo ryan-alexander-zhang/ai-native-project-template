@@ -5,6 +5,8 @@ import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.observability.otel.OpenTelemetryStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.otel.OpenTelemetryTracer;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -60,5 +62,20 @@ public class AipersimmonDddObservabilityOtelAutoConfiguration {
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     TraceIdMdcFilter aipersimmonTraceIdMdcFilter() {
         return new TraceIdMdcFilter();
+    }
+
+    /**
+     * Installs the SDK {@link OpenTelemetry} instance into the logback
+     * {@link OpenTelemetryAppender}, so an application whose {@code logback-spring.xml} attaches
+     * that appender emits each log line as an OTLP {@code LogRecord} — stamped with the active
+     * {@code trace_id}/{@code span_id}, giving logs↔traces correlation in the backend (SigNoz).
+     * Without this call the appender has no SDK and drops records. Idempotent, and harmless when
+     * no app actually attaches the appender; guarded by {@link ConditionalOnClass} so a build that
+     * excludes the appender still starts.
+     */
+    @Bean
+    @ConditionalOnClass(OpenTelemetryAppender.class)
+    InitializingBean aipersimmonOpenTelemetryAppenderInstaller(OpenTelemetry openTelemetry) {
+        return () -> OpenTelemetryAppender.install(openTelemetry);
     }
 }
