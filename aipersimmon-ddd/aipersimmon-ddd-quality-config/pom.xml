@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Single source of truth for the quality-tool RULE CONFIG (a PMD ruleset and a SpotBugs
+    exclude filter) — not build tooling. It exists because that config cannot be shared
+    through a parent (the library and scaffolds share none) and cannot be shared through a
+    BOM (BOMs share dependency versions, not plugin config). So it is shipped as classpath
+    resources under com/aipersimmon/ddd/quality/, and each quality plugin adds this artifact
+    to its OWN <dependency> classpath and loads the file by classpath path — the one shared
+    piece across the library reactor and every scaffold-generated project. No module depends
+    on it as a normal dependency; it is a plugin-classpath artifact only. Resource-only, no Java.
+    See design-00007 §六.
+  -->
+  <artifactId>aipersimmon-ddd-quality-config</artifactId>
+  <name>aipersimmon-ddd-quality-config</name>
+  <description>Shared PMD ruleset and SpotBugs exclude filter, loaded onto the PMD/SpotBugs plugin classpath.</description>
+</project>

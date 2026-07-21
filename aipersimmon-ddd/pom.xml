@@ -54,9 +54,9 @@
     <!-- Modules are added incrementally: the BOM first, then the pure-tier library
          (core), then the reusable ArchUnit rule set. -->
     <module>aipersimmon-ddd-bom</module>
-    <!-- Shared quality-tool config (PMD ruleset, SpotBugs filter) as classpath resources;
-         built early so it is on the plugin classpath of every module that references it. -->
-    <module>aipersimmon-ddd-build-tools</module>
+    <!-- Shared PMD ruleset + SpotBugs filter as classpath resources; built early so it is on
+         the PMD/SpotBugs plugin classpath of every module that runs them. -->
+    <module>aipersimmon-ddd-quality-config</module>
     <module>aipersimmon-ddd-core</module>
     <module>aipersimmon-ddd-observability</module>
     <module>aipersimmon-ddd-observability-otel</module>
@@ -166,9 +166,10 @@
 
         <!-- Quality toolchain management (design-00007 / plan-00009). Management only:
              it supplies versions and config; a module activates a gate by declaring the
-             plugin in its own <build><plugins>. Kept in sync with the same block in
-             aipersimmon-ddd-build (the scaffold-side provider); the shared rulesets live
-             in aipersimmon-ddd-build-tools. -->
+             plugin in its own <build><plugins>. There is NO shared quality parent (D1):
+             each buildable project (this library parent + each scaffold root) declares its
+             own copy of this block; only the rulesets are shared, from
+             aipersimmon-ddd-quality-config. -->
 
         <!-- Spotless: google-java-format (GOOGLE). Format gate; reactor roots activate check @ verify (P1). -->
         <plugin>
@@ -222,7 +223,7 @@
           </dependencies>
         </plugin>
 
-        <!-- PMD + CPD: complexity + duplication; ruleset from build-tools on the plugin classpath. report-only first (P3). -->
+        <!-- PMD + CPD: complexity + duplication; ruleset from aipersimmon-ddd-quality-config on the plugin classpath. report-only first (P3). -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
@@ -236,13 +237,13 @@
           <dependencies>
             <dependency>
               <groupId>com.aipersimmon.ddd</groupId>
-              <artifactId>aipersimmon-ddd-build-tools</artifactId>
+              <artifactId>aipersimmon-ddd-quality-config</artifactId>
               <version>${project.version}</version>
             </dependency>
           </dependencies>
         </plugin>
 
-        <!-- SpotBugs: bytecode defect analysis; exclude filter from build-tools. report-only first (P4). -->
+        <!-- SpotBugs: bytecode defect analysis; exclude filter from aipersimmon-ddd-quality-config. report-only first (P4). -->
         <plugin>
           <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
@@ -254,7 +255,7 @@
           <dependencies>
             <dependency>
               <groupId>com.aipersimmon.ddd</groupId>
-              <artifactId>aipersimmon-ddd-build-tools</artifactId>
+              <artifactId>aipersimmon-ddd-quality-config</artifactId>
               <version>${project.version}</version>
             </dependency>
           </dependencies>
@@ -281,7 +282,7 @@
       </plugin>
 
       <!-- PMD + CPD, report-only (plan-00009 P3): failOnViolation=false so violations are
-           reported but do not fail the build. Ruleset + build-tools dependency inherited
+           reported but do not fail the build. Ruleset + quality-config dependency inherited
            from pluginManagement. Ratcheted to a gate later. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -302,7 +303,7 @@
       </plugin>
 
       <!-- SpotBugs, report-only (plan-00009 P4): failOnError=false so bugs are reported
-           but do not fail the build. Exclude filter + build-tools dependency inherited
+           but do not fail the build. Exclude filter + quality-config dependency inherited
            from pluginManagement. Ratcheted to a gate later. -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>

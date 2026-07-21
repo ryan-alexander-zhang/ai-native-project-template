@@ -8,22 +8,22 @@ parent: design-00007-code-quality-gates
 
 # 代码质量门禁落地计划
 
-落地 [[design-00007-code-quality-gates]]：domain/pure-tier 强制 90% 覆盖 + 90% 变异，全仓库 Spotless/PMD/CPD/SpotBugs，
-经 `aipersimmon-ddd-build` provider 下发给脚手架。分阶段推进，每阶段可独立 PR、可回滚，避免一次性炸构建
+落地 [[design-00007-code-quality-gates]]：domain/pure-tier 强制 90% 覆盖 + 90% 变异，全仓库 Spotless/PMD/CPD/SpotBugs。
+**无 provider parent、纯 BOM**（D1 修订，见 §P0/§P8）。分阶段推进，每阶段可独立 PR、可回滚，避免一次性炸构建
 （下游脚手架/样例在 HEAD 已有 RED 债，见 [[downstream-scaffolds-migration-debt]]）。
 
 ## 原则
 
 - 每阶段先 **report-only** 拿基线，再 ratchet 到门禁；门禁绑 `verify`（`mvn test` 内环不受影响）。
-- 库（`aipersimmon-ddd/*`，不继承 spring-boot-parent）与脚手架（继承 `aipersimmon-ddd-build`）走**同一套规则**，
-  规则单一来源在 `aipersimmon-ddd-build-tools`。
+- 库与脚手架**都不继承 opinionated parent、版本靠 BOM**；质量 `pluginManagement` **各项目自声明**，规则单一来源在
+  `aipersimmon-ddd-quality-config`（挂到 PMD/SpotBugs 插件 classpath，非普通依赖）。
 - 每步跑对应 reactor 的 `mvn verify` 自证，diff 保持窄。
 
 ## 任务
 
 ### P0 — 基础设施骨架
-- [x] 新增 `aipersimmon-ddd-build-tools`（resource-only）：`pmd-ruleset.xml`、`spotbugs-exclude.xml`，进 parent `<modules>` 与 BOM。
-- [x] `aipersimmon-ddd-parent` 增质量插件 `pluginManagement`（版本 + 引用 build-tools 规则），供库内 opt-in。
+- [x] 新增 `aipersimmon-ddd-quality-config`（resource-only）：`pmd-ruleset.xml`、`spotbugs-exclude.xml`，进 parent `<modules>`（**不进 BOM**——它是插件 classpath 产物，非普通依赖）。
+- [x] `aipersimmon-ddd-parent` 增质量插件 `pluginManagement`（版本 + 引用 quality-config 规则），供库内 opt-in。
 - ~~曾新增 `aipersimmon-ddd-build`（provider parent，extends spring-boot-starter-parent）~~ → **已删除**（2026-07-21）：违背
   "绝不继承 opinionated parent、版本靠 BOM"原则；改为无 provider、各项目自声明（见 design-00007 §四 / D1 修订）。
 - 验收：库 reactor `validate`/`install` 绿。
@@ -41,12 +41,12 @@ parent: design-00007-code-quality-gates
 - 验收：报告生成、基线可读、不 fail。`mvn verify` 四模块 BUILD SUCCESS。
 
 ### P3 — PMD + CPD report-only（库全仓库）
-- [x] ruleset 已在 build-tools（复杂度/NPath/方法体量/GodClass/TooManyMethods + CPD）。
+- [x] ruleset 已在 quality-config（复杂度/NPath/方法体量/GodClass/TooManyMethods + CPD）。
 - [x] parent `<build><plugins>` 绑 `check`+`cpd-check` @ verify，`failOnViolation=false`（report-only）。
 - 验收：库全模块出 PMD/CPD 报告；process-manager `verify` 有违规仍 BUILD SUCCESS。
 
 ### P4 — SpotBugs report-only（库全仓库）
-- [x] spotbugs-maven-plugin + exclude filter（build-tools），parent `<build><plugins>` 绑 `check` @ verify，`failOnError=false`。
+- [x] spotbugs-maven-plugin + exclude filter（quality-config），parent `<build><plugins>` 绑 `check` @ verify，`failOnError=false`。
 - 验收：库 26 模块出 spotbugsXml 报告，不 fail。
 
 > **JDK 坑（重要）**：PMD 7.x / SpotBugs 无法解析 Java 26（class major 70）字节码。本机 `mvn` 默认跑在 Homebrew
@@ -82,7 +82,7 @@ parent: design-00007-code-quality-gates
   （import `spring-boot-dependencies` + `mybatis-plus-bom` + `aipersimmon-ddd-bom`），显式补 `maven.compiler.release=21`
   / `-parameters` / UTF-8 / `spring-boot-maven-plugin` repackage 绑定。子模块仍以 `multi-module` 为 reactor parent。
   验收：`mvn -DskipTests package` 全 20 模块 BUILD SUCCESS，`start` repackage 出可运行 jar。✅
-- [ ] **P8b 质量门禁**：multi-module root 自声明 Spotless + 质量 pluginManagement（引用 build-tools 规则）；`*-domain`
+- [ ] **P8b 质量门禁**：multi-module root 自声明 Spotless + 质量 pluginManagement（引用 quality-config 规则）；`*-domain`
   加 5 行 opt-in；`ci.yml` 脚手架 `test`→`verify`。**前置**：`*-domain` 需补测试到 90%/90%（ordering-domain 28 类/1 测试、
   inventory 7/0、payment 2/0——大工作量，单独排期）。
 - [ ] archetype 生成模板同步。

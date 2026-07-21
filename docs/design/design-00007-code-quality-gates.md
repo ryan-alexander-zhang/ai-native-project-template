@@ -19,7 +19,7 @@ parent:
 > **全仓库不继承任何 opinionated parent（尤其 `spring-boot-starter-parent`）——版本一律 BOM 导入
 > （`spring-boot-dependencies` + `aipersimmon-ddd-bom`）。** 质量插件的 `pluginManagement` 无法经 BOM 共享，故由
 > **每个可构建项目各自声明**（库 `aipersimmon-ddd-parent` 已声明；脚手架 root 各自声明），共享的只有
-> `aipersimmon-ddd-build-tools` 里的规则集。
+> `aipersimmon-ddd-quality-config` 里的规则集。
 > **格式门禁 Spotless(google-java-format) 全仓库；ArchUnit 保留；PMD/CPD + SpotBugs 先 report 后 gate。不引入
 > SonarQube、不引入 Checkstyle。** 另建 test-support（Testcontainers 单例复用）testkit 模块。
 
@@ -91,14 +91,14 @@ parent:
 
 ```mermaid
 flowchart TD
-  bt["aipersimmon-ddd-build-tools<br/>（规则集单一来源：pmd-ruleset.xml / spotbugs-exclude.xml）"]
+  bt["aipersimmon-ddd-quality-config<br/>（规则集单一来源：pmd-ruleset.xml / spotbugs-exclude.xml）"]
   lib["aipersimmon-ddd-parent<br/>无 parent；import spring-boot-dependencies BOM<br/>自声明质量 pluginManagement"]
   mm["multi-module（脚手架 root）<br/>无 parent；import spring-boot-dependencies + mybatis-plus-bom + aipersimmon-ddd-bom<br/>自声明质量 pluginManagement"]
   bt -. 插件 classpath 引用规则 .-> lib
   bt -. 插件 classpath 引用规则 .-> mm
 ```
 
-- **抗漂移**：真正易漂的"规则集"（PMD/SpotBugs XML）集中在 `aipersimmon-ddd-build-tools` 一份（§六）；插件版本用属性；
+- **抗漂移**：真正易漂的"规则集"（PMD/SpotBugs XML）集中在 `aipersimmon-ddd-quality-config` 一份（§六）；插件版本用属性；
   各 root 的 pluginManagement 块保持一致，由模板 + review 保证。这比"配置散落且无单一规则来源"已大幅收敛。
 
 ### 4.3 domain 层如何"只在 domain 生效"且强制
@@ -154,10 +154,10 @@ flowchart TD
 ## 六、配置单一来源：config-artifact
 
 PMD ruleset、SpotBugs exclude filter 这类 XML 不能靠 POM 继承在独立 reactor 间共享。沿用 ArchUnit"规则即代码发布模块"
-的范式，新增一个极小资源模块 **`aipersimmon-ddd-build-tools`**（只含资源，无 Java）：
+的范式，新增一个极小资源模块 **`aipersimmon-ddd-quality-config`**（只含资源，无 Java）：
 
 ```
-aipersimmon-ddd-build-tools/src/main/resources/com/aipersimmon/ddd/quality/
+aipersimmon-ddd-quality-config/src/main/resources/com/aipersimmon/ddd/quality/
 ├── pmd-ruleset.xml
 └── spotbugs-exclude.xml
 ```
@@ -192,7 +192,7 @@ artifact，不污染框架无关约束。
 已知风险：部分下游脚手架/样例在 HEAD 已是 RED（见 [[downstream-scaffolds-migration-debt]]），且门禁一上会暴露真实覆盖缺口。
 故分批：
 
-1. `aipersimmon-ddd-build-tools`（规则集 config-artifact）+ 库 `aipersimmon-ddd-parent` 自声明质量 pluginManagement + Spotless 骨架。
+1. `aipersimmon-ddd-quality-config`（规则集 config-artifact）+ 库 `aipersimmon-ddd-parent` 自声明质量 pluginManagement + Spotless 骨架。
 2. **Spotless** 全仓库 `apply` 一次 + 接 `check`（填掉 Lint 占位符）。风险最低、信息量最大，宜作首个 PR。
 3. **JaCoCo report-only** 只在 domain 模块跑，拿真实基线。
 4. **PMD + CPD** report-only → 阈值调到当前能过 → 逐步收紧。
@@ -208,7 +208,7 @@ artifact，不污染框架无关约束。
 - **D1（修订 2026-07-21）= 无 provider parent，纯 BOM + 各项目自声明**：初版的 provider parent `aipersimmon-ddd-build`
   （`extends spring-boot-starter-parent`）已**废弃删除**——它违背"绝不继承 opinionated parent、版本靠 BOM"的原则。
   改为：全仓库不继承 opinionated parent；版本靠 BOM 导入；质量 `pluginManagement` 由库 `aipersimmon-ddd-parent` 与每个
-  脚手架 root 各自声明（块级重复换取零 opinionated 继承），规则集共享自 `aipersimmon-ddd-build-tools`。
+  脚手架 root 各自声明（块级重复换取零 opinionated 继承），规则集共享自 `aipersimmon-ddd-quality-config`。
 - **D2 = 显式 opt-in**：domain 模块用最小 5 行 `<build><plugins>` 激活 JaCoCo+PIT（配置继承自**本 reactor root**），脚手架侧由
   archetype 烘焙；不用 marker 文件激活 profile——显式更透明、diff 可见、不依赖 profile 激活的版本行为。
 - **D3 = PIT 从严**：domain 需要非常严格的测试保障质量，PIT 三阈值同时 ≥90——`mutationThreshold` +

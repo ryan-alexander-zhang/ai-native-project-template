@@ -162,13 +162,9 @@
         <artifactId>aipersimmon-ddd-archunit</artifactId>
         <version>${project.version}</version>
       </dependency>
-      <!-- Shared quality-tool config as classpath resources (PMD ruleset, SpotBugs
-           filter); referenced from quality plugins' own classpath, see design-00007. -->
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-build-tools</artifactId>
-        <version>${project.version}</version>
-      </dependency>
+      <!-- Note: aipersimmon-ddd-quality-config (the shared PMD/SpotBugs rulesets) is
+           deliberately NOT listed here — it is a plugin-classpath artifact, never a normal
+           dependency, so a BOM entry would wrongly imply it is consumable. -->
       <!-- Reusable Testcontainers support (singleton containers + Spring Boot
            @ServiceConnection configs); consumers add it at test scope. -->
       <dependency>
