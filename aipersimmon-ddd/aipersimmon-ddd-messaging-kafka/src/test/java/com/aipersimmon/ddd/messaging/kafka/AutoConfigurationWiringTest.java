@@ -113,6 +113,19 @@ class AutoConfigurationWiringTest {
     }
 
     @Test
+    void failsLoudWhenAnInboxIsConfiguredButNoTransactionManagerIsPresent() {
+        // issue-00029 (c) edge: the inbox insert must be transactional, so a configured Inbox
+        // with no transaction manager is a misconfiguration (a handler failure would leave the
+        // inbox marked and drop the event), not a silent run-without-a-transaction.
+        runner.withPropertyValues("aipersimmon.ddd.messaging.kafka.consumer.enabled=true")
+                .withBean(com.aipersimmon.ddd.application.Inbox.class, () -> messageKey -> false)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).hasMessageContaining("Inbox is configured");
+                });
+    }
+
+    @Test
     void usesTheNamedTransactionManagerWhenSeveralArePresent() {
         runner.withPropertyValues(
                         "aipersimmon.ddd.messaging.kafka.consumer.enabled=true",

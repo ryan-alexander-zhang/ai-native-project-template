@@ -36,7 +36,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.kafka.ConcurrentKafkaListenerContainerFactoryConfigurer;
+import org.springframework.boot.autoconfigure.kafka.DefaultKafkaConsumerFactoryCustomizer;
+import org.springframework.boot.autoconfigure.kafka.DefaultKafkaProducerFactoryCustomizer;
 import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
+import org.springframework.boot.autoconfigure.kafka.KafkaConnectionDetails;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.ssl.SslBundles;
@@ -71,23 +75,28 @@ import org.springframework.util.StringUtils;
  * placeholders. If the starter is present but no event is {@code @Externalized}, a WARN is
  * logged and everything stays LOCAL — the transport is idle, startup is not failed.
  *
- * <p><strong>The transport owns and isolates its own Kafka infrastructure</strong> rather
- * than reusing the application's global beans, so it is self-contained and cannot interfere
- * with the application's other Kafka usage:
+ * <p><strong>The transport shares the host's Kafka infrastructure and isolates only what its
+ * own protocol decides.</strong> The point is not to stand up a parallel Kafka setup, but to
+ * stop the starter and the host application from fighting over the same global policies. So it
+ * <em>shares</em> the broker connection (bootstrap servers, SSL, SASL — from {@link
+ * KafkaProperties} and, under a service connection like Testcontainers or Docker Compose,
+ * {@link KafkaConnectionDetails}), Boot's factory customizers, and Boot's listener operational
+ * config (concurrency, ack mode, poll timeout, observation). It <em>owns</em> only the three
+ * things its protocol determines, on its own dedicated beans:
  * <ul>
- *   <li>a dedicated {@link ProducerFactory}/{@link KafkaTemplate} and (for the consumer) a
- *       dedicated {@link ConsumerFactory}, both with the key/value serializer fixed to
- *       {@code String} — the transport owns the wire format (already-serialized JSON values
- *       with {@code ce_} headers), so it must not depend on the application configuring
- *       {@code spring.kafka.*} serializers (and a {@code JsonSerializer} there would
- *       double-encode the value);</li>
- *   <li>a dedicated {@link ConcurrentKafkaListenerContainerFactory} carrying the
- *       dead-lettering error handler, so the retry/DLT policy is scoped to this listener and
- *       is neither imposed on the application's other listeners nor displaced by an error
- *       handler the application defines;</li>
- *   <li>a {@link TransactionOperations} bound to an explicitly resolved database transaction
- *       manager, so the consumer's inbox check and handling commit or roll back together even
- *       when several transaction managers exist.</li>
+ *   <li>the <strong>wire format</strong>: a dedicated {@link ProducerFactory}/{@link
+ *       KafkaTemplate} and {@link ConsumerFactory} with the serializer fixed to {@code String}
+ *       (already-serialized JSON values with {@code ce_} headers), so the application's own
+ *       {@code spring.kafka.*} serializer cannot change it — a {@code JsonSerializer} there
+ *       would double-encode the value;</li>
+ *   <li>the <strong>error handling</strong>: a dedicated {@link
+ *       ConcurrentKafkaListenerContainerFactory} carrying the dead-lettering handler, so the
+ *       retry/DLT policy is scoped to this listener and is neither imposed on the application's
+ *       other listeners nor displaced by an error handler the application defines;</li>
+ *   <li>the <strong>consumer transaction boundary</strong>: a {@link TransactionOperations}
+ *       bound to an explicitly resolved (not newly created) database transaction manager, so
+ *       the inbox check and handling commit or roll back together even when several transaction
+ *       managers exist.</li>
  * </ul>
  *
  * <p>When {@code aipersimmon.ddd.messaging.kafka.consumer.enabled=true} <em>and</em> at
@@ -194,22 +203,31 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     }
 
     /**
-     * The transport's own producer factory: connection settings come from Boot's
-     * {@link KafkaProperties} (bootstrap servers, security, ...), but the key/value serializer
-     * is fixed to {@link StringSerializer}. The dispatcher hands the factory an
-     * already-serialized JSON string with {@code ce_} headers, so the transport must not
-     * inherit whatever serializer the application set for its own {@code spring.kafka} usage —
-     * a {@code JsonSerializer} in particular would double-encode the value.
+     * The transport's own producer factory. It <em>shares</em> the host's Kafka connection
+     * (bootstrap servers, security, SSL) — taken from Boot's {@link KafkaProperties} and, when a
+     * service connection is active (Testcontainers, Docker Compose), from {@link
+     * KafkaConnectionDetails} rather than the {@code spring.kafka.bootstrap-servers} property —
+     * and Boot's {@link DefaultKafkaProducerFactoryCustomizer}s. It <em>owns</em> only the wire
+     * format: the key/value serializer is fixed to {@link StringSerializer} because the dispatcher
+     * hands the factory an already-serialized JSON string with {@code ce_} headers, so the
+     * transport must not inherit whatever serializer the application set for its own usage — a
+     * {@code JsonSerializer} in particular would double-encode the value.
      */
     @Bean(PRODUCER_FACTORY)
     @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnMissingBean(name = PRODUCER_FACTORY)
     public ProducerFactory<String, String> aipersimmonKafkaProducerFactory(
-            KafkaProperties kafkaProperties, ObjectProvider<SslBundles> sslBundles) {
+            KafkaProperties kafkaProperties, ObjectProvider<SslBundles> sslBundles,
+            ObjectProvider<KafkaConnectionDetails> connectionDetails,
+            ObjectProvider<DefaultKafkaProducerFactoryCustomizer> customizers) {
         Map<String, Object> config = kafkaProperties.buildProducerProperties(sslBundles.getIfAvailable());
+        connectionDetails.ifAvailable(details ->
+                config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, details.getProducerBootstrapServers()));
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        return new DefaultKafkaProducerFactory<>(config);
+        DefaultKafkaProducerFactory<String, String> factory = new DefaultKafkaProducerFactory<>(config);
+        customizers.orderedStream().forEach(customizer -> customizer.customize(factory));
+        return factory;
     }
 
     /** The transport's own {@link KafkaTemplate} over its String producer factory. */
@@ -244,46 +262,66 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     }
 
     /**
-     * The transport's own consumer factory: connection settings from Boot's
-     * {@link KafkaProperties}, but the key/value deserializer fixed to
-     * {@link StringDeserializer} to match the String wire format the consumer reconstructs
-     * from ({@code ce_} headers + JSON body).
+     * The transport's own consumer factory. Like the producer factory it <em>shares</em> the
+     * host's connection ({@link KafkaProperties} + {@link KafkaConnectionDetails}) and Boot's
+     * {@link DefaultKafkaConsumerFactoryCustomizer}s, and <em>owns</em> only the wire format: the
+     * key/value deserializer is fixed to {@link StringDeserializer} so the consumer reconstructs
+     * from the String body + {@code ce_} headers regardless of the application's own
+     * {@code spring.kafka} deserializer choice. Typed {@code <Object, Object>} to mirror Boot's
+     * default factory so {@link ConcurrentKafkaListenerContainerFactoryConfigurer} can configure it.
      */
     @Bean(CONSUMER_FACTORY)
     @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
     @Conditional(OnExternalizedEventsCondition.class)
     @ConditionalOnMissingBean(name = CONSUMER_FACTORY)
-    public ConsumerFactory<String, String> aipersimmonKafkaConsumerFactory(
-            KafkaProperties kafkaProperties, ObjectProvider<SslBundles> sslBundles) {
+    public ConsumerFactory<Object, Object> aipersimmonKafkaConsumerFactory(
+            KafkaProperties kafkaProperties, ObjectProvider<SslBundles> sslBundles,
+            ObjectProvider<KafkaConnectionDetails> connectionDetails,
+            ObjectProvider<DefaultKafkaConsumerFactoryCustomizer> customizers) {
         Map<String, Object> config = kafkaProperties.buildConsumerProperties(sslBundles.getIfAvailable());
+        connectionDetails.ifAvailable(details ->
+                config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, details.getConsumerBootstrapServers()));
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        return new DefaultKafkaConsumerFactory<>(config);
+        DefaultKafkaConsumerFactory<Object, Object> factory = new DefaultKafkaConsumerFactory<>(config);
+        customizers.orderedStream().forEach(customizer -> customizer.customize(factory));
+        return factory;
     }
 
     /**
-     * The transport's own listener container factory, carrying the dead-lettering error
-     * handler. The error handler is set on this factory only — not published as a global
-     * {@code CommonErrorHandler} bean — so Boot does not apply it to the application's other
-     * Kafka listeners on the default factory, and an error handler the application defines
-     * does not displace this one (which would silently drop the transport's own DLT).
+     * The transport's own listener container factory. It <em>shares</em> Boot's listener
+     * operational configuration — concurrency, ack mode, poll timeout, observation, container
+     * customizers from {@code spring.kafka.listener.*} — by running it through Boot's
+     * {@link ConcurrentKafkaListenerContainerFactoryConfigurer} when present, and <em>owns</em>
+     * only the error handling: the dead-lettering handler is set on this factory (overriding
+     * whatever the configurer may have applied) and never published as a global
+     * {@code CommonErrorHandler} bean, so it is neither imposed on the application's other Kafka
+     * listeners nor displaced by an error handler the application defines (which would silently
+     * drop the transport's own DLT). Typed {@code <Object, Object>} to match the configurer.
      */
     @Bean(LISTENER_CONTAINER_FACTORY)
     @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnProperty(name = "aipersimmon.ddd.messaging.kafka.consumer.enabled", havingValue = "true")
     @Conditional(OnExternalizedEventsCondition.class)
     @ConditionalOnMissingBean(name = LISTENER_CONTAINER_FACTORY)
-    public ConcurrentKafkaListenerContainerFactory<String, String> aipersimmonKafkaListenerContainerFactory(
-            @Qualifier(CONSUMER_FACTORY) ConsumerFactory<String, String> consumerFactory,
+    public ConcurrentKafkaListenerContainerFactory<Object, Object> aipersimmonKafkaListenerContainerFactory(
+            @Qualifier(CONSUMER_FACTORY) ConsumerFactory<Object, Object> consumerFactory,
             @Qualifier(KAFKA_TEMPLATE) KafkaTemplate<String, String> kafkaTemplate,
-            KafkaMessagingProperties properties) {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+            KafkaMessagingProperties properties,
+            ObjectProvider<ConcurrentKafkaListenerContainerFactoryConfigurer> configurer) {
+        ConcurrentKafkaListenerContainerFactory<Object, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory);
+        ConcurrentKafkaListenerContainerFactoryConfigurer bootConfigurer = configurer.getIfAvailable();
+        if (bootConfigurer != null) {
+            bootConfigurer.configure(factory, consumerFactory);
+        } else {
+            factory.setConsumerFactory(consumerFactory);
+        }
         // Publish to "<topic>.DLT", keyed the same way as the source so an aggregate's dead
         // letters keep to one partition. The destination is set explicitly (rather than left to
-        // the recoverer's default) so the DLT topic name is the documented one.
+        // the recoverer's default) so the DLT topic name is the documented one. Set last so it
+        // wins over any handler the configurer applied.
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
                 (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
         factory.setCommonErrorHandler(buildErrorHandler(recoverer, properties.getConsumer().getRetry()));
@@ -301,11 +339,12 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
             ObjectProvider<PlatformTransactionManager> transactionManagers,
             @Value("${aipersimmon.ddd.messaging.kafka.consumer.transaction-manager:}") String transactionManagerName,
             BeanFactory beanFactory) {
-        TransactionOperations transaction =
-                resolveConsumerTransaction(transactionManagerName, transactionManagers, beanFactory);
+        Inbox inboxBean = inbox.getIfAvailable();
+        TransactionOperations transaction = resolveConsumerTransaction(
+                transactionManagerName, transactionManagers, beanFactory, inboxBean != null);
         return new KafkaIntegrationEventListener(
                 publisher, objectMapper.getIfAvailable(ObjectMapper::new),
-                inbox.getIfAvailable(), catalog, transaction);
+                inboxBean, catalog, transaction);
     }
 
     /**
@@ -319,18 +358,28 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
      * <ul>
      *   <li>a configured bean name wins (the explicit choice for a multi-manager application);</li>
      *   <li>otherwise the single manager is used;</li>
-     *   <li>none present -> no surrounding transaction (only safe without an inbox);</li>
+     *   <li>none present and an inbox is configured -> fail loud (the inbox insert must be
+     *       transactional, so a missing manager is a misconfiguration, not a silent no-op);</li>
+     *   <li>none present and no inbox -> no surrounding transaction (nothing to make atomic);</li>
      *   <li>several present and none chosen -> fail loud, naming the property to set.</li>
      * </ul>
      */
     private static TransactionOperations resolveConsumerTransaction(String transactionManagerName,
-            ObjectProvider<PlatformTransactionManager> transactionManagers, BeanFactory beanFactory) {
+            ObjectProvider<PlatformTransactionManager> transactionManagers, BeanFactory beanFactory,
+            boolean inboxPresent) {
         if (StringUtils.hasText(transactionManagerName)) {
             return new TransactionTemplate(
                     beanFactory.getBean(transactionManagerName, PlatformTransactionManager.class));
         }
         List<PlatformTransactionManager> present = transactionManagers.stream().toList();
         if (present.isEmpty()) {
+            if (inboxPresent) {
+                throw new IllegalStateException(
+                        "aipersimmon-ddd-messaging-kafka: an Inbox is configured but no PlatformTransactionManager "
+                        + "is present, so the inbox insert and the handling cannot commit or roll back together — a "
+                        + "handler failure would leave the inbox marked and silently drop the event. Configure a "
+                        + "database transaction manager (a JDBC/JPA DataSource brings one).");
+            }
             return TransactionOperations.withoutTransaction();
         }
         if (present.size() == 1) {
