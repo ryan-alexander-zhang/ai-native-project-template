@@ -26,6 +26,21 @@
 
   <dependencyManagement>
     <dependencies>
+      <!-- Core OpenTelemetry line the optional observability-otel starter's instrumentation
+           (opentelemetry-instrumentation.version, in the parent) is built against. Exported here so
+           a consumer that imports this BOM *before* spring-boot-dependencies gets the aligned core
+           artifacts (api/context/sdk/exporters); Spring Boot otherwise manages opentelemetry-api to
+           an older line and the starter fails at boot with NoClassDefFoundError
+           io.opentelemetry.common.ComponentLoader. Import order in the consumer decides the winner,
+           so this BOM must precede the Spring Boot BOM there. Inert for consumers that don't use the
+           OTEL starter (dependencyManagement adds no dependency). -->
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>${opentelemetry.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- Phase 1 -->
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>

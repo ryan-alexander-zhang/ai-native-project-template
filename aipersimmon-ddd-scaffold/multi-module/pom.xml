@@ -60,6 +60,19 @@
 
   <dependencyManagement>
     <dependencies>
+      <!-- Imported BEFORE spring-boot-dependencies on purpose. BOM import order decides the winner
+           for a managed artifact, and aipersimmon-ddd-bom carries the core OpenTelemetry line that
+           the DDD observability starter's instrumentation (2.29.0) requires. Spring Boot manages
+           opentelemetry-api to an older line (1.49.0); if it were imported first the app would fail
+           to boot with NoClassDefFoundError io.opentelemetry.common.ComponentLoader. So the DDD BOM
+           must precede the Spring Boot BOM. -->
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-bom</artifactId>
+        <version>${aipersimmon-ddd.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- Replaces spring-boot-starter-parent: import the Spring Boot BOM for versions
            without inheriting the opinionated parent. -->
       <dependency>
@@ -74,13 +87,6 @@
         <groupId>com.baomidou</groupId>
         <artifactId>mybatis-plus-bom</artifactId>
         <version>${mybatis-plus.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-bom</artifactId>
-        <version>${aipersimmon-ddd.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
