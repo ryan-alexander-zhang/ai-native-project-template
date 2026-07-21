@@ -168,6 +168,12 @@ T1[同步]  POST /orders→command PlaceOrder→JDBC→process.advance(进程内
 (`process` 的 parentSpanID = `publish` 的 spanID);③跨 store-and-forward 边界由 `outbox.publish` 的
 `FOLLOWS_FROM` span-link 逐段链回源头(T1→段1→段2→…)。
 
+**日志作为第三支柱进 SigNoz 并与 trace 关联(实测)** — 参考大厂实践(ECS 结构化日志 + OTel logback appender)接入:
+- **控制台 ECS 结构化 JSON**:Spring Boot 3.4+ 内建 `StructuredLogEncoder`(`format=ecs`),带 `service.name/environment/node`;实测日志行含 `trace_id` + `requestId`(MDC)。
+- **日志经 OTLP 进 SigNoz**:observability-otel starter 提供 `opentelemetry-logback-appender-1.0`(版本随 OTel BOM 对齐)并 `OpenTelemetryAppender.install(openTelemetry)`;样例 `logback-spring.xml` 挂 OTEL appender(`captureMdcAttributes=requestId` + `captureKeyValuePairAttributes`),`otel.logs.exporter=otlp`。
+- **闭环实测**:`signoz_logs.distributed_logs_v2` 查到 service=`ordering` 的日志带 `trace_id`(appender 原生打的 span 上下文)+ `requestId` 属性;取其 `trace_id`(`5ed5229c…`)在 `signoz_traces` 命中对应 trace(`POST /orders→command PlaceOrder→JDBC`)—— 日志↔trace 双向可跳。
+- 架构落点:日志-trace 桥接(appender + install)在**库侧** observability-otel starter(依赖 + 一次 install,无需强推 xml);控制台格式与 OTEL appender 挂载在**样例** `logback-spring.xml` + `application.yml`(消费方自持)。
+
 > 注:此连通性对**当前 messaging-kafka 版本**(复用 Boot 自动配置的、被 OTel 自动埋点的 `KafkaTemplate`)成立。
 > 期间一版"隔离自建 Kafka 工厂"的改动曾使生产者 span 消失、消费者 span 变裸根而**断链**(自建工厂绕过 OTel 自动埋点);
 > 回滚后生产者 span 与生产者→消费者父子关系恢复。任何重新隔离 Kafka 基础设施的改动都须复验此 trace 连通性。
