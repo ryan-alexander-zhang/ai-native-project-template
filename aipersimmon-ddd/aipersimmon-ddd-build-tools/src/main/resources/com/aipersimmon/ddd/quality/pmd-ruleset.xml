@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<ruleset name="aipersimmon-ddd-quality"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>
+    AiPersimmon DDD complexity and duplication rules (design-00007). Focused on the
+    signals that matter for a framework-free building-block library: cognitive and
+    cyclomatic complexity, NPath, method/class size, and parameter lists. Kept narrow
+    on purpose — style/formatting is owned by Spotless (google-java-format), architecture
+    by ArchUnit, bytecode defects by SpotBugs. Thresholds start permissive and are
+    ratcheted per plan-00009.
+  </description>
+
+  <rule ref="category/java/design.xml/CognitiveComplexity"/>
+  <rule ref="category/java/design.xml/CyclomaticComplexity"/>
+  <rule ref="category/java/design.xml/NPathComplexity"/>
+  <rule ref="category/java/design.xml/NcssCount"/>
+  <rule ref="category/java/design.xml/ExcessiveParameterList"/>
+  <rule ref="category/java/design.xml/GodClass"/>
+  <rule ref="category/java/design.xml/TooManyMethods"/>
+
+</ruleset>

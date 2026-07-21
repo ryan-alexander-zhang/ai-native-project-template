@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclude filter (design-00007 / plan-00009). Starts empty: SpotBugs is
+  introduced report-only, real false positives are added here as they surface, then
+  the gate is turned on. Reference the file from the plugin via its classpath path
+  com/aipersimmon/ddd/quality/spotbugs-exclude.xml (this artifact on the plugin's
+  own <dependency> classpath), so library and scaffolds share one filter.
+-->
+<FindBugsFilter
+    xmlns="https://github.com/spotbugs/filter/3.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+</FindBugsFilter>

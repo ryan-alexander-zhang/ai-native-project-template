@@ -162,6 +162,13 @@
         <artifactId>aipersimmon-ddd-archunit</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <!-- Shared quality-tool config as classpath resources (PMD ruleset, SpotBugs
+           filter); referenced from quality plugins' own classpath, see design-00007. -->
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-build-tools</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <!-- Additional modules (application, integration, cqrs, and the pluggable
            starters) are appended here as they are built. -->
     </dependencies>

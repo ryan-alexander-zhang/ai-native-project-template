@@ -38,12 +38,25 @@
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
     <shedlock.version>6.6.0</shedlock.version>
     <opentelemetry-instrumentation.version>2.29.0</opentelemetry-instrumentation.version>
+    <!-- Quality toolchain (design-00007 / plan-00009). This parent does NOT inherit
+         spring-boot-starter-parent, so these plugin versions are pinned explicitly and
+         kept in sync with aipersimmon-ddd-build (the scaffold-side provider parent). -->
+    <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
+    <google-java-format.version>1.35.0</google-java-format.version>
+    <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
+    <pitest-maven.version>1.20.0</pitest-maven.version>
+    <pitest-junit5-plugin.version>1.2.2</pitest-junit5-plugin.version>
+    <maven-pmd-plugin.version>3.26.0</maven-pmd-plugin.version>
+    <spotbugs-maven-plugin.version>4.8.6.6</spotbugs-maven-plugin.version>
   </properties>
 
   <modules>
     <!-- Modules are added incrementally: the BOM first, then the pure-tier library
          (core), then the reusable ArchUnit rule set. -->
     <module>aipersimmon-ddd-bom</module>
+    <!-- Shared quality-tool config (PMD ruleset, SpotBugs filter) as classpath resources;
+         built early so it is on the plugin classpath of every module that references it. -->
+    <module>aipersimmon-ddd-build-tools</module>
     <module>aipersimmon-ddd-core</module>
     <module>aipersimmon-ddd-observability</module>
     <module>aipersimmon-ddd-observability-otel</module>
@@ -72,6 +85,10 @@
     <module>aipersimmon-ddd-web-store-jdbc</module>
     <module>aipersimmon-ddd-web-store-redis</module>
     <module>aipersimmon-ddd-archunit</module>
+    <!-- Provider build parent for scaffold applications (Spring Boot parent + BOM +
+         quality gates). Aggregated here so it is versioned and released with the library;
+         it inherits spring-boot-starter-parent, not this parent. See design-00007. -->
+    <module>aipersimmon-ddd-build</module>
   </modules>
 
   <dependencyManagement>
@@ -146,6 +163,102 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <version>3.2.5</version>
+        </plugin>
+
+        <!-- Quality toolchain management (design-00007 / plan-00009). Management only:
+             it supplies versions and config; a module activates a gate by declaring the
+             plugin in its own <build><plugins>. Kept in sync with the same block in
+             aipersimmon-ddd-build (the scaffold-side provider); the shared rulesets live
+             in aipersimmon-ddd-build-tools. -->
+
+        <!-- Spotless: google-java-format (GOOGLE). Format gate; reactor roots activate check @ verify (P1). -->
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless-maven-plugin.version}</version>
+          <configuration>
+            <java>
+              <googleJavaFormat>
+                <version>${google-java-format.version}</version>
+              </googleJavaFormat>
+            </java>
+          </configuration>
+        </plugin>
+
+        <!-- JaCoCo: prepare-agent + report (report-only, P2). 90% check execution added at ratchet (P5).
+             Pure-tier modules (core/application/integration/cqrs) opt in by naming this plugin. -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-maven-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>jacoco-prepare-agent</id>
+              <goals><goal>prepare-agent</goal></goals>
+            </execution>
+            <execution>
+              <id>jacoco-report</id>
+              <phase>verify</phase>
+              <goals><goal>report</goal></goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!-- PIT mutation testing (D3): mutation/testStrength/coverage all >=90. Bound in P6. -->
+        <plugin>
+          <groupId>org.pitest</groupId>
+          <artifactId>pitest-maven</artifactId>
+          <version>${pitest-maven.version}</version>
+          <configuration>
+            <mutationThreshold>90</mutationThreshold>
+            <testStrengthThreshold>90</testStrengthThreshold>
+            <coverageThreshold>90</coverageThreshold>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.pitest</groupId>
+              <artifactId>pitest-junit5-plugin</artifactId>
+              <version>${pitest-junit5-plugin.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+
+        <!-- PMD + CPD: complexity + duplication; ruleset from build-tools on the plugin classpath. report-only first (P3). -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-pmd-plugin</artifactId>
+          <version>${maven-pmd-plugin.version}</version>
+          <configuration>
+            <rulesets>
+              <ruleset>com/aipersimmon/ddd/quality/pmd-ruleset.xml</ruleset>
+            </rulesets>
+            <printFailingErrors>true</printFailingErrors>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>com.aipersimmon.ddd</groupId>
+              <artifactId>aipersimmon-ddd-build-tools</artifactId>
+              <version>${project.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+
+        <!-- SpotBugs: bytecode defect analysis; exclude filter from build-tools. report-only first (P4). -->
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>${spotbugs-maven-plugin.version}</version>
+          <configuration>
+            <excludeFilterFile>com/aipersimmon/ddd/quality/spotbugs-exclude.xml</excludeFilterFile>
+            <includeTests>false</includeTests>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>com.aipersimmon.ddd</groupId>
+              <artifactId>aipersimmon-ddd-build-tools</artifactId>
+              <version>${project.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
       </plugins>
     </pluginManagement>
