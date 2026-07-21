@@ -1,8 +1,11 @@
 package com.example;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.aipersimmon.ddd.application.DurableIntegrationEvents;
+import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
@@ -42,8 +45,18 @@ class OutboxAtomicityTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    IntegrationEvents integrationEvents;
+
     @Test
     void aggregateAndOutboxRollBackTogetherWhenTheTransactionFails() {
+        // Precondition (issue-00044): the OrderPlaced event is actually written to the outbox in the
+        // command transaction — i.e. the active publisher is the durable outbox writer, not the
+        // in-process fallback. Without this the "outbox == 0 after rollback" assertion below is
+        // vacuously true (nothing is ever written) and proves nothing about atomicity.
+        assertInstanceOf(DurableIntegrationEvents.class, integrationEvents,
+                "active IntegrationEvents must be the durable outbox writer for this test to be meaningful");
+
         // CUST-1 / SKU-1 x1 is valid and in stock, so the handler runs to completion — it saves the
         // order and writes the OrderPlaced outbox row — before the interceptor throws inside the tx.
         assertThrows(RuntimeException.class, () -> commandBus.send(new PlaceOrder(

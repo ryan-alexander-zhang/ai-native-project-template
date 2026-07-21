@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.outbox.mybatisplus;
 
-import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.application.DurableIntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
@@ -28,7 +28,7 @@ import org.springframework.dao.DuplicateKeyException;
  * inserts idempotently, so an at-least-once redelivery of the same staged effect writes
  * the row once.
  */
-public class OutboxWriter implements IntegrationEvents {
+public class OutboxWriter implements DurableIntegrationEvents {
 
     private final OutboxMapper mapper;
     private final ObjectMapper objectMapper;

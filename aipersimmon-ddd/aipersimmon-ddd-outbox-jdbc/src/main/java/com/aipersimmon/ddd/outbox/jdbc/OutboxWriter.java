@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.outbox.jdbc;
 
-import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.application.DurableIntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
@@ -29,7 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * inserts idempotently, so an at-least-once redelivery of the same staged effect writes
  * the row once.
  */
-public class OutboxWriter implements IntegrationEvents {
+public class OutboxWriter implements DurableIntegrationEvents {
 
     private static final String INSERT =
             "INSERT INTO aipersimmon_outbox "

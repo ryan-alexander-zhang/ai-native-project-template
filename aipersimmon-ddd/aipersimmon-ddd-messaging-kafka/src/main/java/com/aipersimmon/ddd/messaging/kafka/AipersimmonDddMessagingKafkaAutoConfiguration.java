@@ -1,6 +1,8 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
+import com.aipersimmon.ddd.application.DurableIntegrationEvents;
 import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
@@ -20,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -106,6 +109,41 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
             log.info("integration event externalization routes -> topics {}", (Object) routes.topics());
         }
         return routes;
+    }
+
+    /**
+     * Fail-loud guard (issue-00044). When the application declares {@code @Externalized} events and a
+     * Kafka transport is wired, those events reach the broker only if the active {@link IntegrationEvents}
+     * publisher is durable — i.e. it writes each event to the transactional outbox the relay drains
+     * ({@link DurableIntegrationEvents}). If an in-process (non-durable) publisher is active instead,
+     * {@code @Externalized} events would be published in process and <em>silently never leave the
+     * JVM</em>. This runs after all singletons are instantiated and, if it finds a non-durable publisher
+     * active, fails startup with a concrete remedy rather than letting the misconfiguration surface only
+     * as missing messages in production.
+     *
+     * <p>Scoped by {@link OnExternalizedEventsCondition} (only when something is actually externalized)
+     * and {@code @ConditionalOnBean(KafkaTemplate)} (only when a real Kafka transport is present). It
+     * throws only when a publisher bean exists and is non-durable; an incomplete context with no
+     * {@link IntegrationEvents} bean at all (e.g. a slice test) is left alone.
+     */
+    @Bean
+    @ConditionalOnBean(KafkaTemplate.class)
+    @Conditional(OnExternalizedEventsCondition.class)
+    public SmartInitializingSingleton aipersimmonDddDurableTransportGuard(
+            ObjectProvider<IntegrationEvents> integrationEvents) {
+        return () -> {
+            IntegrationEvents active = integrationEvents.getIfAvailable();
+            if (active != null && !(active instanceof DurableIntegrationEvents)) {
+                throw new IllegalStateException(
+                        "aipersimmon-ddd-messaging-kafka: the application declares @Externalized integration "
+                        + "event(s) and a Kafka transport, but the active IntegrationEvents publisher is '"
+                        + active.getClass().getName() + "', which is in-process and not durable. @Externalized "
+                        + "events published through it never reach Kafka. Add a durable outbox module "
+                        + "(e.g. aipersimmon-ddd-outbox-mybatis-plus or aipersimmon-ddd-outbox-jdbc) so its "
+                        + "transactional-outbox writer becomes the IntegrationEvents transport, or remove "
+                        + "@Externalized to keep those events LOCAL (in-process) on purpose.");
+            }
+        };
     }
 
     /**

@@ -14,6 +14,8 @@ import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -41,9 +43,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfiguration(after = {
         JdbcTemplateAutoConfiguration.class,
         DataSourceTransactionManagerAutoConfiguration.class,
-        AipersimmonDddOutboxAutoConfiguration.class})
+        AipersimmonDddOutboxAutoConfiguration.class},
+        // Register before the in-process events fallback so this durable writer claims the
+        // IntegrationEvents port and the fallback backs off (issue-00044). String form: this module
+        // does not depend on events-spring, and an absent target is simply ignored.
+        beforeName = "com.aipersimmon.ddd.events.spring.AipersimmonDddEventsAutoConfiguration")
 @EnableScheduling
 public class AipersimmonDddOutboxJdbcAutoConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(AipersimmonDddOutboxJdbcAutoConfiguration.class);
 
     // Name-scoped so this component always contributes its own named clock and injects it by name,
     // rather than backing off when another component (process-manager, inbox) already registered a
@@ -62,6 +70,7 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
             Clock outboxClock,
             @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}") String source,
             ObjectProvider<StoreAndForwardTracer> tracer) {
+        log.info("aipersimmon-ddd integration-event transport: durable transactional outbox (JdbcTemplate)");
         return new OutboxWriter(
                 jdbcTemplate, objectMapper.getIfAvailable(ObjectMapper::new), outboxClock, source,
                 tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
