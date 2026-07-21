@@ -99,6 +99,33 @@ class ExceptionContractTest {
     }
 
     @Test
+    void unknownPathRenders404NotFallback500() throws Exception {
+        // A path with no handler is a routing-level NoResourceFoundException. It must render the
+        // proper 404 problem, not the catch-all 500 (issue-00045).
+        mvc.perform(get("/no-such-endpoint"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void wrongMethodRenders405NotFallback500() throws Exception {
+        // /orders is mapped for POST only; a GET is a method mismatch → 405, not 500 (issue-00045).
+        mvc.perform(get("/orders"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.status").value(405));
+    }
+
+    @Test
+    void healthEndpointIsReachableAndUp() throws Exception {
+        // Actuator on the classpath (issue-00045): the health probe resolves to the real endpoint
+        // and reports UP against the Testcontainers PostgreSQL + Kafka, rather than a 500.
+        mvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void confirmingAnAlreadyConfirmedOrderRenders409() throws Exception {
         // Placing succeeds; the durable fulfilment flow then confirms the order (SKU-1 has stock
         // and the amount is under the payment ceiling) once the async transport settles.

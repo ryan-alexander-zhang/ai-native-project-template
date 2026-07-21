@@ -140,6 +140,16 @@
       <artifactId>spring-boot-starter</artifactId>
     </dependency>
     <!--
+      Actuator: health / liveness / readiness probes (and the info/metrics endpoints). Without it
+      /actuator/** is unmapped, so a probe request falls through to the no-handler path — which the
+      web advice now renders as a proper 404 rather than a 500 (issue-00045), but a deployment still
+      needs the real health endpoint for orchestration readiness/liveness checks.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <!--
       Bean Validation provider (Hibernate Validator). Bringing it onto the classpath
       is what activates the command bus's ValidationCommandInterceptor (auto-wired
       only when a provider is present) and makes @Valid on inbound DTOs effective.
