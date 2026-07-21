@@ -5,8 +5,8 @@ import java.util.Optional;
 
 /**
  * A well-formed repository port: the core {@code @Repository} on an interface in the domain layer.
- * Exercises the good path of {@code repositoryPortsShouldBeInterfacesInDomain}; its implementation
- * lives in the infrastructure layer (see {@code GoodInMemoryStockItems}).
+ * Exercises the good path of {@code portsShouldBeInterfacesInDomain}; its implementation lives in
+ * the infrastructure layer (see {@code GoodInMemoryStockItems}).
  */
 @Repository
 public interface GoodStockItems {

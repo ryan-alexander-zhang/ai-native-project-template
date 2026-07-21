@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository;
 /**
  * A well-formed repository implementation: a concrete adapter for the {@link GoodStockItems} port,
  * placed in the infrastructure layer and carrying Spring's {@code @Repository} stereotype.
- * Exercises the good path of both {@code repositoryImplementationsShouldResideInInfrastructure} and
- * {@code repositoryImplementationsShouldBeSpringRepositories}.
+ * Exercises the good path of both {@code implementationsShouldResideInInfrastructure} and {@code
+ * implementationsShouldBeSpringRepositories}.
  */
 @Repository
 public class GoodInMemoryStockItems implements GoodStockItems {

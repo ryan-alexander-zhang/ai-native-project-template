@@ -26,7 +26,7 @@ parent:
 1. **是读,不是写**:幂等、无副作用、当场要结果——同步请求/响应天然合适,做成事件反而别扭
    (事件无返回值)。
 2. **不能直连内部**:跨上下文只能经对方**发布的契约**,不得引用对方 domain/application 内部
-   (analysis-00004 #5;ArchUnit `boundedContextsShouldOnlyDependOnEachOthersApi` 编译期/测试期
+   (analysis-00004 #5;ArchUnit `BoundedContextRules.dependOnEachOtherOnlyThroughApi` 编译期/测试期
    守着)。
 3. **传输要能演进**:模块化单体内是进程内调用,拆成独立服务后是 HTTP/RPC——业务代码不该因此改动
    (monolith-first,promotion ladder,analysis-00004 #3)。

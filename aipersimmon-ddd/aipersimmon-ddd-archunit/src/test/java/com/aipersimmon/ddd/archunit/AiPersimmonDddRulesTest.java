@@ -278,42 +278,40 @@ class AiPersimmonDddRulesTest {
   }
 
   @Test
-  void repositoryPortsShouldBeInterfacesInDomain_passesForGood() {
-    assertDoesNotThrow(
-        () -> RepositoryRules.repositoryPortsShouldBeInterfacesInDomain().check(GOOD));
+  void portsShouldBeInterfacesInDomain_passesForGood() {
+    assertDoesNotThrow(() -> RepositoryRules.portsShouldBeInterfacesInDomain().check(GOOD));
   }
 
   @Test
-  void repositoryPortsShouldBeInterfacesInDomain_failsForBad() {
+  void portsShouldBeInterfacesInDomain_failsForBad() {
+    assertThrows(
+        AssertionError.class, () -> RepositoryRules.portsShouldBeInterfacesInDomain().check(BAD));
+  }
+
+  @Test
+  void implementationsShouldResideInInfrastructure_passesForGood() {
+    assertDoesNotThrow(
+        () -> RepositoryRules.implementationsShouldResideInInfrastructure().check(GOOD));
+  }
+
+  @Test
+  void implementationsShouldResideInInfrastructure_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> RepositoryRules.repositoryPortsShouldBeInterfacesInDomain().check(BAD));
+        () -> RepositoryRules.implementationsShouldResideInInfrastructure().check(BAD));
   }
 
   @Test
-  void repositoryImplementationsShouldResideInInfrastructure_passesForGood() {
+  void implementationsShouldBeSpringRepositories_passesForGood() {
     assertDoesNotThrow(
-        () -> RepositoryRules.repositoryImplementationsShouldResideInInfrastructure().check(GOOD));
+        () -> RepositoryRules.implementationsShouldBeSpringRepositories().check(GOOD));
   }
 
   @Test
-  void repositoryImplementationsShouldResideInInfrastructure_failsForBad() {
+  void implementationsShouldBeSpringRepositories_failsForBad() {
     assertThrows(
         AssertionError.class,
-        () -> RepositoryRules.repositoryImplementationsShouldResideInInfrastructure().check(BAD));
-  }
-
-  @Test
-  void repositoryImplementationsShouldBeSpringRepositories_passesForGood() {
-    assertDoesNotThrow(
-        () -> RepositoryRules.repositoryImplementationsShouldBeSpringRepositories().check(GOOD));
-  }
-
-  @Test
-  void repositoryImplementationsShouldBeSpringRepositories_failsForBad() {
-    assertThrows(
-        AssertionError.class,
-        () -> RepositoryRules.repositoryImplementationsShouldBeSpringRepositories().check(BAD));
+        () -> RepositoryRules.implementationsShouldBeSpringRepositories().check(BAD));
   }
 
   @Test
@@ -340,19 +338,19 @@ class AiPersimmonDddRulesTest {
   }
 
   @Test
-  void boundedContextsShouldOnlyDependOnEachOthersApi_passesForGood() {
+  void dependOnEachOtherOnlyThroughApi_passesForGood() {
     assertDoesNotThrow(
         () ->
-            BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_GOOD_BASE)
+            BoundedContextRules.dependOnEachOtherOnlyThroughApi(CONTEXTS_GOOD_BASE)
                 .check(CONTEXTS_GOOD));
   }
 
   @Test
-  void boundedContextsShouldOnlyDependOnEachOthersApi_failsForBad() {
+  void dependOnEachOtherOnlyThroughApi_failsForBad() {
     assertThrows(
         AssertionError.class,
         () ->
-            BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi(CONTEXTS_BAD_BASE)
+            BoundedContextRules.dependOnEachOtherOnlyThroughApi(CONTEXTS_BAD_BASE)
                 .check(CONTEXTS_BAD));
   }
 

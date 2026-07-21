@@ -12,10 +12,10 @@ import com.tngtech.archunit.lang.ArchRule;
  * outbound adapters in infrastructure, and (opt-in) those implementations carry Spring's
  * {@code @Repository} stereotype.
  *
- * <p>{@link #repositoryPortsShouldBeInterfacesInDomain()} and {@link
- * #repositoryImplementationsShouldResideInInfrastructure()} are bundled into {@link
- * AiPersimmonDddRules#all()}; {@link #repositoryImplementationsShouldBeSpringRepositories()} is
- * opt-in because it presumes Spring.
+ * <p>{@link #portsShouldBeInterfacesInDomain()} and {@link
+ * #implementationsShouldResideInInfrastructure()} are bundled into {@link
+ * AiPersimmonDddRules#all()}; {@link #implementationsShouldBeSpringRepositories()} is opt-in
+ * because it presumes Spring.
  */
 public final class RepositoryRules {
 
@@ -32,12 +32,12 @@ public final class RepositoryRules {
    * that resides in the domain layer. A repository is the collection-like abstraction over an
    * aggregate, so the port is a domain concept (an interface the domain owns), while its technical
    * implementation lives in the infrastructure layer (see {@link
-   * #repositoryImplementationsShouldResideInInfrastructure()}). Matches the core
-   * {@code @Repository} annotation, not Spring's stereotype, so a Spring {@code @Repository} on an
-   * implementation class is unaffected. Part of {@link AiPersimmonDddRules#all()}; matches nothing
-   * (and so passes) in a project that declares no repository ports.
+   * #implementationsShouldResideInInfrastructure()}). Matches the core {@code @Repository}
+   * annotation, not Spring's stereotype, so a Spring {@code @Repository} on an implementation class
+   * is unaffected. Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a
+   * project that declares no repository ports.
    */
-  public static ArchRule repositoryPortsShouldBeInterfacesInDomain() {
+  public static ArchRule portsShouldBeInterfacesInDomain() {
     return classes()
         .that()
         .areAnnotatedWith(Repository.class)
@@ -59,7 +59,7 @@ public final class RepositoryRules {
    * an outbound adapter and belongs in infrastructure. Part of {@link AiPersimmonDddRules#all()};
    * matches nothing (and so passes) in a project with no repository implementations.
    */
-  public static ArchRule repositoryImplementationsShouldResideInInfrastructure() {
+  public static ArchRule implementationsShouldResideInInfrastructure() {
     return classes()
         .that(implementARepositoryPort())
         .should()
@@ -81,10 +81,10 @@ public final class RepositoryRules {
    * than pass vacuously. Adopt it in Spring projects alongside {@link AiPersimmonDddRules#all()}:
    *
    * <pre>{@code
-   * @ArchTest static final ArchRule repos = RepositoryRules.repositoryImplementationsShouldBeSpringRepositories();
+   * @ArchTest static final ArchRule repos = RepositoryRules.implementationsShouldBeSpringRepositories();
    * }</pre>
    */
-  public static ArchRule repositoryImplementationsShouldBeSpringRepositories() {
+  public static ArchRule implementationsShouldBeSpringRepositories() {
     return classes()
         .that(implementARepositoryPort())
         .should()

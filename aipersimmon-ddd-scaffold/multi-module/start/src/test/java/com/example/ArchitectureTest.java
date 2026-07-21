@@ -36,7 +36,7 @@ class ArchitectureTest {
    */
   @ArchTest
   static final ArchRule repositoryImplementations =
-      RepositoryRules.repositoryImplementationsShouldBeSpringRepositories();
+      RepositoryRules.implementationsShouldBeSpringRepositories();
 
   /**
    * Integration events — the facts each context publishes for others — live in that context's
@@ -54,7 +54,7 @@ class ArchitectureTest {
    */
   @ArchTest
   static final ArchRule contextsAreIsolated =
-      BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi("com.example");
+      BoundedContextRules.dependOnEachOtherOnlyThroughApi("com.example");
 
   /**
    * No inbound adapter depends on a domain directly. An inbound adapter translates a transport

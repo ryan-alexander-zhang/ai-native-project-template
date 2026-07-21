@@ -143,7 +143,7 @@ com.aipersimmon.ddd.core
 ### 5.4 `aipersimmon-ddd-archunit`(第三步)
 
 - 依赖 `-core`(识别注解/marker)+ `archunit-junit5`(**compile** 依赖,消费者以 test scope 引 `-archunit` 即可传递获得)。
-- 提供可复用 `ArchRule` 常量 + 一个无参聚合入口 `AiPersimmonDddRules.all()`(打包所有 framework-agnostic 规则;跨上下文隔离因需基包参数,另走 `boundedContextsShouldOnlyDependOnEachOthersApi(basePackage)`)。规则集示例(权威清单见 `AiPersimmonDddRules` 类级 Javadoc):
+- 提供可复用 `ArchRule` 常量 + 一个无参聚合入口 `AiPersimmonDddRules.all()`(打包所有 framework-agnostic 规则;跨上下文隔离因需基包参数,另走 `BoundedContextRules.dependOnEachOtherOnlyThroughApi(basePackage)`)。规则集示例(权威清单见 `AiPersimmonDddRules` 类级 Javadoc):
   - domain 不得依赖 application / infrastructure / adapter / 任何 framework(已落地,在 `all()`);
   - `IntegrationEvent` 只在 `*-api`(已落地,opt-in `integrationEventsShouldResideInApi`);`DomainEvent` 不得泄漏到 adapter(已落地,在 `all()`);
   - 跨聚合只经 `Association` / `Identifier` 引用聚合根(设计约定,暂未由 ArchUnit 强制)。

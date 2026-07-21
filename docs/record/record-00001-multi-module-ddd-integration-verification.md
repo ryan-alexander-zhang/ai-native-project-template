@@ -133,7 +133,7 @@ mvn clean install -DskipTests -T1C   （JAVA_HOME=JDK 21）
 application 不依赖 infra/interface、domain 无框架依赖）、事件（领域事件驻留、集成事件监听驻留 adapter、
 `@EventType` 声明）、CQRS（handler 不互相依赖、不自调 send）、构建块（聚合根/值对象/领域服务）、
 仓储端口与实现、不变式/状态机/错误码等；opt-in 的
-`repositoryImplementationsShouldBeSpringRepositories` 也通过。`PackageInfoTest` 校验每个包存在
+`RepositoryRules.implementationsShouldBeSpringRepositories` 也通过。`PackageInfoTest` 校验每个包存在
 `package-info.java`。
 
 **5) 可观测性 ✅（已接入 SigNoz 实测并在 SigNoz 中验证）** — 起 `observability` profile

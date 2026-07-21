@@ -34,7 +34,7 @@ import com.tngtech.archunit.lang.CompositeArchRule;
  *   <li>{@link BuildingBlockRules} — aggregate/entity/value-object/domain-service placement and
  *       value-object immutability.
  *   <li>{@link RepositoryRules} — repository ports and implementations; also the opt-in {@link
- *       RepositoryRules#repositoryImplementationsShouldBeSpringRepositories()}.
+ *       RepositoryRules#implementationsShouldBeSpringRepositories()}.
  *   <li>{@link InvariantAndErrorRules} — invariants, state transitions, and error codes.
  *   <li>{@link BoundedContextRules} — the parameterised cross-context isolation rule (opt-in).
  * </ul>
@@ -74,7 +74,7 @@ public final class AiPersimmonDddRules {
         .and(BuildingBlockRules.valueObjectsShouldBeImmutable())
         .and(InvariantAndErrorRules.illegalStateTransitionsShouldOnlyComeFromTransitions())
         .and(InvariantAndErrorRules.errorCodesShouldBeEnums())
-        .and(RepositoryRules.repositoryPortsShouldBeInterfacesInDomain())
-        .and(RepositoryRules.repositoryImplementationsShouldResideInInfrastructure());
+        .and(RepositoryRules.portsShouldBeInterfacesInDomain())
+        .and(RepositoryRules.implementationsShouldResideInInfrastructure());
   }
 }

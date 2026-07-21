@@ -35,12 +35,12 @@ public final class BoundedContextRules {
    *
    * <pre>{@code
    * @ArchTest static final ArchRule contexts =
-   *         BoundedContextRules.boundedContextsShouldOnlyDependOnEachOthersApi("com.example");
+   *         BoundedContextRules.dependOnEachOtherOnlyThroughApi("com.example");
    * }</pre>
    *
    * @param basePackage the package under which each immediate sub-package is a context
    */
-  public static ArchRule boundedContextsShouldOnlyDependOnEachOthersApi(String basePackage) {
+  public static ArchRule dependOnEachOtherOnlyThroughApi(String basePackage) {
     return classes()
         .that()
         .resideInAPackage(basePackage + "..")
