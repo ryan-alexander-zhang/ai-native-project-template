@@ -53,13 +53,18 @@ parent: design-00007-code-quality-gates
 > `export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home`。CI 已是 21，不受影响；后续可考虑加
 > maven-toolchains 强制 21。
 
-### P5 — 覆盖率 ratchet 到 90%（domain + pure tier）
-- [ ] JaCoCo `check`：`LINE`/`BRANCH`/`METHOD` 各 ≥0.90；补测试到达标。
-- 验收：pure tier + 脚手架 domain `verify` 在 90% 门禁下绿。
+### P5 — 覆盖率 ratchet 到 90%（库 pure tier）
+- [x] JaCoCo `check`（`LINE`/`BRANCH`/`METHOD` ≥0.90）逐模块 opt-in（core/application/integration/cqrs 各自 `<build><plugins>` 声明 check execution）。
+- [x] 补测试到达标（见下基线）。
+- 验收：四模块联合 `verify` BUILD SUCCESS（JDK 21）。脚手架 `*-domain` 的门禁随 P8 落地。
 
-### P6 — 变异 ratchet 到 90%（domain + pure tier）
-- [ ] PIT + pitest-junit5-plugin：`mutationThreshold`/`testStrengthThreshold`/`coverageThreshold` 三项 ≥90（D3）；补测试到达标。
-- 验收：pure tier + 脚手架 domain `verify` 在 PIT 三阈值下绿。
+### P6 — 变异 ratchet 到 90%（库 pure tier）
+- [x] PIT + pitest-junit5-plugin：`mutationThreshold`/`testStrengthThreshold`/`coverageThreshold` 三项 ≥90（D3），逐模块 `mutationCoverage@verify`。
+- [x] 补测试杀变异体到达标。
+- 验收：四模块 PIT 三阈值全过。
+
+> 说明：check + PIT 的 execution 目前**逐模块**声明（4 份），因为门禁只对达标模块开；四者稳定后可上移到父 `pluginManagement` 统一。脚手架 `*-domain` 的 90%/90% 随 P8 provider 采用一起接。
+> 质量构建须用 JDK 21（PMD/SpotBugs/PIT 不支持 Java 26 字节码）。
 
 ### P7 — test-support testkit
 - [x] 新增 `aipersimmon-ddd-test-support`（按 Testcontainers + Spring Boot 最佳实践）：
@@ -100,4 +105,13 @@ parent: design-00007-code-quality-gates
 
 转 gate 前需先消化这些（或按规则调阈值/加 exclude）。缺陷集中在 jdbc/web 基础设施层，pure tier 基本干净。
 
-（P5/P6 执行时回填达标后的覆盖率与变异分数。）
+### P5/P6 达标结果（2026-07-21，库 pure tier，JDK 21，门禁已开）
+
+| 模块 | JaCoCo（L/B/M ≥90%） | PIT 变异 | 备注 |
+| --- | --- | --- | --- |
+| aipersimmon-ddd-core | ✅ | 11/11 杀灭，strength 100% | +3 测试类，强化 TransitionsTest 杀 builder 变异体 |
+| aipersimmon-ddd-integration | ✅ | 14/15，strength 93% | +catalog/异常测试，补 envelope 分支 |
+| aipersimmon-ddd-cqrs | ✅ | 4/4，strength 100% | +CommandContext/defaults；修正 UnitOfWork 重载假测试 |
+| aipersimmon-ddd-application | ✅ | 4/4，strength 100% | 从零补齐异常 + DomainEvents/IntegrationEvents 默认方法 |
+
+四模块联合 `verify` BUILD SUCCESS。annotation/marker interface 类无可变异代码，不计入。
