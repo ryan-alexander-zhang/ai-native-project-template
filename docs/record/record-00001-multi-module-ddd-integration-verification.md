@@ -153,6 +153,25 @@ SigNoz 里按它搜不到。已在 observability-otel starter 的 `TraceIdMdcFil
 `request.id`(客户端传入 `rid-verify-38d801ac…` / 服务端生成 `4fe92345…`)在 SigNoz 均定位到对应 trace
 (`2ddb0e38…` / `b7c5af77…`)—— 即"按 X-Request-Id 搜 → 拿 trace → 全局钻取"的标准闭环成立。
 
+**跨 outbox → Kafka → inbox 的 trace 链路端到端连通(实测)** — 对单笔订单在 SigNoz 重建拓扑,确认整条业务流程
+可导航连通(非单一 trace-id,而是"段内父子 + 段间 span-link",此为 OTel 对异步/store-and-forward 的标准建模):
+
+```
+T1[同步]  POST /orders→command PlaceOrder→JDBC→process.advance(进程内首跳)→INSERT outbox
+   └─FOLLOWS_FROM─▶ 段1  outbox.publish(OrderPlaced)→ordering.events publish(生产者)
+                          └─parent─▶ ordering.events process(消费者,同 trace 父子)→inbox 去重→command ReserveStock→INSERT outbox
+   └─FOLLOWS_FROM─▶ 段2  publish(StockReserved)→…→command RequestPayment/ChargePayment→INSERT outbox
+   └─FOLLOWS_FROM─▶ 段3/4 …→command ConfirmOrder→OrderConfirmed(终态)
+```
+
+三处连接点均实测成立:①进程内 `process.advance` 与 HTTP 同一条 trace;②Kafka **生产者→消费者同 trace 父子**
+(`process` 的 parentSpanID = `publish` 的 spanID);③跨 store-and-forward 边界由 `outbox.publish` 的
+`FOLLOWS_FROM` span-link 逐段链回源头(T1→段1→段2→…)。
+
+> 注:此连通性对**当前 messaging-kafka 版本**(复用 Boot 自动配置的、被 OTel 自动埋点的 `KafkaTemplate`)成立。
+> 期间一版"隔离自建 Kafka 工厂"的改动曾使生产者 span 消失、消费者 span 变裸根而**断链**(自建工厂绕过 OTel 自动埋点);
+> 回滚后生产者 span 与生产者→消费者父子关系恢复。任何重新隔离 Kafka 基础设施的改动都须复验此 trace 连通性。
+
 > 复现:`docker compose -f compose.yaml --profile observability up -d db kafka otel-collector signoz`;
 > 应用参数去掉 `--otel.sdk.disabled=true`;SigNoz UI `http://localhost:48080`。验证查询(SigNoz ClickHouse):
 > `SELECT name,count(*) FROM signoz_traces.distributed_signoz_index_v3 WHERE serviceName='ordering' GROUP BY name`。
