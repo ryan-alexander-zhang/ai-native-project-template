@@ -7,21 +7,15 @@ import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.core.type.filter.AssignableTypeFilter;
 
 /**
  * Selects the single outbox {@link OutboxDispatcher}, independently of how the
@@ -66,31 +60,9 @@ public class AipersimmonDddOutboxAutoConfiguration {
     @ConditionalOnMissingBean(IntegrationEventCatalog.class)
     public IntegrationEventCatalog integrationEventCatalog(BeanFactory beanFactory,
             @Value("${aipersimmon.ddd.integration.scan-packages:}") String scanPackages) {
-        Set<String> packages = new LinkedHashSet<>();
-        if (AutoConfigurationPackages.has(beanFactory)) {
-            packages.addAll(AutoConfigurationPackages.get(beanFactory));
-        }
-        for (String pkg : scanPackages.split(",")) {
-            String trimmed = pkg.trim();
-            if (!trimmed.isEmpty()) {
-                packages.add(trimmed);
-            }
-        }
-        ClassPathScanningCandidateComponentProvider scanner =
-                new ClassPathScanningCandidateComponentProvider(false);
-        scanner.addIncludeFilter(new AssignableTypeFilter(IntegrationEvent.class));
         Map<Key, Class<? extends IntegrationEvent>> byTypeAndVersion = new HashMap<>();
-        for (String pkg : packages) {
-            for (BeanDefinition def : scanner.findCandidateComponents(pkg)) {
-                try {
-                    Class<?> c = Class.forName(def.getBeanClassName());
-                    if (IntegrationEvent.class.isAssignableFrom(c) && !c.isInterface()) {
-                        register(byTypeAndVersion, c.asSubclass(IntegrationEvent.class));
-                    }
-                } catch (ClassNotFoundException ignored) {
-                    // skip a candidate that cannot be loaded
-                }
-            }
+        for (Class<? extends IntegrationEvent> c : IntegrationEventScanner.scan(beanFactory, scanPackages)) {
+            register(byTypeAndVersion, c);
         }
         return new RegistryIntegrationEventCatalog(byTypeAndVersion);
     }

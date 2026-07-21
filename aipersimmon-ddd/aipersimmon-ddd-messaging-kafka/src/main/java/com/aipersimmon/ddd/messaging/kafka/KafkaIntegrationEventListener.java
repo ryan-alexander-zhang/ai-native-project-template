@@ -77,7 +77,7 @@ public class KafkaIntegrationEventListener {
     }
 
     @KafkaListener(
-            topics = "${aipersimmon.ddd.messaging.kafka.topic:aipersimmon.integration-events}",
+            topics = "#{@externalizedRoutes.topics()}",
             groupId = "${aipersimmon.ddd.messaging.kafka.consumer.group-id:${spring.application.name:aipersimmon}}")
     @Transactional
     public void onMessage(ConsumerRecord<String, String> record) {

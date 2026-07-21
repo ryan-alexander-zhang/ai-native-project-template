@@ -9,7 +9,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("aipersimmon.ddd.messaging.kafka")
 public class KafkaMessagingProperties {
 
-    /** Topic that integration events are published to and consumed from. */
+    /**
+     * A convenience default topic name events may reference from their {@code @Externalized}
+     * target, e.g. {@code @Externalized("${aipersimmon.ddd.messaging.kafka.topic}")} to route
+     * an event to it. It is <strong>not</strong> the routing key: routing is per event, from
+     * each event's {@code @Externalized} annotation (see {@link ExternalizedRoutes}). An event
+     * with no {@code @Externalized} stays LOCAL regardless of this value.
+     */
     private String topic = "aipersimmon.integration-events";
 
     private final Producer producer = new Producer();

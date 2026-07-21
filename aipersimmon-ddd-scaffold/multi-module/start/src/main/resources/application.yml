@@ -40,12 +40,13 @@ aipersimmon:
         - outbox
         - inbox
     # Integration events cross bounded contexts over Kafka (decision-00006 transport "方式三").
-    # A single topic carries every event type; identity/routing rides in ce_* headers, the record
-    # key is the aggregate subject (per-aggregate ordering). consumer.enabled registers the
-    # inbox-guarded consumer bridge that republishes each event in process.
+    # Routing is per event (design-00006): each @Externalized event goes to its own named topic
+    # (ordering.events / inventory.events / payment.events), and an event with no @Externalized
+    # stays in process. The record key is the aggregate subject (per-aggregate ordering);
+    # identity/type rides in ce_* headers. consumer.enabled registers the inbox-guarded consumer
+    # bridge that subscribes to those topics and republishes each event in process.
     messaging:
       kafka:
-        topic: aipersimmon.integration-events
         consumer:
           enabled: true
 

@@ -1,5 +1,7 @@
 package com.aipersimmon.ddd.integration;
 
+import java.util.Optional;
+
 /**
  * Marker for an integration event: a fact one bounded context publishes for
  * others to consume, part of its published language. Unlike an internal domain
@@ -60,6 +62,31 @@ public interface IntegrationEvent {
                     + " must declare an @EventType version >= 1 (got " + annotation.version() + ")");
         }
         return annotation.version();
+    }
+
+    /**
+     * The external transport target declared by {@code type}'s {@link Externalized}
+     * annotation, or {@link Optional#empty()} if it has none — in which case the
+     * event is LOCAL and never reaches the broker. Read statically from the class (like
+     * {@link #eventTypeOf}) so routing can be decided without constructing an instance and
+     * a consumer-side scan can build the reach map from the class alone. The returned value
+     * is the <em>raw</em> target, which may still contain {@code ${property}} placeholders;
+     * resolving those against configuration is the assembly layer's job.
+     *
+     * @throws IllegalStateException if the annotation is present but its {@code value} is
+     *     blank — an externalized event must name a target
+     */
+    static Optional<String> externalizedTarget(Class<?> type) {
+        Externalized annotation = type.getAnnotation(Externalized.class);
+        if (annotation == null) {
+            return Optional.empty();
+        }
+        if (annotation.value().isBlank()) {
+            throw new IllegalStateException(type.getName()
+                    + " is @Externalized but declares a blank target; name the broker target, e.g. "
+                    + "@Externalized(\"ordering.events\") or @Externalized(\"${ordering.topic:ordering.events}\")");
+        }
+        return Optional.of(annotation.value());
     }
 
     private static EventType requireEventType(Class<?> type) {

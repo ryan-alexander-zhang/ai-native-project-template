@@ -1,6 +1,7 @@
 package com.example.ordering.api;
 
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.util.List;
 
@@ -10,6 +11,7 @@ import java.util.List;
  * (here, so inventory can reserve stock), never the internal domain model.
  */
 @EventType(name = "com.example.ordering.OrderPlaced", version = 1)
+@Externalized("ordering.events")
 public record OrderPlaced(String orderId, List<Line> lines) implements IntegrationEvent {
 
     @Override

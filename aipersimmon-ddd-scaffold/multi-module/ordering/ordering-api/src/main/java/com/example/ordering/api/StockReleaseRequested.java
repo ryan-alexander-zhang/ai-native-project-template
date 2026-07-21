@@ -1,6 +1,7 @@
 package com.example.ordering.api;
 
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
@@ -10,6 +11,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * undo the held stock before the order can be cancelled.
  */
 @EventType(name = "com.example.ordering.StockReleaseRequested", version = 1)
+@Externalized("ordering.events")
 public record StockReleaseRequested(String orderId, String reservationId) implements IntegrationEvent {
 
     @Override

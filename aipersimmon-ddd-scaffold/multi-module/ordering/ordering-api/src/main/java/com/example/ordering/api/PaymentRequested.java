@@ -1,6 +1,7 @@
 package com.example.ordering.api;
 
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
@@ -12,6 +13,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * at-least-once redelivery of this event charges only once (design-00004 §13.2).
  */
 @EventType(name = "com.example.ordering.PaymentRequested", version = 1)
+@Externalized("ordering.events")
 public record PaymentRequested(String orderId, String paymentOperationId, long amountMinor, String currency)
         implements IntegrationEvent {
 

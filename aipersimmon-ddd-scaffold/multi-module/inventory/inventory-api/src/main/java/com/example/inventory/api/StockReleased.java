@@ -1,6 +1,7 @@
 package com.example.inventory.api;
 
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
@@ -11,6 +12,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * domain demands.
  */
 @EventType(name = "com.example.inventory.StockReleased", version = 1)
+@Externalized("inventory.events")
 public record StockReleased(String orderId, String reservationId) implements IntegrationEvent {
 
     @Override

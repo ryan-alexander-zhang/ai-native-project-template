@@ -20,9 +20,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
- * Verifies the Kafka dispatcher maps an outbox message onto a producer record —
- * key, value, and envelope headers — and that a broker send failure surfaces so
- * the outbox relay leaves the row to be retried.
+ * Verifies the Kafka leg maps an outbox message onto a producer record for the
+ * given topic — key, value, and envelope headers — and that a broker send failure
+ * surfaces so the outbox relay leaves the row to be retried.
  */
 class KafkaOutboxDispatcherTest {
 
@@ -43,7 +43,7 @@ class KafkaOutboxDispatcherTest {
         KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
         doReturn(CompletableFuture.completedFuture(null)).when(template).send(any(ProducerRecord.class));
 
-        new KafkaOutboxDispatcher(template, "orders").dispatch(message);
+        new KafkaOutboxDispatcher(template).dispatch(message, "orders");
 
         ArgumentCaptor<ProducerRecord<String, String>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -74,7 +74,7 @@ class KafkaOutboxDispatcherTest {
         doReturn(new CompletableFuture<>()).when(template).send(any(ProducerRecord.class));
 
         KafkaOutboxDispatcher dispatcher =
-                new KafkaOutboxDispatcher(template, "orders", Duration.ofMillis(200));
+                new KafkaOutboxDispatcher(template, Duration.ofMillis(200));
 
         // The single relay thread must not be pinned indefinitely on one stuck send: the
         // bounded await surfaces as a (transient) IllegalStateException — not a permanent
@@ -82,7 +82,7 @@ class KafkaOutboxDispatcherTest {
         // preemptive timeout is generous relative to the 200ms send bound; before the fix
         // (an unbounded get) dispatch never returns and this trips.
         assertTimeoutPreemptively(Duration.ofSeconds(3), () ->
-                assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message)));
+                assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message, "orders")));
     }
 
     @Test
@@ -92,8 +92,8 @@ class KafkaOutboxDispatcherTest {
         doReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")))
                 .when(template).send(any(ProducerRecord.class));
 
-        KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template, "orders");
-        assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message));
+        KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template);
+        assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message, "orders"));
     }
 
     private static String header(ProducerRecord<String, String> record, String name) {

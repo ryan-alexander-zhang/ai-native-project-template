@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
@@ -71,6 +72,16 @@ class KafkaDeadLetterIntegrationTest {
             return new RegistryIntegrationEventCatalog(Map.of(new Key("com.example.Good", 1), GoodEvent.class));
         }
 
+        /**
+         * Pin the routing to just {@code it-events} so the consumer bridge subscribes to
+         * exactly the topic this test drives, independent of any other externalized fixture
+         * on the test classpath.
+         */
+        @Bean
+        ExternalizedRoutes externalizedRoutes() {
+            return new ExternalizedRoutes(Map.of(new Key("com.example.Good", 1), TOPIC));
+        }
+
         @Bean
         Handler handler() {
             return new Handler();
@@ -89,6 +100,7 @@ class KafkaDeadLetterIntegrationTest {
 
     /** A JavaBean event so Jackson maps it by field without needing -parameters. */
     @EventType(name = "com.example.Good", version = 1)
+    @Externalized(TOPIC)
     public static class GoodEvent implements IntegrationEvent {
         public String value;
 

@@ -1,6 +1,7 @@
 package com.example.payment.api;
 
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
@@ -10,6 +11,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * cancel) and translate the decline into its own cancellation reason.
  */
 @EventType(name = "com.example.payment.PaymentDeclined", version = 1)
+@Externalized("payment.events")
 public record PaymentDeclined(String orderId, String code, String reason) implements IntegrationEvent {
 
     @Override

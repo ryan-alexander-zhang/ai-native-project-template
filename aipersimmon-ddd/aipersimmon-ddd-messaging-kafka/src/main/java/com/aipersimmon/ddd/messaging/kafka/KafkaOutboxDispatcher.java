@@ -1,6 +1,5 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
-import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -12,12 +11,19 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
- * {@link OutboxDispatcher} that publishes a stored outbox message to a Kafka topic
- * using the CloudEvents Kafka binary binding. The record key is the message's
- * partition key — the aggregate {@code subject} when present, else the event id —
- * so one aggregate's events keep to a single partition and stay in order; the value
- * is the already-serialized JSON payload; the CloudEvents attributes travel in
+ * Publishes a stored outbox message to a Kafka topic using the CloudEvents Kafka binary
+ * binding. The topic is supplied <em>per message</em> ({@link #dispatch(OutboxMessage,
+ * String)}) — it is the event's externalization target, which the
+ * {@link RoutingOutboxDispatcher} resolves from the event's {@code @Externalized}
+ * annotation — so different event types can go to different named topics. The record key
+ * is the message's partition key — the aggregate {@code subject} when present, else the
+ * event id — so one aggregate's events keep to a single partition and stay in order; the
+ * value is the already-serialized JSON payload; the CloudEvents attributes travel in
  * {@code ce_}-prefixed headers (see {@link IntegrationEventHeaders}).
+ *
+ * <p>This is the Kafka <em>leg</em> the router delegates to, not itself the outbox's
+ * single {@code OutboxDispatcher}: routing (LOCAL vs which EXTERNAL topic) is decided by
+ * the {@link RoutingOutboxDispatcher}, which owns that role.
  *
  * <p>The send is awaited: the method returns only once the broker has acknowledged,
  * and throws if it fails — so the outbox relay marks the row sent only on success
@@ -34,28 +40,28 @@ import org.springframework.kafka.core.KafkaTemplate;
  * {@code batch-size × sendTimeout} comfortably below the relay's {@code lock-at-most-for} so
  * a whole poll of stalled sends cannot outlive the lease either.
  */
-public class KafkaOutboxDispatcher implements OutboxDispatcher {
+public class KafkaOutboxDispatcher {
 
     /** Default bound on awaiting a broker ack when none is configured. */
     static final Duration DEFAULT_SEND_TIMEOUT = Duration.ofSeconds(30);
 
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final String topic;
     private final long sendTimeoutMillis;
 
-    public KafkaOutboxDispatcher(KafkaTemplate<String, String> kafkaTemplate, String topic) {
-        this(kafkaTemplate, topic, DEFAULT_SEND_TIMEOUT);
+    public KafkaOutboxDispatcher(KafkaTemplate<String, String> kafkaTemplate) {
+        this(kafkaTemplate, DEFAULT_SEND_TIMEOUT);
     }
 
-    public KafkaOutboxDispatcher(KafkaTemplate<String, String> kafkaTemplate, String topic,
-                                 Duration sendTimeout) {
+    public KafkaOutboxDispatcher(KafkaTemplate<String, String> kafkaTemplate, Duration sendTimeout) {
         this.kafkaTemplate = kafkaTemplate;
-        this.topic = topic;
         this.sendTimeoutMillis = sendTimeout.toMillis();
     }
 
-    @Override
-    public void dispatch(OutboxMessage message) {
+    /**
+     * Publishes the message to {@code topic}. The topic is the event's resolved
+     * externalization target, chosen by the {@link RoutingOutboxDispatcher}.
+     */
+    public void dispatch(OutboxMessage message, String topic) {
         String partitionKey = message.subject() != null && !message.subject().isBlank()
                 ? message.subject() : message.eventId();
         ProducerRecord<String, String> record =
