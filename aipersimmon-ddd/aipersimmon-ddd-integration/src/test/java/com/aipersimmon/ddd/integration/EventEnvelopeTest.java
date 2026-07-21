@@ -70,4 +70,62 @@ class EventEnvelopeTest {
             new EventEnvelope<SampleEvent>(
                 "evt-1", "/ordering", "OrderPlaced", 1, WHEN, "O-1", "corr-1", null, null));
   }
+
+  @Test
+  void rejectsBlankType() {
+    assertThrows(
+        IllegalArgumentException.class, () -> envelope("evt-1", "/ordering", " ", "O-1", "corr-1"));
+  }
+
+  @Test
+  void rejectsVersionBelowOne() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new EventEnvelope<>(
+                "evt-1", "/ordering", "OrderPlaced", 0, WHEN, "O-1", "corr-1", "cause-1", PAYLOAD));
+  }
+
+  @Test
+  void rejectsNullOccurredAt() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new EventEnvelope<>(
+                "evt-1", "/ordering", "OrderPlaced", 1, null, "O-1", "corr-1", "cause-1", PAYLOAD));
+  }
+
+  @Test
+  void partitionKeyFallsBackToEventIdWhenSubjectIsBlank() {
+    assertEquals(
+        "evt-1", envelope("evt-1", "/ordering", "OrderPlaced", " ", "corr-1").partitionKey());
+  }
+
+  @Test
+  void rejectsNullEventId() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> envelope(null, "/ordering", "OrderPlaced", "O-1", "corr-1"));
+  }
+
+  @Test
+  void rejectsNullSource() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> envelope("evt-1", null, "OrderPlaced", "O-1", "corr-1"));
+  }
+
+  @Test
+  void rejectsNullType() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> envelope("evt-1", "/ordering", null, "O-1", "corr-1"));
+  }
+
+  @Test
+  void rejectsNullCorrelationId() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> envelope("evt-1", "/ordering", "OrderPlaced", "O-1", null));
+  }
 }
