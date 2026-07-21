@@ -6,41 +6,52 @@ status: open
 parent: plan-00006-middleware-integration
 ---
 
-# 单 topic + 消费桥全量进程内重投:每个消费者收到所有事件
+# 入站消费桥订阅全部外发 topic 并全量进程内重投:无选择性订阅
+
+> **更新**:本 issue 原记"所有事件进同一条 topic、无路由";其**出站**一半已被 [[design-00006-integration-event-routing]]
+> 解决(逐事件路由:`@Externalized` 事件发往各自命名 topic)。剩下的、仍 open 的是**入站**一半——消费桥对所有外发
+> topic 一把抓、全量重投、消费端过滤。标题保留旧名以维持 id 稳定。
 
 ## 问题(现状,file:line 为证)
 
-- **等级:Medium(隔离性/可扩展性)**。
-- 所有集成事件类型进**同一条 topic**:`KafkaMessagingProperties` 的 `topic` 默认
-  `aipersimmon.integration-events`,无按类型/上下文路由。
-- `KafkaIntegrationEventListener` 消费该 topic 后,经 inbox 去重、reconstruct envelope,把**每一条**事件用
-  `ApplicationEventPublisher` **进程内重投**;各 `@EventListener` 靠 payload 类型自行过滤。于是本次单体自消费下,
-  三个 BC 互相收到彼此的**全部**集成事件。
-- `decision-00014` §7 已把"按类型 topic 路由"明确记为"未落地扩展点"。
+- **等级:Medium(隔离性/可扩展性;增强,非 correctness)**。
+- **出站已按事件路由**:`RoutingOutboxDispatcher.dispatch`(`RoutingOutboxDispatcher.java:44-51`)按 `(type, version)` 查
+  `ExternalizedRoutes`,`@Externalized` 事件发往**各自命名 topic**、LOCAL 事件只走进程内。故不同事件可落不同 topic。
+- **入站仍是"全订阅 + 全量重投 + 消费端过滤"**:
+  - `KafkaIntegrationEventListener` 的单个 `@KafkaListener` 订阅
+    `topics = "#{@externalizedRoutes.topics()}"`(`KafkaIntegrationEventListener.java:79-81`)——即
+    `ExternalizedRoutes.topics()`(`ExternalizedRoutes.java:42-45`)返回的**所有外发 topic 的去重全集**,由**同一个消费组**消费;
+  - 每条记录经 inbox 去重、reconstruct 后一律 `publisher.publishEvent(...)` **进程内重投**(`KafkaIntegrationEventListener.java:97`);
+  - 各 `@EventListener` 靠 payload 类型**自行过滤**。
+- 于是:一个服务即便只关心部分事件,也会**订阅并反序列化**它 classpath 上所有 `@Externalized` topic 的每一条;单体自
+  消费下每个 `@EventListener` 都会看到全部外发类型(靠类型匹配丢弃无关的)。
 
 ## 根因(第一性)
 
-1. **观察 vs 期望**:期望"消费者只订阅它关心的事件";实际"所有事件一条 topic、全量重投、消费端过滤"。
-2. **最小机制**:单 topic + 单消费桥 + filter-at-consumer,是最省心的默认。
-3. **真根因**:路由被推迟为扩展点。小规模无碍;规模化后代价显现:
-   - 无 topic 级隔离/授权/保留策略(不同事件类的合规/留存需求不同);
-   - 每个消费者反序列化每一条(含与己无关的),CPU/带宽浪费;
-   - 无法按事件类型独立扩缩消费者、独立设置并发/重试/DLT;
-   - 一条 topic 混所有类型(分区 key=聚合 subject,保证 per-aggregate 有序,但不相关聚合共享同一 topic 的运维面)。
+1. **观察 vs 期望**:期望"消费者只订阅它关心的 topic/事件";实际"消费桥把外发 topic 全集当成一个订阅,全量重投,消费端过滤"。
+2. **最小机制**:单 listener + 单消费组 + `topics()` 全集 + filter-at-consumer,是 monolith-first 下最省心的默认。
+3. **真根因**:出站路由已一等化,但**入站的"选择性订阅"与"按 topic 独立的容器调优"被推迟**。小规模无碍;规模化后代价显现:
+   - 无法让某服务只订阅它关心的 topic → 反序列化/带宽浪费在无关事件上;
+   - 单 listener/单容器 → 无法按事件类型独立设并发/重试/DLT、独立扩缩消费者;
+   - 无 topic 级隔离/授权/保留策略的消费侧对应物(出站虽已分 topic,入站又全量拉回)。
 
 ## 复现
 
-n/a(设计观察:单体自消费下每个 `@EventListener` 都会看到全部类型的事件,仅靠类型匹配丢弃)。
+n/a(设计观察:消费桥订阅 `externalizedRoutes.topics()` 全集并逐条 `publishEvent`;单体自消费下每个 `@EventListener` 都会
+看到全部外发类型,仅靠类型匹配丢弃)。
 
 ## 修复/建议(增强)
 
-把路由做成一等配置:出站按 `@EventType`(或上下文)映射到 topic(`OrderPlaced → ordering.events` 等),入站按需
-订阅相应 topic;保留"单 topic"为默认以兼容 monolith-first。这与 issue-00028
-讨论中提到的"混合传输/按事件路由"缺口同源——两者可合并到一份 `messaging-kafka` 路由设计里(出站分流 + 入站选择性
-重投 + inbox 统一去重)。
+把**入站订阅**也做成可配置,与已落地的出站路由对称:
+
+- 允许消费者只订阅外发 topic 的**子集**(按上下文/属性,如 `consumer.topics` 或按 BC),而非无条件订阅 `topics()` 全集;
+- 可选:为不同 topic 用**各自的 listener 容器**,以便按事件类型独立设并发/重试/DLT、独立扩缩;
+- 保留"订阅全集 + 进程内重投"为 monolith-first **默认**,以不破坏单可部署单元的现状。
+
+出站分流(已完成)+ 入站选择性订阅(本 issue)+ inbox 统一去重,合起来才是完整的按事件路由。
 
 ## 关联
 
 - [[plan-00006-middleware-integration]]
-- [[decision-00014-cloudevents-integration-event-contract]](§7 路由为未落地扩展点)
-- issue-00028
+- [[design-00006-integration-event-routing]](已解决出站逐事件路由;入站选择性订阅为后续)
+- [[decision-00014-cloudevents-integration-event-contract]](§7 topic 路由的原始扩展点)
