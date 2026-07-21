@@ -6,17 +6,16 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessDeadlineInsert;
 import com.aipersimmon.ddd.processmanager.model.DeadlineName;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.testsupport.SharedContainers;
+import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * The deadline cancel path on a real MySQL 8, exercising the shipped {@code mysql-schema.sql}.
@@ -28,10 +27,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * coverage: it must run clean on MySQL and actually flip the current generation to CANCELLED while
  * leaving older generations untouched.
  */
-@Testcontainers
 class DeadlineCancelMysqlTest {
 
-  @Container static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0");
+  private static final MySQLContainer<?> MYSQL = SharedContainers.mysql();
 
   private JdbcTemplate jdbc;
   private JdbcProcessDeadlineStore deadlines;
@@ -41,13 +39,7 @@ class DeadlineCancelMysqlTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    SimpleDriverDataSource ds =
-        new SimpleDriverDataSource(
-            (java.sql.Driver)
-                Class.forName("com.mysql.cj.jdbc.Driver").getDeclaredConstructor().newInstance(),
-            MYSQL.getJdbcUrl(),
-            MYSQL.getUsername(),
-            MYSQL.getPassword());
+    var ds = TestDataSources.from(MYSQL);
     jdbc = new JdbcTemplate(ds);
     jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_deadline");
     new ResourceDatabasePopulator(

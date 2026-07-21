@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.aipersimmon.ddd.testsupport.RedisServiceConnection;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
@@ -19,37 +20,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import org.springframework.context.annotation.Import;
 
 /**
  * Exercises the Redis-backed stores against a real Redis via Testcontainers, proving the same
  * semantics as the in-memory and JDBC backends. Skipped when Docker is not available so it never
  * breaks a container-less build.
  */
-@Testcontainers
-@EnabledIf("dockerAvailable")
+@Import(RedisServiceConnection.class)
+@EnabledIf("com.aipersimmon.ddd.testsupport.DockerAvailable#dockerAvailable")
 @SpringBootTest(classes = RedisWebStoreTest.TestApp.class)
 class RedisWebStoreTest {
-
-  @Container
-  static final GenericContainer<?> REDIS =
-      new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
-
-  @DynamicPropertySource
-  static void redisProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.data.redis.host", REDIS::getHost);
-    registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-  }
-
-  static boolean dockerAvailable() {
-    return DockerClientFactory.instance().isDockerAvailable();
-  }
 
   @Autowired IdempotencyStore idempotencyStore;
   @Autowired ReplayGuard replayGuard;

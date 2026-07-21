@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Reusable Testcontainers support (design-00007 / plan-00009 P7). A consumer adds this
+    at test scope and gets both the helpers and Testcontainers/Spring-Boot-Testcontainers
+    transitively. Two patterns, per the Testcontainers + Spring Boot best practices:
+
+      - Spring Boot tests: @TestConfiguration classes exposing containers as
+        @Bean @ServiceConnection (RedisServiceConnection / PostgresServiceConnection /
+        MySqlServiceConnection). The consumer @Import(...)s one; Spring Boot derives the
+        connection details and manages the container lifecycle (context caching shares it
+        across classes). This replaces hand-written @DynamicPropertySource.
+
+      - Non-Spring JDBC tests: the Testcontainers singleton-container pattern
+        (SharedContainers) plus a DataSource helper (TestDataSources), since @ServiceConnection
+        needs a Spring context and these tests have none.
+
+    Compile-scope dependencies here flow to the consumer's TEST classpath. Being a test-only
+    artifact, it may depend on Spring/Testcontainers without touching the framework-free tier.
+  -->
+  <artifactId>aipersimmon-ddd-test-support</artifactId>
+  <name>aipersimmon-ddd-test-support</name>
+  <description>Reusable Testcontainers support (singleton containers + Spring Boot @ServiceConnection configs) for AiPersimmon DDD tests.</description>
+
+  <dependencies>
+    <!-- Testcontainers core + the JDBC container types the helpers expose. Versions managed
+         by the spring-boot-dependencies BOM imported in the parent. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>mysql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+    </dependency>
+
+    <!-- @ServiceConnection lives here; @TestConfiguration in spring-boot-test. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-test</artifactId>
+    </dependency>
+
+    <!-- SimpleDriverDataSource for the non-Spring JDBC DataSource helper. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-jdbc</artifactId>
+    </dependency>
+
+    <!-- JUnit 5 API for the @EnabledIf docker guard. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+  </dependencies>
+</project>

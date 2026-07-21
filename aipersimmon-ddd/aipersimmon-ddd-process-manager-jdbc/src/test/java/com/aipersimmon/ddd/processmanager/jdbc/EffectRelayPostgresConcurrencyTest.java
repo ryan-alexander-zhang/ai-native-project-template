@@ -22,6 +22,8 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.testsupport.SharedContainers;
+import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,22 +38,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * The SKIP LOCKED claim gate on a real PostgreSQL: two workers polling concurrently over many due
  * effects must claim disjoint sets, so every effect is dispatched exactly once — no double delivery
  * from a lost race.
  */
-@Testcontainers
 class EffectRelayPostgresConcurrencyTest {
 
-  @Container
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  private static final PostgreSQLContainer<?> POSTGRES = SharedContainers.postgres();
 
   private JdbcTemplate jdbc;
   private JdbcProcessRuntime runtime;
@@ -67,12 +64,7 @@ class EffectRelayPostgresConcurrencyTest {
 
   @BeforeEach
   void setUp() {
-    SimpleDriverDataSource ds =
-        new SimpleDriverDataSource(
-            new org.postgresql.Driver(),
-            POSTGRES.getJdbcUrl(),
-            POSTGRES.getUsername(),
-            POSTGRES.getPassword());
+    var ds = TestDataSources.from(POSTGRES);
     jdbc = new JdbcTemplate(ds);
     jdbc.execute(
         "DROP TABLE IF EXISTS aipersimmon_process_effect, aipersimmon_process_transition, "

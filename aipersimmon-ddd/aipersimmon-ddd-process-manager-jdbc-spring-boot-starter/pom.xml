@@ -94,5 +94,12 @@
       <artifactId>mysql-connector-j</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Reusable Testcontainers support: singleton containers + DataSource helper. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

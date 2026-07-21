@@ -62,9 +62,13 @@ parent: design-00007-code-quality-gates
 - 验收：pure tier + 脚手架 domain `verify` 在 PIT 三阈值下绿。
 
 ### P7 — test-support testkit
-- [ ] 新增 `aipersimmon-ddd-test-support`：单例容器 + `withReuse(true)`（MySQL/PG/Kafka/Redis）Base 类/Extension、属性接线帮手、process-manager 测试 schema 集中。
-- [ ] 现有 3 处 Testcontainers（PG/MySQL/Redis 测试）改用 testkit。
-- 验收：三处迁移后测试仍绿，容器不再逐类重启。
+- [x] 新增 `aipersimmon-ddd-test-support`（按 Testcontainers + Spring Boot 最佳实践）：
+  - Spring Boot 测试用 `@ServiceConnection` 的 `@TestConfiguration`（`RedisServiceConnection` 需 `name="redis"`，`PostgresServiceConnection`/`MySqlServiceConnection`）——取代手写 `@DynamicPropertySource`。
+  - 非 Spring 的裸 JDBC 测试用 singleton-container pattern（`SharedContainers`，`withReuse(true)`）+ `TestDataSources`（反射加载驱动，消除样板）+ `DockerAvailable` 守卫。
+  - `ContainerImages` 统一镜像版本：**Postgres 对齐 compose 的 `postgres:18.1`**、MySQL 8.0、Redis 7-alpine。
+- [x] 3 处迁移：PG 并发、MySQL 并发、MySQL deadline（→ SharedContainers+TestDataSources）、Redis（→ `@Import(RedisServiceConnection)`）。
+- 验收：JDK 21 下真实容器 BUILD SUCCESS；MySQL 单例复用生效（同模块两测试共享一容器，第二个 0.7s 不再重启）。
+- 注：process-manager 测试 schema 仍由各测试的 `ResourceDatabasePopulator` 加载（集中到 testkit 会引入对 process-manager-jdbc 的反向依赖，且牵涉 schema-copies 债，留作后续）。
 
 ### P8 — 脚手架采用 provider + archetype 烘焙
 - [ ] 三脚手架 root `<parent>` 切到 `aipersimmon-ddd-build`；`*-domain` 加 5 行 opt-in。

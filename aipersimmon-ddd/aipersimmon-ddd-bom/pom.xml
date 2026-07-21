@@ -169,6 +169,13 @@
         <artifactId>aipersimmon-ddd-build-tools</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <!-- Reusable Testcontainers support (singleton containers + Spring Boot
+           @ServiceConnection configs); consumers add it at test scope. -->
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-test-support</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <!-- Additional modules (application, integration, cqrs, and the pluggable
            starters) are appended here as they are built. -->
     </dependencies>

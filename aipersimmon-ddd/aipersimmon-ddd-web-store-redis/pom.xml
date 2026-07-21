@@ -46,10 +46,11 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Real Redis via Testcontainers; the test is skipped when Docker is absent. -->
+    <!-- Real Redis via Testcontainers (Spring Boot @ServiceConnection); skipped when Docker is absent. -->
     <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>junit-jupiter</artifactId>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

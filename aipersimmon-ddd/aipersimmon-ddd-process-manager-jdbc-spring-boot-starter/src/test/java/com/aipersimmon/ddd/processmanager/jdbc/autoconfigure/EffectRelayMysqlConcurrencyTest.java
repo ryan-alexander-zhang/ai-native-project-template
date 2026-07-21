@@ -22,6 +22,8 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.testsupport.SharedContainers;
+import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,21 +38,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * The SKIP LOCKED claim gate on a real MySQL 8, symmetric to the PostgreSQL gate: two concurrent
  * workers must claim disjoint effects, so each is dispatched exactly once — and it exercises the
  * shipped {@code mysql-schema.sql}.
  */
-@Testcontainers
 class EffectRelayMysqlConcurrencyTest {
 
-  @Container static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0");
+  private static final MySQLContainer<?> MYSQL = SharedContainers.mysql();
 
   private JdbcTemplate jdbc;
   private JdbcProcessRuntime runtime;
@@ -66,13 +64,7 @@ class EffectRelayMysqlConcurrencyTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    SimpleDriverDataSource ds =
-        new SimpleDriverDataSource(
-            (java.sql.Driver)
-                Class.forName("com.mysql.cj.jdbc.Driver").getDeclaredConstructor().newInstance(),
-            MYSQL.getJdbcUrl(),
-            MYSQL.getUsername(),
-            MYSQL.getPassword());
+    var ds = TestDataSources.from(MYSQL);
     jdbc = new JdbcTemplate(ds);
     jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_effect");
     jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_transition");
