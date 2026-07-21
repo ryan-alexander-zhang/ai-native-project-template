@@ -1,8 +1,8 @@
 # Publish the AiPersimmon DDD building-block library to GitHub Packages.
 #
 # Runs on a published GitHub release, or on demand. Only the library reactor
-# (aipersimmon-ddd/) is published — the scaffold reference projects and how-to
-# samples are archetype sources and examples, not artifacts to consume.
+# (aipersimmon-ddd/) is published — the multi-module scaffold reference project
+# is an archetype source and example, not an artifact to consume.
 #
 # setup-java writes a settings.xml whose `github` server authenticates with
 # GITHUB_ACTOR / GITHUB_TOKEN; that id matches the distributionManagement

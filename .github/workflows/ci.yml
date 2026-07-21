@@ -1,8 +1,8 @@
-# Build and test everything: the DDD building-block library, then the scaffold
-# reference projects and the focused how-to samples that depend on it.
+# Build and test everything: the DDD building-block library, then the
+# multi-module scaffold reference project that depends on it.
 #
-# The library reactor is installed to the local .m2 first, so the scaffold and
-# samples resolve the aipersimmon-ddd-* SNAPSHOTs they import via the BOM.
+# The library reactor is installed to the local .m2 first, so the scaffold
+# resolves the aipersimmon-ddd-* SNAPSHOTs it imports via the BOM.
 name: CI
 
 on:
@@ -26,20 +26,8 @@ jobs:
       - name: Build and install the building-block library
         run: mvn -B --no-transfer-progress -f aipersimmon-ddd/pom.xml install
 
-      - name: Build the scaffold reference projects
+      - name: Build the scaffold reference project
         run: |
           # multi-module runs the full quality gate (Spotless + PMD/SpotBugs + domain
-          # coverage/mutation) via `verify`; modulith/microservice not yet migrated (plan-00009 P8).
+          # coverage/mutation) via `verify`.
           mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/multi-module/pom.xml verify
-          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/modulith/pom.xml test
-          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/microservice/pom.xml test
-
-      - name: Build the how-to samples
-        run: |
-          for sample in aipersimmon-ddd-scaffold-samples/*/; do
-            if [ -f "$sample/pom.xml" ]; then
-              echo "::group::$sample"
-              mvn -B --no-transfer-progress -f "$sample/pom.xml" test
-              echo "::endgroup::"
-            fi
-          done
