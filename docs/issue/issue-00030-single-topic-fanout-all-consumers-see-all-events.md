@@ -44,29 +44,33 @@ n/a(设计观察:消费桥订阅 `externalizedRoutes.topics()` 全集并逐条 `
 
 按"便宜且高价值"到"重"排序,分档;保留"订阅全集 + 进程内重投"为 monolith-first **默认**,不破坏单可部署单元现状。
 
-**1)类型短路(最推荐,消除 (a) 类浪费,且不碰顺序)。** 在 inbox 之前加一道"本地是否有该类型 handler"的判断:某 `(type,
-version)` 若**没有任何本地** `@EventListener<EventEnvelope<该类型>>`,则**直接跳过**——不写 inbox、不反序列化、不重投。
-安全性:没有 handler ⟹ 没有副作用要与 inbox 原子化,跳过纯属丢弃一条本就会被丢弃的事件;offset 照常前进。
-- 实现要点:启动时从容器里收集"被本地监听的集成事件类型集合"(扫 `@EventListener` 形参的 `EventEnvelope<T>`),消费时按
-  `ce_type`+version 查这个集合;**保守**处理——若存在泛型/动态注册等无法判定的监听器,则不短路(宁可多处理,不可漏处理)。
-- 这消除的是 **(a) 同一 topic 上本地无人接的类型** 的浪费,与订阅粒度正交。
+**1)类型短路 — ✅ 已实现(默认开启)。** `KafkaIntegrationEventListener.onMessage` 在 inbox 之前判断:某 `(type, version)`
+若在 catalog 里**已知**、却**没有任何本地** `@EventListener<EventEnvelope<该类型>>`,则**直接跳过**——不写 inbox、不反序列化、
+不重投。安全性:没有 handler ⟹ 没有副作用要与 inbox 原子化,跳过纯属丢弃一条本就会被丢弃的事件;offset 照常前进。
+- 实现:`LocallyHandledEventTypes.scan(beanFactory)` 启动时扫 `@EventListener` 形参的 `EventEnvelope<T>` 收集本地类型集合;
+  **保守**——凡遇 raw/通配 `EventEnvelope`、`classes()` 声明、无法解析的形参等,一律判 `handlesAll`(**绝不短路**),宁可多处理不可漏处理。
+- **未知类型(不在 catalog)不短路**:仍走 reconstruct → DLT,保留 `decision-00014` 的"未知 (type,version) → DLT"契约。
+- 开关:`aipersimmon.ddd.messaging.kafka.consumer.skip-locally-unhandled`(默认 `true`);若应用用非 `@EventListener` 的
+  程序化 `ApplicationListener` 消费,置 `false` 关闭短路。
+- 消除的是 **(a) 同一 topic 上本地无人接的类型** 的浪费,与订阅粒度正交。
 
-**2)选择性订阅(方案一,跨服务隔离)。** 允许消费者只订阅外发 topic 的**子集**(按上下文/属性,如 `consumer.topics` 或按
-BC),而非无条件订阅 `topics()` 全集。主要在**多服务拆分**后兑现价值(一个服务不订它不处理的 topic → (b) 类浪费与跨
-topic 阻塞被挡在服务边界外);对单体内部帮助有限。
+**3)调 `spring.kafka.listener.concurrency` — ✅ 已在脚手架默认(`multi-module/start/application.yml: 3`)。** 让不同 partition
+分到不同线程,缓解"一条瞬时失败的事件在退避期间拖住其他事件"。**只改示例,不改库**(库沿用 Boot 默认 1,不强加给使用者)。
 
-**3)调 `spring.kafka.listener.concurrency`(缓解阻塞,一行配置)。** 单体内部若担心"一条瞬时失败的事件在退避期间拖住
-其他事件",最便宜的缓解是把并发从默认 1 提高,让不同 partition 分到不同线程。
+**2)选择性订阅(方案一,跨服务隔离)— 仍 open。** 允许消费者只订阅外发 topic 的**子集**(按上下文/属性,如
+`consumer.topics` 或按 BC),而非无条件订阅 `topics()` 全集。主要在**多服务拆分**后兑现价值(一个服务不订它不处理的 topic
+→ (b) 类的跨服务浪费与跨 topic 阻塞被挡在服务边界外);对单体内部帮助有限,故暂缓。
 
-**4)per-topic 容器(方案二,YAGNI)。** 仅当某 topic 确实需要**差异化 SLA**(独立并发/重试/DLT、独立扩缩)时,才为不同
-topic 建各自的 listener 容器——且**不复制 handler**,而是程序化循环注册容器、共用同一处理逻辑。默认不引入。
+**4)per-topic 容器(方案二,YAGNI)— 仍 open。** 仅当某 topic 确实需要**差异化 SLA**(独立并发/重试/DLT、独立扩缩)时,才为
+不同 topic 建各自的 listener 容器——且**不复制 handler**,而是程序化循环注册容器、共用同一处理逻辑。默认不引入。
 
 **topic 粒度:保持 per-context,不做 per-type 默认。** Kafka 只在 partition 内保序,当前分区 key=聚合 subject 使同一聚合的
 多类型事件严格有序;若拆成"一事件类型一 topic",跨类型顺序会被打破(可能先见 Cancelled 再见 Placed)。业界默认即
 topic-per-aggregate/context + 用 `ce_type` 分发(aipersimmon 现状已符合)。个别"无序、量级/保留/合规差异大"的事件可用现有
 `@Externalized("其专属topic")` **按需定向**拆出,无需结构性改动。
 
-出站分流(已完成)+ 类型短路 / 入站选择性订阅(本 issue)+ inbox 统一去重,合起来才是完整的按事件路由。
+进度:出站分流(design-00006)+ 类型短路(#1)+ 并发默认(#3)+ inbox 统一去重 均已就位;**本 issue 保持 open**,余项为
+入站选择性订阅(#2,多服务时做)与 per-topic 容器(#4,差异化 SLA 时做)。
 
 ## 关联
 

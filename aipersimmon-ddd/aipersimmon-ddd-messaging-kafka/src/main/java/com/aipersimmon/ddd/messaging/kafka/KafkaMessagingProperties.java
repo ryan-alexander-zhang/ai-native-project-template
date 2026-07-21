@@ -71,6 +71,17 @@ public class KafkaMessagingProperties {
          */
         private boolean enabled = false;
 
+        /**
+         * Skip a consumed record whose {@code (type, version)} has no local
+         * {@code @EventListener}: since nothing would handle it, the bridge drops it before the
+         * inbox write / reconstruct / republish instead of doing that work only for the event to
+         * match no listener. On by default. Set {@code false} if the application consumes
+         * integration events through a mechanism the startup scan cannot see (e.g. a programmatic
+         * {@code ApplicationListener} rather than an {@code @EventListener} method), so nothing is
+         * skipped.
+         */
+        private boolean skipLocallyUnhandled = true;
+
         private final Retry retry = new Retry();
 
         public boolean isEnabled() {
@@ -79,6 +90,14 @@ public class KafkaMessagingProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public boolean isSkipLocallyUnhandled() {
+            return skipLocallyUnhandled;
+        }
+
+        public void setSkipLocallyUnhandled(boolean skipLocallyUnhandled) {
+            this.skipLocallyUnhandled = skipLocallyUnhandled;
         }
 
         public Retry getRetry() {

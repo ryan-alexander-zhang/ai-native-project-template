@@ -51,9 +51,12 @@ public class KafkaIntegrationEventListener {
     private final ObjectMapper objectMapper;
     private final Inbox inbox;
     private final IntegrationEventCatalog catalog;
+    private final LocallyHandledEventTypes localHandlers;
     private final Clock clock;
 
     /**
+     * Test/convenience: handles every type (never short-circuits).
+     *
      * @param inbox the idempotency guard, or {@code null} to republish every record
      *              without deduplication
      */
@@ -61,18 +64,33 @@ public class KafkaIntegrationEventListener {
                                          ObjectMapper objectMapper,
                                          Inbox inbox,
                                          IntegrationEventCatalog catalog) {
-        this(publisher, objectMapper, inbox, catalog, Clock.systemUTC());
+        this(publisher, objectMapper, inbox, catalog,
+                LocallyHandledEventTypes.handlingEverything(), Clock.systemUTC());
+    }
+
+    /**
+     * @param localHandlers the set of {@code (type, version)}s a local {@code @EventListener}
+     *                      handles; records of any other type are skipped before the inbox
+     */
+    public KafkaIntegrationEventListener(ApplicationEventPublisher publisher,
+                                         ObjectMapper objectMapper,
+                                         Inbox inbox,
+                                         IntegrationEventCatalog catalog,
+                                         LocallyHandledEventTypes localHandlers) {
+        this(publisher, objectMapper, inbox, catalog, localHandlers, Clock.systemUTC());
     }
 
     public KafkaIntegrationEventListener(ApplicationEventPublisher publisher,
                                          ObjectMapper objectMapper,
                                          Inbox inbox,
                                          IntegrationEventCatalog catalog,
+                                         LocallyHandledEventTypes localHandlers,
                                          Clock clock) {
         this.publisher = publisher;
         this.objectMapper = objectMapper;
         this.inbox = inbox;
         this.catalog = catalog;
+        this.localHandlers = localHandlers;
         this.clock = clock;
     }
 
@@ -81,6 +99,13 @@ public class KafkaIntegrationEventListener {
             groupId = "${aipersimmon.ddd.messaging.kafka.consumer.group-id:${spring.application.name:aipersimmon}}")
     @Transactional
     public void onMessage(ConsumerRecord<String, String> record) {
+        // Skip a record no local @EventListener handles: with no handler there is no side effect
+        // to make atomic, so writing the inbox / reconstructing / republishing would be pure waste.
+        // Only skip when the (type, version) are readable and definitively unhandled; anything
+        // unclear falls through to the normal path below (which validates and dead-letters).
+        if (skippableAsUnhandled(record)) {
+            return;
+        }
         // ce_id is a required CloudEvents attribute and the inbox key. A record without
         // it cannot be deduplicated; fabricating an id would make every redelivery look
         // like a new event and silently defeat the inbox — so reject it (permanent
@@ -95,6 +120,35 @@ public class KafkaIntegrationEventListener {
         ResolvableType type = ResolvableType.forClassWithGenerics(
                 EventEnvelope.class, envelope.payload().getClass());
         publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
+    }
+
+    /**
+     * Whether this record can be skipped because no local handler wants its type. Reads the
+     * type and version leniently (no throwing): if either header is absent or unparseable we do
+     * <em>not</em> skip, letting {@link #reconstruct} raise the proper malformed-record failure.
+     */
+    private boolean skippableAsUnhandled(ConsumerRecord<String, String> record) {
+        if (localHandlers.handlesAll()) {
+            return false;
+        }
+        String type = header(record, IntegrationEventHeaders.TYPE);
+        String versionRaw = header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION);
+        if (type == null || versionRaw == null) {
+            return false;
+        }
+        int version;
+        try {
+            version = Integer.parseInt(versionRaw.trim());
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        // Only skip a KNOWN type that no local handler wants. An unknown (type, version) is poison
+        // and must still be dead-lettered (strict inbound validation, decision-00014), so leave it
+        // to the normal path rather than silently dropping it here.
+        if (catalog.lookup(type, version).isEmpty()) {
+            return false;
+        }
+        return !localHandlers.handles(type, version);
     }
 
     private EventEnvelope<IntegrationEvent> reconstruct(ConsumerRecord<String, String> record, String eventId) {

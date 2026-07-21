@@ -24,6 +24,12 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
+    # More than one consumer thread so a slow/retrying record on one partition does not stall the
+    # others: the integration-event bridge consumes several bounded contexts' topics, and blocking
+    # retries (issue-00030) would otherwise let one context's backoff delay the rest. Threads are
+    # capped by the partition count, so idle threads simply stay unassigned.
+    listener:
+      concurrency: 3
 
 aipersimmon:
   ddd:

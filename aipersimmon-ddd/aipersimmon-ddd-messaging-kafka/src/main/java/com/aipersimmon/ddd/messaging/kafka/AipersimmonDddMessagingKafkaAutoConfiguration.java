@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -172,10 +173,17 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     @ConditionalOnMissingBean
     public KafkaIntegrationEventListener kafkaIntegrationEventListener(
             ApplicationEventPublisher publisher, ObjectProvider<ObjectMapper> objectMapper,
-            ObjectProvider<Inbox> inbox, IntegrationEventCatalog catalog) {
+            ObjectProvider<Inbox> inbox, IntegrationEventCatalog catalog,
+            ConfigurableListableBeanFactory beanFactory, KafkaMessagingProperties properties) {
+        // Which event types have a local @EventListener; records of any other type are dropped
+        // before the inbox (nothing would handle them). Opt out to handle-everything when the
+        // application consumes via a mechanism the scan cannot see.
+        LocallyHandledEventTypes localHandlers = properties.getConsumer().isSkipLocallyUnhandled()
+                ? LocallyHandledEventTypes.scan(beanFactory)
+                : LocallyHandledEventTypes.handlingEverything();
         return new KafkaIntegrationEventListener(
                 publisher, objectMapper.getIfAvailable(ObjectMapper::new),
-                inbox.getIfAvailable(), catalog);
+                inbox.getIfAvailable(), catalog, localHandlers);
     }
 
     /**

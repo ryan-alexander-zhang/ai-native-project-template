@@ -74,6 +74,32 @@ class KafkaIntegrationEventListenerTest {
     }
 
     @Test
+    void skipsARecordWhoseTypeHasNoLocalHandler() throws Exception {
+        CapturingPublisher publisher = new CapturingPublisher();
+        InMemoryInbox inbox = new InMemoryInbox();
+        // Handles nothing (and not handle-all): the SampleEvent record is "locally unhandled".
+        KafkaIntegrationEventListener listener = new KafkaIntegrationEventListener(
+                publisher, mapper, inbox, catalog, LocallyHandledEventTypes.handling(Set.of()));
+
+        listener.onMessage(recordFor(new SampleEvent("o-1", "placed"), "evt-1"));
+
+        assertEquals(0, publisher.events.size(), "an unhandled type is not republished");
+        assertTrue(inbox.seen.isEmpty(), "an unhandled type is skipped before the inbox is touched");
+    }
+
+    @Test
+    void handlesARecordWhoseTypeHasALocalHandler() throws Exception {
+        CapturingPublisher publisher = new CapturingPublisher();
+        KafkaIntegrationEventListener listener = new KafkaIntegrationEventListener(
+                publisher, mapper, null, catalog,
+                LocallyHandledEventTypes.handling(Set.of(new Key("SampleEvent", 1))));
+
+        listener.onMessage(recordFor(new SampleEvent("o-1", "placed"), "evt-1"));
+
+        assertEquals(1, publisher.events.size(), "a handled type is republished as before");
+    }
+
+    @Test
     void rejectsARecordMissingTheRequiredIdHeaderInsteadOfFabricatingOne() throws Exception {
         CapturingPublisher publisher = new CapturingPublisher();
         InMemoryInbox inbox = new InMemoryInbox();
