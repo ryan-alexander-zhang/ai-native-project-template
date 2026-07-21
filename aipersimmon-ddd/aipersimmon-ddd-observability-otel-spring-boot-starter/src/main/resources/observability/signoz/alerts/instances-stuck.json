@@ -1,0 +1,48 @@
+{
+  "version": "v5",
+  "alert": "Process Manager instances stuck",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "value",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "disabled": false,
+            "aggregations": [
+              {
+                "metricName": "aipersimmon.process.manager.stuck.instances",
+                "temporality": "Unspecified",
+                "timeAggregation": "latest",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "groupBy": [],
+            "filter": {
+              "expression": "service.name = '__APP__'"
+            }
+          }
+        }
+      ]
+    },
+    "op": "1",
+    "target": 0.0,
+    "matchType": "1"
+  },
+  "labels": {
+    "severity": "warning",
+    "category": "data-integrity",
+    "service": "__APP__"
+  },
+  "annotations": {
+    "summary": "Active instances stuck with no pending work",
+    "description": "aipersimmon.process.manager.stuck.instances > 0 for __APP__: active instances idle past the stuck-threshold with nothing scheduled — likely a wiring gap or a lost trigger."
+  }
+}

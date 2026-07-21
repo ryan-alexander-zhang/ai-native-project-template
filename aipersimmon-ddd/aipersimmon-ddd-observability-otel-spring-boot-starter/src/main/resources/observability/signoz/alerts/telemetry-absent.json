@@ -1,0 +1,50 @@
+{
+  "version": "v5",
+  "alert": "__APP__ telemetry absent (dead-man's switch)",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "value",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "disabled": false,
+            "aggregations": [
+              {
+                "metricName": "jvm.memory.used",
+                "temporality": "Unspecified",
+                "timeAggregation": "latest",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "groupBy": [],
+            "filter": {
+              "expression": "service.name = '__APP__'"
+            }
+          }
+        }
+      ]
+    },
+    "op": "1",
+    "target": 0.0,
+    "matchType": "1",
+    "alertOnAbsent": true,
+    "absentFor": 5
+  },
+  "labels": {
+    "severity": "critical",
+    "category": "availability",
+    "service": "__APP__"
+  },
+  "annotations": {
+    "summary": "No telemetry arriving from the service",
+    "description": "jvm.memory.used for __APP__ (emitted every OTLP step while the app is alive) stopped arriving for 5m — the instance is down/crashlooping OR the OTLP export pipeline is broken. Silence is NOT health. NOTE: absent-data semantics are SigNoz-version-sensitive — verify this rule fires against your instance."
+  }
+}

@@ -1,0 +1,904 @@
+{
+  "title": "__APP__ · Runtime (JVM)",
+  "description": "Generic JVM runtime health (not DDD-specific): memory, GC, threads, CPU from OTel runtime-telemetry, plus HikariCP connection-pool and task-executor saturation from Micrometer (requires otel.instrumentation.micrometer.enabled). Filtered to this service. jvm.memory.used is pinned to the Gauge type to dedupe the OTel-native series from the Micrometer-bridged one.",
+  "tags": [
+    "__APP__",
+    "observability",
+    "runtime"
+  ],
+  "version": "v5",
+  "variables": {},
+  "widgets": [
+    {
+      "id": "r-jvm-mem",
+      "panelTypes": "row",
+      "title": "Memory",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "jvm-mem",
+      "title": "Heap / non-heap used (by area)",
+      "description": "JVM memory used per area (OTel runtime-telemetry gauge).",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "bytes",
+      "query": {
+        "id": "jvm-mem-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "jvm.memory.used",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "jvm.memory.used--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "jvm.memory.used",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "jvm.memory.type",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "id": "jvm.memory.type--string--tag--false"
+                }
+              ],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "{{jvm.memory.type}}",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "jvm-mem-afgc",
+      "title": "Memory used after last GC (heap)",
+      "description": "Live-set after collection — the true heap-pressure signal.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "bytes",
+      "query": {
+        "id": "jvm-mem-afgc-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "jvm.memory.used_after_last_gc",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "jvm.memory.used_after_last_gc--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "jvm.memory.used_after_last_gc",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "jvm.memory.pool.name",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "id": "jvm.memory.pool.name--string--tag--false"
+                }
+              ],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "{{jvm.memory.pool.name}}",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "r-jvm-runtime",
+      "panelTypes": "row",
+      "title": "Threads & CPU",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "jvm-threads",
+      "title": "Live threads",
+      "description": "Current JVM thread count.",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "jvm.thread.count",
+                "dataType": "float64",
+                "type": "Sum",
+                "isColumn": true,
+                "id": "jvm.thread.count--float64--Sum--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "jvm.thread.count",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "",
+        "id": "jvm-threads-q"
+      }
+    },
+    {
+      "id": "jvm-cpu",
+      "title": "CPU utilization",
+      "description": "Recent process CPU utilization (0–1).",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "id": "jvm-cpu-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "jvm.cpu.recent_utilization",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "jvm.cpu.recent_utilization--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "avg",
+              "aggregations": [
+                {
+                  "metricName": "jvm.cpu.recent_utilization",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "avg",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "cpu",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "jvm-gc",
+      "title": "GC time rate (s/s)",
+      "description": "Fraction of wall-clock spent in GC pauses (rate of jvm.gc.duration.sum).",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "id": "jvm-gc-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "rate",
+              "aggregateAttribute": {
+                "key": "jvm.gc.duration.sum",
+                "dataType": "float64",
+                "type": "Sum",
+                "isColumn": true,
+                "id": "jvm.gc.duration.sum--float64--Sum--true"
+              },
+              "timeAggregation": "rate",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "jvm.gc.duration.sum",
+                  "temporality": "",
+                  "timeAggregation": "rate",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "gc s/s",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "r-jvm-hikari",
+      "panelTypes": "row",
+      "title": "DB connection pool (HikariCP)",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "jvm-hikari",
+      "title": "Connections (active / idle / pending)",
+      "description": "HikariCP pool state; sustained pending > 0 = pool starvation (relay/outbox polling contention).",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "id": "jvm-hikari-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "hikaricp.connections.active",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "hikaricp.connections.active--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "hikaricp.connections.active",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "active",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            },
+            {
+              "dataSource": "metrics",
+              "queryName": "B",
+              "expression": "B",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "hikaricp.connections.idle",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "hikaricp.connections.idle--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "hikaricp.connections.idle",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "idle",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            },
+            {
+              "dataSource": "metrics",
+              "queryName": "C",
+              "expression": "C",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "hikaricp.connections.pending",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "hikaricp.connections.pending--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "hikaricp.connections.pending",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "pending",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "jvm-hikari-pending",
+      "title": "Connections pending",
+      "description": "Threads waiting for a DB connection right now (> 0 = contention).",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "hikaricp.connections.pending",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "hikaricp.connections.pending--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "hikaricp.connections.pending",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "",
+        "id": "jvm-hikari-pending-q"
+      }
+    },
+    {
+      "id": "r-jvm-exec",
+      "panelTypes": "row",
+      "title": "Task executor",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "jvm-exec",
+      "title": "Executor active / queued",
+      "description": "Async task-executor active threads and queued tasks; rising queue = saturation.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "id": "jvm-exec-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "executor.active",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "executor.active--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "executor.active",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "active",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            },
+            {
+              "dataSource": "metrics",
+              "queryName": "B",
+              "expression": "B",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "executor.queued",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "executor.queued--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "executor.queued",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "queued",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    }
+  ],
+  "layout": [
+    {
+      "i": "r-jvm-mem",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-mem",
+      "x": 0,
+      "y": 1,
+      "w": 6,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-mem-afgc",
+      "x": 6,
+      "y": 1,
+      "w": 6,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "r-jvm-runtime",
+      "x": 0,
+      "y": 5,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-threads",
+      "x": 0,
+      "y": 6,
+      "w": 3,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-cpu",
+      "x": 3,
+      "y": 6,
+      "w": 5,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-gc",
+      "x": 8,
+      "y": 6,
+      "w": 4,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "r-jvm-hikari",
+      "x": 0,
+      "y": 9,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-hikari",
+      "x": 0,
+      "y": 10,
+      "w": 8,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-hikari-pending",
+      "x": 8,
+      "y": 10,
+      "w": 4,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "r-jvm-exec",
+      "x": 0,
+      "y": 14,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "jvm-exec",
+      "x": 0,
+      "y": 15,
+      "w": 12,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    }
+  ]
+}

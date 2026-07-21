@@ -1,0 +1,48 @@
+{
+  "version": "v5",
+  "alert": "Process Manager effects dead-lettered",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "value",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "disabled": false,
+            "aggregations": [
+              {
+                "metricName": "aipersimmon.process.manager.dead.effects",
+                "temporality": "Unspecified",
+                "timeAggregation": "latest",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "groupBy": [],
+            "filter": {
+              "expression": "service.name = '__APP__'"
+            }
+          }
+        }
+      ]
+    },
+    "op": "1",
+    "target": 0.0,
+    "matchType": "1"
+  },
+  "labels": {
+    "severity": "critical",
+    "category": "dead-letter",
+    "service": "__APP__"
+  },
+  "annotations": {
+    "summary": "Process-manager effects in DEAD",
+    "description": "aipersimmon.process.manager.dead.effects > 0 for __APP__: effects exhausted retries to DEAD and await operator redrive. Absolute-count sentinel."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "version": "v5",
+  "alert": "Process Manager instances suspended",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "value",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "disabled": false,
+            "aggregations": [
+              {
+                "metricName": "aipersimmon.process.manager.suspended.instances",
+                "temporality": "Unspecified",
+                "timeAggregation": "latest",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "groupBy": [],
+            "filter": {
+              "expression": "service.name = '__APP__'"
+            }
+          }
+        }
+      ]
+    },
+    "op": "1",
+    "target": 0.0,
+    "matchType": "1"
+  },
+  "labels": {
+    "severity": "warning",
+    "category": "data-integrity",
+    "service": "__APP__"
+  },
+  "annotations": {
+    "summary": "Instances SUSPENDED after exhaustion",
+    "description": "aipersimmon.process.manager.suspended.instances > 0 for __APP__ (summed over source): instances suspended after relay/deadline exhaustion, awaiting operator action."
+  }
+}

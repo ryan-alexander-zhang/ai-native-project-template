@@ -1,0 +1,715 @@
+{
+  "title": "__APP__ · Process Manager",
+  "description": "Process-manager reliability SLIs from the aipersimmon-ddd process-manager starter (Micrometer, prefix aipersimmon.process.manager.*), filtered to this service. Thresholds for the paired alerts are placeholders — calibrate to real volume.",
+  "tags": [
+    "__APP__",
+    "observability",
+    "process-manager"
+  ],
+  "version": "v5",
+  "variables": {},
+  "widgets": [
+    {
+      "id": "r-pm-redrive",
+      "panelTypes": "row",
+      "title": "Redrive backlog (page on > 0)",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "pm-dead-effects",
+      "title": "Effects dead-lettered",
+      "description": "Effects exhausted to DEAD, awaiting operator redrive.",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.dead.effects",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.dead.effects--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.dead.effects",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "",
+        "id": "pm-dead-effects-q"
+      }
+    },
+    {
+      "id": "pm-dead-deadlines",
+      "title": "Deadlines dead-lettered",
+      "description": "Deadlines exhausted to DEAD, awaiting operator redrive.",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.dead.deadlines",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.dead.deadlines--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.dead.deadlines",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "",
+        "id": "pm-dead-deadlines-q"
+      }
+    },
+    {
+      "id": "r-pm-age",
+      "panelTypes": "row",
+      "title": "Backlog age",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "pm-eff-age",
+      "title": "Oldest pending effect age",
+      "description": "Seconds the oldest due-but-undelivered effect has waited past schedule.",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.oldest.pending.effect.age",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.oldest.pending.effect.age--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.oldest.pending.effect.age",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "s",
+        "id": "pm-eff-age-q"
+      }
+    },
+    {
+      "id": "pm-dl-age",
+      "title": "Oldest pending deadline age",
+      "description": "Seconds the oldest due-but-unfired deadline has waited past schedule.",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.oldest.pending.deadline.age",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.oldest.pending.deadline.age--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.oldest.pending.deadline.age",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "s",
+        "id": "pm-dl-age-q"
+      }
+    },
+    {
+      "id": "r-pm-inst",
+      "panelTypes": "row",
+      "title": "Instance health",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "pm-suspended",
+      "title": "Suspended instances (by source)",
+      "description": "Instances currently SUSPENDED, by suspension source (EFFECT / DEADLINE).",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "id": "pm-suspended-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.suspended.instances",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.suspended.instances--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.suspended.instances",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "source",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "id": "source--string--tag--false"
+                }
+              ],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "{{source}}",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    },
+    {
+      "id": "pm-stuck",
+      "title": "Stuck instances",
+      "description": "Active instances idle past the stuck-threshold with no pending work.",
+      "panelTypes": "value",
+      "nullZeroValues": "zero",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "latest",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.stuck.instances",
+                "dataType": "float64",
+                "type": "Gauge",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.stuck.instances--float64--Gauge--true"
+              },
+              "timeAggregation": "latest",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.stuck.instances",
+                  "temporality": "",
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "",
+              "reduceTo": "last",
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        },
+        "clickhouse_sql": [
+          {
+            "name": "A",
+            "legend": "",
+            "disabled": false,
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "name": "A",
+            "query": "",
+            "legend": "",
+            "disabled": false
+          }
+        ],
+        "unit": "",
+        "id": "pm-stuck-q"
+      }
+    },
+    {
+      "id": "r-pm-contention",
+      "panelTypes": "row",
+      "title": "Contention",
+      "description": "",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [],
+        "promql": [],
+        "queryType": "builder"
+      }
+    },
+    {
+      "id": "pm-conflict",
+      "title": "Advance conflict retries (rate)",
+      "description": "Per-second rate of transactional advances retried after an optimistic-lock revision conflict.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": null,
+      "softMin": null,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "id": "pm-conflict-q",
+        "queryType": "builder",
+        "promql": [],
+        "clickhouse_sql": [],
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "queryName": "A",
+              "expression": "A",
+              "disabled": false,
+              "aggregateOperator": "rate",
+              "aggregateAttribute": {
+                "key": "aipersimmon.process.manager.advance.conflict.retries",
+                "dataType": "float64",
+                "type": "Sum",
+                "isColumn": true,
+                "id": "aipersimmon.process.manager.advance.conflict.retries--float64--Sum--true"
+              },
+              "timeAggregation": "rate",
+              "spaceAggregation": "sum",
+              "aggregations": [
+                {
+                  "metricName": "aipersimmon.process.manager.advance.conflict.retries",
+                  "temporality": "",
+                  "timeAggregation": "rate",
+                  "spaceAggregation": "sum",
+                  "reduceTo": null
+                }
+              ],
+              "filter": {
+                "expression": "service.name = '__APP__'"
+              },
+              "filters": {
+                "items": [],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "limit": null,
+              "orderBy": [],
+              "legend": "conflict retries/s",
+              "reduceTo": null,
+              "stepInterval": null,
+              "source": ""
+            }
+          ],
+          "queryFormulas": [],
+          "queryTraceOperator": []
+        }
+      }
+    }
+  ],
+  "layout": [
+    {
+      "i": "r-pm-redrive",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-dead-effects",
+      "x": 0,
+      "y": 1,
+      "w": 6,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-dead-deadlines",
+      "x": 6,
+      "y": 1,
+      "w": 6,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "r-pm-age",
+      "x": 0,
+      "y": 4,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-eff-age",
+      "x": 0,
+      "y": 5,
+      "w": 6,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-dl-age",
+      "x": 6,
+      "y": 5,
+      "w": 6,
+      "h": 3,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "r-pm-inst",
+      "x": 0,
+      "y": 8,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-suspended",
+      "x": 0,
+      "y": 9,
+      "w": 6,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-stuck",
+      "x": 6,
+      "y": 9,
+      "w": 6,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "r-pm-contention",
+      "x": 0,
+      "y": 13,
+      "w": 12,
+      "h": 1,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "pm-conflict",
+      "x": 0,
+      "y": 14,
+      "w": 12,
+      "h": 4,
+      "minH": 2,
+      "minW": 2,
+      "moved": false,
+      "static": false
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "version": "v5",
+  "alert": "Process Manager advance conflict retries spiking",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "value",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "disabled": false,
+            "aggregations": [
+              {
+                "metricName": "aipersimmon.process.manager.advance.conflict.retries",
+                "temporality": "Unspecified",
+                "timeAggregation": "increase",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "groupBy": [],
+            "filter": {
+              "expression": "service.name = '__APP__'"
+            }
+          }
+        }
+      ]
+    },
+    "op": "1",
+    "target": 20.0,
+    "matchType": "1"
+  },
+  "labels": {
+    "severity": "warning",
+    "category": "saturation",
+    "service": "__APP__"
+  },
+  "annotations": {
+    "summary": "Optimistic-lock contention on process advance",
+    "description": "aipersimmon.process.manager.advance.conflict.retries rose by > 20 in 5m for __APP__: high write contention on the same instances. Threshold is a placeholder — calibrate."
+  }
+}

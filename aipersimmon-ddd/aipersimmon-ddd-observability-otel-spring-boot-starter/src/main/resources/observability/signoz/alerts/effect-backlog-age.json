@@ -1,0 +1,48 @@
+{
+  "version": "v5",
+  "alert": "Process Manager effect backlog aging",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "evalWindow": "5m0s",
+  "frequency": "1m0s",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "value",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "disabled": false,
+            "aggregations": [
+              {
+                "metricName": "aipersimmon.process.manager.oldest.pending.effect.age",
+                "temporality": "Unspecified",
+                "timeAggregation": "latest",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "groupBy": [],
+            "filter": {
+              "expression": "service.name = '__APP__'"
+            }
+          }
+        }
+      ]
+    },
+    "op": "1",
+    "target": 300.0,
+    "matchType": "1"
+  },
+  "labels": {
+    "severity": "warning",
+    "category": "backlog",
+    "service": "__APP__"
+  },
+  "annotations": {
+    "summary": "Oldest pending effect aging past SLO",
+    "description": "aipersimmon.process.manager.oldest.pending.effect.age > 300s for __APP__: the effect relay is falling behind. Threshold is a placeholder — calibrate."
+  }
+}
