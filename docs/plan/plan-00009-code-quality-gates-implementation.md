@@ -82,11 +82,15 @@ parent: design-00007-code-quality-gates
   （import `spring-boot-dependencies` + `mybatis-plus-bom` + `aipersimmon-ddd-bom`），显式补 `maven.compiler.release=21`
   / `-parameters` / UTF-8 / `spring-boot-maven-plugin` repackage 绑定。子模块仍以 `multi-module` 为 reactor parent。
   验收：`mvn -DskipTests package` 全 20 模块 BUILD SUCCESS，`start` repackage 出可运行 jar。✅
-- [ ] **P8b 质量门禁**：multi-module root 自声明 Spotless + 质量 pluginManagement（引用 quality-config 规则）；`*-domain`
-  加 5 行 opt-in；`ci.yml` 脚手架 `test`→`verify`。**前置**：`*-domain` 需补测试到 90%/90%（ordering-domain 28 类/1 测试、
-  inventory 7/0、payment 2/0——大工作量，单独排期）。
-- [ ] archetype 生成模板同步。
-- 验收：multi-module `verify` 门禁全绿；新生成项目 domain 默认带 90%/90%。
+- [x] **P8b-1 结构接线**：multi-module root 自声明 Spotless + 质量 pluginManagement（引用 quality-config 规则）；激活
+  Spotless check + PMD/CPD + SpotBugs（report-only）；`spotless:apply` 全脚手架（155 文件）。
+- [x] **P8b-2 domain 门禁 + 补测试**：三个 `*-domain` 各加 5 行 opt-in + 补测试到 90%/90%：
+  - payment-domain：JaCoCo 90% ✅ / PIT 6/6 100%
+  - inventory-domain：JaCoCo 90% ✅ / PIT 25/26 96%
+  - ordering-domain：JaCoCo 90% ✅ / PIT 88/89 99%（唯一存活为 equivalent mutant：approveReview 显式 guard 后的冗余 check）
+- [x] `ci.yml`：multi-module 步 `test`→`verify`（跑全套门禁）；modulith/microservice 仍 `test`（P8 范围仅 multi-module）。
+- [x] archetype 同步：multi-module 脚手架即 archetype 源，改动随之生效，无独立生成步骤。
+- 验收：multi-module `verify` 门禁全绿。
 
 ## 落地基线记录
 

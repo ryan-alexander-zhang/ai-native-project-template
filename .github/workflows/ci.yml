@@ -28,7 +28,9 @@ jobs:
 
       - name: Build the scaffold reference projects
         run: |
-          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/multi-module/pom.xml test
+          # multi-module runs the full quality gate (Spotless + PMD/SpotBugs + domain
+          # coverage/mutation) via `verify`; modulith/microservice not yet migrated (plan-00009 P8).
+          mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/multi-module/pom.xml verify
           mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/modulith/pom.xml test
           mvn -B --no-transfer-progress -f aipersimmon-ddd-scaffold/microservice/pom.xml test
 
