@@ -183,7 +183,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   /** Compensating, waiting for the reserved stock to be released before cancelling. */
   private ProcessDecision<OrderFulfilmentState> onAwaitingStockRelease(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
-    if (in instanceof OrderFulfilmentInput.StockReleased released) {
+    if (in instanceof OrderFulfilmentInput.StockReleased) {
       OrderId id = new OrderId(state.orderId());
       // Two distinct evidence ids: the decline ref keeps the remembered decline-event id; the
       // release ref takes the current stock-released event's id.

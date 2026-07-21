@@ -10,4 +10,26 @@
     xmlns="https://github.com/spotbugs/filter/3.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+  <!--
+    CT_CONSTRUCTOR_THROW — constructor throws, so the object can leave its constructor
+    partially initialized (a "finalizer attack" vector). Excluded project-wide because it
+    is inherent to how this codebase models domain objects, not a defect:
+
+      * Aggregates, entities and value objects validate their invariants IN the constructor
+        (the always-valid pattern, design-00003). Throwing on a broken invariant is the point;
+        the alternative — an object that can exist in an invalid state — is strictly worse.
+      * The classes are non-final by necessity (aggregate roots extend AbstractAggregateRoot;
+        entities like OrderLine are package-private), and SpotBugs fires purely on "non-final
+        class + throwing constructor". There is no untrusted-subclassing surface here.
+      * The finalizer-attack vector itself is effectively dead: Object.finalize() is deprecated
+        for removal since Java 9 and never overridden in this codebase.
+
+    Not a plugin-version artefact: the known CT_CONSTRUCTOR_THROW false-positive fix
+    (spotbugs/spotbugs#2710) shipped in SpotBugs core 4.8.2 and is already present in the
+    4.8.6 core used by spotbugs-maven-plugin 4.8.6.6; upgrading does not suppress these.
+  -->
+  <Match>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
 </FindBugsFilter>

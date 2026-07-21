@@ -9,4 +9,11 @@ import java.util.List;
  * {@code StockAvailabilityApi} Open Host Service. Its SKUs and result stay in the application's own
  * terms — the mapping to and from the published contract lives in the adapter, not here.
  */
-public record CheckStockAvailability(List<String> skus) implements Query<List<StockLevel>> {}
+public record CheckStockAvailability(List<String> skus) implements Query<List<StockLevel>> {
+
+  public CheckStockAvailability {
+    // Defensive copy so this immutable query cannot be mutated through the caller's
+    // list reference after construction.
+    skus = skus == null ? null : List.copyOf(skus);
+  }
+}

@@ -14,6 +14,12 @@ import java.util.List;
 @Externalized("ordering.events")
 public record OrderPlaced(String orderId, List<Line> lines) implements IntegrationEvent {
 
+  public OrderPlaced {
+    // Defensive copy so this published event stays immutable and cannot be mutated
+    // through the caller's list reference after construction.
+    lines = lines == null ? null : List.copyOf(lines);
+  }
+
   @Override
   public String subject() {
     return orderId();

@@ -25,5 +25,11 @@ public interface StockAvailabilityGateway {
   Availability check(List<String> skus);
 
   /** Ordering's own view of the answer: are all SKUs offerable, and if not, which are not. */
-  record Availability(boolean allAvailable, List<String> unavailableSkus) {}
+  record Availability(boolean allAvailable, List<String> unavailableSkus) {
+    public Availability {
+      // Defensive copy so this immutable verdict cannot be mutated through the caller's
+      // list reference after construction.
+      unavailableSkus = unavailableSkus == null ? null : List.copyOf(unavailableSkus);
+    }
+  }
 }

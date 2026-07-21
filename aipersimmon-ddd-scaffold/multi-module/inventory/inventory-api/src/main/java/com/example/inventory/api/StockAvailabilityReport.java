@@ -10,6 +10,12 @@ import java.util.List;
  */
 public record StockAvailabilityReport(List<Item> items) {
 
+  public StockAvailabilityReport {
+    // Defensive copy so this published-language response stays immutable and cannot be
+    // mutated through the caller's list reference after construction.
+    items = items == null ? null : List.copyOf(items);
+  }
+
   /** The verdict for one SKU: {@code available} is true when inventory can offer it now. */
   public record Item(String sku, boolean available) {}
 }

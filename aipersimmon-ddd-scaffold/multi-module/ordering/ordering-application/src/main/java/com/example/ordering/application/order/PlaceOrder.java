@@ -21,6 +21,12 @@ import java.util.List;
 public record PlaceOrder(@NotBlank String customerId, @NotEmpty List<@Valid Line> lines)
     implements Command<String> {
 
+  public PlaceOrder {
+    // Defensive copy: keep this immutable command isolated from later mutation of the
+    // caller's list. Null is left as-is so @NotEmpty still reports it as a validation error.
+    lines = lines == null ? null : List.copyOf(lines);
+  }
+
   public record Line(
       @NotBlank String sku,
       @Positive int quantity,

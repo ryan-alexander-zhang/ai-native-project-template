@@ -18,6 +18,12 @@ import java.util.List;
  */
 public record PlaceOrderRequest(@NotBlank String customerId, @NotEmpty List<@Valid Line> lines) {
 
+  public PlaceOrderRequest {
+    // Defensive copy: keep this immutable request isolated from later mutation of the
+    // caller's list. Null is left as-is so @NotEmpty still reports it as a validation error.
+    lines = lines == null ? null : List.copyOf(lines);
+  }
+
   public record Line(
       @NotBlank String sku,
       @Positive int quantity,
