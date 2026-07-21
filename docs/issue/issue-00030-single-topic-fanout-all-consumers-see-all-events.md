@@ -54,23 +54,33 @@ n/a(设计观察:消费桥订阅 `externalizedRoutes.topics()` 全集并逐条 `
   程序化 `ApplicationListener` 消费,置 `false` 关闭短路。
 - 消除的是 **(a) 同一 topic 上本地无人接的类型** 的浪费,与订阅粒度正交。
 
-**3)调 `spring.kafka.listener.concurrency` — ✅ 已在脚手架默认(`multi-module/start/application.yml: 3`)。** 让不同 partition
-分到不同线程,缓解"一条瞬时失败的事件在退避期间拖住其他事件"。**只改示例,不改库**(库沿用 Boot 默认 1,不强加给使用者)。
+**3)`spring.kafka.listener.concurrency` — ✅ 脚手架默认设为 3(`multi-module/start/application.yml`);为吞吐必需,保留。**
+但要说清它的**适用边界**:concurrency = 消费线程数,有效并行度 = `min(concurrency, 分配到的分区数)`。
+- **多分区 topic**(生产应如此):`concurrency>1` 把分区摊到多线程并行——**吞吐必需,别用 1**。
+- **单分区 topic 的退化情形**:默认 `RangeAssignor` **按 topic 独立**分配,3 个单分区 topic 的 partition-0 会全塞给同一个
+  consumer、其余线程空转 → 单靠 concurrency **不能**隔离跨 topic 阻塞。此时要么给 topic 足够分区,要么换
+  `CooperativeStickyAssignor`/`RoundRobinAssignor`,要么用 #4 的 per-BC 容器。
+- 故:concurrency 解决**吞吐**,不单独解决**跨 BC 隔离**;隔离看 #4。
+
+**4)per-BC / per-topic 容器(方案二)— 仍 open,且"多 BC 即宜"(不再标 YAGNI)。** 为每个 bounded context 用**各自的 listener
+容器**,使某个 BC 的慢/失败/退避**只阻塞它自己**,不拖累其他 BC。这在**多 BC 同一可部署单元**时就值得(不必等拆服务)——
+尤其在单分区 + RangeAssignor 下 concurrency 不可靠时,per-BC 容器是单体内跨 BC 隔离的**可靠**手段。实现上**不复制 handler**:
+程序化循环为每个 BC/topic 注册容器、共用同一处理逻辑;可各自设并发/重试/DLT。
 
 **2)选择性订阅(方案一,跨服务隔离)— 仍 open。** 允许消费者只订阅外发 topic 的**子集**(按上下文/属性,如
-`consumer.topics` 或按 BC),而非无条件订阅 `topics()` 全集。主要在**多服务拆分**后兑现价值(一个服务不订它不处理的 topic
-→ (b) 类的跨服务浪费与跨 topic 阻塞被挡在服务边界外);对单体内部帮助有限,故暂缓。
-
-**4)per-topic 容器(方案二,YAGNI)— 仍 open。** 仅当某 topic 确实需要**差异化 SLA**(独立并发/重试/DLT、独立扩缩)时,才为
-不同 topic 建各自的 listener 容器——且**不复制 handler**,而是程序化循环注册容器、共用同一处理逻辑。默认不引入。
+`consumer.topics` 或按 BC)。注意它**不同于** #4:方案一改"订哪些 topic",单体必须处理全部 BC → 少订会丢事件 → **单体内无
+帮助**,价值在**多服务拆分**后(一个服务不订它不处理的 topic)。单体内的跨 BC 隔离靠 #4,不是 #2。
 
 **topic 粒度:保持 per-context,不做 per-type 默认。** Kafka 只在 partition 内保序,当前分区 key=聚合 subject 使同一聚合的
 多类型事件严格有序;若拆成"一事件类型一 topic",跨类型顺序会被打破(可能先见 Cancelled 再见 Placed)。业界默认即
 topic-per-aggregate/context + 用 `ce_type` 分发(aipersimmon 现状已符合)。个别"无序、量级/保留/合规差异大"的事件可用现有
 `@Externalized("其专属topic")` **按需定向**拆出,无需结构性改动。
 
-进度:出站分流(design-00006)+ 类型短路(#1)+ 并发默认(#3)+ inbox 统一去重 均已就位;**本 issue 保持 open**,余项为
-入站选择性订阅(#2,多服务时做)与 per-topic 容器(#4,差异化 SLA 时做)。
+进度:出站分流(design-00006)+ 类型短路(#1)+ 并发默认(#3,吞吐)+ inbox 统一去重 均已就位;**本 issue 保持 open**,
+余项为 per-BC 容器(#4,多 BC 内做跨 BC 隔离)与选择性订阅(#2,拆服务时做)。
+
+> 注:消费桥的另一个更严重问题——**系统性故障被当毒丸、DB 短暂不可用即批量 DLT 并破坏 aggregate 顺序**——见
+> [[issue-00047-systemic-failure-treated-as-poison-dlt-flood]](High)。本 issue 只谈 fanout/隔离/吞吐,不含错误分类。
 
 ## 关联
 
