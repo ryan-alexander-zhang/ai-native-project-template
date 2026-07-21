@@ -27,12 +27,12 @@ parent: design-00007-code-quality-gates
 - [ ] `aipersimmon-ddd-parent` 增质量插件 `pluginManagement`（版本 + 引用 build-tools 规则），供库内 opt-in。
 - 验收：`mvn -f aipersimmon-ddd/pom.xml install` 绿；两个新模块产物存在。
 
-### P1 — Spotless（全仓库，首个门禁）
-- [ ] Spotless 3.6.0 + google-java-format 1.35.0（GOOGLE）写入 parent `pluginManagement`，`check` 绑 `verify`。
-- [ ] 库全模块 `mvn spotless:apply` 一次（大 diff，单独 commit）；脚手架/样例各自 `apply`。
-- [ ] 各 reactor root 激活 `spotless:check`。
-- [ ] 填 `DEVELOPMENT.md` 的 `Lint`；写入"提交前跑完整 `spotless:apply`，勿用 `-DspotlessFiles`"坑。
-- 验收：库 + 三脚手架 + 样例 `mvn verify` 格式门禁绿。
+### P1 — Spotless（首个门禁；范围=仅库，脚手架/样例延到 P8）
+- [x] Spotless 3.6.0 + google-java-format 1.35.0（GOOGLE）写入 parent `pluginManagement`，`check` 绑 `verify`。
+- [x] 库全模块 `mvn spotless:apply` 一次（467 文件，单独 commit `fff1fdc`）。脚手架/样例的 apply 随 P8 provider 采用一起做。
+- [x] 库 parent `<build><plugins>` 激活 `spotless:check @ verify`（core `verify` 已验证触发）。
+- [x] 填 `DEVELOPMENT.md` 的命令 + 写入"提交前跑完整 `spotless:apply`，勿用 `-DspotlessFiles`"坑。
+- 验收：库 `spotless:check` 全绿；core `verify` 触发 check 且 BUILD SUCCESS。（脚手架/样例格式门禁 P8。）
 
 ### P2 — JaCoCo report-only（domain + pure tier）
 - [ ] `prepare-agent`@test + `report`@verify，作用于库 pure tier（core/application/integration/cqrs）+ 脚手架 `*-domain`（5 行 opt-in）。

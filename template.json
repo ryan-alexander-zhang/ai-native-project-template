@@ -1,5 +1,5 @@
 {
-  "exclude": [".codex/", "docs/decision/decision-*.md", "docs/operation/operation-*.md", "bc-and-layer-samples/"],
+  "exclude": [".codex/", "docs/decision/decision-*.md", "docs/operation/operation-*.md"],
   "vars": {
     "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" }
   },

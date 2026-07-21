@@ -75,10 +75,15 @@ Use this stage when the change needs durable docs, notes, or decisions.
 Canonical commands for this repo (fill in for the project):
 
 - Setup: `<command>`
-- Test: `<command>`
-- Lint: `<command>`
-- Build: `<command>`
+- Test: `mvn -f aipersimmon-ddd/pom.xml test`
+- Lint: `mvn -f aipersimmon-ddd/pom.xml verify` (runs the Spotless format gate; full quality gate is `verify`) — auto-fix formatting with `mvn -f aipersimmon-ddd/pom.xml spotless:apply`
+- Build: `mvn -f aipersimmon-ddd/pom.xml install`
 - Run: `<command>`
+
+> Formatting is enforced by Spotless (google-java-format, Google style) at the `verify`
+> phase. Before committing Java, run the **full** `mvn spotless:apply` — do **not** use
+> `-DspotlessFiles` to scope it: the `verify`-phase check is stricter than the scoped CLI
+> check, so a scoped "pass" can still fail the build. See `docs/design/design-00007`.
 
 ## Development Matrix
 
