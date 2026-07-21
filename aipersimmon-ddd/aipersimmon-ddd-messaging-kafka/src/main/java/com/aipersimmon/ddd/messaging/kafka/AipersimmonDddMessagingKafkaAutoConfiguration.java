@@ -36,6 +36,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.DataAccessException;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.FixedBackOff;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
@@ -207,32 +210,64 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
         // one and does not depend on a library default.
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
                 (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
-        return buildErrorHandler(recoverer, properties.getConsumer().getRetry());
+        return buildErrorHandler(recoverer, properties.getConsumer());
     }
 
     /**
-     * Builds the error handler from a recoverer and the retry settings. The permanent
-     * failures are marked not-retryable so they skip the backoff and are dead-lettered on
-     * the first failure — the same causes the outbox's {@code DefaultFailureClassifier}
-     * treats as permanent, so both transports agree on what is hopeless. Package-private
-     * so it can be unit-tested without a broker.
+     * Builds the error handler with three failure tiers (issue-00047), so an environment outage is
+     * not mistaken for a poison message. Package-private so it can be unit-tested without a broker.
+     *
+     * <ul>
+     *   <li><strong>Poison</strong> (the message is bad — unknown type, malformed, unparseable):
+     *       marked not-retryable, so it skips the backoff and is dead-lettered at once. Same causes
+     *       the outbox's {@code DefaultFailureClassifier} treats as permanent.</li>
+     *   <li><strong>Systemic</strong> (the environment is down — a {@link DataAccessException}:
+     *       DataSource unavailable, pool exhausted, …): retried <strong>indefinitely</strong> at
+     *       {@code systemicBackoffIntervalMs} and <strong>never</strong> dead-lettered. The
+     *       partition waits at the record until recovery, so healthy messages are not flooded into
+     *       the DLT and per-aggregate order is preserved.</li>
+     *   <li><strong>Everything else</strong> (ambiguous): the bounded exponential backoff, then the
+     *       DLT — a safety net so an unforeseen always-failing record cannot block a partition
+     *       forever.</li>
+     * </ul>
      */
     static DefaultErrorHandler buildErrorHandler(ConsumerRecordRecoverer recoverer,
-                                                 KafkaMessagingProperties.Consumer.Retry retry) {
-        ExponentialBackOffWithMaxRetries backOff =
+                                                 KafkaMessagingProperties.Consumer consumer) {
+        KafkaMessagingProperties.Consumer.Retry retry = consumer.getRetry();
+        ExponentialBackOffWithMaxRetries boundedBackOff =
                 new ExponentialBackOffWithMaxRetries(retry.getMaxRetries());
-        backOff.setInitialInterval(retry.getInitialIntervalMs());
-        backOff.setMultiplier(retry.getMultiplier());
-        backOff.setMaxInterval(retry.getMaxIntervalMs());
-        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
-        // No number of retries conjures a local class for an unknown (type, version),
+        boundedBackOff.setInitialInterval(retry.getInitialIntervalMs());
+        boundedBackOff.setMultiplier(retry.getMultiplier());
+        boundedBackOff.setMaxInterval(retry.getMaxIntervalMs());
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, boundedBackOff);
+        // Poison: no number of retries conjures a local class for an unknown (type, version),
         // reparses a malformed payload, or adds a required attribute a record never had —
-        // dead-letter them at once (see also boundary #5 of the integration-event
-        // contract: unknown inbound (type, version) -> DLT).
+        // dead-letter them at once (see also boundary #5 of the integration-event contract).
         handler.addNotRetryableExceptions(
                 UnknownIntegrationEventException.class,
                 MalformedIntegrationEventException.class,
                 JsonProcessingException.class);
+        // Systemic: give infrastructure failures an unlimited backoff so they never reach the
+        // recoverer (never dead-lettered); a null result falls back to the bounded backoff above.
+        BackOff systemicBackOff =
+                new FixedBackOff(consumer.getSystemicBackoffIntervalMs(), FixedBackOff.UNLIMITED_ATTEMPTS);
+        handler.setBackOffFunction((record, exception) ->
+                isSystemicFailure(exception) ? systemicBackOff : null);
         return handler;
+    }
+
+    /**
+     * Whether the failure signals a down environment (retry forever, never DLT) rather than a bad
+     * message. Walks the cause chain — the container wraps the listener's exception in a
+     * {@code ListenerExecutionFailedException} — and matches {@link DataAccessException} (the whole
+     * Spring JDBC/DAO family: connection failures, pool exhaustion, transient faults).
+     */
+    private static boolean isSystemicFailure(Exception exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof DataAccessException) {
+                return true;
+            }
+        }
+        return false;
     }
 }

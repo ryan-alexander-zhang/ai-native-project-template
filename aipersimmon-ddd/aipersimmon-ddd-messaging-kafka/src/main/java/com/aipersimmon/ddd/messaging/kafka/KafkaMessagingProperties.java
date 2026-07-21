@@ -82,6 +82,19 @@ public class KafkaMessagingProperties {
          */
         private boolean skipLocallyUnhandled = true;
 
+        /**
+         * Interval, in milliseconds, between retries of a <em>systemic</em> failure — one that
+         * signals the environment is down (a {@link org.springframework.dao.DataAccessException}:
+         * DataSource unavailable, connection pool exhausted, …), not that the message is bad. Such
+         * a failure is retried <strong>indefinitely</strong> at this interval and is
+         * <strong>never</strong> dead-lettered: the partition waits at the failed record until the
+         * environment recovers, so healthy messages are not flooded into the DLT and per-aggregate
+         * order is preserved (issue-00047). Keep this comfortably below Kafka's
+         * {@code max.poll.interval.ms} (default 5 min) so the blocking retry does not trigger a
+         * rebalance.
+         */
+        private long systemicBackoffIntervalMs = 10000;
+
         private final Retry retry = new Retry();
 
         public boolean isEnabled() {
@@ -98,6 +111,14 @@ public class KafkaMessagingProperties {
 
         public void setSkipLocallyUnhandled(boolean skipLocallyUnhandled) {
             this.skipLocallyUnhandled = skipLocallyUnhandled;
+        }
+
+        public long getSystemicBackoffIntervalMs() {
+            return systemicBackoffIntervalMs;
+        }
+
+        public void setSystemicBackoffIntervalMs(long systemicBackoffIntervalMs) {
+            this.systemicBackoffIntervalMs = systemicBackoffIntervalMs;
         }
 
         public Retry getRetry() {

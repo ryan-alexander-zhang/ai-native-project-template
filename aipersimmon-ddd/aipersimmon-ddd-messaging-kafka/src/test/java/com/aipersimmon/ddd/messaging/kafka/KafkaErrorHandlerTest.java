@@ -12,6 +12,7 @@ import java.util.List;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
 import org.springframework.kafka.listener.MessageListenerContainer;
@@ -25,20 +26,21 @@ import org.springframework.kafka.listener.MessageListenerContainer;
  */
 class KafkaErrorHandlerTest {
 
-    private final KafkaMessagingProperties.Consumer.Retry retry = retry();
+    private final KafkaMessagingProperties.Consumer props = consumerProperties();
 
-    private static KafkaMessagingProperties.Consumer.Retry retry() {
-        KafkaMessagingProperties.Consumer.Retry r = new KafkaMessagingProperties.Consumer.Retry();
-        r.setMaxRetries(5);
-        r.setInitialIntervalMs(1);
-        r.setMaxIntervalMs(1);
-        return r;
+    private static KafkaMessagingProperties.Consumer consumerProperties() {
+        KafkaMessagingProperties.Consumer c = new KafkaMessagingProperties.Consumer();
+        c.getRetry().setMaxRetries(5);
+        c.getRetry().setInitialIntervalMs(1);
+        c.getRetry().setMaxIntervalMs(1);
+        c.setSystemicBackoffIntervalMs(1); // tiny so the systemic-retry test does not actually wait
+        return c;
     }
 
     private final List<ConsumerRecord<?, ?>> recovered = new ArrayList<>();
     private final DefaultErrorHandler handler =
             AipersimmonDddMessagingKafkaAutoConfiguration.buildErrorHandler(
-                    (record, exception) -> recovered.add(record), retry);
+                    (record, exception) -> recovered.add(record), props);
 
     private final Consumer<?, ?> consumer = mock(Consumer.class);
     private final MessageListenerContainer container = mock(MessageListenerContainer.class);
@@ -97,6 +99,26 @@ class KafkaErrorHandlerTest {
 
         assertEquals(0, recovered.size(),
                 "a transient failure is retried, not dead-lettered immediately");
+    }
+
+    @Test
+    void aSystemicInfrastructureFailureIsRetriedForeverAndNeverDeadLettered() {
+        ConsumerRecord<String, String> record = record();
+        ListenerExecutionFailedException failure = new ListenerExecutionFailedException(
+                "listener failed", new DataAccessResourceFailureException("database is down"));
+
+        // Redeliver far more than maxRetries (5): a bounded/ambiguous failure would have been
+        // dead-lettered by now, but a systemic one is retried indefinitely and never recovered.
+        for (int attempt = 0; attempt < 12; attempt++) {
+            try {
+                handler.handleRemaining(failure, List.of(record), consumer, container);
+            } catch (RuntimeException heldForRedelivery) {
+                // expected: the record is held, not recovered
+            }
+        }
+
+        assertEquals(0, recovered.size(),
+                "a systemic (infrastructure) failure is retried forever, never dead-lettered");
     }
 
     /** A concrete JsonProcessingException so the not-retryable cause-chain check has one to find. */

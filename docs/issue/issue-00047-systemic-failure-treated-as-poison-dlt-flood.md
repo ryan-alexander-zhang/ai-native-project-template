@@ -2,7 +2,7 @@
 id: issue-00047-systemic-failure-treated-as-poison-dlt-flood
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00006-middleware-integration
 ---
 
@@ -67,8 +67,9 @@ spring-kafka 3.3.x。
 - 毒丸层:`handler.addNotRetryableExceptions(...)`(现有三类 + 可配置)→ 立即移交 recoverer(DLT)。
 - 系统性层:`handler.setBackOffFunction((record, ex) -> isSystemic(ex) ? new FixedBackOff(interval, FixedBackOff.UNLIMITED_ATTEMPTS) : null)`
   —— 系统性异常拿到**无限次**退避,永远到不了 recoverer(即永不 DLT);返回 `null` 则用默认有界退避(其余层)。
-- 暂停而非阻塞线程:用 `DefaultErrorHandler(recoverer, backOff, new ContainerPausingBackOffHandler(pauseService))`。长/无限
-  退避时它**暂停分区并继续 poll**,不 `Thread.sleep` 占线程、也不因久等触发 `max.poll.interval.ms` rebalance。
+- 退避等待:**v1 用默认 backoff handler(阻塞 `Thread.sleep`)+ 适中间隔(默认 10s)**。因 10s ≪ `max.poll.interval.ms`
+  (默认 5min),每次 poll 间隔仍在窗口内,不触发 rebalance。`ContainerPausingBackOffHandler`(暂停分区、不占线程、可承受
+  任意长间隔)留作**后续增强**(见下"未做")。
 - `isSystemic(ex)`:沿 **cause 链**匹配(与现有 `JsonProcessingException` 分类同法),默认命中 `DataAccessException`;可配置补充。
 
 ### 为什么这样同时解决 DLT 洪水 + 顺序破坏
@@ -98,6 +99,23 @@ spring-kafka 3.3.x。
   同 aggregate 两事件顺序不乱。
 - 毒丸:未知类型仍进 DLT(现有 `KafkaDeadLetterIntegrationTest` 不回归)。
 - 其余:一个持续抛普通异常的记录,有界重试后**仍进 DLT**(安全网不被破坏)。
+
+## 解决(已实现)
+
+- `AipersimmonDddMessagingKafkaAutoConfiguration.buildErrorHandler` 现按三层分类:毒丸(`addNotRetryableExceptions`,立即
+  DLT)、系统性(`setBackOffFunction` 对 `isSystemicFailure` 的异常返回 `FixedBackOff(systemicBackoffIntervalMs,
+  UNLIMITED_ATTEMPTS)`,永不到 recoverer)、其余(默认有界退避 → DLT)。`isSystemicFailure` 沿 cause 链匹配
+  `org.springframework.dao.DataAccessException`。
+- 新增属性 `aipersimmon.ddd.messaging.kafka.consumer.systemic-backoff-interval-ms`(默认 10000)。
+- 测试:`KafkaErrorHandlerTest.aSystemicInfrastructureFailureIsRetriedForeverAndNeverDeadLettered`(单元,超过 maxRetries
+  仍不 recover);`KafkaSystemicFailureIntegrationTest`(embedded broker,handler 抛 `DataAccessException` 两次后恢复 → 事件被
+  处理一次、`<topic>.DLT` 为空);`KafkaDeadLetterIntegrationTest` 毒丸→DLT 不回归。38 测试全绿。
+
+**未做(有意留后续,非必需):**
+- `ContainerPausingBackOffHandler`(暂停分区而非阻塞线程,支持任意长间隔)——v1 用阻塞退避 + 适中间隔已满足;需要超长
+  间隔或释放线程时再上。
+- 可配置 `systemic-exceptions` / `poison-exceptions` 追加列表——目前分类写死为 `DataAccessException` / 现有三类。
+- 可观测性(WARN + 暴露暂停/lag)与"严格保序流下毒丸也停分区"的决策。
 
 ## 关联
 
