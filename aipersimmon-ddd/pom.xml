@@ -302,14 +302,15 @@
         </executions>
       </plugin>
 
-      <!-- SpotBugs, report-only (plan-00009 P4): failOnError=false so bugs are reported
-           but do not fail the build. Exclude filter + quality-config dependency inherited
-           from pluginManagement. Ratcheted to a gate later. -->
+      <!-- SpotBugs, enforced gate (plan-00009 P4, ratcheted): failOnError=true so any bug
+           fails the build. The codebase is clean; genuine false positives live in the shared
+           exclude filter (quality-config). Exclude filter + quality-config dependency inherited
+           from pluginManagement. -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
-          <failOnError>false</failOnError>
+          <failOnError>true</failOnError>
         </configuration>
         <executions>
           <execution>

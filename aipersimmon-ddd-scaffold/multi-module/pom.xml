@@ -219,9 +219,10 @@
       </plugins>
     </pluginManagement>
 
-    <!-- Active gates for the whole generated project. Spotless is the format gate; PMD/CPD +
-         SpotBugs are report-only (failOn*=false) until ratcheted. Coverage/mutation are opt-in
-         per *-domain module (see design-00007 §4.3), so they are NOT here. -->
+    <!-- Active gates for the whole generated project. Spotless is the format gate; SpotBugs is
+         an enforced gate (failOnError=true, ratcheted). PMD/CPD stay report-only
+         (failOnViolation=false) until their complexity findings are triaged. Coverage/mutation
+         are opt-in per *-domain module (see design-00007 §4.3), so they are NOT here. -->
     <plugins>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
@@ -252,7 +253,7 @@
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
-          <failOnError>false</failOnError>
+          <failOnError>true</failOnError>
         </configuration>
         <executions>
           <execution>
