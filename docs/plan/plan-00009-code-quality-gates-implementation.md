@@ -39,14 +39,19 @@ parent: design-00007-code-quality-gates
 - [x] 收集真实基线（见下）。脚手架 `*-domain` 随 P8 一起接。
 - 验收：报告生成、基线可读、不 fail。`mvn verify` 四模块 BUILD SUCCESS。
 
-### P3 — PMD + CPD report-only（全仓库）
-- [ ] ruleset 落 build-tools：认知/圈复杂度、NPath、方法体量、坏味道 + CPD。
-- [ ] `check` 配 report-only（`failOnViolation=false`），阈值调到当前能过。
-- 验收：全仓库 `verify` 出 PMD/CPD 报告，不 fail。
+### P3 — PMD + CPD report-only（库全仓库）
+- [x] ruleset 已在 build-tools（复杂度/NPath/方法体量/GodClass/TooManyMethods + CPD）。
+- [x] parent `<build><plugins>` 绑 `check`+`cpd-check` @ verify，`failOnViolation=false`（report-only）。
+- 验收：库全模块出 PMD/CPD 报告；process-manager `verify` 有违规仍 BUILD SUCCESS。
 
-### P4 — SpotBugs report-only（全仓库）
-- [ ] spotbugs-maven-plugin + exclude filter（build-tools），report-only。
-- 验收：报告生成，不 fail。
+### P4 — SpotBugs report-only（库全仓库）
+- [x] spotbugs-maven-plugin + exclude filter（build-tools），parent `<build><plugins>` 绑 `check` @ verify，`failOnError=false`。
+- 验收：库 26 模块出 spotbugsXml 报告，不 fail。
+
+> **JDK 坑（重要）**：PMD 7.x / SpotBugs 无法解析 Java 26（class major 70）字节码。本机 `mvn` 默认跑在 Homebrew
+> JDK 26，直接跑会报 `Unsupported class file major version 70`。**必须用 JDK 21 跑质量构建**（对齐 CI 的 temurin 21）：
+> `export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home`。CI 已是 21，不受影响；后续可考虑加
+> maven-toolchains 强制 21。
 
 ### P5 — 覆盖率 ratchet 到 90%（domain + pure tier）
 - [ ] JaCoCo `check`：`LINE`/`BRANCH`/`METHOD` 各 ≥0.90；补测试到达标。
@@ -80,5 +85,15 @@ parent: design-00007-code-quality-gates
 
 结论：pure tier 全部低于 90% 门禁，`application` 完全无测试。**P5（覆盖率）/ P6（变异）到 90% 需要大量补测试**，
 是本计划最重的一步，需单独安排。P3/P4（PMD/CPD/SpotBugs report-only）可先行，不依赖补测试。
+
+### P3/P4 静态分析基线（2026-07-21，库全仓库，report-only，JDK 21）
+
+| 工具 | 总数 | 集中点 |
+| --- | --- | --- |
+| PMD（复杂度/设计） | 36 | process-manager-jdbc 17、其 starter 7、web-spring 4、messaging-kafka 3、archunit 2 |
+| CPD（重复块） | 2 | — |
+| SpotBugs（字节码缺陷） | 90 | process-manager-jdbc 30、web-spring 15、starter 8、outbox-jdbc 6、messaging-kafka 5 |
+
+转 gate 前需先消化这些（或按规则调阈值/加 exclude）。缺陷集中在 jdbc/web 基础设施层，pure tier 基本干净。
 
 （P5/P6 执行时回填达标后的覆盖率与变异分数。）

@@ -280,6 +280,47 @@
           </execution>
         </executions>
       </plugin>
+
+      <!-- PMD + CPD, report-only (plan-00009 P3): failOnViolation=false so violations are
+           reported but do not fail the build. Ruleset + build-tools dependency inherited
+           from pluginManagement. Ratcheted to a gate later. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <configuration>
+          <failOnViolation>false</failOnViolation>
+        </configuration>
+        <executions>
+          <execution>
+            <id>pmd-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+              <goal>cpd-check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- SpotBugs, report-only (plan-00009 P4): failOnError=false so bugs are reported
+           but do not fail the build. Exclude filter + build-tools dependency inherited
+           from pluginManagement. Ratcheted to a gate later. -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <failOnError>false</failOnError>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotbugs-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
