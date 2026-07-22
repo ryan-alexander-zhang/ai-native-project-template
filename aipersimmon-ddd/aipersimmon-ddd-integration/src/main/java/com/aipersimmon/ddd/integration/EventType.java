@@ -8,8 +8,8 @@ import java.lang.annotation.Target;
 
 /**
  * Declares the logical event type (CloudEvents {@code type}) of an {@link IntegrationEvent}. It is
- * <strong>required</strong> on every integration event: {@link IntegrationEvent#eventType()} reads
- * it and fails if it is absent, and the consumer-side type registry keys off the same value — so a
+ * <strong>required</strong> on every integration event: {@link IntegrationEvent#eventTypeOf(Class)}
+ * reads it and fails if it is absent, and the consumer-side type registry keys off the same value — so a
  * producer's wire {@code type} and a consumer's lookup key always agree. There is no class-name
  * default, because a Java class name is an implementation detail, not a stable published contract.
  *
