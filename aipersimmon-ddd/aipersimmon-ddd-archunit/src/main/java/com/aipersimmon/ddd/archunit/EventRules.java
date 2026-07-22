@@ -189,67 +189,82 @@ public final class EventRules {
    * init} over all the events being checked, so both classes in a clash are reported.
    */
   private static ArchCondition<JavaClass> declareAValidUniqueEventType() {
-    Map<String, List<String>> classesByTypeAndVersion = new HashMap<>();
-    return new ArchCondition<>("declare a valid, unique @EventType (name + version)") {
-      @Override
-      public void init(Collection<JavaClass> events) {
-        classesByTypeAndVersion.clear();
-        for (JavaClass event : events) {
-          if (event.isAnnotatedWith(EventType.class)) {
-            EventType annotation = event.getAnnotationOfType(EventType.class);
-            if (!annotation.name().isBlank()) {
-              classesByTypeAndVersion
-                  .computeIfAbsent(key(annotation), key -> new ArrayList<>())
-                  .add(event.getFullName());
-            }
-          }
-        }
-      }
+    return new ValidUniqueEventTypeCondition();
+  }
 
-      @Override
-      public void check(JavaClass event, ConditionEvents events) {
+  /**
+   * The condition behind {@link #declareAValidUniqueEventType()}, extracted from an anonymous class
+   * so its {@code init} (build the collision index) and {@code check} (validate one event) are read
+   * — and measured — as the two independent steps they are.
+   */
+  private static final class ValidUniqueEventTypeCondition extends ArchCondition<JavaClass> {
+
+    private final Map<String, List<String>> classesByTypeAndVersion = new HashMap<>();
+
+    ValidUniqueEventTypeCondition() {
+      super("declare a valid, unique @EventType (name + version)");
+    }
+
+    @Override
+    public void init(Collection<JavaClass> events) {
+      classesByTypeAndVersion.clear();
+      for (JavaClass event : events) {
         if (!event.isAnnotatedWith(EventType.class)) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  event,
-                  event.getFullName()
-                      + " is an IntegrationEvent but is not annotated with @EventType"));
-          return;
+          continue;
         }
         EventType annotation = event.getAnnotationOfType(EventType.class);
         if (annotation.name().isBlank()) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  event, event.getFullName() + " declares a blank @EventType name"));
+          continue;
         }
-        if (annotation.version() < 1) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  event,
-                  event.getFullName()
-                      + " declares @EventType version "
-                      + annotation.version()
-                      + ", which must be >= 1"));
-        }
-        List<String> sharing = classesByTypeAndVersion.get(key(annotation));
-        if (sharing != null && sharing.size() > 1) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  event,
-                  event.getFullName()
-                      + " shares @EventType (name '"
-                      + annotation.name()
-                      + "', version "
-                      + annotation.version()
-                      + ") with "
-                      + sharing));
-        }
+        classesByTypeAndVersion
+            .computeIfAbsent(key(annotation), k -> new ArrayList<>())
+            .add(event.getFullName());
       }
+    }
 
-      private String key(EventType annotation) {
-        return annotation.name() + ' ' + annotation.version();
+    @Override
+    public void check(JavaClass event, ConditionEvents events) {
+      if (!event.isAnnotatedWith(EventType.class)) {
+        events.add(
+            SimpleConditionEvent.violated(
+                event,
+                event.getFullName()
+                    + " is an IntegrationEvent but is not annotated with @EventType"));
+        return;
       }
-    };
+      EventType annotation = event.getAnnotationOfType(EventType.class);
+      if (annotation.name().isBlank()) {
+        events.add(
+            SimpleConditionEvent.violated(
+                event, event.getFullName() + " declares a blank @EventType name"));
+      }
+      if (annotation.version() < 1) {
+        events.add(
+            SimpleConditionEvent.violated(
+                event,
+                event.getFullName()
+                    + " declares @EventType version "
+                    + annotation.version()
+                    + ", which must be >= 1"));
+      }
+      List<String> sharing = classesByTypeAndVersion.get(key(annotation));
+      if (sharing != null && sharing.size() > 1) {
+        events.add(
+            SimpleConditionEvent.violated(
+                event,
+                event.getFullName()
+                    + " shares @EventType (name '"
+                    + annotation.name()
+                    + "', version "
+                    + annotation.version()
+                    + ") with "
+                    + sharing));
+      }
+    }
+
+    private static String key(EventType annotation) {
+      return annotation.name() + ' ' + annotation.version();
+    }
   }
 
   /**

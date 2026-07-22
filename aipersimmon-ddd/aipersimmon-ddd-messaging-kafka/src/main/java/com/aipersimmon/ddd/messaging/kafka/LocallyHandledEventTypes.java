@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -107,41 +108,51 @@ final class LocallyHandledEventTypes {
    * all is unrelated and returns {@code true} without adding anything.
    */
   private static boolean narrow(Method method, EventListener annotation, Set<Key> handled) {
-    // Event type declared via classes(): we cannot read a generic payload from it, so if any
-    // declared class could be an EventEnvelope we must not narrow.
+    // Event type declared via classes(): we cannot read a generic payload from it, so we can only
+    // narrow when none of the declared classes could be an EventEnvelope.
     if (annotation.classes().length > 0) {
-      for (Class<?> declared : annotation.classes()) {
-        if (couldReceiveEnvelope(declared)) {
-          return false;
-        }
-      }
-      return true; // classes() are all unrelated event types
+      return Arrays.stream(annotation.classes())
+          .noneMatch(LocallyHandledEventTypes::couldReceiveEnvelope);
     }
     if (method.getParameterCount() != 1) {
       return true; // not a single-arg listener; Spring resolves its type elsewhere, ignore
     }
     ResolvableType param = ResolvableType.forMethodParameter(method, 0);
-    Class<?> paramClass = param.toClass();
-    if (!couldReceiveEnvelope(paramClass)) {
+    if (!couldReceiveEnvelope(param.toClass())) {
       return true; // a listener for some unrelated event
     }
-    if (paramClass == EventEnvelope.class) {
-      Class<?> payload = param.getGeneric(0).resolve();
-      if (payload != null
-          && payload != IntegrationEvent.class
-          && IntegrationEvent.class.isAssignableFrom(payload)) {
-        try {
-          handled.add(
-              new Key(
-                  IntegrationEvent.eventTypeOf(payload), IntegrationEvent.eventVersionOf(payload)));
-          return true;
-        } catch (RuntimeException ex) {
-          // payload isn't a well-formed @EventType (can't happen for a real event, but
-          // don't let the scan throw or wrongly narrow) -> be safe
-        }
-      }
+    return recordEnvelopePayload(param, handled);
+  }
+
+  /**
+   * Records the {@code (type, version)} of a concrete {@code EventEnvelope<Payload>} parameter, or
+   * returns {@code false} when the parameter cannot be narrowed to a single type (raw/wildcard
+   * envelope, a supertype, or an unresolvable/ill-formed payload).
+   */
+  private static boolean recordEnvelopePayload(ResolvableType param, Set<Key> handled) {
+    if (param.toClass() != EventEnvelope.class) {
+      return false; // a supertype of EventEnvelope, not a concrete envelope we can read
     }
-    return false; // raw/wildcard EventEnvelope, a supertype, or an unresolvable payload
+    Class<?> payload = param.getGeneric(0).resolve();
+    if (!isConcreteIntegrationEvent(payload)) {
+      return false; // raw/wildcard envelope or a non-concrete payload
+    }
+    try {
+      handled.add(
+          new Key(IntegrationEvent.eventTypeOf(payload), IntegrationEvent.eventVersionOf(payload)));
+      return true;
+    } catch (RuntimeException ex) {
+      // payload isn't a well-formed @EventType (can't happen for a real event, but don't let the
+      // scan throw or wrongly narrow) -> be safe
+      return false;
+    }
+  }
+
+  /** Whether {@code payload} is a concrete {@link IntegrationEvent} subtype (not the marker). */
+  private static boolean isConcreteIntegrationEvent(Class<?> payload) {
+    return payload != null
+        && payload != IntegrationEvent.class
+        && IntegrationEvent.class.isAssignableFrom(payload);
   }
 
   /**
