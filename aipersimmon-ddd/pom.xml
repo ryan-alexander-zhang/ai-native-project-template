@@ -45,8 +45,9 @@
          Spring Boot starter fails at boot with NoClassDefFoundError io.opentelemetry.common.ComponentLoader. -->
     <opentelemetry.version>1.63.0</opentelemetry.version>
     <!-- Quality toolchain (design-00007 / plan-00009). This parent does NOT inherit
-         spring-boot-starter-parent, so these plugin versions are pinned explicitly and
-         kept in sync with aipersimmon-ddd-build (the scaffold-side provider parent). -->
+         spring-boot-starter-parent, and by D1 there is no shared provider parent, so these plugin
+         versions are pinned explicitly and kept in sync by hand with the same block in the
+         multi-module scaffold pom (aipersimmon-ddd-scaffold/multi-module/pom.xml). -->
     <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
     <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
