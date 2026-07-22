@@ -58,6 +58,17 @@
       <groupId>jakarta.validation</groupId>
       <artifactId>jakarta.validation-api</artifactId>
     </dependency>
+    <!-- OpenAPI annotations to enrich operations (@Operation/@ApiResponse on the controller).
+         `provided`: the pure annotation jar is on the compile classpath only — springdoc's runtime
+         (the scanner + UI) is pulled in by the start module, not here, so this adapter stays free
+         of the springdoc runtime. Documentation enrichment is an interface-tier concern; read
+         models in the application tier carry none of this (enforced by the ArchUnit rule
+         domainAndApplicationShouldNotDependOnApiDocumentation). -->
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-annotations-jakarta</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- Web-slice test toolchain and a Bean Validation provider so @WebMvcTest can
          exercise @Valid in isolation, with the command bus mocked. -->

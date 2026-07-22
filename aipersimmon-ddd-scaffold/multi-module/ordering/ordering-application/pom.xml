@@ -53,6 +53,16 @@
       <groupId>jakarta.validation</groupId>
       <artifactId>jakarta.validation-api</artifactId>
     </dependency>
+    <!-- OpenAPI annotations for @Schema on read models. A CQRS read model is a presentation-facing
+         projection (returned to callers), so documenting it here is intentional and matches
+         mainstream DDD+CQRS+OpenAPI practice. `provided`: the annotation jar is compile-only; the
+         springdoc runtime is pulled in by the start module. Only the domain is barred from OpenAPI
+         (ArchUnit domainShouldNotDependOnApiDocumentation); the application read side is not. -->
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-annotations-jakarta</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- Command-bus validation is tested at this BC's application layer, not through
          a full-app boot: the concrete bus + validation interceptor are pulled in as

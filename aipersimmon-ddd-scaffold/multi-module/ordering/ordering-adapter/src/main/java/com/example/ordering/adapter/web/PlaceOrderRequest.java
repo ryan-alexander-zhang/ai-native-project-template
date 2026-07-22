@@ -1,6 +1,7 @@
 package com.example.ordering.adapter.web;
 
 import com.example.ordering.application.order.PlaceOrder;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -16,7 +17,12 @@ import java.util.List;
  * The command itself carries an equivalent set of constraints, so non-web entry points are guarded
  * too (see {@link PlaceOrder}).
  */
-public record PlaceOrderRequest(@NotBlank String customerId, @NotEmpty List<@Valid Line> lines) {
+public record PlaceOrderRequest(
+    @Schema(description = "Identifier of the customer placing the order.", example = "cust-42")
+        @NotBlank
+        String customerId,
+    @Schema(description = "Order lines; at least one is required.") @NotEmpty
+        List<@Valid Line> lines) {
 
   public PlaceOrderRequest {
     // Defensive copy: keep this immutable request isolated from later mutation of the
@@ -25,10 +31,17 @@ public record PlaceOrderRequest(@NotBlank String customerId, @NotEmpty List<@Val
   }
 
   public record Line(
-      @NotBlank String sku,
-      @Positive int quantity,
-      @PositiveOrZero long unitAmountMinor,
-      @NotBlank String currency) {}
+      @Schema(description = "Stock-keeping unit of the item.", example = "SKU-1001") @NotBlank
+          String sku,
+      @Schema(description = "Quantity ordered; must be positive.", example = "2") @Positive
+          int quantity,
+      @Schema(
+              description = "Unit price in the currency's minor unit (e.g. cents/fen).",
+              example = "1999")
+          @PositiveOrZero
+          long unitAmountMinor,
+      @Schema(description = "ISO-4217 currency code.", example = "CNY") @NotBlank
+          String currency) {}
 
   public PlaceOrder toCommand() {
     List<PlaceOrder.Line> commandLines =

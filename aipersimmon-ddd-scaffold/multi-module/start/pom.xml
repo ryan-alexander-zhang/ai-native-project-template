@@ -58,6 +58,16 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-web-spring</artifactId>
     </dependency>
+    <!--
+      OpenAPI/Swagger: pulls in springdoc (the /v3/api-docs scanner + Swagger UI, gated by
+      springdoc.swagger-ui.enabled) and a customizer that documents the RFC 9457 problem responses
+      the web-spring advice emits. Controllers are documented by reflection; the read models
+      (@ReadModel) reach the spec with no OpenAPI dependency on the application tier.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-openapi-spring-boot-starter</artifactId>
+    </dependency>
     <!-- Durable Process Manager runtime: wires the order-fulfilment definition + codecs
          into the JDBC runtime, relay, and deadline worker over the app's DataSource. -->
     <dependency>

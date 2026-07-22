@@ -31,6 +31,17 @@ spring:
     listener:
       concurrency: 3
 
+# OpenAPI / Swagger UI (springdoc, via aipersimmon-ddd-openapi-spring-boot-starter). The JSON
+# contract is always served at /v3/api-docs; the interactive Swagger UI at /swagger-ui.html is gated
+# so a production profile can expose the contract without the UI. Default on for local dev — override
+# SWAGGER_UI_ENABLED=false (or set springdoc.swagger-ui.enabled=false in a prod profile) to hide it.
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:true}
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
 aipersimmon:
   ddd:
     # CloudEvents `source` stamped on every published integration event (decision-00014).
