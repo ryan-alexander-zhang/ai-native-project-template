@@ -8,10 +8,7 @@ import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
 import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
-import com.aipersimmon.ddd.processmanager.codec.PayloadType;
-import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
-import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.MaxLifetimeExceeded;
 import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
@@ -26,7 +23,6 @@ import com.aipersimmon.ddd.processmanager.effect.PublishIntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.exception.ProcessAlreadyExistsException;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
-import com.aipersimmon.ddd.processmanager.exception.ProcessPayloadTooLargeException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
 import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
@@ -44,7 +40,6 @@ import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
-import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import java.time.Clock;
@@ -73,8 +68,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
   private final JdbcProcessEffectStore effects;
   private final JdbcProcessDeadlineStore deadlines;
   private final ProcessDefinitionRegistry definitions;
-  private final ProcessPayloadCodecRegistry payloadCodecs;
-  private final ProcessStateCodecRegistry stateCodecs;
+  private final ProcessPayloadSerdes serdes;
   private final JdbcProcessUnitOfWork unitOfWork;
   private final Clock clock;
   private final Supplier<String> idGenerator;
@@ -82,7 +76,6 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
   private final int maxRetries;
   private final ProcessObserver observer;
   private final Optional<Duration> maxLifetime;
-  private final long maxPayloadBytes;
   private final Tracer tracer;
   private final StoreAndForwardTracer storeTracer;
 
@@ -242,8 +235,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     this.effects = effects;
     this.deadlines = deadlines;
     this.definitions = definitions;
-    this.payloadCodecs = payloadCodecs;
-    this.stateCodecs = stateCodecs;
+    this.serdes = new ProcessPayloadSerdes(payloadCodecs, stateCodecs, maxPayloadBytes);
     this.unitOfWork = unitOfWork;
     this.clock = clock;
     this.idGenerator = idGenerator;
@@ -251,7 +243,6 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     this.maxRetries = maxRetries;
     this.observer = observer;
     this.maxLifetime = maxLifetime;
-    this.maxPayloadBytes = maxPayloadBytes;
     this.tracer = tracer;
     this.storeTracer = storeTracer;
   }
@@ -337,7 +328,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     String transitionId = idGenerator.get();
 
     EncodedPayload state =
-        encodeState(processType, definition.stateSchemaVersion(), decision.state());
+        serdes.encodeState(processType, definition.stateSchemaVersion(), decision.state());
     instances.insert(
         new ProcessInstanceRow(
             ref,
@@ -451,7 +442,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
       // arrival order when the instance resumes.
       String parkedId = idGenerator.get();
       Instant parkedAt = clock.instant();
-      EncodedPayload parkedInput = encodePayload(input);
+      EncodedPayload parkedInput = serdes.encodePayload(input);
       transitions.append(
           new ProcessTransitionInsert(
               parkedId,
@@ -482,7 +473,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     ProcessDefinition<?> definition =
         definitions.resolve(ref.processType(), row.definitionVersion());
     Object state =
-        decodeState(
+        serdes.decodeState(
             ref.processType(),
             row.stateSchemaVersion(),
             row.statePayloadType(),
@@ -512,7 +503,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     ProcessRevision revision = row.revision().next();
     String transitionId = idGenerator.get();
     EncodedPayload state2 =
-        encodeState(ref.processType(), definition.stateSchemaVersion(), decision.state());
+        serdes.encodeState(ref.processType(), definition.stateSchemaVersion(), decision.state());
     ProcessInstanceRow updated =
         new ProcessInstanceRow(
             ref,
@@ -582,7 +573,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
       ProcessDecision<Object> decision,
       String kind,
       Instant now) {
-    EncodedPayload encodedInput = encodePayload(input);
+    EncodedPayload encodedInput = serdes.encodePayload(input);
     transitions.append(
         new ProcessTransitionInsert(
             transitionId,
@@ -622,7 +613,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                 index,
                 seqBase + index,
                 dispatch,
-                encodePayload(dispatch.command()),
+                serdes.encodePayload(dispatch.command()),
                 cause,
                 now);
         case PublishIntegrationEvent publish ->
@@ -632,7 +623,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
                 index,
                 seqBase + index,
                 publish,
-                encodePayload(publish.event()),
+                serdes.encodePayload(publish.event()),
                 cause,
                 now);
         case ScheduleDeadline schedule -> scheduleDeadline(ref, schedule, cause, now);
@@ -676,7 +667,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
   private void scheduleDeadline(
       ProcessRef ref, ScheduleDeadline schedule, CommandContext cause, Instant now) {
     long generation = deadlines.nextGeneration(ref.instanceId(), schedule.name());
-    EncodedPayload input = encodePayload(schedule.input());
+    EncodedPayload input = serdes.encodePayload(schedule.input());
     // Persist the scheduling cause's correlation/causation so the timer fires under the same
     // causal chain as the flow that armed it, rather than starting a fresh correlation.
     Captured captured = storeTracer.captureCurrent();
@@ -725,33 +716,5 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
   private ProcessDecision<Object> callReact(
       ProcessDefinition<?> definition, Object state, ProcessInput input, ProcessContext ctx) {
     return ((ProcessDefinition) definition).react(state, input, ctx);
-  }
-
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  private EncodedPayload encodePayload(Object value) {
-    ProcessPayloadCodec codec = payloadCodecs.forJavaType(value.getClass());
-    return enforceSize(codec.encode(value));
-  }
-
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  private EncodedPayload encodeState(ProcessType type, StateSchemaVersion schema, Object state) {
-    ProcessStateCodec codec = stateCodecs.forState(type, schema);
-    return enforceSize(codec.encode(state));
-  }
-
-  /** Guard the configured {@code payload.max-bytes} cap at encode time. */
-  private EncodedPayload enforceSize(EncodedPayload encoded) {
-    int size = encoded.data().length;
-    if (size > maxPayloadBytes) {
-      throw new ProcessPayloadTooLargeException(
-          encoded.type().logicalType(), size, maxPayloadBytes);
-    }
-    return encoded;
-  }
-
-  private Object decodeState(
-      ProcessType type, StateSchemaVersion schema, String payloadType, byte[] payload) {
-    ProcessStateCodec<?> codec = stateCodecs.forState(type, schema);
-    return codec.decode(new EncodedPayload(new PayloadType(payloadType, schema.value()), payload));
   }
 }
