@@ -21,9 +21,9 @@
     from patterns that are correct rather than tangled — DI-heavy constructors / @Bean factories
     (many injected collaborators, not data) and per-item classes (config @Bean factories,
     DAO-per-query stores, one-@ExceptionHandler-per-exception, codec / state-machine handlers).
-    NPathComplexity is raised because it multiplies independent branches, so even a flat
-    guard-clause chain explodes numerically without being hard to read; CyclomaticComplexity +
-    CognitiveComplexity cover genuine difficulty.
+    NPathComplexity stays at its default (200): a method over it is refactored or explicitly
+    suppressed with a reason, not tuned around. CyclomaticComplexity + CognitiveComplexity are
+    the primary difficulty guards.
   -->
   <rule ref="category/java/design.xml/CognitiveComplexity"/>
   <rule ref="category/java/design.xml/CyclomaticComplexity">
@@ -31,11 +31,7 @@
       <property name="methodReportLevel" value="15"/>
     </properties>
   </rule>
-  <rule ref="category/java/design.xml/NPathComplexity">
-    <properties>
-      <property name="reportLevel" value="500"/>
-    </properties>
-  </rule>
+  <rule ref="category/java/design.xml/NPathComplexity"/>
   <rule ref="category/java/design.xml/NcssCount"/>
   <rule ref="category/java/design.xml/ExcessiveParameterList">
     <properties>
