@@ -68,6 +68,30 @@ class LocallyHandledEventTypesTest {
     assertThat(handled.handles("test.Alpha", 1)).isFalse();
   }
 
+  @Test
+  void classesDeclaringAnEnvelopeCapableTypeForceHandleEverything() {
+    LocallyHandledEventTypes handled =
+        LocallyHandledEventTypes.scan(beanFactoryWith(ClassesEnvelopeHandler.class));
+
+    assertThat(handled.handlesAll()).isTrue();
+  }
+
+  @Test
+  void aSupertypeEnvelopeParameterForcesHandleEverything() {
+    LocallyHandledEventTypes handled =
+        LocallyHandledEventTypes.scan(beanFactoryWith(SupertypeHandler.class));
+
+    assertThat(handled.handlesAll()).isTrue();
+  }
+
+  @Test
+  void anEnvelopeOfTheMarkerTypeForcesHandleEverything() {
+    LocallyHandledEventTypes handled =
+        LocallyHandledEventTypes.scan(beanFactoryWith(MarkerPayloadHandler.class));
+
+    assertThat(handled.handlesAll()).isTrue();
+  }
+
   // --- fixtures ----------------------------------------------------------
 
   @EventType(name = "test.Alpha", version = 1)
@@ -96,6 +120,26 @@ class LocallyHandledEventTypesTest {
   static class ClassesHandler {
     @EventListener(String.class)
     void on() {}
+  }
+
+  /** classes() names an envelope-capable type: cannot narrow -> handle everything. */
+  static class ClassesEnvelopeHandler {
+    @EventListener(EventEnvelope.class)
+    void on() {}
+  }
+
+  /**
+   * A supertype of EventEnvelope (Object) could receive one: cannot narrow -> handle everything.
+   */
+  static class SupertypeHandler {
+    @EventListener
+    void on(Object event) {}
+  }
+
+  /** EventEnvelope of the marker interface itself (not a concrete event): cannot narrow. */
+  static class MarkerPayloadHandler {
+    @EventListener
+    void on(EventEnvelope<IntegrationEvent> event) {}
   }
 
   static class PlainBean {

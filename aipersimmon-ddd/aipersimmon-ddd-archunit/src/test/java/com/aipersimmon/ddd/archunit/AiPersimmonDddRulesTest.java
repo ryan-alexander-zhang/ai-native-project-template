@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.archunit;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -11,6 +12,8 @@ class AiPersimmonDddRulesTest {
 
   private static final JavaClasses GOOD =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.good");
+  private static final JavaClasses EVENT_TYPE_FIXTURES =
+      new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.eventtype");
   private static final JavaClasses BAD =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
   private static final JavaClasses ANNOTATED_EVENT_IN_ADAPTER =
@@ -349,6 +352,28 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () -> EventRules.integrationEventsShouldDeclareEventType().check(BAD));
+  }
+
+  /**
+   * Characterizes every violation branch of the rule's condition in one check: a missing
+   * {@code @EventType}, a blank name, a version below 1, and a shared {@code (name, version)} (the
+   * last also exercises the {@code init} collision index). The valid control in the same fixture
+   * package must not add noise — only the four expected kinds are reported.
+   */
+  @Test
+  void integrationEventsShouldDeclareEventType_reportsEachViolationKind() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> EventRules.integrationEventsShouldDeclareEventType().check(EVENT_TYPE_FIXTURES));
+    String message = error.getMessage();
+    assertTrue(
+        message.contains("is not annotated with @EventType"),
+        () -> "missing @EventType: " + message);
+    assertTrue(
+        message.contains("declares a blank @EventType name"), () -> "blank name: " + message);
+    assertTrue(message.contains("which must be >= 1"), () -> "version < 1: " + message);
+    assertTrue(message.contains("shares @EventType"), () -> "collision: " + message);
   }
 
   @Test
