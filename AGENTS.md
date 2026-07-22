@@ -73,6 +73,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
+- When a quality gate fails (Spotless / PMD+CPD / SpotBugs / coverage / mutation) or a
+  review flags complexity or duplication, refactor per `CODE_QUALITY.md`: solve it — do not
+  raise a threshold or suppress a finding to make the build pass.
 - When you discover a bug or defect during any task, before fixing it, create a
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
   with a failing test, following `docs/issue/README.md`. Only then apply the fix.
