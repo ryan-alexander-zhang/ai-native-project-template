@@ -12,6 +12,7 @@ import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.InProcessOutboxDispatcher;
 import com.aipersimmon.ddd.outbox.IntegrationEventScanner;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -148,6 +149,58 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
                 + "(e.g. aipersimmon-ddd-outbox-mybatis-plus or aipersimmon-ddd-outbox-jdbc) so its "
                 + "transactional-outbox writer becomes the IntegrationEvents transport, or remove "
                 + "@Externalized to keep those events LOCAL (in-process) on purpose.");
+      }
+    };
+  }
+
+  /**
+   * Startup WARN when the relay's worst-case per-poll budget can outlive its lease (issue-00050).
+   * The relay dispatches a batch one row at a time and blocks on each broker ack up to {@code
+   * producer.send-timeout-ms}, so a whole poll of stalled sends takes up to {@code batch-size ×
+   * send-timeout}; if that exceeds {@code relay.lock-at-most-for} the ShedLock lease can expire
+   * mid-poll and a second instance can dispatch the same rows concurrently. The shipped defaults
+   * (batch 100 × 30s = 50min &lt; 60min) satisfy this, so this only fires when a custom
+   * configuration breaks the invariant — a WARN, not a failure, because the worst case needs a
+   * sustained broker outage and the operator may accept it knowingly. Gated like the durable guard:
+   * only with a Kafka transport and actual {@code @Externalized} events. {@link OutboxProperties}
+   * is optional (via {@link ObjectProvider}) so a Kafka-consumer-only app without an outbox is left
+   * alone.
+   */
+  @Bean
+  @ConditionalOnBean(KafkaTemplate.class)
+  @Conditional(OnExternalizedEventsCondition.class)
+  public SmartInitializingSingleton aipersimmonDddOutboxLeaseBudgetCheck(
+      ObjectProvider<OutboxProperties> outboxProperties,
+      KafkaMessagingProperties properties,
+      @Value("${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}") String lockAtMostFor) {
+    return () -> {
+      OutboxProperties outbox = outboxProperties.getIfAvailable();
+      if (outbox == null) {
+        return;
+      }
+      // ISO-8601 (the default and the form the ShedLock annotations feed on). If a deployment
+      // overrides it with an unparseable value the lease budget can't be checked — skip the
+      // advisory WARN rather than fail startup over it.
+      Duration lease;
+      try {
+        lease = Duration.parse(lockAtMostFor);
+      } catch (RuntimeException e) {
+        return;
+      }
+      long worstCaseMs = (long) outbox.getBatchSize() * properties.getProducer().getSendTimeoutMs();
+      long leaseMs = lease.toMillis();
+      if (worstCaseMs > leaseMs) {
+        log.warn(
+            "aipersimmon-ddd outbox relay budget: worst-case poll = batch-size ({}) × "
+                + "producer.send-timeout-ms ({}ms) = {}ms, which exceeds relay.lock-at-most-for "
+                + "({}ms). Under a sustained broker outage the ShedLock lease can expire mid-poll and "
+                + "a second instance may dispatch the same rows concurrently. Lower batch-size or "
+                + "send-timeout, or raise relay.lock-at-most-for, so batch-size × send-timeout stays "
+                + "below the lease.",
+            outbox.getBatchSize(),
+            properties.getProducer().getSendTimeoutMs(),
+            worstCaseMs,
+            leaseMs);
       }
     };
   }

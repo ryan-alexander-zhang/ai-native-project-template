@@ -135,7 +135,7 @@ public class OutboxRelay {
   @SchedulerLock(
       name =
           "${aipersimmon.ddd.outbox.relay.lock-name:${spring.application.name:aipersimmon}-outbox-relay}",
-      lockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT10M}")
+      lockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}")
   public void relay() {
     Timestamp now = Timestamp.from(clock.instant());
     List<Pending> batch =

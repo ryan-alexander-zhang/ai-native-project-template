@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxProperties;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
@@ -102,20 +103,18 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
       DeadLetterStore deadLetterStore,
       FailureClassifier failureClassifier,
       Clock outboxClock,
-      @Value("${aipersimmon.ddd.outbox.batch-size:100}") int batchSize,
-      @Value("${aipersimmon.ddd.outbox.max-attempts:10}") int maxAttempts,
-      @Value("${aipersimmon.ddd.outbox.retry.base-backoff-ms:1000}") long baseBackoffMs,
-      @Value("${aipersimmon.ddd.outbox.retry.max-backoff-ms:60000}") long maxBackoffMs,
+      OutboxProperties properties,
       ObjectProvider<StoreAndForwardTracer> tracer) {
     return new OutboxRelay(
         jdbcTemplate,
         outboxDispatcher,
         deadLetterStore,
         failureClassifier,
-        new RetryBackoff(baseBackoffMs, maxBackoffMs),
+        new RetryBackoff(
+            properties.getRetry().getBaseBackoffMs(), properties.getRetry().getMaxBackoffMs()),
         outboxClock,
-        batchSize,
-        maxAttempts,
+        properties.getBatchSize(),
+        properties.getMaxAttempts(),
         tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
 
@@ -124,10 +123,9 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
   @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.cleanup.enabled", havingValue = "true")
   @ConditionalOnMissingBean
   public OutboxCleanup outboxCleanup(
-      JdbcTemplate jdbcTemplate,
-      Clock outboxClock,
-      @Value("${aipersimmon.ddd.outbox.cleanup.retention-seconds:604800}") long retentionSeconds) {
-    return new OutboxCleanup(jdbcTemplate, outboxClock, retentionSeconds);
+      JdbcTemplate jdbcTemplate, Clock outboxClock, OutboxProperties properties) {
+    return new OutboxCleanup(
+        jdbcTemplate, outboxClock, properties.getCleanup().getRetentionSeconds());
   }
 
   /**
@@ -142,7 +140,7 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnBean(DataSource.class)
   @EnableSchedulerLock(
-      defaultLockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT10M}")
+      defaultLockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}")
   static class OutboxSchedulerLockConfiguration {
 
     @Bean

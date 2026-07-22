@@ -2,7 +2,7 @@
 id: issue-00050-outbox-relay-budget-and-config-validation
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00006-middleware-integration
 ---
 
@@ -65,6 +65,27 @@ parent: plan-00006-middleware-integration
 **注意改动面**:(b) 引入 `spring-boot-starter-validation`(或 `jakarta.validation` + 校验实现)并把 `@Value` 迁到
 `@ConfigurationProperties`;(a) 增加一个装配期跨字段校验点并可能调整默认值。不改 schema、不改 `OutboxDispatcher`
 /`Inbox` 接口。两者均需补装配测试。
+
+## 已修复
+
+- **(b) 无依赖显式校验**:新增 `OutboxProperties`(`@ConfigurationProperties("aipersimmon.ddd.outbox")` +
+  `InitializingBean`),把散落的 `batch-size`/`max-attempts`/`retry.*`/`cleanup.retention-seconds` 收敛为一处,
+  `afterPropertiesSet()` 显式 `if-throw` 校验(不引入 `jakarta.validation`):`batch-size>=1`、`max-attempts>=1`、
+  `base-backoff-ms>=0`、`max-backoff-ms>=base-backoff-ms`、`retention-seconds>=0`,非法值启动即失败。经
+  `@EnableConfigurationProperties` 挂到共享 `AipersimmonDddOutboxAutoConfiguration`;jdbc / mybatis 两个装配的 relay
+  与 cleanup 由裸 `@Value` 改为注入该 POJO。测试:`OutboxPropertiesTest`(默认合法 + 五类非法值各自抛)。
+- **(a) 默认满足不变量 + 越界告警**:relay `lock-at-most-for` 默认 `PT10M`→`PT60M`(4 处:jdbc/mybatis 各自的
+  `@SchedulerLock` 与 `@EnableSchedulerLock`;`cleanup.lock-at-most-for` 不变),使出厂 `100×30s=50min < 60min` 成立。
+  另在 `messaging-kafka` 加一个启动期 `SmartInitializingSingleton`(`aipersimmonDddOutboxLeaseBudgetCheck`,与
+  durable guard 同门:`@ConditionalOnBean(KafkaTemplate)` + `OnExternalizedEventsCondition`):当自定义配置使
+  `batch-size × send-timeout > relay.lock-at-most-for` 时打响亮 WARN(非 fail——最坏情形需持续 broker 宕机,运维可
+  知情接受)。`OutboxProperties` 经 `ObjectProvider` 可选,纯消费端应用无 outbox 时跳过。
+
+> 长期方向(超出本 issue,未做):行级 claim/lease/fencing 取代"单定时锁保护整批",从根上消解批级预算与租约的张力。
+
+> 验证:相关模块 `compile` + `test` 全绿(含新 `OutboxPropertiesTest` 与既有 `AutoConfigurationWiringTest`),Spotless
+> 格式门禁通过。PMD/CPD 与 SpotBugs 门禁因本机工具环境在**未修改的** `aipersimmon-ddd-core` 上即 `StackOverflowError`
+> / fork 崩溃而未能本地跑完,留待 CI 复核;本次改动为配置 POJO + 校验 + 一个 guard bean,不涉复杂度/重复热点。
 
 ## 关联
 

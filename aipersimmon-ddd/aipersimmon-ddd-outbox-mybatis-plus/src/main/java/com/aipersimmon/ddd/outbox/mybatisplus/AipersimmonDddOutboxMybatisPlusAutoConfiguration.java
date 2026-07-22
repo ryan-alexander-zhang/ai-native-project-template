@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxProperties;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -128,20 +129,18 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
       DeadLetterStore deadLetterStore,
       FailureClassifier failureClassifier,
       Clock outboxClock,
-      @Value("${aipersimmon.ddd.outbox.batch-size:100}") int batchSize,
-      @Value("${aipersimmon.ddd.outbox.max-attempts:10}") int maxAttempts,
-      @Value("${aipersimmon.ddd.outbox.retry.base-backoff-ms:1000}") long baseBackoffMs,
-      @Value("${aipersimmon.ddd.outbox.retry.max-backoff-ms:60000}") long maxBackoffMs,
+      OutboxProperties properties,
       ObjectProvider<StoreAndForwardTracer> tracer) {
     return new OutboxRelay(
         outboxMapper,
         outboxDispatcher,
         deadLetterStore,
         failureClassifier,
-        new RetryBackoff(baseBackoffMs, maxBackoffMs),
+        new RetryBackoff(
+            properties.getRetry().getBaseBackoffMs(), properties.getRetry().getMaxBackoffMs()),
         outboxClock,
-        batchSize,
-        maxAttempts,
+        properties.getBatchSize(),
+        properties.getMaxAttempts(),
         tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
 
@@ -150,10 +149,9 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
   @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.cleanup.enabled", havingValue = "true")
   @ConditionalOnMissingBean
   public OutboxCleanup outboxCleanup(
-      OutboxMapper outboxMapper,
-      Clock outboxClock,
-      @Value("${aipersimmon.ddd.outbox.cleanup.retention-seconds:604800}") long retentionSeconds) {
-    return new OutboxCleanup(outboxMapper, outboxClock, retentionSeconds);
+      OutboxMapper outboxMapper, Clock outboxClock, OutboxProperties properties) {
+    return new OutboxCleanup(
+        outboxMapper, outboxClock, properties.getCleanup().getRetentionSeconds());
   }
 
   /**
@@ -168,7 +166,7 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnBean(DataSource.class)
   @EnableSchedulerLock(
-      defaultLockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT10M}")
+      defaultLockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}")
   static class OutboxSchedulerLockConfiguration {
 
     @Bean
