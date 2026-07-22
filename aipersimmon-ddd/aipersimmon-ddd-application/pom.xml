@@ -50,7 +50,7 @@
     </dependency>
   </dependencies>
 
-  <!-- Domain gate (design-00007 / plan-00009 P5+P6): JaCoCo 90% line/branch/method +
+  <!-- Domain gate: JaCoCo 90% line/branch/method +
        PIT 90% mutation. prepare-agent + report come from the parent pluginManagement. -->
   <build>
     <plugins>

@@ -1,4 +1,4 @@
--- MySQL 8+ sample DDL for the durable Process Manager four-table model (design-00004 §4.5).
+-- MySQL 8+ sample DDL for the durable Process Manager four-table model.
 -- Sample only: apply via Flyway/Liquibase; the starter never executes it. SKIP LOCKED
 -- requires MySQL 8.0+. DATETIME(3) keeps millisecond precision. Payload columns are
 -- LONGTEXT: they hold base64 (~+33%), so the default 1 MiB payload.max-bytes limit would

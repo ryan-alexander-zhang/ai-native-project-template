@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Regression for issue-00026: when another component (here a stand-in {@code processManagerClock})
+ * Regression test: when another component (here a stand-in {@code processManagerClock})
  * already contributes a {@code Clock} bean, this starter must still contribute its own {@code
  * outboxClock} and wire {@code outboxWriter} to it — not back off and leave the by-name injection
  * dangling.

@@ -28,7 +28,7 @@ public final class CqrsRules {
    * transaction, validation, logging) or, if routed back through the bus, nests transactions and
    * double-applies those concerns; it also blurs the unit-of-work boundary and couples two use
    * cases that should evolve independently. Reusable logic belongs in a domain service or a
-   * non-handler application collaborator, injected into both handlers — see {@code decision-00010}.
+   * non-handler application collaborator, injected into both handlers.
    * Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that
    * has no command handlers.
    */
@@ -53,8 +53,7 @@ public final class CqrsRules {
    * Manager effect row, an outbox row), using that identity verbatim. It exists so an at-least-once
    * relay can redeliver the same effect under a stable messageId. A handler or application class
    * calling it would fabricate message identity outside the sanctioned minting authorities and
-   * bypass the causation chain (see decision-00016-durable-runtime-staged-message-identity, patch
-   * of decision-00013). Business dispatch uses {@link CommandBus#send(Command)} / {@code
+   * bypass the causation chain. Business dispatch uses {@link CommandBus#send(Command)} / {@code
    * send(Command, CommandContext)}.
    *
    * <p>Passes vacuously until {@code sendAs} and a violating call site exist; framework-agnostic,

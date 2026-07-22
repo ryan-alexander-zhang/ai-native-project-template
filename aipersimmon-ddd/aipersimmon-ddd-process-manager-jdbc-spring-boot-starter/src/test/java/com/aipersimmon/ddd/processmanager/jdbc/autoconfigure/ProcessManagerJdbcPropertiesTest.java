@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
-/** Property validation must agree with how each value is consumed (issue-00021). */
+/** Property validation must agree with how each value is consumed. */
 class ProcessManagerJdbcPropertiesTest {
 
   private ProcessManagerJdbcProperties props() {

@@ -16,7 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * {@code max-attempts} dead-letters a healthy message on its first failure; a negative backoff or
  * {@code max-backoff < base-backoff} inverts the retry schedule; a negative {@code
  * retention-seconds} puts the cleanup cutoff in the future and deletes still-live rows. Binding a
- * bad value fails startup with a concrete message (issue-00050).
+ * bad value fails startup with a concrete message.
  *
  * <p>The scheduling-annotation knobs ({@code poll-delay-ms}, {@code relay.lock-at-most-for}, {@code
  * relay.lock-name}, {@code cleanup.enabled}) and the {@code dispatch} mode stay as property

@@ -12,7 +12,7 @@
   </parent>
 
   <!--
-    Reusable Testcontainers support (design-00007 / plan-00009 P7). A consumer adds this
+    Reusable Testcontainers support. A consumer adds this
     at test scope and gets both the helpers and Testcontainers/Spring-Boot-Testcontainers
     transitively. Two patterns, per the Testcontainers + Spring Boot best practices:
 

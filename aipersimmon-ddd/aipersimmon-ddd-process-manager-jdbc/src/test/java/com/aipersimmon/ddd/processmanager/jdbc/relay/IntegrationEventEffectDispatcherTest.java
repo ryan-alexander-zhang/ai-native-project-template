@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
  * The integration-event effect must be delivered through {@link IntegrationEvents#publishAs} —
  * under the effect's persisted identity, verbatim — not the plain {@code publish}, which mints a
  * fresh event id per call and would give each at-least-once redelivery a different downstream
- * dedupe key (issue-00032).
+ * dedupe key.
  */
 class IntegrationEventEffectDispatcherTest {
 

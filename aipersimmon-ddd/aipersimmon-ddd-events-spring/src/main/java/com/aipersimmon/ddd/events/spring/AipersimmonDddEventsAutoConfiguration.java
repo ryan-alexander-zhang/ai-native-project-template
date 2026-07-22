@@ -33,7 +33,7 @@ public class AipersimmonDddEventsAutoConfiguration {
    * port. Detection is by bean presence, not by knowing any concrete outbox class: each outbox
    * auto-configuration declares itself {@code @AutoConfigureBefore} this one, so when an outbox is
    * on the classpath its writer registers first and {@code @ConditionalOnMissingBean} makes this
-   * bean back off (issue-00044). An application can also override with its own bean.
+   * bean back off. An application can also override with its own bean.
    *
    * <p>Note this publisher is <em>not</em> {@link
    * com.aipersimmon.ddd.application.DurableIntegrationEvents}: it does not persist events, so

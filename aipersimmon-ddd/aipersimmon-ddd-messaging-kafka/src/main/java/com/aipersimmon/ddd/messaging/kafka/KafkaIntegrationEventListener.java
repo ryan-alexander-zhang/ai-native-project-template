@@ -150,7 +150,7 @@ public class KafkaIntegrationEventListener {
       return false;
     }
     // Only skip a KNOWN type that no local handler wants. An unknown (type, version) is poison
-    // and must still be dead-lettered (strict inbound validation, decision-00014), so leave it
+    // and must still be dead-lettered (strict inbound validation), so leave it
     // to the normal path rather than silently dropping it here.
     if (catalog.lookup(type, version).isEmpty()) {
       return false;

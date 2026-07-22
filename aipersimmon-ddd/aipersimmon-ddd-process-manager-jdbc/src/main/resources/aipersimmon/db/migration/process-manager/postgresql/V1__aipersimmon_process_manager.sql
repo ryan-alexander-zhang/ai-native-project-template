@@ -1,4 +1,4 @@
--- PostgreSQL test schema for the four-table model (design-00004 §4.5), used by the
+-- PostgreSQL test schema for the four-table model, used by the
 -- Testcontainers SKIP LOCKED gate. Mirrors the H2 schema with TEXT for payload columns.
 
 CREATE TABLE IF NOT EXISTS aipersimmon_process_instance (

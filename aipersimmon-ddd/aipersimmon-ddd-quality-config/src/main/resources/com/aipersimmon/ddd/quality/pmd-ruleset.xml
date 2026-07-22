@@ -5,16 +5,16 @@
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
   <description>
-    AiPersimmon DDD complexity and duplication rules (design-00007). Focused on the
+    AiPersimmon DDD complexity and duplication rules. Focused on the
     signals that matter for a framework-free building-block library: cognitive and
     cyclomatic complexity, NPath, method/class size, and parameter lists. Kept narrow
     on purpose — style/formatting is owned by Spotless (google-java-format), architecture
     by ArchUnit, bytecode defects by SpotBugs. Thresholds start permissive and are
-    ratcheted per plan-00009.
+    ratcheted over time.
   </description>
 
   <!--
-    Complexity policy (plan-00009 ratchet). Two rules stay strict as the real readability guards:
+    Complexity policy (ratcheted). Two rules stay strict as the real readability guards:
     CognitiveComplexity at its default 15, and CyclomaticComplexity at 15 (the widely-accepted
     upper bound; the classic default is 10). A method that exceeds these is refactored, not tuned
     around. ExcessiveParameterList and TooManyMethods are raised because their high counts come

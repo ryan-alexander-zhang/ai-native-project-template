@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  SpotBugs exclude filter (design-00007 / plan-00009). Starts empty: SpotBugs is
+  SpotBugs exclude filter. Starts empty: SpotBugs is
   introduced report-only, real false positives are added here as they surface, then
   the gate is turned on. Reference the file from the plugin via its classpath path
   com/aipersimmon/ddd/quality/spotbugs-exclude.xml (this artifact on the plugin's
@@ -17,7 +17,7 @@
     is inherent to how this codebase models domain objects, not a defect:
 
       * Aggregates, entities and value objects validate their invariants IN the constructor
-        (the always-valid pattern, design-00003). Throwing on a broken invariant is the point;
+        (the always-valid pattern). Throwing on a broken invariant is the point;
         the alternative — an object that can exist in an invalid state — is strictly worse.
       * The classes are non-final by necessity (aggregate roots extend AbstractAggregateRoot;
         entities like OrderLine are package-private), and SpotBugs fires purely on "non-final

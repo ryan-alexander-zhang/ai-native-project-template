@@ -118,7 +118,7 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Fail-loud guard (issue-00044). When the application declares {@code @Externalized} events and a
+   * Fail-loud guard. When the application declares {@code @Externalized} events and a
    * Kafka transport is wired, those events reach the broker only if the active {@link
    * IntegrationEvents} publisher is durable — i.e. it writes each event to the transactional outbox
    * the relay drains ({@link DurableIntegrationEvents}). If an in-process (non-durable) publisher
@@ -154,7 +154,7 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Startup WARN when the relay's worst-case per-poll budget can outlive its lease (issue-00050).
+   * Startup WARN when the relay's worst-case per-poll budget can outlive its lease.
    * The relay dispatches a batch one row at a time and blocks on each broker ack up to {@code
    * producer.send-timeout-ms}, so a whole poll of stalled sends takes up to {@code batch-size ×
    * send-timeout}; if that exceeds {@code relay.lock-at-most-for} the ShedLock lease can expire
@@ -286,7 +286,7 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Builds the error handler with three failure tiers (issue-00047), so an environment outage is
+   * Builds the error handler with three failure tiers, so an environment outage is
    * not mistaken for a poison message. Package-private so it can be unit-tested without a broker.
    *
    * <ul>

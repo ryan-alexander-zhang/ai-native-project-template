@@ -27,7 +27,7 @@
       auto-configurations rely on it: they define named beans (e.g. @ConditionalOnMissingBean(name =
       "processManagerClock")) and inject them by parameter name (Clock processManagerClock). Without
       parameter names, by-name disambiguation fails as soon as a second same-type bean exists — e.g.
-      the process-manager and inbox starters each contributing a Clock. See issue-00026.
+      the process-manager and inbox starters each contributing a Clock.
     -->
     <maven.compiler.parameters>true</maven.compiler.parameters>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -44,7 +44,7 @@
          the core artifacts transitively, so without this import Spring Boot wins and the 2.29.0
          Spring Boot starter fails at boot with NoClassDefFoundError io.opentelemetry.common.ComponentLoader. -->
     <opentelemetry.version>1.63.0</opentelemetry.version>
-    <!-- Quality toolchain (design-00007 / plan-00009). This parent does NOT inherit
+    <!-- Quality toolchain. This parent does NOT inherit
          spring-boot-starter-parent, and by D1 there is no shared provider parent, so these plugin
          versions are pinned explicitly and kept in sync by hand with the same block in the
          multi-module scaffold pom (aipersimmon-ddd-scaffold/multi-module/pom.xml). -->
@@ -106,7 +106,7 @@
     <module>aipersimmon-ddd-openapi-spring-boot-starter</module>
     <module>aipersimmon-ddd-archunit</module>
     <!-- Reusable Testcontainers support (singleton containers + Spring Boot
-         @ServiceConnection configs); consumers add it at test scope. See design-00007. -->
+         @ServiceConnection configs); consumers add it at test scope. -->
     <module>aipersimmon-ddd-test-support</module>
   </modules>
 
@@ -209,7 +209,7 @@
           <version>3.2.5</version>
         </plugin>
 
-        <!-- Quality toolchain management (design-00007 / plan-00009). Management only:
+        <!-- Quality toolchain management. Management only:
              it supplies versions and config; a module activates a gate by declaring the
              plugin in its own <build><plugins>. There is NO shared quality parent (D1):
              each buildable project (this library parent + each scaffold root) declares its
@@ -315,7 +315,7 @@
 
     <!-- Active gates for every library module (inherited). Spotless is the format gate;
          it runs on all modules (pom modules have no Java sources, so it is a no-op there).
-         Coverage/mutation are opt-in per module (see design-00007), so they are NOT here. -->
+         Coverage/mutation are opt-in per module, so they are NOT here. -->
     <plugins>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
@@ -331,7 +331,7 @@
         </executions>
       </plugin>
 
-      <!-- PMD + CPD, enforced gate (plan-00009 P3, ratcheted): failOnViolation=true so any
+      <!-- PMD + CPD, enforced gate (ratcheted): failOnViolation=true so any
            violation fails the build. The codebase is clean; complexity thresholds are tuned to the
            codebase in the shared pmd-ruleset, and genuine outliers were refactored rather than
            tuned around. Ruleset + quality-config dependency inherited from pluginManagement. -->
@@ -353,7 +353,7 @@
         </executions>
       </plugin>
 
-      <!-- SpotBugs, enforced gate (plan-00009 P4, ratcheted): failOnError=true so any bug
+      <!-- SpotBugs, enforced gate (ratcheted): failOnError=true so any bug
            fails the build. The codebase is clean; genuine false positives live in the shared
            exclude filter (quality-config). Exclude filter + quality-config dependency inherited
            from pluginManagement. -->

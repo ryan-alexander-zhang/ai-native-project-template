@@ -20,7 +20,6 @@
     to its OWN <dependency> classpath and loads the file by classpath path — the one shared
     piece across the library reactor and every scaffold-generated project. No module depends
     on it as a normal dependency; it is a plugin-classpath artifact only. Resource-only, no Java.
-    See design-00007 §六.
   -->
   <artifactId>aipersimmon-ddd-quality-config</artifactId>
   <name>aipersimmon-ddd-quality-config</name>

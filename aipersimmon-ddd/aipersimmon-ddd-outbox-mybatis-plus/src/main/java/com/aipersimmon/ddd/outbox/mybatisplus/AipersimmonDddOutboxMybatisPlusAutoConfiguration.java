@@ -50,7 +50,7 @@ import org.springframework.transaction.support.TransactionTemplate;
       AipersimmonDddOutboxAutoConfiguration.class
     },
     // Register before the in-process events fallback so this durable writer claims the
-    // IntegrationEvents port and the fallback backs off (issue-00044). String form: this module
+    // IntegrationEvents port and the fallback backs off. String form: this module
     // does not depend on events-spring, and an absent target is simply ignored.
     beforeName = "com.aipersimmon.ddd.events.spring.AipersimmonDddEventsAutoConfiguration")
 @EnableScheduling
@@ -60,8 +60,7 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
       LoggerFactory.getLogger(AipersimmonDddOutboxMybatisPlusAutoConfiguration.class);
 
   // Name-scoped so this component always contributes its own named clock and injects it by name,
-  // rather than backing off when another component already registered a Clock of the same type. See
-  // issue-00026.
+  // rather than backing off when another component already registered a Clock of the same type.
   @Bean
   @ConditionalOnMissingBean(name = "outboxClock")
   public Clock outboxClock() {

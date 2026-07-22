@@ -21,7 +21,7 @@
     Framework-free. Depends on the pure core tier and the (equally framework-free)
     cqrs and integration tiers: an effect can carry a Command (cqrs) or an
     IntegrationEvent (integration), and a ProcessContext carries the CommandContext
-    that caused the current input. See design-00004-durable-process-manager-runtime.
+    that caused the current input.
   -->
   <artifactId>aipersimmon-ddd-process-manager</artifactId>
   <name>aipersimmon-ddd-process-manager</name>

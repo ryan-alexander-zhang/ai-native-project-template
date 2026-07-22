@@ -1,4 +1,4 @@
--- H2 test schema for the durable Process Manager four-table model (design-00004 §4.5).
+-- H2 test schema for the durable Process Manager four-table model.
 -- Test-only; the production DDL (postgresql/mysql/h2) ships with the starter and is
 -- applied via Flyway/Liquibase, never auto-executed.
 

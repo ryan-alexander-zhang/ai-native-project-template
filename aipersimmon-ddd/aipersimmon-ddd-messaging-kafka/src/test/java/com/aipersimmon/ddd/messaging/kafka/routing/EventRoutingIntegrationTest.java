@@ -34,7 +34,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 /**
- * End-to-end over an in-JVM embedded broker, proving per-event routing (design-00006): an
+ * End-to-end over an in-JVM embedded broker, proving per-event routing: an
  * {@code @Externalized} event goes to <em>its</em> topic and comes back through the consumer bridge
  * to local handlers <strong>exactly once</strong> (no in-process double-delivery); events
  * externalized to different targets land on different topics; and a LOCAL event (no

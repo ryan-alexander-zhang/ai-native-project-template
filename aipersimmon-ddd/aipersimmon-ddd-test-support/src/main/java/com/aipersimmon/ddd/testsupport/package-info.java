@@ -1,5 +1,5 @@
 /**
- * Reusable Testcontainers support for AiPersimmon DDD tests (design-00007).
+ * Reusable Testcontainers support for AiPersimmon DDD tests.
  *
  * <p>Spring Boot tests import a {@code *ServiceConnection} {@link
  * org.springframework.boot.test.context.TestConfiguration} so connection details are derived
