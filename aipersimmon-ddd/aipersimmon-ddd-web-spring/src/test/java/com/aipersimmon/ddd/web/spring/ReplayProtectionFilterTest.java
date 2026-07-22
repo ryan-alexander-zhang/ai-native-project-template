@@ -84,6 +84,28 @@ class ReplayProtectionFilterTest {
         .andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void missingSignatureOrTimestampRejected() throws Exception {
+    mvc.perform(post("/replay").header("X-Timestamp", now()).header("X-Nonce", "n-nosig"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void malformedTimestampRejected() throws Exception {
+    mvc.perform(
+            post("/replay")
+                .header("X-Signature", "good")
+                .header("X-Timestamp", "not-a-number")
+                .header("X-Nonce", "n-malformed"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void missingNonceRejected() throws Exception {
+    mvc.perform(post("/replay").header("X-Signature", "good").header("X-Timestamp", now()))
+        .andExpect(status().isUnauthorized());
+  }
+
   @RestController
   static class ReplayController {
     @PostMapping("/replay")
