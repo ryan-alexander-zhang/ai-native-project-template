@@ -1,7 +1,6 @@
 package com.example.inventory.application.stock;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Component;
  * on the same state rather than double-crediting stock.
  */
 @Component
-@UseCase
 public class ReleaseStockHandler implements CommandHandler<ReleaseStock, Void> {
 
   private final Stocks stocks;

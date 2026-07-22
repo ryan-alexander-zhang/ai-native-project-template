@@ -1,7 +1,6 @@
 package com.example.payment.application;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.payment.api.PaymentAuthorized;
@@ -25,7 +24,6 @@ import org.springframework.stereotype.Component;
  * event.
  */
 @Component
-@UseCase
 public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment, Void> {
 
   private final AuthorizationPolicy authorization = new AuthorizationPolicy();

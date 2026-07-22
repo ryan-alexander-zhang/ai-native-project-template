@@ -29,8 +29,7 @@ import com.tngtech.archunit.lang.CompositeArchRule;
  *   <li>{@link EventRules} — domain- and integration-event placement, event-listener placement, and
  *       {@code @EventType} validity; also the opt-in {@link
  *       EventRules#integrationEventsShouldResideInApi()}.
- *   <li>{@link CqrsRules} — command/query handlers, {@code @UseCase} placement, and the {@code
- *       sendAs} restriction.
+ *   <li>{@link CqrsRules} — command/query handlers and the {@code sendAs} restriction.
  *   <li>{@link BuildingBlockRules} — aggregate/entity/value-object/domain-service placement and
  *       value-object immutability.
  *   <li>{@link RepositoryRules} — repository ports and implementations; also the opt-in {@link
@@ -65,7 +64,6 @@ public final class AiPersimmonDddRules {
         .and(CqrsRules.commandHandlersShouldNotDependOnOtherCommandHandlers())
         .and(CqrsRules.commandHandlersAndApplicationShouldNotCallSendAs())
         .and(CqrsRules.commandAndQueryHandlersShouldResideInApplication())
-        .and(CqrsRules.useCasesShouldResideInApplication())
         .and(InvariantAndErrorRules.invariantsShouldResideInDomain())
         .and(InvariantAndErrorRules.invariantViolationsShouldOnlyComeFromCheckInvariant())
         .and(InvariantAndErrorRules.invariantsShouldNotBeSpringComponents())

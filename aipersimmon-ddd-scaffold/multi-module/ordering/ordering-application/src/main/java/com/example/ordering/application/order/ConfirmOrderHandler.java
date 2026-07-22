@@ -2,7 +2,6 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.domain.order.Order;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
  * Handles {@link ConfirmOrder}: drives the aggregate's state machine, then publishes its events.
  */
 @Component
-@UseCase
 public class ConfirmOrderHandler implements CommandHandler<ConfirmOrder, Void> {
 
   private final Orders orders;

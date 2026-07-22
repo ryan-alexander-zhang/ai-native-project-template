@@ -1,6 +1,5 @@
 package com.example.inventory.application.stock;
 
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
 import com.example.inventory.domain.stock.Sku;
 import com.example.inventory.domain.stock.Stocks;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
  * {@code CommandContext} and no events.
  */
 @Component
-@UseCase
 public class CheckStockAvailabilityHandler
     implements QueryHandler<CheckStockAvailability, List<StockLevel>> {
 

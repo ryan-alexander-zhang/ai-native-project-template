@@ -2,7 +2,6 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
@@ -44,7 +43,6 @@ import org.springframework.stereotype.Component;
  * distinct facts — only readiness drives inventory and the process manager.
  */
 @Component
-@UseCase
 public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
 
   private static final ManualReviewPolicy REVIEW = new ManualReviewPolicy();

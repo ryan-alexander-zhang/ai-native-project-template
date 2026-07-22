@@ -2,7 +2,6 @@ package com.aipersimmon.ddd.archunit;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
@@ -14,8 +13,8 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
  * CQRS and application-layer rules: how command and query handlers relate to one another and to the
- * command bus, and where the CQRS handlers and {@code @UseCase} types live. All four are bundled
- * into {@link AiPersimmonDddRules#all()}.
+ * command bus, and where the CQRS handlers live. All three are bundled into {@link
+ * AiPersimmonDddRules#all()}.
  */
 public final class CqrsRules {
 
@@ -28,9 +27,9 @@ public final class CqrsRules {
    * transaction, validation, logging) or, if routed back through the bus, nests transactions and
    * double-applies those concerns; it also blurs the unit-of-work boundary and couples two use
    * cases that should evolve independently. Reusable logic belongs in a domain service or a
-   * non-handler application collaborator, injected into both handlers.
-   * Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that
-   * has no command handlers.
+   * non-handler application collaborator, injected into both handlers. Part of {@link
+   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that has no command
+   * handlers.
    */
   public static ArchRule commandHandlersShouldNotDependOnOtherCommandHandlers() {
     return classes()
@@ -102,30 +101,6 @@ public final class CqrsRules {
             "a CommandHandler or QueryHandler orchestrates one unit of work over the domain, "
                 + "which is an application-layer responsibility, not domain, infrastructure, or "
                 + "interface work")
-        .allowEmptyShould(true);
-  }
-
-  /**
-   * A type marked {@link UseCase @UseCase} resides in the application layer. A use case
-   * orchestrates one unit of work by driving the domain through its ports and holds no business
-   * rules of its own, so it belongs to the application layer — never the domain, infrastructure, or
-   * interface layers. Pairs with {@link #commandAndQueryHandlersShouldResideInApplication()}:
-   * handlers are the CQRS entry points, {@code @UseCase} marks the use-case role itself, and both
-   * live in application. Matched by the core {@code @UseCase} annotation, which is on every
-   * module's classpath, so a Maven module split alone does not keep it in place. Part of {@link
-   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that annotates no use
-   * cases.
-   */
-  public static ArchRule useCasesShouldResideInApplication() {
-    return classes()
-        .that()
-        .areAnnotatedWith(UseCase.class)
-        .should()
-        .resideInAPackage("..application..")
-        .as("@UseCase types should reside in the application layer")
-        .because(
-            "a use case orchestrates the domain through its ports and holds no business rules, "
-                + "so it belongs in the application layer")
         .allowEmptyShould(true);
   }
 

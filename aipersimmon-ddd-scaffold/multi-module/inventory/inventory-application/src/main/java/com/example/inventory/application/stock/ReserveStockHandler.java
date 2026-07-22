@@ -1,7 +1,6 @@
 package com.example.inventory.application.stock;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandContext;
@@ -44,7 +43,6 @@ import org.springframework.stereotype.Component;
  * reservation even before the transaction rolls back.
  */
 @Component
-@UseCase
 public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
 
   private final Stocks stocks;

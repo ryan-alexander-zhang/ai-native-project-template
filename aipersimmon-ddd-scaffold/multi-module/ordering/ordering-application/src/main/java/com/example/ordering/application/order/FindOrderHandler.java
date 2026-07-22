@@ -1,6 +1,5 @@
 package com.example.ordering.application.order;
 
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.OrderId;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
  * read-model how-to).
  */
 @Component
-@UseCase
 public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderSnapshot>> {
 
   private final Orders orders;

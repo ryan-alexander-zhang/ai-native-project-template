@@ -69,7 +69,7 @@ parent:
 | 模块 | 层 | 依赖 | 内容 |
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-core` | domain 词汇 | **零依赖** | 注解 `@AggregateRoot`/`@Entity`/`@ValueObject`/`@Repository`/`@Identity`/`@DomainEvent`/`@Service`；分层 stereotype `@DomainLayer`/`@ApplicationLayer`/`@InfrastructureLayer`/`@InterfaceLayer`(+ hexagonal 可选)；marker 接口 `AggregateRoot<ID>`/`Entity<ID>`/`Identifier`/`Association<T,ID>`/`DomainEvent`；基类 `AbstractAggregateRoot`(事件登记/清空)；`DomainException` 基类；**可选** `Transitions<S>` 状态迁移守卫(见§十) |
-| `aipersimmon-ddd-application` | application | `-core` | `DomainEvents` 发布 port(见 [[analysis-00001-domain-event-publishing]])；`UseCase` 标记；`ApplicationException` 基类 |
+| `aipersimmon-ddd-application` | application | `-core` | `DomainEvents` 发布 port(见 [[analysis-00001-domain-event-publishing]])；`ApplicationException` 基类 |
 | `aipersimmon-ddd-cqrs` | application(可选) | `-core` | CQRS 契约(见§五)：`Command`/`Query` 标记、`CommandHandler<C>`/`QueryHandler<Q,R>`、`CommandBus`/`QueryBus` port、装饰器 SPI、`ReadModel` 标记、`Projection` 写 port、`UnitOfWork` 抽象。**framework-free**（领域事件在 save 处排空,不再有 `AggregateCollector`,见 [[decision-00012-no-ambient-per-command-state]]） |
 | `aipersimmon-ddd-integration` | api(跨 BC 契约) | `-core`(极薄) | `IntegrationEvent` 基类、`EventEnvelope`(id/type/version/occurredAt/traceId)、版本化约定。拓扑无关的**契约层**(见 [[analysis-00002-domain-vs-integration-events]]) |
 

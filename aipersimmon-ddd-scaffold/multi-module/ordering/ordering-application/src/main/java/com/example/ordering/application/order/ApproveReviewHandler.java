@@ -1,7 +1,6 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.EntityNotFoundException;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.application.fulfilment.FulfilmentTrigger;
@@ -21,7 +20,6 @@ import org.springframework.stereotype.Component;
  * and beginning fulfilment thus share one transaction and one code path.
  */
 @Component
-@UseCase
 public class ApproveReviewHandler implements CommandHandler<ApproveReview, Void> {
 
   private final Orders orders;

@@ -2,7 +2,6 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.application.IntegrationEvents;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.api.PaymentRequested;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Component;
  * a use case into an outbound integration event, keeping that concern out of the process manager.
  */
 @Component
-@UseCase
 public class RequestPaymentHandler implements CommandHandler<RequestPayment, Void> {
 
   private final Orders orders;

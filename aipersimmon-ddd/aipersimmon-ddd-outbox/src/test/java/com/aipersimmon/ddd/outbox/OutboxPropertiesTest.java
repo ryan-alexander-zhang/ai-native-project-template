@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The bound outbox config validates at startup ({@link OutboxProperties#afterPropertiesSet()}), so
  * values that would silently misbehave fail loud instead of surfacing later as no-progress polls,
- * premature dead-lettering, an inverted backoff schedule, or deletion of still-live rows.
- * The shipped defaults are valid.
+ * premature dead-lettering, an inverted backoff schedule, or deletion of still-live rows. The
+ * shipped defaults are valid.
  */
 class OutboxPropertiesTest {
 

@@ -9,7 +9,7 @@ package com.aipersimmon.ddd.application;
  *
  * <p>It carries no methods: it exists so a cross-process transport (e.g. the Kafka messaging
  * starter over {@code @Externalized} events) can assert at startup that the active publisher is
- * durable, turning a silent downgrade to in-process delivery into a boot-time failure
- * rather than a defect discovered only by inspecting the database.
+ * durable, turning a silent downgrade to in-process delivery into a boot-time failure rather than a
+ * defect discovered only by inspecting the database.
  */
 public interface DurableIntegrationEvents extends IntegrationEvents {}

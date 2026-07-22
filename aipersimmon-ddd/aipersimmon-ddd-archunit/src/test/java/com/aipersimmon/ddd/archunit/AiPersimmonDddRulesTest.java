@@ -137,17 +137,6 @@ class AiPersimmonDddRulesTest {
   }
 
   @Test
-  void useCasesShouldResideInApplication_passesForGood() {
-    assertDoesNotThrow(() -> CqrsRules.useCasesShouldResideInApplication().check(GOOD));
-  }
-
-  @Test
-  void useCasesShouldResideInApplication_failsForBad() {
-    assertThrows(
-        AssertionError.class, () -> CqrsRules.useCasesShouldResideInApplication().check(BAD));
-  }
-
-  @Test
   void domainShouldBeFrameworkFree_passesForGood() {
     assertDoesNotThrow(() -> LayeringRules.domainShouldBeFrameworkFree().check(GOOD));
   }

@@ -1,7 +1,6 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
-import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.api.StockReleaseRequested;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
  * the process manager sends only ordering commands.
  */
 @Component
-@UseCase
 public class RequestStockReleaseHandler implements CommandHandler<RequestStockRelease, Void> {
 
   private final IntegrationEvents integrationEvents;
