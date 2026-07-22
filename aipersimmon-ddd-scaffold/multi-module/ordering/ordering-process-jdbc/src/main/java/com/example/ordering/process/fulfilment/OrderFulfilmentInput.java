@@ -13,8 +13,8 @@ public sealed interface OrderFulfilmentInput extends ProcessInput {
 
   String orderId();
 
-  /** The order was placed: start a new flow awaiting stock reservation. */
-  record OrderPlaced(String orderId) implements OrderFulfilmentInput {}
+  /** The order cleared for fulfilment: start a new flow awaiting stock reservation. */
+  record ReadyForFulfilment(String orderId) implements OrderFulfilmentInput {}
 
   /** Inventory reserved stock; carries the reservation handle to release later. */
   record StockReserved(String orderId, String reservationId) implements OrderFulfilmentInput {}
@@ -23,10 +23,10 @@ public sealed interface OrderFulfilmentInput extends ProcessInput {
   record StockReservationFailed(String orderId, String code, String reason)
       implements OrderFulfilmentInput {}
 
-  /** Payment authorised the charge. */
+  /** Payment authorised the order's payment. */
   record PaymentAuthorized(String orderId) implements OrderFulfilmentInput {}
 
-  /** Payment declined the charge; carries the decline code. */
+  /** Payment declined the order's payment; carries the decline code. */
   record PaymentDeclined(String orderId, String code, String reason)
       implements OrderFulfilmentInput {}
 

@@ -140,7 +140,7 @@ public class Order extends AbstractAggregateRoot<OrderId> {
     registerEvent(new OrderFulfilmentStartedEvent(id));
   }
 
-  /** Stock reserved and payment captured. */
+  /** Stock reserved and payment authorized. */
   public void confirm() {
     RULES.check(status, OrderStatus.CONFIRMED);
     this.status = OrderStatus.CONFIRMED;

@@ -11,8 +11,8 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
  */
 public interface OrderFulfilmentProcess {
 
-  /** An order was placed: start a new flow awaiting stock reservation. */
-  void placed(String orderId);
+  /** An order cleared for fulfilment: start a new flow awaiting stock reservation. */
+  void readyForFulfilment(String orderId);
 
   /** Inventory reserved stock. */
   void stockReserved(String orderId, String reservationId, CommandContext cause);
@@ -20,10 +20,10 @@ public interface OrderFulfilmentProcess {
   /** Inventory could not reserve stock. */
   void stockReservationFailed(String orderId, String code, String reason, CommandContext cause);
 
-  /** Payment authorised the charge. */
+  /** Payment authorised the order's payment. */
   void paymentAuthorized(String orderId, CommandContext cause);
 
-  /** Payment declined the charge. */
+  /** Payment declined the order's payment. */
   void paymentDeclined(String orderId, String code, String reason, CommandContext cause);
 
   /** Inventory released the previously reserved stock. */

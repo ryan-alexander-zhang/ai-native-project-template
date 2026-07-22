@@ -29,6 +29,19 @@ import org.springframework.stereotype.Component;
  * <p>On success it also records a {@link Reservation} keyed by a freshly minted {@link
  * ReservationId}, and publishes that id on the event. That id is what makes the later release exact
  * and idempotent — the saga hands it back verbatim to release the same stock it reserved.
+ *
+ * <h2>A deliberate multi-aggregate transaction</h2>
+ *
+ * <p>One reservation mutates several {@link Stock} aggregates and creates one {@link Reservation}
+ * aggregate, and the "reserve every line or none" rule spans all of them. That invariant therefore
+ * does <em>not</em> live inside a single aggregate — it is enforced here, by the application
+ * transaction the command bus opens around this handler. This is a conscious exception to the "one
+ * aggregate per transaction" guideline, made because a {@code Stock} row per SKU is the natural
+ * consistency and contention boundary for inventory, and forcing all SKUs into one aggregate would
+ * serialise unrelated stock. The all-or-nothing guarantee is real but transactional, not
+ * aggregate-level; a distributed inventory would instead model this as its own saga. The
+ * validate-all-before-mutate-any loop above is what keeps a mid-line failure from leaving a partial
+ * reservation even before the transaction rolls back.
  */
 @Component
 @UseCase

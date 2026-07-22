@@ -18,9 +18,9 @@ import com.example.ordering.domain.order.ReservationFailureRef;
 import com.example.ordering.domain.order.StockReleaseRef;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.OrderCancelled;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.OrderConfirmed;
-import com.example.ordering.process.fulfilment.OrderFulfilmentInput.OrderPlaced;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.PaymentAuthorized;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.PaymentDeclined;
+import com.example.ordering.process.fulfilment.OrderFulfilmentInput.ReadyForFulfilment;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReleased;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReservationFailed;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReserved;
@@ -81,12 +81,12 @@ public class OrderFulfilmentCodecs {
 
   // ----- inputs -----
   @Bean
-  ProcessPayloadCodec<OrderPlaced> orderPlacedCodec() {
+  ProcessPayloadCodec<ReadyForFulfilment> readyForFulfilmentCodec() {
     return codec(
-        "ordering.fulfilment.order-placed",
-        OrderPlaced.class,
-        OrderPlaced::orderId,
-        OrderPlaced::new);
+        "ordering.fulfilment.ready-for-fulfilment",
+        ReadyForFulfilment.class,
+        ReadyForFulfilment::orderId,
+        ReadyForFulfilment::new);
   }
 
   @Bean

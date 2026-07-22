@@ -57,5 +57,7 @@ CREATE TABLE inventory.reservation_lines (
 INSERT INTO ordering.customers (id, name, credit_minor, currency)
 VALUES ('CUST-1', 'Acme', 100000, 'USD');
 
+-- SKU-RESTRICTED is stocked like any other, but ordering's ManualReviewPolicy flags it, so an
+-- order containing it is held for manual review before any reservation — the review-path demo.
 INSERT INTO inventory.stocks (sku, available)
-VALUES ('SKU-1', 10), ('SKU-2', 5);
+VALUES ('SKU-1', 10), ('SKU-2', 5), ('SKU-RESTRICTED', 10);

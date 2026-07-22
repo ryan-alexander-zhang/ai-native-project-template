@@ -11,11 +11,16 @@
     assembles them. It is built on the AiPersimmon DDD building blocks (imported via
     the BOM below) and is the source from which the multi-module archetype is generated.
 
-    Aggregates persist in memory, but the app integrates real middleware: cross-context
-    integration events ride the transactional outbox to Kafka and back through an
-    idempotent inbox, the durable process manager and outbox/inbox tables live in
-    PostgreSQL (single-source Flyway migrations), and traces export to SigNoz over OTLP.
-    Local infrastructure is in start/compose.yaml; see docs/plan/plan-00006.
+    Aggregates persist in PostgreSQL via MyBatis, and the app integrates real middleware:
+    cross-context integration events ride the transactional outbox to Kafka and back
+    through an idempotent inbox; the aggregates, the durable process manager, and the
+    outbox/inbox tables all live in PostgreSQL (single-source Flyway migrations); and
+    traces export to SigNoz over OTLP. Local infrastructure is in start/compose.yaml;
+    see docs/plan/plan-00006.
+
+    (The payment context is the one exception to durable persistence: it keeps only a
+    small in-memory operation-dedupe log in payment-infrastructure, since it owns no
+    persisted aggregate — see payment/pom.xml.)
 
     Like the building-block library, it deliberately inherits NO parent POM: it manages
     versions purely by importing BOMs (spring-boot-dependencies + aipersimmon-ddd-bom), so
@@ -107,6 +112,7 @@
       <dependency><groupId>${project.groupId}</groupId><artifactId>payment-api</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>${project.groupId}</groupId><artifactId>payment-domain</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>${project.groupId}</groupId><artifactId>payment-application</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>${project.groupId}</groupId><artifactId>payment-infrastructure</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>${project.groupId}</groupId><artifactId>payment-adapter</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>

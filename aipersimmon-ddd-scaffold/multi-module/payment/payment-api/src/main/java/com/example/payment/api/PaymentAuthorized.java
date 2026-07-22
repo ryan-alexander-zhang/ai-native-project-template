@@ -5,7 +5,7 @@ import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
- * Integration event published when a charge for an order was authorised — the payment context's
+ * Integration event published when a payment for an order was authorised — the payment context's
  * cross-context contract for a successful payment. The ordering saga reacts by confirming the
  * order.
  */

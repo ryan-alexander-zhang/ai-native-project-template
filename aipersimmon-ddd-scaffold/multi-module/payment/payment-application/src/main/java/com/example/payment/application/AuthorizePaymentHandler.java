@@ -11,36 +11,38 @@ import com.example.payment.domain.PaymentDecision;
 import org.springframework.stereotype.Component;
 
 /**
- * Handles {@link ChargePayment}: applies the domain {@link AuthorizationPolicy} and announces the
- * outcome — {@link PaymentAuthorized} or {@link PaymentDeclined}. Reporting the outcome as an event
- * (rather than a return value or a throw) is what lets the ordering saga treat authorisation and
- * decline as the two branches of the fulfilment flow.
+ * Handles {@link AuthorizePayment}: applies the domain {@link AuthorizationPolicy} and announces
+ * the outcome — {@link PaymentAuthorized} or {@link PaymentDeclined}. Reporting the outcome as an
+ * event (rather than a return value or a throw) is what lets the ordering saga treat authorisation
+ * and decline as the two branches of the fulfilment flow.
  *
- * <p>Charging is an irreversible action, so it is guarded by the {@code paymentOperationId}
- * business idempotency key rather than trusting transport-level dedupe alone (design-00004 §13.2).
- * The handler claims the operation in {@link PaymentOperations} before it charges: the first
- * delivery of an operation wins the claim, decides, and announces the outcome; any redelivery of
- * the same operation loses the claim and returns without charging or re-announcing — so an
- * at-least-once redelivery produces exactly one charge and one outcome event.
+ * <p>Authorising a payment is an irreversible action, so it is guarded by the {@code
+ * paymentOperationId} business idempotency key rather than trusting transport-level dedupe alone
+ * (design-00004 §13.2). The handler claims the operation in {@link PaymentOperations} before it
+ * authorises: the first delivery of an operation wins the claim, decides, and announces the
+ * outcome; any redelivery of the same operation loses the claim and returns without authorising or
+ * re-announcing — so an at-least-once redelivery produces exactly one authorisation and one outcome
+ * event.
  */
 @Component
 @UseCase
-public class ChargePaymentHandler implements CommandHandler<ChargePayment, Void> {
+public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment, Void> {
 
   private final AuthorizationPolicy authorization = new AuthorizationPolicy();
   private final IntegrationEvents integrationEvents;
   private final PaymentOperations operations;
 
-  public ChargePaymentHandler(IntegrationEvents integrationEvents, PaymentOperations operations) {
+  public AuthorizePaymentHandler(
+      IntegrationEvents integrationEvents, PaymentOperations operations) {
     this.integrationEvents = integrationEvents;
     this.operations = operations;
   }
 
   @Override
-  public Void handle(ChargePayment command, CommandContext context) {
+  public Void handle(AuthorizePayment command, CommandContext context) {
     PaymentDecision decision = authorization.decide(command.amountMinor(), command.currency());
     if (!operations.recordIfFirst(command.paymentOperationId(), decision)) {
-      // A redelivery of an already-charged operation: idempotent no-op, do not charge again.
+      // A redelivery of an already-authorised operation: idempotent no-op, do not authorise again.
       return null;
     }
     switch (decision) {

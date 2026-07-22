@@ -24,7 +24,7 @@ public enum OrderStatus {
   /** Inventory/payment work has begun; the customer can no longer self-cancel. */
   FULFILMENT_IN_PROGRESS,
 
-  /** Stock reserved and payment captured. */
+  /** Stock reserved and payment authorized. */
   CONFIRMED,
 
   /** Dispatched to the customer; may only enter the reverse (return) flow. */

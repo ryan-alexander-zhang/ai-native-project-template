@@ -2,18 +2,18 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
-import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.application.UseCase;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
-import com.example.ordering.api.OrderPlaced;
+import com.example.ordering.application.fulfilment.FulfilmentTrigger;
 import com.example.ordering.application.order.StockAvailabilityGateway.Availability;
 import com.example.ordering.domain.customer.CreditExceededException;
 import com.example.ordering.domain.customer.Customer;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.customer.Customers;
 import com.example.ordering.domain.order.LineData;
+import com.example.ordering.domain.order.ManualReviewPolicy;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.Orders;
@@ -25,40 +25,47 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
- * Handles {@link PlaceOrder}: builds the aggregate, checks the customer's credit, persists,
- * publishes the internal domain events, then announces the {@link OrderPlaced} integration event to
- * other contexts. It is dispatched by the command bus, which applies the cross-cutting concerns
+ * Handles {@link PlaceOrder}: builds the aggregate, checks the customer's credit, then persists and
+ * publishes. It is dispatched by the command bus, which applies the cross-cutting concerns
  * (logging, and — where a transaction manager is present — the transaction) around it.
  *
  * <p>Before creating anything it calls the {@link StockAvailabilityGateway} — a synchronous,
  * cross-context query into the inventory context — to fail fast on an order whose SKUs inventory
  * cannot currently offer. This is deliberately a <em>read</em>: the authoritative stock
- * <em>reservation</em> is a state change and stays on the asynchronous {@link OrderPlaced} -&gt;
- * reserve-stock -&gt; saga path. The two are complementary — the query gives an immediate,
- * user-facing rejection for hopeless orders; the event/saga does the atomic, compensable
- * reservation for everything that passes the gate.
+ * <em>reservation</em> is a state change and happens only once the order is <em>ready for
+ * fulfilment</em>, via the {@link com.example.ordering.api.OrderReadyForFulfilment} integration
+ * event. The two are complementary — the query gives an immediate, user-facing rejection for
+ * hopeless orders; the event does the atomic, compensable reservation for everything that clears.
+ *
+ * <p>A {@link ManualReviewPolicy} classifies the order: one needing review starts {@code
+ * AWAITING_REVIEW} and reserves nothing until an operator approves it (see {@code
+ * ApproveReviewHandler}); one that needs no review is ready immediately, so it enters fulfilment
+ * now through the {@link FulfilmentTrigger}. Either way, "placed" and "ready for fulfilment" are
+ * distinct facts — only readiness drives inventory and the process manager.
  */
 @Component
 @UseCase
 public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
 
+  private static final ManualReviewPolicy REVIEW = new ManualReviewPolicy();
+
   private final Orders orders;
   private final Customers customers;
   private final DomainEvents domainEvents;
-  private final IntegrationEvents integrationEvents;
   private final StockAvailabilityGateway stockAvailability;
+  private final FulfilmentTrigger fulfilmentTrigger;
 
   public PlaceOrderHandler(
       Orders orders,
       Customers customers,
       DomainEvents domainEvents,
-      IntegrationEvents integrationEvents,
-      StockAvailabilityGateway stockAvailability) {
+      StockAvailabilityGateway stockAvailability,
+      FulfilmentTrigger fulfilmentTrigger) {
     this.orders = orders;
     this.customers = customers;
     this.domainEvents = domainEvents;
-    this.integrationEvents = integrationEvents;
     this.stockAvailability = stockAvailability;
+    this.fulfilmentTrigger = fulfilmentTrigger;
   }
 
   @Override
@@ -75,7 +82,7 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
 
     // Fail fast: synchronously ask the inventory context (through the anti-corruption
     // gateway) whether it can offer these SKUs at all, before creating the order. The
-    // authoritative quantity reservation still happens asynchronously via OrderPlaced.
+    // authoritative quantity reservation still happens asynchronously once the order is ready.
     List<String> skus = command.lines().stream().map(PlaceOrder.Line::sku).distinct().toList();
     Availability availability = stockAvailability.check(skus);
     if (!availability.allAvailable()) {
@@ -95,32 +102,22 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
             .toList();
 
     OrderId orderId = new OrderId(UUID.randomUUID().toString());
-    // This scaffold does not model manual review, so orders are placed review-free and are
-    // immediately eligible for fulfilment. A real ManualReviewPolicy would compute this verdict.
-    Order order = Order.place(orderId, customerId, lines, ReviewRequirement.notRequired());
+    ReviewRequirement review = REVIEW.assess(lines);
+    Order order = Order.place(orderId, customerId, lines, review);
 
     if (!customer.canAfford(order.total())) {
       throw new CreditExceededException(
           "customer " + customerId.value() + " cannot afford " + order.total());
     }
 
-    // Placing the order publishes the OrderPlaced integration event below, which asks inventory
-    // to reserve stock — so fulfilment has genuinely begun. Record that fact now (moving past the
-    // customer's self-cancel window) before the async StockReserved/Failed response can arrive.
-    order.beginFulfilment();
-
-    orders.save(order);
-    domainEvents.publishAndClear(order);
-
-    integrationEvents.publish(toIntegrationEvent(orderId, command), context);
+    if (review.isRequired()) {
+      // Held for manual review: record the placement, but reserve nothing until it clears.
+      orders.save(order);
+      domainEvents.publishAndClear(order);
+    } else {
+      // Cleared immediately: begin fulfilment and ask inventory to reserve, in this transaction.
+      fulfilmentTrigger.begin(order, context);
+    }
     return orderId.value();
-  }
-
-  private static OrderPlaced toIntegrationEvent(OrderId orderId, PlaceOrder command) {
-    List<OrderPlaced.Line> lines =
-        command.lines().stream()
-            .map(line -> new OrderPlaced.Line(line.sku(), line.quantity()))
-            .toList();
-    return new OrderPlaced(orderId.value(), lines);
   }
 }

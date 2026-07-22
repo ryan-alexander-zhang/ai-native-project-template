@@ -12,9 +12,9 @@ import java.util.List;
  *
  * <p>This is a synchronous <em>query</em> used to fail fast at order time: it lets the place-order
  * use case reject an order for a SKU inventory does not carry before it creates anything. It
- * reserves nothing — the authoritative, atomic reservation happens asynchronously after the order
- * is placed (the {@code OrderPlaced} → reserve-stock → saga path), which is where a state change
- * belongs.
+ * reserves nothing — the authoritative, atomic reservation happens asynchronously once the order is
+ * cleared for fulfilment (the {@code OrderReadyForFulfilment} → reserve-stock → saga path), which
+ * is where a state change belongs.
  */
 public interface StockAvailabilityGateway {
 

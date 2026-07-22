@@ -13,8 +13,11 @@
 
   <!--
     Aggregator for the payment bounded context. Like inventory it has no HTTP surface: it
-    reacts to ordering's PaymentRequested integration event and answers with its own. It is
-    stateless (a pure authorization rule), so it has no infrastructure/persistence module.
+    reacts to ordering's PaymentRequested integration event and answers with its own. Its
+    authorization decision is a pure rule, but it is not stateless: it keeps an at-most-once
+    operation-dedupe log behind the PaymentOperations port. That log is an outbound adapter,
+    so it lives in payment-infrastructure (in memory here — this context owns no persisted
+    aggregate, so it has no MyBatis persistence module the way ordering/inventory do).
   -->
   <artifactId>payment</artifactId>
   <packaging>pom</packaging>
@@ -25,6 +28,7 @@
     <module>payment-api</module>
     <module>payment-domain</module>
     <module>payment-application</module>
+    <module>payment-infrastructure</module>
     <module>payment-adapter</module>
   </modules>
 </project>

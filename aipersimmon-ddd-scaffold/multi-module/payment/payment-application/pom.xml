@@ -12,8 +12,9 @@
   </parent>
 
   <!--
-    Application layer of the payment context: the charge-payment use case and the port for
-    announcing its outcome. Depends inward on the domain and on this context's own contract.
+    Application layer of the payment context: the authorize-payment use case, the port for
+    announcing its outcome, and the PaymentOperations dedupe port. Depends inward on the domain
+    and on this context's own contract.
   -->
   <artifactId>payment-application</artifactId>
   <name>payment-application</name>
@@ -48,7 +49,7 @@
       <groupId>jakarta.validation</groupId>
       <artifactId>jakarta.validation-api</artifactId>
     </dependency>
-    <!-- Unit test for charge idempotency: exercises the handler with an in-memory operation store. -->
+    <!-- Unit test for authorization idempotency: exercises the handler with a local operation-log fake. -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

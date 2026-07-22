@@ -6,6 +6,7 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
+import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
@@ -36,7 +37,7 @@ import org.springframework.stereotype.Component;
  * <p>The flow, and the two properties that keep it honest:
  *
  * <pre>
- *   OrderPlaced ─▶ AWAITING_STOCK
+ *   OrderReadyForFulfilment ─▶ AWAITING_STOCK
  *     StockReserved ─▶ RequestPayment ─▶ AWAITING_PAYMENT
  *       PaymentAuthorized ─▶ ConfirmOrder ─▶ AWAITING_ORDER_CONFIRMATION
  *         OrderConfirmed ─▶ COMPLETED (ORDER_CONFIRMED)
@@ -67,9 +68,9 @@ import org.springframework.stereotype.Component;
  *       {@code AWAITING_STOCK} no longer confirms an un-reserved order; {@code PaymentDeclined}
  *       before a reservation no longer releases a {@code null} handle; {@code StockReleased} before
  *       a decline no longer throws on a {@code null} decline code and wedges the queue;
- *   <li><b>reject</b> — a throw, reserved for {@link OrderFulfilmentInput.OrderPlaced}, which is a
- *       start-only input that structurally never reaches {@code react} (so the throw cannot poison
- *       a real redelivery) and only signals a wiring defect.
+ *   <li><b>reject</b> — a throw, reserved for {@link OrderFulfilmentInput.ReadyForFulfilment},
+ *       which is a start-only input that structurally never reaches {@code react} (so the throw
+ *       cannot poison a real redelivery) and only signals a wiring defect.
  * </ul>
  *
  * <p>Evidence refs carry the identity of the <em>causing envelope</em> ({@code
@@ -106,10 +107,10 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
 
   @Override
   public ProcessDecision<OrderFulfilmentState> start(ProcessInput input, ProcessContext context) {
-    if (input instanceof OrderFulfilmentInput.OrderPlaced placed) {
+    if (input instanceof OrderFulfilmentInput.ReadyForFulfilment ready) {
       OrderFulfilmentState state =
-          new OrderFulfilmentState(placed.orderId(), Step.AWAITING_STOCK, null, null, null);
-      return running(state, Step.AWAITING_STOCK, "order-placed");
+          new OrderFulfilmentState(ready.orderId(), Step.AWAITING_STOCK, null, null, null);
+      return running(state, Step.AWAITING_STOCK, "ready-for-fulfilment");
     }
     throw new IllegalStateException("unexpected start input: " + input);
   }
@@ -117,7 +118,17 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   @Override
   public ProcessDecision<OrderFulfilmentState> react(
       OrderFulfilmentState state, ProcessInput input, ProcessContext context) {
-    OrderFulfilmentInput in = (OrderFulfilmentInput) input;
+    // Every business fact is an OrderFulfilmentInput. The only input that is not is the runtime's
+    // MaxLifetimeExceeded backstop, which the runtime fires when instance.max-lifetime is
+    // configured. This scaffold does not arm that backstop, so the input should never arrive; if a
+    // user enables it without also handling it here, reject it cleanly — the runtime then suspends
+    // the instance for operator attention — rather than crashing on a ClassCastException.
+    if (!(input instanceof OrderFulfilmentInput in)) {
+      throw new UnsupportedProcessInputException(
+          "order-fulfilment does not handle the runtime input "
+              + input.getClass().getSimpleName()
+              + "; handle MaxLifetimeExceeded here to use the max-lifetime backstop");
+    }
     return switch (state.step()) {
       case AWAITING_STOCK -> onAwaitingStock(state, in, context);
       case AWAITING_PAYMENT -> onAwaitingPayment(state, in, context);
@@ -240,14 +251,14 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   /**
    * The no-op arm of the transition table: keep the current lifecycle and step and emit no effects,
    * so a duplicate or out-of-order fact is absorbed idempotently instead of driving a wrong
-   * transition or throwing. {@link OrderFulfilmentInput.OrderPlaced} is the one input that is
-   * rejected here: it is start-only and never reaches {@code react} in normal operation.
+   * transition or throwing. {@link OrderFulfilmentInput.ReadyForFulfilment} is the one input that
+   * is rejected here: it is start-only and never reaches {@code react} in normal operation.
    */
   private static ProcessDecision<OrderFulfilmentState> ignore(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
-    if (in instanceof OrderFulfilmentInput.OrderPlaced) {
+    if (in instanceof OrderFulfilmentInput.ReadyForFulfilment) {
       throw new IllegalStateException(
-          "OrderPlaced is a start-only input and must not reach react for order "
+          "ReadyForFulfilment is a start-only input and must not reach react for order "
               + state.orderId());
     }
     ProcessLifecycle current =

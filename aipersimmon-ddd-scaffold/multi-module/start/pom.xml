@@ -37,6 +37,7 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-api</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-domain</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-application</artifactId></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>payment-infrastructure</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-adapter</artifactId></dependency>
 
     <!-- In-process synchronous transport for both domain and integration events. -->

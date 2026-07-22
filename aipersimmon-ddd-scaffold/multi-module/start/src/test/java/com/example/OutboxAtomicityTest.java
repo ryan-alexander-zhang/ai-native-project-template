@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * issue-00027 regression: the aggregate write and the outbox write are one transaction. A command
  * interceptor ordered <em>inside</em> the transaction boundary ({@code order > 200}) throws right
  * after the handler runs — so {@code PlaceOrderHandler} has already persisted the order (into
- * {@code ordering.orders}) and written its {@code OrderPlaced} row (into {@code
+ * {@code ordering.orders}) and written its {@code OrderReadyForFulfilment} row (into {@code
  * aipersimmon_outbox}) when the transaction rolls back. Both must be gone.
  *
  * <p>This assertion is only possible now that aggregates are transactional (plan-00007). With the
@@ -48,7 +48,8 @@ class OutboxAtomicityTest {
 
   @Test
   void aggregateAndOutboxRollBackTogetherWhenTheTransactionFails() {
-    // Precondition (issue-00044): the OrderPlaced event is actually written to the outbox in the
+    // Precondition (issue-00044): the OrderReadyForFulfilment event is actually written to the
+    // outbox in the
     // command transaction — i.e. the active publisher is the durable outbox writer, not the
     // in-process fallback. Without this the "outbox == 0 after rollback" assertion below is
     // vacuously true (nothing is ever written) and proves nothing about atomicity.
@@ -58,7 +59,8 @@ class OutboxAtomicityTest {
         "active IntegrationEvents must be the durable outbox writer for this test to be meaningful");
 
     // CUST-1 / SKU-1 x1 is valid and in stock, so the handler runs to completion — it saves the
-    // order and writes the OrderPlaced outbox row — before the interceptor throws inside the tx.
+    // order and writes the OrderReadyForFulfilment outbox row — before the interceptor throws
+    // inside the tx.
     assertThrows(
         RuntimeException.class,
         () ->

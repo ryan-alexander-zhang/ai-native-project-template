@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handles {@link RequestPayment}: reads the order's total and publishes {@link PaymentRequested} so
- * the payment context can charge it. This mirrors {@code PlaceOrderHandler}'s pattern of turning a
- * use case into an outbound integration event, keeping that concern out of the process manager.
+ * the payment context can authorize it. This mirrors {@code PlaceOrderHandler}'s pattern of turning
+ * a use case into an outbound integration event, keeping that concern out of the process manager.
  */
 @Component
 @UseCase

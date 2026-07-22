@@ -12,12 +12,15 @@
   </parent>
 
   <!--
-    Interface layer of the payment context. Its inbound adapter reacts to ordering's
-    PaymentRequested event and drives the authorize-payment use case.
+    Infrastructure layer of the payment context: the outbound adapter that implements the
+    PaymentOperations port. This context owns no persisted aggregate, so its only technical concern
+    is the at-most-once operation-dedupe log, kept in memory here (the lightest honest stand-in for a
+    durable operations table). Even in-memory it is an outbound adapter, so it lives here, not in the
+    application layer.
   -->
-  <artifactId>payment-adapter</artifactId>
-  <name>payment-adapter</name>
-  <description>Inbound messaging adapter of the payment context.</description>
+  <artifactId>payment-infrastructure</artifactId>
+  <name>payment-infrastructure</name>
+  <description>Technical port implementations of the payment context (in-memory operation log).</description>
 
   <dependencies>
     <dependency>
@@ -25,13 +28,12 @@
       <artifactId>payment-application</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-cqrs</artifactId>
-    </dependency>
-    <!-- Cross-context: consumes ordering's published contract. -->
-    <dependency>
       <groupId>${project.groupId}</groupId>
-      <artifactId>ordering-api</artifactId>
+      <artifactId>payment-domain</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>

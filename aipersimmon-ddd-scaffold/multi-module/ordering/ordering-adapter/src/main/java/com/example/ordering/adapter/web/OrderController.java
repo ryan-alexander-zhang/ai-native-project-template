@@ -2,7 +2,7 @@ package com.example.ordering.adapter.web;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
-import com.example.ordering.application.order.ConfirmOrder;
+import com.example.ordering.application.order.ApproveReview;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderSnapshot;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,12 +22,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST endpoints for placing, confirming, and reading orders. Writes go through the {@link
+ * REST endpoints for placing, approving-review of, and reading orders. Writes go through the {@link
  * CommandBus} and reads through the {@link QueryBus}, so the adapter holds no orchestration itself.
+ *
+ * <p>There is deliberately no public {@code confirm} endpoint: confirming an order is an internal
+ * step of the fulfilment saga (dispatched only once payment is authorized), not a client action, so
+ * exposing it would let a caller bypass the saga's preconditions. Approving a held review, by
+ * contrast, <em>is</em> a legitimate operator action and has its own endpoint below.
  */
 @RestController
 @RequestMapping("/orders")
-@Tag(name = "Orders", description = "Place, confirm, and read orders")
+@Tag(name = "Orders", description = "Place, approve-review, and read orders")
 public class OrderController {
 
   private final CommandBus commandBus;
@@ -52,14 +57,18 @@ public class OrderController {
     return ResponseEntity.created(URI.create("/orders/" + id)).build();
   }
 
-  @Operation(summary = "Confirm a placed order")
-  @ApiResponse(responseCode = "204", description = "Order confirmed; no body.")
-  @PostMapping("/{id}/confirm")
-  public ResponseEntity<Void> confirm(
-      @Parameter(description = "Identifier of the order to confirm.", example = "ord-123")
+  @Operation(summary = "Approve the manual review of an order awaiting it")
+  @ApiResponse(
+      responseCode = "204",
+      description = "Review approved; the order is cleared for fulfilment.")
+  @PostMapping("/{id}/approve-review")
+  public ResponseEntity<Void> approveReview(
+      @Parameter(
+              description = "Identifier of the order whose review to approve.",
+              example = "ord-123")
           @PathVariable
           String id) {
-    commandBus.send(new ConfirmOrder(id));
+    commandBus.send(new ApproveReview(id));
     return ResponseEntity.noContent().build();
   }
 

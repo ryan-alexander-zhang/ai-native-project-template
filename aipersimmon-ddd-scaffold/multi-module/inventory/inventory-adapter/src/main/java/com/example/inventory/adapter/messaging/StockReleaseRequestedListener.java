@@ -10,9 +10,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Reacts to ordering's {@link StockReleaseRequested} integration event by sending a {@link
- * ReleaseStock} command through the command bus. The mirror of {@link OrderPlacedListener} on the
- * compensation path: it reads only ordering's published contract and keeps the causing event's
- * context so the {@code StockReleased} it triggers stays correlated to the order.
+ * ReleaseStock} command through the command bus. The mirror of {@link
+ * OrderReadyForFulfilmentListener} on the compensation path: it reads only ordering's published
+ * contract and keeps the causing event's context so the {@code StockReleased} it triggers stays
+ * correlated to the order.
  */
 @Component
 public class StockReleaseRequestedListener {

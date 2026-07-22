@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Drives the order-fulfilment {@link OrderFulfilmentProcess} through the durable {@link
- * ProcessRuntime}: {@code placed} starts the instance; each subsequent fact resolves the instance's
- * {@link ProcessRef} from its order id (the business key) and hands the input to {@code handle}.
- * The runtime stages the ordering commands as effects and a relay delivers them — so the
- * coordination is durable and at-least-once, not a synchronous in-memory saga.
+ * ProcessRuntime}: {@code readyForFulfilment} starts the instance; each subsequent fact resolves
+ * the instance's {@link ProcessRef} from its order id (the business key) and hands the input to
+ * {@code handle}. The runtime stages the ordering commands as effects and a relay delivers them —
+ * so the coordination is durable and at-least-once, not a synchronous in-memory saga.
  *
  * <p>The terminal domain facts (confirmed/cancelled) arrive without an inbound message, so they run
  * under a deterministic root context keyed by the order id; the cross-context result facts carry
@@ -35,12 +35,12 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
   }
 
   @Override
-  public void placed(String orderId) {
+  public void readyForFulfilment(String orderId) {
     runtime.start(
         TYPE,
         new ProcessBusinessKey(orderId),
-        new OrderFulfilmentInput.OrderPlaced(orderId),
-        rootContext("placed", orderId));
+        new OrderFulfilmentInput.ReadyForFulfilment(orderId),
+        rootContext("ready-for-fulfilment", orderId));
   }
 
   @Override

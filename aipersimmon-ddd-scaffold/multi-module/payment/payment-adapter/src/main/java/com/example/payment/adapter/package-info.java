@@ -1,6 +1,6 @@
 /**
  * Interface layer of the payment context: the inbound adapter that translates ordering's
- * PaymentRequested integration event into a charge-payment use-case call. Depends inward on the
+ * PaymentRequested integration event into an authorize-payment use-case call. Depends inward on the
  * application layer; it reads only ordering's published contract.
  */
 @InterfaceLayer

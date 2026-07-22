@@ -1,13 +1,11 @@
 package com.example;
 
-import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,8 +28,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @Import(TestInfrastructure.class)
 class ExceptionContractTest {
-
-  private static final Duration SETTLE = Duration.ofSeconds(30);
 
   private final MockMvc mvc;
 
@@ -90,8 +86,8 @@ class ExceptionContractTest {
   }
 
   @Test
-  void unknownOrderOnConfirmRenders404() throws Exception {
-    mvc.perform(post("/orders/NON-EXISTENT/confirm"))
+  void unknownOrderOnApproveReviewRenders404() throws Exception {
+    mvc.perform(post("/orders/NON-EXISTENT/approve-review"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("ordering.order-not-found"));
   }
@@ -129,9 +125,10 @@ class ExceptionContractTest {
   }
 
   @Test
-  void confirmingAnAlreadyConfirmedOrderRenders409() throws Exception {
-    // Placing succeeds; the durable fulfilment flow then confirms the order (SKU-1 has stock
-    // and the amount is under the payment ceiling) once the async transport settles.
+  void approvingReviewOfAnOrderNotAwaitingReviewRenders409AndCode() throws Exception {
+    // SKU-1 needs no manual review, so placing it clears the order for fulfilment immediately
+    // (it is already past AWAITING_REVIEW when the POST returns). Approving a review it never
+    // required is a conflict with the current state → 409, carrying the domain's stable code.
     String body =
         """
                 {"customerId":"CUST-1",
@@ -144,20 +141,12 @@ class ExceptionContractTest {
             .getResponse()
             .getHeader("Location");
 
-    // The cross-context cascade rides outbox → Kafka → inbox back into the process, so wait for
-    // the flow to reach CONFIRMED rather than pumping a relay by hand.
-    await()
-        .atMost(SETTLE)
-        .untilAsserted(
-            () -> mvc.perform(get(location)).andExpect(jsonPath("$.status").value("CONFIRMED")));
-
-    // Confirming again is a transition the Order state machine does not allow
-    // (CONFIRMED -> CONFIRMED), i.e. a conflict with the current state → 409.
-    mvc.perform(post(location + "/confirm"))
+    mvc.perform(post(location + "/approve-review"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.status").value(409))
-        // The state-machine guard carries no code, so the type is about:blank (a
-        // conflict whose semantics are fully described by the 409 status).
-        .andExpect(jsonPath("$.type").value("about:blank"));
+        // Unlike a bare state-machine guard, this conflict carries a stable domain code — the
+        // CONFLICT-category error the aggregate raises for a review action on a non-reviewable
+        // order.
+        .andExpect(jsonPath("$.code").value("ordering.order-not-awaiting-review"));
   }
 }

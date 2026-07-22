@@ -270,13 +270,13 @@ class OrderFulfilmentDefinitionTest {
   }
 
   @Test
-  void orderPlacedReachingReactIsRejected() {
+  void readyForFulfilmentReachingReactIsRejected() {
     assertThrows(
         IllegalStateException.class,
         () ->
             definition.react(
                 awaitingStock(),
-                new OrderFulfilmentInput.OrderPlaced(ORDER),
+                new OrderFulfilmentInput.ReadyForFulfilment(ORDER),
                 context("msg", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK)));
   }
 
