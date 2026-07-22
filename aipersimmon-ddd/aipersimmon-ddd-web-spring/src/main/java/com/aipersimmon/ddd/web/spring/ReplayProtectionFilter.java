@@ -65,14 +65,12 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
       return;
     }
 
-    Instant timestamp;
-    try {
-      timestamp = Instant.ofEpochSecond(Long.parseLong(timestampRaw.trim()));
-    } catch (NumberFormatException e) {
+    Instant timestamp = parseEpochSecond(timestampRaw);
+    if (timestamp == null) {
       reject(response, "Malformed timestamp");
       return;
     }
-    if (Duration.between(timestamp, clock.instant()).abs().compareTo(tolerance) > 0) {
+    if (isStale(timestamp)) {
       reject(response, "Request timestamp outside tolerance");
       return;
     }
@@ -84,17 +82,44 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
     }
 
     CachedBodyRequestWrapper cached = new CachedBodyRequestWrapper(request);
-    if (!verifier.verify(new SignedRequest(signature, cached.bodyAsString(), timestamp, nonce))) {
-      reject(response, "Invalid signature");
-      return;
-    }
-
-    if (nonceEnabled && replayGuard.seenBefore(nonce, tolerance.multipliedBy(2))) {
-      reject(response, "Replayed request");
+    String authRejection = verifyAuthenticity(signature, timestamp, nonce, cached);
+    if (authRejection != null) {
+      reject(response, authRejection);
       return;
     }
 
     filterChain.doFilter(cached, response);
+  }
+
+  /** The epoch-second timestamp, or {@code null} if it is not a parseable number. */
+  private static Instant parseEpochSecond(String raw) {
+    try {
+      return Instant.ofEpochSecond(Long.parseLong(raw.trim()));
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  /** Whether {@code timestamp} is further from now than the configured tolerance (either way). */
+  private boolean isStale(Instant timestamp) {
+    return Duration.between(timestamp, clock.instant()).abs().compareTo(tolerance) > 0;
+  }
+
+  /**
+   * The body-dependent authenticity checks: the signature must verify over the cached body, and —
+   * when nonce dedup is on — the nonce must not have been seen before. Returns a rejection reason,
+   * or {@code null} if the request is authentic and fresh.
+   */
+  private String verifyAuthenticity(
+      String signature, Instant timestamp, String nonce, CachedBodyRequestWrapper cached)
+      throws IOException {
+    if (!verifier.verify(new SignedRequest(signature, cached.bodyAsString(), timestamp, nonce))) {
+      return "Invalid signature";
+    }
+    if (nonceEnabled && replayGuard.seenBefore(nonce, tolerance.multipliedBy(2))) {
+      return "Replayed request";
+    }
+    return null;
   }
 
   private void reject(HttpServletResponse response, String detail) throws IOException {
