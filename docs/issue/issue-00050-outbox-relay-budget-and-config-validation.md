@@ -83,9 +83,10 @@ parent: plan-00006-middleware-integration
 
 > 长期方向(超出本 issue,未做):行级 claim/lease/fencing 取代"单定时锁保护整批",从根上消解批级预算与租约的张力。
 
-> 验证:相关模块 `compile` + `test` 全绿(含新 `OutboxPropertiesTest` 与既有 `AutoConfigurationWiringTest`),Spotless
-> 格式门禁通过。PMD/CPD 与 SpotBugs 门禁因本机工具环境在**未修改的** `aipersimmon-ddd-core` 上即 `StackOverflowError`
-> / fork 崩溃而未能本地跑完,留待 CI 复核;本次改动为配置 POJO + 校验 + 一个 guard bean,不涉复杂度/重复热点。
+> 验证:全 reactor `clean verify`(Java 21)`BUILD SUCCESS`——PMD/CPD、SpotBugs、Spotless、ArchUnit、全部测试
+> (含新 `OutboxPropertiesTest`、既有 `AutoConfigurationWiringTest`,以及 `messaging-kafka` 的嵌入式 Kafka 集成测试)
+> 均通过。(先前一次本地跑不完是因为 Maven 误跑在 Homebrew JDK 26 上,SpotBugs/PMD 无法解析 major version 70 字节码;
+> 统一到 Java 21 后门禁恢复正常,与本次改动无关。)
 
 ## 关联
 
