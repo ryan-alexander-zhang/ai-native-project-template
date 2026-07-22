@@ -207,7 +207,7 @@ public final class JdbcProcessOperations {
               instances
                   .findForUpdate(ref.instanceId())
                   .orElseThrow(() -> new ProcessNotFoundException(ref));
-          requireRefMatch(ref, row);
+          row.requireRefMatches(ref);
           if (row.revision().value() != expectedRevision) {
             throw new StaleProcessRevisionException(
                 ref, new ProcessRevision(expectedRevision), row.revision());
@@ -245,26 +245,5 @@ public final class JdbcProcessOperations {
               clock.instant());
           return null;
         });
-  }
-
-  /**
-   * Fail fast when a ref carries a real instanceId but a processType/businessKey that disagrees
-   * with the stored row, so an operator cancel never terminates the wrong instance (the same
-   * load-boundary guard the runtime applies to handle).
-   */
-  private static void requireRefMatch(ProcessRef ref, ProcessInstanceRow row) {
-    if (!row.ref().equals(ref)) {
-      throw new IllegalArgumentException(
-          "process ref mismatch for instance "
-              + ref.instanceId().value()
-              + ": supplied "
-              + ref.processType().value()
-              + "/"
-              + ref.businessKey().value()
-              + " but the stored instance is "
-              + row.ref().processType().value()
-              + "/"
-              + row.ref().businessKey().value());
-    }
   }
 }

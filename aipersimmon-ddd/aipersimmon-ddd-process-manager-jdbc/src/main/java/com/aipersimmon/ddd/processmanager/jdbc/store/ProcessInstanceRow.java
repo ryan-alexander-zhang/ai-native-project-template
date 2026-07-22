@@ -35,4 +35,25 @@ public record ProcessInstanceRow(
   public byte[] statePayload() {
     return statePayload.clone();
   }
+
+  /**
+   * Fail fast when this row's ref disagrees with the {@code expected} one, so an operator action or
+   * a load-boundary check never targets the wrong instance. The same guard is applied by the
+   * runtime on handle and by the operations facade.
+   */
+  public void requireRefMatches(ProcessRef expected) {
+    if (!ref().equals(expected)) {
+      throw new IllegalArgumentException(
+          "process ref mismatch for instance "
+              + expected.instanceId().value()
+              + ": supplied "
+              + expected.processType().value()
+              + "/"
+              + expected.businessKey().value()
+              + " but the stored instance is "
+              + ref().processType().value()
+              + "/"
+              + ref().businessKey().value());
+    }
+  }
 }

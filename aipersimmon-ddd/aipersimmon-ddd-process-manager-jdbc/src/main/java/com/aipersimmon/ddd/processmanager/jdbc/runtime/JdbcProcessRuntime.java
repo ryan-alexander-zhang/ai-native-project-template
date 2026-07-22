@@ -422,7 +422,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         instances
             .findForUpdate(ref.instanceId())
             .orElseThrow(() -> new ProcessNotFoundException(ref));
-    requireRefMatch(ref, row);
+    row.requireRefMatches(ref);
 
     Optional<String> duplicate =
         transitions.findTransitionIdByInput(ref.instanceId(), cause.messageId());
@@ -532,28 +532,6 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
 
     return new ProcessAdvanceResult(
         ref, revision, decision.lifecycle(), decision.step(), false, transitionId);
-  }
-
-  /**
-   * Fail fast when a ref carries a real instanceId but a processType/businessKey that disagrees
-   * with the stored row. Identity is loaded from the row, never trusted from the caller, so a
-   * mismatched ref cannot silently drive the wrong definition/codec against a real instance (the
-   * same guard sits on the read query and the operator cancel).
-   */
-  private static void requireRefMatch(ProcessRef ref, ProcessInstanceRow row) {
-    if (!row.ref().equals(ref)) {
-      throw new IllegalArgumentException(
-          "process ref mismatch for instance "
-              + ref.instanceId().value()
-              + ": supplied "
-              + ref.processType().value()
-              + "/"
-              + ref.businessKey().value()
-              + " but the stored instance is "
-              + row.ref().processType().value()
-              + "/"
-              + row.ref().businessKey().value());
-    }
   }
 
   private ProcessAdvanceResult duplicateResult(ProcessInstanceRow row, String transitionId) {
