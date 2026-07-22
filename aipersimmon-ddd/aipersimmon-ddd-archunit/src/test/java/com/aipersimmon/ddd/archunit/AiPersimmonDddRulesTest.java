@@ -15,6 +15,8 @@ class AiPersimmonDddRulesTest {
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
   private static final JavaClasses ANNOTATED_EVENT_IN_ADAPTER =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.annotated");
+  private static final JavaClasses APIDOC_BAD =
+      new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.apidoc");
   private static final String CONTEXTS_GOOD_BASE =
       "com.aipersimmon.ddd.archunit.fixture.contexts.good";
   private static final String CONTEXTS_BAD_BASE =
@@ -145,6 +147,18 @@ class AiPersimmonDddRulesTest {
   @Test
   void domainShouldBeFrameworkFree_passesForGood() {
     assertDoesNotThrow(() -> LayeringRules.domainShouldBeFrameworkFree().check(GOOD));
+  }
+
+  @Test
+  void domainShouldNotDependOnApiDocumentation_passesForGood() {
+    assertDoesNotThrow(() -> LayeringRules.domainShouldNotDependOnApiDocumentation().check(GOOD));
+  }
+
+  @Test
+  void domainShouldNotDependOnApiDocumentation_failsForBad() {
+    assertThrows(
+        AssertionError.class,
+        () -> LayeringRules.domainShouldNotDependOnApiDocumentation().check(APIDOC_BAD));
   }
 
   @Test

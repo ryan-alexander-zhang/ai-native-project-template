@@ -174,8 +174,28 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-openapi-spring-boot-starter</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-archunit</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <!-- OpenAPI/Swagger versions re-exported (values from aipersimmon-ddd-parent). The full
+           springdoc runtime reaches the app transitively through the openapi starter; the
+           annotation jar is what a consumer's adapter tier compiles against at `provided` scope.
+           Re-exported here so a consumer importing this BOM aligns on the same versions without
+           inheriting the parent. -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-annotations-jakarta</artifactId>
+        <version>${swagger.version}</version>
       </dependency>
       <!-- Note: aipersimmon-ddd-quality-config (the shared PMD/SpotBugs rulesets) is
            deliberately NOT listed here — it is a plugin-classpath artifact, never a normal

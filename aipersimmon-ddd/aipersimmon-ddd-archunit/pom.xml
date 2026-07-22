@@ -66,5 +66,14 @@
       <artifactId>spring-context</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test only: a fixture that (wrongly) annotates an application-tier read model with an OpenAPI
+         schema annotation, so domainAndApplicationShouldNotDependOnApiDocumentation has a real
+         violation to catch. Never a compile dependency — the rule exists to keep this jar off the
+         inner tiers. -->
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-annotations-jakarta</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

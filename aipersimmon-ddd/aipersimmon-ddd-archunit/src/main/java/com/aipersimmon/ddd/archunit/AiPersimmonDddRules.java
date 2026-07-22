@@ -56,6 +56,7 @@ public final class AiPersimmonDddRules {
     return CompositeArchRule.of(LayeringRules.domainShouldNotDependOnOuterLayers())
         .and(LayeringRules.applicationShouldNotDependOnInfrastructureOrInterface())
         .and(LayeringRules.domainShouldBeFrameworkFree())
+        .and(LayeringRules.domainShouldNotDependOnApiDocumentation())
         .and(EventRules.domainEventsShouldStayInDomain())
         .and(EventRules.domainEventListenersShouldResideInApplicationOrDomain())
         .and(EventRules.integrationEventListenersShouldResideInAdapter())

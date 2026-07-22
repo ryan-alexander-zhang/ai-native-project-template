@@ -12,9 +12,10 @@ import com.tngtech.archunit.lang.ArchRule;
  * layer is a sub-package (single deployable) or its own module (multi-module build).
  *
  * <p>{@link #domainShouldNotDependOnOuterLayers()}, {@link
- * #applicationShouldNotDependOnInfrastructureOrInterface()}, and {@link
- * #domainShouldBeFrameworkFree()} are bundled into {@link AiPersimmonDddRules#all()}; {@link
- * #adapterShouldNotDependOnDomain()} is opt-in.
+ * #applicationShouldNotDependOnInfrastructureOrInterface()}, {@link
+ * #domainShouldBeFrameworkFree()}, and {@link #domainShouldNotDependOnApiDocumentation()} are
+ * bundled into {@link AiPersimmonDddRules#all()}; {@link #adapterShouldNotDependOnDomain()} is
+ * opt-in.
  */
 public final class LayeringRules {
 
@@ -30,6 +31,18 @@ public final class LayeringRules {
     "org.apache.ibatis..",
     "com.baomidou..",
     "com.fasterxml.jackson..",
+  };
+
+  /**
+   * API-documentation frameworks (OpenAPI/Swagger) the domain layer must not touch. The domain is
+   * the pure core and stays free of every transport and framework concern, documentation included.
+   * The application and interface tiers are deliberately <em>not</em> covered: a CQRS read model is
+   * a presentation-facing DTO, so annotating it (or a request/response DTO) with {@code @Schema} to
+   * document the wire contract is legitimate — the common practice across DDD + CQRS + OpenAPI
+   * codebases (e.g. eShopOnContainers).
+   */
+  private static final String[] API_DOCUMENTATION_PACKAGES = {
+    "io.swagger..", "org.springdoc..",
   };
 
   private LayeringRules() {}
@@ -58,6 +71,28 @@ public final class LayeringRules {
         .resideInAnyPackage("..infrastructure..", "..adapter..")
         .as("application classes should not depend on the infrastructure or interface layers")
         .because("use-case orchestration must depend inward on the domain only")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * The domain layer must be free of API-documentation frameworks. The domain is the framework-free
+   * core; OpenAPI/Swagger annotations are a transport/presentation concern that never belongs on an
+   * aggregate, value object, or domain event. The application and interface tiers are deliberately
+   * <em>not</em> covered — a CQRS read model is a presentation-facing projection, so documenting it
+   * (and request/response DTOs) with {@code @Schema} is normal and allowed.
+   */
+  public static ArchRule domainShouldNotDependOnApiDocumentation() {
+    return noClasses()
+        .that()
+        .resideInAPackage("..domain..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(API_DOCUMENTATION_PACKAGES)
+        .as("domain classes should not depend on API-documentation frameworks (OpenAPI/Swagger)")
+        .because(
+            "the domain is the framework-free core; OpenAPI/Swagger annotations are a "
+                + "transport/presentation concern for the application or interface tier, not for "
+                + "domain types")
         .allowEmptyShould(true);
   }
 

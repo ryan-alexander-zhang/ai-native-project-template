@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Opt-in OpenAPI/Swagger wiring. Adding this starter to an application turns on springdoc:
+    it pulls in the springdoc webmvc runtime (the /v3/api-docs scanner + Swagger UI), which
+    documents every @RestController by reflection with zero annotations required, then contributes
+    a GlobalOpenApiCustomizer that documents the framework's cross-cutting web contracts the
+    per-controller reflection cannot see: the RFC 9457 (application/problem+json) error responses
+    the shared @RestControllerAdvice produces, shaped after the -web tier's ApiError.
+
+    Deliberately NOT depended on by the inner tiers: read models (@ReadModel) are documented by
+    reflection alone, so domain/application carry no OpenAPI dependency at all (enforced by
+    LayeringRules.domainAndApplicationShouldNotDependOnApiDocumentation). Controllers that want to
+    enrich an operation add io.swagger.core.v3:swagger-annotations-jakarta at `provided` scope in
+    their own adapter module — they do NOT need this starter on their compile classpath.
+
+    Everything is guarded: the auto-configuration is @ConditionalOnClass(springdoc) and gated by
+    aipersimmon.ddd.openapi.enabled (default true); omitting the starter leaves the app springdoc-free.
+  -->
+  <artifactId>aipersimmon-ddd-openapi-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-openapi-spring-boot-starter</name>
+  <description>Spring Boot auto-configuration that pulls in springdoc and documents the framework's cross-cutting web contracts (RFC 9457 problem responses) in the generated OpenAPI spec.</description>
+
+  <dependencies>
+    <!-- The framework-free web contract: ApiError / FieldError / DefaultProblemFamilies shape the
+         problem responses the customizer attaches, so the spec matches what -web-spring emits. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- The springdoc webmvc runtime: the /v3/api-docs scanner, the OpenAPI model
+         (io.swagger.v3.oas.models.*), the GlobalOpenApiCustomizer extension point, and Swagger UI.
+         Pulled in transitively by the consuming app; UI is gated at runtime by
+         springdoc.swagger-ui.enabled, so a prod profile can serve api-docs without the UI. -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
+
+    <!-- @AutoConfiguration / @ConditionalOn* / @ConfigurationProperties. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <!-- Test: the customizer is a plain unit under test (no Spring context needed); springdoc-core
+         and the swagger models come transitively from the runtime dependency above. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test: ApplicationContextRunner to assert the auto-configuration wires (and backs off). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test: WebApplicationContextRunner needs the servlet API to stand up a mock servlet web
+         context (the auto-configuration is @ConditionalOnWebApplication(SERVLET)). -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

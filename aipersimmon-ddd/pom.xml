@@ -54,6 +54,16 @@
     <pitest-junit5-plugin.version>1.2.2</pitest-junit5-plugin.version>
     <maven-pmd-plugin.version>3.26.0</maven-pmd-plugin.version>
     <spotbugs-maven-plugin.version>4.8.6.6</spotbugs-maven-plugin.version>
+    <!-- OpenAPI/Swagger (springdoc). NOT managed by spring-boot-dependencies, so pinned here; the
+         2.8.x line is the one built against Spring Boot 3.5. Two coordinates, two audiences:
+         springdoc-openapi-starter-webmvc-ui is the full runtime (scanner + Swagger UI) that only the
+         opt-in aipersimmon-ddd-openapi-spring-boot-starter and the app pull in; swagger-annotations-jakarta
+         is the pure annotation jar the interface/adapter tier compiles against at `provided` scope to
+         enrich operations, WITHOUT dragging the springdoc runtime into the adapter. The inner tiers
+         (domain/application) depend on neither — read models are documented by reflection (enforced by
+         LayeringRules.domainAndApplicationShouldNotDependOnApiDocumentation). -->
+    <springdoc.version>2.8.9</springdoc.version>
+    <swagger.version>2.2.30</swagger.version>
   </properties>
 
   <modules>
@@ -90,6 +100,9 @@
     <module>aipersimmon-ddd-web-spring</module>
     <module>aipersimmon-ddd-web-store-jdbc</module>
     <module>aipersimmon-ddd-web-store-redis</module>
+    <!-- Opt-in OpenAPI/Swagger starter: springdoc runtime + a customizer that documents the
+         framework's cross-cutting web contracts (RFC 9457 problem responses, pagination, headers). -->
+    <module>aipersimmon-ddd-openapi-spring-boot-starter</module>
     <module>aipersimmon-ddd-archunit</module>
     <!-- Reusable Testcontainers support (singleton containers + Spring Boot
          @ServiceConnection configs); consumers add it at test scope. See design-00007. -->
@@ -167,6 +180,20 @@
         <groupId>com.tngtech.archunit</groupId>
         <artifactId>archunit-junit5</artifactId>
         <version>${archunit.version}</version>
+      </dependency>
+      <!-- OpenAPI/Swagger versions (not managed by spring-boot-dependencies). The full springdoc
+           runtime is pulled in only by the opt-in openapi starter and the app; the annotation jar is
+           what the adapter tier compiles against at `provided`. Both are re-exported by the BOM so a
+           consumer that imports it (e.g. the scaffold) aligns on the same versions. -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-annotations-jakarta</artifactId>
+        <version>${swagger.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
