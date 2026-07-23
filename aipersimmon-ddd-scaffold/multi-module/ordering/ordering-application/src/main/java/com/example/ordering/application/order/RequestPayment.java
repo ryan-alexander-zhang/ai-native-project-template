@@ -1,6 +1,7 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 
 /**
  * Ordering-internal command the saga sends to ask the payment context to authorize payment for an
@@ -16,4 +17,12 @@ import com.aipersimmon.ddd.cqrs.Command;
  * authorize twice (design-00004 §13.2; complements the transport-level effect id, it does not
  * replace it).
  */
+@OperationLog(
+    code = "ordering.order.request-payment",
+    targetType = "Order",
+    targetId = "${input.orderId}",
+    success =
+        "Requested payment for order ${input.orderId} (operation ${input.paymentOperationId})",
+    failure =
+        "Payment request for order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
 public record RequestPayment(String orderId, String paymentOperationId) implements Command<Void> {}

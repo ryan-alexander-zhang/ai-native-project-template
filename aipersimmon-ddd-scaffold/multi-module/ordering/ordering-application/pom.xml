@@ -39,6 +39,12 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs</artifactId>
     </dependency>
+    <!-- Operation Log: the @OperationLog annotation on write commands. Annotation-only metadata;
+         the capture interceptors and the storage backend are wired in the `start` module. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log</artifactId>
+    </dependency>
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>ordering-api</artifactId>

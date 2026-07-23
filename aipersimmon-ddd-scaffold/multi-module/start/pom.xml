@@ -51,6 +51,23 @@
       <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
     </dependency>
     <!--
+      Operation Log: records a business-readable audit row for every write command carrying
+      @OperationLog. The cqrs-spring capture layer auto-registers two CommandInterceptors on the
+      same bus (a committed-success one inside the transaction, a failure one outside it); the
+      mybatis-plus backend persists rows via the app's SqlSessionFactory / DataSource, and its DDL
+      is applied by the aipersimmon Flyway starter once `operation-log` is listed under
+      aipersimmon.ddd.flyway.components (see application.yml). The actor/tenant resolvers are
+      provided by OperationLogConfig in this module.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
+    </dependency>
+    <!--
       Web-layer contract: maps DomainException/ApplicationException and validation
       failures to RFC 9457 ProblemDetail responses, plus a trace-id filter. These
       zero-risk concerns are auto-configured on and replace a hand-written advice.

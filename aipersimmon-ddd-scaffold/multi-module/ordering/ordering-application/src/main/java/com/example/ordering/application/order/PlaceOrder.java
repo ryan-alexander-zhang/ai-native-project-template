@@ -1,6 +1,7 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -18,6 +19,13 @@ import java.util.List;
  * application, not just the web adapter. Note {@code @Valid} on the list element, which cascades
  * into each {@link Line}.
  */
+@OperationLog(
+    code = "ordering.order.place",
+    targetType = "Customer",
+    targetId = "${input.customerId}",
+    success = "Placed order ${resultProjection} for customer ${input.customerId}",
+    failure =
+        "Placing order for customer ${input.customerId} failed: ${failure.code} (${failure.safeSummary})")
 public record PlaceOrder(@NotBlank String customerId, @NotEmpty List<@Valid Line> lines)
     implements Command<String> {
 

@@ -1,6 +1,7 @@
 package com.example.inventory.application.stock;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -15,6 +16,13 @@ import java.util.List;
  * an inbound event with a malformed payload is rejected the same way a bad HTTP request would be —
  * there is no web adapter here to guard it.
  */
+@OperationLog(
+    code = "inventory.stock.reserve",
+    targetType = "Order",
+    targetId = "${input.orderId}",
+    success = "Reserved stock for order ${input.orderId}",
+    failure =
+        "Stock reservation for order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
 public record ReserveStock(@NotBlank String orderId, @NotEmpty List<@Valid Line> lines)
     implements Command<Void> {
 

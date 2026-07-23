@@ -1,6 +1,7 @@
 package com.example.payment.application;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 
@@ -17,6 +18,14 @@ import jakarta.validation.constraints.Positive;
  * same operation id are one business authorization, so an at-least-once redelivery must not
  * authorize twice (design-00004 §13.2).
  */
+@OperationLog(
+    code = "payment.authorize",
+    targetType = "Order",
+    targetId = "${input.orderId}",
+    success =
+        "Authorized payment for order ${input.orderId} (${input.amountMinor} ${input.currency})",
+    failure =
+        "Authorizing payment for order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
 public record AuthorizePayment(
     @NotBlank String orderId,
     @NotBlank String paymentOperationId,

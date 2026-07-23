@@ -1,6 +1,7 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 import com.example.ordering.domain.order.CancellationReason;
 
 /**
@@ -9,4 +10,10 @@ import com.example.ordering.domain.order.CancellationReason;
  * would let a caller assert "cancel" without saying why or proving that any compensation ran. No
  * result.
  */
+@OperationLog(
+    code = "ordering.order.cancel",
+    targetType = "Order",
+    targetId = "${input.orderId}",
+    success = "Cancelled order ${input.orderId} (reason ${input.reason})",
+    failure = "Cancelling order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
 public record CancelOrder(String orderId, CancellationReason reason) implements Command<Void> {}
