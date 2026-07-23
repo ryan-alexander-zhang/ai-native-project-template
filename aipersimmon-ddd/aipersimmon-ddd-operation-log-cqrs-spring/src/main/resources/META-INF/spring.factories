@@ -1,0 +1,3 @@
+# Turns a missing OperationActorResolver / OperationTenantResolver into an actionable startup error.
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.aipersimmon.ddd.operationlog.cqrs.autoconfigure.MissingOperationLogResolverFailureAnalyzer
