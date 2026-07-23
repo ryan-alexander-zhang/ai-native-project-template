@@ -26,7 +26,7 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-application</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-infrastructure</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-adapter</artifactId></dependency>
-    <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-process-jdbc</artifactId></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-process-mybatis-plus</artifactId></dependency>
 
     <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-api</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-domain</artifactId></dependency>
@@ -70,10 +70,12 @@
       <artifactId>aipersimmon-ddd-openapi-spring-boot-starter</artifactId>
     </dependency>
     <!-- Durable Process Manager runtime: wires the order-fulfilment definition + codecs
-         into the JDBC runtime, relay, and deadline worker over the app's DataSource. -->
+         into the MyBatis-Plus runtime, relay, and deadline worker over the app's DataSource.
+         Shares the same SqlSessionFactory / DataSource as the outbox/inbox mappers below, so
+         the process store beans and the aggregate/outbox writes sit on one MyBatis-Plus stack. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
     </dependency>
     <!-- Auto-applies the aipersimmon schema (here: the four process-manager tables) at startup
          via Flyway, on a dedicated history table — replaces a hand-copied schema.sql. -->

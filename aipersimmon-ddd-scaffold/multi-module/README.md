@@ -12,8 +12,8 @@ setting** — not to be a complete product. Three bounded contexts collaborate t
 Each context is split into the standard layers, one Maven module each:
 `*-api` (published cross-context contract) · `*-domain` (model + rules, framework-free) ·
 `*-application` (use cases + ports) · `*-infrastructure` (technical port implementations) ·
-`*-adapter` (inbound transport). Ordering additionally has `ordering-process-jdbc` (the durable
-process manager) and `start` (the Spring Boot composition root + architecture tests).
+`*-adapter` (inbound transport). Ordering additionally has `ordering-process-mybatis-plus` (the
+durable process manager) and `start` (the Spring Boot composition root + architecture tests).
 
 ## Build and run
 

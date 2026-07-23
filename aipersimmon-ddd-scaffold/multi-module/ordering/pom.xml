@@ -23,6 +23,6 @@
     <module>ordering-application</module>
     <module>ordering-infrastructure</module>
     <module>ordering-adapter</module>
-    <module>ordering-process-jdbc</module>
+    <module>ordering-process-mybatis-plus</module>
   </modules>
 </project>

@@ -12,19 +12,19 @@
   </parent>
 
   <!--
-    The ordering context's durable Process Manager provider, on the JDBC (relational)
-    runtime. It owns the order-fulfilment execution code that is specific to this
-    provider — the pure ProcessDefinition policy, its state and inputs, the persistence
+    The ordering context's durable Process Manager provider, on the MyBatis-Plus
+    (relational) runtime. It owns the order-fulfilment execution code that is specific to
+    this provider — the pure ProcessDefinition policy, its state and inputs, the persistence
     codecs, and the runtime-backed implementation of the application's business port.
     The application layer holds only the provider-agnostic contract (the port), so
-    swapping this provider (a Temporal/Seata module, a MyBatis-Plus store) leaves the
+    swapping this provider (a Temporal/Seata module, a JDBC store) leaves the
     application untouched. Kept a separate module — not a sub-package of application —
     so the process-manager framework dependency is compile-fenced out of the
     application layer (design-00004 §六/§13.1; analysis-00012 §7).
   -->
-  <artifactId>ordering-process-jdbc</artifactId>
-  <name>ordering-process-jdbc</name>
-  <description>The ordering context's order-fulfilment Process Manager provider (JDBC runtime).</description>
+  <artifactId>ordering-process-mybatis-plus</artifactId>
+  <name>ordering-process-mybatis-plus</name>
+  <description>The ordering context's order-fulfilment Process Manager provider (MyBatis-Plus runtime).</description>
 
   <dependencies>
     <!-- The business port this provider implements, plus the ordering commands it dispatches. -->
@@ -42,10 +42,11 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-process-manager</artifactId>
     </dependency>
-    <!-- JDBC runtime: ProcessRuntime is driven and JdbcProcessQuery resolves the instance ref. -->
+    <!-- MyBatis-Plus runtime: ProcessRuntime is driven and DefaultProcessQuery resolves the
+         instance ref, both over the MyBatis-Plus store beans. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
     </dependency>
     <!-- CQRS contracts: the CommandContext carried on each fact into the runtime. -->
     <dependency>
