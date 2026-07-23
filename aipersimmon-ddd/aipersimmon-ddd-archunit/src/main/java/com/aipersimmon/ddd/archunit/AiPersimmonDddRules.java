@@ -35,6 +35,8 @@ import com.tngtech.archunit.lang.CompositeArchRule;
  *   <li>{@link RepositoryRules} — repository ports and implementations; also the opt-in {@link
  *       RepositoryRules#implementationsShouldBeSpringRepositories()}.
  *   <li>{@link InvariantAndErrorRules} — invariants, state transitions, and error codes.
+ *   <li>{@link OperationLogRules} — the domain's freedom from the Operation Log component and the
+ *       {@code @OperationLog} annotation's placement on application commands.
  *   <li>{@link BoundedContextRules} — the parameterised cross-context isolation rule (opt-in).
  * </ul>
  *
@@ -74,6 +76,8 @@ public final class AiPersimmonDddRules {
         .and(InvariantAndErrorRules.illegalStateTransitionsShouldOnlyComeFromTransitions())
         .and(InvariantAndErrorRules.errorCodesShouldBeEnums())
         .and(RepositoryRules.portsShouldBeInterfacesInDomain())
-        .and(RepositoryRules.implementationsShouldResideInInfrastructure());
+        .and(RepositoryRules.implementationsShouldResideInInfrastructure())
+        .and(OperationLogRules.domainShouldNotDependOnOperationLog())
+        .and(OperationLogRules.operationLogShouldOnlyAnnotateApplicationCommands());
   }
 }

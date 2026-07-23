@@ -82,6 +82,13 @@
     <module>aipersimmon-ddd-integration</module>
     <module>aipersimmon-ddd-cqrs</module>
     <module>aipersimmon-ddd-cqrs-spring</module>
+    <!-- Operation Log: framework-free core + storage-agnostic engine now; cqrs-spring capture +
+         jdbc/mybatis-plus backends are added incrementally (see plan-00010). -->
+    <module>aipersimmon-ddd-operation-log</module>
+    <module>aipersimmon-ddd-operation-log-engine</module>
+    <module>aipersimmon-ddd-operation-log-cqrs-spring</module>
+    <module>aipersimmon-ddd-operation-log-jdbc</module>
+    <module>aipersimmon-ddd-operation-log-mybatis-plus</module>
     <module>aipersimmon-ddd-process-manager</module>
     <module>aipersimmon-ddd-process-manager-engine</module>
     <module>aipersimmon-ddd-process-manager-jdbc</module>

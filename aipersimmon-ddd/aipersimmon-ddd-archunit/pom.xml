@@ -66,6 +66,16 @@
       <artifactId>spring-context</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test only: fixtures that carry the @OperationLog annotation and (mis)use the component, so
+         the OperationLogRules have real classes to accept and reject. The rules themselves match the
+         annotation and the operationlog packages by name, so this is never a compile dependency —
+         the rules jar stays free of the component and does not drag it onto a consumer's classpath. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <!-- Test only: a fixture that (wrongly) annotates an application-tier read model with an OpenAPI
          schema annotation, so domainAndApplicationShouldNotDependOnApiDocumentation has a real
          violation to catch. Never a compile dependency — the rule exists to keep this jar off the

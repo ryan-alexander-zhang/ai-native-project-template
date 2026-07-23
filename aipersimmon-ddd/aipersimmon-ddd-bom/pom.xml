@@ -84,6 +84,31 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-operation-log</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-operation-log-engine</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-operation-log-cqrs-spring</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-operation-log-jdbc</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-process-manager</artifactId>
         <version>${project.version}</version>
       </dependency>

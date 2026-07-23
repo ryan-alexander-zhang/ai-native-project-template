@@ -383,6 +383,31 @@ class AiPersimmonDddRulesTest {
   }
 
   @Test
+  void domainShouldNotDependOnOperationLog_passesForGood() {
+    assertDoesNotThrow(() -> OperationLogRules.domainShouldNotDependOnOperationLog().check(GOOD));
+  }
+
+  @Test
+  void domainShouldNotDependOnOperationLog_failsForBad() {
+    assertThrows(
+        AssertionError.class,
+        () -> OperationLogRules.domainShouldNotDependOnOperationLog().check(BAD));
+  }
+
+  @Test
+  void operationLogShouldOnlyAnnotateApplicationCommands_passesForGood() {
+    assertDoesNotThrow(
+        () -> OperationLogRules.operationLogShouldOnlyAnnotateApplicationCommands().check(GOOD));
+  }
+
+  @Test
+  void operationLogShouldOnlyAnnotateApplicationCommands_failsForBad() {
+    assertThrows(
+        AssertionError.class,
+        () -> OperationLogRules.operationLogShouldOnlyAnnotateApplicationCommands().check(BAD));
+  }
+
+  @Test
   void all_passesForGood() {
     assertDoesNotThrow(() -> AiPersimmonDddRules.all().check(GOOD));
   }

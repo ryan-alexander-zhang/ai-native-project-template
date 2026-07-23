@@ -46,3 +46,44 @@ Use Process Lifecycle for runtime condition, Business Step for process progress,
 > Developer: And an aggregate still decides whether its own status transition is valid?
 >
 > Domain expert: Yes. The Process Manager coordinates requests; it does not replace aggregate invariants.
+
+## Operation Log Language
+
+Canonical terms for the Operation Log component. Definitions and rationale live in
+`docs/decision/decision-00017-operation-log-component-boundaries.md` and `docs/design/design-00008-operation-log-component.md`.
+
+**Operation Log**:
+A business-readable record of who did what to which business object, with what outcome and which key fields changed.
+_Avoid_: Audit Log, Technical Log, Domain Event, generic application/SLF4J log
+
+**Audit Log**:
+A separate compliance/security-grade evidence record (strong identity, tamper-evident, enforced retention); not delivered by this component.
+_Avoid_: labeling an append-only Operation Log as an audit log
+
+**Operation Outcome**:
+The business result of an operation — `SUCCEEDED`, `REJECTED`, or `FAILED`.
+_Avoid_: HTTP status, exception type, aggregate status
+
+**Transaction Completion**:
+Whether the business transaction took effect — `COMMITTED`, `ROLLED_BACK`, `NOT_STARTED`, `UNKNOWN`; orthogonal to Operation Outcome.
+_Avoid_: conflating with Operation Outcome; a single success boolean
+
+**Actor**:
+The trusted snapshot of who performed an operation (type/id/displayName), captured at record time from a trusted boundary.
+_Avoid_: reading the actor from command payload; a mutable current-user lookup
+
+**Target**:
+The single primary business object an operation acts on (type/id/displayName).
+_Avoid_: multiple targets per record (not in v1); leaking sensitive natural ids
+
+**OperationChange**:
+An explicit, allowlisted before/after field change (field/label/before/after).
+_Avoid_: reflection-based full-object diff; unbounded change sets
+
+## Flagged ambiguities (Operation Log)
+
+**Outcome vs Completion**:
+Use Operation Outcome for the business result and Transaction Completion for whether it persisted; the two are orthogonal — a normal return may be `REJECTED + COMMITTED`, an exception may be `REJECTED + NOT_STARTED` or `FAILED + ROLLED_BACK`. Never collapse them into one success flag.
+
+**Operation Log vs Domain Event**:
+A Domain Event states a fact that happened in the domain and may drive behavior; an Operation Log is a user-readable, actor-attributed record that must never drive domain behavior. One may help produce the other, but neither replaces it.
