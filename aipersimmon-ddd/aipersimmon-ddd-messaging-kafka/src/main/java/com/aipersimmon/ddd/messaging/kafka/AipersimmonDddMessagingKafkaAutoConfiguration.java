@@ -118,14 +118,14 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Fail-loud guard. When the application declares {@code @Externalized} events and a
-   * Kafka transport is wired, those events reach the broker only if the active {@link
-   * IntegrationEvents} publisher is durable — i.e. it writes each event to the transactional outbox
-   * the relay drains ({@link DurableIntegrationEvents}). If an in-process (non-durable) publisher
-   * is active instead, {@code @Externalized} events would be published in process and <em>silently
-   * never leave the JVM</em>. This runs after all singletons are instantiated and, if it finds a
-   * non-durable publisher active, fails startup with a concrete remedy rather than letting the
-   * misconfiguration surface only as missing messages in production.
+   * Fail-loud guard. When the application declares {@code @Externalized} events and a Kafka
+   * transport is wired, those events reach the broker only if the active {@link IntegrationEvents}
+   * publisher is durable — i.e. it writes each event to the transactional outbox the relay drains
+   * ({@link DurableIntegrationEvents}). If an in-process (non-durable) publisher is active instead,
+   * {@code @Externalized} events would be published in process and <em>silently never leave the
+   * JVM</em>. This runs after all singletons are instantiated and, if it finds a non-durable
+   * publisher active, fails startup with a concrete remedy rather than letting the misconfiguration
+   * surface only as missing messages in production.
    *
    * <p>Scoped by {@link OnExternalizedEventsCondition} (only when something is actually
    * externalized) and {@code @ConditionalOnBean(KafkaTemplate)} (only when a real Kafka transport
@@ -154,8 +154,8 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Startup WARN when the relay's worst-case per-poll budget can outlive its lease.
-   * The relay dispatches a batch one row at a time and blocks on each broker ack up to {@code
+   * Startup WARN when the relay's worst-case per-poll budget can outlive its lease. The relay
+   * dispatches a batch one row at a time and blocks on each broker ack up to {@code
    * producer.send-timeout-ms}, so a whole poll of stalled sends takes up to {@code batch-size ×
    * send-timeout}; if that exceeds {@code relay.lock-at-most-for} the ShedLock lease can expire
    * mid-poll and a second instance can dispatch the same rows concurrently. The shipped defaults
@@ -286,8 +286,8 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Builds the error handler with three failure tiers, so an environment outage is
-   * not mistaken for a poison message. Package-private so it can be unit-tested without a broker.
+   * Builds the error handler with three failure tiers, so an environment outage is not mistaken for
+   * a poison message. Package-private so it can be unit-tested without a broker.
    *
    * <ul>
    *   <li><strong>Poison</strong> (the message is bad — unknown type, malformed, unparseable):

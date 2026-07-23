@@ -15,10 +15,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Regression test: when another component (here a stand-in {@code processManagerClock})
- * already contributes a {@code Clock} bean, this starter must still contribute its own {@code
- * outboxClock} and wire {@code outboxWriter} to it — not back off and leave the by-name injection
- * dangling.
+ * Regression test: when another component (here a stand-in {@code processManagerClock}) already
+ * contributes a {@code Clock} bean, this starter must still contribute its own {@code outboxClock}
+ * and wire {@code outboxWriter} to it — not back off and leave the by-name injection dangling.
  *
  * <p>Guards both root causes at once: the name-scoped {@code @ConditionalOnMissingBean(name =
  * "outboxClock")} keeps {@code outboxClock} present despite the foreign clock, and {@code

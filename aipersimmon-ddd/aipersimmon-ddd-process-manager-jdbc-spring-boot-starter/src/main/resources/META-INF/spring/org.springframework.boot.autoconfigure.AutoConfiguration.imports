@@ -1,3 +1,0 @@
-com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.codec.JacksonProcessCodecConfiguration
-com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.AipersimmonDddProcessManagerJdbcAutoConfiguration
-com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.ProcessManagerJdbcObservabilityConfiguration

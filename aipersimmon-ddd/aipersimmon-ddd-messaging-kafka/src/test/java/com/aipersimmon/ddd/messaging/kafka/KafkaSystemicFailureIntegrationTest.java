@@ -37,12 +37,12 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 /**
- * End-to-end over an in-JVM embedded broker (no Docker), proving the systemic-failure contract:
- * a handler that fails with a {@link org.springframework.dao.DataAccessException} (a
- * simulated database outage) for the first few deliveries and then recovers is retried until it
- * succeeds and is <strong>never</strong> dead-lettered — the opposite of the poison contract. This
- * is what keeps a transient infrastructure outage from flooding the DLT with healthy messages and
- * skipping past events (which would break per-aggregate order).
+ * End-to-end over an in-JVM embedded broker (no Docker), proving the systemic-failure contract: a
+ * handler that fails with a {@link org.springframework.dao.DataAccessException} (a simulated
+ * database outage) for the first few deliveries and then recovers is retried until it succeeds and
+ * is <strong>never</strong> dead-lettered — the opposite of the poison contract. This is what keeps
+ * a transient infrastructure outage from flooding the DLT with healthy messages and skipping past
+ * events (which would break per-aggregate order).
  */
 @SpringBootTest(
     classes = KafkaSystemicFailureIntegrationTest.TestApp.class,
