@@ -18,12 +18,12 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.MaxLifetimeExceededCodec;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.MaxLifetimeExceededCodec;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -69,7 +69,7 @@ class JdbcProcessMaxLifetimeReservedDeadlineTest {
   private JdbcProcessTransitionStore transitionStore;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessDeadlineStore deadlineStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private final AtomicInteger ids = new AtomicInteger();
 
   @BeforeEach
@@ -88,11 +88,11 @@ class JdbcProcessMaxLifetimeReservedDeadlineTest {
     transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
   }
 
-  private JdbcProcessRuntime runtime() {
-    return new JdbcProcessRuntime(
+  private DefaultProcessRuntime runtime() {
+    return new DefaultProcessRuntime(
         instanceStore,
         transitionStore,
         effectStore,

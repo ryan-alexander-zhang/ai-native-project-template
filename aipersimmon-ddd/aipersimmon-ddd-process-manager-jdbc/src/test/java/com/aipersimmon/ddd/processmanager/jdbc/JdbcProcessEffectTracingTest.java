@@ -10,17 +10,18 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.relay.DecodedProcessEffect;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.DecodedProcessEffect;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.ProcessEffectDispatcher;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -60,8 +61,8 @@ class JdbcProcessEffectTracingTest {
   private JdbcTemplate jdbc;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessInstanceStore instanceStore;
-  private JdbcProcessUnitOfWork unitOfWork;
-  private JdbcProcessRuntime runtime;
+  private SpringTxProcessUnitOfWork unitOfWork;
+  private DefaultProcessRuntime runtime;
 
   @BeforeEach
   void setUp() {
@@ -77,9 +78,9 @@ class JdbcProcessEffectTracingTest {
     jdbc = new JdbcTemplate(dataSource);
     instanceStore = new JdbcProcessInstanceStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             new JdbcProcessTransitionStore(jdbc),
             effectStore,
@@ -99,10 +100,10 @@ class JdbcProcessEffectTracingTest {
             tracer);
   }
 
-  private JdbcProcessEffectRelay relay() {
-    return new JdbcProcessEffectRelay(
-        jdbc,
-        new AtomicUpdateProcessDialect("h2"),
+  private ProcessEffectRelay relay() {
+    return new ProcessEffectRelay(
+        new JdbcProcessClaimStrategy(
+            jdbc, new AtomicUpdateProcessDialect("h2"), new WorkerId("worker-test")),
         effectStore,
         instanceStore,
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -110,7 +111,6 @@ class JdbcProcessEffectTracingTest {
         unitOfWork,
         zeroBackoff(),
         CLOCK,
-        new WorkerId("worker-test"),
         50,
         Duration.ofSeconds(30),
         () -> "lease-" + ids.incrementAndGet(),

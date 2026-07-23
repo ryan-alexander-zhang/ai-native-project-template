@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.runtime;
+package com.aipersimmon.ddd.processmanager.engine.runtime;
 
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
@@ -12,9 +12,9 @@ import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 
 /**
  * Encodes and decodes process payloads and state, enforcing the {@code payload.max-bytes} cap on
- * encode. Extracted from {@link JdbcProcessRuntime}: the codec concern is cohesive (it touches only
- * the two codec registries and the size cap) and independent of the runtime's orchestration, so it
- * lives as its own collaborator.
+ * encode. Extracted from {@link DefaultProcessRuntime}: the codec concern is cohesive (it touches
+ * only the two codec registries and the size cap) and independent of the runtime's orchestration,
+ * so it lives as its own collaborator.
  */
 final class ProcessPayloadSerdes {
 

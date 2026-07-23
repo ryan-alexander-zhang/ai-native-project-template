@@ -9,23 +9,24 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.EffectStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceCriteria;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.CommandEffectDispatcher;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore.DeadlineStatus;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore.EffectStatus;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceCriteria;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
@@ -51,11 +52,11 @@ class JdbcProcessQueryTest {
       Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
-  private JdbcProcessQuery query;
+  private DefaultProcessRuntime runtime;
+  private DefaultProcessQuery query;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessInstanceStore instanceStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private final AtomicUpdateProcessDialect dialect = new AtomicUpdateProcessDialect("h2");
   private final AtomicInteger ids = new AtomicInteger();
   private final AtomicInteger tokens = new AtomicInteger();
@@ -76,9 +77,9 @@ class JdbcProcessQueryTest {
     JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     JdbcProcessDeadlineStore deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             transitionStore,
             effectStore,
@@ -91,7 +92,8 @@ class JdbcProcessQueryTest {
             () -> "id-" + ids.incrementAndGet(),
             DuplicateBusinessKeyPolicy.REJECT,
             3);
-    query = new JdbcProcessQuery(instanceStore, transitionStore, effectStore, deadlineStore, CLOCK);
+    query =
+        new DefaultProcessQuery(instanceStore, transitionStore, effectStore, deadlineStore, CLOCK);
   }
 
   private ProcessAdvanceResult start(String order) {
@@ -151,7 +153,7 @@ class JdbcProcessQueryTest {
     assertEquals(0, query.effects(EffectStatus.DEAD, 10).size());
 
     relay(new FailingBus(), 1).pollOnce(); // -> DEAD
-    List<com.aipersimmon.ddd.processmanager.jdbc.store.ProcessEffectView> dead =
+    List<com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectView> dead =
         query.effects(EffectStatus.DEAD, 10);
     assertEquals(1, dead.size());
     assertTrue(dead.get(0).lastError().isPresent(), "a dead effect carries its last error");
@@ -177,8 +179,8 @@ class JdbcProcessQueryTest {
         relay(new RecordingBus(), 3).pollOnce(),
         "deliver the effect so no pending work remains");
 
-    JdbcProcessQuery later =
-        new JdbcProcessQuery(
+    DefaultProcessQuery later =
+        new DefaultProcessQuery(
             instanceStore,
             new JdbcProcessTransitionStore(jdbc),
             effectStore,
@@ -202,10 +204,9 @@ class JdbcProcessQueryTest {
         IllegalArgumentException.class, () -> query.find(mismatched));
   }
 
-  private JdbcProcessEffectRelay relay(CommandBus bus, int maxAttempts) {
-    return new JdbcProcessEffectRelay(
-        jdbc,
-        dialect,
+  private ProcessEffectRelay relay(CommandBus bus, int maxAttempts) {
+    return new ProcessEffectRelay(
+        new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("w")),
         effectStore,
         instanceStore,
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -213,7 +214,6 @@ class JdbcProcessQueryTest {
         unitOfWork,
         zeroBackoff(maxAttempts),
         CLOCK,
-        new WorkerId("w"),
         10,
         Duration.ofSeconds(30),
         () -> "lease-" + tokens.incrementAndGet());

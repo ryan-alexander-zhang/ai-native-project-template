@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.store;
+package com.aipersimmon.ddd.processmanager.engine.store;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;

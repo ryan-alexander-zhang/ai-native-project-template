@@ -1,6 +1,6 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.deadline;
+package com.aipersimmon.ddd.processmanager.engine.deadline;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
@@ -7,21 +7,20 @@ import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore.DeadlineRow;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.lease.ProcessClaimStrategy;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.ProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineRow;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Fires due deadlines by turning each into an ordinary {@link ProcessInput} and re-entering {@link
@@ -30,44 +29,39 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * is deterministic ({@code deadlineId#generation}), so the re-fire is a duplicate no-op in {@code
  * handle}.
  *
- * <p>Only active instances' deadlines are claimed (the dialect join), so a suspended or ended
- * instance's timers wait; a superseded generation is an auditable no-op. Exhausted retries move the
- * deadline to {@code DEAD} and suspend the instance.
+ * <p>Only active instances' deadlines are claimed (the claim strategy join), so a suspended or
+ * ended instance's timers wait; a superseded generation is an auditable no-op. Exhausted retries
+ * move the deadline to {@code DEAD} and suspend the instance.
  */
-public final class JdbcProcessDeadlineWorker {
+public final class ProcessDeadlineWorker {
 
-  private final JdbcTemplate jdbc;
-  private final JdbcProcessDialect dialect;
-  private final JdbcProcessDeadlineStore deadlines;
-  private final JdbcProcessInstanceStore instances;
+  private final ProcessClaimStrategy claimStrategy;
+  private final ProcessDeadlineStore deadlines;
+  private final ProcessInstanceStore instances;
   private final ProcessPayloadCodecRegistry payloadCodecs;
   private final ProcessRuntime runtime;
-  private final JdbcProcessUnitOfWork unitOfWork;
+  private final ProcessUnitOfWork unitOfWork;
   private final ProcessRetryPolicy retryPolicy;
   private final java.time.Clock clock;
-  private final WorkerId workerId;
   private final int batchSize;
   private final Duration leaseDuration;
   private final Supplier<String> leaseTokens;
   private final StoreAndForwardTracer storeTracer;
 
-  public JdbcProcessDeadlineWorker(
-      JdbcTemplate jdbc,
-      JdbcProcessDialect dialect,
-      JdbcProcessDeadlineStore deadlines,
-      JdbcProcessInstanceStore instances,
+  public ProcessDeadlineWorker(
+      ProcessClaimStrategy claimStrategy,
+      ProcessDeadlineStore deadlines,
+      ProcessInstanceStore instances,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessRuntime runtime,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       ProcessRetryPolicy retryPolicy,
       java.time.Clock clock,
-      WorkerId workerId,
       int batchSize,
       Duration leaseDuration,
       Supplier<String> leaseTokens) {
     this(
-        jdbc,
-        dialect,
+        claimStrategy,
         deadlines,
         instances,
         payloadCodecs,
@@ -75,30 +69,26 @@ public final class JdbcProcessDeadlineWorker {
         unitOfWork,
         retryPolicy,
         clock,
-        workerId,
         batchSize,
         leaseDuration,
         leaseTokens,
         NoOpStoreAndForwardTracer.INSTANCE);
   }
 
-  public JdbcProcessDeadlineWorker(
-      JdbcTemplate jdbc,
-      JdbcProcessDialect dialect,
-      JdbcProcessDeadlineStore deadlines,
-      JdbcProcessInstanceStore instances,
+  public ProcessDeadlineWorker(
+      ProcessClaimStrategy claimStrategy,
+      ProcessDeadlineStore deadlines,
+      ProcessInstanceStore instances,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessRuntime runtime,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       ProcessRetryPolicy retryPolicy,
       java.time.Clock clock,
-      WorkerId workerId,
       int batchSize,
       Duration leaseDuration,
       Supplier<String> leaseTokens,
       StoreAndForwardTracer storeTracer) {
-    this.jdbc = jdbc;
-    this.dialect = dialect;
+    this.claimStrategy = claimStrategy;
     this.deadlines = deadlines;
     this.instances = instances;
     this.payloadCodecs = payloadCodecs;
@@ -106,7 +96,6 @@ public final class JdbcProcessDeadlineWorker {
     this.unitOfWork = unitOfWork;
     this.retryPolicy = retryPolicy;
     this.clock = clock;
-    this.workerId = workerId;
     this.batchSize = batchSize;
     this.leaseDuration = leaseDuration;
     this.leaseTokens = leaseTokens;
@@ -120,8 +109,7 @@ public final class JdbcProcessDeadlineWorker {
     Instant leaseUntil = now.plus(leaseDuration);
     List<String> claimed =
         unitOfWork.execute(
-            () ->
-                dialect.claimDueDeadlines(jdbc, now, batchSize, workerId, leaseToken, leaseUntil));
+            () -> claimStrategy.claimDueDeadlines(now, batchSize, leaseToken, leaseUntil));
 
     int fired = 0;
     for (String deadlineId : claimed) {
@@ -152,10 +140,8 @@ public final class JdbcProcessDeadlineWorker {
                   deadlines.cancelClaimed(deadlineId, leaseToken, clock.instant());
                   return Boolean.FALSE;
                 }
-                Optional<JdbcProcessDeadlineStore.DeadlineStatus> status =
-                    deadlines.statusForUpdate(deadlineId);
-                if (status.isEmpty()
-                    || status.get() != JdbcProcessDeadlineStore.DeadlineStatus.IN_FLIGHT) {
+                Optional<DeadlineStatus> status = deadlines.statusForUpdate(deadlineId);
+                if (status.isEmpty() || status.get() != DeadlineStatus.IN_FLIGHT) {
                   // Cancelled (or otherwise settled) between claim and fire: nothing to do.
                   return Boolean.FALSE;
                 }

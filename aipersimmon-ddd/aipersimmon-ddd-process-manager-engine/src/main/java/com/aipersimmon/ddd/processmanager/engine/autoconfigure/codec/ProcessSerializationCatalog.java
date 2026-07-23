@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.codec;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure.codec;
 
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;

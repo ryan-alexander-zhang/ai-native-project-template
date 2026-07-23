@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.lease;
+package com.aipersimmon.ddd.processmanager.engine.lease;
 
 import java.util.UUID;
 

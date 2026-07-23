@@ -3,7 +3,7 @@ package com.aipersimmon.ddd.processmanager.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ExponentialBackoffPolicy;
+import com.aipersimmon.ddd.processmanager.engine.retry.ExponentialBackoffPolicy;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 

@@ -9,6 +9,8 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
+import com.aipersimmon.ddd.processmanager.engine.relay.DecodedProcessEffect;
+import com.aipersimmon.ddd.processmanager.engine.relay.IntegrationEventEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import org.junit.jupiter.api.Test;
 

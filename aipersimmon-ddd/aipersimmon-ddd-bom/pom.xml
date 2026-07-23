@@ -89,12 +89,17 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-process-manager-jdbc-spring-boot-starter</artifactId>
+        <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

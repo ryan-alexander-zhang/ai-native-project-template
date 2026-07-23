@@ -1,20 +1,21 @@
-package com.aipersimmon.ddd.processmanager.jdbc.operation;
+package com.aipersimmon.ddd.processmanager.engine.operation;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
+import com.aipersimmon.ddd.processmanager.engine.runtime.ProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.engine.store.ClaimedEffect;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ParkedInput;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ClaimedEffect;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore.ParkedInput;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
@@ -37,26 +38,26 @@ import java.util.function.Supplier;
  * emitted. It does not send compensation; business cancellation stays a process input decided by
  * the definition.
  */
-public final class JdbcProcessOperations {
+public final class ProcessOperations {
 
-  private final JdbcProcessInstanceStore instances;
-  private final JdbcProcessTransitionStore transitions;
-  private final JdbcProcessEffectStore effects;
-  private final JdbcProcessDeadlineStore deadlines;
+  private final ProcessInstanceStore instances;
+  private final ProcessTransitionStore transitions;
+  private final ProcessEffectStore effects;
+  private final ProcessDeadlineStore deadlines;
   private final ProcessRuntime runtime;
   private final ProcessPayloadCodecRegistry payloadCodecs;
-  private final JdbcProcessUnitOfWork unitOfWork;
+  private final ProcessUnitOfWork unitOfWork;
   private final Clock clock;
   private final Supplier<String> idGenerator;
 
-  public JdbcProcessOperations(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public ProcessOperations(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessRuntime runtime,
       ProcessPayloadCodecRegistry payloadCodecs,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       Clock clock,
       Supplier<String> idGenerator) {
     this.instances = instances;
@@ -119,7 +120,7 @@ public final class JdbcProcessOperations {
     ProcessRef resumed =
         unitOfWork.execute(
             () -> {
-              JdbcProcessDeadlineStore.DeadlineRow deadline =
+              DeadlineRow deadline =
                   deadlines
                       .load(deadlineId)
                       .orElseThrow(() -> new IllegalArgumentException("no deadline " + deadlineId));

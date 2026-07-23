@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.store;
+package com.aipersimmon.ddd.processmanager.engine.store;
 
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;

@@ -9,15 +9,16 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.CommandEffectDispatcher;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -48,10 +49,10 @@ class JdbcProcessEffectRelayTest {
 
   private DataSource dataSource;
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessInstanceStore instanceStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private AtomicUpdateProcessDialect dialect;
   private RecordingCommandBus bus;
   private final AtomicInteger ids = new AtomicInteger();
@@ -73,11 +74,11 @@ class JdbcProcessEffectRelayTest {
     JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     JdbcProcessDeadlineStore deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     dialect = new AtomicUpdateProcessDialect("h2");
     bus = new RecordingCommandBus();
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             transitionStore,
             effectStore,
@@ -92,10 +93,9 @@ class JdbcProcessEffectRelayTest {
             3);
   }
 
-  private JdbcProcessEffectRelay relay(ProcessRetryPolicy policy) {
-    return new JdbcProcessEffectRelay(
-        jdbc,
-        dialect,
+  private ProcessEffectRelay relay(ProcessRetryPolicy policy) {
+    return new ProcessEffectRelay(
+        new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("worker-test")),
         effectStore,
         instanceStore,
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -103,7 +103,6 @@ class JdbcProcessEffectRelayTest {
         unitOfWork,
         policy,
         CLOCK,
-        new WorkerId("worker-test"),
         50,
         Duration.ofSeconds(30),
         () -> "lease-" + tokens.incrementAndGet());
@@ -141,7 +140,7 @@ class JdbcProcessEffectRelayTest {
   @Test
   void deliversEffectsOfOneInstanceSeriallyInOrder() {
     ProcessAdvanceResult started = start();
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+    ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     // Deliver the start's single effect first, so the fan-out effects become the head.
     relay.pollOnce();
@@ -165,7 +164,7 @@ class JdbcProcessEffectRelayTest {
     ProcessAdvanceResult started = start();
     runtime.handle(
         started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-advance"));
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+    ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     assertEquals(1, relay.pollOnce(), "only the head effect is delivered; the later one waits");
     assertEquals(List.of("order-1"), references());
@@ -178,7 +177,7 @@ class JdbcProcessEffectRelayTest {
   void aTransientFailureIsRetriedThenSucceeds() {
     ProcessAdvanceResult started = start();
     bus.failTimes = 1;
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+    ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     assertEquals(0, relay.pollOnce(), "first attempt fails");
     String effectId = started.transitionId() + "#0";
@@ -192,7 +191,7 @@ class JdbcProcessEffectRelayTest {
   void exhaustingRetriesMovesTheEffectToDeadAndSuspendsTheInstance() {
     ProcessAdvanceResult started = start();
     bus.failTimes = Integer.MAX_VALUE;
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(2));
+    ProcessEffectRelay relay = relay(zeroBackoff(2));
 
     relay.pollOnce(); // attempt 1 -> retry
     relay.pollOnce(); // attempt 2 -> DEAD + suspend
@@ -224,7 +223,7 @@ class JdbcProcessEffectRelayTest {
     // A failing effect on the same instance is claimed (effects are not lifecycle-filtered) and
     // goes DEAD.
     bus.failTimes = Integer.MAX_VALUE;
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(2));
+    ProcessEffectRelay relay = relay(zeroBackoff(2));
     relay.pollOnce(); // attempt 1 -> retry
     relay.pollOnce(); // attempt 2 -> DEAD
 
@@ -322,7 +321,7 @@ class JdbcProcessEffectRelayTest {
   void redeliversUnderTheSameIdWhenTheAckIsLostAfterASuccessfulDispatch() {
     ProcessAdvanceResult started = start();
     String effectId = started.transitionId() + "#0";
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+    ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     assertEquals(1, relay.pollOnce(), "first delivery succeeds");
     assertEquals(1, bus.commands.size());
@@ -378,7 +377,7 @@ class JdbcProcessEffectRelayTest {
   @Test
   void aCleanlyDeliveredEffectIsNotRedelivered() {
     start();
-    JdbcProcessEffectRelay relay = relay(zeroBackoff(3));
+    ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     assertEquals(1, relay.pollOnce());
     assertEquals(0, relay.pollOnce(), "a DELIVERED effect is never claimed again");

@@ -1,7 +1,7 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
-import com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog.BacklogSnapshot;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog.BacklogSnapshot;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
@@ -10,7 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Exports the pull-based backlog SLIs as Micrometer gauges over a {@link JdbcProcessBacklog}: the
+ * Exports the pull-based backlog SLIs as Micrometer gauges over a {@link ProcessBacklog}: the
  * redrive backlog (dead effects/deadlines), how long the oldest due work has waited, and how many
  * instances are suspended or look stuck. Gauges read the store lazily on scrape; a short-lived
  * memoized {@link BacklogSnapshot} coalesces one scrape's gauge reads into a single one-pass store
@@ -18,7 +18,7 @@ import java.time.Instant;
  * source). Latency and conflict-retry meters are push-based and recorded by {@link
  * MicrometerProcessObserver}.
  */
-public final class ProcessManagerJdbcMeterBinder implements MeterBinder {
+public final class ProcessManagerMeterBinder implements MeterBinder {
 
   /** The suspension sources the runtime sets (relay exhaustion, deadline exhaustion). */
   private static final String[] SUSPENSION_SOURCES = {"EFFECT", "DEADLINE"};
@@ -26,15 +26,14 @@ public final class ProcessManagerJdbcMeterBinder implements MeterBinder {
   /** How long a sampled snapshot is reused; long enough to coalesce one scrape's gauge reads. */
   private static final Duration SAMPLE_TTL = Duration.ofSeconds(1);
 
-  private final JdbcProcessBacklog backlog;
+  private final ProcessBacklog backlog;
   private final Duration stuckThreshold;
   private final Clock clock;
 
   private volatile BacklogSnapshot cached;
   private volatile Instant cachedAt;
 
-  public ProcessManagerJdbcMeterBinder(
-      JdbcProcessBacklog backlog, Duration stuckThreshold, Clock clock) {
+  public ProcessManagerMeterBinder(ProcessBacklog backlog, Duration stuckThreshold, Clock clock) {
     this.backlog = backlog;
     this.stuckThreshold = stuckThreshold;
     this.clock = clock;

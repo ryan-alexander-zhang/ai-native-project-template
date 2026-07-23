@@ -9,12 +9,12 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.exception.ProcessAlreadyExistsException;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -41,24 +41,24 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-/** Atomic-advance contract of JdbcProcessRuntime against an in-memory H2. */
+/** Atomic-advance contract of DefaultProcessRuntime against an in-memory H2. */
 class JdbcProcessRuntimeTest {
 
   private static final ProcessBusinessKey ORDER = new ProcessBusinessKey("order-1");
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
-  private JdbcProcessQuery query;
+  private DefaultProcessRuntime runtime;
+  private DefaultProcessQuery query;
   private final AtomicInteger ids = new AtomicInteger();
 
-  private JdbcProcessRuntime build(DuplicateBusinessKeyPolicy policy) {
+  private DefaultProcessRuntime build(DuplicateBusinessKeyPolicy policy) {
     var instances = new JdbcProcessInstanceStore(jdbc);
     var transitions = new JdbcProcessTransitionStore(jdbc);
     var effects = new JdbcProcessEffectStore(jdbc);
     var deadlines = new JdbcProcessDeadlineStore(jdbc);
     Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
-    query = new JdbcProcessQuery(instances, transitions, effects, deadlines, clock);
-    return new JdbcProcessRuntime(
+    query = new DefaultProcessQuery(instances, transitions, effects, deadlines, clock);
+    return new DefaultProcessRuntime(
         instances,
         transitions,
         effects,
@@ -66,7 +66,7 @@ class JdbcProcessRuntimeTest {
         new ProcessDefinitionRegistry(List.of(new TestFulfilment.Definition())),
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
         new ProcessStateCodecRegistry(List.of(TestFulfilment.stateCodec())),
-        new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
+        new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
         clock,
         () -> "id-" + ids.incrementAndGet(),
         policy,

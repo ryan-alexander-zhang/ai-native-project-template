@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.runtime;
+package com.aipersimmon.ddd.processmanager.engine.runtime;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
@@ -18,16 +18,17 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.store.ConcurrentTransitionException;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.exception.ProcessAlreadyExistsException;
 import com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException;
 import com.aipersimmon.ddd.processmanager.exception.StaleProcessRevisionException;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionInsert;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
@@ -42,7 +43,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.springframework.dao.DuplicateKeyException;
 
 /**
  * The production {@link ProcessRuntime} over the four-table JDBC store. Each {@code start}/{@code
@@ -56,14 +56,14 @@ import org.springframework.dao.DuplicateKeyException;
  * constraint (a repeated input is a duplicate no-op); optimistic concurrency comes from the
  * revision guard on the snapshot update, with a bounded retry.
  */
-public final class JdbcProcessRuntime implements ProcessRuntime {
+public final class DefaultProcessRuntime implements ProcessRuntime {
 
-  private final JdbcProcessInstanceStore instances;
-  private final JdbcProcessTransitionStore transitions;
+  private final ProcessInstanceStore instances;
+  private final ProcessTransitionStore transitions;
   private final ProcessDefinitionRegistry definitions;
   private final ProcessPayloadSerdes serdes;
   private final ProcessOutcomeWriter outcomeWriter;
-  private final JdbcProcessUnitOfWork unitOfWork;
+  private final ProcessUnitOfWork unitOfWork;
   private final Clock clock;
   private final Supplier<String> idGenerator;
   private final DuplicateBusinessKeyPolicy duplicatePolicy;
@@ -72,15 +72,15 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
   private final Optional<Duration> maxLifetime;
   private final Tracer tracer;
 
-  public JdbcProcessRuntime(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public DefaultProcessRuntime(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessDefinitionRegistry definitions,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessStateCodecRegistry stateCodecs,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       Clock clock,
       Supplier<String> idGenerator,
       DuplicateBusinessKeyPolicy duplicatePolicy,
@@ -101,15 +101,15 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         ProcessObserver.NOOP);
   }
 
-  public JdbcProcessRuntime(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public DefaultProcessRuntime(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessDefinitionRegistry definitions,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessStateCodecRegistry stateCodecs,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       Clock clock,
       Supplier<String> idGenerator,
       DuplicateBusinessKeyPolicy duplicatePolicy,
@@ -133,15 +133,15 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         Long.MAX_VALUE);
   }
 
-  public JdbcProcessRuntime(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public DefaultProcessRuntime(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessDefinitionRegistry definitions,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessStateCodecRegistry stateCodecs,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       Clock clock,
       Supplier<String> idGenerator,
       DuplicateBusinessKeyPolicy duplicatePolicy,
@@ -168,15 +168,15 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         NoOpTracer.INSTANCE);
   }
 
-  public JdbcProcessRuntime(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public DefaultProcessRuntime(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessDefinitionRegistry definitions,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessStateCodecRegistry stateCodecs,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       Clock clock,
       Supplier<String> idGenerator,
       DuplicateBusinessKeyPolicy duplicatePolicy,
@@ -205,15 +205,15 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
         NoOpStoreAndForwardTracer.INSTANCE);
   }
 
-  public JdbcProcessRuntime(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public DefaultProcessRuntime(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessDefinitionRegistry definitions,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessStateCodecRegistry stateCodecs,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       Clock clock,
       Supplier<String> idGenerator,
       DuplicateBusinessKeyPolicy duplicatePolicy,
@@ -544,7 +544,7 @@ public final class JdbcProcessRuntime implements ProcessRuntime {
     for (int i = 0; i <= maxRetries; i++) {
       try {
         return attempt.get();
-      } catch (StaleProcessRevisionException | DuplicateKeyException e) {
+      } catch (StaleProcessRevisionException | ConcurrentTransitionException e) {
         last = e;
         observer.advanceConflictRetry();
       }

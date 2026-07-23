@@ -1,6 +1,6 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
-import com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog;
 import java.time.Duration;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
@@ -12,17 +12,17 @@ import org.springframework.boot.actuate.health.Status;
  * past the configured warning threshold, and UP otherwise. DEGRADED is a distinct status so a
  * transient backlog surfaces without failing the aggregate readiness probe.
  */
-public final class ProcessManagerJdbcHealthIndicator implements HealthIndicator {
+public final class ProcessManagerHealthIndicator implements HealthIndicator {
 
   /** A non-standard status: the runtime is serving but has a backlog that needs attention. */
   static final Status DEGRADED = new Status("DEGRADED");
 
-  private final JdbcProcessBacklog backlog;
+  private final ProcessBacklog backlog;
   private final Duration stuckThreshold;
   private final Duration oldestPendingWarn;
 
-  public ProcessManagerJdbcHealthIndicator(
-      JdbcProcessBacklog backlog, Duration stuckThreshold, Duration oldestPendingWarn) {
+  public ProcessManagerHealthIndicator(
+      ProcessBacklog backlog, Duration stuckThreshold, Duration oldestPendingWarn) {
     this.backlog = backlog;
     this.stuckThreshold = stuckThreshold;
     this.oldestPendingWarn = oldestPendingWarn;
@@ -30,7 +30,7 @@ public final class ProcessManagerJdbcHealthIndicator implements HealthIndicator 
 
   @Override
   public Health health() {
-    JdbcProcessBacklog.BacklogSnapshot s;
+    ProcessBacklog.BacklogSnapshot s;
     try {
       s = backlog.snapshot(stuckThreshold); // one coherent read instead of a query per detail
     } catch (RuntimeException storeUnavailable) {

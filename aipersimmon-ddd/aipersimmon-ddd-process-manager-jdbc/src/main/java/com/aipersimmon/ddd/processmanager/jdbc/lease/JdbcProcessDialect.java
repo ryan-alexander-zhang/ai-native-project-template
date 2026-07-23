@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.jdbc.lease;
 
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;

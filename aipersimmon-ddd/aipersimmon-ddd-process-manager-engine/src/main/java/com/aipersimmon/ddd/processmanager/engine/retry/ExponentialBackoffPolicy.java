@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.retry;
+package com.aipersimmon.ddd.processmanager.engine.retry;
 
 import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;

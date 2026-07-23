@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.jdbc.lease;
 
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;

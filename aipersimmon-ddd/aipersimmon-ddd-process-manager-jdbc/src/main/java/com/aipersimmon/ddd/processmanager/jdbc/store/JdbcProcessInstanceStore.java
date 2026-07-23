@@ -1,5 +1,10 @@
 package com.aipersimmon.ddd.processmanager.jdbc.store;
 
+import com.aipersimmon.ddd.processmanager.engine.store.Payloads;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceCriteria;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.VersionRef;
 import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
@@ -27,7 +32,7 @@ import org.springframework.jdbc.core.RowMapper;
  * in its {@code WHERE} clause so a concurrent transition cannot overwrite it (optimistic
  * concurrency).
  */
-public final class JdbcProcessInstanceStore {
+public final class JdbcProcessInstanceStore implements ProcessInstanceStore {
 
   private final JdbcTemplate jdbc;
 
@@ -312,12 +317,6 @@ public final class JdbcProcessInstanceStore {
         ProcessLifecycle.COMPENSATING.name(),
         ProcessLifecycle.SUSPENDED.name());
   }
-
-  /** A distinct schema-version pair a live instance depends on, for startup fail-fast. */
-  public record VersionRef(
-      ProcessType processType,
-      DefinitionVersion definitionVersion,
-      StateSchemaVersion stateSchemaVersion) {}
 
   private static final RowMapper<ProcessInstanceRow> ROW_MAPPER = JdbcProcessInstanceStore::mapRow;
 

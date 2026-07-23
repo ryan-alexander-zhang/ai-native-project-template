@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
@@ -8,9 +8,9 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore.VersionRef;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.VersionRef;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 
@@ -34,7 +34,7 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
 @DependsOnDatabaseInitialization
 public final class ProcessManagerStartupValidator implements InitializingBean {
 
-  private final JdbcProcessInstanceStore instances;
+  private final ProcessInstanceStore instances;
   private final ProcessDefinitionRegistry definitions;
   private final ProcessStateCodecRegistry stateCodecs;
   private final ProcessPayloadCodecRegistry payloadCodecs;
@@ -42,7 +42,7 @@ public final class ProcessManagerStartupValidator implements InitializingBean {
   private final boolean relayEnabled;
 
   public ProcessManagerStartupValidator(
-      JdbcProcessInstanceStore instances,
+      ProcessInstanceStore instances,
       ProcessDefinitionRegistry definitions,
       ProcessStateCodecRegistry stateCodecs,
       ProcessPayloadCodecRegistry payloadCodecs,

@@ -9,16 +9,17 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog;
+import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.CommandEffectDispatcher;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -48,11 +49,11 @@ class JdbcProcessBacklogTest {
       Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessInstanceStore instanceStore;
   private JdbcProcessDeadlineStore deadlineStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private final AtomicUpdateProcessDialect dialect = new AtomicUpdateProcessDialect("h2");
   private final AtomicInteger ids = new AtomicInteger();
   private final AtomicInteger tokens = new AtomicInteger();
@@ -73,11 +74,11 @@ class JdbcProcessBacklogTest {
     JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     ProcessPayloadCodecRegistry payloadCodecs =
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs());
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             transitionStore,
             effectStore,
@@ -100,15 +101,14 @@ class JdbcProcessBacklogTest {
         CommandContext.root("msg-start"));
   }
 
-  private JdbcProcessBacklog backlogAt(Instant at) {
-    return new JdbcProcessBacklog(
+  private ProcessBacklog backlogAt(Instant at) {
+    return new ProcessBacklog(
         effectStore, deadlineStore, instanceStore, Clock.fixed(at, ZoneOffset.UTC));
   }
 
-  private JdbcProcessEffectRelay relay(CommandBus bus, int maxAttempts) {
-    return new JdbcProcessEffectRelay(
-        jdbc,
-        dialect,
+  private ProcessEffectRelay relay(CommandBus bus, int maxAttempts) {
+    return new ProcessEffectRelay(
+        new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("w")),
         effectStore,
         instanceStore,
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -116,7 +116,6 @@ class JdbcProcessBacklogTest {
         unitOfWork,
         zeroBackoff(maxAttempts),
         CLOCK,
-        new WorkerId("w"),
         10,
         Duration.ofSeconds(30),
         () -> "lease-" + tokens.incrementAndGet());
@@ -127,7 +126,7 @@ class JdbcProcessBacklogTest {
     start();
     relay(new FailingBus(), 1).pollOnce(); // exhausts retries -> DEAD + SUSPENDED (source EFFECT)
 
-    JdbcProcessBacklog backlog = backlogAt(CLOCK.instant());
+    ProcessBacklog backlog = backlogAt(CLOCK.instant());
     assertEquals(1L, backlog.deadEffects());
     assertEquals(0L, backlog.deadDeadlines());
     assertEquals(Map.of("EFFECT", 1L), backlog.suspendedInstancesBySource());
@@ -142,14 +141,14 @@ class JdbcProcessBacklogTest {
         new TestFulfilment.ArmDeadline(),
         CommandContext.root("msg-arm")); // schedules a due REVIEW deadline
 
-    JdbcProcessBacklog backlog = backlogAt(CLOCK.instant().plusSeconds(5));
+    ProcessBacklog backlog = backlogAt(CLOCK.instant().plusSeconds(5));
     assertEquals(Duration.ofSeconds(5), backlog.oldestPendingEffectAge());
     assertEquals(Duration.ofSeconds(5), backlog.oldestPendingDeadlineAge());
   }
 
   @Test
   void reportsNoDwellWhenThereIsNoDueWork() {
-    JdbcProcessBacklog backlog = backlogAt(CLOCK.instant());
+    ProcessBacklog backlog = backlogAt(CLOCK.instant());
     assertEquals(Duration.ZERO, backlog.oldestPendingEffectAge());
     assertEquals(Duration.ZERO, backlog.oldestPendingDeadlineAge());
     assertEquals(0L, backlog.suspendedInstances());
@@ -160,7 +159,7 @@ class JdbcProcessBacklogTest {
     start();
     assertEquals(1, relay(new RecordingBus(), 3).pollOnce(), "the staged effect is delivered");
 
-    JdbcProcessBacklog backlog = backlogAt(CLOCK.instant().plus(Duration.ofHours(1)));
+    ProcessBacklog backlog = backlogAt(CLOCK.instant().plus(Duration.ofHours(1)));
     assertEquals(
         0L, backlog.stuckInstances(Duration.ofHours(2)), "not idle long enough for a 2h threshold");
     assertEquals(
@@ -172,7 +171,7 @@ class JdbcProcessBacklogTest {
   @Test
   void doesNotFlagAnInstanceThatStillHasPendingWork() {
     start(); // leaves a pending (undelivered) effect
-    JdbcProcessBacklog backlog = backlogAt(CLOCK.instant().plus(Duration.ofHours(1)));
+    ProcessBacklog backlog = backlogAt(CLOCK.instant().plus(Duration.ofHours(1)));
     assertTrue(
         backlog.stuckInstances(Duration.ofMinutes(1)) == 0L,
         "a pending effect means it is not stuck");

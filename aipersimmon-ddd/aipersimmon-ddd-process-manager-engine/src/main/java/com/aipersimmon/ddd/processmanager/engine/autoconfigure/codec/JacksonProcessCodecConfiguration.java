@@ -1,10 +1,10 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.codec;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure.codec;
 
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.AipersimmonDddProcessManagerJdbcAutoConfiguration;
+import com.aipersimmon.ddd.processmanager.engine.autoconfigure.AipersimmonDddProcessManagerAutoConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +28,7 @@ import org.springframework.context.annotation.Bean;
  */
 @AutoConfiguration(
     after = JacksonAutoConfiguration.class,
-    before = AipersimmonDddProcessManagerJdbcAutoConfiguration.class)
+    before = AipersimmonDddProcessManagerAutoConfiguration.class)
 @ConditionalOnClass(ObjectMapper.class)
 @ConditionalOnBean({ObjectMapper.class, ProcessSerializationCatalog.class})
 public class JacksonProcessCodecConfiguration {

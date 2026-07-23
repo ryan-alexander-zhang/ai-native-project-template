@@ -6,9 +6,9 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -37,7 +37,7 @@ class JdbcProcessRuntimeLongIdTest {
       Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
   private final AtomicInteger ids = new AtomicInteger();
 
   @BeforeEach
@@ -53,7 +53,7 @@ class JdbcProcessRuntimeLongIdTest {
             .build();
     jdbc = new JdbcTemplate(dataSource);
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             new JdbcProcessInstanceStore(jdbc),
             new JdbcProcessTransitionStore(jdbc),
             new JdbcProcessEffectStore(jdbc),
@@ -61,7 +61,7 @@ class JdbcProcessRuntimeLongIdTest {
             new ProcessDefinitionRegistry(List.of(new TestFulfilment.Definition())),
             new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
             new ProcessStateCodecRegistry(List.of(TestFulfilment.stateCodec())),
-            new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
+            new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
             CLOCK,
             () -> "id-" + ids.incrementAndGet(),
             DuplicateBusinessKeyPolicy.REJECT,

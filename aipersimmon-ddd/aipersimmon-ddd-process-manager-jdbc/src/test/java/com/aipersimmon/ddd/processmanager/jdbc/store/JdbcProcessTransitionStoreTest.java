@@ -2,6 +2,8 @@ package com.aipersimmon.ddd.processmanager.jdbc.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.aipersimmon.ddd.processmanager.engine.store.ParkedInput;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionInsert;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
@@ -52,11 +54,11 @@ class JdbcProcessTransitionStoreTest {
     appendParked("zzz-transition", "input-first", sameInstant);
     appendParked("aaa-transition", "input-second", sameInstant);
 
-    List<JdbcProcessTransitionStore.ParkedInput> parked = transitions.findParkedInputs(INSTANCE);
+    List<ParkedInput> parked = transitions.findParkedInputs(INSTANCE);
 
     assertEquals(
         List.of("input-first", "input-second"),
-        parked.stream().map(JdbcProcessTransitionStore.ParkedInput::inputMessageId).toList(),
+        parked.stream().map(ParkedInput::inputMessageId).toList(),
         "parked inputs replay in insertion order, not random transition_id order");
   }
 

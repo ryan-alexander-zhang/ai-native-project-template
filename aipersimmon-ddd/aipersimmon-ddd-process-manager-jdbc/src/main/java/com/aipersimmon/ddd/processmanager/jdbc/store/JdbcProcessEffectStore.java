@@ -3,6 +3,12 @@ package com.aipersimmon.ddd.processmanager.jdbc.store;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
+import com.aipersimmon.ddd.processmanager.engine.store.ClaimedEffect;
+import com.aipersimmon.ddd.processmanager.engine.store.EffectStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.Payloads;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectView;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -15,7 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * relay claims and delivers them afterwards (a later slice). The {@code UNIQUE(transition_id,
  * effect_index)} constraint makes a transaction retry unable to double-insert an effect.
  */
-public final class JdbcProcessEffectStore {
+public final class JdbcProcessEffectStore implements ProcessEffectStore {
 
   private final JdbcTemplate jdbc;
 
@@ -253,14 +259,5 @@ public final class JdbcProcessEffectStore {
         ts,
         effectId,
         leaseToken);
-  }
-
-  /** The lifecycle of a staged effect. */
-  public enum EffectStatus {
-    PENDING,
-    IN_FLIGHT,
-    DELIVERED,
-    DEAD,
-    CANCELLED
   }
 }

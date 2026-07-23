@@ -1,7 +1,7 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
-import com.aipersimmon.ddd.processmanager.jdbc.observe.JdbcProcessBacklog;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -14,12 +14,12 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Optional observability wiring, assembled after the core runtime. Metrics bind only when
  * Micrometer is on the classpath and a {@code MeterRegistry} is present; the health indicator only
- * when Actuator is on the classpath. Both read the pull-based {@link JdbcProcessBacklog}; the
- * {@link MicrometerProcessObserver} is registered as a {@link ProcessObserver} so the runtime and
- * relay pick up push-based latency and conflict meters.
+ * when Actuator is on the classpath. Both read the pull-based {@link ProcessBacklog}; the {@link
+ * MicrometerProcessObserver} is registered as a {@link ProcessObserver} so the runtime and relay
+ * pick up push-based latency and conflict meters.
  */
-@AutoConfiguration(after = AipersimmonDddProcessManagerJdbcAutoConfiguration.class)
-public class ProcessManagerJdbcObservabilityConfiguration {
+@AutoConfiguration(after = AipersimmonDddProcessManagerAutoConfiguration.class)
+public class ProcessManagerObservabilityConfiguration {
 
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnClass(MeterRegistry.class)
@@ -33,13 +33,13 @@ public class ProcessManagerJdbcObservabilityConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(JdbcProcessBacklog.class)
+    @ConditionalOnBean(ProcessBacklog.class)
     @ConditionalOnMissingBean
-    public ProcessManagerJdbcMeterBinder processManagerJdbcMeterBinder(
-        JdbcProcessBacklog backlog,
-        ProcessManagerJdbcProperties properties,
+    public ProcessManagerMeterBinder processManagerMeterBinder(
+        ProcessBacklog backlog,
+        ProcessManagerProperties properties,
         java.time.Clock processManagerClock) {
-      return new ProcessManagerJdbcMeterBinder(
+      return new ProcessManagerMeterBinder(
           backlog, properties.getObservability().getStuckThreshold(), processManagerClock);
     }
   }
@@ -49,12 +49,12 @@ public class ProcessManagerJdbcObservabilityConfiguration {
   static class HealthConfiguration {
 
     @Bean
-    @ConditionalOnBean(JdbcProcessBacklog.class)
-    @ConditionalOnMissingBean(name = "processManagerJdbcHealthIndicator")
-    public ProcessManagerJdbcHealthIndicator processManagerJdbcHealthIndicator(
-        JdbcProcessBacklog backlog, ProcessManagerJdbcProperties properties) {
-      ProcessManagerJdbcProperties.Observability cfg = properties.getObservability();
-      return new ProcessManagerJdbcHealthIndicator(
+    @ConditionalOnBean(ProcessBacklog.class)
+    @ConditionalOnMissingBean(name = "processManagerHealthIndicator")
+    public ProcessManagerHealthIndicator processManagerHealthIndicator(
+        ProcessBacklog backlog, ProcessManagerProperties properties) {
+      ProcessManagerProperties.Observability cfg = properties.getObservability();
+      return new ProcessManagerHealthIndicator(
           backlog, cfg.getStuckThreshold(), cfg.getOldestPendingWarn());
     }
   }

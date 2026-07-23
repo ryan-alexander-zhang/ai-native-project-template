@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.integration.EventEnvelope;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
@@ -61,7 +61,7 @@ class PaymentCompensationFlowTest {
   @Autowired CommandBus commandBus;
   @Autowired QueryBus queryBus;
   @Autowired Stocks stocks;
-  @Autowired JdbcProcessQuery process;
+  @Autowired DefaultProcessQuery process;
   @Autowired CompensationRecorder recorder;
 
   private int available(String sku) {

@@ -10,17 +10,18 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker;
+import com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.operation.ProcessOperations;
+import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.operation.JdbcProcessOperations;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.CommandEffectDispatcher;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -51,13 +52,13 @@ class JdbcProcessOperationsTest {
       Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessInstanceStore instanceStore;
   private JdbcProcessTransitionStore transitionStore;
   private JdbcProcessDeadlineStore deadlineStore;
-  private JdbcProcessUnitOfWork unitOfWork;
-  private JdbcProcessOperations operations;
+  private SpringTxProcessUnitOfWork unitOfWork;
+  private ProcessOperations operations;
   private final AtomicUpdateProcessDialect dialect = new AtomicUpdateProcessDialect("h2");
   private final FailingBus bus = new FailingBus();
   private final AtomicInteger ids = new AtomicInteger();
@@ -79,11 +80,11 @@ class JdbcProcessOperationsTest {
     transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     ProcessPayloadCodecRegistry payloadCodecs =
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs());
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             transitionStore,
             effectStore,
@@ -97,7 +98,7 @@ class JdbcProcessOperationsTest {
             DuplicateBusinessKeyPolicy.REJECT,
             3);
     operations =
-        new JdbcProcessOperations(
+        new ProcessOperations(
             instanceStore,
             transitionStore,
             effectStore,
@@ -127,10 +128,9 @@ class JdbcProcessOperationsTest {
         started.processRef(),
         new TestFulfilment.ArmPoisonDeadline(),
         CommandContext.root("msg-arm"));
-    JdbcProcessDeadlineWorker worker =
-        new JdbcProcessDeadlineWorker(
-            jdbc,
-            dialect,
+    ProcessDeadlineWorker worker =
+        new ProcessDeadlineWorker(
+            new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("dw")),
             deadlineStore,
             instanceStore,
             new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -138,7 +138,6 @@ class JdbcProcessOperationsTest {
             unitOfWork,
             zeroBackoff(1),
             CLOCK,
-            new WorkerId("dw"),
             10,
             Duration.ofSeconds(30),
             () -> "dlease-" + tokens.incrementAndGet());
@@ -148,10 +147,9 @@ class JdbcProcessOperationsTest {
   }
 
   private void suspendViaDeadEffect() {
-    JdbcProcessEffectRelay relay =
-        new JdbcProcessEffectRelay(
-            jdbc,
-            dialect,
+    ProcessEffectRelay relay =
+        new ProcessEffectRelay(
+            new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("w")),
             effectStore,
             instanceStore,
             new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -159,7 +157,6 @@ class JdbcProcessOperationsTest {
             unitOfWork,
             zeroBackoff(1),
             CLOCK,
-            new WorkerId("w"),
             10,
             Duration.ofSeconds(30),
             () -> "lease-" + tokens.incrementAndGet());

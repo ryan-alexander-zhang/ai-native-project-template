@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.runtime;
+package com.aipersimmon.ddd.processmanager.engine.runtime;
 
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;

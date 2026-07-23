@@ -1,0 +1,3 @@
+com.aipersimmon.ddd.processmanager.engine.autoconfigure.codec.JacksonProcessCodecConfiguration
+com.aipersimmon.ddd.processmanager.engine.autoconfigure.AipersimmonDddProcessManagerAutoConfiguration
+com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessManagerObservabilityConfiguration

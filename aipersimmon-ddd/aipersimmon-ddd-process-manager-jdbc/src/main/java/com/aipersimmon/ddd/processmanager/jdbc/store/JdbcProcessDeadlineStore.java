@@ -1,6 +1,12 @@
 package com.aipersimmon.ddd.processmanager.jdbc.store;
 
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineRow;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.Payloads;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineView;
 import com.aipersimmon.ddd.processmanager.model.DeadlineName;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import java.sql.Timestamp;
@@ -14,7 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * deadline worker). Rescheduling a name bumps its generation so a stale generation firing late is a
  * no-op.
  */
-public final class JdbcProcessDeadlineStore {
+public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
 
   private final JdbcTemplate jdbc;
 
@@ -101,33 +107,6 @@ public final class JdbcProcessDeadlineStore {
             deadlineId)
         .stream()
         .findFirst();
-  }
-
-  /**
-   * A claimed deadline loaded for firing: its identity, encoded input, causal context, and attempt
-   * count.
-   */
-  public record DeadlineRow(
-      String deadlineId,
-      ProcessInstanceId instanceId,
-      DeadlineName name,
-      long generation,
-      PayloadType inputType,
-      byte[] inputPayload,
-      String correlationId,
-      String causationId,
-      int attempts,
-      String traceparent,
-      String traceState) {
-
-    public DeadlineRow {
-      inputPayload = inputPayload.clone();
-    }
-
-    @Override
-    public byte[] inputPayload() {
-      return inputPayload.clone();
-    }
   }
 
   public Optional<DeadlineRow> load(String deadlineId) {
@@ -321,14 +300,5 @@ public final class JdbcProcessDeadlineStore {
         ts,
         deadlineId,
         leaseToken);
-  }
-
-  /** The lifecycle of a scheduled deadline. */
-  public enum DeadlineStatus {
-    PENDING,
-    IN_FLIGHT,
-    FIRED,
-    DEAD,
-    CANCELLED
   }
 }

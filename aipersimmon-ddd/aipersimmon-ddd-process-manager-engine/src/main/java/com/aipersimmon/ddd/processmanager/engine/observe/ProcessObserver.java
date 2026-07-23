@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.observe;
+package com.aipersimmon.ddd.processmanager.engine.observe;
 
 import java.time.Duration;
 
@@ -10,7 +10,7 @@ import java.time.Duration;
  * carries no metrics cost.
  *
  * <p>Backlog gauges (dead counts, oldest-pending age, suspended/stuck instances) are pull-based and
- * read on demand via {@link JdbcProcessBacklog}; they are not reported through this hook.
+ * read on demand via {@link ProcessBacklog}; they are not reported through this hook.
  */
 public interface ProcessObserver {
 

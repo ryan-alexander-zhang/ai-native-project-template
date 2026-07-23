@@ -7,15 +7,16 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.exception.ProcessPayloadTooLargeException;
-import com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -50,7 +51,7 @@ class JdbcProcessMaxLifetimeTest {
   private JdbcProcessTransitionStore transitionStore;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessDeadlineStore deadlineStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private final AtomicUpdateProcessDialect dialect = new AtomicUpdateProcessDialect("h2");
   private final AtomicInteger ids = new AtomicInteger();
   private final AtomicInteger tokens = new AtomicInteger();
@@ -71,11 +72,11 @@ class JdbcProcessMaxLifetimeTest {
     transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
   }
 
-  private JdbcProcessRuntime runtime(Optional<Duration> maxLifetime, long maxPayloadBytes) {
-    return new JdbcProcessRuntime(
+  private DefaultProcessRuntime runtime(Optional<Duration> maxLifetime, long maxPayloadBytes) {
+    return new DefaultProcessRuntime(
         instanceStore,
         transitionStore,
         effectStore,
@@ -93,7 +94,7 @@ class JdbcProcessMaxLifetimeTest {
         maxPayloadBytes);
   }
 
-  private ProcessAdvanceResult start(JdbcProcessRuntime runtime) {
+  private ProcessAdvanceResult start(DefaultProcessRuntime runtime) {
     return runtime.start(
         TestFulfilment.TYPE,
         ORDER,
@@ -127,15 +128,14 @@ class JdbcProcessMaxLifetimeTest {
 
   @Test
   void firingTheBackstopLetsTheDefinitionDecide() {
-    JdbcProcessRuntime runtime = runtime(Optional.of(Duration.ofDays(30)), Long.MAX_VALUE);
+    DefaultProcessRuntime runtime = runtime(Optional.of(Duration.ofDays(30)), Long.MAX_VALUE);
     start(runtime);
 
     // A worker whose clock is past the 30-day TTL claims and fires the backstop.
     Clock later = Clock.fixed(T0.plus(Duration.ofDays(31)), ZoneOffset.UTC);
-    JdbcProcessDeadlineWorker worker =
-        new JdbcProcessDeadlineWorker(
-            jdbc,
-            dialect,
+    ProcessDeadlineWorker worker =
+        new ProcessDeadlineWorker(
+            new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("dw")),
             deadlineStore,
             instanceStore,
             new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -143,7 +143,6 @@ class JdbcProcessMaxLifetimeTest {
             unitOfWork,
             zeroBackoff(3),
             later,
-            new WorkerId("dw"),
             50,
             Duration.ofSeconds(30),
             () -> "lease-" + tokens.incrementAndGet());
@@ -159,7 +158,7 @@ class JdbcProcessMaxLifetimeTest {
 
   @Test
   void rejectsAPayloadThatExceedsTheConfiguredCap() {
-    JdbcProcessRuntime runtime = runtime(Optional.empty(), 1L);
+    DefaultProcessRuntime runtime = runtime(Optional.empty(), 1L);
     assertThrows(ProcessPayloadTooLargeException.class, () -> start(runtime));
     assertEquals(
         0L,

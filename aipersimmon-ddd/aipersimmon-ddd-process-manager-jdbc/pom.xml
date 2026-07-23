@@ -12,53 +12,28 @@
   </parent>
 
   <!--
-    The production JDBC runtime for the durable Process Manager contracts: the
-    four-table store, atomic advance in one REQUIRED transaction, the effect relay,
-    the deadline worker, and the query/operations surfaces.
-
-    Depends on Spring JDBC/Tx (so its REQUIRED transaction composes with an existing
-    Inbox and command-handler transaction) and on the application tier (IntegrationEvents
-    for event effects) — but NOT on Spring Boot: auto-configuration lives in the
-    starter module. It carries no business Definition or codec, and does not create
-    tables.
-
-    This slice lands the schema, stores, and atomic advance; the
-    relay, deadline worker, dialect claim, and operations land in later slices.
+    JDBC storage backend for the durable Process Manager. It implements the engine's four store ports
+    and the ProcessClaimStrategy over Spring JdbcTemplate - the four-table store, optimistic advance,
+    the SKIP LOCKED / atomic-conditional claim, and the raw-SQL schema validator - and
+    auto-configures those beans plus the dialect selection. The storage-agnostic
+    aipersimmon-ddd-process-manager-engine then wires the runtime, relay, and deadline worker on top;
+    this module is a self-contained Spring Boot starter (auto-configuration included) and executes no
+    DDL. It is the JDBC sibling of aipersimmon-ddd-process-manager-mybatis-plus; include exactly one
+    Process Manager storage backend.
   -->
   <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
   <name>aipersimmon-ddd-process-manager-jdbc</name>
-  <description>Production JDBC runtime for the durable Process Manager: four-table store, atomic advance, effect relay, and deadline worker over Spring JDBC/Tx.</description>
+  <description>JDBC storage backend and auto-configuration for the durable Process Manager engine: four-table store, SKIP LOCKED claim, and dialect selection.</description>
 
   <dependencies>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- Observability SPI (framework-free, no-op by default): the runtime opens a
-         process.advance span through it, so relay/deadline-driven advances are visible. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-observability</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- IntegrationEvents: the integration-event effect dispatcher publishes through it. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-application</artifactId>
+      <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-jdbc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-tx</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
 
     <dependency>
@@ -67,12 +42,30 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Testcontainers: prove the SKIP LOCKED claim on a real PostgreSQL (the crash-window /
-         concurrent-claim gate). Versions managed by the Spring Boot BOM. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-actuator</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -88,7 +81,16 @@
       <artifactId>postgresql</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Reusable Testcontainers support: singleton containers + DataSource helper. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>mysql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-test-support</artifactId>

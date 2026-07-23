@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * sample and is applied via Flyway/Liquibase. Disabled when {@code schema-validation=none}.
  */
 @DependsOnDatabaseInitialization
-public final class ProcessSchemaValidator implements InitializingBean {
+public final class JdbcProcessSchemaValidator implements InitializingBean {
 
   private static final String[] TABLES = {
     "aipersimmon_process_instance",
@@ -21,7 +21,7 @@ public final class ProcessSchemaValidator implements InitializingBean {
 
   private final JdbcTemplate jdbc;
 
-  public ProcessSchemaValidator(JdbcTemplate jdbc) {
+  public JdbcProcessSchemaValidator(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
   }
 

@@ -1,16 +1,16 @@
-package com.aipersimmon.ddd.processmanager.jdbc.runtime;
+package com.aipersimmon.ddd.processmanager.engine.runtime;
 
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore.DeadlineStatus;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore.EffectStatus;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessDeadlineView;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessEffectView;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceCriteria;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionView;
+import com.aipersimmon.ddd.processmanager.engine.store.DeadlineStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.EffectStatus;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineView;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectView;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceCriteria;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionView;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
@@ -27,21 +27,21 @@ import java.util.Optional;
  * type/businessKey/lifecycle/step/definitionVersion, the transition timeline, pending/dead effect
  * and deadline worklists, and the stuck-instance scan. It exposes runtime metadata (identity,
  * versions, lifecycle/step, outcome, revision, suspension detail) but never decoded business state,
- * and offers no mutation — operator changes go through {@code JdbcProcessOperations}.
+ * and offers no mutation — operator changes go through {@code ProcessOperations}.
  */
-public final class JdbcProcessQuery implements ProcessQuery {
+public final class DefaultProcessQuery implements ProcessQuery {
 
-  private final JdbcProcessInstanceStore instances;
-  private final JdbcProcessTransitionStore transitions;
-  private final JdbcProcessEffectStore effects;
-  private final JdbcProcessDeadlineStore deadlines;
+  private final ProcessInstanceStore instances;
+  private final ProcessTransitionStore transitions;
+  private final ProcessEffectStore effects;
+  private final ProcessDeadlineStore deadlines;
   private final Clock clock;
 
-  public JdbcProcessQuery(
-      JdbcProcessInstanceStore instances,
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+  public DefaultProcessQuery(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       Clock clock) {
     this.instances = instances;
     this.transitions = transitions;
@@ -89,7 +89,7 @@ public final class JdbcProcessQuery implements ProcessQuery {
   /** Page instances matching {@code criteria}, oldest first. */
   public List<ProcessView> search(ProcessInstanceCriteria criteria, int limit, int offset) {
     return instances.search(criteria, limit, offset).stream()
-        .map(JdbcProcessQuery::toView)
+        .map(DefaultProcessQuery::toView)
         .toList();
   }
 
@@ -114,7 +114,7 @@ public final class JdbcProcessQuery implements ProcessQuery {
    */
   public List<ProcessView> stuckInstances(Duration threshold, int limit) {
     return instances.findStuck(clock.instant().minus(threshold), limit).stream()
-        .map(JdbcProcessQuery::toView)
+        .map(DefaultProcessQuery::toView)
         .toList();
   }
 

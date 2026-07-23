@@ -6,13 +6,14 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker;
+import com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.AtomicUpdateProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -41,10 +42,10 @@ class JdbcProcessDeadlineWorkerTest {
       Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
   private JdbcProcessDeadlineStore deadlineStore;
   private JdbcProcessInstanceStore instanceStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private final AtomicUpdateProcessDialect dialect = new AtomicUpdateProcessDialect("h2");
   private final AtomicInteger ids = new AtomicInteger();
   private final AtomicInteger tokens = new AtomicInteger();
@@ -65,9 +66,9 @@ class JdbcProcessDeadlineWorkerTest {
     JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
     JdbcProcessEffectStore effectStore = new JdbcProcessEffectStore(jdbc);
     deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             transitionStore,
             effectStore,
@@ -82,10 +83,9 @@ class JdbcProcessDeadlineWorkerTest {
             3);
   }
 
-  private JdbcProcessDeadlineWorker worker(ProcessRetryPolicy policy) {
-    return new JdbcProcessDeadlineWorker(
-        jdbc,
-        dialect,
+  private ProcessDeadlineWorker worker(ProcessRetryPolicy policy) {
+    return new ProcessDeadlineWorker(
+        new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("worker-test")),
         deadlineStore,
         instanceStore,
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -93,7 +93,6 @@ class JdbcProcessDeadlineWorkerTest {
         unitOfWork,
         policy,
         CLOCK,
-        new WorkerId("worker-test"),
         50,
         Duration.ofSeconds(30),
         () -> "lease-" + tokens.incrementAndGet());
@@ -167,7 +166,7 @@ class JdbcProcessDeadlineWorkerTest {
         started.processRef(),
         new TestFulfilment.ArmPoisonDeadline(),
         CommandContext.root("msg-arm"));
-    JdbcProcessDeadlineWorker worker = worker(zeroBackoff(2));
+    ProcessDeadlineWorker worker = worker(zeroBackoff(2));
 
     worker.pollOnce(); // attempt 1 -> handle throws -> retry
     worker.pollOnce(); // attempt 2 -> DEAD + suspend

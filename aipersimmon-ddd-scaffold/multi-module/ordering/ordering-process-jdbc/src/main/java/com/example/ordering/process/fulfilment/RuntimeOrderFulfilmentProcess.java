@@ -2,7 +2,7 @@ package com.example.ordering.process.fulfilment;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessQuery;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
@@ -27,9 +27,9 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
   private static final ProcessType TYPE = OrderFulfilmentDefinition.PROCESS_TYPE;
 
   private final ProcessRuntime runtime;
-  private final JdbcProcessQuery query;
+  private final DefaultProcessQuery query;
 
-  public RuntimeOrderFulfilmentProcess(ProcessRuntime runtime, JdbcProcessQuery query) {
+  public RuntimeOrderFulfilmentProcess(ProcessRuntime runtime, DefaultProcessQuery query) {
     this.runtime = runtime;
     this.query = query;
   }

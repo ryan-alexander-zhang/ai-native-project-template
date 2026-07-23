@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.store;
+package com.aipersimmon.ddd.processmanager.engine.store;
 
 import java.time.Instant;
 import java.util.Optional;

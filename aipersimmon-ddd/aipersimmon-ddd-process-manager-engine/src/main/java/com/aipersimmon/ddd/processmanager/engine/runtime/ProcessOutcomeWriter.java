@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.runtime;
+package com.aipersimmon.ddd.processmanager.engine.runtime;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
@@ -11,12 +11,12 @@ import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.PublishIntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessDeadlineInsert;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessEffectInsert;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessTransitionInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
@@ -26,24 +26,24 @@ import java.util.function.Supplier;
 
 /**
  * Persists the durable outcome of one process advance: the appended transition-log row, the staged
- * command/event effects, and the deadline changes. Extracted from {@link JdbcProcessRuntime} — this
- * is the "write side" of a decision, cohesive around the transition/effect/deadline stores, and
- * distinct from the runtime's orchestration. Called under the instance row lock, so the per-effect
- * ordering base is stable across concurrent advances of the same instance.
+ * command/event effects, and the deadline changes. Extracted from {@link DefaultProcessRuntime} —
+ * this is the "write side" of a decision, cohesive around the transition/effect/deadline stores,
+ * and distinct from the runtime's orchestration. Called under the instance row lock, so the
+ * per-effect ordering base is stable across concurrent advances of the same instance.
  */
 final class ProcessOutcomeWriter {
 
-  private final JdbcProcessTransitionStore transitions;
-  private final JdbcProcessEffectStore effects;
-  private final JdbcProcessDeadlineStore deadlines;
+  private final ProcessTransitionStore transitions;
+  private final ProcessEffectStore effects;
+  private final ProcessDeadlineStore deadlines;
   private final ProcessPayloadSerdes serdes;
   private final StoreAndForwardTracer storeTracer;
   private final Supplier<String> idGenerator;
 
   ProcessOutcomeWriter(
-      JdbcProcessTransitionStore transitions,
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
+      ProcessTransitionStore transitions,
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
       ProcessPayloadSerdes serdes,
       StoreAndForwardTracer storeTracer,
       Supplier<String> idGenerator) {

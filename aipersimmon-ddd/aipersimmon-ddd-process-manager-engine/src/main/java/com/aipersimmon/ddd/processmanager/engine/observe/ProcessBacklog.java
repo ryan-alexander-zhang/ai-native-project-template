@@ -1,8 +1,8 @@
-package com.aipersimmon.ddd.processmanager.jdbc.observe;
+package com.aipersimmon.ddd.processmanager.engine.observe;
 
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,17 +15,17 @@ import java.util.Map;
  * Read-only and framework-free; the starter's meter binder and health indicator sample it on
  * demand.
  */
-public final class JdbcProcessBacklog {
+public final class ProcessBacklog {
 
-  private final JdbcProcessEffectStore effects;
-  private final JdbcProcessDeadlineStore deadlines;
-  private final JdbcProcessInstanceStore instances;
+  private final ProcessEffectStore effects;
+  private final ProcessDeadlineStore deadlines;
+  private final ProcessInstanceStore instances;
   private final Clock clock;
 
-  public JdbcProcessBacklog(
-      JdbcProcessEffectStore effects,
-      JdbcProcessDeadlineStore deadlines,
-      JdbcProcessInstanceStore instances,
+  public ProcessBacklog(
+      ProcessEffectStore effects,
+      ProcessDeadlineStore deadlines,
+      ProcessInstanceStore instances,
       Clock clock) {
     this.effects = effects;
     this.deadlines = deadlines;

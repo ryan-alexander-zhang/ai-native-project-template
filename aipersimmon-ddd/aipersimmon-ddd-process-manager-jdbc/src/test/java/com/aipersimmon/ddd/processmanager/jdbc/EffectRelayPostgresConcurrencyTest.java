@@ -8,15 +8,16 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
+import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.jdbc.lease.SkipLockedProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.CommandEffectDispatcher;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.EffectDispatcherRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -51,10 +52,10 @@ class EffectRelayPostgresConcurrencyTest {
   private static final PostgreSQLContainer<?> POSTGRES = SharedContainers.postgres();
 
   private JdbcTemplate jdbc;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
   private JdbcProcessEffectStore effectStore;
   private JdbcProcessInstanceStore instanceStore;
-  private JdbcProcessUnitOfWork unitOfWork;
+  private SpringTxProcessUnitOfWork unitOfWork;
   private final SkipLockedProcessDialect dialect = new SkipLockedProcessDialect("postgresql");
   private final ConcurrentDispatchBus bus = new ConcurrentDispatchBus();
   private final AtomicInteger ids = new AtomicInteger();
@@ -80,9 +81,9 @@ class EffectRelayPostgresConcurrencyTest {
     JdbcProcessTransitionStore transitionStore = new JdbcProcessTransitionStore(jdbc);
     effectStore = new JdbcProcessEffectStore(jdbc);
     JdbcProcessDeadlineStore deadlineStore = new JdbcProcessDeadlineStore(jdbc);
-    unitOfWork = new JdbcProcessUnitOfWork(new DataSourceTransactionManager(ds));
+    unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(ds));
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             instanceStore,
             transitionStore,
             effectStore,
@@ -135,10 +136,10 @@ class EffectRelayPostgresConcurrencyTest {
 
   private Runnable worker(AtomicInteger delivered, int total) {
     return () -> {
-      JdbcProcessEffectRelay relay =
-          new JdbcProcessEffectRelay(
-              jdbc,
-              dialect,
+      ProcessEffectRelay relay =
+          new ProcessEffectRelay(
+              new JdbcProcessClaimStrategy(
+                  jdbc, dialect, new WorkerId("worker-" + Thread.currentThread().getName())),
               effectStore,
               instanceStore,
               new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
@@ -146,7 +147,6 @@ class EffectRelayPostgresConcurrencyTest {
               unitOfWork,
               zeroBackoff(),
               CLOCK,
-              new WorkerId("worker-" + Thread.currentThread().getName()),
               5,
               Duration.ofSeconds(30),
               () -> "lease-" + tokens.incrementAndGet());

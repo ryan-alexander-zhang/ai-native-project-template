@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The storage-agnostic engine of the durable Process Manager: the reusable runtime, query,
+    operations, effect relay, deadline worker, dispatchers, retry, serdes, backlog, and
+    observability — everything that is NOT tied to a particular database. It runs against four store
+    ports (ProcessInstanceStore / ProcessTransitionStore / ProcessEffectStore / ProcessDeadlineStore),
+    one ProcessClaimStrategy, and a ProcessUnitOfWork; a storage backend
+    (aipersimmon-ddd-process-manager-jdbc, aipersimmon-ddd-process-manager-mybatis-plus) supplies the
+    adapters. Because the engine lives here once, both backends run identical logic — only the SQL
+    access differs.
+
+    It carries the shared Spring auto-configuration, validated properties, the worker-scheduling
+    lifecycle, the observability seams, the optional Jackson codec convenience layer, and the
+    four-table reference migration SQL. It depends on Spring tx / context / boot-autoconfigure (a
+    durable runtime needs a transaction boundary and an auto-config seam) but NOT on spring-jdbc or
+    any ORM. The orchestration classes themselves are framework-free by construction: they touch only
+    the ports. Include exactly one storage backend starter; a broker starter plugs into either.
+  -->
+  <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
+  <name>aipersimmon-ddd-process-manager-engine</name>
+  <description>Storage-agnostic engine of the durable Process Manager: runtime, relay, deadline worker, and shared Spring wiring over store ports.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Observability SPI (framework-free, no-op by default): the runtime opens a process.advance
+         span through it, so relay/deadline-driven advances are visible. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- IntegrationEvents: the integration-event effect dispatcher publishes through it. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The unit-of-work is a Spring TransactionTemplate; the engine composes its REQUIRED
+         transaction with an existing Inbox and command-handler transaction. No spring-jdbc here. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <!-- Auto-configuration seam + the SmartLifecycle worker scheduler. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <!-- Observability seams are optional: metrics bind only when Micrometer is present, the health
+         indicator only when Actuator is present, and the Jackson codec layer only when Jackson is. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-actuator</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

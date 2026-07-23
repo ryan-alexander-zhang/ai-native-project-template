@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
 /** Metric names for the Process Manager SLIs, under a common prefix. */
 final class ProcessManagerMeters {

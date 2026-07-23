@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -10,8 +10,8 @@ import org.springframework.boot.convert.DurationStyle;
  * aipersimmon.ddd.process-manager.jdbc}. {@link #validate()} is called by the auto-configuration so
  * illegal values fail fast at startup rather than misbehaving at runtime.
  */
-@ConfigurationProperties(prefix = "aipersimmon.ddd.process-manager.jdbc")
-public class ProcessManagerJdbcProperties {
+@ConfigurationProperties(prefix = "aipersimmon.ddd.process-manager")
+public class ProcessManagerProperties {
 
   /** Enable the JDBC runtime auto-configuration. */
   private boolean enabled = true;

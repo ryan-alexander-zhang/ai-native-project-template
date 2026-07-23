@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.store;
+package com.aipersimmon.ddd.processmanager.engine.store;
 
 import java.util.Base64;
 

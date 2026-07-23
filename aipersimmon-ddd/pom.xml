@@ -83,8 +83,9 @@
     <module>aipersimmon-ddd-cqrs</module>
     <module>aipersimmon-ddd-cqrs-spring</module>
     <module>aipersimmon-ddd-process-manager</module>
+    <module>aipersimmon-ddd-process-manager-engine</module>
     <module>aipersimmon-ddd-process-manager-jdbc</module>
-    <module>aipersimmon-ddd-process-manager-jdbc-spring-boot-starter</module>
+    <module>aipersimmon-ddd-process-manager-mybatis-plus</module>
     <module>aipersimmon-ddd-saga</module>
     <module>aipersimmon-ddd-saga-spring</module>
     <module>aipersimmon-ddd-events-spring</module>

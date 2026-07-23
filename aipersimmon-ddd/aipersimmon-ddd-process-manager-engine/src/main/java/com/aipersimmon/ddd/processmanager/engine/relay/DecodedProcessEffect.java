@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.processmanager.jdbc.relay;
+package com.aipersimmon.ddd.processmanager.engine.relay;
 
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;

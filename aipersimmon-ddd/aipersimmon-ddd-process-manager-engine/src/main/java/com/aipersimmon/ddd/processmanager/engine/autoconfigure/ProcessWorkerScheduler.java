@@ -1,7 +1,7 @@
-package com.aipersimmon.ddd.processmanager.jdbc.autoconfigure;
+package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
-import com.aipersimmon.ddd.processmanager.jdbc.deadline.JdbcProcessDeadlineWorker;
-import com.aipersimmon.ddd.processmanager.jdbc.relay.JdbcProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker;
+import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,9 +25,9 @@ public final class ProcessWorkerScheduler implements SmartLifecycle {
 
   private static final Logger log = LoggerFactory.getLogger(ProcessWorkerScheduler.class);
 
-  private final JdbcProcessEffectRelay effectRelay;
+  private final ProcessEffectRelay effectRelay;
   private final Duration effectPollDelay;
-  private final JdbcProcessDeadlineWorker deadlineWorker;
+  private final ProcessDeadlineWorker deadlineWorker;
   private final Duration deadlinePollDelay;
   private final Duration shutdownTimeout;
 
@@ -35,9 +35,9 @@ public final class ProcessWorkerScheduler implements SmartLifecycle {
   private volatile boolean running;
 
   public ProcessWorkerScheduler(
-      JdbcProcessEffectRelay effectRelay,
+      ProcessEffectRelay effectRelay,
       Duration effectPollDelay,
-      JdbcProcessDeadlineWorker deadlineWorker,
+      ProcessDeadlineWorker deadlineWorker,
       Duration deadlinePollDelay,
       Duration shutdownTimeout) {
     this.effectRelay = effectRelay;

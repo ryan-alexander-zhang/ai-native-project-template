@@ -1,35 +1,33 @@
-package com.aipersimmon.ddd.processmanager.jdbc.relay;
+package com.aipersimmon.ddd.processmanager.engine.relay;
 
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessDialect;
-import com.aipersimmon.ddd.processmanager.jdbc.lease.WorkerId;
-import com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver;
-import com.aipersimmon.ddd.processmanager.jdbc.retry.ProcessRetryPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ClaimedEffect;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
-import com.aipersimmon.ddd.processmanager.jdbc.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.lease.ProcessClaimStrategy;
+import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
+import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.ProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.engine.store.ClaimedEffect;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Delivers staged effects at-least-once, out of the advance transaction. One {@link #pollOnce()}
- * claims a batch of due, per-instance-ordered effects (via the {@link JdbcProcessDialect}, marking
- * them {@code IN_FLIGHT} with a fresh lease), then for each: decodes the payload, dispatches under
- * the reconstructed context, and — fenced by that lease token — marks it {@code DELIVERED},
- * schedules a bounded backoff retry, or, once attempts are exhausted, moves it to {@code DEAD} and
- * suspends the instance. A crash before the delivered mark leaves the row {@code IN_FLIGHT} with an
- * expiring lease, so it is re-claimed and re-delivered under the same id.
+ * claims a batch of due, per-instance-ordered effects (via the {@link ProcessClaimStrategy},
+ * marking them {@code IN_FLIGHT} with a fresh lease), then for each: decodes the payload,
+ * dispatches under the reconstructed context, and — fenced by that lease token — marks it {@code
+ * DELIVERED}, schedules a bounded backoff retry, or, once attempts are exhausted, moves it to
+ * {@code DEAD} and suspends the instance. A crash before the delivered mark leaves the row {@code
+ * IN_FLIGHT} with an expiring lease, so it is re-claimed and re-delivered under the same id.
  *
  * <p>Before external dispatch it re-checks the owning instance's lifecycle: if an operator cancel
  * landed while the effect was in flight, the instance is now {@code CANCELLED}, so the dispatch is
@@ -40,41 +38,36 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <p>The scheduling loop that calls {@code pollOnce} on an interval is the starter's concern; this
  * class is the directly testable unit of work.
  */
-public final class JdbcProcessEffectRelay {
+public final class ProcessEffectRelay {
 
-  private final JdbcTemplate jdbc;
-  private final JdbcProcessDialect dialect;
-  private final JdbcProcessEffectStore effects;
-  private final JdbcProcessInstanceStore instances;
+  private final ProcessClaimStrategy claimStrategy;
+  private final ProcessEffectStore effects;
+  private final ProcessInstanceStore instances;
   private final ProcessPayloadCodecRegistry payloadCodecs;
   private final EffectDispatcherRegistry dispatchers;
-  private final JdbcProcessUnitOfWork unitOfWork;
+  private final ProcessUnitOfWork unitOfWork;
   private final ProcessRetryPolicy retryPolicy;
   private final java.time.Clock clock;
-  private final WorkerId workerId;
   private final int batchSize;
   private final Duration leaseDuration;
   private final Supplier<String> leaseTokens;
   private final ProcessObserver observer;
   private final StoreAndForwardTracer storeTracer;
 
-  public JdbcProcessEffectRelay(
-      JdbcTemplate jdbc,
-      JdbcProcessDialect dialect,
-      JdbcProcessEffectStore effects,
-      JdbcProcessInstanceStore instances,
+  public ProcessEffectRelay(
+      ProcessClaimStrategy claimStrategy,
+      ProcessEffectStore effects,
+      ProcessInstanceStore instances,
       ProcessPayloadCodecRegistry payloadCodecs,
       EffectDispatcherRegistry dispatchers,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       ProcessRetryPolicy retryPolicy,
       java.time.Clock clock,
-      WorkerId workerId,
       int batchSize,
       Duration leaseDuration,
       Supplier<String> leaseTokens) {
     this(
-        jdbc,
-        dialect,
+        claimStrategy,
         effects,
         instances,
         payloadCodecs,
@@ -82,7 +75,6 @@ public final class JdbcProcessEffectRelay {
         unitOfWork,
         retryPolicy,
         clock,
-        workerId,
         batchSize,
         leaseDuration,
         leaseTokens,
@@ -90,24 +82,21 @@ public final class JdbcProcessEffectRelay {
         NoOpStoreAndForwardTracer.INSTANCE);
   }
 
-  public JdbcProcessEffectRelay(
-      JdbcTemplate jdbc,
-      JdbcProcessDialect dialect,
-      JdbcProcessEffectStore effects,
-      JdbcProcessInstanceStore instances,
+  public ProcessEffectRelay(
+      ProcessClaimStrategy claimStrategy,
+      ProcessEffectStore effects,
+      ProcessInstanceStore instances,
       ProcessPayloadCodecRegistry payloadCodecs,
       EffectDispatcherRegistry dispatchers,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       ProcessRetryPolicy retryPolicy,
       java.time.Clock clock,
-      WorkerId workerId,
       int batchSize,
       Duration leaseDuration,
       Supplier<String> leaseTokens,
       ProcessObserver observer) {
     this(
-        jdbc,
-        dialect,
+        claimStrategy,
         effects,
         instances,
         payloadCodecs,
@@ -115,7 +104,6 @@ public final class JdbcProcessEffectRelay {
         unitOfWork,
         retryPolicy,
         clock,
-        workerId,
         batchSize,
         leaseDuration,
         leaseTokens,
@@ -123,24 +111,21 @@ public final class JdbcProcessEffectRelay {
         NoOpStoreAndForwardTracer.INSTANCE);
   }
 
-  public JdbcProcessEffectRelay(
-      JdbcTemplate jdbc,
-      JdbcProcessDialect dialect,
-      JdbcProcessEffectStore effects,
-      JdbcProcessInstanceStore instances,
+  public ProcessEffectRelay(
+      ProcessClaimStrategy claimStrategy,
+      ProcessEffectStore effects,
+      ProcessInstanceStore instances,
       ProcessPayloadCodecRegistry payloadCodecs,
       EffectDispatcherRegistry dispatchers,
-      JdbcProcessUnitOfWork unitOfWork,
+      ProcessUnitOfWork unitOfWork,
       ProcessRetryPolicy retryPolicy,
       java.time.Clock clock,
-      WorkerId workerId,
       int batchSize,
       Duration leaseDuration,
       Supplier<String> leaseTokens,
       ProcessObserver observer,
       StoreAndForwardTracer storeTracer) {
-    this.jdbc = jdbc;
-    this.dialect = dialect;
+    this.claimStrategy = claimStrategy;
     this.effects = effects;
     this.instances = instances;
     this.payloadCodecs = payloadCodecs;
@@ -148,7 +133,6 @@ public final class JdbcProcessEffectRelay {
     this.unitOfWork = unitOfWork;
     this.retryPolicy = retryPolicy;
     this.clock = clock;
-    this.workerId = workerId;
     this.batchSize = batchSize;
     this.leaseDuration = leaseDuration;
     this.leaseTokens = leaseTokens;
@@ -164,7 +148,7 @@ public final class JdbcProcessEffectRelay {
     long claimStart = System.nanoTime();
     List<String> claimed =
         unitOfWork.execute(
-            () -> dialect.claimDueEffects(jdbc, now, batchSize, workerId, leaseToken, leaseUntil));
+            () -> claimStrategy.claimDueEffects(now, batchSize, leaseToken, leaseUntil));
     observer.effectClaimed(claimed.size(), Duration.ofNanos(System.nanoTime() - claimStart));
 
     int delivered = 0;

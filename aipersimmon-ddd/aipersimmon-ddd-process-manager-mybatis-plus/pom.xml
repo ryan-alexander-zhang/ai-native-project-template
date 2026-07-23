@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    MyBatis-Plus storage backend for the durable Process Manager. It implements the engine's four
+    store ports and the ProcessClaimStrategy over MyBatis-Plus mappers (BaseMapper + hand-written
+    @Select/@Update carrying SQL identical to the JDBC backend), and auto-configures the store beans,
+    the claim strategy, the Spring-tx unit of work, and the schema validator — then the shared engine
+    auto-configuration wires the runtime, relay, and deadline worker on top. It registers only its
+    own mappers (via MapperFactoryBean), so it never triggers or hijacks the consumer's @MapperScan
+    and defines no JPA @Entity.
+
+    This is the MyBatis-Plus sibling of aipersimmon-ddd-process-manager-jdbc; include exactly one
+    Process Manager storage backend. Delivery/behavior is identical to the JDBC backend because both
+    run the same aipersimmon-ddd-process-manager-engine.
+  -->
+  <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
+  <name>aipersimmon-ddd-process-manager-mybatis-plus</name>
+  <description>MyBatis-Plus storage backend for the durable Process Manager engine: store ports, claim strategy, and auto-configuration.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Testcontainers: prove the SKIP LOCKED claim on a real PostgreSQL/MySQL (the concurrent-claim
+         gate), mirroring the JDBC backend. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

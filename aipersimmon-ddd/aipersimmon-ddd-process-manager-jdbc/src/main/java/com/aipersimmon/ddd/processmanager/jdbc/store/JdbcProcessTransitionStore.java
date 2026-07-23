@@ -1,6 +1,12 @@
 package com.aipersimmon.ddd.processmanager.jdbc.store;
 
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
+import com.aipersimmon.ddd.processmanager.engine.store.ConcurrentTransitionException;
+import com.aipersimmon.ddd.processmanager.engine.store.ParkedInput;
+import com.aipersimmon.ddd.processmanager.engine.store.Payloads;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionInsert;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionView;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
@@ -9,6 +15,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -16,7 +23,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * process-level dedup lookup by {@code (instance_id, input_message_id)}. A history row is never
  * overwritten.
  */
-public final class JdbcProcessTransitionStore {
+public final class JdbcProcessTransitionStore implements ProcessTransitionStore {
 
   private final JdbcTemplate jdbc;
 
@@ -68,28 +75,41 @@ public final class JdbcProcessTransitionStore {
   }
 
   public void append(ProcessTransitionInsert t, Instant now) {
-    jdbc.update(
-        """
+    try {
+      jdbc.update(
+          """
                 INSERT INTO aipersimmon_process_transition (
                     transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
                     input_payload, from_lifecycle, to_lifecycle, from_step, to_step, decision_code,
                     transition_kind, correlation_id, created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        t.transitionId(),
-        t.instanceId().value(),
-        nextTransitionSeq(t.instanceId()),
-        t.inputMessageId(),
-        t.inputType(),
-        t.inputVersion(),
-        Payloads.toText(t.inputPayload()),
-        t.fromLifecycle().map(ProcessLifecycle::name).orElse(null),
-        t.toLifecycle().name(),
-        t.fromStep().map(ProcessStep::value).orElse(null),
-        t.toStep().value(),
-        t.decisionCode().value(),
-        t.transitionKind(),
-        t.correlationId(),
-        Timestamp.from(now));
+          t.transitionId(),
+          t.instanceId().value(),
+          nextTransitionSeq(t.instanceId()),
+          t.inputMessageId(),
+          t.inputType(),
+          t.inputVersion(),
+          Payloads.toText(t.inputPayload()),
+          t.fromLifecycle().map(ProcessLifecycle::name).orElse(null),
+          t.toLifecycle().name(),
+          t.fromStep().map(ProcessStep::value).orElse(null),
+          t.toStep().value(),
+          t.decisionCode().value(),
+          t.transitionKind(),
+          t.correlationId(),
+          Timestamp.from(now));
+    } catch (DuplicateKeyException alreadyRecorded) {
+      // UNIQUE(instance_id, input_message_id): a concurrent transaction already appended a
+      // transition for this input. Surface it store-neutrally so the runtime treats it as a
+      // retriable conflict and folds into the committed transition as an idempotent duplicate.
+      throw new ConcurrentTransitionException(
+          "transition for input "
+              + t.inputMessageId()
+              + " on instance "
+              + t.instanceId().value()
+              + " already recorded",
+          alreadyRecorded);
+    }
   }
 
   /**
@@ -131,22 +151,6 @@ public final class JdbcProcessTransitionStore {
         operator,
         reason,
         Timestamp.from(now));
-  }
-
-  /**
-   * A parked input awaiting replay after the instance resumes, with the causal context to replay
-   * under.
-   */
-  public record ParkedInput(
-      String inputMessageId, PayloadType inputType, byte[] inputPayload, String correlationId) {
-    public ParkedInput {
-      inputPayload = inputPayload.clone();
-    }
-
-    @Override
-    public byte[] inputPayload() {
-      return inputPayload.clone();
-    }
   }
 
   /** The full transition timeline of an instance in chronological order. */

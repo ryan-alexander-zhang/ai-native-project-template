@@ -12,9 +12,9 @@ import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.DuplicateBusinessKeyPolicy;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessRuntime;
-import com.aipersimmon.ddd.processmanager.jdbc.runtime.JdbcProcessUnitOfWork;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
+import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
+import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
@@ -52,7 +52,7 @@ class JdbcProcessRuntimeTracingTest {
   private final AtomicInteger ids = new AtomicInteger();
   private final RecordingTracer tracer = new RecordingTracer();
   private DataSource dataSource;
-  private JdbcProcessRuntime runtime;
+  private DefaultProcessRuntime runtime;
 
   @BeforeEach
   void setUp() {
@@ -68,7 +68,7 @@ class JdbcProcessRuntimeTracingTest {
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);
     runtime =
-        new JdbcProcessRuntime(
+        new DefaultProcessRuntime(
             new JdbcProcessInstanceStore(jdbc),
             new JdbcProcessTransitionStore(jdbc),
             new JdbcProcessEffectStore(jdbc),
@@ -76,12 +76,12 @@ class JdbcProcessRuntimeTracingTest {
             new ProcessDefinitionRegistry(List.of(new TestFulfilment.Definition())),
             new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
             new ProcessStateCodecRegistry(List.of(TestFulfilment.stateCodec())),
-            new JdbcProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
+            new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource)),
             clock,
             () -> "id-" + ids.incrementAndGet(),
             DuplicateBusinessKeyPolicy.REJECT,
             3,
-            com.aipersimmon.ddd.processmanager.jdbc.observe.ProcessObserver.NOOP,
+            com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver.NOOP,
             Optional.empty(),
             Long.MAX_VALUE,
             tracer);
