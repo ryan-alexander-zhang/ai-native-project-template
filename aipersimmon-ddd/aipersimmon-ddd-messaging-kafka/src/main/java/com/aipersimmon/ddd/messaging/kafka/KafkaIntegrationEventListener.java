@@ -125,7 +125,8 @@ public class KafkaIntegrationEventListener {
     // ce_tenantid (absent on pre-tenancy messages -> root sentinel); reconstruct reads the same
     // header into envelope.tenantId(), and the command also carries it via CommandContext.of. The
     // inbox insert must see it here, since it happens before reconstruct.
-    String tenantId = orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
+    String tenantId =
+        orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
     TenantContext.runAs(
         Tenants.fromValue(tenantId),
         () -> {

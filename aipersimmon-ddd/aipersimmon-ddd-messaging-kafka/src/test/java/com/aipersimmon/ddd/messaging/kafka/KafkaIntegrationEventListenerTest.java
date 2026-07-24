@@ -12,6 +12,8 @@ import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -59,6 +61,35 @@ class KafkaIntegrationEventListenerTest {
         "evt-1",
         envelope.correlationId(),
         "correlationId falls back to the event id when the header is absent");
+  }
+
+  @Test
+  void bindsTheHeaderTenantAsTheEnvelopeAndForTheWholeHandling() throws Exception {
+    CapturingPublisher publisher = new CapturingPublisher();
+    KafkaIntegrationEventListener listener =
+        new KafkaIntegrationEventListener(publisher, mapper, new InMemoryInbox(), catalog);
+
+    listener.onMessage(recordWith(IntegrationEventHeaders.TENANT_ID, "acme"));
+
+    EventEnvelope<?> envelope = envelopeOf(publisher.events.get(0));
+    assertEquals("acme", envelope.tenantId(), "the tenant is reconstructed from ce_tenantid");
+    assertEquals(
+        "acme",
+        publisher.tenantAtPublish.get(0),
+        "the tenant is bound in the TenantContext while the event is handled");
+  }
+
+  @Test
+  void defaultsToTheRootTenantWhenTheHeaderIsAbsent() throws Exception {
+    CapturingPublisher publisher = new CapturingPublisher();
+    KafkaIntegrationEventListener listener =
+        new KafkaIntegrationEventListener(publisher, mapper, new InMemoryInbox(), catalog);
+
+    // A pre-tenancy record carries no ce_tenantid — it must default to the root sentinel.
+    listener.onMessage(recordFor(new SampleEvent("o-1", "placed"), "evt-1"));
+
+    assertEquals("__root__", envelopeOf(publisher.events.get(0)).tenantId());
+    assertEquals("__root__", publisher.tenantAtPublish.get(0));
   }
 
   @Test
@@ -270,15 +301,18 @@ class KafkaIntegrationEventListenerTest {
 
   static final class CapturingPublisher implements ApplicationEventPublisher {
     final List<Object> events = new ArrayList<>();
+    // The ambient tenant at the moment of publish — proves the consumer bound it for handling.
+    final List<String> tenantAtPublish = new ArrayList<>();
 
     @Override
     public void publishEvent(Object event) {
+      tenantAtPublish.add(TenantContext.current().map(TenantId::value).orElse(null));
       events.add(event);
     }
 
     @Override
     public void publishEvent(ApplicationEvent event) {
-      events.add(event);
+      publishEvent((Object) event);
     }
   }
 
