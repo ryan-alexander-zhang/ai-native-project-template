@@ -36,7 +36,7 @@ public record OperationLogInvocation(
   /** Fluent builder for {@link OperationLogInvocation}. */
   public static final class Builder {
     private String source;
-    private String tenantId = "GLOBAL";
+    private String tenantId = "__root__";
     private Actor actor;
     private Causality causality = Causality.none();
     private Instant occurredAt;
@@ -49,7 +49,9 @@ public record OperationLogInvocation(
       return this;
     }
 
-    /** The trusted tenant; defaults to {@code GLOBAL} for non-multi-tenant callers. */
+    /**
+     * The trusted tenant; defaults to the {@code __root__} sentinel for non-multi-tenant callers.
+     */
     public Builder tenant(String tenantId) {
       this.tenantId = tenantId;
       return this;

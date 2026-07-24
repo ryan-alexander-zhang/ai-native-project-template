@@ -17,6 +17,9 @@ import com.aipersimmon.ddd.operationlog.engine.autoconfigure.OperationLogPropert
 import com.aipersimmon.ddd.operationlog.engine.observability.OperationLogMetrics;
 import com.aipersimmon.ddd.operationlog.port.OperationLogs;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +74,19 @@ public class AipersimmonDddOperationLogCqrsAutoConfiguration {
   public IndependentTransactionRunner operationLogIndependentTransactionRunner(
       PlatformTransactionManager transactionManager) {
     return new SpringIndependentTransactionRunner(transactionManager);
+  }
+
+  /**
+   * The default tenant resolver delegates to the multi-tenancy {@link TenantContext}, so an
+   * operation-log row is stamped with the same tenant the command runs under (the {@code __root__}
+   * sentinel when tenancy is off or no tenant is bound). An application can still define its own
+   * {@link OperationTenantResolver} to override this — the actor resolver has no default and must
+   * always be supplied.
+   */
+  @Bean
+  @ConditionalOnMissingBean(OperationTenantResolver.class)
+  public OperationTenantResolver operationTenantResolver() {
+    return () -> TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
   }
 
   @Bean

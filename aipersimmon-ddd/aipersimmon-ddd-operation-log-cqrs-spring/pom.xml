@@ -33,6 +33,13 @@
       <artifactId>aipersimmon-ddd-cqrs</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The default OperationTenantResolver delegates to the multi-tenancy TenantContext, so the
+         operation-log tenant matches the request/command tenant without a separate resolver. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-tx</artifactId>

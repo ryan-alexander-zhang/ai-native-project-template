@@ -48,7 +48,7 @@ class OperationLogModelTest {
             .actor(Actor.system("sys"))
             .occurredAt(Instant.EPOCH)
             .build();
-    assertEquals("GLOBAL", inv.tenantId());
+    assertEquals("__root__", inv.tenantId());
     assertNotNull(inv.causality());
     assertThrows(
         NullPointerException.class,

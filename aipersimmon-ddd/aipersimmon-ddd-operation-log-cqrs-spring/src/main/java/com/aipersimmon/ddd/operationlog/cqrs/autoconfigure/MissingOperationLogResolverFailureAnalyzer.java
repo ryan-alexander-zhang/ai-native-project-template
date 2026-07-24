@@ -40,8 +40,9 @@ public class MissingOperationLogResolverFailureAnalyzer
           "the tenant the operation belongs to",
           "    @Bean\n"
               + "    OperationTenantResolver operationTenantResolver() {\n"
-              + "      // resolve from a trusted scope; return \"GLOBAL\" when multi-tenancy is off\n"
-              + "      return () -> \"GLOBAL\";\n"
+              + "      // optional: a default delegating to TenantContext is provided; override only\n"
+              + "      // to resolve from a different trusted scope; return \"__root__\" when off\n"
+              + "      return () -> \"__root__\";\n"
               + "    }");
     }
     return null;

@@ -27,12 +27,12 @@ class MissingOperationLogResolverFailureAnalyzerTest {
   }
 
   @Test
-  void explains_a_missing_tenant_resolver_including_the_global_default() {
+  void explains_a_missing_tenant_resolver_including_the_root_default() {
     FailureAnalysis analysis =
         analyzer.analyze(new NoSuchBeanDefinitionException(OperationTenantResolver.class));
 
     assertTrue(analysis.getDescription().contains("OperationTenantResolver"));
-    assertTrue(analysis.getAction().contains("GLOBAL"));
+    assertTrue(analysis.getAction().contains("__root__"));
   }
 
   @Test

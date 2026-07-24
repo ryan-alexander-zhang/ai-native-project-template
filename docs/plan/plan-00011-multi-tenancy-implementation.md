@@ -170,6 +170,13 @@ observability / archunit / flyway。
 >   全 3 process 模块 verify 绿（jdbc 93 + mp 3 + engine，含真 PG 并发）。**T18 余量**：mp 变体、MySQL/PG 参数化、
 >   web-store/inbox/outbox 隔离用例、缺租户 REJECT、`enabled=false` 等价、迁移安全；**RLS 相关用例(XAC-9.1 池不泄漏/
 >   XAC-8.2 漏写谓词兜底)待 T13**。
+> - ✅ **T17（operation-log 租户对齐 TenantContext + 哨兵统一 __root__）**：operation-log 原有**独立**租户概念(哨兵
+>   `GLOBAL`、`OperationTenantResolver` app 必供)。改为：`operation-log-cqrs-spring` 加 tenancy 依赖 + 提供**默认**
+>   `OperationTenantResolver` bean 委托 `TenantContext.current().orElse(ROOT)`（`@ConditionalOnMissingBean`，app 仍可覆盖；
+>   actor resolver 仍无默认必供）——operation_log 行的租户自动与命令/请求租户一致。`OperationLogInvocation` 默认 tenantId
+>   `GLOBAL`→`__root__`；FailureAnalyzer 示例 + OperationTenantResolver javadoc + 两测试断言同步 `GLOBAL`→`__root__`。
+>   V1 迁移里的 `GLOBAL` 只是 SQL 注释、且改动会破 Flyway checksum，故不动（operation_log.tenant_id 无 DB DEFAULT，靠 resolver 供值）。
+>   operation-log(27) + operation-log-cqrs-spring(32，含 PG/H2 端到端捕获) 全绿。
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 
