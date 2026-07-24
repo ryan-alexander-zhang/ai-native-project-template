@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
@@ -36,6 +38,33 @@ class JdbcWebStoreTest {
   @Autowired ReplayGuard replayGuard;
   @Autowired RateLimiter rateLimiter;
   @Autowired MutableClock clock;
+
+  @Test
+  void idempotencyKeyIsIsolatedPerTenant() {
+    // Two tenants send the SAME client-provided Idempotency-Key; each must keep its own response
+    // (the composite (tenant_id, idempotency_key) PK), never reading back the other's — the
+    // cross-tenant leak the tenant-scoped key prevents (T10).
+    StoredResponse acme = new StoredResponse(201, new byte[] {1}, Map.of());
+    StoredResponse globex = new StoredResponse(202, new byte[] {2}, Map.of());
+
+    TenantContext.runAs(
+        Tenants.of("acme"),
+        () -> assertTrue(idempotencyStore.saveIfAbsent("shared-key", acme, Duration.ofHours(1))));
+    // globex reusing the key is a first write in its own namespace — it wins, not a duplicate.
+    TenantContext.runAs(
+        Tenants.of("globex"),
+        () -> assertTrue(idempotencyStore.saveIfAbsent("shared-key", globex, Duration.ofHours(1))));
+
+    TenantContext.runAs(
+        Tenants.of("acme"),
+        () -> assertEquals(201, idempotencyStore.find("shared-key").orElseThrow().status()));
+    TenantContext.runAs(
+        Tenants.of("globex"),
+        () -> assertEquals(202, idempotencyStore.find("shared-key").orElseThrow().status()));
+    // A third tenant that never wrote the key sees nothing, though two others hold it.
+    TenantContext.runAs(
+        Tenants.of("initech"), () -> assertTrue(idempotencyStore.find("shared-key").isEmpty()));
+  }
 
   @Test
   void idempotencyStoresReplaysAndExpires() {

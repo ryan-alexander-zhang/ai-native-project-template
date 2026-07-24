@@ -167,9 +167,12 @@ observability / archunit / flyway。
 >   传环境 `TenantContext.current().orElse(ROOT)`。既有 ROOT 租户测试不受影响。
 > - ✅ **T18（部分：process-manager JDBC 双租户隔离已证）**：新 `JdbcProcessTenantIsolationTest`（2 例）——两租户共用
 >   business_key 得 2 个独立实例；读侧 `findRef` 只解析环境租户的实例（陌生租户见空）；重复拒绝按起始租户隔离。
->   全 3 process 模块 verify 绿（jdbc 93 + mp 3 + engine，含真 PG 并发）。**T18 余量**：mp 变体、MySQL/PG 参数化、
->   web-store/inbox/outbox 隔离用例、缺租户 REJECT、`enabled=false` 等价、迁移安全；**RLS 相关用例(XAC-9.1 池不泄漏/
->   XAC-8.2 漏写谓词兜底)待 T13**。
+>   全 3 process 模块 verify 绿（jdbc 93 + mp 3 + engine，含真 PG 并发）。**追加 web-store 跨租户用例**：
+>   `JdbcWebStoreTest.idempotencyKeyIsIsolatedPerTenant`——两租户共用同一 Idempotency-Key 各存各的、互不读回、陌生租户见空
+>   （证 T10 复合 PK 隔离）。**缺租户 REJECT 已由 T2 `TenantResolutionFilterTest` 覆盖**（400 missing/invalid）。
+>   **T18 余量**：process mybatis-plus runtime 变体（mp 无 runtime 测试骨架，需较重 Spring 装配）、MP 拦截器(T12)隔离
+>   （需 fixture 表 + opt-in 配置）、MySQL/PG 参数化、inbox/outbox 隔离用例、`enabled=false` 等价、迁移安全；
+>   **RLS 相关用例(XAC-9.1 池不泄漏/XAC-8.2 漏写谓词兜底)待 T13**。
 > - ✅ **T17（operation-log 租户对齐 TenantContext + 哨兵统一 __root__）**：operation-log 原有**独立**租户概念(哨兵
 >   `GLOBAL`、`OperationTenantResolver` app 必供)。改为：`operation-log-cqrs-spring` 加 tenancy 依赖 + 提供**默认**
 >   `OperationTenantResolver` bean 委托 `TenantContext.current().orElse(ROOT)`（`@ConditionalOnMissingBean`，app 仍可覆盖；
