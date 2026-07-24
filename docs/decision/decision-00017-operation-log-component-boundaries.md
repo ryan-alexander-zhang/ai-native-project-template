@@ -109,7 +109,7 @@ design-00008 已给出结构设计。本 ADR 把 analysis-00013 §12 / design-00
     端口 + 每租户 TTL、隐私删除/crypto-shred（必须真正移除旧值并留治理审计）**在 P3 定义**；本 ADR 只确立"必须可真正删除、
     不得永不删除"的原则，不承诺 v1 交付该端口。
 16. **（D8/D11）多租户全链路强制 tenant。** 开启后写入、唯一键与**所有读取**都带可信 tenant（`OperationLogCriteria`
-    强制要求），非多租户模式规范化为 `GLOBAL`（DB 不用 NULL）。
+    强制要求），非多租户模式规范化为 `__root__`（DB 不用 NULL）。
 17. **（D11）actor/tenant 用无状态 resolver、可信来源，不扩展 `CommandContext`。** resolver 无状态/无 IO/无副作用；
     仅当存在自动捕获入口且 resolver 缺失时启动失败；可信来源为安全上下文或显式 invocation scope，**绝不**从 command
     payload 取；batch/scheduler 显式用 `SYSTEM`/`SERVICE` actor。不给 `CommandContext` 加 actor/tenant/metadata map

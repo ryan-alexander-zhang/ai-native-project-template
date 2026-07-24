@@ -199,7 +199,7 @@ com.aipersimmon.ddd.operationlog
 | `source` | 必填、稳定的逻辑 producer / BC 标识；由配置 `aipersimmon.ddd.operation-log.source` 解析（默认 `spring.application.name`）；不用部署实例名 |
 | `idempotencyKey` | 去重键 `SHA-256_hex(messageId｜operationCode｜outcome｜completion)`（完整公式见 §8.4）；在 `(tenantId, source)` 内唯一 |
 | `operationCode` | 使用方拥有的稳定业务码；不用 Java FQCN / 方法名 |
-| `tenantId` | 未启用多租户时规范化为 `GLOBAL`；DB 不用 `NULL` 表示全局 |
+| `tenantId` | 未启用多租户时规范化为 `__root__`；DB 不用 `NULL` 表示全局 |
 | `actor` | `Actor(type, id, displayName)` 当时快照；`displayName` 经脱敏 |
 | `target` | `Target(type, id, displayName)`；v1 只有一个主目标；敏感自然标识换稳定 surrogate |
 | `outcome` | `SUCCEEDED` / `REJECTED` / `FAILED` |
@@ -363,7 +363,7 @@ compiled metadata（有界 cache）（对齐 [[decision-00012-no-ambient-per-com
 - scheduler/batch/message 驱动必须显式使用 `SYSTEM` / `SERVICE` actor type。
 - 不给 `CommandContext` 增加 actor/tenant，也不加 metadata map。跨异步边界传播“原始操作者”需另立 ADR 定义有类型的
   identity envelope，不靠 ThreadLocal 或复用消息 header。
-- 多租户开启后，写入、唯一键与**所有读取**都必须包含可信 tenant；只有明确非多租户模式才规范化为 `GLOBAL`。
+- 多租户开启后，写入、唯一键与**所有读取**都必须包含可信 tenant；只有明确非多租户模式才规范化为 `__root__`。
 
 ### 6.3 受限模板语法
 
@@ -418,7 +418,7 @@ DDL 放在 **`aipersimmon-ddd-operation-log-engine`**`/src/main/resources/aipers
 CREATE TABLE IF NOT EXISTS aipersimmon_operation_log (
     record_id         VARCHAR(64)  NOT NULL PRIMARY KEY, -- 时间有序 id（UUIDv7/ULID）
     source            VARCHAR(128) NOT NULL,
-    tenant_id         VARCHAR(64)  NOT NULL,           -- 非多租户规范化为 'GLOBAL'，禁 NULL
+    tenant_id         VARCHAR(64)  NOT NULL,           -- 非多租户规范化为 '__root__'，禁 NULL
     idempotency_key   CHAR(64)     NOT NULL,           -- SHA-256 hex（见 §8.4）；ASCII，定宽
     operation_code    VARCHAR(128) NOT NULL,
     actor_type        VARCHAR(32)  NOT NULL,

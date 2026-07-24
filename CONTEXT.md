@@ -87,3 +87,49 @@ Use Operation Outcome for the business result and Transaction Completion for whe
 
 **Operation Log vs Domain Event**:
 A Domain Event states a fact that happened in the domain and may drive behavior; an Operation Log is a user-readable, actor-attributed record that must never drive domain behavior. One may help produce the other, but neither replaces it.
+
+## Multi-Tenancy Language
+
+Canonical terms for multi-tenancy. Definitions and rationale live in
+`docs/decision/decision-00018-multi-tenancy-boundaries.md` and `docs/design/design-00009-multi-tenancy-tenant-id.md`.
+
+**Tenant**:
+The data-isolation boundary — an identified customer/organization whose data must never be visible to another tenant.
+_Avoid_: conflating with the acting user/principal, or with an account/workspace nested inside one tenant.
+
+**Tenant Isolation Model**:
+How tenants are separated in storage. The toolkit uses `Pool` (shared schema + a discriminator column); `Silo`
+(schema- or database-per-tenant) is a phase-2 optional backend.
+_Avoid_: assuming physical per-tenant databases; calling the discriminator approach "sharding"; saying "state" alone when both models are in scope.
+
+**Tenant Discriminator (`tenant_id`)**:
+The non-null column carrying the owning tenant on every durable row (`VARCHAR(64) NOT NULL`).
+_Avoid_: `NULL` to mean "no tenant" (silently voids composite unique keys); treating it as a foreign key rather than an opaque id.
+
+**Sentinel Tenant (`__root__`)**:
+The reserved tenant used when multi-tenancy is disabled — single-tenant is N=1 multi-tenancy, not a separate code path.
+_Avoid_: `0`, empty string, or `NULL` as the sentinel; a user tenant id beginning with `__`.
+
+**TenantContext**:
+The request-scoped, trusted-boundary, immutable, single-valued ambient holder of the current tenant, read by the read side
+and infrastructure where no `CommandContext` is threaded. The write-side authority remains `CommandContext.tenantId`.
+_Avoid_: a mutable per-command variable pool (would violate `decision-00012`); business code writing to it; reading the tenant from the command payload.
+
+**Tenant-relative Key**:
+A natural key that can legitimately repeat across tenants (e.g. process `business_key`, web `Idempotency-Key`) — the tenant
+enters its unique constraint. Framework-generated globally-unique ids (`event_id`, `correlation_id`, …) do not.
+_Avoid_: putting the tenant into globally-unique id dedup keys; omitting it from a tenant-relative key (cross-tenant collision = data leak).
+
+**Missing-Tenant Policy**:
+What happens when multi-tenancy is enabled but no tenant resolves from a request — `REJECT` (default) or `SYSTEM` (fall back to the sentinel).
+_Avoid_: silently defaulting to `__root__` while tenancy is enabled.
+
+## Flagged ambiguities (Multi-Tenancy)
+
+**Tenant vs Actor/Principal**:
+Tenant is *which dataset* an operation belongs to (the isolation boundary); Actor is *who* performed it (Operation Log). A single
+request carries both — never collapse the tenant into the actor or vice versa.
+
+**Tenant propagation vs Trace propagation**:
+The tenant is business identity carried explicitly on `CommandContext`, the `EventEnvelope` extension attribute, and the
+`ce_tenantid` header; distributed-trace identity is separate and out-of-band (W3C `traceparent`). Do not make trace baggage the authority for the tenant.

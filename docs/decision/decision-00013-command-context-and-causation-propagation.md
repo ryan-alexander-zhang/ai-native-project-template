@@ -55,6 +55,15 @@ command per event"*)。
 > **信息取舍(需知晓)**:删除后,**不装 OTEL 可观测模块**的消费方,失去"某下游异步事件源自哪次原始请求"的跨异步关联——
 > `correlationId` 仍关联整条因果流,装了 OTEL 则由 span link 复原该关联。这是"删冗余"的必然结果,符合脚手架口径:因果流用
 > `correlationId`、边缘用 `requestId`、要全链路追踪就装 OTEL。核心不变式(元数据不进 payload、禁 ambient)不变。
+>
+> **增补(新增 tenantId)**:[[decision-00018-multi-tenancy-boundaries]] 沿本决策的传播脊柱新增一个字段 `tenantId`——
+> `CommandContext` 增 `tenantId`(写侧权威,`root`/`deriveChild` 继承、`of(envelope)` 读回),并按本决策 §3 同款在
+> `EventEnvelope`(CloudEvents 扩展属性)、`OutboxMessage`、outbox 表列、`IntegrationEventHeaders`(`ce_tenantid`)同步新增。
+> 语义定位与 correlation/causation 一致:**因果/路由类消息元数据、显式随命令传播、绝不进 payload、非 ambient**
+> (与 [[decision-00012-no-ambient-per-command-state]] 一致;`TenantContext` 仅作 trusted-boundary 一次写入的不可变身份,
+> 用于边缘→`CommandContext` 绑定与读侧/基础设施,非可变每命令状态)。这与本决策引用的 Axon `Message` MetaData 承载租户的
+> 实践同构。**这不是 operation-log 那类"把功能字段(actor/target)塞进 CommandContext"——那仍禁止,用 resolver。**
+> 核心不变式(元数据不进 payload、禁 ambient)不变。
 
 ## Decision
 

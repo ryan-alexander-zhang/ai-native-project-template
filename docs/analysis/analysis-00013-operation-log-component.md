@@ -270,7 +270,7 @@ flowchart LR
 | `source` | 必填、稳定的逻辑 producer / Bounded Context 标识；不使用部署实例名 |
 | `idempotencyKey` | 同一个 `resultKind = outcome + completion` 追加的去重键；在同一 tenant/source 内唯一 |
 | `operationCode` | 使用方拥有的稳定业务语义码，不使用 Java FQCN / 方法名 |
-| `tenantId` | 可选多租户维度；未启用时规范化为固定 `GLOBAL`，数据库不使用 `NULL` 表示全局 |
+| `tenantId` | 可选多租户维度；未启用时规范化为固定 `__root__`，数据库不使用 `NULL` 表示全局 |
 | `actor` | `actorType/id/displayName` 的当时快照；displayName 必须经过脱敏策略 |
 | `target` | `targetType/id/displayName`；一条记录只有一个主目标；敏感自然标识要换稳定 surrogate id |
 | `outcome` | `SUCCEEDED` / `REJECTED` / `FAILED` |
@@ -346,7 +346,7 @@ public interface OperationLogReader {
 - 不在本次方案中给 `CommandContext` 增加 actor 或 tenant，也不添加任意 metadata map。
 - 若将来必须跨异步边界传播“原始操作者”，需要单独 ADR 定义有类型、有信任边界的 identity envelope；
   不能靠 ThreadLocal 或复用任意消息 header。
-- 多租户开启后，写入、唯一键和所有读取都必须包含可信 tenant；只有明确的非多租户模式才规范化为 `GLOBAL`。
+- 多租户开启后，写入、唯一键和所有读取都必须包含可信 tenant；只有明确的非多租户模式才规范化为 `__root__`。
   禁止“写了 tenant、查询忘记过滤”。
 
 ---

@@ -51,7 +51,7 @@ parent:
 - **spec-00001-XFR-4**（Unwanted）若异常/回滚路径记录失败，则系统应保留并重抛原业务异常，并输出 failure-loss metric+alert。
 - **spec-00001-XFR-5**（Ubiquitous）系统应默认拒绝记录任何字段（消费方逐项 allowlist），且 secret/token/凭据/生物信息
   永不入库；summary/label/value 入库前去除 CR/LF；failure 只存 `code/category/safeSummary`。
-- **spec-00001-XFR-6**（Where 多租户开启）系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `GLOBAL`。
+- **spec-00001-XFR-6**（Where 多租户开启）系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
 - **spec-00001-XFR-7**（Unwanted）若渲染后的 summary/changes/details/单值/总 payload 超过配置预算，则系统应按策略拒绝或截断并可观测。
 - **spec-00001-XFR-8**（Ubiquitous）系统应在 `-jdbc` 与 `-mybatis-plus` 两后端 × H2/MySQL/PostgreSQL 三方言下，
   唯一约束、幂等收敛、时间序与分页排序行为等价。
