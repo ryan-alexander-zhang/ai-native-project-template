@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    MyBatis-Plus enforcement for multi-tenancy: an auto-configured MybatisPlusInterceptor whose
+    TenantLineInnerInterceptor appends `tenant_id = <current tenant>` (read from the ambient
+    TenantContext) to every statement on a configured set of tenant-scoped tables. The set is
+    EMPTY by default and opt-in per table via aipersimmon.ddd.tenancy.mybatis-plus.tenant-tables,
+    because MyBatis-Plus's interceptor is global across the one shared SqlSessionFactory: a
+    blanket default would rewrite the consumer's own domain tables (which may lack the column) and
+    the framework's background-polled tables (outbox/effect/deadline/inbox — read tenant-less, so a
+    filter would wrongly narrow them to the root sentinel). Apps list the domain tables they want
+    auto-scoped. Activates only when aipersimmon.ddd.tenancy.enabled=true.
+  -->
+  <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
+  <name>aipersimmon-ddd-tenancy-mybatis-plus</name>
+  <description>MyBatis-Plus tenant-line interceptor that scopes a configurable set of tables to the ambient TenantContext.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The interceptor classes (MybatisPlusInterceptor, TenantLineInnerInterceptor) + SqlSessionFactory
+         + jsqlparser. provided: the consuming app brings MyBatis-Plus via its own starter; this module
+         only contributes a bean and must not force MyBatis-Plus (nor propagate the starter) onto a
+         consumer that does not use it. Version comes from the mybatis-plus BOM. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-extension</artifactId>
+      <version>${mybatis-plus.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- In MyBatis-Plus 3.5.9+ the SQL-parsing inner interceptors (incl. TenantLineInnerInterceptor)
+         and their jsqlparser dependency live in this separate module, split out so jsqlparser stays
+         optional for consumers that do not parse SQL. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-jsqlparser</artifactId>
+      <version>${mybatis-plus.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

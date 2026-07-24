@@ -134,7 +134,22 @@ observability / archunit / flyway。
 >   `{tenant}` 段；in-memory 三 store map key 用 `tenant + " " + key` 限定（三 web pom 加 tenancy 依赖）。
 >   web-store-jdbc 测试 `application.properties` 加 V2。**验证**：web/web-spring/web-store-jdbc/web-store-redis 全绿
 >   （WebLayerTest 12 + 三 filter + JdbcWebStoreTest H2 复合 PK + RedisWebStoreTest 真 Redis 租户前缀键）。
->   **待办**：~~T9（saga，已弃用跳过）~~、T12/T13（MP TenantLine / PG RLS）、T15（读侧）、T16（观测）、T18（双租户验收矩阵）。
+> - ✅ **T12（MP TenantLineInnerInterceptor，新模块 `aipersimmon-ddd-tenancy-mybatis-plus`）**：勘察发现全树**无任何
+>   MybatisPlusInterceptor bean**，四个 -mybatis-plus 模块共享 starter 提供的**唯一** SqlSessionFactory——所以一个全局拦截器
+>   会波及 **consumer 自己的领域表**（缺 tenant_id 列→打断查询）且与 T8 显式 insert 冲突。plan 原文的"黑名单 ignoreTable"
+>   不安全。改为 **owner 拍板的"默认 bean + 可配置表集"**：新 framework 模块提供 `MybatisPlusInterceptor`（`TenantLineHandler`
+>   从 TenantContext 取租户、`getTenantIdColumn` 可配、`ignoreTable` = 不在 allow-list 即忽略），`tenant-tables` **默认空**
+>   （空=no-op，不碰任何表），consumer 按 `aipersimmon.ddd.tenancy.mybatis-plus.tenant-tables:[orders,...]` 显式登记自己的
+>   租户域表。**关键安全约束**：只有"仅在已绑定 TenantContext 下访问"的表才可登记——aipersimmon 自有表都不合格作默认
+>   （process_instance/transition 被后台 worker 无租户读、管道表后台轮询、operation_log 有自己的租户解析器 T17），故默认空、
+>   框架自表靠显式代码 + RLS(T13)。`@ConditionalOnProperty(tenancy.enabled=true)` + `@ConditionalOnClass` +
+>   `@ConditionalOnMissingBean(MybatisPlusInterceptor)`（app 有自己的则退让，需自行加 TenantLineInnerInterceptor）。
+>   入 reactor+BOM；9 单测绿（handler ignoreTable/规范化/TenantContext 取值 + autoconfig 三态）+ PMD/SpotBugs 过。
+>   **MP 3.5.15 依赖坑**：`MybatisPlusInterceptor` 在 `mybatis-plus-extension`、`TenantLineInnerInterceptor`+jsqlparser 在
+>   **独立** `mybatis-plus-jsqlparser`（3.5.9+ 拆分，jsqlparser groupId 变 `com.github.jsqlparser` 但包名仍 `net.sf.jsqlparser`）；
+>   两者 BOM 不管理版本→用 `${mybatis-plus.version}` 显式。**Maven 坑**：同一 artifact 声明两次（provided+test）→"must be unique"
+>   后者胜→collapse 成 test-only→主 classpath 缺失；provided 本就在 test classpath，删掉多余 test 声明即可。
+>   **待办**：~~T9（saga，已弃用跳过）~~、**T13（PG RLS，需 owner 定运维模型后做）**、T15（读侧）、T16（观测）、T18（双租户验收矩阵）。
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 

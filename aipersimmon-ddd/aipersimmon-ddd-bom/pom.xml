@@ -94,6 +94,11 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-operation-log</artifactId>
         <version>${project.version}</version>
       </dependency>
