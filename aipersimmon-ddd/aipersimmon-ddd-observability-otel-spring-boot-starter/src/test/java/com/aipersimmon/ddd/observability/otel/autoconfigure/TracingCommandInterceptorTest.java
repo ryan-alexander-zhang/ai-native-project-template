@@ -60,6 +60,21 @@ class TracingCommandInterceptorTest {
     assertEquals(
         "msg-1",
         span.getAttributes().get(AttributeKey.stringKey(ObservabilityAttributes.CORRELATION_ID)));
+    assertEquals(
+        "__root__",
+        span.getAttributes().get(AttributeKey.stringKey(ObservabilityAttributes.TENANT_ID)));
+  }
+
+  @Test
+  void stampsTheCommandTenantOnTheSpan() {
+    CommandContext context = CommandContext.root("acme", "msg-3");
+
+    interceptor.intercept(new PlaceOrder(), context, () -> "done");
+
+    SpanData span = single();
+    assertEquals(
+        "acme",
+        span.getAttributes().get(AttributeKey.stringKey(ObservabilityAttributes.TENANT_ID)));
   }
 
   @Test

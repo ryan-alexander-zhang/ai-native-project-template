@@ -32,6 +32,7 @@ public class TracingCommandInterceptor implements CommandInterceptor {
     String type = command.getClass().getSimpleName();
     try (Tracer.SpanScope span = tracer.startSpan("command " + type)) {
       span.attribute(ObservabilityAttributes.COMMAND_TYPE, type)
+          .attribute(ObservabilityAttributes.TENANT_ID, context.tenantId())
           .attribute(ObservabilityAttributes.MESSAGE_ID, context.messageId())
           .attribute(ObservabilityAttributes.CORRELATION_ID, context.correlationId())
           .attribute(ObservabilityAttributes.CAUSATION_ID, context.causationId());

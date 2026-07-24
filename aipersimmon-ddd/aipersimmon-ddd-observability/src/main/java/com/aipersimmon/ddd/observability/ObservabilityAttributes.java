@@ -17,6 +17,10 @@ public final class ObservabilityAttributes {
   public static final String CORRELATION_ID = "correlation.id";
   public static final String CAUSATION_ID = "causation.id";
 
+  // Multi-tenancy: the tenant a command/request/message ran under (the sentinel when
+  // single-tenant).
+  public static final String TENANT_ID = "tenant.id";
+
   // Command / query dispatch.
   public static final String COMMAND_TYPE = "command.type";
   public static final String QUERY_TYPE = "query.type";

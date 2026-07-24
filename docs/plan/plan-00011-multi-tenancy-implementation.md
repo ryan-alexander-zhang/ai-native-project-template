@@ -150,6 +150,15 @@ observability / archunit / flyway。
 >   两者 BOM 不管理版本→用 `${mybatis-plus.version}` 显式。**Maven 坑**：同一 artifact 声明两次（provided+test）→"must be unique"
 >   后者胜→collapse 成 test-only→主 classpath 缺失；provided 本就在 test classpath，删掉多余 test 声明即可。
 >   **待办**：~~T9（saga，已弃用跳过）~~、**T13（PG RLS，需 owner 定运维模型后做）**、T15（读侧）、T16（观测）、T18（双租户验收矩阵）。
+> - ✅ **T16（观测 tenant.id）**：`ObservabilityAttributes.TENANT_ID="tenant.id"`；`TracingCommandInterceptor` 从
+>   `context.tenantId()` 盖 command span（TracingCommandInterceptorTest 加 root 默认 + 自定义租户两断言）。MDC `tenant`
+>   已由 `TenantResolutionFilter`（T2）在请求域设置——请求日志自带租户。**server span 盖 tenant 未做**：会把 tenancy-spring
+>   耦合到 OTel API；command span 是 server span 子级 + MDC 已覆盖实用需求，故从简（后续可在 OTel 侧 filter 补）。
+>   observability + otel-starter 全绿。
+> - ✅ **T15（读侧，方案 A，无框架改动）**：框架只提供 `QueryBus`/`QueryHandler`/`ReadModel` 接口、**无具体读仓储基类**
+>   （读仓储是 app 侧 QueryHandler）。租户机制已就绪：`TenantResolutionFilter` 为整个请求（含 query 处理）绑定 TenantContext，
+>   读仓储调 `TenantContext.current()` 过滤，不改 QueryBus、不建 QueryContext。故 T15 无框架代码，模式由 T18 scaffold 读仓储演示。
+>   （注意：后台线程上的读无 TenantContext——方案 A 只覆盖请求域读，与设计一致。）
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 
