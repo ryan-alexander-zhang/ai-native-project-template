@@ -120,20 +120,26 @@ public class KafkaIntegrationEventListener {
     // like a new event and silently defeat the inbox — so reject it (permanent
     // failure -> dead-letter) rather than invent identity.
     String eventId = require(record, IntegrationEventHeaders.ID);
-    if (inbox != null && inbox.alreadyProcessed(eventId)) {
-      return;
-    }
-    EventEnvelope<IntegrationEvent> envelope = reconstruct(record, eventId);
-    // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
-    // match despite erasure.
-    ResolvableType type =
-        ResolvableType.forClassWithGenerics(EventEnvelope.class, envelope.payload().getClass());
-    // Bind the event's tenant for the whole downstream handling (ACL adapter -> command), so the
-    // read side and infrastructure see the right tenant even though the command also carries it
-    // explicitly via CommandContext.of(envelope).
+    // Bind the event's tenant for the whole transaction — the inbox dedup row, the ACL adapter, and
+    // the command it issues — before anything touches the database. The tenant travels in
+    // ce_tenantid (absent on pre-tenancy messages -> root sentinel); reconstruct reads the same
+    // header into envelope.tenantId(), and the command also carries it via CommandContext.of. The
+    // inbox insert must see it here, since it happens before reconstruct.
+    String tenantId = orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
     TenantContext.runAs(
-        Tenants.fromValue(envelope.tenantId()),
-        () -> publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type)));
+        Tenants.fromValue(tenantId),
+        () -> {
+          if (inbox != null && inbox.alreadyProcessed(eventId)) {
+            return;
+          }
+          EventEnvelope<IntegrationEvent> envelope = reconstruct(record, eventId);
+          // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
+          // match despite erasure.
+          ResolvableType type =
+              ResolvableType.forClassWithGenerics(
+                  EventEnvelope.class, envelope.payload().getClass());
+          publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
+        });
   }
 
   /**

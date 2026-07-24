@@ -23,13 +23,15 @@ public class InboxRecord {
 
   private String consumer;
   private String messageKey;
+  private String tenantId;
   private Instant processedAt;
 
   public InboxRecord() {}
 
-  public InboxRecord(String consumer, String messageKey, Instant processedAt) {
+  public InboxRecord(String consumer, String messageKey, String tenantId, Instant processedAt) {
     this.consumer = consumer;
     this.messageKey = messageKey;
+    this.tenantId = tenantId;
     this.processedAt = processedAt;
   }
 
@@ -47,6 +49,14 @@ public class InboxRecord {
 
   public void setMessageKey(String messageKey) {
     this.messageKey = messageKey;
+  }
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(String tenantId) {
+    this.tenantId = tenantId;
   }
 
   public Instant getProcessedAt() {

@@ -115,8 +115,18 @@ observability / archunit / flyway。
 >   **全库 reactor `mvn install` 40/40 全绿** + **multi-module scaffold 端到端**（Flyway 对真 Postgres 应用 process-manager
 >   V1→V2→V3，OrderingFlow/ReviewFlow/PaymentCompensationFlow/OperationLog/Outbox 全绿）。scaffold 唯一失败是既有 spotless
 >   drift（`OrderFulfilmentDefinitionTest` javadoc 换行，非本次改动、非租户）。
->   **待办**：T7（inbox tenant 列）、T9（saga）、T10（web-store）、T12/T13（MP TenantLine / PG RLS）、T15（读侧）、
->   T16（观测）、T18（双租户验收矩阵）。
+> - ✅ **T7（inbox 加 tenant_id 数据列）**：三方言 `V2__add_tenant_id.sql`（`ADD COLUMN tenant_id VARCHAR(64) NOT NULL
+>   DEFAULT '__root__'`；**数据列、去重键 `(consumer, message_key)` 不变**——message_key 是生产者侧全局唯一 ce_id，
+>   租户入键反而会让同一消息每租户各处理一次）。租户源=**消费边界已绑定的环境 TenantContext**：`JdbcInbox`/
+>   `MybatisPlusInbox` INSERT 时 `TenantContext.current().map(TenantId::value).orElse(ROOT)`（两模块 pom 加 tenancy 依赖，
+>   `InboxRecord` @TableName 实体加 tenantId 字段+accessor+构造参）。**关键修复**：`KafkaIntegrationEventListener.onMessage`
+>   原先 inbox 去重在 `runAs` **之前**（那时 TenantContext 空→会把每行记成 ROOT）；改为先读 `ce_tenantid` header
+>   （缺→ROOT），把 **inbox 检查 + reconstruct + publish 一起包进 `runAs`**，使 inbox INSERT 落在正确租户内（行为不变：
+>   仍去重优先、重复短路早于 reconstruct）。两 adapter `application.properties` schema-init 加 V2。
+>   **验证**：inbox-jdbc/mp 各自门绿 + `KafkaIntegrationEventListenerTest` 10/10 + 3 个 kafka 集成测试单跑绿；
+>   全库 reactor 除 messaging-kafka 外 30+ 模块绿。messaging-kafka 满套集成测试在本机 SigNoz 栈占内存下偶发超时
+>   （"saw 0 / timed out"，3 个 EmbeddedKafka 类），**已 git stash 掉 listener 改动复现同样失败→确证环境性、与 T7 无关**。
+>   **待办**：T9（saga）、T10（web-store）、T12/T13（MP TenantLine / PG RLS）、T15（读侧）、T16（观测）、T18（双租户验收矩阵）。
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 

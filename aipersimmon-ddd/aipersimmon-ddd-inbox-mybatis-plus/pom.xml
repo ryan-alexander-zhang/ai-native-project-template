@@ -43,6 +43,12 @@
       <artifactId>aipersimmon-ddd-inbox</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Reads the ambient tenant (TenantContext) to stamp tenant_id on each recorded key. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-spring-boot3-starter</artifactId>

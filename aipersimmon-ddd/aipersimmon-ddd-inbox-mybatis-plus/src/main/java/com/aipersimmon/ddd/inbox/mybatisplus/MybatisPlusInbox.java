@@ -1,6 +1,9 @@
 package com.aipersimmon.ddd.inbox.mybatisplus;
 
 import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import java.time.Clock;
 
@@ -41,7 +44,11 @@ public class MybatisPlusInbox implements Inbox {
     if (count != null && count > 0) {
       return true;
     }
-    mapper.insert(new InboxRecord(consumer, messageKey, clock.instant()));
+    // The tenant is bound ambiently by the consume boundary (e.g. the Kafka listener's runAs);
+    // absent that, a single-tenant caller records the root sentinel. Data column only — dedup is
+    // still keyed by (consumer, message_key).
+    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    mapper.insert(new InboxRecord(consumer, messageKey, tenant, clock.instant()));
     return false;
   }
 }
