@@ -7,13 +7,19 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.operationlog.engine.observability.OperationLogMetrics;
+import com.aipersimmon.ddd.operationlog.model.Actor;
+import com.aipersimmon.ddd.operationlog.model.Causality;
+import com.aipersimmon.ddd.operationlog.model.OperationLogDraft;
 import com.aipersimmon.ddd.operationlog.model.OperationLogEntry;
+import com.aipersimmon.ddd.operationlog.model.OperationLogInvocation;
 import com.aipersimmon.ddd.operationlog.port.AppendResult;
 import com.aipersimmon.ddd.operationlog.port.OperationLogSink;
 import com.aipersimmon.ddd.operationlog.port.OperationLogs;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
 import java.time.Clock;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -89,6 +95,38 @@ class AipersimmonDddOperationLogAutoConfigurationTest {
             });
   }
 
+  @Test
+  void record_id_comes_from_the_injected_id_generator() {
+    // The record_id DDL documents a time-ordered id; the pipeline mints it from the IdGenerator
+    // bean when present. A sentinel proves it flows from the bean rather than an inlined random
+    // UUID.
+    CapturingSink sink = new CapturingSink();
+    IdGenerator idGenerator = () -> "record-id-sentinel";
+    runner
+        .withBean(OperationLogSink.class, () -> sink)
+        .withBean(IdGenerator.class, () -> idGenerator)
+        .run(
+            context -> {
+              context
+                  .getBean(OperationLogs.class)
+                  .record(
+                      OperationLogDraft.from(
+                              OperationLogInvocation.builder()
+                                  .source("orders-service")
+                                  .tenant("acme")
+                                  .actor(Actor.user("u1", "Alice"))
+                                  .causality(Causality.none())
+                                  .occurredAt(Instant.parse("2020-01-01T00:00:00Z"))
+                                  .build())
+                          .operation("order.remark.update")
+                          .target("Order", "o1", "SO-1")
+                          .succeeded()
+                          .summary("ok")
+                          .build());
+              assertEquals("record-id-sentinel", sink.captured.recordId());
+            });
+  }
+
   @Configuration(proxyBeanMethods = false)
   static class SinkConfig {
     @Bean
@@ -100,6 +138,16 @@ class AipersimmonDddOperationLogAutoConfigurationTest {
   private static final class RecordingSink implements OperationLogSink {
     @Override
     public AppendResult append(OperationLogEntry entry) {
+      return new AppendResult.Appended(entry.recordId());
+    }
+  }
+
+  private static final class CapturingSink implements OperationLogSink {
+    private OperationLogEntry captured;
+
+    @Override
+    public AppendResult append(OperationLogEntry entry) {
+      this.captured = entry;
       return new AppendResult.Appended(entry.recordId());
     }
   }

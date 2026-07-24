@@ -37,6 +37,10 @@
     <spring-boot.version>3.5.10</spring-boot.version>
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
     <shedlock.version>6.6.0</shedlock.version>
+    <!-- JUG (java-uuid-generator): the UUIDv7 generator behind the default IdGenerator in the
+         optional aipersimmon-ddd-id module. 5.x is the line that supports RFC 9562 UUIDv7 via
+         Generators.timeBasedEpochGenerator(). Not managed by any imported BOM, so pinned here. -->
+    <java-uuid-generator.version>5.1.0</java-uuid-generator.version>
     <opentelemetry-instrumentation.version>2.29.0</opentelemetry-instrumentation.version>
     <!-- Core OpenTelemetry SDK/API line that opentelemetry-instrumentation-bom 2.29.0 is built
          against. Pinned explicitly (and imported below) because spring-boot-dependencies manages
@@ -75,6 +79,7 @@
          the PMD/SpotBugs plugin classpath of every module that runs them. -->
     <module>aipersimmon-ddd-quality-config</module>
     <module>aipersimmon-ddd-core</module>
+    <module>aipersimmon-ddd-id</module>
     <module>aipersimmon-ddd-observability</module>
     <module>aipersimmon-ddd-observability-otel</module>
     <module>aipersimmon-ddd-observability-otel-spring-boot-starter</module>
@@ -186,6 +191,13 @@
         <version>${shedlock.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- JUG version for the optional aipersimmon-ddd-id UUIDv7 implementation. Import only
+           supplies the version; it adds no dependency, so the pure tier stays framework-free. -->
+      <dependency>
+        <groupId>com.fasterxml.uuid</groupId>
+        <artifactId>java-uuid-generator</artifactId>
+        <version>${java-uuid-generator.version}</version>
       </dependency>
       <!-- ArchUnit, used by aipersimmon-ddd-archunit (compile there; consumers get it via test scope). -->
       <dependency>

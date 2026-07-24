@@ -2,8 +2,13 @@ package com.aipersimmon.ddd.events.spring;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.core.id.IdGenerator;
+import java.time.Clock;
+import java.util.UUID;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -45,10 +50,16 @@ public class AipersimmonDddEventsAutoConfiguration {
   public IntegrationEvents integrationEvents(
       ApplicationEventPublisher publisher,
       @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}")
-          String source) {
+          String source,
+      ObjectProvider<IdGenerator> idGenerator) {
     log.info(
         "aipersimmon-ddd integration-event transport: in-process (local) — no durable outbox on "
             + "the classpath; @Externalized events cannot reach an external broker with this transport");
-    return new SpringIntegrationEvents(publisher, source);
+    IdGenerator generator = idGenerator.getIfAvailable();
+    // With aipersimmon-ddd-id present the in-process event id is a time-ordered UUIDv7;
+    // without it, SpringIntegrationEvents keeps its UUID.randomUUID() default.
+    Supplier<String> ids =
+        generator != null ? generator::newId : () -> UUID.randomUUID().toString();
+    return new SpringIntegrationEvents(publisher, Clock.systemUTC(), source, ids);
   }
 }

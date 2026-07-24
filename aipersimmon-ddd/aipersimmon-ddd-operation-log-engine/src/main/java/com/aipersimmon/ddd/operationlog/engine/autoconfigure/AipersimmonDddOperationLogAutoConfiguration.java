@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.operationlog.engine.autoconfigure;
 
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.operationlog.engine.classifier.DefaultFailureClassifier;
 import com.aipersimmon.ddd.operationlog.engine.observability.OperationLogMetrics;
 import com.aipersimmon.ddd.operationlog.engine.pipeline.DefaultOperationLogs;
@@ -9,6 +10,8 @@ import com.aipersimmon.ddd.operationlog.port.OperationLogs;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
 import java.time.Clock;
 import java.util.UUID;
+import java.util.function.Supplier;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -52,8 +55,9 @@ public class AipersimmonDddOperationLogAutoConfiguration {
 
   /**
    * The default pipeline. Binds only when a backend has provided an {@link OperationLogSink}. The
-   * id supplier defaults to a random UUID; inject a time-ordered supplier (ULID/UUIDv7) for better
-   * index locality.
+   * record-id supplier resolves to the time-ordered UUIDv7 {@link IdGenerator} when {@code
+   * aipersimmon-ddd-id} is on the classpath — the id the {@code record_id} DDL already documents;
+   * without it, it falls back to a random UUID.
    */
   @Bean
   @ConditionalOnBean(OperationLogSink.class)
@@ -62,7 +66,8 @@ public class AipersimmonDddOperationLogAutoConfiguration {
       OperationLogSink sink,
       Clock operationLogClock,
       OperationLogProperties properties,
-      OperationLogMetrics metrics) {
+      OperationLogMetrics metrics,
+      ObjectProvider<IdGenerator> idGenerator) {
     OperationLogProperties.Limits configured = properties.getLimits();
     OperationLogLimits limits =
         new OperationLogLimits(
@@ -70,7 +75,9 @@ public class AipersimmonDddOperationLogAutoConfiguration {
             configured.getMaxChanges(),
             configured.getMaxDetails(),
             configured.getMaxValueChars());
-    return new DefaultOperationLogs(
-        sink, operationLogClock, () -> UUID.randomUUID().toString(), limits, metrics);
+    IdGenerator generator = idGenerator.getIfAvailable();
+    Supplier<String> recordIds =
+        generator != null ? generator::newId : () -> UUID.randomUUID().toString();
+    return new DefaultOperationLogs(sink, operationLogClock, recordIds, limits, metrics);
   }
 }

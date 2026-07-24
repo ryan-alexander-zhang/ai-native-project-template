@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.NoOpTracer;
@@ -135,7 +136,8 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ProcessManagerProperties properties,
       ObjectProvider<ProcessObserver> observer,
       ObjectProvider<Tracer> tracer,
-      ObjectProvider<StoreAndForwardTracer> storeTracer) {
+      ObjectProvider<StoreAndForwardTracer> storeTracer,
+      ObjectProvider<IdGenerator> idGenerator) {
     DuplicateBusinessKeyPolicy policy =
         DuplicateBusinessKeyPolicy.valueOf(
             properties.getStartDuplicateBusinessKey().toUpperCase(Locale.ROOT));
@@ -149,7 +151,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         stateCodecs,
         unitOfWork,
         processManagerClock,
-        randomIds(),
+        ids(idGenerator),
         policy,
         properties.getConcurrencyMaxRetries(),
         observer.getIfAvailable(() -> ProcessObserver.NOOP),
@@ -213,7 +215,8 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ProcessRuntime runtime,
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessUnitOfWork unitOfWork,
-      Clock processManagerClock) {
+      Clock processManagerClock,
+      ObjectProvider<IdGenerator> idGenerator) {
     return new ProcessOperations(
         instances,
         transitions,
@@ -223,7 +226,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         payloadCodecs,
         unitOfWork,
         processManagerClock,
-        randomIds());
+        ids(idGenerator));
   }
 
   @Bean
@@ -269,7 +272,8 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       Clock processManagerClock,
       ProcessManagerProperties properties,
       ObjectProvider<ProcessObserver> observer,
-      ObjectProvider<StoreAndForwardTracer> storeTracer) {
+      ObjectProvider<StoreAndForwardTracer> storeTracer,
+      ObjectProvider<IdGenerator> idGenerator) {
     ProcessManagerProperties.Worker cfg = properties.getEffectRelay();
     return new ProcessEffectRelay(
         claimStrategy,
@@ -282,7 +286,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         processManagerClock,
         cfg.getBatchSize(),
         cfg.getLeaseDuration(),
-        randomIds(),
+        ids(idGenerator),
         observer.getIfAvailable(() -> ProcessObserver.NOOP),
         storeTracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
@@ -308,7 +312,8 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ProcessUnitOfWork unitOfWork,
       Clock processManagerClock,
       ProcessManagerProperties properties,
-      ObjectProvider<StoreAndForwardTracer> storeTracer) {
+      ObjectProvider<StoreAndForwardTracer> storeTracer,
+      ObjectProvider<IdGenerator> idGenerator) {
     ProcessManagerProperties.Worker cfg = properties.getDeadlineWorker();
     return new ProcessDeadlineWorker(
         claimStrategy,
@@ -321,7 +326,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         processManagerClock,
         cfg.getBatchSize(),
         cfg.getLeaseDuration(),
-        randomIds(),
+        ids(idGenerator),
         storeTracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
 
@@ -364,7 +369,12 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         b.getInitial(), b.getMax(), b.getMultiplier(), b.getJitter(), cfg.getMaxAttempts());
   }
 
-  private static Supplier<String> randomIds() {
-    return () -> UUID.randomUUID().toString();
+  // Resolve the id supplier for every minting point (instance / transition / effect / deadline id).
+  // With aipersimmon-ddd-id present these are time-ordered UUIDv7 — the biggest locality win, since
+  // these are the random VARCHAR clustered primary keys; without it, fall back to
+  // UUID.randomUUID().
+  private static Supplier<String> ids(ObjectProvider<IdGenerator> idGenerator) {
+    IdGenerator generator = idGenerator.getIfAvailable();
+    return generator != null ? generator::newId : () -> UUID.randomUUID().toString();
   }
 }

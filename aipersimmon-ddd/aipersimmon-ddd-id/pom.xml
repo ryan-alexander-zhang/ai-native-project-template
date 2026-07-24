@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The optional default implementation of the framework-free IdGenerator SPI
+    (in aipersimmon-ddd-core): a time-ordered UUIDv7 generator plus the
+    auto-configuration that binds it. Pulling this module onto the classpath is
+    what turns UUIDv7 on — every framework minting point (command messageId,
+    integration event_id, process instance/transition/effect/deadline id,
+    operation-log recordId) then resolves its id supplier to this generator.
+
+    A build that omits it stays entirely JUG-free: each consuming
+    auto-configuration falls back to UUID.randomUUID(), behaving exactly as
+    before (see decision-00019 / design-00010). The UUIDv7 library (JUG) is the
+    only third-party dependency and is confined to this module, so core stays
+    zero-dependency.
+  -->
+  <artifactId>aipersimmon-ddd-id</artifactId>
+  <name>aipersimmon-ddd-id</name>
+  <description>Optional UUIDv7 implementation of the aipersimmon-ddd IdGenerator SPI: a time-ordered, JUG-backed id generator and its auto-configuration.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- The UUIDv7 generator. The single third-party dependency, confined here. -->
+    <dependency>
+      <groupId>com.fasterxml.uuid</groupId>
+      <artifactId>java-uuid-generator</artifactId>
+    </dependency>
+
+    <!-- Compile scope: the @AutoConfiguration/@Bean use spring-context directly. Declared
+         explicitly rather than relied on transitively, to avoid a scope-shadowing surprise on a
+         clean build (same reasoning as operation-log-engine / tenancy-spring). -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- The ApplicationContextRunner's AssertableApplicationContext extends AssertJ's AssertProvider,
+         so AssertJ must be on the test classpath even though the assertions below use plain JUnit. -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

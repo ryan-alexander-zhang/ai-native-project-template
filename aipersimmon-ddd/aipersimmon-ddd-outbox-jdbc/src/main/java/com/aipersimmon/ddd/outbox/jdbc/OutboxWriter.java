@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -41,6 +42,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
   private final Clock clock;
   private final String source;
   private final StoreAndForwardTracer tracer;
+  private final Supplier<String> idGenerator;
 
   public OutboxWriter(JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock, String source) {
     this(jdbc, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE);
@@ -52,11 +54,27 @@ public class OutboxWriter implements DurableIntegrationEvents {
       Clock clock,
       String source,
       StoreAndForwardTracer tracer) {
+    this(jdbc, objectMapper, clock, source, tracer, () -> UUID.randomUUID().toString());
+  }
+
+  /**
+   * @param idGenerator supplies each brand-new event's id (default: random UUID); injectable so a
+   *     time-ordered generator (UUIDv7) can replace it for better index locality on the {@code
+   *     event_id} unique index
+   */
+  public OutboxWriter(
+      JdbcTemplate jdbc,
+      ObjectMapper objectMapper,
+      Clock clock,
+      String source,
+      StoreAndForwardTracer tracer,
+      Supplier<String> idGenerator) {
     this.jdbc = jdbc;
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.source = source;
     this.tracer = tracer;
+    this.idGenerator = idGenerator;
   }
 
   @Override
@@ -65,7 +83,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
     // id and record the command (context.messageId()) as the cause.
     write(
         event,
-        UUID.randomUUID().toString(),
+        idGenerator.get(),
         context.tenantId(),
         context.correlationId(),
         context.messageId(),

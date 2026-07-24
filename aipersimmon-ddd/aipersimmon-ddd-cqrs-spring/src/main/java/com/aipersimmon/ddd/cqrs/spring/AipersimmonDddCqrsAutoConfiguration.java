@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.cqrs.spring;
 
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
@@ -65,8 +66,15 @@ public class AipersimmonDddCqrsAutoConfiguration {
   @ConditionalOnMissingBean
   public CommandBus commandBus(
       ObjectProvider<CommandHandler<?, ?>> handlers,
-      ObjectProvider<CommandInterceptor> interceptors) {
-    return new RegistryCommandBus(handlers.stream().toList(), interceptors.stream().toList());
+      ObjectProvider<CommandInterceptor> interceptors,
+      ObjectProvider<IdGenerator> idGenerator) {
+    IdGenerator generator = idGenerator.getIfAvailable();
+    // With aipersimmon-ddd-id on the classpath the message id is a time-ordered UUIDv7;
+    // without it, RegistryCommandBus keeps its UUID.randomUUID() default.
+    return generator != null
+        ? new RegistryCommandBus(
+            handlers.stream().toList(), interceptors.stream().toList(), generator::newId)
+        : new RegistryCommandBus(handlers.stream().toList(), interceptors.stream().toList());
   }
 
   @Bean

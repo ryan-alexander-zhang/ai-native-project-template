@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -40,5 +41,23 @@ class SpringIntegrationEventsTest {
         "the declared @EventType logical type");
     assertEquals("corr-1", envelope.correlationId(), "inherits the command's correlation");
     assertEquals("cmd-1", envelope.causationId(), "caused by the emitting command");
+  }
+
+  @Test
+  void mintsAFreshEventIdFromTheInjectedGenerator() {
+    List<Object> captured = new ArrayList<>();
+    ApplicationEventPublisher publisher = captured::add;
+    // The injected id supplier is what a UUIDv7 IdGenerator plugs into; here a sentinel proves the
+    // brand-new event id comes from it rather than an inlined UUID.randomUUID().
+    IntegrationEvents events =
+        new SpringIntegrationEvents(publisher, Clock.systemUTC(), "/inventory", () -> "EVT-7");
+
+    events.publish(
+        new SampleIntegrationEvent("1"),
+        new CommandContext("__root__", "cmd-1", "corr-1", "cause-0"));
+
+    PayloadApplicationEvent<?> published = (PayloadApplicationEvent<?>) captured.get(0);
+    EventEnvelope<?> envelope = (EventEnvelope<?>) published.getPayload();
+    assertEquals("EVT-7", envelope.eventId(), "a brand-new event id comes from the id generator");
   }
 }

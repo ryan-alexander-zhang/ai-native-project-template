@@ -40,6 +40,16 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-infrastructure</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-adapter</artifactId></dependency>
 
+    <!--
+      Time-ordered UUIDv7 identifiers: binds the default IdGenerator so every framework-minted id
+      (command messageId, integration event_id, process instance/transition/effect/deadline id,
+      operation-log recordId) is a time-ordered UUIDv7 instead of a random v4 — better index
+      locality on the high-cardinality keys. Omitting this module falls back to UUID.randomUUID().
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id</artifactId>
+    </dependency>
     <!-- In-process synchronous transport for both domain and integration events. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

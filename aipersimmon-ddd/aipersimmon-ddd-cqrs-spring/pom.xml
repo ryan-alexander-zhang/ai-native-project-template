@@ -75,6 +75,14 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The real UUIDv7 IdGenerator + its auto-config, so the two-state test can prove the
+         command bus mints a v7 messageId when this module is present and a v4 one when it is not. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <!-- Brings a transaction manager (spring-jdbc) and an in-memory database so the
          transaction interceptor and event drain can be exercised end to end. -->
     <dependency>

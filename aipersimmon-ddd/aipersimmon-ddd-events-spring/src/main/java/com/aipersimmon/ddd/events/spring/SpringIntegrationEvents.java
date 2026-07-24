@@ -6,6 +6,7 @@ import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.time.Clock;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.PayloadApplicationEvent;
 import org.springframework.core.ResolvableType;
@@ -27,15 +28,29 @@ public class SpringIntegrationEvents implements IntegrationEvents {
   private final ApplicationEventPublisher publisher;
   private final Clock clock;
   private final String source;
+  private final Supplier<String> idGenerator;
 
   public SpringIntegrationEvents(ApplicationEventPublisher publisher, String source) {
     this(publisher, Clock.systemUTC(), source);
   }
 
   public SpringIntegrationEvents(ApplicationEventPublisher publisher, Clock clock, String source) {
+    this(publisher, clock, source, () -> UUID.randomUUID().toString());
+  }
+
+  /**
+   * @param idGenerator supplies each brand-new event's id (default: random UUID); injectable so a
+   *     time-ordered generator (UUIDv7) can replace it for better index locality
+   */
+  public SpringIntegrationEvents(
+      ApplicationEventPublisher publisher,
+      Clock clock,
+      String source,
+      Supplier<String> idGenerator) {
     this.publisher = publisher;
     this.clock = clock;
     this.source = source;
+    this.idGenerator = idGenerator;
   }
 
   @Override
@@ -43,11 +58,7 @@ public class SpringIntegrationEvents implements IntegrationEvents {
     // A brand-new event caused by the command described by context: mint a fresh event
     // id and record the command (context.messageId()) as the cause.
     publish(
-        event,
-        UUID.randomUUID().toString(),
-        context.tenantId(),
-        context.correlationId(),
-        context.messageId());
+        event, idGenerator.get(), context.tenantId(), context.correlationId(), context.messageId());
   }
 
   @Override
