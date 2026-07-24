@@ -1,5 +1,8 @@
 package com.aipersimmon.ddd.web.store.redis;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
 import java.time.Duration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -21,7 +24,8 @@ public class RedisReplayGuard implements ReplayGuard {
 
   @Override
   public boolean seenBefore(String nonce, Duration ttl) {
-    Boolean stored = redis.opsForValue().setIfAbsent(PREFIX + nonce, "1", ttl);
+    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    Boolean stored = redis.opsForValue().setIfAbsent(PREFIX + tenant + ":" + nonce, "1", ttl);
     return !Boolean.TRUE.equals(stored);
   }
 }

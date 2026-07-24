@@ -28,6 +28,12 @@
       <artifactId>aipersimmon-ddd-web</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Reads the ambient tenant (TenantContext) to prefix Redis keys per tenant. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-redis</artifactId>

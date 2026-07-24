@@ -30,6 +30,12 @@
       <artifactId>aipersimmon-ddd-web</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Reads the ambient tenant (TenantContext) to scope keys per tenant in the composite PK. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>

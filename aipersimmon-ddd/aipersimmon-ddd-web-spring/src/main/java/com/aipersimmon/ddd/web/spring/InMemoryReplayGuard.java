@@ -1,5 +1,8 @@
 package com.aipersimmon.ddd.web.spring;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
 import java.time.Clock;
 import java.time.Duration;
@@ -26,8 +29,19 @@ public class InMemoryReplayGuard implements ReplayGuard {
     Instant expiresAt = now.plus(ttl);
     Instant previous =
         seen.compute(
-            nonce, (k, current) -> (current != null && current.isAfter(now)) ? current : expiresAt);
+            tenantKey(nonce),
+            (k, current) -> (current != null && current.isAfter(now)) ? current : expiresAt);
     // If the stored expiry is the one we just computed, this was the first sighting.
     return previous != expiresAt;
+  }
+
+  /**
+   * Qualify the nonce with the ambient tenant (root sentinel when tenancy is off) so a nonce is
+   * single-use per tenant. NUL separates the segments so no tenant/nonce pair collides.
+   */
+  private static String tenantKey(String nonce) {
+    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value())
+        + "\u0000"
+        + nonce;
   }
 }

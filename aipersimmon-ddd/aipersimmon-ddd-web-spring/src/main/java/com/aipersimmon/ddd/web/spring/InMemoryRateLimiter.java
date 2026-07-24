@@ -1,5 +1,8 @@
 package com.aipersimmon.ddd.web.spring;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import java.time.Clock;
@@ -33,7 +36,7 @@ public class InMemoryRateLimiter implements RateLimiter {
     long nowMillis = clock.millis();
     long alignedStart = (nowMillis / windowMillis) * windowMillis;
 
-    Window window = windows.computeIfAbsent(key, k -> new Window());
+    Window window = windows.computeIfAbsent(tenantKey(key), k -> new Window());
     long count;
     synchronized (window) {
       if (window.startMillis != alignedStart) {
@@ -50,5 +53,15 @@ public class InMemoryRateLimiter implements RateLimiter {
     Duration retryAfter =
         allowed ? Duration.ZERO : Duration.ofMillis(alignedStart + windowMillis - nowMillis);
     return new Decision(allowed, remaining, resetAt, retryAfter);
+  }
+
+  /**
+   * Qualify the bucket key with the ambient tenant (root sentinel when tenancy is off) so quota is
+   * never shared across tenants. NUL separates the segments so no tenant/key pair collides.
+   */
+  private static String tenantKey(String key) {
+    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value())
+        + "\u0000"
+        + key;
   }
 }

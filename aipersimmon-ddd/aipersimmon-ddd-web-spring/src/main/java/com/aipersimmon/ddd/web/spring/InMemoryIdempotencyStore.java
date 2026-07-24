@@ -1,5 +1,8 @@
 package com.aipersimmon.ddd.web.spring;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
 import java.time.Clock;
@@ -26,12 +29,13 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
 
   @Override
   public Optional<StoredResponse> find(String key) {
-    Entry entry = entries.get(key);
+    String mapKey = tenantKey(key);
+    Entry entry = entries.get(mapKey);
     if (entry == null) {
       return Optional.empty();
     }
     if (entry.expiresAt().isBefore(clock.instant())) {
-      entries.remove(key, entry);
+      entries.remove(mapKey, entry);
       return Optional.empty();
     }
     return Optional.of(entry.response());
@@ -42,7 +46,7 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
     Instant expiresAt = clock.instant().plus(ttl);
     Entry existing =
         entries.compute(
-            key,
+            tenantKey(key),
             (k, current) -> {
               if (current != null && current.expiresAt().isAfter(clock.instant())) {
                 return current;
@@ -50,5 +54,16 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
               return new Entry(response, expiresAt);
             });
     return existing.response() == response;
+  }
+
+  /**
+   * Qualify the client-provided key with the ambient tenant (root sentinel when tenancy is off) so
+   * two tenants reusing the same Idempotency-Key keep separate entries. NUL separates the segments
+   * so no tenant/key pair can collide with another.
+   */
+  private static String tenantKey(String key) {
+    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value())
+        + "\u0000"
+        + key;
   }
 }

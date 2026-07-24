@@ -126,7 +126,15 @@ observability / archunit / flyway。
 >   **验证**：inbox-jdbc/mp 各自门绿 + `KafkaIntegrationEventListenerTest` 10/10 + 3 个 kafka 集成测试单跑绿；
 >   全库 reactor 除 messaging-kafka 外 30+ 模块绿。messaging-kafka 满套集成测试在本机 SigNoz 栈占内存下偶发超时
 >   （"saw 0 / timed out"，3 个 EmbeddedKafka 类），**已 git stash 掉 listener 改动复现同样失败→确证环境性、与 T7 无关**。
->   **待办**：T9（saga）、T10（web-store）、T12/T13（MP TenantLine / PG RLS）、T15（读侧）、T16（观测）、T18（双租户验收矩阵）。
+> - ✅ **T10（web-store idempotency/nonce/rate-limit 加 tenant_id，键升复合）**：三方言 `V2__add_tenant_id.sql`——三表
+>   `ADD COLUMN tenant_id` 后 **PK 升复合**（idempotency `(tenant_id, idempotency_key)`、nonce `(tenant_id, nonce)`、
+>   rate_limit `(tenant_id, bucket_key, window_start)`）；键由**客户端提供=租户相对**，不含租户会跨租户读回响应/共享限流计数
+>   （PK-drop 方言差异：H2/MySQL `DROP PRIMARY KEY`、PG `DROP CONSTRAINT <table>_pkey`）。租户源=**请求边界的环境
+>   TenantContext**（T2 filter 绑定），SPI 签名不变。jdbc 三 store 全 SQL 带 tenant_id 谓词/列；redis 三 store key 前缀加
+>   `{tenant}` 段；in-memory 三 store map key 用 `tenant + " " + key` 限定（三 web pom 加 tenancy 依赖）。
+>   web-store-jdbc 测试 `application.properties` 加 V2。**验证**：web/web-spring/web-store-jdbc/web-store-redis 全绿
+>   （WebLayerTest 12 + 三 filter + JdbcWebStoreTest H2 复合 PK + RedisWebStoreTest 真 Redis 租户前缀键）。
+>   **待办**：~~T9（saga，已弃用跳过）~~、T12/T13（MP TenantLine / PG RLS）、T15（读侧）、T16（观测）、T18（双租户验收矩阵）。
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 
@@ -164,7 +172,9 @@ observability / archunit / flyway。
 - **T8** `[process-manager-engine/-jdbc/-mybatis-plus]` 四表加 `tenant_id`；**`uq_process_instance_business` 升级为
    `(tenant_id, process_type, business_key)`**（租户相对键），其余唯一键不变；四 `*Store` + `ProcessInstanceCriteria` +
    `ProcessClaimStrategy` 带租户；检索索引 `tenant_id` 前导。claim/relay 走 BYPASSRLS（见 T13）。
-- **T9** `[saga/saga-spring]` `aipersimmon_saga`/`aipersimmon_deadline` 加 `tenant_id` 数据列（键不变，`correlation_id` 全局唯一）。
+- **T9** `[saga/saga-spring]` ~~`aipersimmon_saga`/`aipersimmon_deadline` 加 `tenant_id` 数据列~~ **已跳过（SKIPPED）——
+   saga 模块已弃用（owner 2026-07-24 确认），不再接收多租户改造。模块仍在 reactor 内编译（承接 T3–T6 的
+   CommandContext/EventEnvelope 变更），但不新增 tenant_id 列。**
 - **T10** `[web-store-jdbc/-redis]` `aipersimmon_web_idempotency`/`_nonce`/`_rate_limit` **PK 升级为含 `tenant_id`**（客户端
    提供键、防跨租户泄漏）；redis key 前缀加 `{tenant}` 段。
 - **T11** `[flyway]` 各组件 `ADD COLUMN tenant_id VARCHAR(64) NOT NULL DEFAULT '__root__'` + 仅租户相对键表升级唯一约束；

@@ -1,5 +1,8 @@
 package com.aipersimmon.ddd.web.store.jdbc;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -39,12 +42,13 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     List<StoredResponse> found =
         jdbc.query(
             "SELECT response_status, response_body, response_headers FROM aipersimmon_web_idempotency "
-                + "WHERE idempotency_key = ? AND expires_at > ?",
+                + "WHERE tenant_id = ? AND idempotency_key = ? AND expires_at > ?",
             (rs, rowNum) ->
                 new StoredResponse(
                     rs.getInt("response_status"),
                     rs.getBytes("response_body"),
                     readHeaders(rs.getString("response_headers"))),
+            tenant(),
             key,
             Timestamp.from(clock.instant()));
     return found.stream().findFirst();
@@ -53,15 +57,18 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
   @Override
   public boolean saveIfAbsent(String key, StoredResponse response, Duration ttl) {
     Instant now = clock.instant();
+    String tenant = tenant();
     jdbc.update(
-        "DELETE FROM aipersimmon_web_idempotency WHERE idempotency_key = ? AND expires_at <= ?",
+        "DELETE FROM aipersimmon_web_idempotency WHERE tenant_id = ? AND idempotency_key = ? AND expires_at <= ?",
+        tenant,
         key,
         Timestamp.from(now));
     try {
       jdbc.update(
           "INSERT INTO aipersimmon_web_idempotency "
-              + "(idempotency_key, response_status, response_body, response_headers, created_at, expires_at) "
-              + "VALUES (?, ?, ?, ?, ?, ?)",
+              + "(tenant_id, idempotency_key, response_status, response_body, response_headers, created_at, expires_at) "
+              + "VALUES (?, ?, ?, ?, ?, ?, ?)",
+          tenant,
           key,
           response.status(),
           response.body(),
@@ -72,6 +79,15 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     } catch (DuplicateKeyException e) {
       return false;
     }
+  }
+
+  /**
+   * The tenant that scopes this key, read from the ambient {@link TenantContext} bound on the
+   * request edge (the tenant-resolution filter); the root sentinel when tenancy is off. The key is
+   * client-provided, so tenant is part of its identity — see the composite primary key.
+   */
+  private static String tenant() {
+    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
   }
 
   private Map<String, String> readHeaders(String json) {

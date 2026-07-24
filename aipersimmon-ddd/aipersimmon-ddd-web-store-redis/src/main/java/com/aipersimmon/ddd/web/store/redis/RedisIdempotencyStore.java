@@ -1,5 +1,8 @@
 package com.aipersimmon.ddd.web.store.redis;
 
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,7 +29,7 @@ public class RedisIdempotencyStore implements IdempotencyStore {
 
   @Override
   public Optional<StoredResponse> find(String key) {
-    String json = redis.opsForValue().get(PREFIX + key);
+    String json = redis.opsForValue().get(tenantKey(key));
     if (json == null) {
       return Optional.empty();
     }
@@ -45,7 +48,17 @@ public class RedisIdempotencyStore implements IdempotencyStore {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to serialize idempotent response", e);
     }
-    Boolean stored = redis.opsForValue().setIfAbsent(PREFIX + key, json, ttl);
+    Boolean stored = redis.opsForValue().setIfAbsent(tenantKey(key), json, ttl);
     return Boolean.TRUE.equals(stored);
+  }
+
+  /**
+   * Namespace the client-provided key under the ambient tenant (bound on the request edge; the root
+   * sentinel when tenancy is off), so two tenants reusing the same Idempotency-Key never read back
+   * each other's stored response.
+   */
+  private static String tenantKey(String key) {
+    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return PREFIX + tenant + ":" + key;
   }
 }

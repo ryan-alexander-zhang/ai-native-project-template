@@ -35,6 +35,13 @@
       <artifactId>aipersimmon-ddd-web</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Reads the ambient tenant (TenantContext) so idempotency/nonce/rate-limit keys are
+         scoped per tenant. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- Optional: the ApplicationException advice is wired only when -application
          is on the classpath, so consumers that do not use it inherit nothing. -->
     <dependency>
