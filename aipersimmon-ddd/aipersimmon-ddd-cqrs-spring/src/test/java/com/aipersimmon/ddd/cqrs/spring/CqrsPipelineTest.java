@@ -14,6 +14,8 @@ import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.Query;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -77,6 +79,20 @@ class CqrsPipelineTest {
   }
 
   @Test
+  void seedsTheRootTenantWhenNoneIsBound() {
+    // enabled=false / single-tenant equivalence: with no TenantContext bound, the bus seeds the
+    // command with the root sentinel, so everything downstream is written under __root__ exactly as
+    // before multi-tenancy existed.
+    assertEquals("__root__", commandBus.send(new EchoTenant()));
+  }
+
+  @Test
+  void seedsTheAmbientTenantWhenBound() {
+    String seen = TenantContext.runAs(Tenants.of("acme"), () -> commandBus.send(new EchoTenant()));
+    assertEquals("acme", seen);
+  }
+
+  @Test
   void queryBusAnswersFromTheReadSide() {
     commandBus.send(new PlaceThing("a"));
     commandBus.send(new PlaceThing("b"));
@@ -91,6 +107,9 @@ class CqrsPipelineTest {
   // --- test fixtures -----------------------------------------------------
 
   record PlaceThing(@NotBlank String name) implements Command<String> {}
+
+  /** Returns the tenant the bus seeded onto the command context — used to prove tenant seeding. */
+  record EchoTenant() implements Command<String> {}
 
   record CountThings() implements Query<Integer> {}
 
@@ -127,6 +146,18 @@ class CqrsPipelineTest {
     @Bean
     CountThingsHandler countThingsHandler(JdbcTemplate jdbc) {
       return new CountThingsHandler(jdbc);
+    }
+
+    @Bean
+    EchoTenantHandler echoTenantHandler() {
+      return new EchoTenantHandler();
+    }
+  }
+
+  static final class EchoTenantHandler implements CommandHandler<EchoTenant, String> {
+    @Override
+    public String handle(EchoTenant command, CommandContext context) {
+      return context.tenantId();
     }
   }
 
