@@ -16,6 +16,9 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessQuery;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -56,7 +59,12 @@ public final class DefaultProcessQuery implements ProcessQuery {
    * for {@code handle}. Returns empty if no instance exists for that key.
    */
   public Optional<ProcessRef> findRef(ProcessType processType, ProcessBusinessKey businessKey) {
-    return instances.readByBusinessKey(processType, businessKey).map(ProcessInstanceRow::ref);
+    // Scope to the ambient tenant (root sentinel when tenancy is off): with a tenant-relative
+    // business key, an unscoped read could resolve another tenant's instance.
+    String tenantId = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return instances
+        .readByBusinessKey(tenantId, processType, businessKey)
+        .map(ProcessInstanceRow::ref);
   }
 
   @Override

@@ -21,16 +21,20 @@ public interface ProcessInstanceMapper {
   InstanceRow findForUpdate(@Param("instanceId") String instanceId);
 
   @Select(
-      "SELECT * FROM aipersimmon_process_instance WHERE process_type = #{processType} AND"
-          + " business_key = #{businessKey} FOR UPDATE")
+      "SELECT * FROM aipersimmon_process_instance WHERE tenant_id = #{tenantId} AND process_type ="
+          + " #{processType} AND business_key = #{businessKey} FOR UPDATE")
   InstanceRow findByBusinessKey(
-      @Param("processType") String processType, @Param("businessKey") String businessKey);
+      @Param("tenantId") String tenantId,
+      @Param("processType") String processType,
+      @Param("businessKey") String businessKey);
 
   @Select(
-      "SELECT * FROM aipersimmon_process_instance WHERE process_type = #{processType} AND"
-          + " business_key = #{businessKey}")
+      "SELECT * FROM aipersimmon_process_instance WHERE tenant_id = #{tenantId} AND process_type ="
+          + " #{processType} AND business_key = #{businessKey}")
   InstanceRow readByBusinessKey(
-      @Param("processType") String processType, @Param("businessKey") String businessKey);
+      @Param("tenantId") String tenantId,
+      @Param("processType") String processType,
+      @Param("businessKey") String businessKey);
 
   @Update(
       "INSERT INTO aipersimmon_process_instance ( tenant_id, instance_id, process_type, business_key,"

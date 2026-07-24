@@ -50,15 +50,17 @@ public final class MybatisProcessInstanceStore implements ProcessInstanceStore {
 
   @Override
   public Optional<ProcessInstanceRow> findByBusinessKey(
-      ProcessType processType, ProcessBusinessKey businessKey) {
-    return Optional.ofNullable(mapper.findByBusinessKey(processType.value(), businessKey.value()))
+      String tenantId, ProcessType processType, ProcessBusinessKey businessKey) {
+    return Optional.ofNullable(
+            mapper.findByBusinessKey(tenantId, processType.value(), businessKey.value()))
         .map(MybatisProcessInstanceStore::toRow);
   }
 
   @Override
   public Optional<ProcessInstanceRow> readByBusinessKey(
-      ProcessType processType, ProcessBusinessKey businessKey) {
-    return Optional.ofNullable(mapper.readByBusinessKey(processType.value(), businessKey.value()))
+      String tenantId, ProcessType processType, ProcessBusinessKey businessKey) {
+    return Optional.ofNullable(
+            mapper.readByBusinessKey(tenantId, processType.value(), businessKey.value()))
         .map(MybatisProcessInstanceStore::toRow);
   }
 

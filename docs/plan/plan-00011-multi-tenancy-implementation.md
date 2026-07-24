@@ -159,6 +159,17 @@ observability / archunit / flyway。
 >   （读仓储是 app 侧 QueryHandler）。租户机制已就绪：`TenantResolutionFilter` 为整个请求（含 query 处理）绑定 TenantContext，
 >   读仓储调 `TenantContext.current()` 过滤，不改 QueryBus、不建 QueryContext。故 T15 无框架代码，模式由 T18 scaffold 读仓储演示。
 >   （注意：后台线程上的读无 TenantContext——方案 A 只覆盖请求域读，与设计一致。）
+> - 🐛→✅ **T8 读路径修正（跨租户读隔离 bug）**：T8 把 `uq_process_instance_business` 升为复合后，两租户可共用同一
+>   business_key，但 `ProcessInstanceStore.find/readByBusinessKey` 的 SQL 仍是 `WHERE process_type=? AND business_key=?`
+>   **无租户谓词** + `.findFirst()`——租户 A 的 start 可能加载(并 `FOR UPDATE` 锁)租户 B 的实例。process_instance 又刻意
+>   不在 MP/RLS 默认强制内，无人兜底。**修正**：两方法加 `String tenantId` 首参 + SQL `AND tenant_id = ?`（jdbc + mp mapper）；
+>   `findByBusinessKey` 调用点(DefaultProcessRuntime start)传 `cause.tenantId()`，`readByBusinessKey`(DefaultProcessQuery.findRef)
+>   传环境 `TenantContext.current().orElse(ROOT)`。既有 ROOT 租户测试不受影响。
+> - ✅ **T18（部分：process-manager JDBC 双租户隔离已证）**：新 `JdbcProcessTenantIsolationTest`（2 例）——两租户共用
+>   business_key 得 2 个独立实例；读侧 `findRef` 只解析环境租户的实例（陌生租户见空）；重复拒绝按起始租户隔离。
+>   全 3 process 模块 verify 绿（jdbc 93 + mp 3 + engine，含真 PG 并发）。**T18 余量**：mp 变体、MySQL/PG 参数化、
+>   web-store/inbox/outbox 隔离用例、缺租户 REJECT、`enabled=false` 等价、迁移安全；**RLS 相关用例(XAC-9.1 池不泄漏/
+>   XAC-8.2 漏写谓词兜底)待 T13**。
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 

@@ -61,11 +61,13 @@ public final class JdbcProcessInstanceStore implements ProcessInstanceStore {
   }
 
   public Optional<ProcessInstanceRow> findByBusinessKey(
-      ProcessType processType, ProcessBusinessKey businessKey) {
+      String tenantId, ProcessType processType, ProcessBusinessKey businessKey) {
     return jdbc
         .query(
-            "SELECT * FROM aipersimmon_process_instance WHERE process_type = ? AND business_key = ? FOR UPDATE",
+            "SELECT * FROM aipersimmon_process_instance"
+                + " WHERE tenant_id = ? AND process_type = ? AND business_key = ? FOR UPDATE",
             ROW_MAPPER,
+            tenantId,
             processType.value(),
             businessKey.value())
         .stream()
@@ -74,11 +76,13 @@ public final class JdbcProcessInstanceStore implements ProcessInstanceStore {
 
   /** Read-only lookup of an instance by its business key (no lock), for resolving its reference. */
   public Optional<ProcessInstanceRow> readByBusinessKey(
-      ProcessType processType, ProcessBusinessKey businessKey) {
+      String tenantId, ProcessType processType, ProcessBusinessKey businessKey) {
     return jdbc
         .query(
-            "SELECT * FROM aipersimmon_process_instance WHERE process_type = ? AND business_key = ?",
+            "SELECT * FROM aipersimmon_process_instance"
+                + " WHERE tenant_id = ? AND process_type = ? AND business_key = ?",
             ROW_MAPPER,
+            tenantId,
             processType.value(),
             businessKey.value())
         .stream()

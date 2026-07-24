@@ -298,7 +298,12 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
       CommandContext cause) {
     ProcessDefinition<?> definition = definitions.resolveActive(processType);
 
-    Optional<ProcessInstanceRow> existing = instances.findByBusinessKey(processType, businessKey);
+    // Scope the lookup to the advancing tenant: the (tenant_id, process_type, business_key) key
+    // lets
+    // two tenants reuse a business key, so an unscoped lookup could load — and FOR UPDATE lock —
+    // another tenant's instance.
+    Optional<ProcessInstanceRow> existing =
+        instances.findByBusinessKey(cause.tenantId(), processType, businessKey);
     if (existing.isPresent()) {
       return resolveExistingStart(existing.get(), processType, businessKey, cause);
     }

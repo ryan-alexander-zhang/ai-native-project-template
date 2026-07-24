@@ -24,10 +24,10 @@ public interface ProcessInstanceStore {
   Optional<ProcessInstanceRow> findForUpdate(ProcessInstanceId instanceId);
 
   Optional<ProcessInstanceRow> findByBusinessKey(
-      ProcessType processType, ProcessBusinessKey businessKey);
+      String tenantId, ProcessType processType, ProcessBusinessKey businessKey);
 
   Optional<ProcessInstanceRow> readByBusinessKey(
-      ProcessType processType, ProcessBusinessKey businessKey);
+      String tenantId, ProcessType processType, ProcessBusinessKey businessKey);
 
   void insert(ProcessInstanceRow row, Instant now);
 
