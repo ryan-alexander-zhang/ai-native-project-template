@@ -33,10 +33,10 @@ public interface ProcessInstanceMapper {
       @Param("processType") String processType, @Param("businessKey") String businessKey);
 
   @Update(
-      "INSERT INTO aipersimmon_process_instance ( instance_id, process_type, business_key,"
+      "INSERT INTO aipersimmon_process_instance ( tenant_id, instance_id, process_type, business_key,"
           + " definition_version, state_schema_version, lifecycle, resume_lifecycle,"
           + " suspension_reason, business_step, outcome, revision, state_payload_type,"
-          + " state_payload, created_at, updated_at, ended_at) VALUES (#{instanceId},"
+          + " state_payload, created_at, updated_at, ended_at) VALUES (#{tenantId}, #{instanceId},"
           + " #{processType}, #{businessKey}, #{definitionVersion}, #{stateSchemaVersion},"
           + " #{lifecycle}, #{resumeLifecycle,jdbcType=VARCHAR}, #{suspensionReason,jdbcType=VARCHAR}, #{businessStep}, #{outcome,jdbcType=VARCHAR},"
           + " #{revision}, #{statePayloadType}, #{statePayload}, #{createdAt}, #{updatedAt},"

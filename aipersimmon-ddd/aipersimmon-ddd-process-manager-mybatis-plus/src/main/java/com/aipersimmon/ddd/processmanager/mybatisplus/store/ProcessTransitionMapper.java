@@ -29,10 +29,10 @@ public interface ProcessTransitionMapper {
   Long maxTransitionSeq(@Param("instanceId") String instanceId);
 
   @Update(
-      "INSERT INTO aipersimmon_process_transition ( transition_id, instance_id, transition_seq,"
+      "INSERT INTO aipersimmon_process_transition ( tenant_id, transition_id, instance_id, transition_seq,"
           + " input_message_id, input_type, input_version, input_payload, from_lifecycle,"
           + " to_lifecycle, from_step, to_step, decision_code, transition_kind, correlation_id,"
-          + " created_at) VALUES (#{transitionId}, #{instanceId}, #{transitionSeq},"
+          + " created_at) VALUES (#{tenantId}, #{transitionId}, #{instanceId}, #{transitionSeq},"
           + " #{inputMessageId}, #{inputType}, #{inputVersion}, #{inputPayload},"
           + " #{fromLifecycle,jdbcType=VARCHAR}, #{toLifecycle}, #{fromStep,jdbcType=VARCHAR},"
           + " #{toStep}, #{decisionCode}, #{transitionKind}, #{correlationId,jdbcType=VARCHAR},"
@@ -40,10 +40,10 @@ public interface ProcessTransitionMapper {
   void append(Map<String, Object> row);
 
   @Update(
-      "INSERT INTO aipersimmon_process_transition ( transition_id, instance_id, transition_seq,"
+      "INSERT INTO aipersimmon_process_transition ( tenant_id, transition_id, instance_id, transition_seq,"
           + " input_message_id, input_type, input_version, input_payload, from_lifecycle,"
           + " to_lifecycle, from_step, to_step, decision_code, transition_kind, correlation_id,"
-          + " operator_id, operation_reason, created_at) VALUES (#{transitionId}, #{instanceId},"
+          + " operator_id, operation_reason, created_at) VALUES (#{tenantId}, #{transitionId}, #{instanceId},"
           + " #{transitionSeq}, #{inputMessageId}, #{inputType}, #{inputVersion}, #{inputPayload},"
           + " #{fromLifecycle}, #{toLifecycle}, #{fromStep}, #{toStep}, #{decisionCode},"
           + " #{transitionKind}, #{correlationId,jdbcType=VARCHAR}, #{operatorId},"
@@ -58,8 +58,8 @@ public interface ProcessTransitionMapper {
   List<TransitionViewRow> timeline(@Param("instanceId") String instanceId);
 
   @Select(
-      "SELECT input_message_id, input_type, input_version, input_payload, correlation_id FROM"
-          + " aipersimmon_process_transition WHERE instance_id = #{instanceId} AND transition_kind"
+      "SELECT tenant_id, input_message_id, input_type, input_version, input_payload, correlation_id"
+          + " FROM aipersimmon_process_transition WHERE instance_id = #{instanceId} AND transition_kind"
           + " = 'PARKED' ORDER BY transition_seq")
   List<ParkedRow> findParkedInputs(@Param("instanceId") String instanceId);
 }

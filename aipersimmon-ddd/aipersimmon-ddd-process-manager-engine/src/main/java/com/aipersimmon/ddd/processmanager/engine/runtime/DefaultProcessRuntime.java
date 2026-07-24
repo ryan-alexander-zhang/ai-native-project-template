@@ -324,6 +324,7 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
         serdes.encodeState(processType, definition.stateSchemaVersion(), decision.state());
     instances.insert(
         new ProcessInstanceRow(
+            cause.tenantId(),
             ref,
             definition.definitionVersion(),
             definition.stateSchemaVersion(),
@@ -438,6 +439,7 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
       EncodedPayload parkedInput = serdes.encodePayload(input);
       transitions.append(
           new ProcessTransitionInsert(
+              cause.tenantId(),
               parkedId,
               ref.instanceId(),
               cause.messageId(),
@@ -499,6 +501,7 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
         serdes.encodeState(ref.processType(), definition.stateSchemaVersion(), decision.state());
     ProcessInstanceRow updated =
         new ProcessInstanceRow(
+            row.tenantId(),
             ref,
             definition.definitionVersion(),
             definition.stateSchemaVersion(),

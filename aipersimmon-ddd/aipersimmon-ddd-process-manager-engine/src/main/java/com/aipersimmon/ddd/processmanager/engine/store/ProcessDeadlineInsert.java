@@ -10,6 +10,7 @@ import java.time.Instant;
  * deadline input is delivered back as an ordinary input when the timer fires.
  */
 public record ProcessDeadlineInsert(
+    String tenantId,
     String deadlineId,
     ProcessInstanceId instanceId,
     DeadlineName name,

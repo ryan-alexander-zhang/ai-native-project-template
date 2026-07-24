@@ -22,6 +22,7 @@ public interface ProcessTransitionStore {
   void append(ProcessTransitionInsert transition, Instant now);
 
   void appendOperator(
+      String tenantId,
       String transitionId,
       ProcessInstanceId instanceId,
       ProcessLifecycle fromLifecycle,

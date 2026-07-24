@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -42,6 +43,8 @@ class JdbcProcessTransitionStoreTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
             .build();
     transitions = new JdbcProcessTransitionStore(new JdbcTemplate(dataSource));
   }
@@ -65,6 +68,7 @@ class JdbcProcessTransitionStoreTest {
   private void appendParked(String transitionId, String inputMessageId, Instant at) {
     transitions.append(
         new ProcessTransitionInsert(
+            Tenants.ROOT.value(),
             transitionId,
             INSTANCE,
             inputMessageId,

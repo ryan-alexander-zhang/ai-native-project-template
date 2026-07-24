@@ -42,6 +42,7 @@ public final class MybatisProcessDeadlineStore implements ProcessDeadlineStore {
     Timestamp ts = Timestamp.from(now);
     Timestamp due = Timestamp.from(d.dueAt());
     Map<String, Object> m = new HashMap<>();
+    m.put("tenantId", d.tenantId());
     m.put("deadlineId", d.deadlineId());
     m.put("instanceId", d.instanceId().value());
     m.put("name", d.name().value());
@@ -92,6 +93,7 @@ public final class MybatisProcessDeadlineStore implements ProcessDeadlineStore {
     }
     return Optional.of(
         new DeadlineRow(
+            r.getTenantId(),
             r.getDeadlineId(),
             new ProcessInstanceId(r.getInstanceId()),
             new DeadlineName(r.getName()),

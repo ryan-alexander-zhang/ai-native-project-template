@@ -66,6 +66,7 @@ public final class MybatisProcessInstanceStore implements ProcessInstanceStore {
   public void insert(ProcessInstanceRow row, Instant now) {
     Timestamp ts = Timestamp.from(now);
     Map<String, Object> m = new HashMap<>();
+    m.put("tenantId", row.tenantId());
     m.put("instanceId", row.ref().instanceId().value());
     m.put("processType", row.ref().processType().value());
     m.put("businessKey", row.ref().businessKey().value());
@@ -175,6 +176,7 @@ public final class MybatisProcessInstanceStore implements ProcessInstanceStore {
             new ProcessType(r.getProcessType()),
             new ProcessBusinessKey(r.getBusinessKey()));
     return new ProcessInstanceRow(
+        r.getTenantId(),
         ref,
         new DefinitionVersion(r.getDefinitionVersion()),
         new StateSchemaVersion(r.getStateSchemaVersion()),

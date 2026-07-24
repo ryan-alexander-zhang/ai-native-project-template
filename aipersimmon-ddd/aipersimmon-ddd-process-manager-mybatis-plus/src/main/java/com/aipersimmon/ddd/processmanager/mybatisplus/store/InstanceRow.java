@@ -6,6 +6,7 @@ package com.aipersimmon.ddd.processmanager.mybatisplus.store;
  * ProcessInstanceRow} value object, mirroring the JDBC RowMapper.
  */
 public class InstanceRow {
+  private String tenantId;
   private String instanceId;
   private String processType;
   private String businessKey;
@@ -19,6 +20,14 @@ public class InstanceRow {
   private long revision;
   private String statePayloadType;
   private String statePayload;
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(String v) {
+    this.tenantId = v;
+  }
 
   public String getInstanceId() {
     return instanceId;

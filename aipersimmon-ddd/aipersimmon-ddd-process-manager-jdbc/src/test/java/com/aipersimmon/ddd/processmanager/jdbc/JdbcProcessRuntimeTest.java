@@ -85,6 +85,8 @@ class JdbcProcessRuntimeTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
             .build();
     jdbc = new JdbcTemplate(dataSource);
     runtime = build(DuplicateBusinessKeyPolicy.REJECT);

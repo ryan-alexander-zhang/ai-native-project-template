@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
  * Correlation/causation are derived from the input that produced it.
  */
 public record ProcessEffectInsert(
+    String tenantId,
     String effectId,
     ProcessInstanceId instanceId,
     String transitionId,

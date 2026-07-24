@@ -15,6 +15,7 @@ import java.util.Optional;
  * the state codec to decode; the byte array is defensively copied.
  */
 public record ProcessInstanceRow(
+    String tenantId,
     ProcessRef ref,
     DefinitionVersion definitionVersion,
     StateSchemaVersion stateSchemaVersion,
@@ -28,6 +29,9 @@ public record ProcessInstanceRow(
     Optional<String> suspensionReason) {
 
   public ProcessInstanceRow {
+    if (tenantId == null || tenantId.isBlank()) {
+      throw new IllegalArgumentException("tenantId required");
+    }
     statePayload = statePayload.clone();
   }
 

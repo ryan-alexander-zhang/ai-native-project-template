@@ -78,7 +78,9 @@ class EffectRelayPostgresConcurrencyTest {
             new ClassPathResource(
                 "aipersimmon/db/migration/process-manager/postgresql/V1__aipersimmon_process_manager.sql"),
             new ClassPathResource(
-                "aipersimmon/db/migration/process-manager/postgresql/V2__drop_trace_id.sql"))
+                "aipersimmon/db/migration/process-manager/postgresql/V2__drop_trace_id.sql"),
+            new ClassPathResource(
+                "aipersimmon/db/migration/process-manager/postgresql/V3__add_tenant_id.sql"))
         .execute(ds);
 
     SqlSessionFactoryBean factory = new SqlSessionFactoryBean();

@@ -18,10 +18,10 @@ public interface ProcessEffectMapper {
   Long maxSeq(@Param("instanceId") String instanceId);
 
   @Update(
-      "INSERT INTO aipersimmon_process_effect ( effect_id, instance_id, transition_id,"
+      "INSERT INTO aipersimmon_process_effect ( tenant_id, effect_id, instance_id, transition_id,"
           + " effect_index, seq, effect_kind, payload_type, payload_version, payload, message_id,"
           + " correlation_id, causation_id, traceparent, trace_state, status, attempts,"
-          + " next_attempt_at, created_at, updated_at) VALUES (#{effectId}, #{instanceId},"
+          + " next_attempt_at, created_at, updated_at) VALUES (#{tenantId}, #{effectId}, #{instanceId},"
           + " #{transitionId}, #{effectIndex}, #{seq}, #{effectKind}, #{payloadType},"
           + " #{payloadVersion}, #{payload}, #{messageId}, #{correlationId},"
           + " #{causationId,jdbcType=VARCHAR}, #{traceparent,jdbcType=VARCHAR},"

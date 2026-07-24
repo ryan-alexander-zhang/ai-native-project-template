@@ -10,7 +10,6 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectInsert;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectView;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -37,6 +36,7 @@ public final class MybatisProcessEffectStore implements ProcessEffectStore {
   public void insert(ProcessEffectInsert e, Instant now) {
     Timestamp ts = Timestamp.from(now);
     Map<String, Object> m = new HashMap<>();
+    m.put("tenantId", e.tenantId());
     m.put("effectId", e.effectId());
     m.put("instanceId", e.instanceId().value());
     m.put("transitionId", e.transitionId());
@@ -71,8 +71,7 @@ public final class MybatisProcessEffectStore implements ProcessEffectStore {
             new PayloadType(r.getPayloadType(), r.getPayloadVersion()),
             Payloads.fromText(r.getPayload()),
             new CommandContext(
-                // TODO(tenancy T8): read r.getTenantId() once the column exists.
-                Tenants.ROOT.value(), r.getMessageId(), r.getCorrelationId(), r.getCausationId()),
+                r.getTenantId(), r.getMessageId(), r.getCorrelationId(), r.getCausationId()),
             r.getAttempts(),
             r.getTraceparent(),
             r.getTraceState()));

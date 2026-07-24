@@ -53,6 +53,7 @@ public final class MybatisProcessTransitionStore implements ProcessTransitionSto
   @Override
   public void append(ProcessTransitionInsert t, Instant now) {
     Map<String, Object> m = new HashMap<>();
+    m.put("tenantId", t.tenantId());
     m.put("transitionId", t.transitionId());
     m.put("instanceId", t.instanceId().value());
     m.put("transitionSeq", nextTransitionSeq(t.instanceId()));
@@ -83,6 +84,7 @@ public final class MybatisProcessTransitionStore implements ProcessTransitionSto
 
   @Override
   public void appendOperator(
+      String tenantId,
       String transitionId,
       ProcessInstanceId instanceId,
       ProcessLifecycle fromLifecycle,
@@ -94,6 +96,7 @@ public final class MybatisProcessTransitionStore implements ProcessTransitionSto
       String reason,
       Instant now) {
     Map<String, Object> m = new HashMap<>();
+    m.put("tenantId", tenantId);
     m.put("transitionId", transitionId);
     m.put("instanceId", instanceId.value());
     m.put("transitionSeq", nextTransitionSeq(instanceId));
@@ -142,6 +145,7 @@ public final class MybatisProcessTransitionStore implements ProcessTransitionSto
         .map(
             r ->
                 new ParkedInput(
+                    r.getTenantId(),
                     r.getInputMessageId(),
                     new PayloadType(r.getInputType(), r.getInputVersion()),
                     Payloads.fromText(r.getInputPayload()),

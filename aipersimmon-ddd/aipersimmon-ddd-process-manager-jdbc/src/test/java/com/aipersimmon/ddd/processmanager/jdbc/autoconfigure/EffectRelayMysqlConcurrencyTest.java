@@ -75,7 +75,9 @@ class EffectRelayMysqlConcurrencyTest {
             new ClassPathResource(
                 "aipersimmon/db/migration/process-manager/mysql/V1__aipersimmon_process_manager.sql"),
             new ClassPathResource(
-                "aipersimmon/db/migration/process-manager/mysql/V2__drop_trace_id.sql"))
+                "aipersimmon/db/migration/process-manager/mysql/V2__drop_trace_id.sql"),
+            new ClassPathResource(
+                "aipersimmon/db/migration/process-manager/mysql/V3__add_tenant_id.sql"))
         .execute(ds);
 
     instanceStore = new JdbcProcessInstanceStore(jdbc);

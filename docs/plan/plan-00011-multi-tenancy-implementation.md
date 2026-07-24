@@ -101,8 +101,22 @@ observability / archunit / flyway。
 >   `ConnectedTraceEndToEndTest`（`EmbeddedDatabaseBuilder.addScript`）。mp 双孪生实体的 boilerplate accessor 加
 >   `// CPD-OFF`（新增 tenantId accessor 触发 CPD 重复阈值）。**全 reactor `mvn install` BUILD SUCCESS——40/40 全绿零失败**
 >   （含三方言迁移 + relay 往返 + Kafka ce_tenantid + 90/90/90 门）。过程中 `OutboxRelayBackoffTest` 一次 flaky（重跑绿）。
->   **待办**：T4（EventEnvelope/OutboxMessage 加 tenantId + 接 of()）、T2（-tenancy-spring filter+interceptor）、
->   T8（process 行 tenant_id → 替换 3 处 ROOT 占位）。
+> - ✅ **T8（process 四表加 tenant_id + `uq_process_instance_business` 升复合，消除 4 处 ROOT 占位）**：三方言
+>   `V3__add_tenant_id.sql`——四表（instance/transition/effect/deadline）`ADD COLUMN tenant_id VARCHAR(64) NOT NULL
+>   DEFAULT '__root__'`；`uq_process_instance_business` `DROP` 后重建为 `(tenant_id, process_type, business_key)`
+>   （PG/H2 `DROP CONSTRAINT IF EXISTS`、MySQL `DROP INDEX`）。引擎写模型串租户：四个 `*Insert`/`ProcessInstanceRow`/
+>   `ParkedInput`/`DeadlineRow` 记录加 `tenantId` 首字段，`appendOperator` 加 `tenantId` 参；instance 从 `cause.tenantId()`
+>   盖章，`updateSnapshot`/cancel 快照与 operator 事务从**已载入行** `row.tenantId()`（租户不可变），deadline/effect/parked
+>   重放从**各自持久行**读回（4 处占位全消除：`ProcessOperations` replay、`ProcessDeadlineWorker` fire、
+>   `Jdbc/MybatisProcessEffectStore.load`）。两后端 SQL/mapper/POJO 全改（jdbc 六 INSERT + 三 row-mapper；mp 四 mapper
+>   INSERT + 四 store map + `InstanceRow`/`EffectLoadRow`/`DeadlineLoadRow`/`ParkedRow` 加 `tenantId` 字段+accessor，
+>   `SELECT *` 自动映射）。测试 schema-init 同步加 V3：20 个 jdbc/mp 测试类（h2 `addScript` 16 个 + PG/MySQL
+>   `ResourceDatabasePopulator.ClassPathResource` 4 个）+ 两 `application.properties`；3 处旧 arity 构造点补 `Tenants.ROOT.value()`。
+>   **全库 reactor `mvn install` 40/40 全绿** + **multi-module scaffold 端到端**（Flyway 对真 Postgres 应用 process-manager
+>   V1→V2→V3，OrderingFlow/ReviewFlow/PaymentCompensationFlow/OperationLog/Outbox 全绿）。scaffold 唯一失败是既有 spotless
+>   drift（`OrderFulfilmentDefinitionTest` javadoc 换行，非本次改动、非租户）。
+>   **待办**：T7（inbox tenant 列）、T9（saga）、T10（web-store）、T12/T13（MP TenantLine / PG RLS）、T15（读侧）、
+>   T16（观测）、T18（双租户验收矩阵）。
 
 ### P0 · 术语、原语骨架、ADR 对齐（前置）
 

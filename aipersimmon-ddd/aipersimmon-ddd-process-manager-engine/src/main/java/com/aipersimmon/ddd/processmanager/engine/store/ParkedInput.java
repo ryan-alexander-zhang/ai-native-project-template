@@ -7,7 +7,11 @@ import com.aipersimmon.ddd.processmanager.codec.PayloadType;
  * under.
  */
 public record ParkedInput(
-    String inputMessageId, PayloadType inputType, byte[] inputPayload, String correlationId) {
+    String tenantId,
+    String inputMessageId,
+    PayloadType inputType,
+    byte[] inputPayload,
+    String correlationId) {
 
   public ParkedInput {
     inputPayload = inputPayload.clone();

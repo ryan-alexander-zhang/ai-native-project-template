@@ -19,10 +19,10 @@ public interface ProcessDeadlineMapper {
   Long maxGeneration(@Param("instanceId") String instanceId, @Param("name") String name);
 
   @Update(
-      "INSERT INTO aipersimmon_process_deadline ( deadline_id, instance_id, name, generation,"
+      "INSERT INTO aipersimmon_process_deadline ( tenant_id, deadline_id, instance_id, name, generation,"
           + " due_at, input_type, input_version, input_payload, correlation_id, causation_id,"
           + " traceparent, trace_state, status, attempts, next_attempt_at, created_at, updated_at)"
-          + " VALUES (#{deadlineId}, #{instanceId}, #{name}, #{generation}, #{dueAt},"
+          + " VALUES (#{tenantId}, #{deadlineId}, #{instanceId}, #{name}, #{generation}, #{dueAt},"
           + " #{inputType}, #{inputVersion}, #{inputPayload}, #{correlationId,jdbcType=VARCHAR},"
           + " #{causationId,jdbcType=VARCHAR}, #{traceparent,jdbcType=VARCHAR},"
           + " #{traceState,jdbcType=VARCHAR}, 'PENDING', 0, #{nextAttemptAt}, #{createdAt},"

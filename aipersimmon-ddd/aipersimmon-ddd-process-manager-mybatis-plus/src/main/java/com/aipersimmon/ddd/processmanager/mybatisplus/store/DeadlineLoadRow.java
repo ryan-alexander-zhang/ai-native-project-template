@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.processmanager.mybatisplus.store;
 
 /** Flat projection of a deadline row loaded for firing. */
 public class DeadlineLoadRow {
+  private String tenantId;
   private String deadlineId;
   private String instanceId;
   private String name;
@@ -14,6 +15,14 @@ public class DeadlineLoadRow {
   private int attempts;
   private String traceparent;
   private String traceState;
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(String v) {
+    this.tenantId = v;
+  }
 
   public String getDeadlineId() {
     return deadlineId;

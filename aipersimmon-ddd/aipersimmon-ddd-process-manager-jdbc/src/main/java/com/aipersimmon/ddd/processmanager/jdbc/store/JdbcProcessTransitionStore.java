@@ -79,10 +79,11 @@ public final class JdbcProcessTransitionStore implements ProcessTransitionStore 
       jdbc.update(
           """
                 INSERT INTO aipersimmon_process_transition (
-                    transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
+                    tenant_id, transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
                     input_payload, from_lifecycle, to_lifecycle, from_step, to_step, decision_code,
                     transition_kind, correlation_id, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+          t.tenantId(),
           t.transitionId(),
           t.instanceId().value(),
           nextTransitionSeq(t.instanceId()),
@@ -117,6 +118,7 @@ public final class JdbcProcessTransitionStore implements ProcessTransitionStore 
    * synthetic input identity, so it never collides with a business input.
    */
   public void appendOperator(
+      String tenantId,
       String transitionId,
       ProcessInstanceId instanceId,
       ProcessLifecycle fromLifecycle,
@@ -130,10 +132,11 @@ public final class JdbcProcessTransitionStore implements ProcessTransitionStore 
     jdbc.update(
         """
                 INSERT INTO aipersimmon_process_transition (
-                    transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
+                    tenant_id, transition_id, instance_id, transition_seq, input_message_id, input_type, input_version,
                     input_payload, from_lifecycle, to_lifecycle, from_step, to_step, decision_code,
                     transition_kind, correlation_id, operator_id, operation_reason, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        tenantId,
         transitionId,
         instanceId.value(),
         nextTransitionSeq(instanceId),
@@ -182,12 +185,13 @@ public final class JdbcProcessTransitionStore implements ProcessTransitionStore 
   public List<ParkedInput> findParkedInputs(ProcessInstanceId instanceId) {
     return jdbc.query(
         """
-                SELECT input_message_id, input_type, input_version, input_payload, correlation_id
+                SELECT tenant_id, input_message_id, input_type, input_version, input_payload, correlation_id
                 FROM aipersimmon_process_transition
                 WHERE instance_id = ? AND transition_kind = 'PARKED'
                 ORDER BY transition_seq""",
         (rs, n) ->
             new ParkedInput(
+                rs.getString("tenant_id"),
                 rs.getString("input_message_id"),
                 new PayloadType(rs.getString("input_type"), rs.getInt("input_version")),
                 Payloads.fromText(rs.getString("input_payload")),

@@ -16,7 +16,6 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -161,8 +160,7 @@ public final class ProcessDeadlineWorker {
                 // timeout stays on the same causal chain as the flow that armed it.
                 CommandContext context =
                     new CommandContext(
-                        // TODO(tenancy T8): carry the process row's tenant_id once persisted.
-                        Tenants.ROOT.value(),
+                        deadline.tenantId(),
                         deadline.deadlineId() + "#" + deadline.generation(),
                         deadline.correlationId(),
                         deadline.causationId());

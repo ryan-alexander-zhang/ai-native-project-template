@@ -12,6 +12,7 @@ import java.util.Optional;
  * payload type/version plus base64-persisted bytes.
  */
 public record ProcessTransitionInsert(
+    String tenantId,
     String transitionId,
     ProcessInstanceId instanceId,
     String inputMessageId,

@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
  * count.
  */
 public record DeadlineRow(
+    String tenantId,
     String deadlineId,
     ProcessInstanceId instanceId,
     DeadlineName name,

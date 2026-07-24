@@ -2,11 +2,20 @@ package com.aipersimmon.ddd.processmanager.mybatisplus.store;
 
 /** Flat projection of a parked-input transition row. */
 public class ParkedRow {
+  private String tenantId;
   private String inputMessageId;
   private String inputType;
   private int inputVersion;
   private String inputPayload;
   private String correlationId;
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(String v) {
+    this.tenantId = v;
+  }
 
   public String getInputMessageId() {
     return inputMessageId;

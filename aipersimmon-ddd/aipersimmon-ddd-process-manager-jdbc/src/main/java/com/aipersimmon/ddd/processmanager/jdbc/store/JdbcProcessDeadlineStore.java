@@ -44,10 +44,11 @@ public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
     jdbc.update(
         """
                 INSERT INTO aipersimmon_process_deadline (
-                    deadline_id, instance_id, name, generation, due_at, input_type, input_version, input_payload,
+                    tenant_id, deadline_id, instance_id, name, generation, due_at, input_type, input_version, input_payload,
                     correlation_id, causation_id, traceparent, trace_state,
                     status, attempts, next_attempt_at, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        d.tenantId(),
         d.deadlineId(),
         d.instanceId().value(),
         d.name().value(),
@@ -115,6 +116,7 @@ public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
             "SELECT * FROM aipersimmon_process_deadline WHERE deadline_id = ?",
             (rs, n) ->
                 new DeadlineRow(
+                    rs.getString("tenant_id"),
                     rs.getString("deadline_id"),
                     new ProcessInstanceId(rs.getString("instance_id")),
                     new DeadlineName(rs.getString("name")),

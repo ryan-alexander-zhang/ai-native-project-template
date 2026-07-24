@@ -21,7 +21,6 @@ import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -93,6 +92,7 @@ public final class ProcessOperations {
                       .findForUpdate(effect.instanceId())
                       .orElseThrow(() -> new IllegalStateException("effect without instance"));
               transitions.appendOperator(
+                  row.tenantId(),
                   idGenerator.get(),
                   effect.instanceId(),
                   row.lifecycle(),
@@ -144,6 +144,7 @@ public final class ProcessOperations {
                       .findForUpdate(deadline.instanceId())
                       .orElseThrow(() -> new IllegalStateException("deadline without instance"));
               transitions.appendOperator(
+                  row.tenantId(),
                   idGenerator.get(),
                   deadline.instanceId(),
                   row.lifecycle(),
@@ -191,8 +192,7 @@ public final class ProcessOperations {
       // stored).
       String correlationId = parked.correlationId() != null ? parked.correlationId() : replayId;
       CommandContext context =
-          new CommandContext(
-              Tenants.ROOT.value(), replayId, correlationId, parked.inputMessageId());
+          new CommandContext(parked.tenantId(), replayId, correlationId, parked.inputMessageId());
       // If a concurrent worker re-suspended the instance mid-replay, handle() simply re-parks this
       // input (it never throws), so the remaining inputs stay parked for the next redrive.
       runtime.handle(ref, input, context);
@@ -222,6 +222,7 @@ public final class ProcessOperations {
           ProcessRevision next = row.revision().next();
           ProcessInstanceRow cancelled =
               new ProcessInstanceRow(
+                  row.tenantId(),
                   ref,
                   row.definitionVersion(),
                   row.stateSchemaVersion(),
@@ -237,6 +238,7 @@ public final class ProcessOperations {
           effects.cancelPending(ref.instanceId(), clock.instant());
           deadlines.cancelPending(ref.instanceId(), clock.instant());
           transitions.appendOperator(
+              row.tenantId(),
               idGenerator.get(),
               ref.instanceId(),
               row.lifecycle(),

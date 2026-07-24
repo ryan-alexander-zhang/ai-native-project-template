@@ -90,10 +90,11 @@ public final class JdbcProcessInstanceStore implements ProcessInstanceStore {
     jdbc.update(
         """
                 INSERT INTO aipersimmon_process_instance (
-                    instance_id, process_type, business_key, definition_version, state_schema_version,
+                    tenant_id, instance_id, process_type, business_key, definition_version, state_schema_version,
                     lifecycle, resume_lifecycle, suspension_reason, business_step, outcome, revision,
                     state_payload_type, state_payload, created_at, updated_at, ended_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        row.tenantId(),
         row.ref().instanceId().value(),
         row.ref().processType().value(),
         row.ref().businessKey().value(),
@@ -330,6 +331,7 @@ public final class JdbcProcessInstanceStore implements ProcessInstanceStore {
     String resume = rs.getString("resume_lifecycle");
     String suspensionReason = rs.getString("suspension_reason");
     return new ProcessInstanceRow(
+        rs.getString("tenant_id"),
         ref,
         new DefinitionVersion(rs.getString("definition_version")),
         new StateSchemaVersion(rs.getInt("state_schema_version")),

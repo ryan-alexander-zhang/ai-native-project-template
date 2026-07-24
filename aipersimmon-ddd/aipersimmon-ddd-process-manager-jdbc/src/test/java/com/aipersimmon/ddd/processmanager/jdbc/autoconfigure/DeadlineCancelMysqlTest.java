@@ -6,6 +6,7 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineInsert;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.model.DeadlineName;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.testsupport.SharedContainers;
 import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +47,9 @@ class DeadlineCancelMysqlTest {
             new ClassPathResource(
                 "aipersimmon/db/migration/process-manager/mysql/V1__aipersimmon_process_manager.sql"),
             new ClassPathResource(
-                "aipersimmon/db/migration/process-manager/mysql/V2__drop_trace_id.sql"))
+                "aipersimmon/db/migration/process-manager/mysql/V2__drop_trace_id.sql"),
+            new ClassPathResource(
+                "aipersimmon/db/migration/process-manager/mysql/V3__add_tenant_id.sql"))
         .execute(ds);
     deadlines = new JdbcProcessDeadlineStore(jdbc);
   }
@@ -65,6 +68,7 @@ class DeadlineCancelMysqlTest {
 
   private ProcessDeadlineInsert insert(String deadlineId, long generation) {
     return new ProcessDeadlineInsert(
+        Tenants.ROOT.value(),
         deadlineId,
         instance,
         name,

@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.processmanager.mybatisplus.store;
 
 /** Flat projection of an effect row loaded for dispatch. */
 public class EffectLoadRow {
+  private String tenantId;
   private String effectId;
   private String instanceId;
   private String effectKind;
@@ -14,6 +15,14 @@ public class EffectLoadRow {
   private int attempts;
   private String traceparent;
   private String traceState;
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(String v) {
+    this.tenantId = v;
+  }
 
   public String getEffectId() {
     return effectId;

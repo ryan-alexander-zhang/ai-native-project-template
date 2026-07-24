@@ -64,6 +64,8 @@ class JdbcProcessRuntimeTracingTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
             .build();
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     Clock clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC);

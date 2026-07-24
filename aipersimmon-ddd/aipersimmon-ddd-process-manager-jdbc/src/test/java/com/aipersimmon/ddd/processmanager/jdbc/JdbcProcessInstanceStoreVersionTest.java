@@ -17,6 +17,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +48,8 @@ class JdbcProcessInstanceStoreVersionTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V1__aipersimmon_process_manager.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
             .build();
     instances = new JdbcProcessInstanceStore(new JdbcTemplate(dataSource));
   }
@@ -57,6 +60,7 @@ class JdbcProcessInstanceStoreVersionTest {
         new ProcessRef(new ProcessInstanceId(instanceId), TYPE, new ProcessBusinessKey(order));
     instances.insert(
         new ProcessInstanceRow(
+            Tenants.ROOT.value(),
             ref,
             new DefinitionVersion(definitionVersion),
             SCHEMA,
