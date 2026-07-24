@@ -62,6 +62,7 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
           message.version(),
           message.occurredAt(),
           message.subject(),
+          message.tenantId(),
           message.correlationId(),
           message.causationId(),
           payload);

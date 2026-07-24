@@ -80,8 +80,10 @@
     <module>aipersimmon-ddd-observability-otel-spring-boot-starter</module>
     <module>aipersimmon-ddd-application</module>
     <module>aipersimmon-ddd-integration</module>
+    <module>aipersimmon-ddd-tenancy</module>
     <module>aipersimmon-ddd-cqrs</module>
     <module>aipersimmon-ddd-cqrs-spring</module>
+    <module>aipersimmon-ddd-tenancy-spring</module>
     <!-- Operation Log: framework-free core + storage-agnostic engine now; cqrs-spring capture +
          jdbc/mybatis-plus backends are added incrementally (see plan-00010). -->
     <module>aipersimmon-ddd-operation-log</module>

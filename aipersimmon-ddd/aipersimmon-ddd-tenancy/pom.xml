@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The framework-free multi-tenancy primitives: the TenantId value, the sentinel
+    tenant, the request-scoped TenantContext holder, and the TenantResolver /
+    MissingTenantPolicy SPIs.
+
+    Hard rule: ZERO framework dependencies (only aipersimmon-ddd-core for the
+    Identifier marker). No Spring, servlet, JDBC, or messaging here — the edge
+    resolution filter and the CommandContext binding live in the optional
+    aipersimmon-ddd-tenancy-spring module. Tenant isolation itself is woven into
+    the existing cqrs / integration / outbox / process-manager / saga / web-store
+    components (see design-00009 / decision-00018).
+  -->
+  <artifactId>aipersimmon-ddd-tenancy</artifactId>
+  <name>aipersimmon-ddd-tenancy</name>
+  <description>Framework-free multi-tenancy primitives: TenantId value, sentinel tenant, request-scoped TenantContext, and TenantResolver / MissingTenantPolicy SPIs.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

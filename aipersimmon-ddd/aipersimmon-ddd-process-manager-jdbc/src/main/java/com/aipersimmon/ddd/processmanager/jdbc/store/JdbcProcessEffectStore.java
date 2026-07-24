@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectInsert;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectView;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
@@ -87,6 +88,8 @@ public final class JdbcProcessEffectStore implements ProcessEffectStore {
                     new PayloadType(rs.getString("payload_type"), rs.getInt("payload_version")),
                     Payloads.fromText(rs.getString("payload")),
                     new CommandContext(
+                        // TODO(tenancy T8): read rs.getString("tenant_id") once the column exists.
+                        Tenants.ROOT.value(),
                         rs.getString("message_id"),
                         rs.getString("correlation_id"),
                         rs.getString("causation_id")),

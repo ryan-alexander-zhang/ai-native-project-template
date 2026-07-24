@@ -27,6 +27,7 @@ public class OutboxRecord {
   private String subject;
   private String correlationId;
   private String causationId;
+  private String tenantId;
   private String traceparent;
   private String traceState;
   private Boolean sent;
@@ -35,6 +36,8 @@ public class OutboxRecord {
   private Instant nextAttemptAt;
   private Instant createdAt;
 
+  // CPD-OFF — boilerplate get/set accessors; their inevitable overlap with the twin
+  // DeadLetterRecord entity is not meaningful duplication.
   public Long getId() {
     return id;
   }
@@ -113,6 +116,14 @@ public class OutboxRecord {
 
   public void setCausationId(String causationId) {
     this.causationId = causationId;
+  }
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(String tenantId) {
+    this.tenantId = tenantId;
   }
 
   public String getTraceparent() {

@@ -52,6 +52,7 @@ class InProcessOutboxDispatcherTest {
                 "{\"orderId\":\"O-1\"}",
                 Instant.EPOCH,
                 "O-1",
+                "acme",
                 "corr-1",
                 "cause-1"));
 
@@ -63,6 +64,7 @@ class InProcessOutboxDispatcherTest {
     assertEquals("O-1", payload.orderId());
     assertEquals("/orders", envelope.source());
     assertEquals("O-1", envelope.subject());
+    assertEquals("acme", envelope.tenantId());
     assertEquals("corr-1", envelope.correlationId());
     assertEquals("cause-1", envelope.causationId());
   }
@@ -82,6 +84,7 @@ class InProcessOutboxDispatcherTest {
                         "{}",
                         Instant.EPOCH,
                         null,
+                        "__root__",
                         "corr-1",
                         null)));
   }
@@ -102,6 +105,7 @@ class InProcessOutboxDispatcherTest {
                         "{\"orderId\":\"O-1\"}",
                         Instant.EPOCH,
                         "O-1",
+                        "__root__",
                         "corr-1",
                         null)));
   }

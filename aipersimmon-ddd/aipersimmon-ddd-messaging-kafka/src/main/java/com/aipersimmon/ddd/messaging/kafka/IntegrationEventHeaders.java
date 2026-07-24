@@ -35,6 +35,9 @@ public final class IntegrationEventHeaders {
   /** Extension: causation id (the message that caused this one). */
   public static final String CAUSATION_ID = "ce_causationid";
 
+  /** Extension: the owning tenant (the data-isolation boundary). */
+  public static final String TENANT_ID = "ce_tenantid";
+
   /** CloudEvents Partitioning extension {@code partitionkey} — the Kafka message key. */
   public static final String PARTITION_KEY = "ce_partitionkey";
 

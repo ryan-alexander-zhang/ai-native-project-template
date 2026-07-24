@@ -129,7 +129,7 @@ class OutboxJdbcTest {
     // delivered-mark cannot leave two rows with two different event ids, which would defeat the
     // downstream inbox's dedupe. Before the fix, the effect path used publish() and each
     // redelivery minted a new random event id.
-    CommandContext effectContext = new CommandContext("txn-1#0", "corr-1", "cause-1");
+    CommandContext effectContext = new CommandContext("__root__", "txn-1#0", "corr-1", "cause-1");
 
     integrationEvents.publishAs(new SampleEvent("O-7"), effectContext);
     integrationEvents.publishAs(

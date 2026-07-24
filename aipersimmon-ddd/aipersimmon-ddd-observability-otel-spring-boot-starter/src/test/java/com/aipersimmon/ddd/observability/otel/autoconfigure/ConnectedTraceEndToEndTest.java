@@ -71,6 +71,7 @@ class ConnectedTraceEndToEndTest {
             .generateUniqueName(true)
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V1__aipersimmon_outbox.sql")
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V2__drop_trace_id.sql")
+            .addScript("classpath:aipersimmon/db/migration/outbox/h2/V3__add_tenant_id.sql")
             .build();
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 

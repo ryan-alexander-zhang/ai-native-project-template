@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring wiring for multi-tenancy: the edge TenantResolutionFilter that resolves
+    the tenant from an inbound request and binds it into the TenantContext, and the
+    TenantContextCommandInterceptor that re-binds the ambient TenantContext from a
+    command's CommandContext.tenantId for the whole handling (so background / relay /
+    batch dispatches, which have no ambient tenant, still run under the right one).
+    The whole resolution activates only when aipersimmon.ddd.tenancy.enabled=true, so
+    a single-tenant deployment behaves exactly as it did before tenancy existed.
+  -->
+  <artifactId>aipersimmon-ddd-tenancy-spring</artifactId>
+  <name>aipersimmon-ddd-tenancy-spring</name>
+  <description>Spring wiring for multi-tenancy: edge tenant-resolution filter and the command interceptor that binds the ambient TenantContext from the command's tenant.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+    </dependency>
+    <!-- Compile scope: the autoconfig uses @Configuration/@Bean directly. Declared explicitly
+         rather than relied on transitively, to avoid a scope-shadowing surprise on a clean build. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!-- Servlet API for the OncePerRequestFilter; provided by the container/web starter at runtime. -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

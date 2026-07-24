@@ -256,6 +256,7 @@ public class OutboxRelay {
         record.getPayload(),
         record.getOccurredAt(),
         record.getSubject(),
+        record.getTenantId(),
         record.getCorrelationId(),
         record.getCausationId());
   }

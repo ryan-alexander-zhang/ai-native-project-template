@@ -50,7 +50,7 @@ public class OutboxRelay {
 
   private static final String SELECT_DUE =
       "SELECT o.event_id, o.source, o.type, o.version, o.payload, o.occurred_at, o.subject, "
-          + "o.correlation_id, o.causation_id, o.traceparent, o.trace_state, o.attempts "
+          + "o.tenant_id, o.correlation_id, o.causation_id, o.traceparent, o.trace_state, o.attempts "
           + "FROM aipersimmon_outbox o "
           + "WHERE o.sent = FALSE AND o.attempts < ? "
           + "AND (o.next_attempt_at IS NULL OR o.next_attempt_at <= ?) "
@@ -276,6 +276,7 @@ public class OutboxRelay {
             rs.getString("payload"),
             rs.getTimestamp("occurred_at").toInstant(),
             rs.getString("subject"),
+            rs.getString("tenant_id"),
             rs.getString("correlation_id"),
             rs.getString("causation_id"));
     return new Pending(

@@ -17,7 +17,7 @@ class EventEnvelopeTest {
   private static EventEnvelope<SampleEvent> envelope(
       String eventId, String source, String type, String subject, String correlationId) {
     return new EventEnvelope<>(
-        eventId, source, type, 1, WHEN, subject, correlationId, "cause-1", PAYLOAD);
+        eventId, source, type, 1, WHEN, subject, "acme", correlationId, "cause-1", PAYLOAD);
   }
 
   @Test
@@ -30,7 +30,16 @@ class EventEnvelopeTest {
     assertDoesNotThrow(
         () ->
             new EventEnvelope<>(
-                "evt-1", "/ordering", "OrderPlaced", 1, WHEN, null, "corr-1", null, PAYLOAD));
+                "evt-1",
+                "/ordering",
+                "OrderPlaced",
+                1,
+                WHEN,
+                null,
+                "acme",
+                "corr-1",
+                null,
+                PAYLOAD));
   }
 
   @Test
@@ -68,7 +77,7 @@ class EventEnvelopeTest {
         IllegalArgumentException.class,
         () ->
             new EventEnvelope<SampleEvent>(
-                "evt-1", "/ordering", "OrderPlaced", 1, WHEN, "O-1", "corr-1", null, null));
+                "evt-1", "/ordering", "OrderPlaced", 1, WHEN, "O-1", "acme", "corr-1", null, null));
   }
 
   @Test
@@ -83,7 +92,16 @@ class EventEnvelopeTest {
         IllegalArgumentException.class,
         () ->
             new EventEnvelope<>(
-                "evt-1", "/ordering", "OrderPlaced", 0, WHEN, "O-1", "corr-1", "cause-1", PAYLOAD));
+                "evt-1",
+                "/ordering",
+                "OrderPlaced",
+                0,
+                WHEN,
+                "O-1",
+                "acme",
+                "corr-1",
+                "cause-1",
+                PAYLOAD));
   }
 
   @Test
@@ -92,7 +110,16 @@ class EventEnvelopeTest {
         IllegalArgumentException.class,
         () ->
             new EventEnvelope<>(
-                "evt-1", "/ordering", "OrderPlaced", 1, null, "O-1", "corr-1", "cause-1", PAYLOAD));
+                "evt-1",
+                "/ordering",
+                "OrderPlaced",
+                1,
+                null,
+                "O-1",
+                "acme",
+                "corr-1",
+                "cause-1",
+                PAYLOAD));
   }
 
   @Test
@@ -127,5 +154,23 @@ class EventEnvelopeTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> envelope("evt-1", "/ordering", "OrderPlaced", "O-1", null));
+  }
+
+  @Test
+  void rejectsBlankTenantId() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new EventEnvelope<>(
+                "evt-1",
+                "/ordering",
+                "OrderPlaced",
+                1,
+                WHEN,
+                "O-1",
+                " ",
+                "corr-1",
+                "cause-1",
+                PAYLOAD));
   }
 }

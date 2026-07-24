@@ -21,6 +21,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -189,7 +190,9 @@ public final class ProcessOperations {
       // same causal chain (fall back to the replay id for rows parked before correlation was
       // stored).
       String correlationId = parked.correlationId() != null ? parked.correlationId() : replayId;
-      CommandContext context = new CommandContext(replayId, correlationId, parked.inputMessageId());
+      CommandContext context =
+          new CommandContext(
+              Tenants.ROOT.value(), replayId, correlationId, parked.inputMessageId());
       // If a concurrent worker re-suspended the instance mid-replay, handle() simply re-parks this
       // input (it never throws), so the remaining inputs stay parked for the next redrive.
       runtime.handle(ref, input, context);

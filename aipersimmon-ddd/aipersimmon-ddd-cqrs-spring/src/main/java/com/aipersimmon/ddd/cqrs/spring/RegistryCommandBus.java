@@ -5,6 +5,9 @@ import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -67,7 +70,8 @@ public class RegistryCommandBus implements CommandBus {
 
   @Override
   public <R> R send(Command<R> command) {
-    return dispatch(command, CommandContext.root(idGenerator.get()));
+    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return dispatch(command, CommandContext.root(tenant, idGenerator.get()));
   }
 
   @Override

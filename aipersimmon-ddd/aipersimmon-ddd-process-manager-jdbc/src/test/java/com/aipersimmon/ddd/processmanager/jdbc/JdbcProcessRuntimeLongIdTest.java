@@ -80,7 +80,7 @@ class JdbcProcessRuntimeLongIdTest {
     // A no-effect transition (Finish) whose input carries an id longer than the old 64-char column
     // width but within the 96-char id-column width; only input_message_id is exercised.
     String longMessageId = "m".repeat(80);
-    CommandContext cause = new CommandContext(longMessageId, "corr-1", null);
+    CommandContext cause = new CommandContext("__root__", longMessageId, "corr-1", null);
     ProcessAdvanceResult finished =
         runtime.handle(started.processRef(), new TestFulfilment.Finish(), cause);
 

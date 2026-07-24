@@ -32,8 +32,9 @@ public class OutboxWriter implements DurableIntegrationEvents {
   private static final String INSERT =
       "INSERT INTO aipersimmon_outbox "
           + "(event_id, source, type, version, payload, occurred_at, subject, "
-          + "correlation_id, causation_id, traceparent, trace_state, sent, attempts, created_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+          + "tenant_id, correlation_id, causation_id, traceparent, trace_state, sent, attempts, "
+          + "created_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
   private final JdbcTemplate jdbc;
   private final ObjectMapper objectMapper;
@@ -62,7 +63,13 @@ public class OutboxWriter implements DurableIntegrationEvents {
   public void publish(IntegrationEvent event, CommandContext context) {
     // A brand-new event caused by the command described by context: mint a fresh event
     // id and record the command (context.messageId()) as the cause.
-    write(event, UUID.randomUUID().toString(), context.correlationId(), context.messageId(), false);
+    write(
+        event,
+        UUID.randomUUID().toString(),
+        context.tenantId(),
+        context.correlationId(),
+        context.messageId(),
+        false);
   }
 
   @Override
@@ -72,12 +79,19 @@ public class OutboxWriter implements DurableIntegrationEvents {
     // (context.messageId()), cause = context.causationId(). The insert is idempotent: a
     // redelivery re-inserting the same event id collapses onto the existing row, so the one
     // logical event is written once and the downstream inbox dedupes redeliveries by it.
-    write(event, context.messageId(), context.correlationId(), context.causationId(), true);
+    write(
+        event,
+        context.messageId(),
+        context.tenantId(),
+        context.correlationId(),
+        context.causationId(),
+        true);
   }
 
   private void write(
       IntegrationEvent event,
       String eventId,
+      String tenantId,
       String correlationId,
       String causationId,
       boolean idempotent) {
@@ -94,6 +108,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
             IntegrationEvent.eventVersionOf(event.getClass()),
             clock.instant(),
             event.subject(),
+            tenantId,
             correlationId,
             causationId,
             event);
@@ -107,6 +122,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
           payload,
           Timestamp.from(envelope.occurredAt()),
           envelope.subject(),
+          envelope.tenantId(),
           envelope.correlationId(),
           envelope.causationId(),
           captured.traceparent(),

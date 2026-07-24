@@ -78,6 +78,7 @@ public class KafkaOutboxDispatcher {
     addHeader(record, IntegrationEventHeaders.SUBJECT, message.subject());
     addHeader(
         record, IntegrationEventHeaders.DATA_SCHEMA_VERSION, Integer.toString(message.version()));
+    addHeader(record, IntegrationEventHeaders.TENANT_ID, message.tenantId());
     addHeader(record, IntegrationEventHeaders.CORRELATION_ID, message.correlationId());
     addHeader(record, IntegrationEventHeaders.CAUSATION_ID, message.causationId());
     addHeader(record, IntegrationEventHeaders.PARTITION_KEY, partitionKey);

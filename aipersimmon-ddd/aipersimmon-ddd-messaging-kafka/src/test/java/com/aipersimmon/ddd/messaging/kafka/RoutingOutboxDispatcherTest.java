@@ -65,6 +65,7 @@ class RoutingOutboxDispatcherTest {
         "{}",
         Instant.parse("2026-01-01T00:00:00Z"),
         "o-1",
+        "__root__",
         "corr-1",
         "cause-1");
   }

@@ -6,6 +6,8 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -126,7 +128,12 @@ public class KafkaIntegrationEventListener {
     // match despite erasure.
     ResolvableType type =
         ResolvableType.forClassWithGenerics(EventEnvelope.class, envelope.payload().getClass());
-    publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
+    // Bind the event's tenant for the whole downstream handling (ACL adapter -> command), so the
+    // read side and infrastructure see the right tenant even though the command also carries it
+    // explicitly via CommandContext.of(envelope).
+    TenantContext.runAs(
+        Tenants.fromValue(envelope.tenantId()),
+        () -> publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type)));
   }
 
   /**
@@ -174,11 +181,24 @@ public class KafkaIntegrationEventListener {
     try {
       IntegrationEvent payload = objectMapper.readValue(record.value(), eventType);
       String subject = header(record, IntegrationEventHeaders.SUBJECT);
+      // ce_tenantid is defaulted to the sentinel when absent, so events produced before tenancy
+      // was introduced (no header) reconstitute as single-tenant rather than being rejected.
+      String tenantId =
+          orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
       String correlationId =
           orElse(header(record, IntegrationEventHeaders.CORRELATION_ID), eventId);
       String causationId = header(record, IntegrationEventHeaders.CAUSATION_ID);
       return new EventEnvelope<>(
-          eventId, source, type, version, occurredAt, subject, correlationId, causationId, payload);
+          eventId,
+          source,
+          type,
+          version,
+          occurredAt,
+          subject,
+          tenantId,
+          correlationId,
+          causationId,
+          payload);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("failed to reconstruct integration event of type " + type, e);
     }

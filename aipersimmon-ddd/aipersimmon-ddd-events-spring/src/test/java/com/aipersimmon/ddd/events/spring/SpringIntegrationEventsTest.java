@@ -26,7 +26,7 @@ class SpringIntegrationEventsTest {
     IntegrationEvents events = new SpringIntegrationEvents(publisher, "/inventory");
 
     SampleIntegrationEvent event = new SampleIntegrationEvent("1");
-    CommandContext context = new CommandContext("cmd-1", "corr-1", "cause-0");
+    CommandContext context = new CommandContext("__root__", "cmd-1", "corr-1", "cause-0");
     events.publish(event, context);
 
     assertEquals(1, captured.size());

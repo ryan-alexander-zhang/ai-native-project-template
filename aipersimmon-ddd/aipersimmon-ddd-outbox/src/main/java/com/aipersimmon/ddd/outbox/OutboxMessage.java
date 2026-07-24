@@ -15,5 +15,6 @@ public record OutboxMessage(
     String payload,
     Instant occurredAt,
     String subject,
+    String tenantId,
     String correlationId,
     String causationId) {}

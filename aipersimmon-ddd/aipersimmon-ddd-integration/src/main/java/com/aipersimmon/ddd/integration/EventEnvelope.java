@@ -18,6 +18,9 @@ import java.time.Instant;
  *   <li>{@code occurredAt} — CloudEvents {@code time}.
  *   <li>{@code subject} — CloudEvents {@code subject}: the aggregate id, used as the transport
  *       partition/ordering key ({@code null} if none).
+ *   <li>{@code tenantId} — the owning tenant (a CloudEvents extension attribute); required and
+ *       never blank, so the event stays isolated to its tenant across the wire (single-tenant uses
+ *       the {@code __root__} sentinel).
  *   <li>{@code correlationId} / {@code causationId} — the causal chain, as CloudEvents extension
  *       attributes.
  * </ul>
@@ -38,6 +41,7 @@ public record EventEnvelope<T extends IntegrationEvent>(
     int version,
     Instant occurredAt,
     String subject,
+    String tenantId,
     String correlationId,
     String causationId,
     T payload) {
@@ -57,6 +61,9 @@ public record EventEnvelope<T extends IntegrationEvent>(
     }
     if (occurredAt == null) {
       throw new IllegalArgumentException("occurredAt required");
+    }
+    if (tenantId == null || tenantId.isBlank()) {
+      throw new IllegalArgumentException("tenantId required");
     }
     if (correlationId == null || correlationId.isBlank()) {
       throw new IllegalArgumentException("correlationId required");

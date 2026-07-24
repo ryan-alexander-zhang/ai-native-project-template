@@ -35,6 +35,7 @@ class KafkaOutboxDispatcherTest {
           "{\"orderId\":\"o-1\"}",
           Instant.parse("2026-01-01T00:00:00Z"),
           "o-1",
+          "acme",
           "corr-1",
           "cause-1");
 
@@ -65,6 +66,7 @@ class KafkaOutboxDispatcherTest {
     assertEquals("1", header(record, IntegrationEventHeaders.DATA_SCHEMA_VERSION));
     assertEquals("corr-1", header(record, IntegrationEventHeaders.CORRELATION_ID));
     assertEquals("cause-1", header(record, IntegrationEventHeaders.CAUSATION_ID));
+    assertEquals("acme", header(record, IntegrationEventHeaders.TENANT_ID));
     assertEquals("o-1", header(record, IntegrationEventHeaders.PARTITION_KEY));
     assertEquals("application/json", header(record, IntegrationEventHeaders.CONTENT_TYPE));
     assertEquals("2026-01-01T00:00:00Z", header(record, IntegrationEventHeaders.TIME));
