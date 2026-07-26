@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.id.AipersimmonDddIdAutoConfiguration;
-import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
+import com.aipersimmon.ddd.outbox.spring.AipersimmonDddOutboxAutoConfiguration;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Spring assembly for the transactional outbox. It holds everything about the outbox that needs
+    a container: the auto-configuration that selects a dispatcher, the bound OutboxProperties, the
+    in-process dispatcher (which publishes through ApplicationEventPublisher), and the classpath
+    scanner that builds the integration-event type registry from the bean factory.
+
+    It exists so aipersimmon-ddd-outbox can stay Spring-free. That module is a CONTRACT module —
+    -outbox-jdbc, -outbox-mybatis-plus and -messaging-kafka all depend on it for OutboxMessage and
+    OutboxDispatcher — and a contract module is exactly the kind a domain layer may depend on, so it
+    must not drag a framework in (design-00012).
+  -->
+  <artifactId>aipersimmon-ddd-outbox-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-outbox-spring-boot-starter</name>
+  <description>Spring Boot assembly for the transactional outbox: dispatcher selection, bound properties, the in-process dispatcher, and the integration-event type scanner.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The in-process dispatcher reconstructs an EventEnvelope from a stored row before
+         republishing it, and the scanner reads each event's @EventType. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

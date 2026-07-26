@@ -3,8 +3,8 @@ package com.aipersimmon.ddd.messaging.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.aipersimmon.ddd.outbox.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.spring.AipersimmonDddOutboxAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;

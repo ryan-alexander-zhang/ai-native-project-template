@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.outbox;
+package com.aipersimmon.ddd.outbox.spring;
 
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.util.LinkedHashSet;

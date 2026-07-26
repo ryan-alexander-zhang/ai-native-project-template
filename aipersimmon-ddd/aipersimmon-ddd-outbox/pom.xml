@@ -35,17 +35,12 @@
       <artifactId>aipersimmon-ddd-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-context</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-autoconfigure</artifactId>
-    </dependency>
+    <!-- jackson-core only (not databind): DefaultFailureClassifier classifies a
+         JsonProcessingException as a permanent failure. No Spring here, by design — this is a
+         contract module a domain layer may depend on (design-00012). -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
+      <artifactId>jackson-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

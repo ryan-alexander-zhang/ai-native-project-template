@@ -1,10 +1,14 @@
-package com.aipersimmon.ddd.outbox;
+package com.aipersimmon.ddd.outbox.spring;
 
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
+import com.aipersimmon.ddd.outbox.DefaultFailureClassifier;
+import com.aipersimmon.ddd.outbox.FailureClassifier;
+import com.aipersimmon.ddd.outbox.LoggingOutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;

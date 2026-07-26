@@ -1,7 +1,7 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
 import com.aipersimmon.ddd.integration.IntegrationEvent;
-import com.aipersimmon.ddd.outbox.IntegrationEventScanner;
+import com.aipersimmon.ddd.outbox.spring.IntegrationEventScanner;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.type.AnnotatedTypeMetadata;

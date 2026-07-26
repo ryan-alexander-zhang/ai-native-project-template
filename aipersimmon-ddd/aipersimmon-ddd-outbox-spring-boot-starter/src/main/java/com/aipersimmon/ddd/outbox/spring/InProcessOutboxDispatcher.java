@@ -1,9 +1,11 @@
-package com.aipersimmon.ddd.outbox;
+package com.aipersimmon.ddd.outbox.spring;
 
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
+import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;

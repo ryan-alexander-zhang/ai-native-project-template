@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.outbox;
+package com.aipersimmon.ddd.outbox.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.RegistryIntegrationEventCatalog.Key;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.ArrayList;

@@ -65,7 +65,7 @@
       <Class name="com.aipersimmon.ddd.inbox.jdbc.JdbcInbox"/>
       <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaIntegrationEventListener"/>
       <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaOutboxDispatcher"/>
-      <Class name="com.aipersimmon.ddd.outbox.InProcessOutboxDispatcher"/>
+      <Class name="com.aipersimmon.ddd.outbox.spring.InProcessOutboxDispatcher"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.OutboxCleanup"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.OutboxRelay"/>
