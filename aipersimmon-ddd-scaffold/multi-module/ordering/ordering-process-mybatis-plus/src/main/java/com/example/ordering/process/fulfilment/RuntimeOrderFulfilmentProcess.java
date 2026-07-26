@@ -7,6 +7,9 @@ import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.ordering.application.fulfilment.OrderFulfilmentProcess;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +20,11 @@ import org.springframework.stereotype.Component;
  * {@code handle}. The runtime stages the ordering commands as effects and a relay delivers them —
  * so the coordination is durable and at-least-once, not a synchronous in-memory saga.
  *
- * <p>The terminal domain facts (confirmed/cancelled) arrive without an inbound message, so they run
- * under a deterministic root context keyed by the order id; the cross-context result facts carry
- * the triggering event's context, keeping the causal chain intact.
+ * <p>The domain facts (ready-for-fulfilment, confirmed, cancelled) arrive without an inbound
+ * message, so they mint a fresh context keyed by the order id but stamped with the ambient tenant
+ * ({@link TenantContext}, bound by the command that raised the fact) — so the instance is created,
+ * and every later advance found, under the right tenant. The cross-context result facts instead
+ * carry the triggering event's context, keeping the causal chain intact.
  */
 @Component
 public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
@@ -40,7 +45,7 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
         TYPE,
         new ProcessBusinessKey(orderId),
         new OrderFulfilmentInput.ReadyForFulfilment(orderId),
-        rootContext("ready-for-fulfilment", orderId));
+        factContext("ready-for-fulfilment", orderId));
   }
 
   @Override
@@ -74,7 +79,7 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
     handle(
         orderId,
         new OrderFulfilmentInput.OrderConfirmed(orderId),
-        rootContext("confirmed", orderId));
+        factContext("confirmed", orderId));
   }
 
   @Override
@@ -82,7 +87,7 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
     handle(
         orderId,
         new OrderFulfilmentInput.OrderCancelled(orderId),
-        rootContext("cancelled", orderId));
+        factContext("cancelled", orderId));
   }
 
   private void handle(String orderId, ProcessInput input, CommandContext cause) {
@@ -95,7 +100,14 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
     runtime.handle(ref, input, cause);
   }
 
-  private static CommandContext rootContext(String fact, String orderId) {
-    return CommandContext.root(fact + ":" + orderId);
+  /**
+   * A fresh context for a domain fact that arrives without an inbound message, keyed by the order
+   * id but stamped with the ambient tenant so the process instance is created — and every
+   * tenant-scoped advance thereafter is found — under the tenant whose command raised the fact.
+   * Falls to the {@code __root__} sentinel only when no tenant is bound (single-tenant N=1).
+   */
+  private static CommandContext factContext(String fact, String orderId) {
+    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return CommandContext.root(tenant, fact + ":" + orderId);
   }
 }
