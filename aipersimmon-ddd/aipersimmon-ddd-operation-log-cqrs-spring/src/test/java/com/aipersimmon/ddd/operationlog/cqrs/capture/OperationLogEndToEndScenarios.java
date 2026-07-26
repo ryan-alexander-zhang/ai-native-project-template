@@ -119,7 +119,8 @@ public final class OperationLogEndToEndScenarios {
             new TransactionTemplateUnitOfWork(new TransactionTemplate(txManager)));
     return new RegistryCommandBus(
         List.of(new UpdateResourceHandler(jdbc), new FailingUpdateHandler(jdbc)),
-        List.of(failed, transaction, completed));
+        List.of(failed, transaction, completed),
+        () -> UUID.randomUUID().toString());
   }
 
   private static AnnotationOperationLogDefinition annotation(Class<?> commandType) {

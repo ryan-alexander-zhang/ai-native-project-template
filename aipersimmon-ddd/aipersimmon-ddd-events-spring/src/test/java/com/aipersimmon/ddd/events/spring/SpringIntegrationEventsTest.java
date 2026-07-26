@@ -24,7 +24,8 @@ class SpringIntegrationEventsTest {
   void publishesEnvelopeCarryingEventAndCausalMetadata() {
     List<Object> captured = new ArrayList<>();
     ApplicationEventPublisher publisher = captured::add;
-    IntegrationEvents events = new SpringIntegrationEvents(publisher, "/inventory");
+    IntegrationEvents events =
+        new SpringIntegrationEvents(publisher, Clock.systemUTC(), "/inventory", () -> "EVT-1");
 
     SampleIntegrationEvent event = new SampleIntegrationEvent("1");
     CommandContext context = new CommandContext("__root__", "cmd-1", "corr-1", "cause-0");

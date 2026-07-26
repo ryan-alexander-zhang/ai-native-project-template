@@ -9,9 +9,6 @@ import com.aipersimmon.ddd.operationlog.port.OperationLogSink;
 import com.aipersimmon.ddd.operationlog.port.OperationLogs;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
 import java.time.Clock;
-import java.util.UUID;
-import java.util.function.Supplier;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -67,7 +64,7 @@ public class AipersimmonDddOperationLogAutoConfiguration {
       Clock operationLogClock,
       OperationLogProperties properties,
       OperationLogMetrics metrics,
-      ObjectProvider<IdGenerator> idGenerator) {
+      IdGenerator idGenerator) {
     OperationLogProperties.Limits configured = properties.getLimits();
     OperationLogLimits limits =
         new OperationLogLimits(
@@ -75,9 +72,6 @@ public class AipersimmonDddOperationLogAutoConfiguration {
             configured.getMaxChanges(),
             configured.getMaxDetails(),
             configured.getMaxValueChars());
-    IdGenerator generator = idGenerator.getIfAvailable();
-    Supplier<String> recordIds =
-        generator != null ? generator::newId : () -> UUID.randomUUID().toString();
-    return new DefaultOperationLogs(sink, operationLogClock, recordIds, limits, metrics);
+    return new DefaultOperationLogs(sink, operationLogClock, idGenerator::newId, limits, metrics);
   }
 }

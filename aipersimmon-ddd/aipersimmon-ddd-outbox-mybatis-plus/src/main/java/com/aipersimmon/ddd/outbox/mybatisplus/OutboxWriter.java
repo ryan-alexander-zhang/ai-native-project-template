@@ -10,7 +10,6 @@ import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -36,23 +35,21 @@ public class OutboxWriter implements DurableIntegrationEvents {
   private final StoreAndForwardTracer tracer;
   private final Supplier<String> idGenerator;
 
-  public OutboxWriter(OutboxMapper mapper, ObjectMapper objectMapper, Clock clock, String source) {
-    this(mapper, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE);
-  }
-
   public OutboxWriter(
       OutboxMapper mapper,
       ObjectMapper objectMapper,
       Clock clock,
       String source,
-      StoreAndForwardTracer tracer) {
-    this(mapper, objectMapper, clock, source, tracer, () -> UUID.randomUUID().toString());
+      Supplier<String> idGenerator) {
+    this(mapper, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE, idGenerator);
   }
 
   /**
-   * @param idGenerator supplies each brand-new event's id (default: random UUID); injectable so a
-   *     time-ordered generator (UUIDv7) can replace it for better index locality on the {@code
-   *     event_id} unique index
+   * @param idGenerator supplies each brand-new event's id. Required: there is no defaulting
+   *     overload, so a caller cannot accidentally fall back to a random UUID and lose index
+   *     locality on the {@code event_id} unique index (see {@code issue-00053}). Auto-configuration
+   *     passes the {@link com.aipersimmon.ddd.core.id.IdGenerator} bean; tests pass a deterministic
+   *     supplier.
    */
   public OutboxWriter(
       OutboxMapper mapper,

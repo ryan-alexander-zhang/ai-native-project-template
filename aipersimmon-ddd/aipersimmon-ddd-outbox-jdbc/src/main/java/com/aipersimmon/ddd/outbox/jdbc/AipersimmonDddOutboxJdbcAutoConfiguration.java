@@ -12,8 +12,6 @@ import com.aipersimmon.ddd.outbox.OutboxProperties;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
-import java.util.UUID;
-import java.util.function.Supplier;
 import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
@@ -77,21 +75,16 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
       @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}")
           String source,
       ObjectProvider<StoreAndForwardTracer> tracer,
-      ObjectProvider<IdGenerator> idGenerator) {
+      IdGenerator idGenerator) {
     log.info(
         "aipersimmon-ddd integration-event transport: durable transactional outbox (JdbcTemplate)");
-    IdGenerator generator = idGenerator.getIfAvailable();
-    // With aipersimmon-ddd-id present the event id is a time-ordered UUIDv7 (better locality on
-    // the event_id unique index); without it, OutboxWriter keeps its UUID.randomUUID() default.
-    Supplier<String> ids =
-        generator != null ? generator::newId : () -> UUID.randomUUID().toString();
     return new OutboxWriter(
         jdbcTemplate,
         objectMapper.getIfAvailable(ObjectMapper::new),
         outboxClock,
         source,
         tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE),
-        ids);
+        idGenerator::newId);
   }
 
   @Bean

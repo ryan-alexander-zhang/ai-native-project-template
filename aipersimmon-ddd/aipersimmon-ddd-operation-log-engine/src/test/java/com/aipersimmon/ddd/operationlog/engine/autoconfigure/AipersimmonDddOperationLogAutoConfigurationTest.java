@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.id.IdGenerator;
+import com.aipersimmon.ddd.id.AipersimmonDddIdAutoConfiguration;
 import com.aipersimmon.ddd.operationlog.engine.observability.OperationLogMetrics;
 import com.aipersimmon.ddd.operationlog.model.Actor;
 import com.aipersimmon.ddd.operationlog.model.Causality;
@@ -32,7 +33,11 @@ class AipersimmonDddOperationLogAutoConfigurationTest {
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
           .withConfiguration(
-              AutoConfigurations.of(AipersimmonDddOperationLogAutoConfiguration.class));
+              AutoConfigurations.of(
+                  AipersimmonDddOperationLogAutoConfiguration.class,
+                  // The record-id supplier requires an IdGenerator (issue-00053), so the module
+                  // that supplies it is part of the minimal assembly.
+                  AipersimmonDddIdAutoConfiguration.class));
 
   @Test
   void wires_clock_classifier_and_noop_metrics_but_no_pipeline_without_a_sink() {

@@ -38,7 +38,6 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import java.time.Clock;
 import java.util.Locale;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -137,7 +136,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ObjectProvider<ProcessObserver> observer,
       ObjectProvider<Tracer> tracer,
       ObjectProvider<StoreAndForwardTracer> storeTracer,
-      ObjectProvider<IdGenerator> idGenerator) {
+      IdGenerator idGenerator) {
     DuplicateBusinessKeyPolicy policy =
         DuplicateBusinessKeyPolicy.valueOf(
             properties.getStartDuplicateBusinessKey().toUpperCase(Locale.ROOT));
@@ -216,7 +215,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ProcessPayloadCodecRegistry payloadCodecs,
       ProcessUnitOfWork unitOfWork,
       Clock processManagerClock,
-      ObjectProvider<IdGenerator> idGenerator) {
+      IdGenerator idGenerator) {
     return new ProcessOperations(
         instances,
         transitions,
@@ -273,7 +272,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ProcessManagerProperties properties,
       ObjectProvider<ProcessObserver> observer,
       ObjectProvider<StoreAndForwardTracer> storeTracer,
-      ObjectProvider<IdGenerator> idGenerator) {
+      IdGenerator idGenerator) {
     ProcessManagerProperties.Worker cfg = properties.getEffectRelay();
     return new ProcessEffectRelay(
         claimStrategy,
@@ -313,7 +312,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       Clock processManagerClock,
       ProcessManagerProperties properties,
       ObjectProvider<StoreAndForwardTracer> storeTracer,
-      ObjectProvider<IdGenerator> idGenerator) {
+      IdGenerator idGenerator) {
     ProcessManagerProperties.Worker cfg = properties.getDeadlineWorker();
     return new ProcessDeadlineWorker(
         claimStrategy,
@@ -369,12 +368,10 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         b.getInitial(), b.getMax(), b.getMultiplier(), b.getJitter(), cfg.getMaxAttempts());
   }
 
-  // Resolve the id supplier for every minting point (instance / transition / effect / deadline id).
-  // With aipersimmon-ddd-id present these are time-ordered UUIDv7 — the biggest locality win, since
-  // these are the random VARCHAR clustered primary keys; without it, fall back to
-  // UUID.randomUUID().
-  private static Supplier<String> ids(ObjectProvider<IdGenerator> idGenerator) {
-    IdGenerator generator = idGenerator.getIfAvailable();
-    return generator != null ? generator::newId : () -> UUID.randomUUID().toString();
+  // The id supplier for every minting point (instance / transition / effect / deadline id). These
+  // are the high-cardinality VARCHAR primary keys where time ordering wins the most, so the
+  // IdGenerator bean is required rather than defaulted (see issue-00053).
+  private static Supplier<String> ids(IdGenerator idGenerator) {
+    return idGenerator::newId;
   }
 }

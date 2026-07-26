@@ -5,7 +5,6 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import java.time.Clock;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.PayloadApplicationEvent;
@@ -30,17 +29,11 @@ public class SpringIntegrationEvents implements IntegrationEvents {
   private final String source;
   private final Supplier<String> idGenerator;
 
-  public SpringIntegrationEvents(ApplicationEventPublisher publisher, String source) {
-    this(publisher, Clock.systemUTC(), source);
-  }
-
-  public SpringIntegrationEvents(ApplicationEventPublisher publisher, Clock clock, String source) {
-    this(publisher, clock, source, () -> UUID.randomUUID().toString());
-  }
-
   /**
-   * @param idGenerator supplies each brand-new event's id (default: random UUID); injectable so a
-   *     time-ordered generator (UUIDv7) can replace it for better index locality
+   * @param idGenerator supplies each brand-new event's id. Required: there is no defaulting
+   *     overload, so a caller cannot accidentally fall back to a non-time-ordered id (see {@code
+   *     issue-00053}). Auto-configuration passes the {@link
+   *     com.aipersimmon.ddd.core.id.IdGenerator} bean; tests pass a deterministic supplier.
    */
   public SpringIntegrationEvents(
       ApplicationEventPublisher publisher,

@@ -58,7 +58,14 @@ class RegistryCommandBusSendAsTest {
   @Test
   void redeliveringTheSameEffectKeepsTheSameMessageId() {
     CapturingReserveHandler handler = new CapturingReserveHandler();
-    CommandBus bus = new RegistryCommandBus(List.of(handler), List.of());
+    // A supplier that fails if called: sendAs must reuse the persisted identity verbatim.
+    CommandBus bus =
+        new RegistryCommandBus(
+            List.of(handler),
+            List.of(),
+            () -> {
+              throw new AssertionError("sendAs must not mint an id");
+            });
     CommandContext effectCtx = CommandContext.root(Tenants.ROOT.value(), "effect-99");
 
     bus.sendAs(new Reserve("s"), effectCtx);

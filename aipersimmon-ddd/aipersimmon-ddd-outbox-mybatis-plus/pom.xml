@@ -35,6 +35,14 @@
   <description>Transactional-outbox storage over MyBatis-Plus for reliable integration-event delivery.</description>
 
   <dependencies>
+    <!-- Time-ordered (UUIDv7) IdGenerator. A required dependency, not optional: a silent
+         fall back to UUID.randomUUID() would reintroduce exactly the random-VARCHAR-key write
+         amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- Observability SPI (framework-free, no-op default): capture on write, restore on dispatch. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

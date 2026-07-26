@@ -30,6 +30,14 @@
   <description>Spring starter implementing the CQRS command/query buses, interceptor chain, unit-of-work and aggregate collector.</description>
 
   <dependencies>
+    <!-- Time-ordered (UUIDv7) IdGenerator. A required dependency, not optional: a silent
+         fall back to UUID.randomUUID() would reintroduce exactly the random-VARCHAR-key write
+         amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs</artifactId>
@@ -73,14 +81,6 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- The real UUIDv7 IdGenerator + its auto-config, so the two-state test can prove the
-         command bus mints a v7 messageId when this module is present and a v4 one when it is not. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- Brings a transaction manager (spring-jdbc) and an in-memory database so the

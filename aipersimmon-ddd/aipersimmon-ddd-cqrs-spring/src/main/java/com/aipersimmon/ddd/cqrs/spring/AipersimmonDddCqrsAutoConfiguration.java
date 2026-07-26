@@ -67,14 +67,9 @@ public class AipersimmonDddCqrsAutoConfiguration {
   public CommandBus commandBus(
       ObjectProvider<CommandHandler<?, ?>> handlers,
       ObjectProvider<CommandInterceptor> interceptors,
-      ObjectProvider<IdGenerator> idGenerator) {
-    IdGenerator generator = idGenerator.getIfAvailable();
-    // With aipersimmon-ddd-id on the classpath the message id is a time-ordered UUIDv7;
-    // without it, RegistryCommandBus keeps its UUID.randomUUID() default.
-    return generator != null
-        ? new RegistryCommandBus(
-            handlers.stream().toList(), interceptors.stream().toList(), generator::newId)
-        : new RegistryCommandBus(handlers.stream().toList(), interceptors.stream().toList());
+      IdGenerator idGenerator) {
+    return new RegistryCommandBus(
+        handlers.stream().toList(), interceptors.stream().toList(), idGenerator::newId);
   }
 
   @Bean

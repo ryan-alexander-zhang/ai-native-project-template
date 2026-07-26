@@ -92,7 +92,8 @@ class ConnectedTraceEndToEndTest {
         new OpenTelemetryStoreAndForwardTracer(
             otelTracer, sdk.getPropagators().getTextMapPropagator());
 
-    writer = new OutboxWriter(jdbc, new ObjectMapper(), CLOCK, "test-src", storeTracer);
+    writer =
+        new OutboxWriter(jdbc, new ObjectMapper(), CLOCK, "test-src", storeTracer, () -> "EVT-1");
     dispatcher = new CapturingDispatcher();
     relay =
         new OutboxRelay(

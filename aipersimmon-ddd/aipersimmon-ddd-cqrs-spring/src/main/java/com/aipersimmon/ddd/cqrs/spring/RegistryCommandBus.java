@@ -12,7 +12,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.core.ResolvableType;
 
@@ -37,14 +36,11 @@ public class RegistryCommandBus implements CommandBus {
   private final List<CommandInterceptor> interceptors;
   private final Supplier<String> idGenerator;
 
-  public RegistryCommandBus(
-      List<CommandHandler<?, ?>> handlers, List<CommandInterceptor> interceptors) {
-    this(handlers, interceptors, () -> UUID.randomUUID().toString());
-  }
-
   /**
-   * @param idGenerator supplies each command's message id (default: random UUID); injectable so
-   *     tests can make ids deterministic
+   * @param idGenerator supplies each command's message id. Required: there is no defaulting
+   *     overload, so a caller cannot accidentally fall back to a non-time-ordered id (see {@code
+   *     issue-00053}). Auto-configuration passes the {@link
+   *     com.aipersimmon.ddd.core.id.IdGenerator} bean; tests pass a deterministic supplier.
    */
   public RegistryCommandBus(
       List<CommandHandler<?, ?>> handlers,

@@ -33,6 +33,14 @@
   <description>Storage-agnostic engine of the durable Process Manager: runtime, relay, deadline worker, and shared Spring wiring over store ports.</description>
 
   <dependencies>
+    <!-- Time-ordered (UUIDv7) IdGenerator. A required dependency, not optional: a silent
+         fall back to UUID.randomUUID() would reintroduce exactly the random-VARCHAR-key write
+         amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-process-manager</artifactId>
