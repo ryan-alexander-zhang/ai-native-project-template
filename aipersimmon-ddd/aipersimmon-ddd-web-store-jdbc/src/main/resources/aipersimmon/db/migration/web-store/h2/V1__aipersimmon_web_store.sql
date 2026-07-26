@@ -1,6 +1,6 @@
 -- Flyway migration (H2) for the aipersimmon-ddd-web-store-jdbc tables (idempotency, nonce,
 -- rate-limit). Single source of the web-store schema. Applied automatically by the optional
--- aipersimmon-ddd-flyway starter (history table flyway_schema_history_aipersimmon_web_store),
+-- aipersimmon-ddd-flyway-spring-boot-starter starter (history table flyway_schema_history_aipersimmon_web_store),
 -- or copy into your own Flyway/Liquibase.
 CREATE TABLE IF NOT EXISTS aipersimmon_web_idempotency (
     idempotency_key  VARCHAR(255) PRIMARY KEY,

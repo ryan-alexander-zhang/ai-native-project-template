@@ -38,7 +38,7 @@ public final class MybatisProcessSchemaValidator implements InitializingBean {
                     + table
                     + "' is missing or unreadable; apply the schema "
                     + "(see aipersimmon/db/migration/process-manager) via the "
-                    + "aipersimmon-ddd-flyway starter or your own Flyway/Liquibase, or set "
+                    + "aipersimmon-ddd-flyway-spring-boot-starter starter or your own Flyway/Liquibase, or set "
                     + "aipersimmon.ddd.process-manager.schema-validation=none",
                 missing);
           }

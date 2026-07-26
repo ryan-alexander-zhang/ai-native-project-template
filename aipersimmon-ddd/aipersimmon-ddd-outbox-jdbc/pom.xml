@@ -21,7 +21,7 @@
     so it never overrides a consumer's own entity scanning. The consumer creates
     the outbox table. The DDL ships (in aipersimmon-ddd-outbox) as vendor-templated
     Flyway migrations under aipersimmon/db/migration/outbox/{vendor} (the single
-    source) — apply them via the optional shared aipersimmon-ddd-flyway starter, or
+    source) — apply them via the optional shared aipersimmon-ddd-flyway-spring-boot-starter starter, or
     copy them into your own Flyway/Liquibase.
 
     Delivery is at-least-once: a crash between dispatch and marking a row sent
@@ -37,7 +37,7 @@
          amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

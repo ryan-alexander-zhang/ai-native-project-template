@@ -25,8 +25,8 @@
     idempotency / replay / rate-limit filters and their pluggable stores build on
     this in the -web-store-* modules.
   -->
-  <artifactId>aipersimmon-ddd-web-spring</artifactId>
-  <name>aipersimmon-ddd-web-spring</name>
+  <artifactId>aipersimmon-ddd-web-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-web-spring-boot-starter</name>
   <description>Spring starter for the web layer: exception-to-ProblemDetail advice, trace-id, cursor pagination serialization and i18n.</description>
 
   <dependencies>

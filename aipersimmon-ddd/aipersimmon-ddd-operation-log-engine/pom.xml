@@ -27,7 +27,7 @@
          amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

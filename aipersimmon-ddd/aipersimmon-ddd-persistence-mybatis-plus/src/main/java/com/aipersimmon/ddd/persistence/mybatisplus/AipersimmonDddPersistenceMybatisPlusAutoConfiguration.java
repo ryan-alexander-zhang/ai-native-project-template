@@ -20,7 +20,8 @@ import org.springframework.core.annotation.Order;
  * <p>It contributes an {@code InnerInterceptor} rather than a whole {@code MybatisPlusInterceptor}
  * for the reason given in {@code design-00011} §3 — MyBatis-Plus honours one interceptor bean, so
  * competing registrations back off silently instead of composing. {@code
- * aipersimmon-ddd-mybatis-plus} owns the single interceptor and assembles the contributions.
+ * aipersimmon-ddd-mybatis-plus-spring-boot-starter} owns the single interceptor and assembles the
+ * contributions.
  *
  * <p>{@code @Order(300)} places it after tenant scoping (100) and a consumer's pagination (200),
  * following the order MyBatis-Plus recommends.

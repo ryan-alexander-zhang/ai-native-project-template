@@ -22,9 +22,9 @@ import org.springframework.core.annotation.Order;
  * <p>It contributes an {@code InnerInterceptor} rather than a whole {@link MybatisPlusInterceptor}:
  * MyBatis-Plus honours a single interceptor bean, so registering one here would not compose with
  * the optimistic locker or any other concern — whichever lost {@code @ConditionalOnMissingBean}
- * would back off silently and stop taking effect. {@code aipersimmon-ddd-mybatis-plus} owns the one
- * interceptor and assembles every contribution in {@code @Order} sequence; see {@code design-00011}
- * §3.
+ * would back off silently and stop taking effect. {@code
+ * aipersimmon-ddd-mybatis-plus-spring-boot-starter} owns the one interceptor and assembles every
+ * contribution in {@code @Order} sequence; see {@code design-00011} §3.
  *
  * <p>{@code @Order(100)} puts tenant scoping first, as MyBatis-Plus recommends. With an empty
  * {@code tenant-tables} set it rewrites nothing.

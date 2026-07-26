@@ -20,8 +20,8 @@
     The whole resolution activates only when aipersimmon.ddd.tenancy.enabled=true, so
     a single-tenant deployment behaves exactly as it did before tenancy existed.
   -->
-  <artifactId>aipersimmon-ddd-tenancy-spring</artifactId>
-  <name>aipersimmon-ddd-tenancy-spring</name>
+  <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-tenancy-spring-boot-starter</name>
   <description>Spring wiring for multi-tenancy: edge tenant-resolution filter and the command interceptor that binds the ambient TenantContext from the command's tenant.</description>
 
   <dependencies>

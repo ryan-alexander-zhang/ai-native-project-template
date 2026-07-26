@@ -18,8 +18,8 @@
     registry, actor/tenant resolver contracts, and the auto-configuration. Depends on the engine for
     the OperationLogs pipeline and shared properties; carries no storage. See design-00008 §6.
   -->
-  <artifactId>aipersimmon-ddd-operation-log-cqrs-spring</artifactId>
-  <name>aipersimmon-ddd-operation-log-cqrs-spring</name>
+  <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</name>
   <description>CQRS/Spring capture for the Operation Log component: interceptors, restricted template engine, annotation compiler, definition registry, and resolvers.</description>
 
   <dependencies>
@@ -65,7 +65,7 @@
     <!-- End-to-end capture: real CommandBus + TransactionCommandInterceptor + JDBC backend. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
+      <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

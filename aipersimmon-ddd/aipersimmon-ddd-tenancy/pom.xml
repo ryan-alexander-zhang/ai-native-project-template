@@ -19,7 +19,7 @@
     Hard rule: ZERO framework dependencies (only aipersimmon-ddd-core for the
     Identifier marker). No Spring, servlet, JDBC, or messaging here — the edge
     resolution filter and the CommandContext binding live in the optional
-    aipersimmon-ddd-tenancy-spring module. Tenant isolation itself is woven into
+    aipersimmon-ddd-tenancy-spring-boot-starter module. Tenant isolation itself is woven into
     the existing cqrs / integration / outbox / process-manager / web-store
     components (see design-00009 / decision-00018).
   -->

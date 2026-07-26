@@ -26,8 +26,8 @@
     DatabaseInitializerDetector makes @DependsOnDatabaseInitialization beans (e.g. the
     process-manager schema validator) wait for these migrations.
   -->
-  <artifactId>aipersimmon-ddd-flyway</artifactId>
-  <name>aipersimmon-ddd-flyway</name>
+  <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-flyway-spring-boot-starter</name>
   <description>Opt-in, schema-agnostic Flyway runner that auto-applies every aipersimmon-ddd component schema on its own history table.</description>
 
   <dependencies>

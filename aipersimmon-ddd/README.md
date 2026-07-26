@@ -121,11 +121,11 @@ DDD 战术构件与结构约定,零依赖。包含:
 
 ### 适配器层(Spring / JDBC / Kafka)
 
-#### `aipersimmon-ddd-cqrs-spring`
+#### `aipersimmon-ddd-cqrs-spring-boot-starter`
 CQRS 契约的 Spring 实现。`RegistryCommandBus` / `RegistryQueryBus` 按注册表把命令/查询路由到唯一处理器并施加拦截器链;内置拦截器:`LoggingCommandInterceptor`(最外)、`ValidationCommandInterceptor`(存在 Bean Validation 时)、`TransactionCommandInterceptor`(最内,在 `TransactionTemplateUnitOfWork` 中运行处理器,并在同一事务内排干 `ThreadLocalAggregateCollector` 收集的聚合事件)。`AipersimmonDddCqrsAutoConfiguration` 自动装配,每个 bean 均可被应用覆盖。
 
 
-#### `aipersimmon-ddd-events-spring`
+#### `aipersimmon-ddd-events-spring-boot-starter`
 事件发布端口的 Spring 适配器——进程内、同步传输。`SpringDomainEvents` / `SpringIntegrationEvents` 把每个事件交给 Spring 的 `ApplicationEventPublisher`,`AipersimmonDddEventsAutoConfiguration` 自动装配。投递是同步、同线程、同事务的,处理器在调用方事务内内联运行。**集成事件发布器仅在缺少 outbox starter 时提供。**
 
 #### `aipersimmon-ddd-inbox-jdbc`

@@ -45,7 +45,7 @@
          random VARCHAR clustered primary key the decision targets first — is a v7 when supplied. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

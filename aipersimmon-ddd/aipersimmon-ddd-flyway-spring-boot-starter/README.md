@@ -1,4 +1,4 @@
-# aipersimmon-ddd-flyway (shared, Scheme B)
+# aipersimmon-ddd-flyway-spring-boot-starter (shared, Scheme B)
 
 Opt-in, schema-agnostic Flyway integration for the whole aipersimmon-ddd family. Add this one
 module and the tables of whichever aipersimmon storage modules you use — outbox, inbox,
@@ -10,7 +10,7 @@ web-store, process-manager — apply themselves at startup. **No manual SQL, no
 ```xml
 <dependency>
   <groupId>com.aipersimmon.ddd</groupId>
-  <artifactId>aipersimmon-ddd-flyway</artifactId>
+  <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
 </dependency>
 ```
 

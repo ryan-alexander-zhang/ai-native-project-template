@@ -22,8 +22,8 @@
     -persistence-mybatis-plus, because either may be present without the other. It lives here, and
     both of those contribute plain InnerInterceptor beans instead.
   -->
-  <artifactId>aipersimmon-ddd-mybatis-plus</artifactId>
-  <name>aipersimmon-ddd-mybatis-plus</name>
+  <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-mybatis-plus-spring-boot-starter</name>
   <description>Owns the single MyBatis-Plus interceptor and composes the framework's InnerInterceptor contributions in order.</description>
 
   <dependencies>

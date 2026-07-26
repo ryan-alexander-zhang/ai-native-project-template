@@ -35,7 +35,7 @@ public final class JdbcProcessSchemaValidator implements InitializingBean {
             "process-manager table '"
                 + table
                 + "' is missing or unreadable; apply the schema "
-                + "(see aipersimmon/db/migration/process-manager) via the aipersimmon-ddd-flyway "
+                + "(see aipersimmon/db/migration/process-manager) via the aipersimmon-ddd-flyway-spring-boot-starter "
                 + "starter or your own Flyway/Liquibase, or set "
                 + "aipersimmon.ddd.process-manager.jdbc.schema-validation=none",
             missing);

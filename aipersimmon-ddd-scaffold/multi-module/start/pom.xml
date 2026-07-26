@@ -48,17 +48,17 @@
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
     </dependency>
     <!-- In-process synchronous transport for both domain and integration events. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-events-spring</artifactId>
+      <artifactId>aipersimmon-ddd-events-spring-boot-starter</artifactId>
     </dependency>
     <!-- CQRS command/query buses; registers the handlers and routes to them. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
+      <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
     </dependency>
     <!--
       Operation Log: records a business-readable audit row for every write command carrying
@@ -71,7 +71,7 @@
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring</artifactId>
+      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
@@ -84,7 +84,7 @@
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-web-spring</artifactId>
+      <artifactId>aipersimmon-ddd-web-spring-boot-starter</artifactId>
     </dependency>
     <!--
       OpenAPI/Swagger: pulls in springdoc (the /v3/api-docs scanner + Swagger UI, gated by
@@ -108,7 +108,7 @@
          via Flyway, on a dedicated history table — replaces a hand-copied schema.sql. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-flyway</artifactId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
     </dependency>
     <!-- Flyway 10+ ships PostgreSQL support as a separate module (this app runs on PostgreSQL). -->
     <dependency>
@@ -173,7 +173,7 @@
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-tenancy-spring</artifactId>
+      <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

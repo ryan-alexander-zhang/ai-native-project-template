@@ -53,8 +53,8 @@ public class AipersimmonDddOperationLogAutoConfiguration {
   /**
    * The default pipeline. Binds only when a backend has provided an {@link OperationLogSink}. The
    * record-id supplier resolves to the time-ordered UUIDv7 {@link IdGenerator} when {@code
-   * aipersimmon-ddd-id} is on the classpath — the id the {@code record_id} DDL already documents;
-   * without it, it falls back to a random UUID.
+   * aipersimmon-ddd-id-spring-boot-starter} is on the classpath — the id the {@code record_id} DDL
+   * already documents; without it, it falls back to a random UUID.
    */
   @Bean
   @ConditionalOnBean(OperationLogSink.class)

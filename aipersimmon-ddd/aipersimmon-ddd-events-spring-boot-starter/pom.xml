@@ -23,8 +23,8 @@
     transactional outbox translation step relies on it — so this bridge is not made
     asynchronous.
   -->
-  <artifactId>aipersimmon-ddd-events-spring</artifactId>
-  <name>aipersimmon-ddd-events-spring</name>
+  <artifactId>aipersimmon-ddd-events-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-events-spring-boot-starter</name>
   <description>Spring starter bridging the DomainEvents port to Spring's ApplicationEventPublisher.</description>
 
   <dependencies>
@@ -33,7 +33,7 @@
          amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

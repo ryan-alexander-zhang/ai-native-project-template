@@ -7,8 +7,9 @@ package com.aipersimmon.ddd.core.id;
  * <p>The contract is a globally-unique, <strong>time-ordered</strong> identifier string. Time
  * ordering is what makes these ids cheap to index at scale: a monotonic key inserts near the tail
  * of a B-tree instead of scattering random writes across it. The default implementation ({@code
- * Uuidv7IdGenerator} in {@code aipersimmon-ddd-id}) returns a UUIDv7, which keeps the 36-char UUID
- * shape so it drops in wherever {@code UUID.randomUUID().toString()} was used.
+ * Uuidv7IdGenerator} in {@code aipersimmon-ddd-id-spring-boot-starter}) returns a UUIDv7, which
+ * keeps the 36-char UUID shape so it drops in wherever {@code UUID.randomUUID().toString()} was
+ * used.
  *
  * <p>This is a pure, zero-dependency SPI so it can live in framework-free {@code
  * aipersimmon-ddd-core}: the library implementation carrying a UUID generator lives in a separate

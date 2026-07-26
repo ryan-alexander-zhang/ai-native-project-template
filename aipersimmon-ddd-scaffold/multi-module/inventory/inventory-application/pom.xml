@@ -65,7 +65,7 @@
          CommandBus contract alone. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
+      <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

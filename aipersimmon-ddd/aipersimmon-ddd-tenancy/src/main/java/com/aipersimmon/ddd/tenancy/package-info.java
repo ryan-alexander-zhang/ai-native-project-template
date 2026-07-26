@@ -23,6 +23,6 @@
  *
  * <p>Hard rule: zero framework dependencies (only the {@code aipersimmon-ddd-core} Identifier
  * marker). The Spring edge filter and the CommandContext binding live in the optional {@code
- * aipersimmon-ddd-tenancy-spring} module.
+ * aipersimmon-ddd-tenancy-spring-boot-starter} module.
  */
 package com.aipersimmon.ddd.tenancy;

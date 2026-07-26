@@ -38,7 +38,7 @@
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-mybatis-plus</artifactId>
+      <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- BaseMapper + OptimisticLockerInnerInterceptor. provided for the same reason as the other

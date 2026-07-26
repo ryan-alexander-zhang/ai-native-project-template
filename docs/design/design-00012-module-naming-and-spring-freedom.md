@@ -91,6 +91,8 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 | `-web-spring` | `-web-spring-boot-starter` | HTTP 适配 + 装配 |
 | `-flyway` | `-flyway-spring-boot-starter` | 纯装配（无契约、无实现，只按 classpath 应用迁移）；现名甚至看不出它是 Spring 的 |
 | `-id` | `-id-spring-boot-starter` | 默认 `IdGenerator` 实现 + 装配；契约在 `core` |
+| `-operation-log-cqrs-spring` | `-operation-log-cqrs-spring-boot-starter` | 同上；本表初稿遗漏了它，改为按 `artifactId` 全量扫描 `-spring$` 得出清单后补入 |
+| `-mybatis-plus` | `-mybatis-plus-spring-boot-starter` | 多组件共享的 `InnerInterceptor` 装配座；现名读起来像「什么都不适配的 mybatis-plus 适配器」|
 
 `-observability-otel-spring-boot-starter` 与 `-openapi-spring-boot-starter` 已符合，不动。
 
@@ -105,9 +107,6 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 
 - `-persistence-jdbc` / `-persistence-mybatis-plus`：已符合 `<domain>-<backend>`。它们携带 Spring 是被豁免的。
 - 13 个后端适配器一律不拆 starter：见第一节，那是与 P1-1 相反的方向。
-- `-mybatis-plus`（阶段一新增的 `InnerInterceptor` 组合座）：名字是「无 domain 的 backend」，看起来像
-  「什么都不适配的 mybatis-plus 适配器」。它实际是**多个组件共享的装配座**，按 3.1 属于纯装配，
-  应叫 `-mybatis-plus-spring-boot-starter`。**改**。
 - 两个 `-engine`：`-engine` 是第四种后缀，但它表达的东西（存储无关运行时）真实存在且没有更好的词；
   改成 `-spring-boot-starter` 是错的（它们含大量实现代码），改成 `-<backend>` 也是错的（它们与后端无关）。
   **保留 `-engine`，并把它写进 3.1 的后缀表**，使其从「例外」变成「规则的一部分」。
@@ -137,8 +136,8 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 
 ## 五、影响面
 
-- 7 个模块目录重命名 + artifactId（`-cqrs-spring`、`-events-spring`、`-tenancy-spring`、`-web-spring`、
-  `-flyway`、`-id`、`-mybatis-plus`）
+- 8 个模块目录重命名 + artifactId（`-cqrs-spring`、`-events-spring`、`-tenancy-spring`、`-web-spring`、
+  `-operation-log-cqrs-spring`、`-flyway`、`-id`、`-mybatis-plus`）
 - 1 个模块拆分（`-outbox`）
 - 反应堆 `<modules>`、BOM 全量条目、模块间依赖引用、样例 `start/pom.xml` 与各上下文 pom
 - `AutoConfiguration.imports` 的**内容不变**（类的全限定名不变——Java 包名不随 artifactId 改）

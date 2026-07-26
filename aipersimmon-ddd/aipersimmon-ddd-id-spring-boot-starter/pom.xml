@@ -25,8 +25,8 @@
     only third-party dependency and is confined to this module, so core stays
     zero-dependency.
   -->
-  <artifactId>aipersimmon-ddd-id</artifactId>
-  <name>aipersimmon-ddd-id</name>
+  <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-id-spring-boot-starter</name>
   <description>Optional UUIDv7 implementation of the aipersimmon-ddd IdGenerator SPI: a time-ordered, JUG-backed id generator and its auto-configuration.</description>
 
   <dependencies>

@@ -1,4 +1,4 @@
-# aipersimmon-ddd-operation-log-cqrs-spring
+# aipersimmon-ddd-operation-log-cqrs-spring-boot-starter
 
 The CQRS/Spring capture layer for the Operation Log component. Add it (with a storage backend) and
 every write command carrying `@OperationLog` — or a hand-written `OperationLogDefinition` — is
@@ -15,10 +15,10 @@ coordination are auto-configured; you do not touch them.
    - `aipersimmon-ddd-operation-log-mybatis-plus`.
 
    The backend supplies the `OperationLogSink` and ships the schema (the three-dialect DDL lives in
-   the engine and is picked up by `aipersimmon-ddd-flyway` when you list `operation-log` under
+   the engine and is picked up by `aipersimmon-ddd-flyway-spring-boot-starter` when you list `operation-log` under
    `aipersimmon.ddd.flyway.components`).
 
-2. **This module** (`aipersimmon-ddd-operation-log-cqrs-spring`) on the same classpath — it
+2. **This module** (`aipersimmon-ddd-operation-log-cqrs-spring-boot-starter`) on the same classpath — it
    registers the capture interceptors once a sink is present.
 
 3. **The two trusted resolvers**, as beans in your composition root. They tell the capture layer

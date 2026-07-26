@@ -20,10 +20,10 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * The command bus takes its message-id supplier from the {@link IdGenerator} bean, which is
- * <em>required</em>: {@code aipersimmon-ddd-id} is a compile dependency of this module, so a
- * time-ordered UUIDv7 messageId is the only outcome in a real application. A context assembled
- * without any {@code IdGenerator} fails to start rather than silently minting random (v4) ids and
- * reintroducing the write amplification the SPI exists to remove — see {@code issue-00053}.
+ * <em>required</em>: {@code aipersimmon-ddd-id-spring-boot-starter} is a compile dependency of this
+ * module, so a time-ordered UUIDv7 messageId is the only outcome in a real application. A context
+ * assembled without any {@code IdGenerator} fails to start rather than silently minting random (v4)
+ * ids and reintroducing the write amplification the SPI exists to remove — see {@code issue-00053}.
  *
  * <p>A messageId is opaque, so we assert only its UUID version — never any ordering the framework
  * must not expose.
@@ -66,7 +66,7 @@ class CommandBusIdGeneratorWiringTest {
               assertEquals(
                   7,
                   UUID.fromString(seen.messageId()).version(),
-                  "with aipersimmon-ddd-id the messageId is a UUIDv7");
+                  "with aipersimmon-ddd-id-spring-boot-starter the messageId is a UUIDv7");
               assertEquals(
                   seen.messageId(),
                   seen.correlationId(),

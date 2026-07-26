@@ -25,8 +25,8 @@
         UnitOfWork.
     Validation is wired only when a Bean Validation provider is on the classpath.
   -->
-  <artifactId>aipersimmon-ddd-cqrs-spring</artifactId>
-  <name>aipersimmon-ddd-cqrs-spring</name>
+  <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
+  <name>aipersimmon-ddd-cqrs-spring-boot-starter</name>
   <description>Spring starter implementing the CQRS command/query buses, interceptor chain, unit-of-work and aggregate collector.</description>
 
   <dependencies>
@@ -35,7 +35,7 @@
          amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id</artifactId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
