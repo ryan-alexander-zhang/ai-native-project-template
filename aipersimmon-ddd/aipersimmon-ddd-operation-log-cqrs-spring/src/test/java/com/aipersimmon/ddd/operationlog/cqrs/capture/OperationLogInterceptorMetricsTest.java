@@ -15,6 +15,7 @@ import com.aipersimmon.ddd.operationlog.engine.observability.OperationLogMetrics
 import com.aipersimmon.ddd.operationlog.model.Completion;
 import com.aipersimmon.ddd.operationlog.spi.ClassifiedOutcome;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,7 @@ import org.junit.jupiter.api.Test;
 /** Verifies the capture interceptors emit render latency and the failure-record-loss signal. */
 class OperationLogInterceptorMetricsTest {
 
-  private static final CommandContext CTX = CommandContext.root("m1");
+  private static final CommandContext CTX = CommandContext.root(Tenants.ROOT.value(), "m1");
   private static final String CODE = "order.remark.update";
 
   private static final FailureClassifier CLASSIFIER =

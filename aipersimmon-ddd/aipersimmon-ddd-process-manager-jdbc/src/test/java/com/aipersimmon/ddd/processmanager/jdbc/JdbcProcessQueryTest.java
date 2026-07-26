@@ -31,6 +31,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -103,7 +104,7 @@ class JdbcProcessQueryTest {
         TestFulfilment.TYPE,
         new ProcessBusinessKey(order),
         new TestFulfilment.Started(order),
-        CommandContext.root("start-" + order));
+        CommandContext.root(Tenants.ROOT.value(), "start-" + order));
   }
 
   @Test
@@ -140,7 +141,10 @@ class JdbcProcessQueryTest {
   @Test
   void returnsTheTransitionTimelineInOrder() {
     ProcessAdvanceResult started = start("order-1");
-    runtime.handle(started.processRef(), new TestFulfilment.Advance(), CommandContext.root("adv"));
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "adv"));
 
     var timeline = query.timeline(started.processRef());
     assertEquals(
@@ -165,7 +169,9 @@ class JdbcProcessQueryTest {
   void listsPendingDeadlineWorklist() {
     ProcessAdvanceResult started = start("order-1");
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("arm"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "arm"));
 
     var pending = query.deadlines(DeadlineStatus.PENDING, 10);
     assertEquals(1, pending.size());

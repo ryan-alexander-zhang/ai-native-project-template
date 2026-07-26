@@ -19,6 +19,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
@@ -33,8 +34,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the pure {@link OrderFulfilmentDefinition} transition table — the first tests in
- * the {@code ordering-process-mybatis-plus} module (issue-00035). They drive {@code react} directly with a
- * hand-built {@link ProcessContext}, so no runtime, database, or Spring context is involved.
+ * the {@code ordering-process-mybatis-plus} module (issue-00035). They drive {@code react} directly
+ * with a hand-built {@link ProcessContext}, so no runtime, database, or Spring context is involved.
  *
  * <p>They cover the whole {@code (step, input)} matrix: the happy path, both compensation branches,
  * and — the point of the fix — the out-of-order and duplicate facts that a type-only switch
@@ -323,6 +324,6 @@ class OrderFulfilmentDefinitionTest {
         java.util.Optional.of(lifecycle),
         java.util.Optional.of(new ProcessStep(step.name())),
         Instant.EPOCH,
-        CommandContext.root(causeMessageId));
+        CommandContext.root(Tenants.ROOT.value(), causeMessageId));
   }
 }

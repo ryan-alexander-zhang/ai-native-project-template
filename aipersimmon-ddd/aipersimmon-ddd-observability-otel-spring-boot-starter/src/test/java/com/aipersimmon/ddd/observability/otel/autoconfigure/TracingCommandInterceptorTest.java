@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.observability.ObservabilityAttributes;
 import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.observability.otel.OpenTelemetryTracer;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
@@ -44,7 +45,7 @@ class TracingCommandInterceptorTest {
 
   @Test
   void wrapsSuccessfulCommandInASpanWithAttributes() {
-    CommandContext context = CommandContext.root("msg-1");
+    CommandContext context = CommandContext.root(Tenants.ROOT.value(), "msg-1");
 
     String result = interceptor.intercept(new PlaceOrder(), context, () -> "done");
 
@@ -79,7 +80,7 @@ class TracingCommandInterceptorTest {
 
   @Test
   void marksSpanFailedWhenHandlerThrows() {
-    CommandContext context = CommandContext.root("msg-2");
+    CommandContext context = CommandContext.root(Tenants.ROOT.value(), "msg-2");
     RuntimeException boom = new IllegalStateException("boom");
 
     RuntimeException thrown =

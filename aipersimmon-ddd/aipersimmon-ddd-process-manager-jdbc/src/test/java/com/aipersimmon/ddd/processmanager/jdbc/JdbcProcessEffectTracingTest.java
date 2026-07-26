@@ -27,6 +27,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -126,7 +127,7 @@ class JdbcProcessEffectTracingTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
 
     String traceparent =
         jdbc.queryForObject("SELECT traceparent FROM aipersimmon_process_effect", String.class);
@@ -139,7 +140,7 @@ class JdbcProcessEffectTracingTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
 
     int delivered = relay().pollOnce();
 

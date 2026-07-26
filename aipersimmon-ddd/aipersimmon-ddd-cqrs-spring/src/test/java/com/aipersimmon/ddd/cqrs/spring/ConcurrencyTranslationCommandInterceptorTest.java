@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
 
@@ -27,7 +28,7 @@ class ConcurrencyTranslationCommandInterceptorTest {
             () ->
                 interceptor.intercept(
                     new Ping(),
-                    CommandContext.root("m1"),
+                    CommandContext.root(Tenants.ROOT.value(), "m1"),
                     () -> {
                       throw cause;
                     }));
@@ -38,7 +39,9 @@ class ConcurrencyTranslationCommandInterceptorTest {
   @Test
   void passesThroughWhenNoConflict() {
     assertEquals(
-        "ok", interceptor.intercept(new StringCommand(), CommandContext.root("m2"), () -> "ok"));
+        "ok",
+        interceptor.intercept(
+            new StringCommand(), CommandContext.root(Tenants.ROOT.value(), "m2"), () -> "ok"));
   }
 
   private record StringCommand() implements Command<String> {}

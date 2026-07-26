@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -46,7 +47,8 @@ class OutboxIdGeneratorWiringTest {
   void freshEventIdComesFromTheInjectedGenerator() {
     jdbc.update("DELETE FROM aipersimmon_outbox");
 
-    integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1"));
+    integrationEvents.publish(
+        new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
 
     assertEquals(
         "outbox-id-sentinel",

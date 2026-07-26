@@ -16,6 +16,7 @@ import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore;
 import com.aipersimmon.ddd.outbox.jdbc.OutboxRelay;
 import com.aipersimmon.ddd.outbox.jdbc.OutboxWriter;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
@@ -111,7 +112,8 @@ class ConnectedTraceEndToEndTest {
   void outboxDispatchSpanLinksBackToTheCommandSpanAcrossTheHop() {
     // A command is being handled: its span is active while the handler publishes an event.
     try (Tracer.SpanScope ignored = domainTracer.startSpan("command PlaceOrder")) {
-      writer.publish(new OrderPlaced("order-1"), CommandContext.root("msg-1"));
+      writer.publish(
+          new OrderPlaced("order-1"), CommandContext.root(Tenants.ROOT.value(), "msg-1"));
     }
 
     // Later, on the scheduler thread with no ambient context, the relay dispatches the row.

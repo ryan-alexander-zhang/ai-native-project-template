@@ -15,6 +15,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -85,7 +86,7 @@ class ProcessManagerJdbcAutoConfigurationTest {
             StarterTestProcess.TYPE,
             new ProcessBusinessKey("order-1"),
             new StarterTestProcess.Begin("order-1"),
-            CommandContext.root("msg-1"));
+            CommandContext.root(Tenants.ROOT.value(), "msg-1"));
 
     ProcessView view = query.find(started.processRef()).orElseThrow();
     assertEquals("GO", view.step().value());

@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +59,7 @@ class RegistryCommandBusSendAsTest {
   void redeliveringTheSameEffectKeepsTheSameMessageId() {
     CapturingReserveHandler handler = new CapturingReserveHandler();
     CommandBus bus = new RegistryCommandBus(List.of(handler), List.of());
-    CommandContext effectCtx = CommandContext.root("effect-99");
+    CommandContext effectCtx = CommandContext.root(Tenants.ROOT.value(), "effect-99");
 
     bus.sendAs(new Reserve("s"), effectCtx);
     bus.sendAs(new Reserve("s"), effectCtx); // relay redelivers the same persisted effect

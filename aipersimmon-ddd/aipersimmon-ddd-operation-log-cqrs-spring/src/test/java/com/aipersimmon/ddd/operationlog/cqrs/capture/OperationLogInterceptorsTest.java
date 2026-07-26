@@ -15,13 +15,14 @@ import com.aipersimmon.ddd.operationlog.model.OperationLogDraft;
 import com.aipersimmon.ddd.operationlog.model.Outcome;
 import com.aipersimmon.ddd.operationlog.spi.ClassifiedOutcome;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class OperationLogInterceptorsTest {
 
-  private static final CommandContext CTX = CommandContext.root("m1");
+  private static final CommandContext CTX = CommandContext.root(Tenants.ROOT.value(), "m1");
 
   private static OperationLogDefinitionRegistry registryWithUpdateRemark() {
     return OperationLogDefinitionRegistry.build(

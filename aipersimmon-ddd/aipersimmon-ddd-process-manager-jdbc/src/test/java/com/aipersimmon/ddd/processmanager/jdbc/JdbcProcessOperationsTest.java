@@ -30,6 +30,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -117,7 +118,7 @@ class JdbcProcessOperationsTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
   }
 
   private String lifecycle() {
@@ -129,7 +130,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmPoisonDeadline(),
-        CommandContext.root("msg-arm"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
     ProcessDeadlineWorker worker =
         new ProcessDeadlineWorker(
             new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("dw")),
@@ -174,7 +175,9 @@ class JdbcProcessOperationsTest {
     // handle returns normally (parked), so the transport can ack instead of retrying forever.
     ProcessAdvanceResult parked =
         runtime.handle(
-            started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
+            started.processRef(),
+            new TestFulfilment.Advance(),
+            CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
     assertFalse(parked.duplicate());
     assertEquals(
         1L,
@@ -185,7 +188,9 @@ class JdbcProcessOperationsTest {
     // A redelivery of the same input while suspended is a duplicate no-op — it is not parked twice.
     ProcessAdvanceResult again =
         runtime.handle(
-            started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
+            started.processRef(),
+            new TestFulfilment.Advance(),
+            CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
     assertTrue(again.duplicate());
     assertEquals(
         1L,
@@ -200,7 +205,9 @@ class JdbcProcessOperationsTest {
     String deadEffectId = started.transitionId() + "#0";
     suspendViaDeadEffect();
     runtime.handle(
-        started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
 
     operations.redriveEffect(deadEffectId, "operator-1", "transient outage cleared");
 
@@ -270,9 +277,13 @@ class JdbcProcessOperationsTest {
 
     // Two distinct inputs arrive while suspended; both are parked, not rebounded.
     runtime.handle(
-        started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
     runtime.handle(
-        started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan"));
+        started.processRef(),
+        new TestFulfilment.FanOut(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-fan"));
     assertEquals(
         2L,
         jdbc.queryForObject(
@@ -296,7 +307,9 @@ class JdbcProcessOperationsTest {
     suspendViaDeadEffect();
     // Park an input under a specific correlation while suspended.
     runtime.handle(
-        started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-adv"));
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
 
     operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
 

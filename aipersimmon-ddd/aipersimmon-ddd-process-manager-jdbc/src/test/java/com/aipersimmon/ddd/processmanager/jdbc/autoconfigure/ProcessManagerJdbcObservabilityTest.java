@@ -19,6 +19,7 @@ import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -111,7 +112,7 @@ class ProcessManagerJdbcObservabilityTest {
             StarterTestProcess.TYPE,
             new ProcessBusinessKey("order-obs"),
             new StarterTestProcess.Begin("order-obs"),
-            CommandContext.root("msg-1"));
+            CommandContext.root(Tenants.ROOT.value(), "msg-1"));
     assertEquals(1, relay.pollOnce(), "the staged effect is delivered");
 
     assertTrue(

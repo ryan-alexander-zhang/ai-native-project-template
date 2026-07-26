@@ -23,6 +23,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.testsupport.SharedContainers;
 import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.time.Clock;
@@ -108,7 +109,7 @@ class EffectRelayPostgresConcurrencyTest {
           TestFulfilment.TYPE,
           new ProcessBusinessKey("order-" + i),
           new TestFulfilment.Started("order-" + i),
-          CommandContext.root("msg-" + i));
+          CommandContext.root(Tenants.ROOT.value(), "msg-" + i));
     }
     assertEquals(
         (long) total,

@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,7 +96,8 @@ class OutboxTracingTest {
 
   @Test
   void writerCapturesTraceContextOntoTheRow() {
-    integrationEvents.publish(new SampleEvent("o1"), CommandContext.root("m1"));
+    integrationEvents.publish(
+        new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1"));
 
     String traceparent =
         jdbc.queryForObject("SELECT traceparent FROM aipersimmon_outbox", String.class);
@@ -107,7 +109,8 @@ class OutboxTracingTest {
 
   @Test
   void relayRestoresTheCapturedContextAroundDispatch() {
-    integrationEvents.publish(new SampleEvent("o1"), CommandContext.root("m1"));
+    integrationEvents.publish(
+        new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1"));
 
     relay.relay();
 

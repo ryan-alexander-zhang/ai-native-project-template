@@ -23,6 +23,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -101,7 +102,7 @@ class JdbcProcessMaxLifetimeTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
   }
 
   @Test

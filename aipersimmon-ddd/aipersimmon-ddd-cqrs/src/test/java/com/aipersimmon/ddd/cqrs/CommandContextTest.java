@@ -61,7 +61,7 @@ class CommandContextTest {
 
   @Test
   void rootUnderTheSentinelTenantSeedsCorrelationToItsOwnId() {
-    CommandContext ctx = CommandContext.root("cmd-1");
+    CommandContext ctx = CommandContext.root(Tenants.ROOT.value(), "cmd-1");
 
     assertEquals(Tenants.ROOT.value(), ctx.tenantId());
     assertEquals("cmd-1", ctx.messageId());

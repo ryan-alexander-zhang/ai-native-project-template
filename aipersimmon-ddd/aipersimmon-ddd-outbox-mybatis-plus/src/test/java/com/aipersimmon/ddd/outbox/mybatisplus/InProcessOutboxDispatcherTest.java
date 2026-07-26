@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.InProcessOutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +74,8 @@ class InProcessOutboxDispatcherTest {
   void relayRepublishesTheEventInProcess() {
     assertInstanceOf(InProcessOutboxDispatcher.class, dispatcher);
 
-    integrationEvents.publish(new InProcessSampleEvent("O-1"), CommandContext.root("cmd-1"));
+    integrationEvents.publish(
+        new InProcessSampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
     relay.relay();
 
     assertEquals(1, listener.received.size());

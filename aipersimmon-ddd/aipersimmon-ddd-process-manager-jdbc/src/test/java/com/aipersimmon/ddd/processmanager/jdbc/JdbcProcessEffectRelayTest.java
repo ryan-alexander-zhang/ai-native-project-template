@@ -25,6 +25,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -115,7 +116,7 @@ class JdbcProcessEffectRelayTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
   }
 
   private String status(String effectId) {
@@ -147,7 +148,9 @@ class JdbcProcessEffectRelayTest {
     // Deliver the start's single effect first, so the fan-out effects become the head.
     relay.pollOnce();
     runtime.handle(
-        started.processRef(), new TestFulfilment.FanOut(), CommandContext.root("msg-fan"));
+        started.processRef(),
+        new TestFulfilment.FanOut(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-fan"));
 
     int firstRound = relay.pollOnce();
     assertEquals(1, firstRound, "only the head of the two fan-out effects is delivered");
@@ -165,7 +168,9 @@ class JdbcProcessEffectRelayTest {
     // not on (created_at, effect_index), or the per-instance serial guarantee is broken.
     ProcessAdvanceResult started = start();
     runtime.handle(
-        started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-advance"));
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-advance"));
     ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     assertEquals(1, relay.pollOnce(), "only the head effect is delivered; the later one waits");

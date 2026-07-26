@@ -23,6 +23,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.testsupport.SharedContainers;
 import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.time.Clock;
@@ -110,7 +111,7 @@ class EffectRelayMysqlConcurrencyTest {
           StarterTestProcess.TYPE,
           new ProcessBusinessKey("order-" + i),
           new StarterTestProcess.Begin("order-" + i),
-          CommandContext.root("msg-" + i));
+          CommandContext.root(Tenants.ROOT.value(), "msg-" + i));
     }
 
     AtomicInteger delivered = new AtomicInteger();

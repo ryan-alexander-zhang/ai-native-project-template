@@ -22,6 +22,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -95,7 +96,7 @@ class JdbcProcessRuntimeTracingTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("m1"));
+        CommandContext.root(Tenants.ROOT.value(), "m1"));
 
     assertEquals(1, tracer.spans.size());
     RecordingTracer.RecordedSpan span = tracer.spans.get(0);
@@ -116,7 +117,11 @@ class JdbcProcessRuntimeTracingTest {
 
     assertThrows(
         RuntimeException.class,
-        () -> runtime.handle(ghost, new TestFulfilment.Advance(), CommandContext.root("m2")));
+        () ->
+            runtime.handle(
+                ghost,
+                new TestFulfilment.Advance(),
+                CommandContext.root(Tenants.ROOT.value(), "m2")));
 
     assertEquals(1, tracer.spans.size());
     RecordingTracer.RecordedSpan span = tracer.spans.get(0);

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,7 @@ class IntegrationEventsTest {
     IntegrationEvents events = (event, context) -> published.add(event);
 
     SampleEvent event = new SampleEvent("e-1");
-    events.publish(event, CommandContext.root("c-1"));
+    events.publish(event, CommandContext.root(Tenants.ROOT.value(), "c-1"));
 
     assertEquals(List.of(event), published);
   }
@@ -31,7 +32,9 @@ class IntegrationEventsTest {
     UnsupportedOperationException ex =
         assertThrows(
             UnsupportedOperationException.class,
-            () -> events.publishAs(new SampleEvent("e-1"), CommandContext.root("c-1")));
+            () ->
+                events.publishAs(
+                    new SampleEvent("e-1"), CommandContext.root(Tenants.ROOT.value(), "c-1")));
     assertEquals(
         "this IntegrationEvents transport does not support staged (publishAs) publication",
         ex.getMessage());

@@ -26,6 +26,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -97,7 +98,7 @@ class JdbcProcessRuntimeTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(messageId));
+        CommandContext.root(Tenants.ROOT.value(), messageId));
   }
 
   private long count(String table) {
@@ -159,7 +160,9 @@ class JdbcProcessRuntimeTest {
     ProcessAdvanceResult started = start("msg-1");
     ProcessAdvanceResult advanced =
         runtime.handle(
-            started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-2"));
+            started.processRef(),
+            new TestFulfilment.Advance(),
+            CommandContext.root(Tenants.ROOT.value(), "msg-2"));
 
     assertFalse(advanced.duplicate());
     assertEquals(2L, advanced.revision().value());
@@ -174,7 +177,11 @@ class JdbcProcessRuntimeTest {
     ProcessRef ghost = new ProcessRef(new ProcessInstanceId("nope"), TestFulfilment.TYPE, ORDER);
     assertThrows(
         ProcessNotFoundException.class,
-        () -> runtime.handle(ghost, new TestFulfilment.Advance(), CommandContext.root("m")));
+        () ->
+            runtime.handle(
+                ghost,
+                new TestFulfilment.Advance(),
+                CommandContext.root(Tenants.ROOT.value(), "m")));
   }
 
   @Test
@@ -187,7 +194,10 @@ class JdbcProcessRuntimeTest {
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            runtime.handle(mismatched, new TestFulfilment.Advance(), CommandContext.root("msg-2")));
+            runtime.handle(
+                mismatched,
+                new TestFulfilment.Advance(),
+                CommandContext.root(Tenants.ROOT.value(), "msg-2")));
     // The real instance is untouched: still one transition, revision 1.
     assertEquals(1L, count("aipersimmon_process_transition"));
     assertEquals(1L, query.find(started.processRef()).orElseThrow().revision().value());
@@ -200,7 +210,9 @@ class JdbcProcessRuntimeTest {
         IllegalStateException.class,
         () ->
             runtime.handle(
-                started.processRef(), new TestFulfilment.Boom(), CommandContext.root("msg-2")));
+                started.processRef(),
+                new TestFulfilment.Boom(),
+                CommandContext.root(Tenants.ROOT.value(), "msg-2")));
 
     // Nothing from the failed advance persisted: still one transition, one effect, revision 1.
     assertEquals(1L, count("aipersimmon_process_transition"));
@@ -214,7 +226,9 @@ class JdbcProcessRuntimeTest {
   void anIllegalLifecycleTransitionIsRejected() {
     ProcessAdvanceResult started = start("msg-1");
     runtime.handle(
-        started.processRef(), new TestFulfilment.EnterCompensating(), CommandContext.root("msg-2"));
+        started.processRef(),
+        new TestFulfilment.EnterCompensating(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-2"));
     // COMPENSATING -> RUNNING is illegal.
     assertThrows(
         IllegalStateException.class,
@@ -222,17 +236,22 @@ class JdbcProcessRuntimeTest {
             runtime.handle(
                 started.processRef(),
                 new TestFulfilment.IllegalBack(),
-                CommandContext.root("msg-3")));
+                CommandContext.root(Tenants.ROOT.value(), "msg-3")));
   }
 
   @Test
   void ordinaryInputToATerminalInstanceIsAnIdempotentNoOp() {
     ProcessAdvanceResult started = start("msg-1");
-    runtime.handle(started.processRef(), new TestFulfilment.Finish(), CommandContext.root("msg-2"));
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.Finish(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-2"));
 
     ProcessAdvanceResult afterDone =
         runtime.handle(
-            started.processRef(), new TestFulfilment.Advance(), CommandContext.root("msg-3"));
+            started.processRef(),
+            new TestFulfilment.Advance(),
+            CommandContext.root(Tenants.ROOT.value(), "msg-3"));
 
     assertTrue(afterDone.duplicate());
     assertEquals(ProcessLifecycle.COMPLETED, afterDone.lifecycle());
@@ -244,7 +263,9 @@ class JdbcProcessRuntimeTest {
   void schedulingADeadlinePersistsAPendingDeadlineRow() {
     ProcessAdvanceResult started = start("msg-1");
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-2"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-2"));
 
     Map<String, Object> deadline = jdbc.queryForMap("SELECT * FROM aipersimmon_process_deadline");
     assertEquals("REVIEW", deadline.get("NAME"));

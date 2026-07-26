@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +58,9 @@ class CqrsContractsTest {
     CommandBus bus = new TestBus((c, ctx) -> "x", List.of());
     assertThrows(
         UnsupportedOperationException.class,
-        () -> bus.sendAs(new CreateThing("w"), CommandContext.root("effect-1")));
+        () ->
+            bus.sendAs(
+                new CreateThing("w"), CommandContext.root(Tenants.ROOT.value(), "effect-1")));
   }
 
   @Test
@@ -100,7 +103,7 @@ class CqrsContractsTest {
             List.of());
 
     // e.g. an inbound integration event mapped to a cause context.
-    CommandContext cause = CommandContext.root("evt-1");
+    CommandContext cause = CommandContext.root(Tenants.ROOT.value(), "evt-1");
     bus.send(new CreateThing("y"), cause);
 
     CommandContext ctx = seen.get(0);
@@ -178,7 +181,7 @@ class CqrsContractsTest {
 
     @Override
     public <R> R send(Command<R> command) {
-      return dispatch(command, CommandContext.root(nextId()));
+      return dispatch(command, CommandContext.root(Tenants.ROOT.value(), nextId()));
     }
 
     @Override

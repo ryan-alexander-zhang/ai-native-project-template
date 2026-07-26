@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +68,8 @@ class OutboxMybatisPlusTest {
 
   @Test
   void writesUnsentRowThenRelayDispatchesAndMarksSent() {
-    integrationEvents.publish(new SampleEvent("O-1"), CommandContext.root("cmd-1"));
+    integrationEvents.publish(
+        new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
 
     assertEquals(
         Integer.valueOf(1),

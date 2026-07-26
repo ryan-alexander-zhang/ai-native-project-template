@@ -18,6 +18,7 @@ import com.aipersimmon.ddd.operationlog.engine.pipeline.OperationLogLimits;
 import com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogSink;
 import com.aipersimmon.ddd.operationlog.model.Actor;
 import com.aipersimmon.ddd.operationlog.port.OperationLogs;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.List;
@@ -78,7 +79,7 @@ public final class OperationLogEndToEndScenarios {
     assertEquals("ROLLED_BACK", completion(jdbc, "res-3"));
 
     // 4. idempotent redelivery (same messageId, same result kind): exactly one log row.
-    CommandContext redelivered = CommandContext.root("msg-9");
+    CommandContext redelivered = CommandContext.root(Tenants.ROOT.value(), "msg-9");
     bus.sendAs(new UpdateResource("res-4", "a", false), redelivered);
     bus.sendAs(new UpdateResource("res-4", "a", false), redelivered);
     assertEquals(1, logCount(jdbc, "res-4"));

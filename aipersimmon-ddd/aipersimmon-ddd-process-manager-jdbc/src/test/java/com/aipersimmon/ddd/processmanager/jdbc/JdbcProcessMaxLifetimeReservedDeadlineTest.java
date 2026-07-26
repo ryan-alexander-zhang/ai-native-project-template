@@ -35,6 +35,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -120,7 +121,9 @@ class JdbcProcessMaxLifetimeReservedDeadlineTest {
 
   @Test
   void aDefinitionReschedulingTheReservedNameInStartWinsOverTheDefaultBackstop() {
-    runtime().start(TYPE, ORDER, new Reschedule(), CommandContext.root("msg-start"));
+    runtime()
+        .start(
+            TYPE, ORDER, new Reschedule(), CommandContext.root(Tenants.ROOT.value(), "msg-start"));
 
     assertEquals(
         1L,
@@ -137,7 +140,8 @@ class JdbcProcessMaxLifetimeReservedDeadlineTest {
 
   @Test
   void aDefinitionCancellingTheReservedNameInStartWinsOverTheDefaultBackstop() {
-    runtime().start(TYPE, ORDER, new Cancel(), CommandContext.root("msg-start"));
+    runtime()
+        .start(TYPE, ORDER, new Cancel(), CommandContext.root(Tenants.ROOT.value(), "msg-start"));
 
     assertEquals(
         0L,

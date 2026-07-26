@@ -15,6 +15,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -77,7 +78,7 @@ class JdbcProcessRuntimeLongIdTest {
             TestFulfilment.TYPE,
             new ProcessBusinessKey("order-1"),
             new TestFulfilment.Started("order-1"),
-            CommandContext.root("msg-start"));
+            CommandContext.root(Tenants.ROOT.value(), "msg-start"));
 
     // A no-effect transition (Finish) whose input carries an id longer than the old 64-char column
     // width but within the 96-char id-column width; only input_message_id is exercised.

@@ -25,8 +25,10 @@ import com.aipersimmon.ddd.tenancy.Tenants;
  *
  * <p>Framework-free and immutable. Ids are minted by the {@link CommandBus}, not by this type, and
  * the tenant is seeded by the bus from the ambient {@code TenantContext}; use {@link #root(String,
- * String)} / {@link #root(String)} and {@link #deriveChild(String)} to build the chain from a
- * bus-supplied id.
+ * String)} and {@link #deriveChild(String)} to build the chain from a bus-supplied id. There is
+ * deliberately no tenant-defaulting overload: the owning tenant is always an explicit choice, made
+ * at the trusted boundary that mints the context (the bus reads it from the ambient tenant; a
+ * genuinely tenant-less system path passes {@link Tenants#ROOT} by name).
  */
 public record CommandContext(
     String tenantId, String messageId, String correlationId, String causationId) {
@@ -42,17 +44,6 @@ public record CommandContext(
       throw new IllegalArgumentException("correlationId required");
     }
     // causationId is null for a root command.
-  }
-
-  /**
-   * A root context under the sentinel {@link Tenants#ROOT} tenant, for a command with no resolved
-   * tenant (single-tenant deployments) and no upstream cause. Correlation is seeded to the
-   * command's own id.
-   *
-   * @param messageId the bus-minted id for this command
-   */
-  public static CommandContext root(String messageId) {
-    return root(Tenants.ROOT.value(), messageId);
   }
 
   /**

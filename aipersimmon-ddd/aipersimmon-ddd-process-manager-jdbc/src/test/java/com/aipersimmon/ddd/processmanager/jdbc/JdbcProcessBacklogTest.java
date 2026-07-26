@@ -26,6 +26,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -100,7 +101,7 @@ class JdbcProcessBacklogTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
   }
 
   private ProcessBacklog backlogAt(Instant at) {
@@ -141,7 +142,7 @@ class JdbcProcessBacklogTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root("msg-arm")); // schedules a due REVIEW deadline
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm")); // schedules a due REVIEW deadline
 
     ProcessBacklog backlog = backlogAt(CLOCK.instant().plusSeconds(5));
     assertEquals(Duration.ofSeconds(5), backlog.oldestPendingEffectAge());

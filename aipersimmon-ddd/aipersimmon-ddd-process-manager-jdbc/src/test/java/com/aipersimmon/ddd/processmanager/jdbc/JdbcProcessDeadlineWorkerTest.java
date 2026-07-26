@@ -20,6 +20,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -105,7 +106,7 @@ class JdbcProcessDeadlineWorkerTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root("msg-start"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
   }
 
   private String instanceLifecycle() {
@@ -116,7 +117,9 @@ class JdbcProcessDeadlineWorkerTest {
   void firesADueDeadlineAndAdvancesTheProcess() {
     ProcessAdvanceResult started = start();
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-arm"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
 
     int fired = worker(zeroBackoff(3)).pollOnce();
 
@@ -135,9 +138,13 @@ class JdbcProcessDeadlineWorkerTest {
     ProcessAdvanceResult started = start();
     // Arm the same deadline name twice: generation 1 then 2, both pending.
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("arm-1"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "arm-1"));
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("arm-2"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "arm-2"));
     assertEquals(
         2L,
         jdbc.queryForObject(
@@ -167,7 +174,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmPoisonDeadline(),
-        CommandContext.root("msg-arm"));
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
     ProcessDeadlineWorker worker = worker(zeroBackoff(2));
 
     worker.pollOnce(); // attempt 1 -> handle throws -> retry
@@ -187,7 +194,9 @@ class JdbcProcessDeadlineWorkerTest {
     ProcessAdvanceResult started = start();
     // Arm the deadline under a specific correlation; the fire must stay on that chain.
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-arm"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
 
     assertEquals(1, worker(zeroBackoff(3)).pollOnce());
 
@@ -204,7 +213,9 @@ class JdbcProcessDeadlineWorkerTest {
   void aDeadlineCancelledWhileInFlightDoesNotFire() {
     ProcessAdvanceResult started = start();
     runtime.handle(
-        started.processRef(), new TestFulfilment.ArmDeadline(), CommandContext.root("msg-arm"));
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
 
     // A worker claimed the deadline (IN_FLIGHT) and its lease has since expired (crash/slow
     // worker).
@@ -219,7 +230,9 @@ class JdbcProcessDeadlineWorkerTest {
 
     // The business cancels the deadline while it is in flight.
     runtime.handle(
-        started.processRef(), new TestFulfilment.CancelReview(), CommandContext.root("msg-cancel"));
+        started.processRef(),
+        new TestFulfilment.CancelReview(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-cancel"));
 
     int fired = worker(zeroBackoff(3)).pollOnce();
 

@@ -18,6 +18,7 @@ import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessView;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
@@ -86,7 +87,7 @@ class ProcessManagerJdbcJacksonCodecTest {
             StarterTestProcess.TYPE,
             new ProcessBusinessKey("order-json"),
             new StarterTestProcess.Begin("order-json"),
-            CommandContext.root("msg-1"));
+            CommandContext.root(Tenants.ROOT.value(), "msg-1"));
 
     ProcessView view = query.find(started.processRef()).orElseThrow();
     assertEquals(

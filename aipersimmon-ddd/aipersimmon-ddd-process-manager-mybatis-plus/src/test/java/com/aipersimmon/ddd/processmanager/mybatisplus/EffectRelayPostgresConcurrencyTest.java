@@ -27,6 +27,7 @@ import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessDeadlineMappe
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessEffectMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessInstanceMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessTransitionMapper;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.testsupport.SharedContainers;
 import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.time.Clock;
@@ -129,7 +130,7 @@ class EffectRelayPostgresConcurrencyTest {
           MybatisTestProcess.TYPE,
           new ProcessBusinessKey("order-" + i),
           new MybatisTestProcess.Begin("order-" + i),
-          CommandContext.root("msg-" + i));
+          CommandContext.root(Tenants.ROOT.value(), "msg-" + i));
     }
 
     AtomicInteger delivered = new AtomicInteger();

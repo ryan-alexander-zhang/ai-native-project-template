@@ -30,6 +30,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -122,7 +123,7 @@ class JdbcProcessStateUpcastTest {
         now);
     ProcessRef ref = new ProcessRef(new ProcessInstanceId("inst-1"), TYPE, ORDER);
 
-    runtime.handle(ref, new Advance(), CommandContext.root("msg-adv"));
+    runtime.handle(ref, new Advance(), CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
 
     assertEquals(
         1,
