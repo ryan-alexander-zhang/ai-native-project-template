@@ -2,7 +2,7 @@
 id: issue-00052-domain-events-lost-when-publish-and-clear-forgotten
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -66,6 +66,21 @@ parent: report-00001-ddd-framework-review
 **注意改动面**：`TransactionCommandInterceptor`（新增提交前校验 + Javadoc）、`DomainEvents` Javadoc、
 样例 4 处 handler（删除手工 `publishAndClear`）、样例 2 个仓储（`MyBatisOrders` / `MyBatisCustomers` 等在
 `save` 末尾 drain）。不改 `DomainEvents` 接口签名。
+
+## 验证结果（批次 A，已修复）
+
+`publishAndClear` 已从 4 处 handler（`PlaceOrderHandler` / `ConfirmOrderHandler` / `CancelOrderHandler` /
+`FulfilmentTrigger`）全部移除，收口到 3 个仓储的 `save()` 末尾；`ConfirmOrderHandler` / `CancelOrderHandler` /
+`FulfilmentTrigger` 因此不再需要 `DomainEvents` 协作者，构造签名一并收窄。
+
+`DomainEvents` 的 Javadoc 已删去 "or the handler" 这一歧义授权，并明确写出「handler 必须**不**调用它」及原因；
+`TransactionCommandInterceptor` 的说明同步更新。
+
+事件仍然到达：样例全量 `verify` 通过，其中 `OrderingFlowTest` / `ReviewFlowTest` /
+`PaymentCompensationFlowTest` 依赖领域事件驱动整条跨上下文流程走到终态——若收口丢了事件，这些测试会立刻变红。
+
+**本阶段有意不实现报告 P0-2 的方案 B（提交前兜底扫描）**：一旦发布收口进仓储 `save()`，「被 save 过的聚合」
+其事件集合恒为空，该检查退化为恒真断言。理由记录在 [[plan-00013-phase-one-correctness-remediation]]。
 
 ## 关联
 

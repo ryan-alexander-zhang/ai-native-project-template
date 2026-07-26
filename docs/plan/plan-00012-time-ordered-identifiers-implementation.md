@@ -21,7 +21,10 @@ framework-free 的 `IdGenerator` SPI（`aipersimmon-ddd-core`，零依赖），�
 **铁律**：
 1. **core 保持零第三方运行时依赖**：`IdGenerator` 是纯接口、无 Spring/JDBC/uuid 库依赖（enforcer + ArchUnit 守护不变）。
 2. **前向兼容、零 DDL 迁移**：不改任何列/唯一键；v4 老行与 v7 新行合法共存、各自全局唯一。
-3. **回退等价**：每个消费 autoconfig 用 `ObjectProvider<IdGenerator>`——present 用之，absent 保留现有
+3. **回退等价**（⚠ **已于 2026-07-26 被推翻，见 [[issue-00053-id-generator-silently-degrades-to-uuidv4]]**：
+   该 fallback 使「漏配依赖」与「有意简约装配」在类型上不可区分，等于让本计划要消除的随机主键写放大可以静默
+   复现。`aipersimmon-ddd-id` 现为 6 个装配模块的 `compile` 依赖，六处 fallback 已删除，缺 `IdGenerator` 时
+   启动失败。本条以下描述仅作历史记录。）：每个消费 autoconfig 用 `ObjectProvider<IdGenerator>`——present 用之，absent 保留现有
    `UUID.randomUUID()` 默认；缺 `-id` 模块时行为与改造前逐字节等价。
 4. **不改身份语义**：id 皆不透明 String，无 `UUID.fromString` 解析假设被引入到业务/框架路径（测试断言不得依赖 v4 随机性，
    也不得反过来把 v7 的时间有序当作契约向消费方暴露）。

@@ -2,7 +2,7 @@
 id: issue-00054-sample-aggregate-ids-use-random-uuid
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -58,6 +58,18 @@ parent: report-00001-ddd-framework-review
 
 **注意改动面**：`PlaceOrderHandler`、inventory 侧对应 handler、`IdGenerator` Javadoc。与
 [[issue-00051-aggregates-have-no-optimistic-locking]] 同批修改样例聚合表，DDL 迁移可合并为一个。
+
+## 验证结果（已修复）
+
+`PlaceOrderHandler`（`OrderId`）与 `ReserveStockHandler`（`ReservationId`）改为由注入的 `IdGenerator` 铸造；
+样例业务代码内已无 `UUID.randomUUID()` 用于聚合主键。
+
+根因一并修掉：`core/id/IdGenerator.java` 的 Javadoc 现在把「业务聚合/实体的主键」**显式列为推荐用途**，
+与既有排除清单对称，并补上「业务提供的自然键（SKU、客户编码）不由框架铸造」这一边界。
+
+回归守卫：`start/src/test/java/com/example/AggregateIdIsTimeOrderedTest.java` 断言下单返回的 orderId
+`UUID.fromString(...).version() == 7`，且连续铸造的 5 个 id 字典序与创建先后一致（时间有序性在 `VARCHAR`
+主键上的可观测表现，也即尾部插入的前提）。id 仍视为不透明——不断言内嵌时间戳可读。
 
 ## 关联
 

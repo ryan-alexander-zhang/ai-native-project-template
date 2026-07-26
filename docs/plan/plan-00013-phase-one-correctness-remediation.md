@@ -65,6 +65,9 @@ flowchart TB
 
 ## 二、任务
 
+> **批次 A 状态：已完成**（A1 / A3 / A4 / A5 / A6 / A7 / A8 落地；A2 取消，理由见下）。批次 B 未开始。
+> 实施中相对本计划的三处偏差，均记录在对应任务下：A2 取消、A8 合并为一个测试类、V3 默认值由 `0` 改为 `1`。
+
 > 约定：`[core]` 等标模块；每个任务 test-first。批次 A 内 A1/A2/A3 与 A4–A8 可并行起步，A4→A5→A6→A8 有序。
 
 ### 批次 A · 正确性基线
@@ -87,10 +90,13 @@ flowchart TB
   移除 `RegistryCommandBus` / `SpringIntegrationEvents` / `OutboxWriter`(×2) 的「无 supplier」构造重载。
   保留 `@ConditionalOnMissingBean` 可覆盖性。**测**：装配测断言默认 `messageId`/`event_id` 均 `version()==7`；
   自定义 `IdGenerator` 仍可覆盖。**并为 [[plan-00012-time-ordered-identifiers-implementation]] 补一条 patch**
-  说明其「铁律 3（回退等价）」被本任务有意推翻。
+  说明其「铁律 3（回退等价）」被本任务有意推翻。**已办**：直接在 plan-00012 的铁律 3 就地加了推翻说明并
+  指向 issue-00053，而不另建 patch 文档——该 plan 已 `resolved`，为一条交叉引用新建文档只会增加文档数而不增信息。
   → [[issue-00053-id-generator-silently-degrades-to-uuidv4]]
 - **A4** `[sample]` 新迁移 `V3__aggregate_version.sql`：`ordering.orders` / `inventory.stocks` /
-  `inventory.reservations` 各加 `version BIGINT NOT NULL DEFAULT 0`。不动 `ordering.customers`（只读聚合）。
+  `inventory.reservations` 各加 `version BIGINT NOT NULL DEFAULT 1`。不动 `ordering.customers`（只读聚合）。
+  **默认值 `1` 而非计划中的 `0`**：`0` 保留表示「尚未持久化」（仓储据此区分 INSERT/UPDATE），已有的 V1 种子行
+  以 `0` 迁入会被误判为新聚合而走 INSERT 撞主键。实施中发现并修正。
   → [[issue-00051-aggregates-have-no-optimistic-locking]]
 - **A5** `[sample]` `OrderDo` / `StockDo` / `ReservationDo` 加 `@Version private Long version`；rehydrate 工厂
   （`Order.reconstitute`、`Stock`、`Reservation`）多带 version 参数并 `restoreVersion`；3 个仓储改为
@@ -98,8 +104,10 @@ flowchart TB
   `OptimisticLockingFailureException`；删除 `selectById` 预查（消 TOCTOU）。
   **在 `start` 注册一个自有 `MybatisPlusInterceptor`**，组合 `TenantLineInnerInterceptor`（沿用 tenancy 的
   handler 与属性）+ `OptimisticLockerInnerInterceptor`——tenancy autoconfig 按其既有 `@ConditionalOnMissingBean`
-  文档整体退让。**测**：装配测断言该 interceptor 同时含两个 inner interceptor（防止退让把租户隔离一起关掉）；
-  既有 `TwoTenantAcceptanceTest` 必须保持绿。
+  文档整体退让。**测**：`MybatisPlusInterceptorCompositionTest` 断言恰好一个 `MybatisPlusInterceptor`、且它
+  同时含 `TenantLineInnerInterceptor` 与 `OptimisticLockerInnerInterceptor`、顺序为「租户先、乐观锁后」——
+  两个 inner interceptor 任一缺席都是静默失效（租户不隔离，或版本谓词消失、超卖回归），故在装配层直接断言。
+  既有 `TwoTenantAcceptanceTest` 保持绿。
   → [[issue-00051-aggregates-have-no-optimistic-locking]]、[[design-00011-aggregate-persistence-contract]] §3
 - **A6** `[sample]` 3 个仓储在 `save()` 末尾 `domainEvents.publishAndClear(aggregate)`；删除
   `PlaceOrderHandler:114` / `ConfirmOrderHandler:41` / `CancelOrderHandler:39` / `FulfilmentTrigger:46`
@@ -112,10 +120,14 @@ flowchart TB
   显式列为推荐用途**（本 issue 的根因）。**测**：`AggregateIdIsTimeOrderedTest` 断言返回的 orderId
   `UUID.fromString(...).version()==7`，且连续下单 id 字典序与创建先后一致。
   → [[issue-00054-sample-aggregate-ids-use-random-uuid]]
-- **A8** `[sample]` 两个并发回归测试（Testcontainers PostgreSQL + `CyclicBarrier` 确定性交错）：
-  `ConcurrentStockReservationTest`（**主**：断言恰好一方成功 + 守恒式
-  `sum(reservation_lines.quantity) + stocks.available == 初始值`）与 `ConcurrentOrderModificationTest`
-  （**次**：断言恰好一方抛 `ConcurrencyConflictException`，outbox 只有胜者的事件）。
+- **A8** `[sample]` 并发回归测试 `ConcurrentAggregateWriteTest`（Testcontainers PostgreSQL）：
+  `concurrentReservationsOfOneSkuCannotOversell`（`CyclicBarrier` 对齐两个事务，断言恰好一方成功 + 库存守恒）
+  与 `aWriteFromAStaleSnapshotIsRejected`（**无线程、确定性**，钉住版本谓词本身）。另加
+  `AggregateIdIsTimeOrderedTest`（A7 的守卫）。
+  **合并为一个类、不建状态机专用用例**：计划中的 `ConcurrentOrderModificationTest` 与超卖用例由**同一个**
+  版本谓词保证，再建一份只是重复覆盖同一机制；超卖是业务后果更重且断言更强（守恒式）的那条路径，故选它作主用例。
+  **已证明该测试能捕获缺陷**：临时还原 `MyBatisStocks.save` 的读-改-写后，两个用例双双变红，
+  超卖用例报 `expected: <1> but was: <2>`。
   → [[issue-00051-aggregates-have-no-optimistic-locking]]
 
 ### 批次 B · 易用性（依赖批次 A 全绿）

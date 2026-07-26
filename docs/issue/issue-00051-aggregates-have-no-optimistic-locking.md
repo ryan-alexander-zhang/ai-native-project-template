@@ -2,7 +2,7 @@
 id: issue-00051-aggregates-have-no-optimistic-locking
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -93,7 +93,10 @@ T1: 发布 OrderConfirmedEvent                    T2: 发布 OrderCancelledEvent
 
 ## 复现（test-first）
 
-**主复现**：`start/src/test/java/com/example/ConcurrentStockReservationTest.java`（Testcontainers PostgreSQL，
+> 实现时两条复现合并为一个测试类 `ConcurrentAggregateWriteTest`（见「验证结果」）：超卖路径是主用例，
+> 陈旧写入被拒是它依赖的、不带时序的确定性用例。状态机路径（次复现）由同一个版本谓词保证，未单独建测。
+
+**主复现**：`start/src/test/java/com/example/ConcurrentAggregateWriteTest.java`（Testcontainers PostgreSQL，
 两个真实并发事务）——直接证明超卖：
 
 1. 置 `SKU-1` 的 `available = 10`。
@@ -122,12 +125,14 @@ T1: 发布 OrderConfirmedEvent                    T2: 发布 OrderCancelledEvent
 分两批（见 [[plan-00013-phase-one-correctness-remediation]]）：
 
 - **批次 A（正确性基线）**：`AbstractAggregateRoot` 增加 `version`（`0` = 未持久化）+ `restoreVersion` /
-  `version()` / `versionAdvanced()`；**三张被写入的聚合表**加 `version BIGINT NOT NULL DEFAULT 0`（新迁移）：
+  `version()` / `versionAdvanced()`；**三张被写入的聚合表**加 `version BIGINT NOT NULL DEFAULT 1`（新迁移）：
   `ordering.orders`、`inventory.stocks`、`inventory.reservations`。（`ordering.customers` 只读——`Customers`
   端口仅有 `findById`，无 `save`——故**不加**，保持改动面最小。）
   对应 DO 用 MyBatis-Plus `@Version` 声明式加 `WHERE version = ?`；仓储检查 affected-rows，`0` 行则抛
   `OptimisticLockingFailureException`，由既有 `ConcurrencyTranslationCommandInterceptor` 翻译成 409。
   顺带消掉 `selectById + insert` 的 TOCTOU：以 `version() == 0` 区分新建/更新，不再靠先查一次。
+  **默认值是 `1` 而非 `0`**：`0` 被保留表示「尚未持久化」，若已有行以 `0` 迁入，仓储会把它们当作新聚合而走
+  INSERT 并撞主键。（这是实施中发现并修正的一处自伤。）
 - **批次 B（易用性）**：抽出框架侧版本化仓储基类，把「版本谓词 + affected-rows 检查 + 事件发布」收成默认路径，
   见 [[design-00011-aggregate-persistence-contract]]。
 
@@ -142,6 +147,29 @@ autoconfig，则**开启多租户时它静默退让**，`@Version` 不生成 `WH
 **注意改动面**：批次 A 触及 `core`（新增字段与三个方法）、样例 DDL（新迁移）、3 个 DO + 3 个仓储、
 样例的 MyBatis-Plus 拦截器组合；不改任何仓储端口签名，但 **`Order.reconstitute` 等 rehydrate 工厂要多带一个
 version 参数**（破坏性，无外部使用者，可接受）。
+
+## 验证结果（批次 A，已修复）
+
+回归守卫：`start/src/test/java/com/example/ConcurrentAggregateWriteTest.java`（Testcontainers PostgreSQL）。
+
+**证明它能捕获本缺陷**：把 `MyBatisStocks.save` 临时改回修复前的读-改-写后重跑，两个测试双双变红——
+
+- `aWriteFromAStaleSnapshotIsRejected`：`Expected OptimisticLockingFailureException to be thrown,
+  but nothing was thrown`（陈旧快照的写入被静默接受）；
+- `concurrentReservationsOfOneSkuCannotOversell`：`exactly one reservation may win ==>
+  expected: <1> but was: <2>`——**超卖如本 issue 所述精确复现**（两个预留都成功）。
+
+恢复修复后两者转绿，且 `available + 已预留 == 初始库存` 的守恒式成立。
+
+冲突→409 链路不再是死代码：仓储抛 `OptimisticLockingFailureException`，由既有
+`ConcurrencyTranslationCommandInterceptor` 译为 `ConcurrencyConflictException`。
+
+样例全量 `mvn -f aipersimmon-ddd-scaffold/multi-module/pom.xml verify` 通过——含真实 Postgres + Kafka 的
+`OrderingFlowTest` / `ReviewFlowTest` / `PaymentCompensationFlowTest` / `TwoTenantAcceptanceTest`，
+证明版本化写入与拦截器组合没有破坏既有流程或租户隔离。
+
+批次 B（仓储基类，把正确写法变成默认路径）见 [[plan-00013-phase-one-correctness-remediation]]，属易用性改进，
+本 issue 的缺陷已闭环。
 
 ## 关联
 

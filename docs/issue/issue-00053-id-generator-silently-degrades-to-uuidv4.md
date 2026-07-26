@@ -2,7 +2,7 @@
 id: issue-00053-id-generator-silently-degrades-to-uuidv4
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -67,6 +67,18 @@ parent: report-00001-ddd-framework-review
 
 **注意改动面**：6 个模块的 autoconfig + 4 个 pom + 移除 4 个构造重载；**不改 schema、不改 id 语义、不改
 `IdGenerator` 接口**。`plan-00012` 的「铁律 3」被本 issue 有意推翻，需在该 plan 加一条 patch 说明。
+
+## 验证结果（已修复）
+
+`aipersimmon-ddd-id` 已成为 6 个装配模块的 `compile` 依赖，6 处 `generator != null ? ... : UUID.randomUUID()`
+三元全部删除，`RegistryCommandBus` / `SpringIntegrationEvents` / `OutboxWriter`(×2) 的默认 id 构造重载移除。
+
+`CommandBusIdGeneratorWiringTest` 原有的 `fallsBackToUuidv4MessageId_whenIdModuleAbsent` 已改写为
+`failsToStart_whenNoIdGeneratorIsAvailable`——断言缺 `IdGenerator` 时上下文**启动失败**，即降级不再静默。
+
+框架全量 `mvn -f aipersimmon-ddd/pom.xml install` 通过，578 项测试绿。改造过程中有 3 个
+`ApplicationContextRunner` 测试（`OutboxClockCoexistenceTest`、`AipersimmonDddOperationLogAutoConfigurationTest`）
+因手工挑选 autoconfig 而启动失败——**这正是预期的 fail-loud**，已把 `-id` 的 autoconfig 纳入其最小装配。
 
 ## 关联
 

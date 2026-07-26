@@ -2,7 +2,7 @@
 id: issue-00055-aggregate-root-missing-identity-equality
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -77,6 +77,20 @@ List.of(a).contains(b);            // false
 
 **注意改动面**：仅 `aipersimmon-ddd-core`（一个类）+ 一条 ArchUnit 规则 + 单测。样例无需改动（它们本就没有
 自己的 `equals`，继承基类即获得正确语义）。
+
+## 验证结果（已修复）
+
+`AbstractAggregateRoot` 实现了 `final equals`（`getClass()` 精确比较 + `Objects.equals(id(), ...)`）与
+`final hashCode`（`Objects.hashCode(id())`）。`version` 与 `domainEvents` 均不参与。
+
+`AbstractAggregateRootTest` 覆盖：同 id 两实例相等且 `hashCode` 一致、`HashSet` 去重为 1、自反、不同 id 不等、
+**不同聚合类型同 id 不等（双向）**、`null` 与异类不等、版本与已记录事件不影响相等。
+（`Set.of()` 遇重复元素是抛异常而非去重，故去重测试改用可变 `HashSet`，否则会因错误的原因通过。）
+
+`mvn -f aipersimmon-ddd/pom.xml -pl aipersimmon-ddd-core verify` 通过，含 JaCoCo 分支覆盖率门禁——
+补 `equals` 自反分支的测试后达标，未调低阈值。
+
+计划中的 ArchUnit 规则经判定冗余后取消，理由见上文「修复」一节。
 
 ## 关联
 
