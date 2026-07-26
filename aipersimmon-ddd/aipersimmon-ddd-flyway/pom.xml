@@ -14,7 +14,7 @@
   <!--
     Opt-in, schema-agnostic Flyway integration for the whole aipersimmon-ddd family
     (Scheme B, shared). Adding this one module to the classpath makes the tables of
-    whichever aipersimmon storage modules are present (outbox, inbox, web-store, saga,
+    whichever aipersimmon storage modules are present (outbox, inbox, web-store,
     process-manager) apply themselves at startup with zero consumer configuration.
 
     It carries NO schema of its own and depends on no storage module. At startup it scans

@@ -90,7 +90,6 @@
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessInstanceStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessTransitionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.lease.MybatisProcessClaimStrategy"/>
-      <Class name="com.aipersimmon.ddd.saga.spring.JdbcDeadlineScheduler"/>
       <Class name="com.aipersimmon.ddd.web.spring.IdempotencyFilter"/>
       <Class name="com.aipersimmon.ddd.web.spring.ProblemHttpResponseWriter"/>
       <Class name="com.aipersimmon.ddd.web.spring.RateLimitFilter"/>

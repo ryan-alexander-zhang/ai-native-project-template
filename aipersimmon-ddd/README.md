@@ -18,12 +18,10 @@ flowchart TD
     subgraph abstraction["抽象层 — 框架无关的端口/状态"]
         application["application<br/>应用层端口"]
         cqrs["cqrs<br/>CQRS 契约"]
-        saga["saga<br/>Saga/流程管理器契约"]
     end
 
     subgraph adapter["适配器层 — Spring / JDBC / Kafka 实现"]
         cqrs_spring["cqrs-spring"]
-        saga_spring["saga-spring"]
         events_spring["events-spring"]
         inbox_jdbc["inbox-jdbc"]
         outbox_jdbc["outbox-jdbc"]
@@ -38,12 +36,10 @@ flowchart TD
     application --> core
     application --> integration
     cqrs --> core
-    saga --> core
     archunit --> core
 
     cqrs_spring --> cqrs
     cqrs_spring --> application
-    saga_spring --> saga
     events_spring --> application
     events_spring --> integration
     inbox_jdbc --> application
@@ -60,8 +56,8 @@ flowchart TD
     classDef adap fill:#fff5eb,stroke:#c05621,color:#7b341e;
     classDef tool fill:#f7f7f7,stroke:#718096,color:#2d3748;
     class core,integration found;
-    class application,cqrs,saga abst;
-    class cqrs_spring,saga_spring,events_spring,inbox_jdbc,outbox_jdbc,messaging_kafka adap;
+    class application,cqrs abst;
+    class cqrs_spring,events_spring,inbox_jdbc,outbox_jdbc,messaging_kafka adap;
     class archunit,bom tool;
 ```
 
@@ -73,9 +69,7 @@ flowchart TD
 | `integration` | 基础 | (无) | 0 |
 | `application` | 抽象 | core, integration | 1 |
 | `cqrs` | 抽象 | core | 1 |
-| `saga` | 抽象 | core | 1 |
 | `cqrs-spring` | 适配器 | cqrs, application | 2 |
-| `saga-spring` | 适配器 | saga | 2 |
 | `events-spring` | 适配器 | application, integration | 2 |
 | `inbox-jdbc` | 适配器 | application | 2 |
 | `outbox-jdbc` | 适配器 | application, integration | 2 |
@@ -86,8 +80,8 @@ flowchart TD
 **设计要点**
 
 - **两个根**:`core`(DDD 战术构件)与 `integration`(集成事件契约)均无内部依赖;只有 `application` 同时依赖二者。
-- **两分结构**:纯领域侧(`core`/`integration`/`application`/`cqrs`/`saga`)完全不依赖 Spring;适配器侧(`*-spring`/`*-jdbc`/`messaging-kafka`)才引入具体技术。端口—适配器边界落到了模块级别。
-- **`cqrs`/`saga` 只依赖 `core`**:是纯领域层构建块,独立于应用层用例装配。
+- **两分结构**:纯领域侧(`core`/`integration`/`application`/`cqrs`)完全不依赖 Spring;适配器侧(`*-spring`/`*-jdbc`/`messaging-kafka`)才引入具体技术。端口—适配器边界落到了模块级别。
+- **`cqrs` 只依赖 `core`**:是纯领域层构建块,独立于应用层用例装配。
 - **最长链**:`messaging-kafka → outbox-jdbc → application → {core, integration}`,Kafka 发送强制走事务性发件箱,不直接触达 `application`。
 
 ---
@@ -124,16 +118,12 @@ DDD 战术构件与结构约定,零依赖。包含:
 
 一切均为可选,仅依赖纯 `core`。
 
-#### `aipersimmon-ddd-saga`
-框架无关的 Saga / 流程管理器契约,用于从一处协调跨聚合、多步骤的流程。`@ProcessManager` 标记协调者,其持久化状态继承 `SagaState`(携带路由用的 correlationId 与守卫合法转换的 `SagaStatus`);`SagaStore` 按 correlationId 加载/保存实例(乐观锁);`DeadlineScheduler` 注册/取消 `Deadline`,到期时派发给 `DeadlineHandler`。契约与引擎无关,流程可通过替换实现迁移到 durable-execution 引擎。编舞(choreography)是默认;本模块面向步骤/分支/超时多到需要显式状态机的流程。
 
 ### 适配器层(Spring / JDBC / Kafka)
 
 #### `aipersimmon-ddd-cqrs-spring`
 CQRS 契约的 Spring 实现。`RegistryCommandBus` / `RegistryQueryBus` 按注册表把命令/查询路由到唯一处理器并施加拦截器链;内置拦截器:`LoggingCommandInterceptor`(最外)、`ValidationCommandInterceptor`(存在 Bean Validation 时)、`TransactionCommandInterceptor`(最内,在 `TransactionTemplateUnitOfWork` 中运行处理器,并在同一事务内排干 `ThreadLocalAggregateCollector` 收集的聚合事件)。`AipersimmonDddCqrsAutoConfiguration` 自动装配,每个 bean 均可被应用覆盖。
 
-#### `aipersimmon-ddd-saga-spring`
-Saga 契约的 Spring 实现。`SchedulingDeadlineScheduler` 通过 `TaskScheduler` 触发 saga 超时并派发给应用的 `DeadlineHandler`(进程内,待触发定时器**不跨重启存活**);`JdbcSagaStore` 是抽象 `SagaStore`,拥有 correlationId 查询与版本校验的 upsert(并发推进时抛 `OptimisticLockingFailureException`),仅把行映射留给限界上下文的子类;`AipersimmonDddSagaAutoConfiguration` 在存在 `DeadlineHandler` 时装配调度器。
 
 #### `aipersimmon-ddd-events-spring`
 事件发布端口的 Spring 适配器——进程内、同步传输。`SpringDomainEvents` / `SpringIntegrationEvents` 把每个事件交给 Spring 的 `ApplicationEventPublisher`,`AipersimmonDddEventsAutoConfiguration` 自动装配。投递是同步、同线程、同事务的,处理器在调用方事务内内联运行。**集成事件发布器仅在缺少 outbox starter 时提供。**

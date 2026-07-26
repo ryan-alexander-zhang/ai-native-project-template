@@ -67,7 +67,7 @@ drives inventory and the process manager.
 | Domain events (subscriber in application layer) | `OrderFulfilmentStarter` on `OrderReadyForFulfilmentEvent` | `ReviewFlowTest`, `OrderingFlowTest` |
 | Integration events + transactional outbox → Kafka → inbox | `OrderReadyForFulfilment`, `PaymentRequested` (`*-api`); `PlaceOrderHandler`/`FulfilmentTrigger` publish | `OutboxAtomicityTest`, `IntegrationEventTransportTest` |
 | Anti-corruption layers | `StockAvailabilityGateway` (ordering port + infra adapter); `OrderReadyForFulfilmentListener`, `PaymentRequestedListener` (inbound ACLs) | `OrderingFlowTest`, `PaymentCompensationFlowTest` |
-| Durable process manager (saga) | `OrderFulfilmentDefinition` (pure decision), `OrderFulfilmentCodecs`, `RuntimeOrderFulfilmentProcess` | `OrderFulfilmentDefinitionTest` (unit), `OrderingFlowTest` (e2e) |
+| Durable process manager | `OrderFulfilmentDefinition` (pure decision), `OrderFulfilmentCodecs`, `RuntimeOrderFulfilmentProcess` | `OrderFulfilmentDefinitionTest` (unit), `OrderingFlowTest` (e2e) |
 | Ordered compensation (release then cancel) | `OrderFulfilmentDefinition` compensation branches | `PaymentCompensationFlowTest` |
 | Business-key idempotency (at-most-once) | `AuthorizePaymentHandler` + `PaymentOperations` port | `AuthorizePaymentIdempotencyTest` |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
@@ -80,9 +80,9 @@ is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it 
 
 ## Intentional design decisions worth knowing
 
-- **No public `confirm` endpoint.** Confirming is an *internal* step of the fulfilment saga
-  (dispatched only after payment is authorized). Exposing it would let a client bypass the saga's
-  preconditions, so `OrderController` offers only `place`, `approve-review`, and `read`. Approving a
+- **No public `confirm` endpoint.** Confirming is an *internal* step of the fulfilment process
+  (dispatched only after payment is authorized). Exposing it would let a client bypass the process
+  manager's preconditions, so `OrderController` offers only `place`, `approve-review`, and `read`. Approving a
   held review *is* a legitimate operator action, and hosts the 404/409 error-contract demos.
 - **Payment speaks one word — *authorize*.** This reference demonstrates the authorization step
   only, not a later capture, so `AuthorizePayment`/`AuthorizationPolicy`/`PaymentAuthorized` are used

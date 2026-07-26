@@ -2,7 +2,7 @@
 
 Opt-in, schema-agnostic Flyway integration for the whole aipersimmon-ddd family. Add this one
 module and the tables of whichever aipersimmon storage modules you use — outbox, inbox,
-web-store, saga, process-manager — apply themselves at startup. **No manual SQL, no
+web-store, process-manager — apply themselves at startup. **No manual SQL, no
 `spring.flyway.locations`, no per-module Flyway starter.**
 
 ## Use it
