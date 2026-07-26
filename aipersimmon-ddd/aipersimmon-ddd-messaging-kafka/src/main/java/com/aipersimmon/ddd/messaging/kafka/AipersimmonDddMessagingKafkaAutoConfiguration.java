@@ -15,11 +15,14 @@ import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.header.Header;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
@@ -44,6 +47,7 @@ import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.RetryListener;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 import org.springframework.util.backoff.BackOff;
 import org.springframework.util.backoff.FixedBackOff;
@@ -324,22 +328,73 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     BackOff systemicBackOff =
         new FixedBackOff(consumer.getSystemicBackoffIntervalMs(), FixedBackOff.UNLIMITED_ATTEMPTS);
     handler.setBackOffFunction(
-        (record, exception) -> isSystemicFailure(exception) ? systemicBackOff : null);
+        (record, exception) -> systemicCause(exception) != null ? systemicBackOff : null);
+    // Because a systemic failure is never recovered, it never reaches the dead-letter recoverer
+    // and so never produces the ERROR that path logs. Without this the only output is Spring
+    // Kafka's "Record in retry and not yet recovered" INFO, which names neither the record nor
+    // the cause — a stalled partition and an idle one look identical (issue-00057).
+    handler.setRetryListeners(new SystemicStallReporter());
     return handler;
   }
 
   /**
-   * Whether the failure signals a down environment (retry forever, never DLT) rather than a bad
-   * message. Walks the cause chain — the container wraps the listener's exception in a {@code
-   * ListenerExecutionFailedException} — and matches {@link DataAccessException} (the whole Spring
-   * JDBC/DAO family: connection failures, pool exhaustion, transient faults).
+   * Reports the one failure path that is otherwise invisible: a systemic failure retried forever.
+   * Fires once per failed delivery, so the report cadence <em>is</em> {@code
+   * systemic-backoff-interval-ms} — no second knob to understand, and turning the noise down means
+   * backing off harder, which is the right response to a sustained outage anyway. The stack trace
+   * is logged on the first delivery only; repeating it every interval for a partition that may stay
+   * stalled for hours would bury the signal it is meant to provide.
    */
-  private static boolean isSystemicFailure(Exception exception) {
-    for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-      if (cause instanceof DataAccessException) {
-        return true;
+  static final class SystemicStallReporter implements RetryListener {
+
+    @Override
+    public void failedDelivery(
+        ConsumerRecord<?, ?> record, Exception exception, int deliveryAttempt) {
+      DataAccessException cause = systemicCause(exception);
+      if (cause == null) {
+        // The bounded path ends at the dead-letter recoverer, which logs an ERROR of its own.
+        return;
+      }
+      String location = record.topic() + "-" + record.partition() + "@" + record.offset();
+      String eventId = header(record, IntegrationEventHeaders.ID);
+      if (deliveryAttempt <= 1) {
+        log.warn(
+            "aipersimmon-ddd Kafka consumer stalled at {} (ce_id {}): classified as a systemic "
+                + "(environment) failure, so this record is retried indefinitely and never "
+                + "dead-lettered — the partition waits here and consumes nothing else until the "
+                + "cause is fixed.",
+            location,
+            eventId,
+            cause);
+      } else {
+        log.warn(
+            "aipersimmon-ddd Kafka consumer still stalled at {} (ce_id {}) after {} deliveries: {}",
+            location,
+            eventId,
+            deliveryAttempt,
+            cause.toString());
       }
     }
-    return false;
+
+    private static String header(ConsumerRecord<?, ?> record, String name) {
+      Header header = record.headers().lastHeader(name);
+      return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+  }
+
+  /**
+   * The {@link DataAccessException} in the failure's cause chain, or {@code null} if there is none.
+   * Its presence is what marks a failure systemic — a down environment (retry forever, never DLT)
+   * rather than a bad message. The chain is walked because the container wraps the listener's
+   * exception in a {@code ListenerExecutionFailedException}; the matched exception is returned
+   * rather than a boolean so the stall report can name the actual cause.
+   */
+  private static DataAccessException systemicCause(Exception exception) {
+    for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+      if (cause instanceof DataAccessException dataAccess) {
+        return dataAccess;
+      }
+    }
+    return null;
   }
 }
