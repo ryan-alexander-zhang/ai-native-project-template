@@ -2,7 +2,7 @@
 id: plan-00014-adoption-threshold-and-architecture-simplification
 type: plan
 role: main
-status: active
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
