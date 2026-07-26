@@ -52,6 +52,12 @@
     <!-- The Inbox port used by the consumer bridge. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- IntegrationEvents / DurableIntegrationEvents: the durable-transport startup guard. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-application</artifactId>
       <version>${project.version}</version>
     </dependency>

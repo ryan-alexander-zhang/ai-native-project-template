@@ -1,8 +1,8 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
 import com.aipersimmon.ddd.application.DurableIntegrationEvents;
-import com.aipersimmon.ddd.application.Inbox;
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.inbox.Inbox;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;

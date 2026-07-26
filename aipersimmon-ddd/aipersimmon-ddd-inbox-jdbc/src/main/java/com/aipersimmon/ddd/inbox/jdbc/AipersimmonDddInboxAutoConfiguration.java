@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.inbox.jdbc;
 
-import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.inbox.Inbox;
 import java.time.Clock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

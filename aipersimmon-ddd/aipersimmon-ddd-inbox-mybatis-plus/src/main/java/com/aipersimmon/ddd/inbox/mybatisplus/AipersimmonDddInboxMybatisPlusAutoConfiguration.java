@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.inbox.mybatisplus;
 
-import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.inbox.Inbox;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import java.time.Clock;
 import org.apache.ibatis.session.SqlSessionFactory;

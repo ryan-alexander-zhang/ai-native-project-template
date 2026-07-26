@@ -12,16 +12,19 @@
   </parent>
 
   <!--
-    Shared inbox schema module. Unlike outbox, the inbox has no storage-agnostic core with
-    contracts, yet the -inbox-jdbc and -inbox-mybatis-plus adapters use an IDENTICAL table.
-    This module is the single home for that DDL: it ships the vendor-templated Flyway
-    migrations (aipersimmon/db/migration/inbox/{vendor}) that both adapters depend on, so the
-    schema lives in exactly one place and is on the classpath whichever adapter is used. It
-    carries no code. Applied automatically by the optional aipersimmon-ddd-flyway starter, or
+    Storage-agnostic inbox module, symmetrical with aipersimmon-ddd-outbox: it owns the Inbox
+    contract (the idempotency guard a consumer calls before handling a message) and the shared
+    table schema both adapters write to. Zero dependencies, so a consuming application can
+    depend on the port without choosing JDBC or MyBatis-Plus.
+
+    The schema is the vendor-templated Flyway migrations under
+    aipersimmon/db/migration/inbox/{vendor}: the -inbox-jdbc and -inbox-mybatis-plus adapters use
+    an IDENTICAL table, so it lives here in exactly one place and is on the classpath whichever
+    adapter is used. Applied automatically by the optional aipersimmon-ddd-flyway starter, or
     copied into the consumer's own Flyway/Liquibase.
   -->
   <artifactId>aipersimmon-ddd-inbox</artifactId>
   <name>aipersimmon-ddd-inbox</name>
-  <description>Shared inbox table schema (vendor-templated Flyway migrations) for the JDBC and MyBatis-Plus inbox adapters.</description>
+  <description>Storage-agnostic inbox contract and shared table schema for the JDBC and MyBatis-Plus inbox adapters.</description>
 
 </project>

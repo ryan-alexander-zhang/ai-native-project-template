@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
-import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.inbox.Inbox;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;

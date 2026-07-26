@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.application;
+package com.aipersimmon.ddd.inbox;
 
 /**
  * Idempotency guard for consuming a message at most once in effect. A consumer calls this before

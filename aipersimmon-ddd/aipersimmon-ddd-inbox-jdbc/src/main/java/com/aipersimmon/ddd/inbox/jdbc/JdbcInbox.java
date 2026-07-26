@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.inbox.jdbc;
 
-import com.aipersimmon.ddd.application.Inbox;
+import com.aipersimmon.ddd.inbox.Inbox;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.aipersimmon.ddd.tenancy.TenantId;
 import com.aipersimmon.ddd.tenancy.Tenants;
