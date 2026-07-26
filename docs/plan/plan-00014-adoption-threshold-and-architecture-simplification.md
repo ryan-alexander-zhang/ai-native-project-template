@@ -75,7 +75,49 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
 
 ## 五、完成记录
 
-（逐批填写。）
+### 批次 C（结构精简）—— 已完成
+
+| 批次 | commit | 结果 |
+| --- | --- | --- |
+| C1 | `b2afc6e` `d1bdef6` | 删除 `-saga` / `-saga-spring`（34 文件、-1180 行）；顺带把样例里 ~35 处「saga」改为「process manager」 |
+| C2 | `d4947b7` | `cqrs` 不再依赖 `integration`；转换点落在 `application.InboundEvents.commandContext` |
+| C3 | `8e68c73` | `Inbox` 移入 `-inbox`，与 outbox 对称 |
+| C4 | `ff39a4e` | `Page`/`Slice`/`Cursor` 下沉 `-cqrs`；`core` 新增 `Specification<T>` |
+| C5 | `1a61409` `d700d3c` | 8 个模块改名统一为 `-spring-boot-starter`；`-outbox` 拆出 Spring 半边；新增 `ModuleNamingChecks` 断言 |
+
+每批均以「框架 `install`（全质量门）+ 样例 `verify`」验收。C5 结束时：框架 **741 项测试全绿**，样例 BUILD SUCCESS。
+
+### 偏差记录（6 处）
+
+1. **C2 的落点从 `integration` 改为 `application`**。报告 P2-1 提议在 `integration` 侧提供
+   `EventEnvelopes.toCommandContext`，即 `integration → cqrs`。但 `integration` 当前**零内部依赖**，是一个根；
+   让它依赖 `cqrs` 会把 `cqrs`+`core`+`tenancy` 拖进每个「只用集成事件」的消费者——**与要修的耦合同构，只是反向**。
+   `application` 已同时依赖三者，放那里**不新增任何一条边**，且「入站事件翻译成命令」本就是入站 ACL 的职责。
+2. **`AbstractIdentifier` 不做**。报告 P2-4 的前提（「每个 ID 类型都要重写 `value()`/`equals`/`hashCode`/校验」）
+   不成立：框架与样例里每个 id 类型都是 **record**——record 免费提供这四项，且**不能继承类**。基类既无必要也
+   不可实现。剩下的唯一重复是两行空值校验，不足以让每个项目的每个 id 都 import 一个新类型。
+3. **`-money` 模块不做**。报告自己写着「不必自造，直接引 Joda-Money / javax.money」。新建模块属推测性设计。
+4. **报告 P1-2 的三段式规则不可照抄**，已由 [[design-00012-module-naming-and-spring-freedom]] 重新表述：
+   按字面执行会把 42 个模块变成约 60 个（13 个后端适配器各自再裂一个 starter），与 P1-1 方向相反。真正的
+   不变量是「领域层可依赖的模块必须零 Spring」，按此重测**真违规者只有 `-outbox` 一个**；报告点名的 `-id` 与两个
+   `-engine` 不持有契约，问题只是「名字没说明自己是什么」。
+5. **改名清单从 7 个增至 8 个**：`-operation-log-cqrs-spring` 在 design 初稿的表里被漏掉，改为按 artifactId
+   全量扫描 `-spring$` 得出清单后补入。教训已写进该 design。
+6. **Java 包名不随 artifactId 改**（`com.aipersimmon.ddd.cqrs.spring` 保持原样）。artifactId 是分发单元的名字，
+   包名是代码的名字；同时改会把一次可机械验证的重命名变成一次大规模源码改动。`-outbox` 拆分是唯一例外——
+   那里包名必须改（`...outbox.spring`），因为两个模块不能共用一个包。
+
+### 过程中新发现并已修复的缺陷（不在本 plan 原范围）
+
+- [[issue-00056-kafka-tests-pin-a-stale-inbox-schema]] —— 三个 Kafka 消费端集成测试在 HEAD 即红，
+  借用的 inbox schema 漏了租户迁移 V2。
+- [[issue-00057-unlimited-systemic-retry-is-invisible]] —— 被判为 systemic 的失败无限重试却从不报告原因，
+  这是上一条长期不可诊断的原因。
+
+### 批次 D（采纳门槛）—— 未开始
+
+D1（聚合 starter）、D2（in-memory 降级显式化）、D3（样例 codec）、D4（`SimpleProcess`，需先有 design）、
+D5（四份使用者文档，必须最后）。D1 与 D5 的前置条件（模块图定稿）已随 C5 完成。
 
 ## 关联
 
