@@ -13,11 +13,16 @@ import com.aipersimmon.ddd.web.spi.RequestSignatureVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -41,6 +46,9 @@ import org.springframework.core.Ordered;
 @AutoConfiguration(after = JacksonAutoConfiguration.class)
 @EnableConfigurationProperties(AipersimmonDddWebProperties.class)
 public class AipersimmonDddWebAutoConfiguration {
+
+  private static final Logger log =
+      LoggerFactory.getLogger(AipersimmonDddWebAutoConfiguration.class);
 
   @Bean
   @ConditionalOnMissingBean
@@ -235,6 +243,73 @@ public class AipersimmonDddWebAutoConfiguration {
     FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 20);
     return registration;
+  }
+
+  // --- In-memory fallback guard ---------------------------------------------
+
+  /**
+   * Reports every enabled concern that is running on its in-memory implementation, and can refuse
+   * to start instead.
+   *
+   * <p>Each of these concerns exists to stop something: a repeated submission, a replayed signed
+   * request, a caller exceeding its rate. An in-memory store keeps its state per JVM, so on a
+   * second instance each of those stops working — the key, nonce or counter simply is not there.
+   * The implementations say so in their Javadoc, but nobody reads a Javadoc while assembling a
+   * deployment, and a concern was <em>deliberately switched on</em> by whoever is now unprotected
+   * (issue-00058).
+   *
+   * <p>Runs after all singletons are instantiated, so it can report the whole picture at once
+   * rather than as three unrelated log lines, and so it sees the store that actually won — an
+   * application bean or a {@code -web-store-*} module silences it, which is the point.
+   *
+   * <p>WARN by default because in-memory is the right default for development; set {@code
+   * aipersimmon.ddd.web.allow-in-memory-stores=false} in production and this becomes a startup
+   * failure.
+   */
+  @Bean
+  public SmartInitializingSingleton aipersimmonDddInMemoryStoreGuard(
+      AipersimmonDddWebProperties properties,
+      ObjectProvider<IdempotencyStore> idempotencyStore,
+      ObjectProvider<ReplayGuard> replayGuard,
+      ObjectProvider<RateLimiter> rateLimiter) {
+    return () -> {
+      List<String> degraded = new ArrayList<>();
+      if (properties.getIdempotency().isEnabled()
+          && idempotencyStore.getIfAvailable() instanceof InMemoryIdempotencyStore) {
+        degraded.add(
+            "idempotency — a repeated request whose Idempotency-Key was first seen by another "
+                + "instance is not recognised, so the side effect runs twice");
+      }
+      if (properties.getReplay().isEnabled()
+          && replayGuard.getIfAvailable() instanceof InMemoryReplayGuard) {
+        degraded.add(
+            "replay protection — a nonce spent on one instance is unknown to the others, so the "
+                + "same signed request can be replayed successfully");
+      }
+      if (properties.getRateLimit().isEnabled()
+          && rateLimiter.getIfAvailable() instanceof InMemoryRateLimiter) {
+        degraded.add(
+            "rate limiting — each instance counts on its own, so the effective limit is the "
+                + "configured one multiplied by the instance count");
+      }
+      if (degraded.isEmpty()) {
+        return;
+      }
+      String detail =
+          "aipersimmon-ddd-web: "
+              + degraded.size()
+              + " enabled concern(s) are running on an in-memory store, which holds its state per "
+              + "JVM and therefore stops working as soon as there is a second instance:\n  - "
+              + String.join("\n  - ", degraded)
+              + "\nAdd a shared backend (aipersimmon-ddd-web-store-redis or "
+              + "aipersimmon-ddd-web-store-jdbc), or declare your own store bean. Single instance "
+              + "and staying that way? Keep aipersimmon.ddd.web.allow-in-memory-stores=true.";
+      if (!properties.isAllowInMemoryStores()) {
+        throw new IllegalStateException(
+            detail + " (allow-in-memory-stores=false, so this is a startup failure.)");
+      }
+      log.warn("{}", detail);
+    };
   }
 
   /** Registered only when the application layer is present. */

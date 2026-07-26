@@ -19,6 +19,25 @@ public class AipersimmonDddWebProperties {
   private final Replay replay = new Replay();
   private final RateLimit rateLimit = new RateLimit();
 
+  /**
+   * Whether an enabled concern may fall back to its in-memory implementation. {@code true} keeps
+   * development frictionless — idempotency works without running Redis. Set it to {@code false} in
+   * the production profile and startup fails instead of silently substituting a store that does not
+   * survive a second instance (issue-00058).
+   *
+   * <p>It is only about the <em>fallback</em>: with a {@code -web-store-*} module on the classpath,
+   * or the application's own store bean, this changes nothing.
+   */
+  private boolean allowInMemoryStores = true;
+
+  public boolean isAllowInMemoryStores() {
+    return allowInMemoryStores;
+  }
+
+  public void setAllowInMemoryStores(boolean allowInMemoryStores) {
+    this.allowInMemoryStores = allowInMemoryStores;
+  }
+
   public ProblemDetails getProblemDetails() {
     return problemDetails;
   }
