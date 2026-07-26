@@ -19,6 +19,13 @@ import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
  * {@link #activeForNewInstances()} true; older versions stay registered (with it false) to keep
  * serving their running instances.
  *
+ * <p>A first process implements three methods — {@link #processType()}, {@link #start} and {@link
+ * #react}. Versioning ({@link #definitionVersion()}, {@link #activeForNewInstances()}, {@link
+ * #stateSchemaVersion()}) is defaulted to the single-version case, so its concepts appear only once
+ * a flow actually needs a second version. Nothing about the engine is weakened by that: the
+ * defaults are the values a one-version flow would have written by hand, and the registry still
+ * refuses to start if two versions collide or none is active.
+ *
  * @param <S> the business state type this definition reads and returns
  */
 public interface ProcessDefinition<S> {
@@ -26,14 +33,37 @@ public interface ProcessDefinition<S> {
   /** The logical process type this definition implements. */
   ProcessType processType();
 
-  /** This definition's version; a running instance is pinned to it. */
-  DefinitionVersion definitionVersion();
+  /**
+   * This definition's version; a running instance is pinned to it. Defaults to {@code v1}: a
+   * process has exactly one version until it needs a second, and writing {@code v1} by hand carries
+   * no information. Override on every version once there is more than one — a second definition
+   * that forgets to is rejected at startup ({@code two process definitions registered for <type>
+   * v1}), so the default cannot silently shadow anything.
+   */
+  default DefinitionVersion definitionVersion() {
+    return DefinitionVersion.INITIAL;
+  }
 
-  /** Whether new instances of this type start on this version (exactly one true per type). */
-  boolean activeForNewInstances();
+  /**
+   * Whether new instances of this type start on this version (exactly one true per type). Defaults
+   * to {@code true}, which is right while there is one version and loudly wrong when a second one
+   * forgets to override it: the registry rejects startup with {@code more than one active
+   * definition for process type <type>}. Set it to {@code false} on the old version when you
+   * introduce a new one — the old version stays registered to keep serving its running instances.
+   */
+  default boolean activeForNewInstances() {
+    return true;
+  }
 
-  /** The schema version of the state this definition reads and writes. */
-  StateSchemaVersion stateSchemaVersion();
+  /**
+   * The schema version of the state this definition reads and writes. Defaults to the first
+   * version. Bump it — and register a codec for the new schema — whenever the state's shape changes
+   * in a way an older encoded state cannot satisfy; unlike the two above, nothing can detect a
+   * forgotten bump for you, because a stale state simply decodes into the wrong shape.
+   */
+  default StateSchemaVersion stateSchemaVersion() {
+    return StateSchemaVersion.INITIAL;
+  }
 
   /**
    * Decide the first transition of a new instance.

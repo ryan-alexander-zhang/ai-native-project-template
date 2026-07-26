@@ -8,12 +8,10 @@ import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
-import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
-import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
@@ -90,20 +88,10 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     return PROCESS_TYPE;
   }
 
-  @Override
-  public DefinitionVersion definitionVersion() {
-    return new DefinitionVersion("v1");
-  }
-
-  @Override
-  public boolean activeForNewInstances() {
-    return true;
-  }
-
-  @Override
-  public StateSchemaVersion stateSchemaVersion() {
-    return new StateSchemaVersion(1);
-  }
+  // definitionVersion / activeForNewInstances / stateSchemaVersion are left at their defaults
+  // (v1, active, schema 1) — this flow has one version. Overriding them only becomes necessary
+  // when a second version has to run alongside this one; until then the values carry no
+  // information, and the registry refuses to start if two versions ever collide.
 
   @Override
   public ProcessDecision<OrderFulfilmentState> start(ProcessInput input, ProcessContext context) {

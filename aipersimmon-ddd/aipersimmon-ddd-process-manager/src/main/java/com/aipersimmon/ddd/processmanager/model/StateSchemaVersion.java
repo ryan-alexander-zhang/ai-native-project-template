@@ -10,6 +10,12 @@ package com.aipersimmon.ddd.processmanager.model;
  */
 public record StateSchemaVersion(int value) {
 
+  /**
+   * The schema a state has before it ever migrates, and the default of {@link
+   * com.aipersimmon.ddd.processmanager.definition.ProcessDefinition#stateSchemaVersion()}.
+   */
+  public static final StateSchemaVersion INITIAL = new StateSchemaVersion(1);
+
   public StateSchemaVersion {
     if (value < 1) {
       throw new IllegalArgumentException("state schema version must be >= 1");

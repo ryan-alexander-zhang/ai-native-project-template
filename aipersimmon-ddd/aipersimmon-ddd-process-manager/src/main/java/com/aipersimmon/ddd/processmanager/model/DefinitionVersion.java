@@ -10,6 +10,13 @@ package com.aipersimmon.ddd.processmanager.model;
  */
 public record DefinitionVersion(String value) {
 
+  /**
+   * The version a process has before it ever needs a second one, and the default of {@link
+   * com.aipersimmon.ddd.processmanager.definition.ProcessDefinition#definitionVersion()}. Named
+   * rather than repeated as a literal so the single-version case has one spelling.
+   */
+  public static final DefinitionVersion INITIAL = new DefinitionVersion("v1");
+
   public DefinitionVersion {
     if (value == null || value.isBlank()) {
       throw new IllegalArgumentException("definition version value required");
