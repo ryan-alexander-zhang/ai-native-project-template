@@ -3,9 +3,8 @@ package com.example.ordering.process.fulfilment;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
-import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
+import com.aipersimmon.ddd.processmanager.engine.autoconfigure.codec.ProcessSerializationCatalog;
 import com.aipersimmon.ddd.processmanager.exception.ProcessSerializationException;
-import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
@@ -24,259 +23,166 @@ import com.example.ordering.process.fulfilment.OrderFulfilmentInput.ReadyForFulf
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReleased;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReservationFailed;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReserved;
-import com.example.ordering.process.fulfilment.OrderFulfilmentState.Step;
 import java.nio.charset.StandardCharsets;
-import java.util.function.Function;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Explicit process-manager codecs for the order-fulfilment flow (the provider side): stable logical
- * type/version for each persisted input, command effect, and the flow state — never a Java class
- * name. Payloads are encoded as unit-separator-delimited UTF-8, so any field is round-tripped
- * without a JSON dependency; {@link CancelOrder} additionally carries the evidence-bearing {@link
- * CancellationReason} the ordering aggregate requires. The starter collects these beans into its
- * codec registries at startup.
+ * How the order-fulfilment flow's persisted values are encoded. Every entry names a <em>stable
+ * logical type and version</em> — never a Java class name — so a payload written by one deployment
+ * stays readable after the class is renamed or moved.
+ *
+ * <p>It shows both routes, because a real flow usually needs both:
+ *
+ * <ol>
+ *   <li><strong>The default route: {@link ProcessSerializationCatalog}.</strong> Declare the
+ *       logical type, version and Java type; the framework's Jackson layer generates the codec.
+ *       Twelve of this flow's thirteen payloads are records of strings and one enum, so that is all
+ *       they need.
+ *   <li><strong>The escape hatch: an explicit {@link ProcessPayloadCodec} bean.</strong> {@link
+ *       CancelOrder} needs one, and the reason is instructive — see below.
+ * </ol>
+ *
+ * <p>The two compose: the framework builds its registries from the catalog <em>plus</em> whatever
+ * codec beans exist, and fails fast if the same logical type/version is claimed twice.
+ *
+ * <h2>When you actually need to hand-write one</h2>
+ *
+ * Only when Jackson cannot or must not do it:
+ *
+ * <ul>
+ *   <li><strong>A polymorphic payload whose type must stay annotation-free</strong> — this flow's
+ *       case. {@code CancelOrder} carries a {@link CancellationReason}, a sealed interface with two
+ *       record variants. Jackson would need {@code @JsonTypeInfo} on it to know which variant to
+ *       rebuild, and {@code CancellationReason} lives in {@code ordering-domain}: putting a
+ *       serialization annotation on a domain type is exactly the infrastructure leak the layering
+ *       forbids. Writing the discriminator by hand keeps the domain clean.
+ *   <li><strong>Encryption</strong> of a payload at rest.
+ *   <li><strong>Upcasting</strong> — reading an old version and migrating it forward on decode.
+ *   <li><strong>A non-JSON format</strong> imposed from outside.
+ * </ul>
+ *
+ * <p>If none of those apply, use the catalog. A hand-written codec has to be kept in step with the
+ * type it encodes, and nothing checks that for you.
+ *
+ * <p><strong>Changing an encoding is a wire change.</strong> The logical type/version identifies
+ * the <em>format</em>, not just the shape. Re-encoding an existing {@code (type, version)}
+ * differently would leave already-persisted rows undecodable, so in production you bump the version
+ * and keep a codec for the old one until no rows carry it.
  */
 @Configuration
 public class OrderFulfilmentCodecs {
 
-  private static final String US = "\u001f";
+  private static final String US = "";
 
-  // ----- state -----
+  /**
+   * The default route. One line per payload: logical type, version, Java type. Version 1 for all of
+   * them because none has been through a schema change yet.
+   */
   @Bean
-  ProcessStateCodec<OrderFulfilmentState> orderFulfilmentStateCodec() {
-    return new ProcessStateCodec<>() {
-      @Override
-      public ProcessType processType() {
-        return OrderFulfilmentDefinition.PROCESS_TYPE;
-      }
-
-      @Override
-      public StateSchemaVersion schemaVersion() {
-        return new StateSchemaVersion(1);
-      }
-
-      @Override
-      public EncodedPayload encode(OrderFulfilmentState s) {
-        return bytes(
-            new PayloadType("ordering.fulfilment.state", 1),
-            String.join(
-                US,
-                s.orderId(),
-                s.step().name(),
-                nz(s.reservationId()),
-                nz(s.paymentDeclineCode()),
-                nz(s.paymentDeclineEvidenceId())));
-      }
-
-      @Override
-      public OrderFulfilmentState decode(EncodedPayload p) {
-        String[] f = parts(p);
-        return new OrderFulfilmentState(
-            f[0], Step.valueOf(f[1]), blankToNull(f[2]), blankToNull(f[3]), blankToNull(f[4]));
-      }
-    };
+  ProcessSerializationCatalog orderFulfilmentSerialization() {
+    return ProcessSerializationCatalog.builder()
+        // inputs — the facts the flow reacts to
+        .payload("ordering.fulfilment.ready-for-fulfilment", 1, ReadyForFulfilment.class)
+        .payload("ordering.fulfilment.stock-reserved", 1, StockReserved.class)
+        .payload("ordering.fulfilment.stock-reservation-failed", 1, StockReservationFailed.class)
+        .payload("ordering.fulfilment.payment-authorized", 1, PaymentAuthorized.class)
+        .payload("ordering.fulfilment.payment-declined", 1, PaymentDeclined.class)
+        .payload("ordering.fulfilment.stock-released", 1, StockReleased.class)
+        .payload("ordering.fulfilment.order-confirmed", 1, OrderConfirmed.class)
+        .payload("ordering.fulfilment.order-cancelled", 1, OrderCancelled.class)
+        // command effects — what the flow dispatches (CancelOrder is the exception, below)
+        .payload("ordering.fulfilment.request-payment", 1, RequestPayment.class)
+        .payload("ordering.fulfilment.confirm-order", 1, ConfirmOrder.class)
+        .payload("ordering.fulfilment.request-stock-release", 1, RequestStockRelease.class)
+        // the flow's own state
+        .state(
+            OrderFulfilmentDefinition.PROCESS_TYPE,
+            new StateSchemaVersion(1),
+            "ordering.fulfilment.state",
+            OrderFulfilmentState.class)
+        .build();
   }
 
-  // ----- inputs -----
-  @Bean
-  ProcessPayloadCodec<ReadyForFulfilment> readyForFulfilmentCodec() {
-    return codec(
-        "ordering.fulfilment.ready-for-fulfilment",
-        ReadyForFulfilment.class,
-        ReadyForFulfilment::orderId,
-        ReadyForFulfilment::new);
-  }
-
-  @Bean
-  ProcessPayloadCodec<StockReserved> stockReservedCodec() {
-    return codec(
-        "ordering.fulfilment.stock-reserved",
-        StockReserved.class,
-        v -> String.join(US, v.orderId(), v.reservationId()),
-        s -> new StockReserved(parts(s)[0], parts(s)[1]));
-  }
-
-  @Bean
-  ProcessPayloadCodec<StockReservationFailed> stockReservationFailedCodec() {
-    return codec(
-        "ordering.fulfilment.stock-reservation-failed",
-        StockReservationFailed.class,
-        v -> String.join(US, v.orderId(), v.code(), v.reason()),
-        s -> new StockReservationFailed(parts(s)[0], parts(s)[1], parts(s)[2]));
-  }
-
-  @Bean
-  ProcessPayloadCodec<PaymentAuthorized> paymentAuthorizedCodec() {
-    return codec(
-        "ordering.fulfilment.payment-authorized",
-        PaymentAuthorized.class,
-        PaymentAuthorized::orderId,
-        PaymentAuthorized::new);
-  }
-
-  @Bean
-  ProcessPayloadCodec<PaymentDeclined> paymentDeclinedCodec() {
-    return codec(
-        "ordering.fulfilment.payment-declined",
-        PaymentDeclined.class,
-        v -> String.join(US, v.orderId(), v.code(), v.reason()),
-        s -> new PaymentDeclined(parts(s)[0], parts(s)[1], parts(s)[2]));
-  }
-
-  @Bean
-  ProcessPayloadCodec<StockReleased> stockReleasedCodec() {
-    return codec(
-        "ordering.fulfilment.stock-released",
-        StockReleased.class,
-        v -> String.join(US, v.orderId(), v.reservationId()),
-        s -> new StockReleased(parts(s)[0], parts(s)[1]));
-  }
-
-  @Bean
-  ProcessPayloadCodec<OrderConfirmed> orderConfirmedCodec() {
-    return codec(
-        "ordering.fulfilment.order-confirmed",
-        OrderConfirmed.class,
-        OrderConfirmed::orderId,
-        OrderConfirmed::new);
-  }
-
-  @Bean
-  ProcessPayloadCodec<OrderCancelled> orderCancelledCodec() {
-    return codec(
-        "ordering.fulfilment.order-cancelled",
-        OrderCancelled.class,
-        OrderCancelled::orderId,
-        OrderCancelled::new);
-  }
-
-  // ----- command effects -----
-  @Bean
-  ProcessPayloadCodec<RequestPayment> requestPaymentCodec() {
-    return codec(
-        "ordering.fulfilment.request-payment",
-        RequestPayment.class,
-        v -> String.join(US, v.orderId(), v.paymentOperationId()),
-        s -> new RequestPayment(parts(s)[0], parts(s)[1]));
-  }
-
-  @Bean
-  ProcessPayloadCodec<ConfirmOrder> confirmOrderCodec() {
-    return codec(
-        "ordering.fulfilment.confirm-order",
-        ConfirmOrder.class,
-        ConfirmOrder::orderId,
-        ConfirmOrder::new);
-  }
-
-  @Bean
-  ProcessPayloadCodec<RequestStockRelease> requestStockReleaseCodec() {
-    return codec(
-        "ordering.fulfilment.request-stock-release",
-        RequestStockRelease.class,
-        v -> String.join(US, v.orderId(), v.reservationId()),
-        s -> new RequestStockRelease(parts(s)[0], parts(s)[1]));
-  }
-
+  /**
+   * The escape hatch, and the one payload that earns it: {@link CancellationReason} is a sealed
+   * interface, so decoding has to know which variant to rebuild. The discriminator ({@code
+   * INVENTORY_UNAVAILABLE} / {@code PAYMENT_DECLINED}) is written here rather than as a
+   * {@code @JsonTypeInfo} annotation on the domain type, so {@code ordering-domain} stays free of
+   * serialization concerns. Fields are unit-separator delimited UTF-8 and read back by position.
+   *
+   * <p>The {@code default} branch is not defensive padding: the ordering aggregate accepts other
+   * cancellation reasons, but this flow never dispatches them, and silently encoding one would
+   * persist an effect the flow cannot have produced.
+   */
   @Bean
   ProcessPayloadCodec<CancelOrder> cancelOrderCodec() {
-    return codec(
-        "ordering.fulfilment.cancel-order",
-        CancelOrder.class,
-        OrderFulfilmentCodecs::encodeCancel,
-        OrderFulfilmentCodecs::decodeCancel);
-  }
-
-  private static String encodeCancel(CancelOrder c) {
-    return switch (c.reason()) {
-      case CancellationReason.InventoryUnavailable u ->
-          String.join(
-              US,
-              c.orderId(),
-              "INVENTORY_UNAVAILABLE",
-              u.failure().failureId(),
-              u.failure().orderId().value(),
-              u.failure().reasonCode(),
-              u.failure().detail());
-      case CancellationReason.PaymentDeclinedAfterStockReleased d ->
-          String.join(
-              US,
-              c.orderId(),
-              "PAYMENT_DECLINED",
-              d.paymentDecline().declineId(),
-              d.paymentDecline().orderId().value(),
-              d.paymentDecline().declineCode(),
-              d.stockRelease().releaseId(),
-              d.stockRelease().orderId().value());
-      default ->
-          throw new ProcessSerializationException(
-              "order-fulfilment does not dispatch CancelOrder with reason " + c.reason());
-    };
-  }
-
-  private static CancelOrder decodeCancel(String s) {
-    String[] f = s.split(US, -1);
-    CancellationReason reason =
-        switch (f[1]) {
-          case "INVENTORY_UNAVAILABLE" ->
-              new CancellationReason.InventoryUnavailable(
-                  new ReservationFailureRef(f[2], new OrderId(f[3]), f[4], f[5]));
-          case "PAYMENT_DECLINED" ->
-              new CancellationReason.PaymentDeclinedAfterStockReleased(
-                  new PaymentDeclineRef(f[2], new OrderId(f[3]), f[4]),
-                  new StockReleaseRef(f[5], new OrderId(f[6])));
-          default -> throw new ProcessSerializationException("unknown cancel reason kind: " + f[1]);
-        };
-    return new CancelOrder(f[0], reason);
-  }
-
-  private static <T> ProcessPayloadCodec<T> codec(
-      String logicalType,
-      Class<T> javaType,
-      Function<T, String> encode,
-      Function<String, T> decode) {
     return new ProcessPayloadCodec<>() {
       @Override
       public PayloadType payloadType() {
-        return new PayloadType(logicalType, 1);
+        return new PayloadType("ordering.fulfilment.cancel-order", 1);
       }
 
       @Override
-      public Class<T> javaType() {
-        return javaType;
+      public Class<CancelOrder> javaType() {
+        return CancelOrder.class;
       }
 
       @Override
-      public EncodedPayload encode(T value) {
-        return bytes(payloadType(), encode.apply(value));
+      public EncodedPayload encode(CancelOrder command) {
+        return new EncodedPayload(
+            payloadType(), encodeCancel(command).getBytes(StandardCharsets.UTF_8));
       }
 
       @Override
-      public T decode(EncodedPayload payload) {
-        return decode.apply(new String(payload.data(), StandardCharsets.UTF_8));
+      public CancelOrder decode(EncodedPayload payload) {
+        return decodeCancel(new String(payload.data(), StandardCharsets.UTF_8));
       }
     };
   }
 
-  private static EncodedPayload bytes(PayloadType type, String text) {
-    return new EncodedPayload(type, text.getBytes(StandardCharsets.UTF_8));
+  private static String encodeCancel(CancelOrder command) {
+    return switch (command.reason()) {
+      case CancellationReason.InventoryUnavailable unavailable ->
+          String.join(
+              US,
+              command.orderId(),
+              "INVENTORY_UNAVAILABLE",
+              unavailable.failure().failureId(),
+              unavailable.failure().orderId().value(),
+              unavailable.failure().reasonCode(),
+              unavailable.failure().detail());
+      case CancellationReason.PaymentDeclinedAfterStockReleased declined ->
+          String.join(
+              US,
+              command.orderId(),
+              "PAYMENT_DECLINED",
+              declined.paymentDecline().declineId(),
+              declined.paymentDecline().orderId().value(),
+              declined.paymentDecline().declineCode(),
+              declined.stockRelease().releaseId(),
+              declined.stockRelease().orderId().value());
+      default ->
+          throw new ProcessSerializationException(
+              "order-fulfilment does not dispatch CancelOrder with reason " + command.reason());
+    };
   }
 
-  private static String[] parts(EncodedPayload payload) {
-    return new String(payload.data(), StandardCharsets.UTF_8).split(US, -1);
-  }
-
-  private static String[] parts(String text) {
-    return text.split(US, -1);
-  }
-
-  private static String nz(String v) {
-    return v == null ? "" : v;
-  }
-
-  private static String blankToNull(String v) {
-    return v.isEmpty() ? null : v;
+  private static CancelOrder decodeCancel(String text) {
+    String[] fields = text.split(US, -1);
+    CancellationReason reason =
+        switch (fields[1]) {
+          case "INVENTORY_UNAVAILABLE" ->
+              new CancellationReason.InventoryUnavailable(
+                  new ReservationFailureRef(
+                      fields[2], new OrderId(fields[3]), fields[4], fields[5]));
+          case "PAYMENT_DECLINED" ->
+              new CancellationReason.PaymentDeclinedAfterStockReleased(
+                  new PaymentDeclineRef(fields[2], new OrderId(fields[3]), fields[4]),
+                  new StockReleaseRef(fields[5], new OrderId(fields[6])));
+          default ->
+              throw new ProcessSerializationException("unknown cancel reason kind: " + fields[1]);
+        };
+    return new CancelOrder(fields[0], reason);
   }
 }

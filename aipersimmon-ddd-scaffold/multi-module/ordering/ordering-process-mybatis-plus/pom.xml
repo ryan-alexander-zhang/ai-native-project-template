@@ -48,6 +48,12 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
     </dependency>
+    <!-- ProcessSerializationCatalog: the Jackson convenience layer's registration list, so most
+         payloads need one declaration instead of a hand-written codec. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
+    </dependency>
     <!-- CQRS contracts: the CommandContext carried on each fact into the runtime. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
