@@ -1,20 +1,14 @@
 package com.aipersimmon.ddd.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.web.error.ApiError;
 import com.aipersimmon.ddd.web.error.ApiException;
 import com.aipersimmon.ddd.web.error.FieldError;
 import com.aipersimmon.ddd.web.error.ProblemDescriptor;
-import com.aipersimmon.ddd.web.page.Cursor;
-import com.aipersimmon.ddd.web.page.Page;
-import com.aipersimmon.ddd.web.page.Slice;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.SignedRequest;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
@@ -88,30 +82,6 @@ class WebContractsTest {
     assertEquals("over limit", ex.getMessage());
     assertEquals(1, ex.errors().size());
     assertThrows(IllegalArgumentException.class, () -> new ApiException(null, "x"));
-  }
-
-  @Test
-  void sliceIsCursorFirstAndReportsHasNext() {
-    Slice<String> last = new Slice<>(List.of("a", "b"), null);
-    assertFalse(last.hasNext());
-    assertNull(last.nextCursor());
-
-    Slice<String> more = new Slice<>(List.of("a"), Cursor.of("b3JkXzE="));
-    assertTrue(more.hasNext());
-    assertEquals("b3JkXzE=", more.nextCursor().value());
-  }
-
-  @Test
-  void pageCarriesTotalsAndValidatesThem() {
-    Page<String> page = new Page<>(List.of("a"), null, 42L, 5);
-    assertEquals(42L, page.totalElements());
-    assertEquals(5, page.totalPages());
-    assertThrows(IllegalArgumentException.class, () -> new Page<>(List.of(), null, -1L, 0));
-  }
-
-  @Test
-  void cursorRejectsBlankValue() {
-    assertThrows(IllegalArgumentException.class, () -> Cursor.of(" "));
   }
 
   @Test

@@ -35,6 +35,14 @@
       <artifactId>aipersimmon-ddd-web</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Read-side pagination contracts: CursorJacksonModule serializes the opaque Cursor.
+         The values live in -cqrs so an application layer can return a Slice without depending
+         on the web tier; only their HTTP form belongs here. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- Reads the ambient tenant (TenantContext) so idempotency/nonce/rate-limit keys are
          scoped per tenant. -->
     <dependency>

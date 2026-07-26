@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.web.page;
+package com.aipersimmon.ddd.cqrs.page;
 
 import java.util.List;
 

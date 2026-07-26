@@ -10,11 +10,13 @@
  *   <li>{@link com.aipersimmon.ddd.web.error} — a {@code ProblemDescriptor} + {@code
  *       ProblemRegistry} mapping (code → problem type) and an {@code ApiError} value model shaped
  *       after RFC 9457, kept independent of Spring's {@code ProblemDetail}.
- *   <li>{@link com.aipersimmon.ddd.web.page} — cursor-first {@code Slice}/{@code Page} value
- *       objects and an opaque {@code Cursor}.
  *   <li>{@link com.aipersimmon.ddd.web.spi} — the cross-cutting SPIs whose state a backend must
  *       hold: idempotency, replay protection, rate limiting, and request-signature verification.
  * </ul>
+ *
+ * <p>Pagination is <em>not</em> here: {@code Slice}/{@code Page}/{@code Cursor} are read-side
+ * contracts and live in {@code com.aipersimmon.ddd.cqrs.page}, so an application layer can return a
+ * paged result without depending on the web tier. This module's starter only serializes them.
  *
  * <p>A Spring starter implements these ports; pluggable Redis/JDBC backends implement the SPIs.
  * Nothing here depends on Spring, Jackson, or the servlet API.

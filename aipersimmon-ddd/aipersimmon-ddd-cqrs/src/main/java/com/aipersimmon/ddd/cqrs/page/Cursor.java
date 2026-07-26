@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.web.page;
+package com.aipersimmon.ddd.cqrs.page;
 
 /**
  * An opaque cursor: a pointer to a position in a result set that the client echoes back verbatim to

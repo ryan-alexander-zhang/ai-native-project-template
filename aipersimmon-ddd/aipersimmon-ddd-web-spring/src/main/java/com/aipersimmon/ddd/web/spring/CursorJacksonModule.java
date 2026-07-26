@@ -1,6 +1,6 @@
 package com.aipersimmon.ddd.web.spring;
 
-import com.aipersimmon.ddd.web.page.Cursor;
+import com.aipersimmon.ddd.cqrs.page.Cursor;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
