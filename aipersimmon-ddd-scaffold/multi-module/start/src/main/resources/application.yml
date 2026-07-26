@@ -67,6 +67,31 @@ aipersimmon:
       kafka:
         consumer:
           enabled: true
+    # Multi-tenancy (design-00009). enabled=true turns on end-to-end tenant isolation: the web edge
+    # resolves the tenant from the X-Tenant-Id header (default HeaderTenantResolver) and binds it for
+    # the request; the command bus seeds it onto CommandContext.tenantId; the outbox stamps it onto
+    # ce_tenantid and the Kafka consumer reconstructs it — so an async reservation runs under the
+    # originating tenant. missing-policy=REJECT fails a header-less request at the edge (400) rather
+    # than letting it touch a shared bucket — the safe production posture; a request with no
+    # resolvable tenant is treated as malformed. (Actuator/probe traffic carries no tenant; the
+    # filter's exclude-paths default already exempts /actuator/**, so probes stay reachable — add
+    # your own public paths there if needed.) tenant-tables is the
+    # opt-in allow-list the MyBatis-Plus tenant-line interceptor scopes: only these consumer-owned
+    # domain tables are rewritten. The framework's background-polled tables (outbox/inbox/process/
+    # operation-log) are deliberately absent — they are scanned tenant-lessly by relays and carry
+    # their tenant as a stamped data column, not a query predicate.
+    tenancy:
+      enabled: true
+      header: X-Tenant-Id
+      missing-policy: REJECT
+      mybatis-plus:
+        tenant-tables:
+          - customers
+          - orders
+          - order_lines
+          - stocks
+          - reservations
+          - reservation_lines
 
 # OpenTelemetry export to the SigNoz otel-collector. In dev the collector listens on the host at
 # 44317 (gRPC) / 44318 (HTTP) — see compose.yaml (started with the `observability` profile). These

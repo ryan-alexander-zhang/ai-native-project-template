@@ -64,7 +64,9 @@ class OperationLogRecordingTest {
     assertEquals("CUST-1", place.get("target_id"));
     assertEquals("SYSTEM", place.get("actor_type"));
     assertEquals("ordering-scaffold", place.get("actor_id"));
-    assertEquals("GLOBAL", place.get("tenant_id"));
+    // Dispatched straight on the bus with no tenant bound, so the command bus seeds the __root__
+    // sentinel (single-tenant N=1) and the tenant resolver reads it back onto the audit row.
+    assertEquals("__root__", place.get("tenant_id"));
     assertEquals("SUCCEEDED", place.get("outcome"));
     assertEquals("COMMITTED", place.get("completion"));
 

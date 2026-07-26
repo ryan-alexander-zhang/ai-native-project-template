@@ -150,6 +150,37 @@
     </dependency>
 
     <!--
+      SQL-parsing inner interceptors + jsqlparser. Since MyBatis-Plus 3.5.9 the interceptors that
+      rewrite SQL (TenantLineInnerInterceptor, PaginationInnerInterceptor, …) and their jsqlparser
+      dependency live in this module, split out of the starter so jsqlparser stays optional. The
+      tenant-line interceptor below needs it, so the consuming app opts in explicitly. Version comes
+      from the mybatis-plus-bom.
+    -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-jsqlparser</artifactId>
+    </dependency>
+
+    <!--
+      Multi-tenancy (design-00009). Both modules are inert until aipersimmon.ddd.tenancy.enabled=true
+      (see application.yml). -spring resolves the tenant at the web edge (X-Tenant-Id via the default
+      HeaderTenantResolver), binds the request-scoped TenantContext, and seeds it onto every command's
+      CommandContext.tenantId — the write-side authority. -mybatis-plus registers the single
+      MybatisPlusInterceptor carrying a TenantLineInnerInterceptor that scopes the opted-in domain
+      tables (aipersimmon.ddd.tenancy.mybatis-plus.tenant-tables) to that tenant; the framework's own
+      background-polled tables are deliberately left off the allow-list. tenancy-core arrives
+      transitively via cqrs-spring, so only these two need declaring.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-spring</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
+    </dependency>
+
+    <!--
       Observability: binds the framework-free observability SPIs to OpenTelemetry and pulls in the
       OpenTelemetry Spring Boot starter (boundary auto-instrumentation for HTTP/JDBC/Kafka, plus
       logback-MDC and Micrometer exemplar bridges). Traces are exported over OTLP to the SigNoz
