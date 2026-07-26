@@ -3,6 +3,7 @@ package com.example.inventory.application.stock;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.inventory.api.StockReservationFailed;
@@ -16,7 +17,6 @@ import com.example.inventory.domain.stock.Stock;
 import com.example.inventory.domain.stock.Stocks;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
@@ -48,12 +48,17 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
   private final Stocks stocks;
   private final Reservations reservations;
   private final IntegrationEvents integrationEvents;
+  private final IdGenerator idGenerator;
 
   public ReserveStockHandler(
-      Stocks stocks, Reservations reservations, IntegrationEvents integrationEvents) {
+      Stocks stocks,
+      Reservations reservations,
+      IntegrationEvents integrationEvents,
+      IdGenerator idGenerator) {
     this.stocks = stocks;
     this.reservations = reservations;
     this.integrationEvents = integrationEvents;
+    this.idGenerator = idGenerator;
   }
 
   @Override
@@ -75,7 +80,8 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
         stocks.save(stock);
         held.merge(new Sku(line.sku()), line.quantity(), Integer::sum);
       }
-      ReservationId reservationId = new ReservationId(UUID.randomUUID().toString());
+      // Time-ordered (UUIDv7) primary key from IdGenerator, not UUID.randomUUID() (issue-00054).
+      ReservationId reservationId = new ReservationId(idGenerator.newId());
       reservations.save(new Reservation(reservationId, command.orderId(), held));
       integrationEvents.publish(
           new StockReserved(command.orderId(), reservationId.value()), context);

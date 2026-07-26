@@ -9,13 +9,20 @@ import java.util.Collection;
  * aggregate it drains the aggregate's events and hands them here; the infrastructure layer supplies
  * the implementation (for example, an in-process dispatcher or a transactional outbox).
  *
- * <p>The drain happens where the aggregate is saved: a repository (or the handler) calls {@link
- * #publishAndClear(AbstractAggregateRoot)} right after persisting the root, inside the command's
+ * <p>The drain belongs to the <strong>repository</strong>: its {@code save} calls {@link
+ * #publishAndClear(AbstractAggregateRoot)} after persisting the root, inside the command's
  * transaction. This keeps the "who changed?" question answered by whoever just saved the aggregate
  * — no ambient, thread-scoped change tracker is needed. Because publishing runs on the same
  * transaction as the save, a transactional implementation (an outbox row, or an
  * {@code @TransactionalEventListener}) still commits or rolls back atomically with the state
  * change.
+ *
+ * <p>A command handler must <em>not</em> call it: an aggregate's recorded events are not published
+ * until something drains them, and nothing detects a missed drain — no exception, no log, no outbox
+ * row. Leaving the call to the handler makes losing a domain fact a matter of remembering one line,
+ * and the loss shows up far downstream (a process manager that never advances, a projection that
+ * never updates). Keeping the single call site in the repository removes that possibility; see
+ * {@code issue-00052}.
  */
 public interface DomainEvents {
 

@@ -1,5 +1,6 @@
 package com.example.inventory.infrastructure.persistence;
 
+import com.aipersimmon.ddd.application.DomainEvents;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
@@ -9,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -22,10 +24,13 @@ public class MyBatisReservations implements Reservations {
 
   private final ReservationMapper reservations;
   private final ReservationLineMapper lines;
+  private final DomainEvents domainEvents;
 
-  public MyBatisReservations(ReservationMapper reservations, ReservationLineMapper lines) {
+  public MyBatisReservations(
+      ReservationMapper reservations, ReservationLineMapper lines, DomainEvents domainEvents) {
     this.reservations = reservations;
     this.lines = lines;
+    this.domainEvents = domainEvents;
   }
 
   @Override
@@ -35,11 +40,17 @@ public class MyBatisReservations implements Reservations {
     header.setId(id);
     header.setOrderId(reservation.orderId());
     header.setReleased(reservation.isReleased());
-    if (reservations.selectById(id) == null) {
+    if (reservation.version() == 0) {
+      header.setVersion(1L);
       reservations.insert(header);
     } else {
-      reservations.updateById(header);
+      header.setVersion(reservation.version());
+      if (reservations.updateById(header) == 0) {
+        throw new OptimisticLockingFailureException(
+            "reservation " + id + " was modified concurrently");
+      }
     }
+    reservation.versionAdvanced();
 
     lines.delete(
         new LambdaQueryWrapper<ReservationLineDo>().eq(ReservationLineDo::getReservationId, id));
@@ -50,6 +61,8 @@ public class MyBatisReservations implements Reservations {
       row.setQuantity(held.getValue());
       lines.insert(row);
     }
+
+    domainEvents.publishAndClear(reservation);
   }
 
   @Override
@@ -66,10 +79,12 @@ public class MyBatisReservations implements Reservations {
     for (ReservationLineDo row : rows) {
       held.put(new Sku(row.getSku()), row.getQuantity());
     }
-    Reservation reservation = new Reservation(id, header.getOrderId(), held);
-    if (Boolean.TRUE.equals(header.getReleased())) {
-      reservation.markReleased();
-    }
-    return Optional.of(reservation);
+    return Optional.of(
+        Reservation.reconstitute(
+            id,
+            header.getOrderId(),
+            held,
+            Boolean.TRUE.equals(header.getReleased()),
+            header.getVersion()));
   }
 }

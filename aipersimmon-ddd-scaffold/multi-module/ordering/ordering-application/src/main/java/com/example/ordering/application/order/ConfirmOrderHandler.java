@@ -1,6 +1,5 @@
 package com.example.ordering.application.order;
 
-import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
@@ -17,11 +16,9 @@ import org.springframework.stereotype.Component;
 public class ConfirmOrderHandler implements CommandHandler<ConfirmOrder, Void> {
 
   private final Orders orders;
-  private final DomainEvents domainEvents;
 
-  public ConfirmOrderHandler(Orders orders, DomainEvents domainEvents) {
+  public ConfirmOrderHandler(Orders orders) {
     this.orders = orders;
-    this.domainEvents = domainEvents;
   }
 
   @Override
@@ -38,7 +35,6 @@ public class ConfirmOrderHandler implements CommandHandler<ConfirmOrder, Void> {
     order.confirm();
 
     orders.save(order);
-    domainEvents.publishAndClear(order);
     return null;
   }
 }

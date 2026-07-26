@@ -18,9 +18,16 @@ package com.aipersimmon.ddd.core.id;
  * <p>The returned id is opaque: callers must not parse it or depend on the embedded timestamp being
  * present, so a v4 value from an environment without the default implementation remains valid.
  *
+ * <p>Use it for a <strong>business aggregate's or entity's primary key</strong> too, whenever the
+ * application mints that key itself rather than taking a client-supplied natural key. Aggregate
+ * tables are usually the highest-volume tables in the schema, so a time-ordered key pays off most
+ * there — {@code UUID.randomUUID()} on an aggregate primary key is exactly the scattered-write
+ * pattern this SPI exists to remove (see {@code issue-00054}).
+ *
  * <p>This does <em>not</em> cover values that are deliberately not high-cardinality time-ordered
  * keys: a {@code tenant_id} discriminator, client-supplied web idempotency/nonce keys, an edge
- * {@code requestId}, or a lease {@code WorkerId}.
+ * {@code requestId}, or a lease {@code WorkerId}. Nor does it cover a natural key the business
+ * supplies (a SKU, a customer code) — those are not the framework's to mint.
  */
 @FunctionalInterface
 public interface IdGenerator {

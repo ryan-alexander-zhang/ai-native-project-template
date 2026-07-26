@@ -1,6 +1,5 @@
 package com.example.ordering.application.fulfilment;
 
-import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.example.ordering.api.OrderReadyForFulfilment;
@@ -26,13 +25,10 @@ import org.springframework.stereotype.Component;
 public class FulfilmentTrigger {
 
   private final Orders orders;
-  private final DomainEvents domainEvents;
   private final IntegrationEvents integrationEvents;
 
-  public FulfilmentTrigger(
-      Orders orders, DomainEvents domainEvents, IntegrationEvents integrationEvents) {
+  public FulfilmentTrigger(Orders orders, IntegrationEvents integrationEvents) {
     this.orders = orders;
-    this.domainEvents = domainEvents;
     this.integrationEvents = integrationEvents;
   }
 
@@ -43,7 +39,6 @@ public class FulfilmentTrigger {
   public void begin(Order order, CommandContext context) {
     order.beginFulfilment();
     orders.save(order);
-    domainEvents.publishAndClear(order);
     integrationEvents.publish(reservationRequest(order), context);
   }
 

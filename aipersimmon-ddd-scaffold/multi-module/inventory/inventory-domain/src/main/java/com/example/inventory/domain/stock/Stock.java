@@ -20,6 +20,19 @@ public class Stock extends AbstractAggregateRoot<Sku> {
     this.available = available;
   }
 
+  /**
+   * Reconstitute a stored stock row. For persistence adapters only.
+   *
+   * @param version the row's optimistic-lock version, which the repository puts back in the {@code
+   *     WHERE} clause when it saves. This is what stops two concurrent reservations of one SKU from
+   *     each passing {@link #reserve} on the same snapshot and overselling it.
+   */
+  public static Stock reconstitute(Sku sku, int available, long version) {
+    Stock stock = new Stock(sku, available);
+    stock.restoreVersion(version);
+    return stock;
+  }
+
   /** Reserve the given quantity, guarding against reserving more than is available. */
   public void reserve(int quantity) {
     if (quantity <= 0) {

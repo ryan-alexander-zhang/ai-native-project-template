@@ -96,7 +96,7 @@ class OrderPlacementTest {
 
   @Test
   void reconstituteWithNoLinesHasNoTotal() {
-    Order empty = Order.reconstitute(ID, CUSTOMER, List.of(), OrderStatus.CONFIRMED);
+    Order empty = Order.reconstitute(ID, CUSTOMER, List.of(), OrderStatus.CONFIRMED, 1L);
 
     assertThrows(DomainException.class, empty::total);
   }
@@ -136,7 +136,7 @@ class OrderPlacementTest {
   void lineDataRoundTripsThroughReconstitute() {
     Order placed = Order.place(ID, CUSTOMER, oneLine(), ReviewRequirement.notRequired());
 
-    Order restored = Order.reconstitute(ID, CUSTOMER, placed.lineData(), OrderStatus.CONFIRMED);
+    Order restored = Order.reconstitute(ID, CUSTOMER, placed.lineData(), OrderStatus.CONFIRMED, 3L);
 
     assertEquals(OrderStatus.CONFIRMED, restored.status(), "reconstitute sets the given status");
     assertTrue(restored.domainEvents().isEmpty(), "reconstitution records no events");

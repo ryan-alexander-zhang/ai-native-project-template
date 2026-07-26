@@ -28,7 +28,7 @@ class ReserveStockBusValidationTest {
   private final RecordingHandler handler = new RecordingHandler();
   private final CommandBus bus =
       new RegistryCommandBus(
-          List.of(handler), List.of(new ValidationCommandInterceptor(validator)));
+          List.of(handler), List.of(new ValidationCommandInterceptor(validator)), () -> "cmd-1");
 
   @Test
   void malformedCommandIsRejectedBeforeTheHandlerRuns() {

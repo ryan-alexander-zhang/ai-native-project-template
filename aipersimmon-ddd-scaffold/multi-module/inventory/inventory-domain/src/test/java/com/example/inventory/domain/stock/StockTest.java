@@ -3,6 +3,7 @@ package com.example.inventory.domain.stock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.exception.DomainException;
 import org.junit.jupiter.api.Test;
@@ -74,5 +75,20 @@ class StockTest {
     Stock stock = new Stock(SKU, 10);
 
     assertThrows(DomainException.class, () -> stock.release(0));
+  }
+
+  @Test
+  void reconstituteCarriesThePersistedVersionAndRecordsNoEvents() {
+    Stock stock = Stock.reconstitute(SKU, 7, 4L);
+
+    assertSame(SKU, stock.id());
+    assertEquals(7, stock.available());
+    assertEquals(4L, stock.version(), "the loaded version is what the repository checks on save");
+    assertTrue(stock.domainEvents().isEmpty(), "reconstitution records no events");
+  }
+
+  @Test
+  void reconstituteStillRejectsANegativeAvailable() {
+    assertThrows(DomainException.class, () -> Stock.reconstitute(SKU, -1, 1L));
   }
 }

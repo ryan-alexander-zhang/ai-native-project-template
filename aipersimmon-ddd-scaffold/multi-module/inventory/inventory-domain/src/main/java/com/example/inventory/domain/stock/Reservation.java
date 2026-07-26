@@ -35,6 +35,26 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
     this.released = false;
   }
 
+  /**
+   * Reconstitute a stored reservation, including whether it was already released. For persistence
+   * adapters only: it restores the {@code released} flag directly instead of replaying {@link
+   * #markReleased()}, so rehydration never runs behaviour.
+   *
+   * @param version the row's optimistic-lock version, which the repository puts back in the {@code
+   *     WHERE} clause when it saves
+   */
+  public static Reservation reconstitute(
+      ReservationId id,
+      String orderId,
+      Map<Sku, Integer> heldBySku,
+      boolean released,
+      long version) {
+    Reservation reservation = new Reservation(id, orderId, heldBySku);
+    reservation.released = released;
+    reservation.restoreVersion(version);
+    return reservation;
+  }
+
   public String orderId() {
     return orderId;
   }

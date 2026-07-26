@@ -11,7 +11,7 @@ import com.aipersimmon.ddd.cqrs.UnitOfWork;
  * published during the command commit or roll back together.
  *
  * <p>This interceptor owns only the transaction boundary. Draining an aggregate's recorded events
- * is done where the aggregate is saved: the repository (or handler) calls {@link
+ * is done where the aggregate is saved: the repository's {@code save} calls {@link
  * DomainEvents#publishAndClear} after persisting the root, within this transaction — so no
  * thread-scoped collector is needed to tell the interceptor which aggregates changed. Ordered
  * innermost of the built-in chain so the transaction wraps the handler but sits inside logging and

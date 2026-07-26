@@ -63,4 +63,27 @@ class ReservationTest {
     assertTrue(reservation.isReleased());
     assertFalse(reservation.markReleased(), "a second release is a no-op");
   }
+
+  @Test
+  void reconstituteRestoresTheReleasedFlagAndVersionWithoutReplayingBehaviour() {
+    Reservation released =
+        Reservation.reconstitute(
+            new ReservationId("res-1"), "order-1", Map.of(new Sku("sku-1"), 2), true, 5L);
+
+    assertTrue(released.isReleased(), "a released reservation loads back as released");
+    assertFalse(released.markReleased(), "so releasing again is still a no-op");
+    assertEquals(
+        5L, released.version(), "the loaded version is what the repository checks on save");
+    assertTrue(released.domainEvents().isEmpty(), "reconstitution records no events");
+  }
+
+  @Test
+  void reconstituteAnUnreleasedReservation() {
+    Reservation open =
+        Reservation.reconstitute(
+            new ReservationId("res-2"), "order-2", Map.of(new Sku("sku-1"), 1), false, 1L);
+
+    assertFalse(open.isReleased());
+    assertTrue(open.markReleased(), "an unreleased reservation can still be released");
+  }
 }

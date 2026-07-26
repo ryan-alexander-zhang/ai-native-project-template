@@ -17,6 +17,19 @@
   <description>Technical port implementations of the inventory context (in-memory).</description>
 
   <dependencies>
+    <!-- DomainEvents: the repository drains the aggregate's recorded events as part of save,
+         inside the command transaction, so no handler has to remember a second call (issue-00052). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+    </dependency>
+    <!-- org.springframework.dao.OptimisticLockingFailureException: the repository raises it when a
+         version-checked update matches no row, and the framework's ConcurrencyTranslationCommandInterceptor
+         turns it into ConcurrencyConflictException -> HTTP 409 (issue-00051). -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>inventory-domain</artifactId>

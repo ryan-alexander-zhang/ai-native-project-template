@@ -1,8 +1,8 @@
 package com.example.ordering.application.order;
 
-import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.core.exception.DomainException;
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.application.fulfilment.FulfilmentTrigger;
@@ -20,7 +20,6 @@ import com.example.ordering.domain.order.ReviewRequirement;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
@@ -49,19 +48,19 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
 
   private final Orders orders;
   private final Customers customers;
-  private final DomainEvents domainEvents;
+  private final IdGenerator idGenerator;
   private final StockAvailabilityGateway stockAvailability;
   private final FulfilmentTrigger fulfilmentTrigger;
 
   public PlaceOrderHandler(
       Orders orders,
       Customers customers,
-      DomainEvents domainEvents,
+      IdGenerator idGenerator,
       StockAvailabilityGateway stockAvailability,
       FulfilmentTrigger fulfilmentTrigger) {
     this.orders = orders;
     this.customers = customers;
-    this.domainEvents = domainEvents;
+    this.idGenerator = idGenerator;
     this.stockAvailability = stockAvailability;
     this.fulfilmentTrigger = fulfilmentTrigger;
   }
@@ -99,7 +98,9 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
                         Money.of(line.unitAmountMinor(), line.currency())))
             .toList();
 
-    OrderId orderId = new OrderId(UUID.randomUUID().toString());
+    // The aggregate's primary key comes from IdGenerator (UUIDv7), not UUID.randomUUID(): orders is
+    // the highest-volume table here, so a time-ordered key is worth most on it (issue-00054).
+    OrderId orderId = new OrderId(idGenerator.newId());
     ReviewRequirement review = REVIEW.assess(lines);
     Order order = Order.place(orderId, customerId, lines, review);
 
@@ -109,9 +110,9 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     }
 
     if (review.isRequired()) {
-      // Held for manual review: record the placement, but reserve nothing until it clears.
+      // Held for manual review: record the placement, but reserve nothing until it clears. The
+      // repository drains the recorded events as part of saving (issue-00052).
       orders.save(order);
-      domainEvents.publishAndClear(order);
     } else {
       // Cleared immediately: begin fulfilment and ask inventory to reserve, in this transaction.
       fulfilmentTrigger.begin(order, context);

@@ -95,16 +95,26 @@ public class Order extends AbstractAggregateRoot<OrderId> {
    * Reconstitute a stored order: sets state directly and registers no events. For persistence
    * adapters only — application code creates orders through {@link #place}. Framework-free (no
    * persistence annotations here; the ORM/mapper lives in the infrastructure layer).
+   *
+   * @param version the row's optimistic-lock version, which the repository puts back in the {@code
+   *     WHERE} clause when it saves; passing it through the aggregate's own factory is what keeps a
+   *     repository from setting the version behind the aggregate's back
    */
   public static Order reconstitute(
-      OrderId id, CustomerId customerId, List<LineData> lineData, OrderStatus status) {
+      OrderId id,
+      CustomerId customerId,
+      List<LineData> lineData,
+      OrderStatus status,
+      long version) {
     List<OrderLine> lines = new ArrayList<>();
     if (lineData != null) {
       for (LineData line : lineData) {
         lines.add(new OrderLine(line.sku(), line.quantity(), line.unitPrice()));
       }
     }
-    return new Order(id, customerId, lines, status);
+    Order order = new Order(id, customerId, lines, status);
+    order.restoreVersion(version);
+    return order;
   }
 
   /** This order's lines as raw {@link LineData}, so a persistence adapter can store them. */

@@ -1,6 +1,5 @@
 package com.example.ordering.application.order;
 
-import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
@@ -15,11 +14,9 @@ import org.springframework.stereotype.Component;
 public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
 
   private final Orders orders;
-  private final DomainEvents domainEvents;
 
-  public CancelOrderHandler(Orders orders, DomainEvents domainEvents) {
+  public CancelOrderHandler(Orders orders) {
     this.orders = orders;
-    this.domainEvents = domainEvents;
   }
 
   @Override
@@ -36,7 +33,6 @@ public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
     order.cancel(command.reason());
 
     orders.save(order);
-    domainEvents.publishAndClear(order);
     return null;
   }
 }
