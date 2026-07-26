@@ -129,6 +129,12 @@
     <!-- Reusable Testcontainers support (singleton containers + Spring Boot
          @ServiceConnection configs); consumers add it at test scope. -->
     <module>aipersimmon-ddd-test-support</module>
+    <!-- Bundles: aggregate the modules above into the two or three dependencies an
+         application actually declares. Listed last because they depend on all of them. -->
+    <module>aipersimmon-ddd-starter</module>
+    <module>aipersimmon-ddd-starter-mybatis-plus</module>
+    <module>aipersimmon-ddd-starter-jdbc</module>
+    <module>aipersimmon-ddd-starter-messaging-kafka</module>
   </modules>
 
   <dependencyManagement>

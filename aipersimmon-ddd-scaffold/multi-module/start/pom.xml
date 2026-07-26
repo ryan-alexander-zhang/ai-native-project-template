@@ -41,107 +41,60 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>payment-adapter</artifactId></dependency>
 
     <!--
-      Time-ordered UUIDv7 identifiers: binds the default IdGenerator so every framework-minted id
-      (command messageId, integration event_id, process instance/transition/effect/deadline id,
-      operation-log recordId) is a time-ordered UUIDv7 instead of a random v4 — better index
-      locality on the high-cardinality keys. Omitting this module falls back to UUID.randomUUID().
+      The whole aipersimmon-ddd MyBatis-Plus stack in one dependency: CQRS buses, in-process events,
+      time-ordered UUIDv7 ids, the RFC 9457 web contract, versioned aggregate repositories, the
+      transactional outbox, the consumer inbox, the durable process manager, the operation log,
+      multi-tenancy, and the Flyway schema applier.
+
+      Bundling is not enabling. Tenancy stays inert until aipersimmon.ddd.tenancy.enabled=true and
+      Flyway applies only the components listed under aipersimmon.ddd.flyway.components (both in
+      application.yml), so nothing here starts writing tables on its own.
+
+      Everything inside remains individually available: a project that wants, say, CQRS and the
+      outbox but not the process manager declares those two modules instead. The bundle is the
+      default path, not the only one.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
-    </dependency>
-    <!-- In-process synchronous transport for both domain and integration events. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-events-spring-boot-starter</artifactId>
-    </dependency>
-    <!-- CQRS command/query buses; registers the handlers and routes to them. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
+      <artifactId>aipersimmon-ddd-starter-mybatis-plus</artifactId>
     </dependency>
     <!--
-      Operation Log: records a business-readable audit row for every write command carrying
-      @OperationLog. The cqrs-spring capture layer auto-registers two CommandInterceptors on the
-      same bus (a committed-success one inside the transaction, a failure one outside it); the
-      mybatis-plus backend persists rows via the app's SqlSessionFactory / DataSource, and its DDL
-      is applied by the aipersimmon Flyway starter once `operation-log` is listed under
-      aipersimmon.ddd.flyway.components (see application.yml). The actor/tenant resolvers are
-      provided by OperationLogConfig in this module.
+      Cross-service integration events over Kafka (decision-00006 "方式三": broker + outbox). It is
+      built ON the outbox the bundle above provides, not instead of it: only @Externalized events
+      cross the broker, the ShedLock-guarded relay publishes them as CloudEvents, and the
+      inbox-guarded consumer bridge republishes them in process so the existing @EventListener
+      handlers are untouched. consumer.enabled=true is what registers that bridge.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
+      <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
     </dependency>
     <!--
-      Web-layer contract: maps DomainException/ApplicationException and validation
-      failures to RFC 9457 ProblemDetail responses, plus a trace-id filter. These
-      zero-risk concerns are auto-configured on and replace a hand-written advice.
-    -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-web-spring-boot-starter</artifactId>
-    </dependency>
-    <!--
-      OpenAPI/Swagger: pulls in springdoc (the /v3/api-docs scanner + Swagger UI, gated by
-      springdoc.swagger-ui.enabled) and a customizer that documents the RFC 9457 problem responses
-      the web-spring advice emits. Controllers are documented by reflection; the read models
-      (@ReadModel) reach the spec with no OpenAPI dependency on the application tier.
+      Two deliberately un-bundled add-ons. Both pull an opinionated third-party stack, so they stay
+      an explicit choice rather than something the default path decides for you:
+
+        - openapi: springdoc (the /v3/api-docs scanner + Swagger UI) plus a customizer that
+          documents the RFC 9457 problem responses the web layer emits.
+        - observability-otel: the OpenTelemetry Spring Boot starter (boundary auto-instrumentation
+          for HTTP/JDBC/Kafka, logback-MDC and Micrometer exemplar bridges), exporting over OTLP.
+          The framework-free observability SPIs are already present and no-op without this; adding
+          it binds them to OpenTelemetry.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-openapi-spring-boot-starter</artifactId>
     </dependency>
-    <!-- Durable Process Manager runtime: wires the order-fulfilment definition + codecs
-         into the MyBatis-Plus runtime, relay, and deadline worker over the app's DataSource.
-         Shares the same SqlSessionFactory / DataSource as the outbox/inbox mappers below, so
-         the process store beans and the aggregate/outbox writes sit on one MyBatis-Plus stack. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
+      <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
     </dependency>
-    <!-- Auto-applies the aipersimmon schema (here: the four process-manager tables) at startup
-         via Flyway, on a dedicated history table — replaces a hand-copied schema.sql. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
-    </dependency>
+
     <!-- Flyway 10+ ships PostgreSQL support as a separate module (this app runs on PostgreSQL). -->
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
 
-    <!--
-      Reliable integration-event transport (decision-00006 "方式三": broker + outbox).
-      With an outbox storage on the classpath, the IntegrationEvents port is backed by the
-      transactional OutboxWriter (same-tx write) instead of the in-process events-spring
-      publisher, and the ShedLock-guarded relay drains it. The Kafka module overrides the
-      relay's dispatcher to publish CloudEvents to a topic and (consumer.enabled=true)
-      registers the inbox-guarded consumer bridge that republishes in process — so the
-      existing @EventListener handlers are untouched. The inbox de-dups the consumer side.
-      All three tables (outbox + dead-letter + shedlock, inbox) come from the flyway starter.
-      Full MyBatis-Plus stack (plan-00007): outbox/inbox use the -mybatis-plus variants so they
-      share one SqlSessionFactory / DataSource with the aggregate mappers — aggregate write and
-      outbox write commit in the same transaction. (Table shapes are identical to the -jdbc
-      variants; flyway.components is unchanged.)
-    -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
-    </dependency>
     <!-- MyBatis-Plus: provides the SqlSessionFactory the outbox/inbox variants and the aggregate
          mappers share. Version comes from the mybatis-plus-bom imported by the reactor root. -->
     <dependency>
@@ -161,36 +114,6 @@
       <artifactId>mybatis-plus-jsqlparser</artifactId>
     </dependency>
 
-    <!--
-      Multi-tenancy (design-00009). Both modules are inert until aipersimmon.ddd.tenancy.enabled=true
-      (see application.yml). -spring resolves the tenant at the web edge (X-Tenant-Id via the default
-      HeaderTenantResolver), binds the request-scoped TenantContext, and seeds it onto every command's
-      CommandContext.tenantId — the write-side authority. -mybatis-plus registers the single
-      MybatisPlusInterceptor carrying a TenantLineInnerInterceptor that scopes the opted-in domain
-      tables (aipersimmon.ddd.tenancy.mybatis-plus.tenant-tables) to that tenant; the framework's own
-      background-polled tables are deliberately left off the allow-list. tenancy-core arrives
-      transitively via cqrs-spring, so only these two need declaring.
-    -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
-    </dependency>
-
-    <!--
-      Observability: binds the framework-free observability SPIs to OpenTelemetry and pulls in the
-      OpenTelemetry Spring Boot starter (boundary auto-instrumentation for HTTP/JDBC/Kafka, plus
-      logback-MDC and Micrometer exemplar bridges). Traces are exported over OTLP to the SigNoz
-      otel-collector (otel.exporter.otlp.endpoint). Activated purely by being on the classpath; the
-      whole domain spine stays no-op if this module is absent.
-    -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
-    </dependency>
     <!-- PostgreSQL for the four process tables; started from compose.yaml by spring-boot-docker-compose. -->
     <dependency>
       <groupId>org.postgresql</groupId>

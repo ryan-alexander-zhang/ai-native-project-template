@@ -121,6 +121,46 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 为它单独区分「适配器」与「starter」不会带来任何选择自由，只会多一层模块。这条裁定必须写进后缀表的脚注，
 否则下一个人会重新纠结同一件事。
 
+### 3.4 捆绑包（bundle）：`aipersimmon-ddd-starter[-<stack>]`
+
+实施 P1-1（17 依赖 → 少数几个）时撞到一个命名冲撞：报告希望聚合 starter 叫
+`aipersimmon-ddd-mybatis-plus-spring-boot-starter`，但 3.2 已把**拦截器组合座**命名为该名字。两者不能合并——
+组合座是 `-tenancy-mybatis-plus` 等后端各自依赖的**共享座**，若并入聚合包，只想要 tenancy 的使用者会被迫
+拉进整套 outbox/inbox/process-manager/operation-log，直接违反 plan-00014 铁律 1（细粒度挑选能力不可受损）。
+
+裁定：**捆绑包用 `-starter-` 中缀，单一关注点 starter 保持 `-spring-boot-starter` 后缀。**
+
+| artifactId | 含义 |
+| --- | --- |
+| `aipersimmon-ddd-starter` | 默认装配：cqrs + events + id + web |
+| `aipersimmon-ddd-starter-mybatis-plus` | 上者 + 全部 MyBatis-Plus 后端 + tenancy + flyway |
+| `aipersimmon-ddd-starter-jdbc` | 上者 + 全部 JDBC 后端 + tenancy 传播 + flyway |
+| `aipersimmon-ddd-starter-messaging-kafka` | Kafka 传输（建立在存储捆绑包之上，非替代） |
+
+为什么中缀而不是后缀：
+
+1. **两类东西必须能从名字区分**。`<domain>-spring-boot-starter` 装配**一个**关注点；`starter-<stack>` 拉进
+   **一整个技术栈**。同一后缀无法表达这个差别，且如上所述会与已有名字**撞名**。
+2. 与 Spring 自己的习惯同构：官方捆绑包是前缀式 `spring-boot-starter-web`，第三方单一关注点 starter 是后缀式
+   `xxx-spring-boot-starter`。这里的前缀是 `aipersimmon-ddd-starter-`，不侵占 Spring 命名空间。
+3. **可判定**，因此可断言：`ModuleNamingChecks` 按 `aipersimmon-ddd-starter` 前缀（精确匹配或后接 `-`）识别
+   捆绑包并归入「装配」一类，允许依赖框架。它**不**认「名字里出现 starter 一词」，所以不能被用来给契约模块
+   夹带 Spring——这一点有专门的反向测试。
+
+捆绑包一律 `packaging` 默认（jar，无源码），不用 `pom`：`pom` 会迫使消费者在每条依赖上写 `<type>pom</type>`，
+而消除仪式正是 P1-1 的目的。
+
+**捆绑不等于启用**。包内每个 bean 仍是 `@ConditionalOnMissingBean` / `@ConditionalOnProperty`；tenancy 在
+`aipersimmon.ddd.tenancy.enabled=true` 前完全惰性，Flyway 只应用 `aipersimmon.ddd.flyway.components` 列出的组件。
+捆绑包只是**默认路径**，不是唯一路径。
+
+**有意不入包的两个模块**：`-openapi-spring-boot-starter`（拉 springdoc + Swagger UI）与
+`-observability-otel-spring-boot-starter`（拉整个 OpenTelemetry Spring Boot starter）。二者各自带来一整套
+有主张的第三方栈，不该由默认路径替使用者决定。报告 P1-1 把 "observability(no-op)" 列进核心包——那指的是
+**framework-free 的 observability SPI**（`aipersimmon-ddd-observability`），它已随 cqrs/outbox 传递到位且默认 no-op；
+OTel **绑定**是另一件事。因此样例的 aipersimmon 编译依赖是 **16 → 4**（2 个捆绑包 + 2 个显式 add-on），
+而非报告设想的 2——差额是有意的。
+
 ## 四、断言（否则半年后再次漂移）
 
 在 `aipersimmon-ddd-archunit` 之外增加一条**构建期**断言，因为要检查的是 **pom 依赖**而非字节码：Maven Enforcer

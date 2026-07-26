@@ -79,6 +79,28 @@ class ModuleNamingChecksTest {
   }
 
   @Test
+  void aBundleIsAssemblyAndMayNameAFramework(@TempDir Path root) throws IOException {
+    String spring = dependency("org.springframework.boot", "spring-boot-autoconfigure", null);
+    module(root, "aipersimmon-ddd-starter", spring);
+    module(root, "aipersimmon-ddd-starter-mybatis-plus", spring);
+
+    assertDoesNotThrow(() -> ModuleNamingChecks.assertModuleNamingRules(root));
+  }
+
+  @Test
+  void aContractModuleIsNotExcusedByMerelyContainingTheWordStarter(@TempDir Path root)
+      throws IOException {
+    // The bundle rule keys on the aipersimmon-ddd-starter prefix, not on the word appearing
+    // anywhere, so it cannot be used to smuggle a framework into a contract module.
+    module(
+        root,
+        "aipersimmon-ddd-my-starter-thing",
+        dependency("org.springframework", "spring-tx", null));
+
+    assertEquals(1, ModuleNamingChecks.contractModulesNamingAFramework(root).size());
+  }
+
+  @Test
   void aTestScopedFrameworkDependencyIsFine(@TempDir Path root) throws IOException {
     module(
         root,

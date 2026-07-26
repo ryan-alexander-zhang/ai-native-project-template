@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The default path for any aipersimmon-ddd application: the write side, the read side, event
+    publishing, time-ordered ids, and the HTTP error/pagination contract. One dependency instead of
+    five, chosen so that a service with no database of its own still works.
+
+    It bundles nothing storage-specific — add aipersimmon-ddd-starter-mybatis-plus or
+    aipersimmon-ddd-starter-jdbc for that, and either of those already includes this one.
+
+    A bundle only aggregates; every component inside stays independently usable and every bean stays
+    @ConditionalOnMissingBean, so picking modules by hand remains fully supported (design-00012 §3.4).
+  -->
+  <artifactId>aipersimmon-ddd-starter</artifactId>
+  <name>aipersimmon-ddd-starter</name>
+  <description>Bundle: the default aipersimmon-ddd assembly — CQRS, in-process events, time-ordered ids, and the web error/pagination contract.</description>
+
+  <dependencies>
+    <!-- Command/query buses, the interceptor chain, the unit of work. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- In-process synchronous transport for domain and integration events. A durable outbox
+         backend, if present, takes over the integration half automatically. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-events-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Time-ordered UUIDv7 for every framework-minted id. Not optional: without it the ids
+         are random v4 and index locality is lost (issue-00053). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- RFC 9457 problem responses, the request-id filter, cursor pagination over HTTP. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>

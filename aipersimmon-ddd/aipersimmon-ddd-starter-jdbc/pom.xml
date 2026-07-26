@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The full JdbcTemplate stack: the default bundle plus every component's JDBC backend and the
+    schema applier. Choose this over -starter-mybatis-plus when the application maps its own SQL and
+    does not want MyBatis-Plus.
+
+    One asymmetry worth knowing: tenant SQL rewriting is a MyBatis-Plus interceptor capability, so
+    this bundle carries tenant resolution and propagation but not automatic row scoping — a JDBC
+    application writes the tenant predicate itself. The tenant is still on CommandContext, the
+    EventEnvelope and every durable row.
+
+    Bundling is not enabling: Flyway applies only the components listed under
+    aipersimmon.ddd.flyway.components.
+  -->
+  <artifactId>aipersimmon-ddd-starter-jdbc</artifactId>
+  <name>aipersimmon-ddd-starter-jdbc</name>
+  <description>Bundle: the full JdbcTemplate stack — outbox, inbox, process manager, operation log, tenant propagation, versioned aggregate repositories and the schema applier.</description>
+
+  <dependencies>
+    <!-- Everything in the default bundle. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- JdbcAggregateRepository: version-checked aggregate writes with event draining
+         (design-00011). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Transactional outbox over JdbcTemplate. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Consumer-side idempotency. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Durable process-manager store, relay and deadline worker. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Audit capture: two command interceptors around the transaction. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Where the audit rows land. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Tenant resolution at the web edge and on every CommandContext. Note: SQL-level tenant
+         scoping is a MyBatis-Plus interceptor feature; a JDBC application writes the tenant
+         predicate in its own SQL, so there is no -tenancy-jdbc to bundle. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Applies each bundled component's own migrations at startup, on its own history table. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>

@@ -48,6 +48,15 @@ public final class ModuleNamingChecks {
   private static final List<String> PLUGGABLE_SUFFIXES =
       List.of("-jdbc", "-mybatis-plus", "-redis", "-kafka", "-engine", "-spring-boot-starter");
 
+  /**
+   * Bundles: {@code aipersimmon-ddd-starter} and {@code aipersimmon-ddd-starter-<stack>}. They
+   * aggregate other modules into the two or three dependencies an application declares, so they are
+   * assembly, not contract — a domain layer never names one. The {@code -starter-} infix keeps a
+   * bundle distinguishable from a single-concern {@code <domain>-spring-boot-starter}, and keeps
+   * the two from colliding over a name (design-00012 §3.4).
+   */
+  private static final String BUNDLE_PREFIX = "aipersimmon-ddd-starter";
+
   /** Group-id prefixes a contract module must not ask for. */
   private static final List<String> FRAMEWORK_GROUPS =
       List.of("org.springframework", "com.baomidou");
@@ -136,7 +145,9 @@ public final class ModuleNamingChecks {
   }
 
   private static boolean isPluggable(String artifactId) {
-    return PLUGGABLE_SUFFIXES.stream().anyMatch(artifactId::endsWith);
+    return artifactId.equals(BUNDLE_PREFIX)
+        || artifactId.startsWith(BUNDLE_PREFIX + "-")
+        || PLUGGABLE_SUFFIXES.stream().anyMatch(artifactId::endsWith);
   }
 
   /** The {@code <artifactId>} of the module itself: the first one that is not the parent's. */

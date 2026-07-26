@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The full MyBatis-Plus stack: the default bundle plus every component's MyBatis-Plus backend and
+    the schema applier. This is the one dependency a typical application needs alongside its own
+    mybatis-plus-spring-boot3-starter.
+
+    Every backend here shares the application's SqlSessionFactory and DataSource, which is the point:
+    an aggregate write and its outbox write commit in one transaction.
+
+    Bundling is not enabling. The stateful concerns stay off until configured (tenancy until
+    aipersimmon.ddd.tenancy.enabled=true, Flyway until a component is listed under
+    aipersimmon.ddd.flyway.components), so a bundle never silently starts writing tables.
+  -->
+  <artifactId>aipersimmon-ddd-starter-mybatis-plus</artifactId>
+  <name>aipersimmon-ddd-starter-mybatis-plus</name>
+  <description>Bundle: the full MyBatis-Plus stack — outbox, inbox, process manager, operation log, tenancy, versioned aggregate repositories and the schema applier.</description>
+
+  <dependencies>
+    <!-- Everything in the default bundle. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- MybatisPlusAggregateRepository: version-checked aggregate writes with event draining
+         (design-00011). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The single MybatisPlusInterceptor every InnerInterceptor contribution composes into.
+         MyBatis-Plus honours exactly one, so it must be owned in one place (design-00011 §3). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Transactional outbox: the IntegrationEvents port becomes a same-transaction write, and
+         the ShedLock-guarded relay drains it. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Consumer-side idempotency. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Durable process-manager store, relay and deadline worker. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Audit capture: two command interceptors around the transaction. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Where the audit rows land. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Multi-tenancy. Both tenancy modules are inert until
+         aipersimmon.ddd.tenancy.enabled=true, so bundling them costs nothing when N=1. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Applies each bundled component's own migrations at startup, on its own history table.
+         Which components apply is aipersimmon.ddd.flyway.components — bundling the module does
+         not silently create tables. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>

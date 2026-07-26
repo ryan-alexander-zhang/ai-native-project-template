@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Cross-service integration events over Kafka. Add it beside a storage bundle
+    (-starter-mybatis-plus or -starter-jdbc): the broker transport is built ON the transactional
+    outbox, not instead of it, so a storage bundle is a prerequisite rather than an alternative.
+
+    Only events annotated @Externalized cross the broker; everything else stays in process. If a
+    storage bundle is absent the durable-transport guard fails startup rather than letting
+    @Externalized events be published in process and silently never leave the JVM (issue-00044).
+  -->
+  <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
+  <name>aipersimmon-ddd-starter-messaging-kafka</name>
+  <description>Bundle: Kafka transport for @Externalized integration events, over the transactional outbox, with the inbox-guarded consumer bridge.</description>
+
+  <dependencies>
+    <!-- The Kafka OutboxDispatcher and the inbox-guarded consumer bridge. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-messaging-kafka</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>
