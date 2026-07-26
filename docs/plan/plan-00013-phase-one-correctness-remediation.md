@@ -75,9 +75,12 @@ flowchart TB
   **测**：新建聚合 `version()==0`；rehydrate 后为持久化值；`versionAdvanced()` 后 +1；同 id 不同实例相等且
   `Set` 去重为 1；不同 id 不等；不同具体类型同 id 不等；`null`/异类不等；`version` 不影响相等。
   → [[issue-00051-aggregates-have-no-optimistic-locking]]、[[issue-00055-aggregate-root-missing-identity-equality]]
-- **A2** `[archunit]` 新增 `BuildingBlockRules.aggregateRootsShouldNotOverrideEquality()`：`@AggregateRoot`
-  类型不得自行声明 `equals`/`hashCode`；纳入 `AiPersimmonDddRules.all()`；加 `fixture/bad` 反例。
-  **测**：good fixture 通过、bad fixture 失败且信息可读。
+- **A2** ~~`[archunit]` 新增 `aggregateRootsShouldNotOverrideEquality()`~~ —— **已取消（实施中判定为冗余）**。
+  A1 把 `equals`/`hashCode` 声明为 `final`，子类覆写是**编译期错误**；而既有
+  `BuildingBlockRules.aggregateRootsShouldExtendAbstractAggregateRoot()` 已强制 `@AggregateRoot` 类型继承基类。
+  两者叠加已完整保证身份相等语义，ArchUnit 规则**永远不可能命中**——一条不可能失败的规则只是噪声
+  （`CODE_QUALITY.md` §7「Metric-as-goal」与 `AGENTS.md` §2「Nothing speculative」）。报告 P2-5 提出该规则时
+  尚未确定用 `final`，故此处收窄。
   → [[issue-00055-aggregate-root-missing-identity-equality]]
 - **A3** `[id]`+6 模块 `-id` 由 `test` 提为 `compile`（`cqrs-spring/pom.xml:80-85`），其余消费模块补依赖；
   删除 6 处 `generator != null ? ... : () -> UUID.randomUUID()...` 三元，改为直接注入 `IdGenerator`；

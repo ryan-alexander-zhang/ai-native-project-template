@@ -68,8 +68,9 @@ List.of(a).contains(b);            // false
   对称性；聚合类型不同即不同实体。随后比较 `id()`。
 - `hashCode`：`Objects.hashCode(id())`。
 - 两者声明为 `final`，防止子类覆写后再次漂移。
-- 新增 ArchUnit 规则 `aggregateRootsShouldNotOverrideEquality()`：`@AggregateRoot` 类型不得自行声明
-  `equals`/`hashCode`（基类已 `final`，规则把「编译期才发现」提前到架构测试，并给出解释性失败信息）。
+- ~~新增 ArchUnit 规则 `aggregateRootsShouldNotOverrideEquality()`~~ —— **实施中判定为冗余，已取消**：
+  `final` 使覆写成为**编译期错误**，而既有 `aggregateRootsShouldExtendAbstractAggregateRoot()` 已强制
+  `@AggregateRoot` 继承基类；两者叠加后该规则永远不可能命中。一条不可能失败的规则不提供任何保护，只增加噪声。
 
 **注意 `version` 字段不参与相等**（见 [[issue-00051-aggregates-have-no-optimistic-locking]]）：版本是持久化
 并发控制的元数据，不是身份的一部分；同一订单的 v3 与 v5 仍是同一个订单。`domainEvents` 同理不参与。
