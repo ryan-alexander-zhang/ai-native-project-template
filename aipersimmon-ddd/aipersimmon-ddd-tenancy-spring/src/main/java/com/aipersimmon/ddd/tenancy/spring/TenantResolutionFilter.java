@@ -11,8 +11,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.MDC;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -24,6 +27,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * to the {@code __root__} sentinel; {@code REJECT} (the default) fails the request with {@code 400
  * Bad Request} rather than letting it read or write a shared bucket. A present-but-invalid tenant
  * value is likewise rejected.
+ *
+ * <p>Paths matching one of the configured {@code excludePaths} (Ant-style patterns) are skipped
+ * entirely — no tenant is resolved or required — so tenant-less management traffic (actuator
+ * probes) and any explicitly public endpoint stay reachable under {@code REJECT}.
  */
 public class TenantResolutionFilter extends OncePerRequestFilter {
 
@@ -32,10 +39,32 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
 
   private final TenantResolver resolver;
   private final MissingTenantPolicy missingPolicy;
+  private final List<String> excludePaths;
+  private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
   public TenantResolutionFilter(TenantResolver resolver, MissingTenantPolicy missingPolicy) {
+    this(resolver, missingPolicy, List.of());
+  }
+
+  public TenantResolutionFilter(
+      TenantResolver resolver, MissingTenantPolicy missingPolicy, Collection<String> excludePaths) {
     this.resolver = resolver;
     this.missingPolicy = missingPolicy;
+    this.excludePaths = List.copyOf(excludePaths);
+  }
+
+  /**
+   * Skip the filter for configured public/management paths (the tenant is neither read nor set).
+   */
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    String path = request.getRequestURI().substring(request.getContextPath().length());
+    for (String pattern : excludePaths) {
+      if (pathMatcher.match(pattern, path)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

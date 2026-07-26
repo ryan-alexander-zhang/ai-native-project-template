@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.tenancy.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -13,6 +14,7 @@ import com.aipersimmon.ddd.tenancy.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +74,22 @@ class TenantResolutionFilterTest {
     filter(MissingTenantPolicy.SYSTEM).doFilterInternal(request, response, chain);
 
     assertEquals("__root__", seen[0]);
+  }
+
+  @Test
+  void skipsExcludedPathsAndFiltersEverythingElse() {
+    TenantResolutionFilter filter =
+        new TenantResolutionFilter(
+            new HeaderTenantResolver("X-Tenant-Id"),
+            MissingTenantPolicy.REJECT,
+            List.of("/actuator/**"));
+    when(request.getContextPath()).thenReturn("");
+
+    when(request.getRequestURI()).thenReturn("/actuator/health");
+    assertTrue(filter.shouldNotFilter(request), "actuator path must be excluded");
+
+    when(request.getRequestURI()).thenReturn("/orders");
+    assertFalse(filter.shouldNotFilter(request), "a domain path must still be filtered");
   }
 
   @Test

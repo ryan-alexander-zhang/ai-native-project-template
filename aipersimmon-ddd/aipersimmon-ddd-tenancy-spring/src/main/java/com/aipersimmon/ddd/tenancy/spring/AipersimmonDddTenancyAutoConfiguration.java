@@ -47,7 +47,8 @@ public class AipersimmonDddTenancyAutoConfiguration {
       TenantResolver resolver, TenancyProperties properties) {
     FilterRegistrationBean<TenantResolutionFilter> registration =
         new FilterRegistrationBean<>(
-            new TenantResolutionFilter(resolver, properties.getMissingPolicy()));
+            new TenantResolutionFilter(
+                resolver, properties.getMissingPolicy(), properties.getExcludePaths()));
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 15);
     return registration;
   }
