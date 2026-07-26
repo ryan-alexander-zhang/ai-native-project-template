@@ -32,7 +32,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(
     classes = OutboxRelayMarkSentFailureTest.TestApp.class,
     properties = {
-      "aipersimmon.ddd.outbox.poll-delay-ms=3600000",
+      "aipersimmon.ddd.outbox.relay.enabled=false",
       "aipersimmon.ddd.outbox.max-attempts=1"
     })
 class OutboxRelayMarkSentFailureTest {

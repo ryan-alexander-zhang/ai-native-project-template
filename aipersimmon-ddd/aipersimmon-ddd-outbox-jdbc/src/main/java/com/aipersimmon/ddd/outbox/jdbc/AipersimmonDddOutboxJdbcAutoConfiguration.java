@@ -120,6 +120,22 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
         tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
 
+  /**
+   * The scheduled trigger. Conditional so a deployment that relays from one dedicated instance — or
+   * a test that drives the relay itself — can switch the schedule off without losing the relay. The
+   * relay bean above stays either way.
+   */
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnProperty(
+      name = "aipersimmon.ddd.outbox.relay.enabled",
+      havingValue = "true",
+      matchIfMissing = true)
+  @ConditionalOnMissingBean
+  public OutboxRelayScheduler outboxRelayScheduler(OutboxRelay outboxRelay) {
+    return new OutboxRelayScheduler(outboxRelay);
+  }
+
   @Bean
   @ConditionalOnBean(JdbcTemplate.class)
   @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.cleanup.enabled", havingValue = "true")

@@ -27,7 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(
     classes = OutboxIdGeneratorWiringTest.TestApp.class,
-    properties = "aipersimmon.ddd.outbox.poll-delay-ms=3600000")
+    properties = "aipersimmon.ddd.outbox.relay.enabled=false")
 class OutboxIdGeneratorWiringTest {
 
   @SpringBootConfiguration

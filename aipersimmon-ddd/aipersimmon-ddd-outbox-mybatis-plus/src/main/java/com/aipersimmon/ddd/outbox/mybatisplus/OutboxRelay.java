@@ -13,10 +13,8 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 
 /**
  * Polls the outbox for unsent rows that are due and dispatches them, marking each sent on success.
@@ -99,11 +97,10 @@ public class OutboxRelay {
     this.tracer = tracer;
   }
 
-  @Scheduled(fixedDelayString = "${aipersimmon.ddd.outbox.poll-delay-ms:1000}")
-  @SchedulerLock(
-      name =
-          "${aipersimmon.ddd.outbox.relay.lock-name:${spring.application.name:aipersimmon}-outbox-relay}",
-      lockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}")
+  /**
+   * Drain one batch of due rows. Scheduling and the multi-instance lock live in {@link
+   * OutboxRelayScheduler}, so this method is safe to call directly — no lock can silently skip it.
+   */
   public void relay() {
     java.time.Instant now = clock.instant();
     List<OutboxRecord> batch = mapper.selectDue(maxAttempts, now, batchSize);

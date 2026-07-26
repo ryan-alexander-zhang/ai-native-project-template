@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(
     classes = OutboxCleanupTest.TestApp.class,
     properties = {
-      "aipersimmon.ddd.outbox.poll-delay-ms=3600000",
+      "aipersimmon.ddd.outbox.relay.enabled=false",
       "aipersimmon.ddd.outbox.cleanup.enabled=true",
       "aipersimmon.ddd.outbox.cleanup.retention-seconds=1"
     })

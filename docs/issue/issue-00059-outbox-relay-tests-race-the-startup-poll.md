@@ -2,7 +2,7 @@
 id: issue-00059-outbox-relay-tests-race-the-startup-poll
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -58,25 +58,41 @@ parent: report-00001-ddd-framework-review
 `OutboxDispatcher`），再从测试体调用 `relay()`，断言它被 ShedLock 跳过——这会把间歇性竞态变成必然失败，
 是修复前应当先写的那个测试。
 
-## 修复方向（未实施）
+## 修复（已实施）
 
-要把「关掉调度器」表达成结构，而不是一个大到不会触发的间隔：
+采纳第一节所列的**首选**方案：把「被调度的触发器」从 `OutboxRelay` 上分出来。
 
-- **首选**：让测试上下文不装配调度。`@EnableScheduling` 目前挂在 autoconfig 上，测试无法用属性关掉它——
-  这本身是可用性问题（消费方也无法在集成测试里关掉框架的后台轮询）。建议给框架加一个
-  `aipersimmon.ddd.outbox.relay.enabled`（默认 `true`），测试置 `false`；这与 process-manager
-  已有的 `effect-relay.enabled` / `deadline-worker.enabled` 形状一致，**属于补齐既有约定，而非新发明**。
-- 备选（纯测试侧）：测试不注入被 `@SchedulerLock` 包裹的 bean，而是直接构造 `OutboxRelay` 调用其逻辑，
-  绕开 ShedLock 切面。缺点是不再覆盖真实装配路径。
+- 新增 `OutboxRelayScheduler`（两个后端各一个，约 30 行）。`@Scheduled` 与 `@SchedulerLock` **移到它的
+  `poll()` 上**，`poll()` 只做一件事：调 `relay.relay()`。
+- `OutboxRelay.relay()` 不再带任何注解，因此**直接调用不会被任何锁静默跳过**——这消掉了竞态的后一半。
+- 新属性 `aipersimmon.ddd.outbox.relay.enabled`（默认 `true`）只控制 **scheduler bean 是否装配**，
+  relay bean 不受影响。这消掉了竞态的前一半（启动即轮询）。与 process-manager 已有的
+  `effect-relay.enabled` / `deadline-worker.enabled` 同形，是补齐既有约定。
 
-**不采用**「重跑即可」或「把断言放宽成 `>= 0`」——那会把一个真实的竞态改写成永真断言。
+**锁为什么留在 scheduler 而不是 relay**：它守护的是**调度**——防止多实例同时轮询同一批行。
+直接调用是单个调用方的明确动作，不需要这个守护，更不该被它静默否决。
 
-## 影响与当前状态
+16 个测试类从「把 `poll-delay-ms` 调到 1 小时」改为 `relay.enabled=false`，即从「调得足够慢」改为
+「结构上关掉」。两个 `OutboxTracingTest` 里那条「给本测试起唯一锁名」的绕法一并删除——它只解决跨测试类的
+锁争用，不解决本上下文的启动轮询，现在有了正解就不该留两套机制。
 
-- 产品行为**不受影响**：`@Scheduled` 启动即跑一次是生产上想要的（服务重启后立即排空积压），
-  ShedLock 跳过重复轮询也是正确的。**只有测试对调度器的假设是错的。**
-- 本 issue **未修复**，故标记 `open`。它会让全量构建偶发变红；遇到时可确认失败是否正是本条，
-  而不是把它当作新回归。
+`relayPollIsGuardedByShedLock` 这条既有断言**没有被删掉，而是搬了家**：它守护的契约（调度轮询必须持锁）
+依然成立，只是方法换了位置，因此迁到新的 `OutboxRelayScheduleTest`（两个后端各一份，调 `scheduler.poll()`）。
+**留在原处会必然失败——那正是本次改动应当被察觉的地方。**
+
+## 验证结果
+
+新增 3 个测试类：
+
+- `OutboxRelayScheduleTest`（jdbc + mybatis-plus）—— 默认装配 scheduler，且 `poll()` 确实取到 shedlock 行。
+- `OutboxRelayScheduleDisabledTest`（jdbc）—— `relay.enabled=false` 时 scheduler bean **不存在**、
+  relay bean **仍存在**，且直接 `relay()` 后 shedlock 表里 **0 行**——即直接路径已无锁可跳过。
+
+**间歇性已消除**：两个 outbox 模块连跑 **3 次**全绿（此前三次全量构建里红 2 次）。
+框架全量 `install`（全质量门）通过；样例 `verify` BUILD SUCCESS。
+
+`CONFIGURATION.md` 补上 `relay.enabled`，并把 `poll-delay-ms` 的说明改为「控制**第一次之后**的节奏」——
+文档此前也隐含了同一个错误假设。
 
 ## 关联
 

@@ -32,7 +32,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(
     classes = InProcessOutboxDispatcherTest.TestApp.class,
     properties = {
-      "aipersimmon.ddd.outbox.poll-delay-ms=3600000",
+      "aipersimmon.ddd.outbox.relay.enabled=false",
       "aipersimmon.ddd.outbox.dispatch=in-process"
     })
 class InProcessOutboxDispatcherTest {

@@ -24,13 +24,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Exercises the MyBatis-Plus outbox end to end against an in-memory H2 database: a published
- * integration event lands as an unsent row, and the relay dispatches it and marks it sent. The poll
- * delay is set very high so the background scheduler does not fire during the test; the relay is
- * invoked directly instead.
+ * integration event lands as an unsent row, and the relay dispatches it and marks it sent. The
+ * schedule is switched off so nothing polls behind the test's back; the relay is invoked directly
+ * instead.
  */
 @SpringBootTest(
     classes = OutboxMybatisPlusTest.TestApp.class,
-    properties = "aipersimmon.ddd.outbox.poll-delay-ms=3600000")
+    properties = "aipersimmon.ddd.outbox.relay.enabled=false")
 class OutboxMybatisPlusTest {
 
   @SpringBootConfiguration
@@ -96,16 +96,5 @@ class OutboxMybatisPlusTest {
   @Test
   void autoConfiguresWriterAsIntegrationEventsPublisher() {
     assertInstanceOf(OutboxWriter.class, integrationEvents);
-  }
-
-  @Test
-  void relayPollIsGuardedByShedLock() {
-    relay.relay();
-
-    assertEquals(
-        Integer.valueOf(1),
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM shedlock WHERE name = 'aipersimmon-outbox-relay'", Integer.class),
-        "the relay poll must acquire a ShedLock lock so only one instance polls at a time");
   }
 }

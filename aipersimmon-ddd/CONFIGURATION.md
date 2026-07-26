@@ -96,7 +96,8 @@ Present with a storage module; the relay polls as soon as it is.
 
 | Property | Default | Effect |
 | --- | --- | --- |
-| `poll-delay-ms` | `1000` | How often the relay looks for unsent rows. Lower means lower latency and more empty queries. |
+| `relay.enabled` | `true` | Whether the relay is *scheduled*. `false` removes only the schedule, not the relay: nothing polls on its own, and a caller can drive `OutboxRelay.relay()` directly with no lock in the way. Use it when one dedicated instance relays while the rest only write, or in an integration test that asserts on what a single poll did. |
+| `poll-delay-ms` | `1000` | How often the relay looks for unsent rows, *after* the first poll. `@Scheduled(fixedDelay)` runs first and waits afterwards, so raising this does not prevent a poll at startup — that is what `relay.enabled=false` is for. Lower means lower latency and more empty queries. |
 | `batch-size` | `100` | Rows per poll. See the budget note below. |
 | `max-attempts` | `10` | Attempts before a row moves to the dead-letter table. A *permanent* failure (unknown type, malformed payload) skips straight there — retrying cannot fix it. |
 | `retry.base-backoff-ms` / `retry.max-backoff-ms` | `1000` / `60000` | Exponential backoff between attempts on a transient failure. |
