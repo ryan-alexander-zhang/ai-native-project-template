@@ -1,0 +1,182 @@
+---
+id: design-00011-aggregate-persistence-contract
+type: design
+role: main
+status: active
+parent: plan-00013-phase-one-correctness-remediation
+---
+
+# 聚合持久化契约：版本化写入、事件发布收口，与 MyBatis-Plus 拦截器组合
+
+聚合是**一个事务一致性单元**。要让这句话成立，写回时必须校验「读取时的快照仍然有效」，并且聚合记录的事实必须
+与状态变更同生共死。本设计定义三层：core 的**版本契约**、后端的**版本化仓储基类**、以及使二者在 MyBatis-Plus
+下真正生效所必需的**拦截器组合模型**。
+
+背景缺陷：[[issue-00051-aggregates-have-no-optimistic-locking]]、
+[[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]。
+
+## 一、core：聚合版本契约
+
+`AbstractAggregateRoot` 增加一个 `long version`，语义为**加载时的版本**（`0` = 尚未持久化）。
+
+```java
+public abstract class AbstractAggregateRoot<ID> implements AggregateRoot<ID> {
+  private final transient List<DomainEvent> domainEvents = new ArrayList<>();
+  private long version;                       // 0 = 未持久化
+
+  protected final void restoreVersion(long persisted)   // 子类 rehydrate 工厂调用
+  public final long version()                           // 仓储读取，用于 WHERE 谓词
+  public final void versionAdvanced()                    // 仓储在写入成功后调用，version++
+}
+```
+
+三个成员的可见性是刻意的：
+
+- `restoreVersion` **protected** —— 只有聚合自己的 rehydrate 工厂（`Order.reconstitute`）能设置版本，仓储无法
+  绕过聚合直接注入版本。
+- `version()` **public** —— 仓储在另一个包，必须能读。
+- `versionAdvanced()` **public** —— 同上；与既有的 `clearDomainEvents()` 可见性一致（同类需求、同类妥协）。
+
+**`version` 不参与 `equals`/`hashCode`**：版本是并发控制元数据，不是身份。同一订单的 v3 与 v5 仍是同一订单
+（见 [[issue-00055-aggregate-root-missing-identity-equality]]）。`transient` 只加在 `domainEvents` 上；`version`
+是需要持久化的状态，不标 `transient`。
+
+```mermaid
+sequenceDiagram
+  participant H as CommandHandler
+  participant R as Repository
+  participant A as Aggregate
+  participant DB as Database
+  participant E as DomainEvents
+
+  H->>R: findById(id)
+  R->>DB: SELECT ... (含 version)
+  R->>A: reconstitute(..., version=3)
+  H->>A: confirm()
+  A->>A: registerEvent(OrderConfirmed)
+  H->>R: save(aggregate)
+  R->>DB: UPDATE ... SET version=4 WHERE id=? AND version=3
+  alt affected == 0
+    R-->>H: OptimisticLockingFailureException → 409
+  else affected == 1
+    R->>A: versionAdvanced()  (3 → 4)
+    R->>E: publishAndClear(aggregate)
+  end
+```
+
+## 二、后端：版本化仓储基类（模板方法）
+
+**不引入通用 CRUD 端口。** 领域仓储端口（`Orders`）仍由消费方在 domain 层自行定义——一个框架强加的
+`AggregateRepository<A, ID>` 会把 `findAll`/`update` 之类的通用操作带进领域语言，这正是 DDD 要避免的。
+框架只提供**基类**，不提供端口。
+
+因此**不需要** `aipersimmon-ddd-persistence` 契约模块；新增两个后端模块即可：
+
+| 模块 | 内容 |
+|---|---|
+| `aipersimmon-ddd-persistence-mybatis-plus` | `MybatisPlusAggregateRepository` + `VersionedRow` |
+| `aipersimmon-ddd-persistence-jdbc` | `JdbcAggregateRepository` |
+
+两者均依赖 `-core`（`AbstractAggregateRoot`）+ `-application`（`DomainEvents`）。
+
+### MyBatis-Plus 基类
+
+```java
+public abstract class MybatisPlusAggregateRepository<
+        A extends AbstractAggregateRoot<?>, D extends VersionedRow> {
+
+  private final BaseMapper<D> mapper;
+  private final DomainEvents domainEvents;
+
+  /** 版本化写入 + 子表写入 + 事件发布，一次调用。 */
+  protected final void save(A aggregate) {
+    D row = toRow(aggregate);
+    row.setVersion(aggregate.version());          // @Version 读它构造 WHERE 谓词
+    int affected = aggregate.version() == 0 ? mapper.insert(row) : mapper.updateById(row);
+    if (affected == 0) {
+      throw new OptimisticLockingFailureException(...);
+    }
+    saveChildren(aggregate);
+    aggregate.versionAdvanced();
+    domainEvents.publishAndClear(aggregate);       // 收口：消费方不再手工调用
+  }
+
+  protected abstract D toRow(A aggregate);
+  protected void saveChildren(A aggregate) {}      // 默认无子表
+}
+```
+
+`VersionedRow` 是一个两方法接口（`getVersion` / `setVersion`），让基类无需反射即可搬运版本，并把「DO 忘了加
+`@Version` 字段」变成**编译期**错误而非运行期静默失效。
+
+消费方由此只写 `toRow` + `saveChildren` + `findById`——`MyBatisOrders.save()` 整个消失，`selectById + insert`
+的 TOCTOU 也随之消失（新建/更新由 `version() == 0` 判定，不再先查一次）。
+
+### JDBC 基类
+
+JDBC 无声明式版本谓词，故把 SQL 留给消费方，但**把期望版本作为参数递给它**——未使用的参数会被 PMD 抓到，
+比一句文档更难忽略：
+
+```java
+protected final void save(A aggregate) {
+  int affected = aggregate.version() == 0
+      ? insert(aggregate)
+      : update(aggregate, aggregate.version());
+  if (affected == 0) throw new OptimisticLockingFailureException(...);
+  aggregate.versionAdvanced();
+  domainEvents.publishAndClear(aggregate);
+}
+protected abstract int insert(A aggregate);
+protected abstract int update(A aggregate, long expectedVersion);   // SQL 必须含 WHERE version = ?
+```
+
+## 三、MyBatis-Plus 拦截器组合模型（必须先修，否则 §2 静默失效）
+
+**这是本设计中风险最高的一节。** MyBatis-Plus 只认**一个** `MybatisPlusInterceptor` bean，而
+`AipersimmonDddTenancyMybatisPlusAutoConfiguration:35-45` 已经用
+`@ConditionalOnMissingBean(MybatisPlusInterceptor.class)` 注册了自己那一个。
+
+若按直觉再加一个「注册 `OptimisticLockerInnerInterceptor` 的 autoconfig」并同样标
+`@ConditionalOnMissingBean(MybatisPlusInterceptor.class)`，则**开启多租户时它会静默退让**：tenancy 的 bean 先在，
+乐观锁拦截器永不注册，`@Version` 不产生 `WHERE version = ?`，于是 `updateById` 恒返回 1，
+[[issue-00051-aggregates-have-no-optimistic-locking]] **看起来修了但实际没修**。这与该 issue 的根因同类
+（能力静默缺席），不可接受。
+
+**改为 `InnerInterceptor` 贡献模型**：框架持有唯一一个 `MybatisPlusInterceptor`，按 `@Order` 收集所有
+`InnerInterceptor` bean。
+
+```mermaid
+flowchart LR
+  T["TenantLineInnerInterceptor<br/>@Order(100)"] --> C
+  O["OptimisticLockerInnerInterceptor<br/>@Order(300)"] --> C
+  P["(消费方) PaginationInnerInterceptor<br/>@Order(200)"] --> C
+  C["MybatisPlusInterceptor<br/>(框架唯一, 收集 ObjectProvider&lt;InnerInterceptor&gt;)"] --> MP["MyBatis-Plus"]
+```
+
+顺序遵循 MyBatis-Plus 官方建议：**多租户 → 分页 → 乐观锁**。故 `@Order` 取 100 / 200 / 300。
+
+代价与迁移：`tenancy-mybatis-plus` 从「注册 `MybatisPlusInterceptor`」改为「注册 `TenantLineInnerInterceptor`」，
+是一个**破坏性但内部**的改动（无外部使用者）。消费方若已自定义 `MybatisPlusInterceptor`，仍以
+`@ConditionalOnMissingBean` 整体退让——这个逃生舱保留不变。
+
+**批次 A 不做本节**：批次 A 让**样例自己**组合一个 `MybatisPlusInterceptor`（tenancy 按既有文档退让），
+以最小改动拿到正确的版本谓词；本节的框架侧收口留给批次 B，届时样例的那段组合代码删除。
+
+## 四、边界（本设计不涵盖）
+
+- **不涵盖悲观锁**（`SELECT ... FOR UPDATE`）。乐观锁是默认，写冲突罕见时它更省资源；高冲突聚合可由消费方在
+  自己的仓储里自行加锁，框架不提供开关（避免一个不该由框架决定的性能选择）。
+- **不涵盖跨聚合事务**。一个命令写多个聚合时，各自独立版本校验；框架不引入聚合间的一致性协调（那是流程管理器
+  的职责，见 [[design-00004-durable-process-manager-runtime]]）。
+- **不涵盖 `version` 的溢出/回绕**。`BIGINT` 单调递增，实践中不可达。
+- **不涵盖读模型**。投影表无聚合语义，不参与版本化。
+- **不改 `DomainEvents` 接口**。`publishAndClear` 保持原样，只是调用点收口到基类。
+
+## 关联
+
+- [[issue-00051-aggregates-have-no-optimistic-locking]]（本设计要解决的主缺陷）
+- [[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]（事件发布收口）
+- [[issue-00055-aggregate-root-missing-identity-equality]]（`version` 不参与相等）
+- [[plan-00013-phase-one-correctness-remediation]]（落地计划，批次 A / B）
+- [[design-00009-multi-tenancy-tenant-id]]（tenancy 的 MyBatis-Plus 拦截器现状，§3 要改的对象）
+- [[design-00001-aipersimmon-ddd-and-scaffold]]（模块分层与「端口在 domain、实现在 infrastructure」的既有约定）
