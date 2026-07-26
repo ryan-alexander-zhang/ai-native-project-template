@@ -3,11 +3,11 @@ package com.example.ordering.domain.order;
 /**
  * Lifecycle states of an {@link Order}. The set is deliberately richer than a single {@code
  * PENDING}: it makes the fulfilment boundary an explicit, persistable fact rather than something a
- * policy has to infer from a saga's internal step.
+ * policy has to infer from a process manager's internal step.
  *
  * <p>{@link #FULFILMENT_IN_PROGRESS} is the pivotal state — once an order enters it the customer
- * can no longer cancel on their own, and only the fulfilment saga (holding evidence of what
- * inventory and payment did) may drive it to a terminal state.
+ * can no longer cancel on their own, and only the fulfilment process manager (holding evidence of
+ * what inventory and payment did) may drive it to a terminal state.
  *
  * <p>Legal transitions are guarded inside {@link Order}: mechanical ones by a {@code Transitions}
  * table, and cancellation — which depends on <em>why</em> and on evidence — by {@link

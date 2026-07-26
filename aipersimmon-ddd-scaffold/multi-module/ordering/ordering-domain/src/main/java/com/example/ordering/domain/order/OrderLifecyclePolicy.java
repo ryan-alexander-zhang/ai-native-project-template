@@ -19,7 +19,7 @@ import com.example.ordering.domain.customer.CustomerId;
  * CancellationReason}. It is the rich arbiter for the one transition whose legality depends on
  * <em>why</em> and on <em>proof</em> — everything a flat transition table cannot express.
  *
- * <p>What it must never do: touch a repository, a payment gateway, or the saga store. It only
+ * <p>What it must never do: touch a repository, a payment gateway, or the process store. It only
  * reasons; it never reaches. The aggregate stays the sole mutator — this policy returns by throwing
  * or by returning normally, and {@link Order} performs the actual state change and event.
  */

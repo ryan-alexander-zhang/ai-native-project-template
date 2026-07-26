@@ -10,8 +10,8 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
  * and reports failure as a {@code StockReservationFailed} event, never an RFC 9457 response. So
  * there is deliberately <em>no</em> {@code ProblemCatalog}/{@code ProblemDescriptor} here (those
  * are the HTTP boundary's concern); instead the code travels on the failure event, giving the
- * reacting saga a stable identity to branch on. This is the event-driven counterpart to ordering's
- * HTTP-facing use of the same {@code ErrorCode} model (design-00003 §4.5/§4.7).
+ * reacting process manager a stable identity to branch on. This is the event-driven counterpart to
+ * ordering's HTTP-facing use of the same {@code ErrorCode} model (design-00003 §4.5/§4.7).
  */
 public enum InventoryErrorCode implements ErrorCode {
 

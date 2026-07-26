@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
  * OrderFulfilmentProcess}. It <em>starts</em> the flow on {@link OrderReadyForFulfilmentEvent} —
  * the fact that the order has cleared for fulfilment (past manual review, if any), not merely that
  * it was created — and it feeds the flow's terminal facts back in: {@link OrderConfirmedEvent} and
- * {@link OrderCancelledEvent} are what let the saga reach a terminal status on the confirmed
- * outcome, rather than the moment a confirm/cancel command was merely sent.
+ * {@link OrderCancelledEvent} are what let the process manager reach a terminal status on the
+ * confirmed outcome, rather than the moment a confirm/cancel command was merely sent.
  *
  * <p>Domain-event subscribers belong here, in the application layer, not in an inbound adapter: an
  * adapter translates an external transport into a command and must not reach into the context's own

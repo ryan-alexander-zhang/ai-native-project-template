@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * Handles {@link AuthorizePayment}: applies the domain {@link AuthorizationPolicy} and announces
  * the outcome — {@link PaymentAuthorized} or {@link PaymentDeclined}. Reporting the outcome as an
- * event (rather than a return value or a throw) is what lets the ordering saga treat authorisation
- * and decline as the two branches of the fulfilment flow.
+ * event (rather than a return value or a throw) is what lets the ordering process manager treat
+ * authorisation and decline as the two branches of the fulfilment flow.
  *
  * <p>Authorising a payment is an irreversible action, so it is guarded by the {@code
  * paymentOperationId} business idempotency key rather than trusting transport-level dedupe alone

@@ -7,8 +7,8 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 /**
  * Integration event published when a payment authorization for an order was declined — the payment
  * context's cross-context contract for a failed payment. It carries a stable machine-readable
- * {@code code} and a human-readable {@code reason}, so the ordering saga can compensate (release
- * stock, then cancel) and translate the decline into its own cancellation reason.
+ * {@code code} and a human-readable {@code reason}, so the ordering process manager can compensate
+ * (release stock, then cancel) and translate the decline into its own cancellation reason.
  */
 @EventType(name = "com.example.payment.PaymentDeclined", version = 1)
 @Externalized("payment.events")

@@ -4,10 +4,10 @@ import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 
 /**
- * Ordering-internal command the saga sends to ask the inventory context to release a reservation
- * (the stock-release compensation). Its handler publishes the {@code StockReleaseRequested}
- * integration event carrying the {@code reservationId} inventory issued at reservation time. No
- * result.
+ * Ordering-internal command the process manager sends to ask the inventory context to release a
+ * reservation (the stock-release compensation). Its handler publishes the {@code
+ * StockReleaseRequested} integration event carrying the {@code reservationId} inventory issued at
+ * reservation time. No result.
  */
 @OperationLog(
     code = "ordering.order.request-stock-release",

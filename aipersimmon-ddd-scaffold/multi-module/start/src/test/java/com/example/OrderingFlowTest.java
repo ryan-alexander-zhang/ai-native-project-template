@@ -94,7 +94,7 @@ class OrderingFlowTest {
   }
 
   @Test
-  void whenStockIsInsufficientTheSagaCancelsWithInsufficientStockCode() {
+  void whenStockIsInsufficientTheProcessManagerCancelsWithInsufficientStockCode() {
     // SKU-1 is carried and in stock, so it passes the synchronous availability gate;
     // the exact-quantity check is the reservation's job. SKU-1 has 10 units, so asking
     // for 999 is reserved asynchronously, fails, and the process compensates by cancelling.

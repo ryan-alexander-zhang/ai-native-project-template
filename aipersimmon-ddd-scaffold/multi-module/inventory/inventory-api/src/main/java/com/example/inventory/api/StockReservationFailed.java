@@ -11,9 +11,9 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * com.aipersimmon.ddd.core.error.ErrorCode}'s value, e.g. {@code "inventory.insufficient-stock"}),
  * and a human-readable {@code reason}, so the originating context can branch on the code and
  * compensate (here, cancel the order). Reporting failure as an event, rather than throwing, is what
- * lets the order-fulfilment saga react to it as one of the flow's outcomes — and carrying the code
- * on the event is how a bounded context with no HTTP surface still surfaces a stable error
- * identity.
+ * lets the order-fulfilment process manager react to it as one of the flow's outcomes — and
+ * carrying the code on the event is how a bounded context with no HTTP surface still surfaces a
+ * stable error identity.
  */
 @EventType(name = "com.example.inventory.StockReservationFailed", version = 1)
 @Externalized("inventory.events")

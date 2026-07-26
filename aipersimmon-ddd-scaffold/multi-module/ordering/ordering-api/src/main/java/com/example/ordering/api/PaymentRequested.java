@@ -6,11 +6,12 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 
 /**
  * Integration event asking the payment context to authorize payment for an order — the ordering
- * context's cross-context contract for the payment step of fulfilment. The saga emits it once stock
- * is reserved; the payment context reacts and answers with its own {@code PaymentAuthorized} or
- * {@code PaymentDeclined}. It carries the amount to authorize in minor units plus its currency, and
- * a {@code paymentOperationId} — the business idempotency key the payment context dedupes by, so an
- * at-least-once redelivery of this event authorizes only once (design-00004 §13.2).
+ * context's cross-context contract for the payment step of fulfilment. The process manager emits it
+ * once stock is reserved; the payment context reacts and answers with its own {@code
+ * PaymentAuthorized} or {@code PaymentDeclined}. It carries the amount to authorize in minor units
+ * plus its currency, and a {@code paymentOperationId} — the business idempotency key the payment
+ * context dedupes by, so an at-least-once redelivery of this event authorizes only once
+ * (design-00004 §13.2).
  */
 @EventType(name = "com.example.ordering.PaymentRequested", version = 1)
 @Externalized("ordering.events")

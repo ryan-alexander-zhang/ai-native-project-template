@@ -5,7 +5,7 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 
 /**
  * Command to approve the manual review of an order held in {@code AWAITING_REVIEW}, clearing it for
- * fulfilment. Unlike {@code ConfirmOrder} (a saga-internal step), this is a legitimate operator
+ * fulfilment. Unlike {@code ConfirmOrder} (a process-internal step), this is a legitimate operator
  * action with its own public entry point: it only <em>starts</em> fulfilment, it does not assert
  * that stock and payment already succeeded. No result.
  */

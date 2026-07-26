@@ -26,9 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
  * CommandBus} and reads through the {@link QueryBus}, so the adapter holds no orchestration itself.
  *
  * <p>There is deliberately no public {@code confirm} endpoint: confirming an order is an internal
- * step of the fulfilment saga (dispatched only once payment is authorized), not a client action, so
- * exposing it would let a caller bypass the saga's preconditions. Approving a held review, by
- * contrast, <em>is</em> a legitimate operator action and has its own endpoint below.
+ * step of the fulfilment process manager (dispatched only once payment is authorized), not a client
+ * action, so exposing it would let a caller bypass the process manager's preconditions. Approving a
+ * held review, by contrast, <em>is</em> a legitimate operator action and has its own endpoint
+ * below.
  */
 @RestController
 @RequestMapping("/orders")

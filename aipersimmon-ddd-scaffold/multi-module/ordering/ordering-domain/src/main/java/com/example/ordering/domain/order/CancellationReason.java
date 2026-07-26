@@ -5,10 +5,10 @@ import com.example.ordering.domain.customer.CustomerId;
 
 /**
  * Why an order is being cancelled — a <em>closed</em> set of reasons, each carrying the evidence
- * that makes it legitimate. This is the type that keeps the fulfilment saga honest: the
+ * that makes it legitimate. This is the type that keeps the fulfilment process manager honest: the
  * compensating reason {@link PaymentDeclinedAfterStockReleased} cannot be constructed until the
- * saga actually holds a {@link StockReleaseRef}, so the domain can trust — from the type alone —
- * that stock was released before it cancels the order.
+ * process manager actually holds a {@link StockReleaseRef}, so the domain can trust — from the type
+ * alone — that stock was released before it cancels the order.
  *
  * <p>A bare enum ({@code PAYMENT_DECLINED}) could not carry that guarantee: it would assert an
  * outcome without any proof the compensation ran.

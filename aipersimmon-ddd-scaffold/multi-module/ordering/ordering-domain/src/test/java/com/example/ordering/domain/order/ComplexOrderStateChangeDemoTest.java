@@ -76,7 +76,7 @@ class ComplexOrderStateChangeDemoTest {
       OrderId id = new OrderId("order-1");
       Order order = orderUnderFulfilment(id);
 
-      // The saga has run the compensation: payment was declined, then the reserved stock
+      // The process manager has run the compensation: payment was declined, then the reserved stock
       // was released. Both facts are carried as evidence refs that name this very order.
       PaymentDeclineRef decline = new PaymentDeclineRef("pay-decline-1", id, "card_declined");
       StockReleaseRef release = new StockReleaseRef("stock-release-1", id);
@@ -97,7 +97,8 @@ class ComplexOrderStateChangeDemoTest {
       PaymentDeclineRef decline = new PaymentDeclineRef("pay-decline-1", id, "card_declined");
 
       // This is the load-bearing guarantee: with no StockReleaseRef there is no legal reason,
-      // so a saga that has not yet released stock literally cannot ask to cancel for this cause.
+      // so a process manager that has not yet released stock literally cannot ask to cancel for
+      // this cause.
       assertThrows(
           DomainException.class,
           () -> new CancellationReason.PaymentDeclinedAfterStockReleased(decline, null));

@@ -47,7 +47,8 @@ public class ReleaseStockHandler implements CommandHandler<ReleaseStock, Void> {
                         "unknown reservation: " + command.reservationId()));
 
     // markReleased() flips the flag once; a second ReleaseStock finds it already false and skips
-    // the hand-back, but we still publish so the saga's wait for StockReleased always resolves.
+    // the hand-back, but we still publish so the process manager's wait for StockReleased always
+    // resolves.
     if (reservation.markReleased()) {
       for (Map.Entry<Sku, Integer> line : reservation.held()) {
         Stock stock =

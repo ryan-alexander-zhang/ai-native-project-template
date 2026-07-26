@@ -3,7 +3,9 @@ package com.example.ordering.application.order;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 
-/** Command to confirm an order (sent by the fulfilment saga on reservation). No result. */
+/**
+ * Command to confirm an order (sent by the fulfilment process manager on reservation). No result.
+ */
 @OperationLog(
     code = "ordering.order.confirm",
     targetType = "Order",

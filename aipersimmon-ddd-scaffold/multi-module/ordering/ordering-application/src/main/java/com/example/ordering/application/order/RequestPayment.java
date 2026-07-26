@@ -4,11 +4,11 @@ import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 
 /**
- * Ordering-internal command the saga sends to ask the payment context to authorize payment for an
- * order. Its handler looks up the order's total and publishes the {@code PaymentRequested}
- * integration event — keeping the outbound-event concern in a use-case handler, so the process
- * manager sends only ordering commands and never touches the integration-event port itself. No
- * result.
+ * Ordering-internal command the process manager sends to ask the payment context to authorize
+ * payment for an order. Its handler looks up the order's total and publishes the {@code
+ * PaymentRequested} integration event — keeping the outbound-event concern in a use-case handler,
+ * so the process manager sends only ordering commands and never touches the integration-event port
+ * itself. No result.
  *
  * <p>It carries the {@code paymentOperationId} — a <em>business idempotency key</em> the process
  * manager derives from the stable identity of the fact that triggered the authorization (so an
