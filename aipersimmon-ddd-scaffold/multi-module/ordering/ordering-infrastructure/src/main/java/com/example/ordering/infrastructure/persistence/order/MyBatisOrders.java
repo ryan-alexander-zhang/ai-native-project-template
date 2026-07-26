@@ -1,6 +1,7 @@
 package com.example.ordering.infrastructure.persistence.order;
 
 import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.persistence.mybatisplus.MybatisPlusAggregateRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.order.LineData;
@@ -12,7 +13,6 @@ import com.example.ordering.domain.shared.Money;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -23,27 +23,36 @@ import org.springframework.stereotype.Repository;
  * order's line set is small and only set at placement.
  */
 @Repository
-public class MyBatisOrders implements Orders {
+public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo>
+    implements Orders {
 
   private final OrderMapper orders;
   private final OrderLineMapper lines;
-  private final DomainEvents domainEvents;
 
   public MyBatisOrders(OrderMapper orders, OrderLineMapper lines, DomainEvents domainEvents) {
+    super(orders, domainEvents);
     this.orders = orders;
     this.lines = lines;
-    this.domainEvents = domainEvents;
   }
 
   @Override
   public void save(Order order) {
-    String id = order.id().value();
+    saveAggregate(order);
+  }
+
+  @Override
+  protected OrderDo toRow(Order order) {
     OrderDo header = new OrderDo();
-    header.setId(id);
+    header.setId(order.id().value());
     header.setCustomerId(order.customerId().value());
     header.setStatus(order.status().name());
-    writeVersioned(order, header);
+    return header;
+  }
 
+  /** An order's line set is small and only set at placement, so it is rewritten wholesale. */
+  @Override
+  protected void saveChildren(Order order) {
+    String id = order.id().value();
     lines.delete(new LambdaQueryWrapper<OrderLineDo>().eq(OrderLineDo::getOrderId, id));
     List<LineData> lineData = order.lineData();
     for (int i = 0; i < lineData.size(); i++) {
@@ -57,32 +66,6 @@ public class MyBatisOrders implements Orders {
       row.setCurrency(line.unitPrice().currency());
       lines.insert(row);
     }
-
-    // The events the aggregate recorded are drained here, where it is saved, inside the command's
-    // transaction — so the state change and its facts commit or roll back together and no handler
-    // has to remember a second call (issue-00052).
-    domainEvents.publishAndClear(order);
-  }
-
-  /**
-   * Write the root row under its optimistic-lock version: a not-yet-persisted aggregate ({@code
-   * version == 0}) is inserted at version 1, an existing one is updated with {@code WHERE version =
-   * loaded} (supplied by {@code @Version}). An update that matches no row means another transaction
-   * moved the aggregate on since it was loaded, so this write is refused rather than allowed to
-   * overwrite it (issue-00051).
-   */
-  private void writeVersioned(Order order, OrderDo header) {
-    if (order.version() == 0) {
-      header.setVersion(1L);
-      orders.insert(header);
-    } else {
-      header.setVersion(order.version());
-      if (orders.updateById(header) == 0) {
-        throw new OptimisticLockingFailureException(
-            "order " + order.id().value() + " was modified concurrently");
-      }
-    }
-    order.versionAdvanced();
   }
 
   @Override

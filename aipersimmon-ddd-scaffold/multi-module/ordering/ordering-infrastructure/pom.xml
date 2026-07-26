@@ -22,6 +22,12 @@
   <description>Technical port implementations of the ordering context (in-memory).</description>
 
   <dependencies>
+    <!-- Version-checked aggregate repository base + the optimistic-locker InnerInterceptor
+         contribution (design-00011). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
+    </dependency>
     <!-- org.springframework.dao.OptimisticLockingFailureException: the repository raises it when a
          version-checked update matches no row, and the framework's ConcurrencyTranslationCommandInterceptor
          turns it into ConcurrencyConflictException -> HTTP 409 (issue-00051). -->

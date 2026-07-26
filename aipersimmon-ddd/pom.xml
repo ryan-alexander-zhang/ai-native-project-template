@@ -89,7 +89,13 @@
     <module>aipersimmon-ddd-cqrs</module>
     <module>aipersimmon-ddd-cqrs-spring</module>
     <module>aipersimmon-ddd-tenancy-spring</module>
+    <!-- Shared MyBatis-Plus seam: owns the single MybatisPlusInterceptor and composes every
+         InnerInterceptor contribution. Built before the modules that contribute to it. -->
+    <module>aipersimmon-ddd-mybatis-plus</module>
     <module>aipersimmon-ddd-tenancy-mybatis-plus</module>
+    <!-- Version-checked aggregate repository bases (design-00011 §2). -->
+    <module>aipersimmon-ddd-persistence-jdbc</module>
+    <module>aipersimmon-ddd-persistence-mybatis-plus</module>
     <!-- Operation Log: framework-free core + storage-agnostic engine now; cqrs-spring capture +
          jdbc/mybatis-plus backends are added incrementally (see plan-00010). -->
     <module>aipersimmon-ddd-operation-log</module>

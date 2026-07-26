@@ -27,6 +27,13 @@
   <description>MyBatis-Plus tenant-line interceptor that scopes a configurable set of tables to the ambient TenantContext.</description>
 
   <dependencies>
+    <!-- The shared MyBatis-Plus seam that owns the single MybatisPlusInterceptor and composes this
+         module's TenantLineInnerInterceptor contribution into it (design-00011 §3). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-mybatis-plus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-tenancy</artifactId>

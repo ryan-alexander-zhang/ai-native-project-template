@@ -1,6 +1,7 @@
 package com.example.inventory.infrastructure.persistence;
 
 import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.persistence.mybatisplus.MybatisPlusAggregateRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
@@ -10,7 +11,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -20,38 +20,36 @@ import org.springframework.stereotype.Repository;
  * stock was already handed back — the exactly-once release guarantee survives restarts.
  */
 @Repository
-public class MyBatisReservations implements Reservations {
+public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservation, ReservationDo>
+    implements Reservations {
 
   private final ReservationMapper reservations;
   private final ReservationLineMapper lines;
-  private final DomainEvents domainEvents;
 
   public MyBatisReservations(
       ReservationMapper reservations, ReservationLineMapper lines, DomainEvents domainEvents) {
+    super(reservations, domainEvents);
     this.reservations = reservations;
     this.lines = lines;
-    this.domainEvents = domainEvents;
   }
 
   @Override
   public void save(Reservation reservation) {
-    String id = reservation.id().value();
+    saveAggregate(reservation);
+  }
+
+  @Override
+  protected ReservationDo toRow(Reservation reservation) {
     ReservationDo header = new ReservationDo();
-    header.setId(id);
+    header.setId(reservation.id().value());
     header.setOrderId(reservation.orderId());
     header.setReleased(reservation.isReleased());
-    if (reservation.version() == 0) {
-      header.setVersion(1L);
-      reservations.insert(header);
-    } else {
-      header.setVersion(reservation.version());
-      if (reservations.updateById(header) == 0) {
-        throw new OptimisticLockingFailureException(
-            "reservation " + id + " was modified concurrently");
-      }
-    }
-    reservation.versionAdvanced();
+    return header;
+  }
 
+  @Override
+  protected void saveChildren(Reservation reservation) {
+    String id = reservation.id().value();
     lines.delete(
         new LambdaQueryWrapper<ReservationLineDo>().eq(ReservationLineDo::getReservationId, id));
     for (Map.Entry<Sku, Integer> held : reservation.held()) {
@@ -61,8 +59,6 @@ public class MyBatisReservations implements Reservations {
       row.setQuantity(held.getValue());
       lines.insert(row);
     }
-
-    domainEvents.publishAndClear(reservation);
   }
 
   @Override

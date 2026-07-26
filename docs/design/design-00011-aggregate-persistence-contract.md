@@ -70,14 +70,20 @@ sequenceDiagram
 `AggregateRepository<A, ID>` 会把 `findAll`/`update` 之类的通用操作带进领域语言，这正是 DDD 要避免的。
 框架只提供**基类**，不提供端口。
 
-因此**不需要** `aipersimmon-ddd-persistence` 契约模块；新增两个后端模块即可：
+因此**不需要** `aipersimmon-ddd-persistence` 契约模块。实施后共三个新模块：
 
 | 模块 | 内容 |
 |---|---|
-| `aipersimmon-ddd-persistence-mybatis-plus` | `MybatisPlusAggregateRepository` + `VersionedRow` |
+| `aipersimmon-ddd-persistence-mybatis-plus` | `MybatisPlusAggregateRepository` + `VersionedRow` + 乐观锁 `InnerInterceptor` 贡献 |
 | `aipersimmon-ddd-persistence-jdbc` | `JdbcAggregateRepository` |
+| `aipersimmon-ddd-mybatis-plus` | **实施中新增**：持有唯一 `MybatisPlusInterceptor` 并组合所有 `InnerInterceptor` 贡献（见 §3） |
 
-两者均依赖 `-core`（`AbstractAggregateRoot`）+ `-application`（`DomainEvents`）。
+前两者依赖 `-core`（`AbstractAggregateRoot`）+ `-application`（`DomainEvents`）。
+
+> **实施偏差：为什么多出第三个模块。** §3 的组合器既不能放在 `-tenancy-mybatis-plus` 也不能放在
+> `-persistence-mybatis-plus`——两者互相独立可选，任一方持有组合器时另一方单独启用就没人组合。本设计原稿没有
+> 指出这个归属问题，实施时才暴露，故新增一个只含一个类的共享基座模块。它同时是 `-tenancy-mybatis-plus`
+> 与 `-persistence-mybatis-plus` 的依赖。
 
 ### MyBatis-Plus 基类
 
@@ -88,8 +94,8 @@ public abstract class MybatisPlusAggregateRepository<
   private final BaseMapper<D> mapper;
   private final DomainEvents domainEvents;
 
-  /** 版本化写入 + 子表写入 + 事件发布，一次调用。 */
-  protected final void save(A aggregate) {
+  /** 版本化写入 + 子表写入 + 事件发布，一次调用。实现中命名为 saveAggregate，避免与消费方端口的 save 混淆。 */
+  protected final void saveAggregate(A aggregate) {
     D row = toRow(aggregate);
     row.setVersion(aggregate.version());          // @Version 读它构造 WHERE 谓词
     int affected = aggregate.version() == 0 ? mapper.insert(row) : mapper.updateById(row);
@@ -161,6 +167,17 @@ flowchart LR
 
 **批次 A 不做本节**：批次 A 让**样例自己**组合一个 `MybatisPlusInterceptor`（tenancy 按既有文档退让），
 以最小改动拿到正确的版本谓词；本节的框架侧收口留给批次 B，届时样例的那段组合代码删除。
+
+**已实施（批次 B）**：组合器为 `aipersimmon-ddd-mybatis-plus` 的
+`AipersimmonDddMybatisPlusAutoConfiguration`，按 `ObjectProvider<InnerInterceptor>.orderedStream()` 装配并在
+启动时 `log.info` 列出实际安装的拦截器（让「装了什么」可见，而非只能靠推断）。tenancy 贡献
+`TenantLineInnerInterceptor`（`@Order(100)`），persistence 贡献 `OptimisticLockerInnerInterceptor`
+（`@Order(300)`），200 留给消费方分页。样例的 `MybatisPlusConfig` 已删除，其
+`MybatisPlusInterceptorCompositionTest`**一行未改**仍绿——即框架组合装出的结果与手写配置等价。
+
+**逃生舱的代价已在测试中钉住**：消费方自定义 `MybatisPlusInterceptor` 时框架**整体**退让，不会把贡献合并进去。
+这是有意的（否则「自定义」名不副实），但意味着自定义者必须自己装齐框架的 inner interceptor；
+`InnerInterceptorCompositionTest.aConsumerOwnedInterceptorWinsWholesale` 断言了这一语义，Javadoc 也写明。
 
 ## 四、边界（本设计不涵盖）
 

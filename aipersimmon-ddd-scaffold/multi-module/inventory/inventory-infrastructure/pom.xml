@@ -17,6 +17,12 @@
   <description>Technical port implementations of the inventory context (in-memory).</description>
 
   <dependencies>
+    <!-- Version-checked aggregate repository base + the optimistic-locker InnerInterceptor
+         contribution (design-00011). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
+    </dependency>
     <!-- DomainEvents: the repository drains the aggregate's recorded events as part of save,
          inside the command transaction, so no handler has to remember a second call (issue-00052). -->
     <dependency>

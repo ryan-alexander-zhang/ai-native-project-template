@@ -2,7 +2,7 @@
 id: plan-00013-phase-one-correctness-remediation
 type: plan
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -65,8 +65,8 @@ flowchart TB
 
 ## 二、任务
 
-> **批次 A 状态：已完成**（A1 / A3 / A4 / A5 / A6 / A7 / A8 落地；A2 取消，理由见下）。批次 B 未开始。
-> 实施中相对本计划的三处偏差，均记录在对应任务下：A2 取消、A8 合并为一个测试类、V3 默认值由 `0` 改为 `1`。
+> **状态：批次 A、批次 B 均已完成。** 实施中相对本计划的偏差，均记录在对应任务下：A2 取消、
+> A8 合并为一个测试类、V3 默认值由 `0` 改为 `1`、B1 多出一个共享基座模块、基类方法名 `saveAggregate`。
 
 > 约定：`[core]` 等标模块；每个任务 test-first。批次 A 内 A1/A2/A3 与 A4–A8 可并行起步，A4→A5→A6→A8 有序。
 
@@ -134,6 +134,10 @@ flowchart TB
 
 - **B1** `[repo]` 新增 `aipersimmon-ddd-persistence-mybatis-plus` 与 `aipersimmon-ddd-persistence-jdbc`：
   pom（parent + 依赖 `-core`/`-application`）、`package-info`、根 `pom.xml` reactor、BOM 条目。
+  **实际新增三个模块**：还需要 `aipersimmon-ddd-mybatis-plus` 作为 §3 组合器的归属——它既不能放在 tenancy
+  也不能放在 persistence（两者互相独立可选）。见 [[design-00011-aggregate-persistence-contract]] §2 的偏差说明。
+  另一处实施细节：`mybatis-plus-extension` 若同时以 `provided` 和 `test` 声明，后者会覆盖前者并把它从主编译
+  classpath 移除；测试改用 `mybatis-plus-spring-boot3-starter`。
 - **B2** `[persistence-mybatis-plus]` `VersionedRow`（`getVersion`/`setVersion`）+
   `MybatisPlusAggregateRepository`（模板方法 `save`：搬运 version → insert/updateById → affected-rows 检查 →
   `saveChildren` → `versionAdvanced` → `publishAndClear`；抽象 `toRow`，可选 `saveChildren`）。
@@ -149,6 +153,9 @@ flowchart TB
   防的静默退让，此处由框架保证）；消费方自定义时框架整体退让。
 - **B5** `[sample]` 3 个仓储改为继承 B2 基类，删除 A5 在 `start` 里的手工 `MybatisPlusInterceptor` 组合与
   仓储内的样板；A8 的回归测试**不改一行**仍须全绿（这是「基类等价于手写版本化写入」的证明）。
+  **已达成**：`MybatisPlusConfig` 删除；`ConcurrentAggregateWriteTest`、`MybatisPlusInterceptorCompositionTest`、
+  `AggregateIdIsTimeOrderedTest` 三者一行未改仍绿。三个仓储现在只写 `toRow` / 可选 `saveChildren` / `findXxx`，
+  版本谓词、affected-rows 检查、事件发布均由基类承担。
 
 ## 三、验收路径
 
@@ -167,8 +174,18 @@ SpotBugs）通过。样例侧同时跑 `mvn -f aipersimmon-ddd-scaffold/multi-mo
 6. **身份相等成立**：同一聚合加载两次相等且 `Set` 去重为 1；ArchUnit 规则拦住覆写。
 7. **多租户未被削弱**：`TwoTenantAcceptanceTest` 保持绿（A5/B4 的拦截器改动没有关掉租户隔离）。
 8. **既有测试无回归**：框架 + 样例全量测试绿。
-9. **文档闭环**：5 个 issue 均转 `resolved` 并填「验证结果」；design-00011 转 `active`；本 plan 转 `resolved`;
-   `plan-00012` 收到关于「铁律 3 被推翻」的 patch。
+9. **文档闭环**：5 个 issue 均转 `resolved` 并填「验证结果」；design-00011 转 `active`；本 plan 转 `resolved`；
+   `plan-00012` 收到关于「铁律 3 被推翻」的说明。
+
+## 四、完成记录
+
+- **框架**：`mvn -f aipersimmon-ddd/pom.xml install` —— 590 项测试通过。仅
+  `aipersimmon-ddd-messaging-kafka` 的 3 个集成测试失败（embedded Kafka 消费者 20s 超时），**在 HEAD
+  上以完全相同的方式失败**，与本计划无关；属既有问题，未在本阶段处置。
+- **样例**：`mvn -f aipersimmon-ddd-scaffold/multi-module/pom.xml verify` —— **BUILD SUCCESS**，157 项测试通过
+  （含真实 Postgres + Kafka 的跨上下文流程、多租户验收、并发超卖回归）。
+- **`-T1C` 不可用于本仓库测试**：并行构建下 embedded Kafka / H2 互相干扰，失败集合随机漂移
+  （HEAD 上也如此）。验证一律用 `DEVELOPMENT.md` 的串行命令。
 
 **提交切分**（每批一个逻辑变更，见 `COMMIT.md`）：
 `docs` (本批文档) → `feat(core)` A1+A2 → `refactor(id)` A3 → `feat(scaffold)` A4+A5 → `refactor(scaffold)` A6 →

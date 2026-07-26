@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    Shared MyBatis-Plus seam: it owns the single MybatisPlusInterceptor and composes every
+    InnerInterceptor bean into it, in @Order sequence.
+
+    Why this exists as its own module: MyBatis-Plus honours exactly ONE MybatisPlusInterceptor bean,
+    so two auto-configurations that each register their own do not compose — under
+    @ConditionalOnMissingBean the second silently backs off and its concern disappears with no error
+    (design-00011 §3). The composing bean therefore cannot live in -tenancy-mybatis-plus nor in
+    -persistence-mybatis-plus, because either may be present without the other. It lives here, and
+    both of those contribute plain InnerInterceptor beans instead.
+  -->
+  <artifactId>aipersimmon-ddd-mybatis-plus</artifactId>
+  <name>aipersimmon-ddd-mybatis-plus</name>
+  <description>Owns the single MyBatis-Plus interceptor and composes the framework's InnerInterceptor contributions in order.</description>
+
+  <dependencies>
+    <!-- MybatisPlusInterceptor / InnerInterceptor + SqlSessionFactory. provided: the consuming app
+         brings MyBatis-Plus via its own starter; this module only contributes a bean and must not
+         force MyBatis-Plus onto a consumer that does not use it. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-extension</artifactId>
+      <version>${mybatis-plus.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- A real MyBatis-Plus runtime (SqlSessionFactory + auto-config) and H2 for the assembly and
+         behaviour tests. The starter, not a second mybatis-plus-extension entry: declaring the same
+         coordinate twice would let the test scope override the provided one and take it off the main
+         compile classpath. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>
