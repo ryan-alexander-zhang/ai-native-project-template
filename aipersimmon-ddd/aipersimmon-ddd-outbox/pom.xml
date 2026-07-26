@@ -26,7 +26,7 @@
   -->
   <artifactId>aipersimmon-ddd-outbox</artifactId>
   <name>aipersimmon-ddd-outbox</name>
-  <description>Storage-agnostic transactional-outbox core: the dispatcher contract, stored-message shape, and default dispatchers.</description>
+  <description>Storage-agnostic transactional-outbox core: the dispatcher contract, stored-message shape, failure classification and retry schedule. Zero Spring.</description>
 
   <dependencies>
     <!-- EventEnvelope: the in-process dispatcher republishes the full envelope. -->

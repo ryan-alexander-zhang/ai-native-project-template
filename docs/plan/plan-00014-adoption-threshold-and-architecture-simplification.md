@@ -114,10 +114,59 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
 - [[issue-00057-unlimited-systemic-retry-is-invisible]] —— 被判为 systemic 的失败无限重试却从不报告原因，
   这是上一条长期不可诊断的原因。
 
-### 批次 D（采纳门槛）—— 未开始
+### 批次 D（采纳门槛）—— 已完成
 
-D1（聚合 starter）、D2（in-memory 降级显式化）、D3（样例 codec）、D4（`SimpleProcess`，需先有 design）、
-D5（四份使用者文档，必须最后）。D1 与 D5 的前置条件（模块图定稿）已随 C5 完成。
+| 批次 | commit | 结果 |
+| --- | --- | --- |
+| D3 | `6733d70` | 样例 codec 改用 `ProcessSerializationCatalog`：12 个 payload + state → 22 行声明 |
+| D2 | `93c1fa7` | in-memory 降级显式化：启动守卫 WARN + `allow-in-memory-stores` 可令其失败 |
+| D1 | `b2a88f5` | 4 个捆绑包；样例 aipersimmon 编译依赖 **16 → 4** |
+| D4 | `4239757` | 否决 `SimpleProcess`，改为给 `ProcessDefinition` 加默认方法 |
+| D5 | 本次 | 四份使用者文档 |
+
+### 批次 D 的偏差记录（5 处）
+
+1. **D3 不是 282 → 15 行，而是 282 → 188 行**（其中 catalog 声明 22 行）。报告假设 13 个 payload 全部可入
+   catalog，但 `CancelOrder` 携带 `CancellationReason`——一个 sealed interface。让 Jackson 解它需要在
+   **`ordering-domain` 的类型上**加 `@JsonTypeInfo`，那正是分层禁止的基础设施泄漏。因此保留手写 codec，
+   并按报告第 2 条把它写成「何时才该手写」的进阶示例。**每个 payload 的样板从约 200 行降到 22 行**是真实收益，
+   总行数没降那么多是因为新增了约 60 行「如何选择」的教学注释。
+2. **D1 的捆绑包命名用 `-starter-` 中缀，而非报告的 `-<stack>-spring-boot-starter` 后缀**。后者已被 C5 的
+   拦截器组合座占用，且二者不能合并（见 [[design-00012-module-naming-and-spring-freedom]] §3.4）。
+3. **D1 是 16 → 4，而非报告设想的 17 → 2**。`-openapi-spring-boot-starter` 与
+   `-observability-otel-spring-boot-starter` 各自拉一整套有主张的第三方栈（springdoc + Swagger UI、
+   整个 OpenTelemetry starter），不应由默认路径替使用者决定。报告 P1-1 把 "observability(no-op)" 列进核心包，
+   那指的是 framework-free 的 SPI（已随 cqrs/outbox 传递且默认 no-op），**OTel 绑定是另一件事**。
+4. **D2 不做 `/actuator/health` degraded**。需给 `-web-spring-boot-starter` 新增 `spring-boot-actuator`
+   依赖，而信息与启动期 WARN/失败完全重合。
+5. **D4 否决 `SimpleProcess` 门面**。两条理由：(a) 报告测到的负担主体是 codec，而 D3 已消除；剩下的只是 18 行
+   零信息仪式。(b) 报告草拟的 `next(state, input, effects)` 以**可变 effects** 收集副作用，放弃了
+   `(state, input) → decision` 的纯函数形状——而报告自己的「不建议改」附录恰恰点名该形状是对的；且它没有
+   自然的方式表达 `ignore`（乱序事实的安全语义）。忠于原语义的门面就是 `ProcessDefinition` 改个名字，
+   即**一个概念两套 API**。改为在接口上给版本化三方法加默认值：首个流程只实现 3 个方法，版本概念只在真的需要
+   第二个版本时出现——同样是渐进式披露，但只有一套 API，且注册表对版本冲突仍 fail-fast。
+
+### 过程中新发现（已立 issue，未修复）
+
+- [[issue-00059-outbox-relay-tests-race-the-startup-poll]] —— outbox 两个后端共 7 个测试类用
+  `poll-delay-ms` 大值试图关掉后台调度，但 `@Scheduled(fixedDelay)` 是**先执行再等待**，启动即轮询一次；
+  它若持有 ShedLock 锁，测试体那次直接 `relay()` 会被切面整个跳过 → 间歇性失败。**产品行为无误，
+  只有测试对调度器的假设是错的。** 标记 `open`。
+
+### 全部 10 项的最终状态
+
+| 报告项 | 结果 |
+| --- | --- |
+| P1-1 聚合 starter | ✅ 16 → 4 |
+| P1-2 统一命名 | ✅ 8 改名 + `-outbox` 拆分 + 构建期断言 |
+| P1-3 `Inbox` 归位 | ✅ |
+| P1-4 样例 codec | ✅ 样板 200 → 22 行 |
+| P1-5 使用者文档 | ✅ README / CHOOSING-MODULES / CONFIGURATION / ARCHITECTURE |
+| P1-6 in-memory 降级 | ✅ WARN + 可 fail-loud |
+| P2-1 `cqrs` ↔ `integration` | ✅（落点改为 `application`） |
+| P2-2 删除 saga | ✅ |
+| P2-3 流程管理器概念负载 | ✅ 以默认方法实现，**未**建 `SimpleProcess` |
+| P2-4 `core` 补件 / 分页归位 | ✅ `Specification` + 分页下沉；**未**建 `AbstractIdentifier`（record 使其不可行） |
 
 ## 关联
 

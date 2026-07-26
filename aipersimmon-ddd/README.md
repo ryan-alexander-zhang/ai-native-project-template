@@ -1,147 +1,236 @@
-# AiPersimmon DDD 构建块
+# AiPersimmon DDD
 
-> `groupId: com.aipersimmon.ddd` · `version: 0.1.0-SNAPSHOT` · Java 21
+> `com.aipersimmon.ddd` · `0.1.0-SNAPSHOT` · Java 21 · Spring Boot 3
 
-一组**框架无关**的领域驱动设计(DDD)构建块,按端口—适配器(六边形)架构组织成多个 Maven 模块。纯领域/应用层只提供契约(端口),Spring / JDBC / Kafka 等具体实现放在独立的适配器模块中,可按需引入、按规模替换,而不影响业务代码。
+DDD building blocks for services that have to stay correct under concurrency and at-least-once
+delivery. The tactical model (`core`, `cqrs`, `integration`, …) is framework-free; Spring,
+MyBatis-Plus, JDBC, Kafka and Redis live in separate pluggable modules you add only if you use them.
 
-## 模块依赖关系
+**Three guides, in the order you need them**
 
-依赖边指向下层(`A --> B` 表示 A 依赖 B)。所有边均为 `compile` 作用域,整体是一张无环有向图(DAG)。
+| | |
+| --- | --- |
+| this file | get something running |
+| [CHOOSING-MODULES.md](CHOOSING-MODULES.md) | which dependency for which problem |
+| [CONFIGURATION.md](CONFIGURATION.md) | every `aipersimmon.ddd.*` property and its default |
 
-```mermaid
-flowchart TD
-    subgraph foundation["基础层 — 无内部依赖"]
-        core["core<br/>DDD 战术构件"]
-        integration["integration<br/>集成事件契约"]
-    end
-
-    subgraph abstraction["抽象层 — 框架无关的端口/状态"]
-        application["application<br/>应用层端口"]
-        cqrs["cqrs<br/>CQRS 契约"]
-    end
-
-    subgraph adapter["适配器层 — Spring / JDBC / Kafka 实现"]
-        cqrs_spring["cqrs-spring"]
-        events_spring["events-spring"]
-        inbox_jdbc["inbox-jdbc"]
-        outbox_jdbc["outbox-jdbc"]
-        messaging_kafka["messaging-kafka"]
-    end
-
-    subgraph tooling["工具/聚合"]
-        archunit["archunit<br/>架构约束测试"]
-        bom["bom<br/>版本对齐"]
-    end
-
-    application --> core
-    application --> integration
-    cqrs --> core
-    archunit --> core
-
-    cqrs_spring --> cqrs
-    cqrs_spring --> application
-    events_spring --> application
-    events_spring --> integration
-    inbox_jdbc --> application
-    outbox_jdbc --> application
-    outbox_jdbc --> integration
-    messaging_kafka --> outbox_jdbc
-
-    bom -.->|管理版本| foundation
-    bom -.->|管理版本| abstraction
-    bom -.->|管理版本| adapter
-
-    classDef found fill:#e8f4ff,stroke:#2b6cb0,color:#1a365d;
-    classDef abst fill:#eafaf1,stroke:#2f855a,color:#1c4532;
-    classDef adap fill:#fff5eb,stroke:#c05621,color:#7b341e;
-    classDef tool fill:#f7f7f7,stroke:#718096,color:#2d3748;
-    class core,integration found;
-    class application,cqrs abst;
-    class cqrs_spring,events_spring,inbox_jdbc,outbox_jdbc,messaging_kafka adap;
-    class archunit,bom tool;
-```
-
-### 分层与依赖表
-
-| 模块 | 层 | 直接依赖 | 最大依赖深度 |
-|---|---|---|---|
-| `core` | 基础 | (无) | 0 |
-| `integration` | 基础 | (无) | 0 |
-| `application` | 抽象 | core, integration | 1 |
-| `cqrs` | 抽象 | core | 1 |
-| `cqrs-spring` | 适配器 | cqrs, application | 2 |
-| `events-spring` | 适配器 | application, integration | 2 |
-| `inbox-jdbc` | 适配器 | application | 2 |
-| `outbox-jdbc` | 适配器 | application, integration | 2 |
-| `messaging-kafka` | 适配器 | outbox-jdbc | 4 |
-| `archunit` | 工具 | core | 1 |
-| `bom` | 聚合 | 管理全部模块版本 | — |
-
-**设计要点**
-
-- **两个根**:`core`(DDD 战术构件)与 `integration`(集成事件契约)均无内部依赖;只有 `application` 同时依赖二者。
-- **两分结构**:纯领域侧(`core`/`integration`/`application`/`cqrs`)完全不依赖 Spring;适配器侧(`*-spring`/`*-jdbc`/`messaging-kafka`)才引入具体技术。端口—适配器边界落到了模块级别。
-- **`cqrs` 只依赖 `core`**:是纯领域层构建块,独立于应用层用例装配。
-- **最长链**:`messaging-kafka → outbox-jdbc → application → {core, integration}`,Kafka 发送强制走事务性发件箱,不直接触达 `application`。
+The module map and dependency rules are in [../ARCHITECTURE.md](../ARCHITECTURE.md); a complete
+working service is in [../aipersimmon-ddd-scaffold/multi-module](../aipersimmon-ddd-scaffold/multi-module).
 
 ---
 
-## 各模块详解
+## Quick start
 
-### 基础层
+### 1. Two dependencies
 
-#### `aipersimmon-ddd-core`
-DDD 战术构件与结构约定,零依赖。包含:
+```xml
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-bom</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
 
-- **`annotation`** — 标记类型的战术角色(聚合根、实体、值对象、仓储、领域服务、领域事件)的注解,不强制实现任何框架接口;运行时保留,供反射工具与架构测试读取。
-- **`architecture`** — 施加在包的 `package-info.java` 上的分层刻板印象注解(domain / application / infrastructure / interface),架构测试据此强制"依赖只能向内"的方向。
-- **`model`** — 战术构件的类型接口与基类:`Identifier`、`Entity`、`AggregateRoot`、`Association`、`AbstractAggregateRoot`。
-- **`event`** — `DomainEvent` 标记,表示限界上下文内部发生的事实(区别于对外发布的版本化契约)。
-- **`state`** — 极简、无依赖的状态转换守卫 `Transitions`,把合法转换集中在一处,让领域对象在自己的意图方法内校验变更,而不引入状态机引擎。
-- **`exception`** — `DomainException` 基类,把业务规则违反与技术故障区分开。
+<dependencies>
+  <dependency>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-starter-mybatis-plus</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>com.baomidou</groupId>
+    <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+  </dependency>
+</dependencies>
+```
 
-#### `aipersimmon-ddd-integration`
-集成层构件:`IntegrationEvent`(跨上下文事件标记,属于限界上下文对外发布的语言)与 `EventEnvelope`(承载传输所需元数据的信封)。**集成事件是版本化契约**:发布后须向后兼容演进(只增可选字段,不删/不改语义),破坏性变更需提升 `version`。这与可自由变更的内部领域事件相对。
+That is CQRS, in-process events, time-ordered UUIDv7 ids, RFC 9457 error responses, version-checked
+aggregate repositories, a transactional outbox, a consumer inbox, the durable process manager, the
+operation log, multi-tenancy and the schema applier — in one dependency. Nothing is *enabled* merely
+by being present; see [CONFIGURATION.md](CONFIGURATION.md).
 
-### 抽象层(框架无关)
+Prefer plain `JdbcTemplate`? Use `aipersimmon-ddd-starter-jdbc`. Want to pick modules one at a time?
+That is fully supported — see [CHOOSING-MODULES.md](CHOOSING-MODULES.md).
 
-#### `aipersimmon-ddd-application`
-应用层构建块:`DomainEvents` 端口(用例通过它发布聚合记录的事件)、`ApplicationException` 基类,以及 `Inbox`(**幂等消费**守卫——处理消息前调用,基础设施记录 key 并报告是否已处理过)。全部是端口与标记,由基础设施实现或读取。
+### 2. An aggregate
 
-> 说明:本模块提供**你的应用层所使用的**构建块,它本身不是一个应用。模块名沿用 `core`/`integration` 的规律,以其所服务的 DDD 层命名。
+An aggregate root is the transactional consistency unit. Extend `AbstractAggregateRoot` and it gets
+identity equality, a domain-event buffer, and an optimistic-lock version.
 
-#### `aipersimmon-ddd-cqrs`
-框架无关的 CQRS 契约,分读写两侧:
+```java
+public class Order extends AbstractAggregateRoot<OrderId> {
 
-- **写侧**:`Command` 经 `CommandBus` 派发给唯一的 `CommandHandler`,外围套一条有序的 `CommandInterceptor` 链(通常 日志 → 校验 → 事务)。事务步骤在 `UnitOfWork` 内运行处理器,并排干由 `AggregateCollector` 收集的聚合的领域事件,使状态变更与事件一起提交。
-- **读侧**:`Query` 由 `QueryHandler`(可经 `QueryBus` 路由)从 `ReadModel` 作答,读模型由 `Projection` 保持最新,完全绕开聚合。
+  private static final Transitions<OrderStatus> RULES =
+      Transitions.<OrderStatus>of().allow(OrderStatus.PLACED, OrderStatus.CONFIRMED);
 
-一切均为可选,仅依赖纯 `core`。
+  private final OrderId id;
+  private OrderStatus status;
 
+  public static Order place(OrderId id) {
+    Order order = new Order(id, OrderStatus.PLACED);
+    order.registerEvent(new OrderPlaced(id.value()));
+    return order;
+  }
 
-### 适配器层(Spring / JDBC / Kafka)
+  /** Rebuilt from a row: hand back the stored version so the next write can check against it. */
+  public static Order reconstitute(OrderId id, OrderStatus status, long version) {
+    Order order = new Order(id, status);
+    order.restoreVersion(version);
+    return order;
+  }
 
-#### `aipersimmon-ddd-cqrs-spring-boot-starter`
-CQRS 契约的 Spring 实现。`RegistryCommandBus` / `RegistryQueryBus` 按注册表把命令/查询路由到唯一处理器并施加拦截器链;内置拦截器:`LoggingCommandInterceptor`(最外)、`ValidationCommandInterceptor`(存在 Bean Validation 时)、`TransactionCommandInterceptor`(最内,在 `TransactionTemplateUnitOfWork` 中运行处理器,并在同一事务内排干 `ThreadLocalAggregateCollector` 收集的聚合事件)。`AipersimmonDddCqrsAutoConfiguration` 自动装配,每个 bean 均可被应用覆盖。
+  public void confirm() {
+    // A state table, not scattered ifs: an illegal transition throws instead of being written.
+    RULES.check(status, OrderStatus.CONFIRMED);
+    status = OrderStatus.CONFIRMED;
+    registerEvent(new OrderConfirmed(id.value()));
+  }
 
+  @Override
+  public OrderId id() {
+    return id;
+  }
+}
+```
 
-#### `aipersimmon-ddd-events-spring-boot-starter`
-事件发布端口的 Spring 适配器——进程内、同步传输。`SpringDomainEvents` / `SpringIntegrationEvents` 把每个事件交给 Spring 的 `ApplicationEventPublisher`,`AipersimmonDddEventsAutoConfiguration` 自动装配。投递是同步、同线程、同事务的,处理器在调用方事务内内联运行。**集成事件发布器仅在缺少 outbox starter 时提供。**
+### 3. A repository
 
-#### `aipersimmon-ddd-inbox-jdbc`
-基于 `JdbcTemplate` 的**幂等消费者**实现。`JdbcInbox` 把已处理消息 key 记入带唯一约束的 inbox 表,重投的消息被检测并跳过。不使用 JPA 实体,不影响消费者的实体扫描。应与处理逻辑同事务,失败时记录一并回滚以便重试。
+Extend the base and you get the version predicate, the affected-rows check, and event draining. Skip
+the base and each of those becomes yours to remember, every time.
 
-#### `aipersimmon-ddd-outbox-jdbc`
-基于 `JdbcTemplate` 的**事务性发件箱**实现。`OutboxWriter` 在调用方事务内把集成事件写入 outbox 表;`OutboxRelay` 把未发送行经 `OutboxDispatcher` 派发并标记为已发。不使用 JPA 实体,不影响消费者的实体扫描。
+```java
+@Repository
+public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo> implements Orders {
 
-#### `aipersimmon-ddd-messaging-kafka`
-集成事件的 Kafka 传输,叠加在事务性发件箱之上。`KafkaOutboxDispatcher`(生产侧)是把每条 outbox 行发布到 Kafka 主题的 `OutboxDispatcher`,信封元数据放入 `IntegrationEventHeaders`、JSON 载荷作记录值;由 outbox relay 驱动,broker 确认后才标记已发。`KafkaIntegrationEventListener`(可选消费侧)按事件 id 经 `Inbox` 去重,并在进程内重发重建的事件供本地 `@EventListener` 处理。`AipersimmonDddMessagingKafkaAutoConfiguration` 装配两侧,由 `KafkaMessagingProperties` 配置。
+  public MyBatisOrders(OrderMapper mapper, DomainEvents domainEvents) {
+    super(mapper, domainEvents);
+  }
 
-### 工具 / 聚合
+  @Override
+  public void save(Order order) {
+    saveAggregate(order); // versioned write + publishAndClear, in the caller's transaction
+  }
 
-#### `aipersimmon-ddd-archunit`
-跨项目复用的结构性检查,强制 DDD 分层与构建块约定。`AiPersimmonDddRules` 提供 ArchUnit 规则(针对编译后的类运行);`PackageInfoChecks` 提供源码级检查,确保每个包都声明 `package-info.java`(源码级是因为无注解的 package-info 不产生 class 文件,字节码分析看不到)。
+  @Override
+  protected OrderDo toRow(Order order) {
+    OrderDo row = new OrderDo();
+    row.setId(order.id().value());
+    row.setStatus(order.status().name());
+    return row;
+  }
+}
+```
 
-#### `aipersimmon-ddd-bom`
-版本对齐用的物料清单(BOM),把上述所有构建块模块的版本统一管理。使用方在自己的 `dependencyManagement` 中导入本 BOM,即可引入各模块而无需逐一指定版本。
-</content>
+The row carries `@Version private Long version` and implements `VersionedRow`; the table has a
+`version BIGINT NOT NULL DEFAULT 1` column. A concurrent write matching no row raises
+`OptimisticLockingFailureException`, which the command bus translates to
+`ConcurrencyConflictException` and the web layer renders as **409 Conflict**. That chain is what makes
+the aggregate a real consistency boundary rather than a suggestion.
+
+### 4. A command and its handler
+
+```java
+public record ConfirmOrder(String orderId) implements Command<Void> {}
+
+@Component
+public class ConfirmOrderHandler implements CommandHandler<ConfirmOrder, Void> {
+
+  private final Orders orders;
+
+  @Override
+  public Void handle(ConfirmOrder command, CommandContext context) {
+    Order order =
+        orders
+            .findById(new OrderId(command.orderId()))
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException(
+                        OrderingErrorCode.ORDER_NOT_FOUND, "unknown order: " + command.orderId()));
+    order.confirm();
+    orders.save(order);
+    return null;
+  }
+}
+```
+
+`OrderingErrorCode` is your own `ErrorCode` enum: a stable machine-readable code per failure, which
+is what lets the web layer map it to a problem type without the domain knowing about HTTP.
+
+The bus wraps every dispatch in logging → concurrency translation → validation → transaction, mints
+the message id, seeds the tenant, and drains domain events inside the transaction. You do not put
+`@Transactional` on the handler.
+
+### 5. An endpoint
+
+```java
+@RestController
+@RequestMapping("/orders")
+public class OrderController {
+
+  private final CommandBus commandBus;
+
+  @PostMapping("/{id}/confirm")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void confirm(@PathVariable String id) {
+    commandBus.send(new ConfirmOrder(id));
+  }
+}
+```
+
+A `DomainException` or `ApplicationException` thrown anywhere below becomes an RFC 9457 problem
+document with the right status — no `@ExceptionHandler` of your own.
+
+### 6. The schema
+
+Your tables are yours. The framework's tables (outbox, inbox, process manager, operation log, web
+stores) ship as Flyway migrations; list only the components you actually use:
+
+```yaml
+aipersimmon:
+  ddd:
+    flyway:
+      components: [outbox, inbox]
+```
+
+Listing nothing creates nothing.
+
+---
+
+## What you get, and what it costs to operate
+
+| You add | You get | It costs |
+| --- | --- | --- |
+| `-starter` | command/query buses, in-process events, UUIDv7 ids, RFC 9457 errors | nothing to operate |
+| `-starter-mybatis-plus` / `-starter-jdbc` | the above, plus versioned repositories, outbox, inbox, process manager, operation log, tenancy, Flyway | tables, and background pollers once configured |
+| `-starter-messaging-kafka` | `@Externalized` events cross a broker, exactly-once in effect | a broker, a topic, and the inbox |
+
+Cross-service messaging is built **on** the outbox, not instead of it: a storage bundle is a
+prerequisite. Adding the Kafka bundle without one fails startup rather than letting `@Externalized`
+events be published in process and silently never leave the JVM.
+
+## Conventions worth knowing before you write code
+
+- **The aggregate is the transaction.** One command, one aggregate, one version-checked write. When a
+  flow spans aggregates or contexts, reach for the process manager — not for a bigger transaction.
+- **Domain events are in-process facts; integration events cross a boundary.** Different types in
+  different modules, on purpose. A domain event never leaves the JVM.
+- **Who mints an id matters.** `send`/`publish` mint a fresh identity; `sendAs`/`publishAs` carry an
+  existing one, which is what keeps a replay idempotent. Business code uses the first pair.
+- **`Invariant` throws, `Specification` answers.** Using one where the other belongs is how
+  exceptions become control flow, or how an illegal state gets written.
+- **A degraded capability says so.** A missing id generator, `@Externalized` events with no durable
+  outbox, or an enabled protection running on an in-memory store each produce a startup failure or a
+  WARN naming the remedy — never silence.
+
+## Extending
+
+Every bean is `@ConditionalOnMissingBean`: declare your own and the framework steps aside. The seams
+designed to be replaced are `IdGenerator`, `OutboxDispatcher`, `FailureClassifier`,
+`IdempotencyStore` / `ReplayGuard` / `RateLimiter`, `TenantResolver`, `ProcessPayloadCodec` /
+`ProcessStateCodec`, `OperationLogSink`, and the observability SPIs.
+
+`aipersimmon-ddd-archunit` ships the layering rules as tests you can run against your own code.

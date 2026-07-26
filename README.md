@@ -1,5 +1,18 @@
 # AI-Native Project Template
 
+> **Looking for the library?** This repository also *is* an AI-native project: it holds
+> **AiPersimmon DDD**, a set of DDD building blocks for Spring Boot services.
+>
+> | | |
+> | --- | --- |
+> | [aipersimmon-ddd/README.md](aipersimmon-ddd/README.md) | quick start — two dependencies, a working aggregate, command and endpoint |
+> | [aipersimmon-ddd/CHOOSING-MODULES.md](aipersimmon-ddd/CHOOSING-MODULES.md) | which dependency for which problem |
+> | [aipersimmon-ddd/CONFIGURATION.md](aipersimmon-ddd/CONFIGURATION.md) | every `aipersimmon.ddd.*` property and its default |
+> | [ARCHITECTURE.md](ARCHITECTURE.md) | the module map, the layering rules, and why |
+> | [aipersimmon-ddd-scaffold/multi-module](aipersimmon-ddd-scaffold/multi-module) | a complete reference service |
+>
+> The rest of this file describes the template baseline the repository was started from.
+
 This repository is a docs-first template for starting an AI-native software
 project.
 
