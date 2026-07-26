@@ -1,7 +1,7 @@
 package com.example.payment.adapter;
 
+import com.aipersimmon.ddd.application.InboundEvents;
 import com.aipersimmon.ddd.cqrs.CommandBus;
-import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.example.ordering.api.PaymentRequested;
 import com.example.payment.application.AuthorizePayment;
@@ -30,6 +30,6 @@ public class PaymentRequestedListener {
         new AuthorizePayment(
             event.orderId(), event.paymentOperationId(),
             event.amountMinor(), event.currency()),
-        CommandContext.of(envelope));
+        InboundEvents.commandContext(envelope));
   }
 }

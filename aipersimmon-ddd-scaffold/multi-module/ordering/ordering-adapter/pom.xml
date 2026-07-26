@@ -37,6 +37,17 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs</artifactId>
     </dependency>
+    <!-- Inbound ACL: InboundEvents.commandContext turns the received EventEnvelope's
+         identity into the triggered command's cause, so the causal chain survives the hop. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+    </dependency>
+    <!-- EventEnvelope: the wire form these listeners receive. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+    </dependency>
     <!-- Cross-context: consumes inventory's published contract (stock reserved/failed/released). -->
     <dependency>
       <groupId>${project.groupId}</groupId>

@@ -1,5 +1,6 @@
 package com.example.ordering.adapter.messaging;
 
+import com.aipersimmon.ddd.application.InboundEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.example.inventory.api.StockReleased;
@@ -35,31 +36,39 @@ public class OrderFulfilment {
   @EventListener
   public void onStockReserved(EventEnvelope<StockReserved> envelope) {
     StockReserved payload = envelope.payload();
-    process.stockReserved(payload.orderId(), payload.reservationId(), CommandContext.of(envelope));
+    process.stockReserved(
+        payload.orderId(), payload.reservationId(), InboundEvents.commandContext(envelope));
   }
 
   @EventListener
   public void onStockReservationFailed(EventEnvelope<StockReservationFailed> envelope) {
     StockReservationFailed payload = envelope.payload();
     process.stockReservationFailed(
-        payload.orderId(), payload.code(), payload.reason(), CommandContext.of(envelope));
+        payload.orderId(),
+        payload.code(),
+        payload.reason(),
+        InboundEvents.commandContext(envelope));
   }
 
   @EventListener
   public void onPaymentAuthorized(EventEnvelope<PaymentAuthorized> envelope) {
-    process.paymentAuthorized(envelope.payload().orderId(), CommandContext.of(envelope));
+    process.paymentAuthorized(envelope.payload().orderId(), InboundEvents.commandContext(envelope));
   }
 
   @EventListener
   public void onPaymentDeclined(EventEnvelope<PaymentDeclined> envelope) {
     PaymentDeclined payload = envelope.payload();
     process.paymentDeclined(
-        payload.orderId(), payload.code(), payload.reason(), CommandContext.of(envelope));
+        payload.orderId(),
+        payload.code(),
+        payload.reason(),
+        InboundEvents.commandContext(envelope));
   }
 
   @EventListener
   public void onStockReleased(EventEnvelope<StockReleased> envelope) {
     StockReleased payload = envelope.payload();
-    process.stockReleased(payload.orderId(), payload.reservationId(), CommandContext.of(envelope));
+    process.stockReleased(
+        payload.orderId(), payload.reservationId(), InboundEvents.commandContext(envelope));
   }
 }

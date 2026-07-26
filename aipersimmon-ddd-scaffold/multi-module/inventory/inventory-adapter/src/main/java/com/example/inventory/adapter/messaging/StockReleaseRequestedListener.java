@@ -1,7 +1,7 @@
 package com.example.inventory.adapter.messaging;
 
+import com.aipersimmon.ddd.application.InboundEvents;
 import com.aipersimmon.ddd.cqrs.CommandBus;
-import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.example.inventory.application.stock.ReleaseStock;
 import com.example.ordering.api.StockReleaseRequested;
@@ -27,6 +27,7 @@ public class StockReleaseRequestedListener {
   @EventListener
   public void on(EventEnvelope<StockReleaseRequested> envelope) {
     StockReleaseRequested event = envelope.payload();
-    commandBus.send(new ReleaseStock(event.reservationId()), CommandContext.of(envelope));
+    commandBus.send(
+        new ReleaseStock(event.reservationId()), InboundEvents.commandContext(envelope));
   }
 }

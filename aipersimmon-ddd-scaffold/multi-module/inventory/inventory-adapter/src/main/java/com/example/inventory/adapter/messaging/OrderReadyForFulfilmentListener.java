@@ -1,5 +1,6 @@
 package com.example.inventory.adapter.messaging;
 
+import com.aipersimmon.ddd.application.InboundEvents;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
@@ -33,6 +34,7 @@ public class OrderReadyForFulfilmentListener {
         event.lines().stream()
             .map(line -> new ReserveStock.Line(line.sku(), line.quantity()))
             .toList();
-    commandBus.send(new ReserveStock(event.orderId(), lines), CommandContext.of(envelope));
+    commandBus.send(
+        new ReserveStock(event.orderId(), lines), InboundEvents.commandContext(envelope));
   }
 }

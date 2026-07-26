@@ -4,10 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.aipersimmon.ddd.integration.EventEnvelope;
-import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.tenancy.Tenants;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,33 +20,6 @@ class CqrsContractsTest {
 
   /** A command whose result type is carried in the type parameter. */
   record CreateThing(String name) implements Command<String> {}
-
-  record ThingImported(String id) implements IntegrationEvent {}
-
-  @Test
-  void ofEnvelopeMakesTheInboundEventTheCause() {
-    EventEnvelope<ThingImported> envelope =
-        new EventEnvelope<>(
-            "evt-9",
-            "/test",
-            "ThingImported",
-            1,
-            Instant.EPOCH,
-            "subj-1",
-            "acme",
-            "corr-3",
-            "upstream-cause",
-            new ThingImported("t-1"));
-
-    CommandContext cause = CommandContext.of(envelope);
-    assertEquals("evt-9", cause.messageId(), "the event's id becomes the cause's message id");
-    assertEquals("corr-3", cause.correlationId());
-
-    // A command dispatched from this cause records the event as its causation.
-    CommandContext command = cause.deriveChild("cmd-1");
-    assertEquals("corr-3", command.correlationId());
-    assertEquals("evt-9", command.causationId());
-  }
 
   @Test
   void sendAsIsUnsupportedByDefault() {

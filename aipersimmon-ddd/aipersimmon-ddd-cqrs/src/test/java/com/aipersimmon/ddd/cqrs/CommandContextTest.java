@@ -4,15 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.aipersimmon.ddd.integration.EventEnvelope;
-import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.tenancy.Tenants;
-import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class CommandContextTest {
-
-  record ThingImported(String id) implements IntegrationEvent {}
 
   @Test
   void rejectsNullTenantId() {
@@ -88,28 +83,5 @@ class CommandContextTest {
     assertEquals("cmd-2", child.messageId());
     assertEquals("cmd-1", child.correlationId());
     assertEquals("cmd-1", child.causationId());
-  }
-
-  @Test
-  void ofEnvelopeCopiesIdCorrelationAndCausation() {
-    EventEnvelope<ThingImported> envelope =
-        new EventEnvelope<>(
-            "evt-9",
-            "/test",
-            "ThingImported",
-            1,
-            Instant.EPOCH,
-            "subj-1",
-            "acme",
-            "corr-3",
-            "upstream-cause",
-            new ThingImported("t-1"));
-
-    CommandContext ctx = CommandContext.of(envelope);
-
-    assertEquals("acme", ctx.tenantId());
-    assertEquals("evt-9", ctx.messageId());
-    assertEquals("corr-3", ctx.correlationId());
-    assertEquals("upstream-cause", ctx.causationId());
   }
 }

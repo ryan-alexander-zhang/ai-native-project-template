@@ -1,6 +1,5 @@
 package com.aipersimmon.ddd.cqrs;
 
-import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.tenancy.Tenants;
 
 /**
@@ -22,6 +21,11 @@ import com.aipersimmon.ddd.tenancy.Tenants;
  *
  * <p>Distributed-trace identity is carried out of band by the OpenTelemetry context (a W3C {@code
  * traceparent}), not by this value: it needs no trace-id field.
+ *
+ * <p>An inbound integration event becomes the triggering cause of a command through {@code
+ * InboundEvents.commandContext(envelope)} in {@code aipersimmon-ddd-application}. That conversion
+ * deliberately does not live here: this module is the write-side core and must not know the wire
+ * format, so {@code cqrs} depends only on {@code core} and {@code tenancy}.
  *
  * <p>Framework-free and immutable. Ids are minted by the {@link CommandBus}, not by this type, and
  * the tenant is seeded by the bus from the ambient {@code TenantContext}; use {@link #root(String,
@@ -67,18 +71,5 @@ public record CommandContext(
    */
   public CommandContext deriveChild(String childMessageId) {
     return new CommandContext(tenantId, childMessageId, correlationId, messageId);
-  }
-
-  /**
-   * The context of an inbound integration event, to pass as the triggering cause when an
-   * anti-corruption adapter translates the event into a command ({@code commandBus.send(command,
-   * CommandContext.of(envelope))}). The event's id becomes this context's {@code messageId}, so the
-   * dispatched command records the event as its causation and inherits its correlation. This is the
-   * one place inbound adapters convert an {@link EventEnvelope} to a context — they do not each
-   * re-map its fields.
-   */
-  public static CommandContext of(EventEnvelope<?> envelope) {
-    return new CommandContext(
-        envelope.tenantId(), envelope.eventId(), envelope.correlationId(), envelope.causationId());
   }
 }

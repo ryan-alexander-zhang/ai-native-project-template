@@ -34,12 +34,6 @@
       <artifactId>aipersimmon-ddd-core</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- EventEnvelope: CommandContext.of(envelope) maps an inbound message to a dispatch context. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-integration</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-tenancy</artifactId>
