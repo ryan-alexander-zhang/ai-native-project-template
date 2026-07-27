@@ -78,7 +78,7 @@ drives inventory and the process manager.
 | Cursor-paged read model (no aggregate loaded) | `OrderQueries` + `OrderListMapper` → `GET /orders?customerId=`; `Slice`/`Cursor` | `OrderListPagingTest`, `FindCustomerOrdersHandlerTest` |
 | HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-jdbc` on `POST /orders` | `OrderIdempotencyTest` |
 | Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
-| Dead letters and operator replay | `DeadLetterOpsController` (`GET /ops/dead-letters`, `POST /ops/dead-letters/{id}/replay`) | `DeadLetterReplayTest` |
+| Dead letters and operator replay | `DeadLetterOpsController` over the `DeadLetters` + `DeadLetterStore` ports (`GET /ops/dead-letters` cursor-paged, `GET /ops/dead-letters/{id}`, `POST /ops/dead-letters/{id}/replay`) | `DeadLetterReplayTest` |
 | `Specification` answers, `Invariant` refuses | `CancellableByCustomer` (on `OrderSnapshot.cancellableByCustomer`) vs `OrderLifecyclePolicy`; `POST /orders/{id}/cancel` | `CancellableByCustomerTest`, `SelfCancelTest` |
 | Business-key idempotency (at-most-once) | `AuthorizePaymentHandler` + `PaymentOperations` port | `AuthorizePaymentIdempotencyTest` |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
@@ -97,14 +97,14 @@ list tells you.
 |---|---|---|---|---|
 | Versioned aggregate write | ~0 | — | row implements `VersionedRow` **and** carries `@Version`; table needs `version DEFAULT 1` | none — the base class carries it |
 | Conflict → 409 | 0 | — | none | the lock 409 is `about:blank` with no `code`, while a *domain* 409 is coded: the one a client should retry is the one it cannot recognise |
-| HTTP idempotency | ~8 (yaml) | `Idempotency-Key` | a MyBatis-Plus app still takes a **`-jdbc`** store module; `flyway.components` needs `web-store` | issue-00062, issue-00063 (startup failure), issue-00064 (replay loses `Location`) |
-| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 | issue-00065 (a missing query param was a 500) |
+| HTTP idempotency | ~8 (yaml) | `Idempotency-Key` | a MyBatis-Plus app still takes a **`-jdbc`** store module; `flyway.components` needs `web-store` | issue-00062, issue-00063 (startup failure), issue-00064 (replay lost `Location`) — all three fixed |
+| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 | issue-00065 (a missing query param was a 500) — fixed |
 | Deadlines | ~25 | `DeadlineName`, `ScheduleDeadline`, `CancelDeadline` | arm and cancel on every branch leaving the step; due time must come from `context.now()` | none — this API fits |
-| Dead letters + replay | ~60 | `DeadLetterStore` | none | issue-00066: `replay(eventId)` with no way to obtain an `eventId` |
+| Dead letters + replay | ~45 | `DeadLetters` (read), `DeadLetterStore` (replay) | none | issue-00066: `replay(eventId)` with no way to obtain an `eventId` — fixed by the read port, which deleted this project's hand-written query |
 | `Specification` | ~30 | `Specification` | keep one statement of the rule, or the answer and the refusal drift | none |
-| Test infrastructure | ~15 | `@ServiceConnection` | — | issue-00067: PostgreSQL/MySQL/Redis are provided, Kafka — the library's own transport — is not |
+| Test infrastructure | ~2 | `@ServiceConnection` | — | issue-00067: Kafka — the library's own transport — was the one container the module did not provide; fixed |
 
-Three patterns are worth more than the individual rows:
+Four patterns are worth more than the individual rows:
 
 - **Everything above is cheap to write and easy to get subtly wrong.** The line counts are small;
   the "implicit pairing" column is where the cost actually lives, and no bundle reduces it.
@@ -115,6 +115,11 @@ Three patterns are worth more than the individual rows:
 - **The two rows with no friction are the two whose API was designed around the failure mode**
   (deadlines: a timer is an ordinary input; specification: answering is a different job from
   refusing) rather than around the happy path.
+- **Fixing the library shortened this project.** Every one of the six defects was fixed upstream, and
+  three of those fixes deleted code from *here*: the dead-letter query (a mapper against a table this
+  application does not own), the Kafka container declaration and four Testcontainers dependencies, and
+  a comment explaining why a replayed `201` pointed nowhere. The ledger's real reading is that each
+  friction row was a line of consumer code that should not have had to exist.
 
 ## Not demonstrated here, on purpose
 

@@ -236,7 +236,12 @@ stateDiagram-v2
 
 ## 七、完成记录
 
-三个批次全部完成。样例测试 **314 → 378**，既有断言一行未改；库 1528 项全绿。
+三个批次全部完成。样例测试 **157 → 189**，既有断言一行未改；库全绿。
+
+> **数字勘误（后补）**：本节原写「样例 314 → 378，库 1528」。那是把 Maven 输出里的
+> `Tests run:` 行直接求和得到的——surefire 每个测试类打一行、每个模块再打一行汇总，
+> 于是每项测试被数了两次。按 surefire XML 里的 `tests=` 属性重新统计，样例是 **157 → 189**，
+> 库当前 **773**（含本轮收尾新增的 7 项）。结论与比例不变，绝对数改正。
 
 | 批次 | commit | 结果 |
 | --- | --- | --- |
@@ -252,16 +257,17 @@ stateDiagram-v2
 
 ### 摩擦点清单（G4）——本 plan 的主要产出
 
-在样例里真的去用每一条能力，共发现 **6 个库侧缺陷**（4 个已修）与 1 个样例缺陷：
+在样例里真的去用每一条能力，共发现 **6 个库侧缺陷**与 1 个样例缺陷。**六条现已全部修完**——
+前三条在 F2/F3 当场修（否则那两条能力落不下来），后三条在收尾轮统一修：
 
 | id | 摘要 | 状态 |
 | --- | --- | --- |
 | [[issue-00062-web-store-module-does-not-displace-the-in-memory-stores]] | 后端 store 与内存兜底之间没有排序边——issue-00044 的同构副本 | 已修 |
 | [[issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist]] | `getIfAvailable` 用在多候选处 → 开幂等即启动失败 | 已修 |
-| [[issue-00064-a-replayed-idempotent-response-loses-its-location-header]] | 重放的 201 丢 `Location` | open |
+| [[issue-00064-a-replayed-idempotent-response-loses-its-location-header]] | 重放的 201 丢 `Location` | 已修（收尾轮） |
 | [[issue-00065-a-missing-request-parameter-is-reported-as-a-server-error]] | 参数绑定失败不在 4xx 覆盖内 → 500 | 已修 |
-| [[issue-00066-dead-letter-store-can-replay-but-cannot-be-read]] | `replay(eventId)` 而拿不到 `eventId` | open |
-| [[issue-00067-test-support-covers-every-store-except-the-transport]] | 测试模块没有 Kafka——库自己的传输 | open |
+| [[issue-00066-dead-letter-store-can-replay-but-cannot-be-read]] | `replay(eventId)` 而拿不到 `eventId` | 已修（收尾轮，新增 `DeadLetters` 只读端口） |
+| [[issue-00067-test-support-covers-every-store-except-the-transport]] | 测试模块没有 Kafka——库自己的传输 | 已修（收尾轮） |
 
 **它们的共同点，就是这个 plan 想证明的那件事**：没有一个需要更多单元测试才能发现。库的每个模块单测
 只装配自己那一个组件——于是「两个自动配置同时在场」「容器里有 5 个 `Clock`」「端点带查询参数」
@@ -270,8 +276,10 @@ stateDiagram-v2
 
 另外两条不够格立 issue、但记在账本里的采纳摩擦：
 - 乐观锁 409 是 `about:blank` 无 `code`，而领域 409 有——**该重试的那个反而不可识别**。
-- 共享 SpotBugs 过滤器按类名逐条豁免库自己的类，**消费方无法扩展**；样例改用 mapper 绕开
-  （见 `DeadLetterMapper`），但下一个持有注入 `JdbcTemplate` 的消费方会再撞一次。
+- 共享 SpotBugs 过滤器按类名逐条豁免库自己的类，**消费方无法扩展**。这一条在收尾轮变了形而没有消失：
+  issue-00066 修完后，样例控制器不再持有 `JdbcTemplate`（改注入端口），该 finding 落回库自己的
+  `JdbcDeadLetters`，按既有约定登记进过滤器即可。**换言之受影响的人从消费方变回了库作者**——
+  这一次运气好，因为缺的那个端口本来就该有；下一个正当地持有注入 `JdbcTemplate` 的消费方仍会撞上。
 
 ### 偏差记录（5 处）
 
@@ -288,6 +296,23 @@ stateDiagram-v2
    而不再列为「未完成」。
 5. **G2 只完成一半**。`-test-support` 没有 Kafka，样例仍自己声明容器（issue-00067）。
    PostgreSQL 已改由模块提供，镜像版本因此不再由样例自己钉。
+   **收尾轮补齐**：`KafkaServiceConnection` 进了模块，`TestInfrastructure` 只剩两行 `@Import`，
+   `start/pom.xml` 里 4 个 Testcontainers 依赖一并删除。
+
+### 收尾轮（plan 转 `resolved` 之后）
+
+本 plan 结束时有意留了三条 `open` 的库侧 issue，按铁律 3 交由排期。随后按要求一次做完，
+**全部是库侧改动**——这也是这三条为什么当时没做：
+
+| issue | 库侧改动 | 样例侧的变化 |
+| --- | --- | --- |
+| 00064 | `IdempotencyFilter` 存可回放 header 白名单 | 断言从"钉住缺陷"翻转为"钉住等价" |
+| 00066 | 新增 `DeadLetters` 只读端口 + 两后端实现 | 删掉 `DeadLetterMapper`，控制器零 SQL，列表改 cursor 分页 |
+| 00067 | `-test-support` 加 `KafkaServiceConnection` | `TestInfrastructure` 只剩 `@Import`，pom 少 4 个依赖 |
+
+三条的共同形状值得记一句：**修的是库，但收益全部体现在"消费方少写了什么"**——
+少一处手写 SQL、少一个容器声明、少四个依赖、少一句"这是当前契约，请忍受"的注释。
+这正好是 §二那个目标的反向验证：人体工学账本上的每一行摩擦，都对应库里一处可以被删掉的消费方代码。
 
 ### 阶段验收对照
 
@@ -296,10 +321,10 @@ stateDiagram-v2
 3. README 的每条约定都有代码 ✅ —— 除 `sendAs`/`publishAs`，已在「不演示 + 原因」中列明。
 4. 人体工学账本存在且填满 ✅ —— 样例 README「What each capability cost to adopt」。
 5. 生产检查清单 7/7 可见 ✅ —— `application.yml` 对 7 条各有显式设置或显式取舍注释。
-6. 既有行为无回归 ✅ —— 起点的 314 项一行未改仍绿。
+6. 既有行为无回归 ✅ —— 起点的 157 项一行未改仍绿。
 7. CI 绿 ✅ —— 本地按 CI 同一命令（库 `install` + 样例 `verify`）全绿。
-8. 文档闭环 ✅ —— issue-00060/00061 转 `resolved`；00062/00063/00065 已修并记录验证；
-   00064/00066/00067 保持 `open` 并在代码注释中被指向。
+8. 文档闭环 ✅ —— issue-00060/00061 转 `resolved`；六条摩擦点 issue 全部 `resolved` 并填了验证结果
+   （00062/00063/00065 在批次 F 内，00064/00066/00067 在收尾轮）。
 
 ## 关联
 
