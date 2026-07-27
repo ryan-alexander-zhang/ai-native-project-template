@@ -10,8 +10,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Answers {@link FindOrder} with an {@link OrderSnapshot}. Kept minimal: it loads the aggregate and
- * maps it. A dedicated read model that bypasses the aggregate can be introduced later (see the CQRS
- * read-model how-to).
+ * maps it, which is the right trade for a single-order read whose shape follows the aggregate's. A
+ * query that diverges from that shape — a list, a projection joining other tables — should instead
+ * read the tables directly and never rehydrate an aggregate it does not intend to change.
  */
 @Component
 public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderSnapshot>> {

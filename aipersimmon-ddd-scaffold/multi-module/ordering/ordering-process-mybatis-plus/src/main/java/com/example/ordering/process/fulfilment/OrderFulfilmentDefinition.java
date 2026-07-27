@@ -27,10 +27,11 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * The order-fulfilment coordination policy as a pure, deterministic {@link ProcessDefinition} — the
- * durable process-manager replacement for the old orchestration saga. Given the current state and
- * an input, it returns the next state, lifecycle, and the ordering commands to dispatch; the
- * durable runtime persists the transition and relays the commands at-least-once.
+ * The order-fulfilment coordination policy as a pure, deterministic {@link ProcessDefinition}.
+ * Given the current state and an input, it returns the next state, lifecycle, and the ordering
+ * commands to dispatch; the durable runtime persists the transition and relays the commands
+ * at-least-once. Deciding and acting are separate on purpose: this class can be unit-tested with no
+ * database and no clock.
  *
  * <p>The flow, and the two properties that keep it honest:
  *
