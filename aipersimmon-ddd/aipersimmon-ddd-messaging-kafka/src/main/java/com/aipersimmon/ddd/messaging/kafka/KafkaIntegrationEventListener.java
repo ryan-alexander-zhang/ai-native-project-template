@@ -24,15 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Consumes CloudEvents-encoded integration events from Kafka and hands them to local handlers. A
- * record must carry well-formed required CloudEvents attributes: {@code ce_id} (the inbox key),
- * {@code ce_type} (the catalog key), {@code ce_source}, {@code ce_specversion} (must be {@code
- * 1.0}), and {@code ce_dataschemaversion} (an integer {@code >= 1}, the other half of the catalog
- * key); {@code ce_time} is optional (it falls back to the broker record timestamp, then the local
- * clock). A record missing a required attribute, or carrying an unparseable one, is rejected as a
- * {@link MalformedIntegrationEventException} (a permanent failure, dead-lettered) rather than
- * defaulted around or retried — fabricating identity or a schema version would defeat the inbox and
- * the {@code (type, version)} contract. For a well-formed record it guards against redelivery with
- * the {@link Inbox} (keyed by {@code ce_id}); otherwise it resolves the {@code ce_type} (type,
+ * record must carry well-formed required CloudEvents attributes: {@code ce_id} and {@code
+ * ce_source} (together the inbox key), {@code ce_type} (the catalog key), {@code ce_specversion}
+ * (must be {@code 1.0}), and {@code ce_dataschemaversion} (an integer {@code >= 1}, the other half
+ * of the catalog key); {@code ce_time} is optional (it falls back to the broker record timestamp,
+ * then the local clock). A record missing a required attribute, or carrying an unparseable one, is
+ * rejected as a {@link MalformedIntegrationEventException} (a permanent failure, dead-lettered)
+ * rather than defaulted around or retried — fabricating identity or a schema version would defeat
+ * the inbox and the {@code (type, version)} contract. For a well-formed record it guards against
+ * redelivery with the {@link Inbox} (keyed by {@code ce_source} plus {@code ce_id} — an id is
+ * unique only within the source that minted it); otherwise it resolves the {@code ce_type} (type,
  * version) pair to a local class via the {@link IntegrationEventCatalog} — never loading the
  * producer's class by name, dead-lettering an unknown pair — reconstructs the {@link EventEnvelope}
  * from the {@code ce_} headers and JSON payload, and republishes the envelope through Spring's
@@ -115,11 +116,16 @@ public class KafkaIntegrationEventListener {
     if (skippableAsUnhandled(record)) {
       return;
     }
-    // ce_id is a required CloudEvents attribute and the inbox key. A record without
+    // ce_id is a required CloudEvents attribute and half of the inbox key. A record without
     // it cannot be deduplicated; fabricating an id would make every redelivery look
     // like a new event and silently defeat the inbox — so reject it (permanent
     // failure -> dead-letter) rather than invent identity.
     String eventId = require(record, IntegrationEventHeaders.ID);
+    // The other half: ce_id is unique only WITHIN its source, so the inbox keys on the pair.
+    // Read it here, before the dedup check, rather than only in reconstruct() below — keying on
+    // the id alone would let one producer's id mask a different event carrying the same id from
+    // another producer, dropping it as a phantom duplicate.
+    String source = require(record, IntegrationEventHeaders.SOURCE);
     // Bind the event's tenant for the whole transaction — the inbox dedup row, the ACL adapter, and
     // the command it issues — before anything touches the database. The tenant travels in
     // ce_tenantid (absent on pre-tenancy messages -> root sentinel); reconstruct reads the same
@@ -130,10 +136,10 @@ public class KafkaIntegrationEventListener {
     TenantContext.runAs(
         Tenants.fromValue(tenantId),
         () -> {
-          if (inbox != null && inbox.alreadyProcessed(eventId)) {
+          if (inbox != null && inbox.alreadyProcessed(source, eventId)) {
             return;
           }
-          EventEnvelope<IntegrationEvent> envelope = reconstruct(record, eventId);
+          EventEnvelope<IntegrationEvent> envelope = reconstruct(record, eventId, source);
           // Carry the payload's concrete type so listeners typed EventEnvelope<TheEvent>
           // match despite erasure.
           ResolvableType type =
@@ -173,13 +179,13 @@ public class KafkaIntegrationEventListener {
   }
 
   private EventEnvelope<IntegrationEvent> reconstruct(
-      ConsumerRecord<String, String> record, String eventId) {
+      ConsumerRecord<String, String> record, String eventId, String source) {
     // Validate the required CloudEvents attributes up front; a malformed one is a
     // permanent failure (dead-lettered), not a fabricated default or a retried parse.
+    // ce_id and ce_source are already validated by the caller — they are the inbox key.
     String type = require(record, IntegrationEventHeaders.TYPE);
     requireSpecVersion(record);
     int version = requireVersion(record);
-    String source = require(record, IntegrationEventHeaders.SOURCE);
     Instant occurredAt = occurredAt(record);
     Class<? extends IntegrationEvent> eventType =
         catalog

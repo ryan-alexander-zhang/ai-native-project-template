@@ -35,9 +35,10 @@ class InboxMybatisPlusTest {
 
   @Test
   void recordsFirstKeyThenDetectsDuplicate() {
-    assertFalse(inbox.alreadyProcessed("k1"), "first delivery should be new");
-    assertTrue(inbox.alreadyProcessed("k1"), "redelivery of the same key should be detected");
-    assertFalse(inbox.alreadyProcessed("k2"), "a different key should be new");
+    assertFalse(inbox.alreadyProcessed("shop", "k1"), "first delivery should be new");
+    assertTrue(
+        inbox.alreadyProcessed("shop", "k1"), "redelivery of the same key should be detected");
+    assertFalse(inbox.alreadyProcessed("shop", "k2"), "a different key should be new");
   }
 
   @Test
@@ -45,11 +46,26 @@ class InboxMybatisPlusTest {
     MybatisPlusInbox serviceA = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a");
     MybatisPlusInbox serviceB = new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b");
 
-    assertFalse(serviceA.alreadyProcessed("evt-1"), "first delivery to service-a is new");
-    assertTrue(serviceA.alreadyProcessed("evt-1"), "redelivery to service-a is a duplicate");
+    assertFalse(serviceA.alreadyProcessed("shop", "evt-1"), "first delivery to service-a is new");
+    assertTrue(
+        serviceA.alreadyProcessed("shop", "evt-1"), "redelivery to service-a is a duplicate");
     assertFalse(
-        serviceB.alreadyProcessed("evt-1"),
+        serviceB.alreadyProcessed("shop", "evt-1"),
         "the same message id under a different consumer must be handled independently");
+  }
+
+  @Test
+  void dedupIsScopedPerSource() {
+    // A message id is unique only within the source that minted it (CloudEvents: ce_id is
+    // scoped by ce_source). Two producers using per-source sequence numbers will both emit
+    // "1" — deduplicating on the id alone would drop the second as a phantom duplicate and
+    // lose it with no error, no dead letter and no log.
+    assertFalse(inbox.alreadyProcessed("billing", "1"), "billing's first message is new");
+    assertFalse(
+        inbox.alreadyProcessed("shipping", "1"),
+        "the same id from a DIFFERENT source is a different message and must still be handled");
+    assertTrue(inbox.alreadyProcessed("billing", "1"), "billing's own redelivery is a duplicate");
+    assertTrue(inbox.alreadyProcessed("shipping", "1"), "shipping's own redelivery is a duplicate");
   }
 
   @Test
@@ -60,11 +76,13 @@ class InboxMybatisPlusTest {
   @Test
   void idBasedAccessDoesNotSilentlyIgnoreTheConsumerScope() {
     // Two consumers recorded the same producer-assigned message id.
-    new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a").alreadyProcessed("evt-1");
-    new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b").alreadyProcessed("evt-1");
+    new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-a")
+        .alreadyProcessed("shop", "evt-1");
+    new MybatisPlusInbox(inboxMapper, Clock.systemUTC(), "service-b")
+        .alreadyProcessed("shop", "evt-1");
     assertEquals(2L, inboxMapper.selectCount(null), "each consumer has its own dedup row");
 
-    // The record's identity is the composite (consumer, message_key); message_key alone is
+    // The record's identity is the composite (consumer, source, message_key); message_key alone is
     // NOT a unique id. BaseMapper's id-based methods must therefore not be usable to address
     // a row by message_key — otherwise deleteById("evt-1") would wipe BOTH consumers' rows,
     // silently clobbering another service's dedup state.

@@ -317,11 +317,13 @@ class KafkaIntegrationEventListenerTest {
   }
 
   static final class InMemoryInbox implements Inbox {
-    private final Set<String> seen = new HashSet<>();
+    // Keyed by the (source, key) pair, like the real adapters: a stub that deduplicated on the
+    // key alone would hide exactly the cross-source collision the pair exists to prevent.
+    private final Set<List<String>> seen = new HashSet<>();
 
     @Override
-    public boolean alreadyProcessed(String messageKey) {
-      return !seen.add(messageKey);
+    public boolean alreadyProcessed(String source, String messageKey) {
+      return !seen.add(List.of(source, messageKey));
     }
   }
 }

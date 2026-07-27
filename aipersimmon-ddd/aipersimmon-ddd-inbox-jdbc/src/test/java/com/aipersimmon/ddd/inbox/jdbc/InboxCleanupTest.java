@@ -35,8 +35,10 @@ class InboxCleanupTest {
 
   private void insert(String messageKey, Instant processedAt) {
     jdbc.update(
-        "INSERT INTO aipersimmon_inbox (consumer, message_key, processed_at) VALUES (?, ?, ?)",
+        "INSERT INTO aipersimmon_inbox (consumer, source, message_key, processed_at)"
+            + " VALUES (?, ?, ?, ?)",
         "svc",
+        "producer",
         messageKey,
         Timestamp.from(processedAt));
   }

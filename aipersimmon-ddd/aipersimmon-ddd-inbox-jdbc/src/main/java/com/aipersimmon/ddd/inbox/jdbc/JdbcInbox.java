@@ -11,7 +11,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * Records handled message keys in the inbox table, scoped to a configured {@code consumer} (this
  * application's identity), so several services sharing one inbox table do not suppress one
- * another's processing of the same producer-assigned message id.
+ * another's processing of the same producer-assigned message id, and to the message's {@code
+ * source}, so two producers that happen to mint the same id are not mistaken for one another.
  *
  * <p>It checks for the key first and only inserts when absent. Doing the read first keeps the
  * common redelivery case — the key is already recorded — free of a constraint violation, which
@@ -26,10 +27,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class JdbcInbox implements Inbox {
 
   private static final String EXISTS =
-      "SELECT COUNT(*) FROM aipersimmon_inbox WHERE consumer = ? AND message_key = ?";
+      "SELECT COUNT(*) FROM aipersimmon_inbox"
+          + " WHERE consumer = ? AND source = ? AND message_key = ?";
   private static final String INSERT =
-      "INSERT INTO aipersimmon_inbox (consumer, message_key, tenant_id, processed_at)"
-          + " VALUES (?, ?, ?, ?)";
+      "INSERT INTO aipersimmon_inbox (consumer, source, message_key, tenant_id, processed_at)"
+          + " VALUES (?, ?, ?, ?, ?)";
 
   private final JdbcTemplate jdbc;
   private final Clock clock;
@@ -42,16 +44,16 @@ public class JdbcInbox implements Inbox {
   }
 
   @Override
-  public boolean alreadyProcessed(String messageKey) {
-    Integer count = jdbc.queryForObject(EXISTS, Integer.class, consumer, messageKey);
+  public boolean alreadyProcessed(String source, String messageKey) {
+    Integer count = jdbc.queryForObject(EXISTS, Integer.class, consumer, source, messageKey);
     if (count != null && count > 0) {
       return true;
     }
     // The tenant is bound ambiently by the consume boundary (e.g. the Kafka listener's runAs);
     // absent that, a single-tenant caller records the root sentinel. Data column only — dedup is
-    // still keyed by (consumer, message_key).
+    // still keyed by (consumer, source, message_key).
     String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
-    jdbc.update(INSERT, consumer, messageKey, tenant, Timestamp.from(clock.instant()));
+    jdbc.update(INSERT, consumer, source, messageKey, tenant, Timestamp.from(clock.instant()));
     return false;
   }
 }

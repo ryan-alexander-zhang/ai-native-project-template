@@ -2,7 +2,7 @@
 id: issue-00048-inbox-dedup-key-omits-cloudevents-source
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00006-middleware-integration
 ---
 
@@ -44,3 +44,43 @@ parent: plan-00006-middleware-integration
 
 - [[plan-00006-middleware-integration]]
 - [[decision-00014-cloudevents-integration-event-contract]](CloudEvents:id 同源唯一,id+source 全局唯一)
+
+## 核查结论(在当前 HEAD 复核)
+
+**确认成立。** 逐条复核无误:`Inbox.alreadyProcessed(String messageKey)` 只收一个键;三方言 DDL 主键均为
+`PRIMARY KEY (consumer, message_key)`;`JdbcInbox` 的 `WHERE consumer = ? AND message_key = ?`;消费桥用
+`ce_id` 单值调用。所以 A 源的 id `"1"` 落库后,B 源的**不同事件**若 id 也是 `"1"`,查询命中 ⟹ 判重 ⟹
+`onMessage` 直接 return ⟹ **静默丢弃**,无异常、无 DLT、无日志。
+
+还发现一处**文档层面同源错误**:`V2__add_tenant_id.sql` 的注释把 `message_key` 说成
+「producer-assigned, **globally-unique** message id」——正是本 issue 要纠正的那个错误前提,已一并改掉。
+
+## 修复(已实施)
+
+去重键改为 `(consumer, source, message_key)`:
+
+- `Inbox.alreadyProcessed(String source, String messageKey)`——**不留单参重载**:留着就等于把这个 bug
+  作为一条可用路径继续提供。
+- 三方言 V1 迁移加 `source VARCHAR(255) NOT NULL` 并进主键。MySQL 侧核过 InnoDB 3072 字节上限:
+  `(128+255+128) × 4 = 2044`,注释里写明。
+- `JdbcInbox` / `MybatisPlusInbox`(＋`InboxRecord` 新增 `source` 字段)同步。
+- 消费桥把 `require(record, SOURCE)` **提前到去重之前**读取,并传给 `reconstruct` 复用(不重复读 header)。
+  副作用是缺 `ce_source` 的记录现在在**写 inbox 之前**就被判为 malformed → DLT,比之前更干净。
+
+**为什么改 V1 而不是加 V3**:V3 需要在三方言里各自 drop/add 主键,更关键的是**必须给既有行的 `source`
+编造一个值**——而那个值不可知,编出来的行本来也无法正确去重。改 V1 避免伪造数据。框架尚未发布、无使用者,
+Flyway 校验和变更的代价只落在可丢弃的本地库上;这是在「留一段"我们把键搞错了"的永久迁移史」与
+「不伪造数据」之间选了后者。
+
+顺带把 `-inbox-jdbc` / `-inbox-mybatis-plus` 测试里**手工枚举**借用迁移的 `schema-locations` 改成
+`classpath*:.../V*.sql` 模式。这两个模块和 kafka 一样是**借用**它不拥有的 schema,枚举式引用正是
+[[issue-00056-kafka-tests-pin-a-stale-inbox-schema]] 的成因;本次若不改,下一个 V3 会在这里重演。
+
+## 验证结果
+
+两个适配器各新增 `dedupIsScopedPerSource`:同 id 不同 source 的两条**都必须被处理**,各自的重投**都必须被判重**。
+在旧键下第一条断言必然失败——这就是它守护的东西。`KafkaIntegrationEventListenerTest` 的 `InMemoryInbox`
+桩改为按 `(source, key)` 去重:桩若只按 key 去重,就会掩盖这个键存在的全部理由。
+`InboxCleanupTest` 的直插夹具被 `NOT NULL` 逮到并补齐 source——约束按预期发挥了作用。
+
+`-inbox` / `-inbox-jdbc` / `-inbox-mybatis-plus` 全绿;框架全量 `install` 与样例 `verify` 均 BUILD SUCCESS。
