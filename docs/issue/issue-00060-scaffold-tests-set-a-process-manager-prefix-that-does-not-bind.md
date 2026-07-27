@@ -2,7 +2,7 @@
 id: issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -84,7 +84,19 @@ class ProcessManagerPropertyBindingTest {
 
 ## 验证结果
 
-（待填）
+修复提交 `079dbef`。
+
+- **先红**：`BackgroundWorkerControlTest` 按上文写好后，先用样例当时的旧前缀跑一次——
+  `theProcessManagerPrefixBinds` 失败于
+  `expected: <PT1H> but was: <PT0.5S>`，即"键被丢弃、取到 500ms 默认值"，与根因分析一致。
+- **后绿**：前缀改正（库侧 Javadoc + 11 个测试类的 22 行）后，
+  `mvn -f aipersimmon-ddd-scaffold/multi-module/pom.xml verify` **BUILD SUCCESS**，
+  测试计数 314 → 320（新增守卫，既有断言一行未改）；
+  `mvn -f aipersimmon-ddd/pom.xml -pl aipersimmon-ddd-process-manager-engine install` 绿。
+- **静态验证**：`grep -r --include=*.java 'process-manager\.jdbc\.'` 在全仓 0 命中，
+  仅守卫测试的类注释里保留一处对旧前缀的说明性引用。
+- **回归守卫**：`BackgroundWorkerControlTest.WhenTheWorkersAreTurnedOff#theProcessManagerPrefixBinds`
+  ——前缀若再次漂移，它会立刻变红。
 
 ## 关联
 

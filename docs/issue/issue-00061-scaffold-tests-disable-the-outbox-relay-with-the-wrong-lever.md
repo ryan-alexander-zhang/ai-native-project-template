@@ -2,7 +2,7 @@
 id: issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -67,7 +67,23 @@ parent: report-00001-ddd-framework-review
 
 ## 验证结果
 
-（待填）
+修复提交 `079dbef`（与 issue-00060 同批：两者改的是同一批测试类里的同一段属性块，
+拆成两次提交只会产生一个谁也不想要的中间状态）。
+
+- **语义钉死测试两半都绿**：`BackgroundWorkerControlTest`
+  - `WhenTheWorkersAreTurnedOff#theOutboxRelayIsNotScheduled` —— `relay.enabled=false` 下
+    上下文中 `OutboxRelayScheduler` bean 数为 0；
+  - `WhenOnlyTheDelayIsRaised#theOutboxRelayIsStillScheduled` —— 只把 `poll-delay-ms` 提到 1 小时时
+    该 bean **依然存在**。这一半把"delay 控制节奏、不控制开关"从注释变成断言，
+    也正是修复前那 4 个测试类的真实状态。
+- **静态验证**：`grep -r 'poll-delay-ms=3600000'` 在样例代码中只剩守卫测试里那一处**反例**，
+  业务测试中 0 命中。
+- **改法**：4 处 `outbox.poll-delay-ms=3600000` → `outbox.relay.enabled=false`；
+  11 个类里只求"安静"的 `effect-relay` / `deadline-worker` 一并改为 `enabled=false`；
+  7 个确实需要流程快跑完的 e2e 测试保留 `effect-relay.poll-delay=200ms` 与
+  `outbox.poll-delay-ms=200`——那里诉求是节奏，用节奏参数是对的。
+- **全量**：`mvn -f aipersimmon-ddd-scaffold/multi-module/pom.xml verify` **BUILD SUCCESS**，
+  既有断言一行未改仍绿。
 
 ## 关联
 
