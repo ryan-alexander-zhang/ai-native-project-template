@@ -145,7 +145,7 @@ public class AipersimmonDddWebAutoConfiguration {
       name = "enabled",
       havingValue = "true")
   public IdempotencyStore aipersimmonDddIdempotencyStore(ObjectProvider<Clock> clock) {
-    return new InMemoryIdempotencyStore(clock.getIfAvailable(Clock::systemUTC));
+    return new InMemoryIdempotencyStore(clock.getIfUnique(Clock::systemUTC));
   }
 
   @Bean
@@ -183,7 +183,7 @@ public class AipersimmonDddWebAutoConfiguration {
       name = "enabled",
       havingValue = "true")
   public ReplayGuard aipersimmonDddReplayGuard(ObjectProvider<Clock> clock) {
-    return new InMemoryReplayGuard(clock.getIfAvailable(Clock::systemUTC));
+    return new InMemoryReplayGuard(clock.getIfUnique(Clock::systemUTC));
   }
 
   @Bean
@@ -205,7 +205,7 @@ public class AipersimmonDddWebAutoConfiguration {
             verifier,
             replayGuard,
             writer,
-            clock.getIfAvailable(Clock::systemUTC),
+            clock.getIfUnique(Clock::systemUTC),
             config.getTolerance(),
             config.getSignatureHeader(),
             config.getTimestampHeader(),
@@ -226,7 +226,7 @@ public class AipersimmonDddWebAutoConfiguration {
       name = "enabled",
       havingValue = "true")
   public RateLimiter aipersimmonDddRateLimiter(ObjectProvider<Clock> clock) {
-    return new InMemoryRateLimiter(clock.getIfAvailable(Clock::systemUTC));
+    return new InMemoryRateLimiter(clock.getIfUnique(Clock::systemUTC));
   }
 
   @Bean

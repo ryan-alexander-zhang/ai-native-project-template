@@ -18,7 +18,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  * {@code @ConditionalOnMissingBean} on its SPI type, replacing the {@code -web-spring} in-memory
  * default while yielding to a consumer's own bean.
  */
-@AutoConfiguration(after = RedisAutoConfiguration.class)
+// beforeName, not before: this module must not compile against -web-spring-boot-starter. See the
+// same declaration on the JDBC store — without it, this configuration and the web starter's
+// in-memory fallback race to declare the same beans (issue-00062).
+@AutoConfiguration(
+    after = RedisAutoConfiguration.class,
+    beforeName = "com.aipersimmon.ddd.web.spring.AipersimmonDddWebAutoConfiguration")
 public class AipersimmonDddWebStoreRedisAutoConfiguration {
 
   @Bean
