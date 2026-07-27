@@ -2,7 +2,7 @@
 id: issue-00064-a-replayed-idempotent-response-loses-its-location-header
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---
 
@@ -54,15 +54,29 @@ assertNull(retry.getHeaders().getLocation());   // 当前行为
 修复后第二行应改为 `assertEquals(first…, retry…)`；测试里已注明这一点，
 所以修复时不会漏改。
 
-## 修复（建议，未实施）
+## 修复
 
-在写入点保存一份**可回放的 header 白名单**，至少包含 `Location`、`Content-Type`、`ETag`、
-`Content-Language`。不宜整份复制：`Date`、`Set-Cookie`、连接相关的头回放出去是错的，
-而白名单让"哪些头属于响应的语义"成为一个显式决定，而不是一个遗漏。
+在写入点保存一份**可回放的 header 白名单**：`Location`、`Content-Type`、`ETag`、`Content-Language`。
+不整份复制：`Date`、`Set-Cookie`、连接相关的头回放出去是错的，而白名单让"哪些头属于响应的语义"
+成为一个显式决定，而不是一个遗漏。
+
+`IdempotencyFilter` 新增 `REPLAYABLE_HEADERS`（小写比较——header 名不区分大小写）与
+`replayableHeaders(wrapper)`。其中一处不是多余的谨慎：`Content-Type` 仍走 `wrapper.getContentType()`
+单独读，因为 Tomcat 把 content type 存在专门的字段里而**不在** `MimeHeaders` 中，
+只遍历 `getHeaderNames()` 会在真容器上丢掉它（MockMvc 上不会——这正是库内单测看不见的那类差异）。
 
 ## 验证结果
 
-（未修复。当前行为已由 `OrderIdempotencyTest` 钉住，修复时该断言会提示同步更新。）
+**已修复。**
+
+- 库侧 test-first：`IdempotencyFilterTest#aReplayedCreateKeepsTheHeadersThatCarryItsMeaning`
+  （新增 `POST /idem/create` 返回 201 + `Location` + `ETag` + 一个非语义头 `X-Trace-Note`）。
+  修复前红：`Response header 'Location' expected:</idem/3> but was:<null>`；修复后绿。
+  断言同时钉住"白名单之外的头不回放"——否则修复很容易滑成整份复制。
+- 样例侧断言按 issue 里预留的提示同步翻转：`OrderIdempotencyTest` 由 `assertNull(retry…Location)`
+  改为 `assertEquals(first…Location, retry…Location)`，类注释的"rough edge"一节改写为
+  "重放是同一个答复，不只是同一串字节"。
+- 库 BUILD SUCCESS（773 项测试，0 失败）；样例 `verify` BUILD SUCCESS（189 项，0 失败）。
 
 ## 关联
 

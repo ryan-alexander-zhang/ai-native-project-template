@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.store.jdbc.JdbcIdempotencyStore;
@@ -39,12 +38,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * is asserted below, because the alternative — a global key space — would let one tenant's retry
  * suppress another tenant's genuine request.
  *
- * <h2>A rough edge worth knowing (issue-00064)</h2>
+ * <h2>The replay is the same answer, not just the same bytes</h2>
  *
- * <p>The stored response keeps the status, the body and {@code Content-Type} — and nothing else. A
- * replayed {@code 201} therefore arrives <strong>without its {@code Location} header</strong>, so a
- * client that retried cannot learn where its order lives. This test pins that behaviour rather than
- * hiding it: it is the current contract, and the sample should not pretend otherwise.
+ * <p>A retried {@code POST /orders} comes back with its {@code Location} intact, so the client that
+ * never saw the first response still learns where its order is. That is asserted below because it
+ * used not to hold: the stored response carried {@code Content-Type} alone and a replayed {@code
+ * 201} pointed nowhere (issue-00064).
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -116,11 +115,10 @@ class OrderIdempotencyTest {
         "a retry must not ask inventory to reserve the stock a second time");
 
     assertNotNull(first.getHeaders().getLocation(), "the original response carries Location");
-    // Pinning issue-00064, not endorsing it: the store keeps status, body and Content-Type only,
-    // so the replay loses Location. A client that retried has no way to find its order.
-    assertNull(
+    assertEquals(
+        first.getHeaders().getLocation(),
         retry.getHeaders().getLocation(),
-        "if this starts passing Location through, issue-00064 was fixed — update this assertion");
+        "a retry that cannot learn where its order is has only half an answer (issue-00064)");
   }
 
   @Test
