@@ -179,36 +179,15 @@
       <scope>test</scope>
     </dependency>
     <!--
-      Testcontainers @ServiceConnection configs with the image versions the library itself tests
-      against, so the sample's containers cannot drift from them. It covers PostgreSQL (and MySQL,
-      Redis); the Kafka container is still declared by hand in TestInfrastructure because the module
-      has no equivalent for it — see issue-00067.
+      The acceptance tests run against real middleware — PostgreSQL and a Kafka broker — and this one
+      dependency supplies both: @ServiceConnection configs (imported by TestInfrastructure) pinned to
+      the image versions the library itself tests against, plus Testcontainers and
+      spring-boot-testcontainers transitively. Nothing here names a container image or a
+      Testcontainers artifact, so the sample cannot drift from the library's versions.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-test-support</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- Acceptance tests run against a real PostgreSQL via Testcontainers (@ServiceConnection). -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-testcontainers</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>postgresql</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- Acceptance tests exercise the real broker hop over a Kafka container (@ServiceConnection). -->
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>kafka</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
