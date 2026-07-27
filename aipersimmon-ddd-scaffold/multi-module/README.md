@@ -86,6 +86,46 @@ drives inventory and the process manager.
 | Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/.../V1__aggregates.sql` | `OutboxAtomicityTest` |
 | Architecture rules (layering, context isolation, event placement) | `AiPersimmonDddRules` applied over `com.example` | `ArchitectureTest`, `PackageInfoTest` |
 
+## What each capability cost to adopt
+
+This project is also the library's first consumer that assembles the components together, so what it
+cost to use them is worth recording. "Lines" counts what a consuming project writes, excluding tests
+and comments. "Implicit pairing" is the knowledge you had to already have — the part no dependency
+list tells you.
+
+| Capability | Lines | New concepts | Implicit pairing | Friction found |
+|---|---|---|---|---|
+| Versioned aggregate write | ~0 | — | row implements `VersionedRow` **and** carries `@Version`; table needs `version DEFAULT 1` | none — the base class carries it |
+| Conflict → 409 | 0 | — | none | the lock 409 is `about:blank` with no `code`, while a *domain* 409 is coded: the one a client should retry is the one it cannot recognise |
+| HTTP idempotency | ~8 (yaml) | `Idempotency-Key` | a MyBatis-Plus app still takes a **`-jdbc`** store module; `flyway.components` needs `web-store` | issue-00062, issue-00063 (startup failure), issue-00064 (replay loses `Location`) |
+| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 | issue-00065 (a missing query param was a 500) |
+| Deadlines | ~25 | `DeadlineName`, `ScheduleDeadline`, `CancelDeadline` | arm and cancel on every branch leaving the step; due time must come from `context.now()` | none — this API fits |
+| Dead letters + replay | ~60 | `DeadLetterStore` | none | issue-00066: `replay(eventId)` with no way to obtain an `eventId` |
+| `Specification` | ~30 | `Specification` | keep one statement of the rule, or the answer and the refusal drift | none |
+| Test infrastructure | ~15 | `@ServiceConnection` | — | issue-00067: PostgreSQL/MySQL/Redis are provided, Kafka — the library's own transport — is not |
+
+Three patterns are worth more than the individual rows:
+
+- **Everything above is cheap to write and easy to get subtly wrong.** The line counts are small;
+  the "implicit pairing" column is where the cost actually lives, and no bundle reduces it.
+- **Five of the eight turned up a library defect**, all of them invisible to the library's own tests
+  — each of its modules is tested alone, so a defect that needs several components assembled, or an
+  endpoint with a query parameter, or an operator who does not already know an id, cannot appear
+  there. This project is where they appear.
+- **The two rows with no friction are the two whose API was designed around the failure mode**
+  (deadlines: a timer is an ordinary input; specification: answering is a different job from
+  refusing) rather than around the happy path.
+
+## Not demonstrated here, on purpose
+
+| | Why |
+|---|---|
+| The JDBC stack (`-starter-jdbc`, `-persistence-jdbc`, …) | A second backend would double the build for a story already told. `CHOOSING-MODULES.md` presents it as an equal path; only this one has a worked example. |
+| Redis web stores, rate limiting, replay protection | Idempotency already demonstrates the edge-store wiring; the other two differ only in what they count. |
+| `sendAs` / `publishAs` | The replay path preserves identity structurally — the row keeps its id — so nothing here needed the explicit carry-an-existing-identity entry points. They remain unexercised. |
+| A second topology (modulith, microservice) | Dropped in `605fab3`; the transport story is the same one, packaged differently. |
+| `instance.max-lifetime` | See "Known demo gaps" below. |
+
 Try it: `SKU-RESTRICTED` is on the review watchlist (`ManualReviewPolicy`), so an order containing it
 is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it — see `ReviewFlowTest`.
 

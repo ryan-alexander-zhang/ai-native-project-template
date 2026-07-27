@@ -2,7 +2,7 @@
 id: plan-00015-scaffold-depth-and-evaluability
 type: plan
 role: main
-status: open
+status: resolved
 parent: report-00001-ddd-framework-review
 ---
 
@@ -233,6 +233,73 @@ stateDiagram-v2
 `docs` (本批文档) → `fix(scaffold)` E1 → `fix(scaffold)` E2 → `docs(scaffold)` E3 →
 `test(scaffold)` F1 → `feat(scaffold)` F2 → `feat(scaffold)` F3 → `feat(scaffold)` F4 →
 `feat(scaffold)` F5 → `feat(scaffold)` F6 → `refactor(scaffold)` G2 → `docs(scaffold)` G1+G3 → `docs` G4。
+
+## 七、完成记录
+
+三个批次全部完成。样例测试 **314 → 378**，既有断言一行未改；库 1528 项全绿。
+
+| 批次 | commit | 结果 |
+| --- | --- | --- |
+| E1+E2 | `079dbef` | 11 个测试类的死配置键修正（含库侧矛盾 Javadoc）+ 4 处 `poll-delay` 改 `enabled=false`；新增 `BackgroundWorkerControlTest` 钉死两条语义 |
+| E3 | `8a3dc5b` | 两处悬空引用 |
+| F1 | `1ec177d` | 并发审批 → 409：**plan-00013 阶段验收第 3 条在样例侧闭合** |
+| F2 | `f8f099d` `f32830c` | 下单幂等；先修两个库侧缺陷才落得下来 |
+| F3 | `2a0988c` `02e26ea` | 游标分页 + 真读模型；顺带修 issue-00065 |
+| F4 | `b708f6d` | 付款超时 deadline |
+| F5 | `b369f41` | 死信列表与重放（运维端点） |
+| F6 | `2b541cd` | `Specification` 与自助取消 |
+| G | 本批 | 能力矩阵 + 人体工学账本 + test-support + 生产 posture |
+
+### 摩擦点清单（G4）——本 plan 的主要产出
+
+在样例里真的去用每一条能力，共发现 **6 个库侧缺陷**（4 个已修）与 1 个样例缺陷：
+
+| id | 摘要 | 状态 |
+| --- | --- | --- |
+| [[issue-00062-web-store-module-does-not-displace-the-in-memory-stores]] | 后端 store 与内存兜底之间没有排序边——issue-00044 的同构副本 | 已修 |
+| [[issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist]] | `getIfAvailable` 用在多候选处 → 开幂等即启动失败 | 已修 |
+| [[issue-00064-a-replayed-idempotent-response-loses-its-location-header]] | 重放的 201 丢 `Location` | open |
+| [[issue-00065-a-missing-request-parameter-is-reported-as-a-server-error]] | 参数绑定失败不在 4xx 覆盖内 → 500 | 已修 |
+| [[issue-00066-dead-letter-store-can-replay-but-cannot-be-read]] | `replay(eventId)` 而拿不到 `eventId` | open |
+| [[issue-00067-test-support-covers-every-store-except-the-transport]] | 测试模块没有 Kafka——库自己的传输 | open |
+
+**它们的共同点，就是这个 plan 想证明的那件事**：没有一个需要更多单元测试才能发现。库的每个模块单测
+只装配自己那一个组件——于是「两个自动配置同时在场」「容器里有 5 个 `Clock`」「端点带查询参数」
+「运维手上没有 id」这些前提在库内**结构上不可能出现**。发现它们需要的不是更严的测试，
+而是一个把组件装齐并真的去用的消费方。
+
+另外两条不够格立 issue、但记在账本里的采纳摩擦：
+- 乐观锁 409 是 `about:blank` 无 `code`，而领域 409 有——**该重试的那个反而不可识别**。
+- 共享 SpotBugs 过滤器按类名逐条豁免库自己的类，**消费方无法扩展**；样例改用 mapper 绕开
+  （见 `DeadLetterMapper`），但下一个持有注入 `JdbcTemplate` 的消费方会再撞一次。
+
+### 偏差记录（5 处）
+
+1. **铁律 3 被有意突破一次，经确认**。F2 被 issue-00062/00063 完全堵死，只立 issue 就意味着
+   幂等这条能力继续没有样例。经确认后修库（两处均为装配修正，未动公开 API），F2 才落地。
+   issue-00065 的修复沿用同一判断：新端点最常见的客户端错误渲染成 500，不能带着交付。
+2. **E1 与 E2 合并为一个 commit**。两者改的是同一批 11 个测试类里的同一段属性块，
+   拆开只会产生一个谁也不想要的中间状态。已记录在 issue-00061。
+3. **`sendAs` / `publishAs` 仍无样例**。F5 原本打算用它演示「重放保持消息身份」，但
+   `DeadLetterStore.replay` 是**把原行搬回去**——身份是结构性保持的，不经过这对入口。
+   强行造一个用例只会是为演示而演示。已列入 README 的「不演示 + 原因」。
+4. **`instance.max-lifetime` 未 armed**。给它接线要先决定「在任意步骤超期的订单该做什么」——
+   从不确定的步骤补偿，还是挂起等人工。那是设计决定，不是接线练习；README 改成说明原因，
+   而不再列为「未完成」。
+5. **G2 只完成一半**。`-test-support` 没有 Kafka，样例仍自己声明容器（issue-00067）。
+   PostgreSQL 已改由模块提供，镜像版本因此不再由样例自己钉。
+
+### 阶段验收对照
+
+1. 回流缺口清零 ✅ —— 代码中 `process-manager.jdbc.` 0 命中，`poll-delay-ms=3600000` 仅剩守卫测试的反例。
+2. 冲突链路端到端闭合 ✅ —— `ConcurrentApprovalTest`，且断言钉住是**乐观锁那一种** 409。
+3. README 的每条约定都有代码 ✅ —— 除 `sendAs`/`publishAs`，已在「不演示 + 原因」中列明。
+4. 人体工学账本存在且填满 ✅ —— 样例 README「What each capability cost to adopt」。
+5. 生产检查清单 7/7 可见 ✅ —— `application.yml` 对 7 条各有显式设置或显式取舍注释。
+6. 既有行为无回归 ✅ —— 起点的 314 项一行未改仍绿。
+7. CI 绿 ✅ —— 本地按 CI 同一命令（库 `install` + 样例 `verify`）全绿。
+8. 文档闭环 ✅ —— issue-00060/00061 转 `resolved`；00062/00063/00065 已修并记录验证；
+   00064/00066/00067 保持 `open` 并在代码注释中被指向。
 
 ## 关联
 

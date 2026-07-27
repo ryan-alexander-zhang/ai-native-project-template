@@ -178,6 +178,17 @@
       <artifactId>aipersimmon-ddd-archunit</artifactId>
       <scope>test</scope>
     </dependency>
+    <!--
+      Testcontainers @ServiceConnection configs with the image versions the library itself tests
+      against, so the sample's containers cannot drift from them. It covers PostgreSQL (and MySQL,
+      Redis); the Kafka container is still declared by hand in TestInfrastructure because the module
+      has no equivalent for it — see issue-00067.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Acceptance tests run against a real PostgreSQL via Testcontainers (@ServiceConnection). -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

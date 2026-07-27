@@ -98,6 +98,34 @@ aipersimmon:
       kafka:
         consumer:
           enabled: true
+    # The transactional outbox. Two settings here are the ones CONFIGURATION.md's production
+    # checklist asks to be decided rather than inherited:
+    #
+    #   - the lease budget: a whole poll of stalled sends must not outlive the ShedLock lease, or a
+    #     second instance starts dispatching the same rows. batch-size (100) x
+    #     messaging.kafka.producer.send-timeout-ms (30s default) = 50 minutes, which is under the
+    #     60-minute lease — so the shipped arithmetic holds. Raising batch-size means raising
+    #     lock-at-most-for with it.
+    #   - cleanup: on, because a sent row has no further purpose and an outbox that only grows
+    #     eventually makes the unsent-row scan slower for no benefit. Seven days of retention is
+    #     long enough to answer "did we send it?" during an incident. Leaving it off is a valid
+    #     choice too — what is not valid is never having read the question.
+    outbox:
+      batch-size: 100
+      relay:
+        lock-at-most-for: PT60M
+      cleanup:
+        enabled: true
+        retention-seconds: 604800
+    # The consumer inbox. Retention must exceed the longest redelivery a broker can produce, or a
+    # very late duplicate is processed a second time — the one thing the inbox exists to prevent.
+    # Thirty days comfortably covers Kafka's default seven-day topic retention: a consumer group
+    # reset to the earliest offset replays everything still on the topic, and every one of those
+    # records must still be recognised.
+    inbox:
+      cleanup:
+        enabled: true
+        retention-seconds: 2592000
     # The durable process manager. deadline-worker.poll-delay is how often due timers are looked
     # for, so it bounds how late a timeout fires — the order-fulfilment flow arms a PAYMENT
     # deadline while it waits for the payment context (see OrderFulfilmentDefinition). The worker
