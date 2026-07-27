@@ -1,5 +1,6 @@
 package com.example;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -152,10 +153,22 @@ class ExceptionContractTest {
 
   @Test
   void wrongMethodRenders405NotFallback500() throws Exception {
-    // /orders is mapped for POST only; a GET is a method mismatch → 405, not 500 (issue-00045).
-    mvc.perform(get("/orders").header("X-Tenant-Id", TENANT))
+    // /orders is mapped for POST (place) and GET (list) but not DELETE → 405, not 500
+    // (issue-00045).
+    mvc.perform(delete("/orders").header("X-Tenant-Id", TENANT))
         .andExpect(status().isMethodNotAllowed())
         .andExpect(jsonPath("$.status").value(405));
+  }
+
+  @Test
+  void aMissingQueryParameterRenders400NotFallback500() throws Exception {
+    // GET /orders requires customerId. Omitting it is a client mistake and must render 400
+    // (issue-00065); it used to reach the catch-all and come back as 500, telling the caller to
+    // retry a request that can never succeed.
+    mvc.perform(get("/orders").header("X-Tenant-Id", TENANT))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+        .andExpect(jsonPath("$.status").value(400));
   }
 
   @Test

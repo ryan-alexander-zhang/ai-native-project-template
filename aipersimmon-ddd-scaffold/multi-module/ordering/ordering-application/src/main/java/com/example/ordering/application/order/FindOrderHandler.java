@@ -10,9 +10,12 @@ import org.springframework.stereotype.Component;
 
 /**
  * Answers {@link FindOrder} with an {@link OrderSnapshot}. Kept minimal: it loads the aggregate and
- * maps it, which is the right trade for a single-order read whose shape follows the aggregate's. A
- * query that diverges from that shape — a list, a projection joining other tables — should instead
- * read the tables directly and never rehydrate an aggregate it does not intend to change.
+ * maps it, which is the right trade for a single-order read whose shape follows the aggregate's.
+ *
+ * <p>A query that diverges from that shape reads the tables instead — see {@link OrderQueries} and
+ * {@link FindCustomerOrders}, where a page of orders is one join with the totals summed in SQL.
+ * Rehydrating fifty aggregates to render a list rebuilds fifty sets of lines and invariants that a
+ * read is never going to use.
  */
 @Component
 public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderSnapshot>> {

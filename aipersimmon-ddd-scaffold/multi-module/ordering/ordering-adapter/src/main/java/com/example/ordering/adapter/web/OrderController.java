@@ -2,8 +2,12 @@ package com.example.ordering.adapter.web;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.aipersimmon.ddd.cqrs.page.Cursor;
+import com.aipersimmon.ddd.cqrs.page.Slice;
 import com.example.ordering.application.order.ApproveReview;
+import com.example.ordering.application.order.FindCustomerOrders;
 import com.example.ordering.application.order.FindOrder;
+import com.example.ordering.application.order.OrderListItem;
 import com.example.ordering.application.order.OrderSnapshot;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -71,6 +76,25 @@ public class OrderController {
           String id) {
     commandBus.send(new ApproveReview(id));
     return ResponseEntity.noContent().build();
+  }
+
+  // Cursor paging, not page numbers: nextCursor is opaque and the client echoes it back verbatim,
+  // which is what lets the server change how positions are encoded without breaking callers. A
+  // response with no nextCursor is the last page.
+  @Operation(summary = "List a customer's orders, newest first")
+  @ApiResponse(responseCode = "200", description = "A page of the customer's orders.")
+  @GetMapping
+  public Slice<OrderListItem> list(
+      @Parameter(description = "Customer whose orders to list.", example = "CUST-1") @RequestParam
+          String customerId,
+      @Parameter(description = "Cursor from the previous page; omit for the first page.")
+          @RequestParam(required = false)
+          String cursor,
+      @Parameter(description = "Page size; clamped by the handler.", example = "20")
+          @RequestParam(defaultValue = "20")
+          int size) {
+    return queryBus.ask(
+        new FindCustomerOrders(customerId, cursor == null ? null : Cursor.of(cursor), size));
   }
 
   // The 200 body is the OrderSnapshot read model, a presentation-facing projection that documents
