@@ -39,6 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -149,6 +150,27 @@ class WebLayerTest {
     mvc.perform(get("/test/not-found")).andExpect(status().isNotFound());
   }
 
+  /**
+   * A missing or unconvertible request parameter is the client's mistake, not the server's
+   * (issue-00065). Before this was handled it fell through to the catch-all and came back as 500,
+   * which tells the caller to retry a request that can never succeed.
+   */
+  @Test
+  void aMissingRequiredParameterIs400NotAServerError() throws Exception {
+    mvc.perform(get("/test/list").param("size", "10"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value(notNullValue()));
+  }
+
+  @Test
+  void anUnconvertibleParameterIs400NotAServerError() throws Exception {
+    mvc.perform(get("/test/list").param("customerId", "CUST-1").param("size", "many"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
   @Test
   void sliceSerializesCursorAsOpaqueString() throws Exception {
     mvc.perform(get("/test/slice"))
@@ -244,6 +266,11 @@ class WebLayerTest {
     @GetMapping("/test/not-found")
     String notFound() {
       throw new NoSuchElementException("nope");
+    }
+
+    @GetMapping("/test/list")
+    String list(@RequestParam String customerId, @RequestParam int size) {
+      return customerId + ":" + size;
     }
 
     @GetMapping("/test/slice")

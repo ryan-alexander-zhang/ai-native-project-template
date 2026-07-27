@@ -14,9 +14,11 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestValueException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -147,6 +149,18 @@ public class AipersimmonDddWebExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ProblemDetail handleNotReadable(HttpMessageNotReadableException ex) {
     return factory.simple(HttpStatus.BAD_REQUEST, "Malformed request body.", List.of());
+  }
+
+  /**
+   * A required query, header or path parameter is missing, or one cannot be converted to the type
+   * the endpoint declares → 400 (issue-00065). Omitting {@code ?customerId=} or sending {@code
+   * ?size=many} is a client mistake in exactly the way a malformed body is; without this it reached
+   * the catch-all below and was reported as a server error, telling the caller to retry something
+   * that will never succeed.
+   */
+  @ExceptionHandler({MissingRequestValueException.class, MethodArgumentTypeMismatchException.class})
+  public ProblemDetail handleBadRequestParameter(Exception ex) {
+    return factory.simple(HttpStatus.BAD_REQUEST, ex.getMessage(), List.of());
   }
 
   @ExceptionHandler(Exception.class)
