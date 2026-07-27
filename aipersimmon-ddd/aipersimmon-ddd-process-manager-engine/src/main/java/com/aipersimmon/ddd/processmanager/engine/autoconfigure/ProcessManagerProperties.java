@@ -6,9 +6,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.convert.DurationStyle;
 
 /**
- * Configuration for the JDBC Process Manager runtime, under {@code
- * aipersimmon.ddd.process-manager.jdbc}. {@link #validate()} is called by the auto-configuration so
- * illegal values fail fast at startup rather than misbehaving at runtime.
+ * Configuration for the Process Manager runtime, under {@code aipersimmon.ddd.process-manager} —
+ * the prefix declared below, with no backend segment: these settings are the engine's and apply
+ * whichever store backs it. {@link #validate()} is called by the auto-configuration so illegal
+ * values fail fast at startup rather than misbehaving at runtime.
  */
 @ConfigurationProperties(prefix = "aipersimmon.ddd.process-manager")
 public class ProcessManagerProperties {

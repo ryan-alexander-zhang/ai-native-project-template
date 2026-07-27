@@ -34,9 +34,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(
     properties = {
-      "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=1h",
-      "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
-      "aipersimmon.ddd.outbox.poll-delay-ms=3600000",
+      "aipersimmon.ddd.process-manager.effect-relay.enabled=false",
+      "aipersimmon.ddd.process-manager.deadline-worker.enabled=false",
+      "aipersimmon.ddd.outbox.relay.enabled=false",
     })
 @Import(TestInfrastructure.class)
 class AggregateIdIsTimeOrderedTest {

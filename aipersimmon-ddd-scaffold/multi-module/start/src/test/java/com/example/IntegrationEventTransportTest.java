@@ -38,8 +38,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(
     properties = {
-      "aipersimmon.ddd.process-manager.jdbc.effect-relay.poll-delay=200ms",
-      "aipersimmon.ddd.process-manager.jdbc.deadline-worker.poll-delay=1h",
+      "aipersimmon.ddd.process-manager.effect-relay.poll-delay=200ms",
+      "aipersimmon.ddd.process-manager.deadline-worker.enabled=false",
       "aipersimmon.ddd.outbox.poll-delay-ms=200",
     })
 @Import(TestInfrastructure.class)

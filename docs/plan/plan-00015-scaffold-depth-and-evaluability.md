@@ -214,8 +214,9 @@ stateDiagram-v2
 
 **阶段验收**（缺一不可）：
 
-1. **回流缺口清零**：全仓 grep `process-manager.jdbc.` 与 `poll-delay-ms=3600000` 均 0 命中；
-   两条新增的绑定/语义守卫测试绿。
+1. **回流缺口清零**：全仓**代码**（`--include=*.java`）grep `process-manager.jdbc.` 0 命中，
+   `poll-delay-ms=3600000` 仅剩守卫测试里那一处反例；两条新增的绑定/语义守卫测试绿。
+   （文档侧 issue-00060 / issue-00061 引用这两个字符串作为反例，属预期。）
 2. **冲突链路端到端闭合**：存在一条从并发 HTTP 请求到 409 problem 文档的、被测试覆盖的真实路径
    ——补上 plan-00013 阶段验收第 3 条在样例侧的缺口。
 3. **README 的每条约定都有代码**：`aipersimmon-ddd/README.md` 的"约定"与"可替换的接缝"两节，
