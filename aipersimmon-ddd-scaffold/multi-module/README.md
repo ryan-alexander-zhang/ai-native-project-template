@@ -79,6 +79,7 @@ drives inventory and the process manager.
 | HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-jdbc` on `POST /orders` | `OrderIdempotencyTest` |
 | Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
 | Dead letters and operator replay | `DeadLetterOpsController` (`GET /ops/dead-letters`, `POST /ops/dead-letters/{id}/replay`) | `DeadLetterReplayTest` |
+| `Specification` answers, `Invariant` refuses | `CancellableByCustomer` (on `OrderSnapshot.cancellableByCustomer`) vs `OrderLifecyclePolicy`; `POST /orders/{id}/cancel` | `CancellableByCustomerTest`, `SelfCancelTest` |
 | Business-key idempotency (at-most-once) | `AuthorizePaymentHandler` + `PaymentOperations` port | `AuthorizePaymentIdempotencyTest` |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
 | Web error contract (RFC 9457) | `OrderingProblemCatalog` (composition root) | `ExceptionContractTest` |

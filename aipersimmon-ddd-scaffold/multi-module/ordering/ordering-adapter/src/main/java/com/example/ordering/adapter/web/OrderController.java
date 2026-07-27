@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.cqrs.page.Cursor;
 import com.aipersimmon.ddd.cqrs.page.Slice;
 import com.example.ordering.application.order.ApproveReview;
+import com.example.ordering.application.order.CancelOwnOrder;
 import com.example.ordering.application.order.FindCustomerOrders;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderListItem;
@@ -75,6 +76,27 @@ public class OrderController {
           @PathVariable
           String id) {
     commandBus.send(new ApproveReview(id));
+    return ResponseEntity.noContent().build();
+  }
+
+  // The customer's own cancellation, as opposed to the compensating one the fulfilment process
+  // manager issues with evidence. Whether it is still allowed is answered in advance on the order
+  // snapshot (cancellableByCustomer), so a client can offer or hide the action; this endpoint is
+  // where the aggregate decides for real, and refuses with the reason if the window has closed or
+  // the caller does not own the order.
+  @Operation(summary = "Cancel your own order, while it may still be cancelled")
+  @ApiResponse(responseCode = "204", description = "Cancelled.")
+  @PostMapping("/{id}/cancel")
+  public ResponseEntity<Void> cancel(
+      @Parameter(description = "Identifier of the order to cancel.") @PathVariable String id,
+      @Parameter(
+              description =
+                  "The requesting customer. A real deployment takes this from the authenticated"
+                      + " principal, never from the client.",
+              example = "CUST-1")
+          @RequestParam
+          String customerId) {
+    commandBus.send(new CancelOwnOrder(id, customerId));
     return ResponseEntity.noContent().build();
   }
 

@@ -82,14 +82,29 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
         factContext("confirmed", orderId));
   }
 
+  /**
+   * Unlike the other two facts, this one can legitimately arrive for an order that has no flow at
+   * all: a customer cancelling before fulfilment starts, or a review rejection. Those orders never
+   * reached {@code READY_FOR_FULFILMENT}, so no instance was ever started, and there is nothing to
+   * advance — the cancellation is the whole story. Demanding an instance here would turn an
+   * ordinary business outcome into a 500.
+   */
   @Override
   public void orderCancelled(String orderId) {
-    handle(
-        orderId,
-        new OrderFulfilmentInput.OrderCancelled(orderId),
-        factContext("cancelled", orderId));
+    query
+        .findRef(TYPE, new ProcessBusinessKey(orderId))
+        .ifPresent(
+            ref ->
+                runtime.handle(
+                    ref,
+                    new OrderFulfilmentInput.OrderCancelled(orderId),
+                    factContext("cancelled", orderId)));
   }
 
+  /**
+   * For a fact that can only exist because a flow produced it. A missing instance is then a wiring
+   * defect, not a business case, and failing loudly is the point.
+   */
   private void handle(String orderId, ProcessInput input, CommandContext cause) {
     ProcessRef ref =
         query

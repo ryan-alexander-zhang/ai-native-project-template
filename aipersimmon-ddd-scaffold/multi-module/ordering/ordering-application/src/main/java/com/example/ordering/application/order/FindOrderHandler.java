@@ -1,6 +1,7 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.QueryHandler;
+import com.example.ordering.domain.order.CancellableByCustomer;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.Orders;
@@ -33,11 +34,16 @@ public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderS
 
   private static OrderSnapshot toSnapshot(Order order) {
     Money total = order.total();
+    // The specification answers here so the caller does not have to attempt the cancellation to
+    // find out whether it would be allowed. The aggregate still decides at the moment of the
+    // write — this is advice, not authorisation.
+    boolean cancellable = new CancellableByCustomer(order.customerId()).isSatisfiedBy(order);
     return new OrderSnapshot(
         order.id().value(),
         order.customerId().value(),
         order.status().name(),
         total.amountMinor(),
-        total.currency());
+        total.currency(),
+        cancellable);
   }
 }

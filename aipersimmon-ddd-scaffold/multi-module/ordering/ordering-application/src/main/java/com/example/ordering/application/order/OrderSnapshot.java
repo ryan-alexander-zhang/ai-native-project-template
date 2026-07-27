@@ -15,4 +15,11 @@ public record OrderSnapshot(
             description = "Order total in the currency's minor unit (e.g. cents/fen).",
             example = "3998")
         long totalMinor,
-    @Schema(description = "ISO-4217 currency code.", example = "CNY") String currency) {}
+    @Schema(description = "ISO-4217 currency code.", example = "CNY") String currency,
+    @Schema(
+            description =
+                "Whether the owning customer may still cancel this order themselves. Answered by"
+                    + " the CancellableByCustomer specification, so a client can decide whether to"
+                    + " offer the action instead of attempting it and reading the error.",
+            example = "true")
+        boolean cancellableByCustomer) {}

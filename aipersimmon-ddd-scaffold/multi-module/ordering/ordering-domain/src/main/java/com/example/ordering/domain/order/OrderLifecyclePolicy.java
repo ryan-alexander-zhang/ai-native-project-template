@@ -58,8 +58,10 @@ public final class OrderLifecyclePolicy {
     if (!customerId.equals(request.requestedBy())) {
       throw new DomainException(NOT_ORDER_CUSTOMER, "only the order's own customer may cancel it");
     }
-    // The customer's window closes the moment fulfilment starts.
-    if (status != OrderStatus.AWAITING_REVIEW && status != OrderStatus.READY_FOR_FULFILMENT) {
+    // The same statement of the window that CancellableByCustomer answers with, so the question a
+    // client asks and the refusal it would get cannot drift apart. What this adds is the reason:
+    // a specification says no, an invariant says which rule said no.
+    if (!CancellableByCustomer.BEFORE_FULFILMENT.isSatisfiedBy(status)) {
       throw new DomainException(
           CUSTOMER_CANCELLATION_WINDOW_CLOSED,
           "the order has entered fulfilment and can no longer be cancelled by the customer");

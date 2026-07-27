@@ -158,3 +158,10 @@ silo **seam** 预留在范围内（XFR-12），其路由实现不在。
 - 设计：[[design-00009-multi-tenancy-tenant-id]]
 - 术语：`CONTEXT.md` → Multi-Tenancy Language
 - 已对齐：[[spec-00001-operation-log-component]] 等 operation-log 文档哨兵 `GLOBAL` → `__root__`
+
+requireent 001:adfasfadfadsfad
+# Spec
+
+# Plan
+
+# Desing
