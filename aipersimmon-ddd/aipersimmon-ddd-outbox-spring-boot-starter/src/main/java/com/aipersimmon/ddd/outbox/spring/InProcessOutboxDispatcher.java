@@ -39,6 +39,17 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
     this.catalog = catalog;
   }
 
+  /**
+   * In-process delivery is real delivery, but it stops at the JVM boundary: an
+   * {@code @Externalized} event republished here never reaches the broker it names. Saying so lets
+   * the auto-configuration refuse to start such a deployment instead of letting it archive those
+   * events as sent.
+   */
+  @Override
+  public boolean reachesExternalTargets() {
+    return false;
+  }
+
   @Override
   public void dispatch(OutboxMessage message) {
     EventEnvelope<IntegrationEvent> envelope = reconstruct(message);

@@ -87,3 +87,21 @@ topic-per-aggregate/context + 用 `ce_type` 分发(aipersimmon 现状已符合)�
 - [[plan-00006-middleware-integration]]
 - [[design-00006-integration-event-routing]](已解决出站逐事件路由;入站选择性订阅为后续)
 - [[decision-00014-cloudevents-integration-event-contract]](§7 topic 路由的原始扩展点)
+
+## 核查结论(在当前 HEAD 复核):**不是缺陷,保持 open 作为增强路线**
+
+复核了本 issue 的全部事实陈述,**均与 HEAD 一致**:`@KafkaListener(topics = "#{@externalizedRoutes.topics()}")`
+确实订阅外发 topic 全集、单消费组、逐条 `publishEvent` 进程内重投、消费端按类型过滤。
+
+但**这些陈述描述的是一个刻意的设计选择,不是错误行为**:没有事件被丢、被重复投递或被错误路由;代价是
+无关事件的反序列化/带宽,以及无法按 topic 独立调容器。本 issue 自己已把 #1(类型短路)与 #3(并发默认)
+标为**已实现**,并为 #2/#4 给出了**成立的**推迟理由——
+
+- **#2 选择性订阅在单体内无帮助**:单体必须处理全部 BC,少订就是丢事件。价值只在拆服务之后;
+- **#4 per-BC 容器**在"多 BC 同一可部署单元"时才开始值得,而这是消费方的部署形态,不是框架的缺陷。
+
+本轮**不动它**:没有可修的错误,而在没有真实多 BC / 多服务诉求驱动前实现 #2/#4,是给框架加没人要的配置面。
+与本轮修的两个 issue 的区别很清楚——那两个是**静默数据丢失**(修),这个是**尚未需要的隔离能力**(留)。
+
+> 另注:本 issue 提到的"更严重问题"[[issue-00047-systemic-failure-treated-as-poison-dlt-flood]] 已 resolved,
+> 且其可观测性缺口由 [[issue-00057-unlimited-systemic-retry-is-invisible]] 补齐(systemic stall 现在会 WARN)。

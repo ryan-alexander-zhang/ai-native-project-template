@@ -4,9 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Default {@link OutboxDispatcher} that logs each message instead of sending it to a broker, so the
- * outbox works out of the box. Replace it with a broker-backed dispatcher (for example from a
- * messaging starter) by defining your own {@code OutboxDispatcher} bean.
+ * {@link OutboxDispatcher} that logs each message instead of delivering it anywhere, for
+ * smoke-testing the store-and-forward path without a transport. It is <strong>opt-in</strong>
+ * ({@code aipersimmon.ddd.outbox.dispatch=logging}) and not a default: because it returns normally,
+ * the relay marks every row sent, so choosing it discards integration events. Use a messaging
+ * starter, or the in-process republisher, to actually deliver them.
  */
 public class LoggingOutboxDispatcher implements OutboxDispatcher {
 
@@ -21,5 +23,11 @@ public class LoggingOutboxDispatcher implements OutboxDispatcher {
         message.correlationId(),
         message.causationId(),
         message.payload());
+  }
+
+  /** Logging delivers nowhere at all, let alone to an external target. */
+  @Override
+  public boolean reachesExternalTargets() {
+    return false;
   }
 }

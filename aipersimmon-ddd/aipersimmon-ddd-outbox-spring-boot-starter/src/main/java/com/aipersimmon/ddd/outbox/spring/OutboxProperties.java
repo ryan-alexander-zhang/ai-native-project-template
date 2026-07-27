@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.outbox.spring;
 
+import java.util.Set;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -19,9 +20,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * bad value fails startup with a concrete message.
  *
  * <p>The scheduling-annotation knobs ({@code poll-delay-ms}, {@code relay.lock-at-most-for}, {@code
- * relay.lock-name}, {@code cleanup.enabled}) and the {@code dispatch} mode stay as property
- * placeholders on their annotations — annotation attributes cannot read a bound bean — so they are
- * intentionally not mirrored here.
+ * relay.lock-name}, {@code cleanup.enabled}, {@code relay.enabled}) stay as property placeholders
+ * on their annotations — annotation attributes cannot read a bound bean — so they are intentionally
+ * not mirrored here. {@code dispatch} is the exception: the beans still select themselves by
+ * placeholder, but it is bound here as well so that an unrecognised value is rejected outright
+ * instead of matching no bean and surfacing as a missing dependency somewhere downstream.
  */
 @ConfigurationProperties("aipersimmon.ddd.outbox")
 public class OutboxProperties implements InitializingBean {
@@ -32,9 +35,34 @@ public class OutboxProperties implements InitializingBean {
   /** Dispatch attempts before a row is dead-lettered. Must be {@code >= 1}. */
   private int maxAttempts = 10;
 
+  /**
+   * Which built-in dispatcher to use when no messaging starter and no custom {@code
+   * OutboxDispatcher} bean supplies one: {@code in-process} (the default) republishes each relayed
+   * event in process; {@code logging} only logs it and delivers nothing.
+   *
+   * <p>Bound here purely to be validated. The beans select themselves with
+   * {@code @ConditionalOnProperty}, which cannot read a bound bean, but that also means an
+   * unrecognised value quietly matches nothing — leaving no dispatcher at all and failing later as
+   * an unsatisfied dependency of the relay, which reads as a packaging bug rather than a typo. A
+   * transport is chosen by adding a starter, so a plausible guess like {@code dispatch=kafka} lands
+   * exactly here.
+   */
+  private String dispatch = "in-process";
+
+  /**
+   * Allow startup when the application declares {@code @Externalized} events but the active
+   * dispatcher cannot reach an external target — accepting that those events are marked sent
+   * without leaving the process. Off by default: that is silent data loss, and the point of the
+   * guard is that nothing else would reveal it. Switch it on for a deliberately broker-less run.
+   */
+  private boolean allowUnreachableExternalEvents = false;
+
   private final Retry retry = new Retry();
 
   private final Cleanup cleanup = new Cleanup();
+
+  /** The dispatch modes this starter can wire itself; anything else is a configuration error. */
+  private static final Set<String> DISPATCH_MODES = Set.of("in-process", "logging");
 
   @Override
   public void afterPropertiesSet() {
@@ -68,6 +96,16 @@ public class OutboxProperties implements InitializingBean {
               + " the cutoff in the future and deletes still-live rows), got "
               + cleanup.retentionSeconds);
     }
+    if (dispatch == null || !DISPATCH_MODES.contains(dispatch)) {
+      throw new IllegalStateException(
+          "aipersimmon.ddd.outbox.dispatch must be one of "
+              + DISPATCH_MODES
+              + ", got '"
+              + dispatch
+              + "'. A broker transport is not selected here — add its starter (e.g."
+              + " aipersimmon-ddd-messaging-kafka) or define your own OutboxDispatcher bean, and"
+              + " leave this unset.");
+    }
   }
 
   public int getBatchSize() {
@@ -84,6 +122,22 @@ public class OutboxProperties implements InitializingBean {
 
   public void setMaxAttempts(int maxAttempts) {
     this.maxAttempts = maxAttempts;
+  }
+
+  public String getDispatch() {
+    return dispatch;
+  }
+
+  public void setDispatch(String dispatch) {
+    this.dispatch = dispatch;
+  }
+
+  public boolean isAllowUnreachableExternalEvents() {
+    return allowUnreachableExternalEvents;
+  }
+
+  public void setAllowUnreachableExternalEvents(boolean allowUnreachableExternalEvents) {
+    this.allowUnreachableExternalEvents = allowUnreachableExternalEvents;
   }
 
   public Retry getRetry() {

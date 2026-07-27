@@ -12,6 +12,7 @@ import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.spring.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.spring.InProcessOutboxDispatcher;
 import com.aipersimmon.ddd.outbox.spring.IntegrationEventScanner;
+import com.aipersimmon.ddd.outbox.spring.OnExternalizedEventsCondition;
 import com.aipersimmon.ddd.outbox.spring.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

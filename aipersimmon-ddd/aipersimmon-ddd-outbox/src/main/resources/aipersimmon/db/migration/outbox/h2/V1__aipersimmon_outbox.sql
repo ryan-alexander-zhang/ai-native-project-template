@@ -49,7 +49,15 @@ CREATE TABLE IF NOT EXISTS aipersimmon_dead_letter (
     failed_at   TIMESTAMP    NOT NULL
 );
 
--- ShedLock JDBC contract table (single-instance relay). Column names/types are fixed.
+-- ShedLock JDBC contract table, used by the relay and the cleanup job to keep one instance
+-- polling at a time. Deliberately NOT prefixed `aipersimmon_`: this is ShedLock's own default
+-- table name, which is what a consumer's LockProvider already expects, so renaming it would
+-- either need custom withTableName() config or leave an app that already uses ShedLock with two
+-- lock tables. Column names/types are fixed by ShedLock. IF NOT EXISTS is what makes it a shared
+-- table rather than a claimed one: an application (or another library) already managing `shedlock`
+-- is unaffected, and one that is not gets it provisioned here. It rides in the outbox migration
+-- because the outbox is currently the only component that takes a ShedLock lease — the
+-- process-manager leases through its own columns, not ShedLock.
 CREATE TABLE IF NOT EXISTS shedlock (
     name       VARCHAR(64)  NOT NULL,
     lock_until TIMESTAMP    NOT NULL,
