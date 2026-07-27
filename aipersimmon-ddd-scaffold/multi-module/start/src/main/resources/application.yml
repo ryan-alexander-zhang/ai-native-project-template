@@ -123,6 +123,14 @@ aipersimmon:
       enabled: true
       header: X-Tenant-Id
       missing-policy: REJECT
+      # Setting this REPLACES the default, so /actuator/** has to be re-listed. /ops/** is the
+      # operator surface (the dead-letter listing and replay): those rows belong to the deployment,
+      # not to a tenant — the relay scans the outbox tenant-lessly and each row carries its tenant
+      # as data — so requiring a tenant header there would be asking for an answer that has no
+      # meaning. A deployment puts /ops/** behind an operator role instead.
+      exclude-paths:
+        - /actuator/**
+        - /ops/**
       mybatis-plus:
         tenant-tables:
           - customers
