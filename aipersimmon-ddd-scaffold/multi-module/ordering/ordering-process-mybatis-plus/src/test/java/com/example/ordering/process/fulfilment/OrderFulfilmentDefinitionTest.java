@@ -11,7 +11,9 @@ import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
+import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
+import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
@@ -26,8 +28,10 @@ import com.example.ordering.application.order.RequestPayment;
 import com.example.ordering.application.order.RequestStockRelease;
 import com.example.ordering.domain.order.CancellationReason;
 import com.example.ordering.process.fulfilment.OrderFulfilmentState.Step;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -46,7 +50,9 @@ import org.junit.jupiter.api.Test;
 class OrderFulfilmentDefinitionTest {
 
   private static final String ORDER = "order-1";
-  private final OrderFulfilmentDefinition definition = new OrderFulfilmentDefinition();
+  private static final Duration PAYMENT_TIMEOUT = Duration.ofMinutes(2);
+  private final OrderFulfilmentDefinition definition =
+      new OrderFulfilmentDefinition(PAYMENT_TIMEOUT);
 
   // ---------- happy path ----------
 
@@ -63,7 +69,7 @@ class OrderFulfilmentDefinitionTest {
     assertEquals(Step.AWAITING_PAYMENT.name(), decision.step().value());
     assertEquals("res-1", decision.state().reservationId());
 
-    RequestPayment command = assertInstanceOf(RequestPayment.class, onlyCommand(decision));
+    RequestPayment command = assertInstanceOf(RequestPayment.class, dispatchedCommand(decision));
     assertEquals(ORDER, command.orderId());
     // The business idempotency key is the stable identity of the triggering fact (the cause), so a
     // redelivery of the same StockReserved yields the same paymentOperationId (issue-00041).
@@ -81,7 +87,7 @@ class OrderFulfilmentDefinitionTest {
 
     assertEquals(ProcessLifecycle.RUNNING, decision.lifecycle());
     assertEquals(Step.AWAITING_ORDER_CONFIRMATION.name(), decision.step().value());
-    assertInstanceOf(ConfirmOrder.class, onlyCommand(decision));
+    assertInstanceOf(ConfirmOrder.class, dispatchedCommand(decision));
   }
 
   @Test
@@ -99,6 +105,83 @@ class OrderFulfilmentDefinitionTest {
     assertTrue(decision.effects().isEmpty());
   }
 
+  // ---------- the payment deadline ----------
+
+  @Test
+  void reservingStockArmsThePaymentDeadlineAlongsideTheRequest() {
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingStock(),
+            new OrderFulfilmentInput.StockReserved(ORDER, "res-1"),
+            context("msg-reserved", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK));
+
+    // Asking and arming are one decision: the flow can never be left waiting on an answer that
+    // nobody is obliged to send.
+    ScheduleDeadline armed = onlyEffectOfType(decision, ScheduleDeadline.class);
+    assertEquals(OrderFulfilmentDefinition.PAYMENT_DEADLINE, armed.name());
+    // Due time comes from the runtime-supplied now, so the decision is repeatable on redelivery.
+    assertEquals(Instant.EPOCH.plus(PAYMENT_TIMEOUT), armed.dueAt());
+    assertEquals(new OrderFulfilmentInput.PaymentTimedOut(ORDER), armed.input());
+  }
+
+  @Test
+  void anAnsweredPaymentCancelsTheDeadline() {
+    ProcessDecision<OrderFulfilmentState> authorized =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentAuthorized(ORDER),
+            context("msg-auth", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+    ProcessDecision<OrderFulfilmentState> declined =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentDeclined(ORDER, "DECLINED", "over ceiling"),
+            context("msg-declined", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+
+    assertEquals(
+        OrderFulfilmentDefinition.PAYMENT_DEADLINE,
+        onlyEffectOfType(authorized, CancelDeadline.class).name());
+    assertEquals(
+        OrderFulfilmentDefinition.PAYMENT_DEADLINE,
+        onlyEffectOfType(declined, CancelDeadline.class).name());
+  }
+
+  @Test
+  void aTimedOutPaymentCompensatesExactlyAsADeclineDoes() {
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentTimedOut(ORDER),
+            context("msg-timeout", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+
+    assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
+    assertEquals(Step.AWAITING_STOCK_RELEASE.name(), decision.step().value());
+    RequestStockRelease release =
+        assertInstanceOf(RequestStockRelease.class, dispatchedCommand(decision));
+    assertEquals("res-1", release.reservationId(), "the same handle inventory issued");
+    // What distinguishes it afterwards is the recorded code and the evidence, not the path.
+    assertEquals("PAYMENT_TIMEOUT", decision.state().paymentDeclineCode());
+    assertEquals("msg-timeout", decision.state().paymentDeclineEvidenceId());
+    // Nothing to cancel: this decision is the deadline firing.
+    assertNoEffectOfType(decision, CancelDeadline.class);
+  }
+
+  @Test
+  void aTimerThatFiresAfterPaymentAlreadyAnsweredIsIgnored() {
+    OrderFulfilmentState state = awaitingPayment().withStep(Step.AWAITING_ORDER_CONFIRMATION);
+
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            state,
+            new OrderFulfilmentInput.PaymentTimedOut(ORDER),
+            context(
+                "msg-late-timeout", ProcessLifecycle.RUNNING, Step.AWAITING_ORDER_CONFIRMATION));
+
+    // The generation guard should already have stopped it; the step table refuses it as well,
+    // because an ignored late timer must not undo a confirmation.
+    assertEquals(Step.AWAITING_ORDER_CONFIRMATION.name(), decision.step().value());
+    assertTrue(decision.effects().isEmpty());
+  }
+
   // ---------- compensation branches + evidence identity (issue-00042) ----------
 
   @Test
@@ -111,7 +194,7 @@ class OrderFulfilmentDefinitionTest {
 
     assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
     assertEquals(Step.AWAITING_ORDER_CANCELLATION.name(), decision.step().value());
-    CancelOrder cancel = assertInstanceOf(CancelOrder.class, onlyCommand(decision));
+    CancelOrder cancel = assertInstanceOf(CancelOrder.class, dispatchedCommand(decision));
     CancellationReason.InventoryUnavailable reason =
         assertInstanceOf(CancellationReason.InventoryUnavailable.class, cancel.reason());
     // Evidence id is the causing envelope's messageId, not orderId (issue-00042).
@@ -129,7 +212,7 @@ class OrderFulfilmentDefinitionTest {
     assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
     assertEquals(Step.AWAITING_STOCK_RELEASE.name(), decision.step().value());
     RequestStockRelease release =
-        assertInstanceOf(RequestStockRelease.class, onlyCommand(decision));
+        assertInstanceOf(RequestStockRelease.class, dispatchedCommand(decision));
     assertEquals("res-1", release.reservationId());
     // The decline code and the decline event's identity are remembered for the later cancellation.
     assertEquals("DECLINED", decision.state().paymentDeclineCode());
@@ -147,7 +230,7 @@ class OrderFulfilmentDefinitionTest {
 
     assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
     assertEquals(Step.AWAITING_ORDER_CANCELLATION.name(), decision.step().value());
-    CancelOrder cancel = assertInstanceOf(CancelOrder.class, onlyCommand(decision));
+    CancelOrder cancel = assertInstanceOf(CancelOrder.class, dispatchedCommand(decision));
     CancellationReason.PaymentDeclinedAfterStockReleased reason =
         assertInstanceOf(
             CancellationReason.PaymentDeclinedAfterStockReleased.class, cancel.reason());
@@ -179,7 +262,7 @@ class OrderFulfilmentDefinitionTest {
     String failureId =
         ((CancellationReason.InventoryUnavailable)
                 ((CancelOrder)
-                        onlyCommand(
+                        dispatchedCommand(
                             definition.react(
                                 awaitingStock(),
                                 new OrderFulfilmentInput.StockReservationFailed(ORDER, "C", "d"),
@@ -191,7 +274,7 @@ class OrderFulfilmentDefinitionTest {
     CancellationReason.PaymentDeclinedAfterStockReleased decline =
         (CancellationReason.PaymentDeclinedAfterStockReleased)
             ((CancelOrder)
-                    onlyCommand(
+                    dispatchedCommand(
                         definition.react(
                             awaitingStockRelease("id-declined"),
                             new OrderFulfilmentInput.StockReleased(ORDER, "res-1"),
@@ -292,9 +375,34 @@ class OrderFulfilmentDefinitionTest {
     assertTrue(decision.decisionCode().value().startsWith("ignored:"), "ignore is labelled");
   }
 
-  private static Command<?> onlyCommand(ProcessDecision<OrderFulfilmentState> decision) {
-    assertEquals(1, decision.effects().size(), "expected exactly one effect");
-    return assertInstanceOf(DispatchCommand.class, decision.effects().get(0)).command();
+  /**
+   * The one command a decision dispatches. A decision may carry other effects alongside it — the
+   * payment step arms and cancels a deadline — so this selects the dispatch rather than assuming it
+   * is the only effect, while still insisting there is exactly one command.
+   */
+  private static Command<?> dispatchedCommand(ProcessDecision<OrderFulfilmentState> decision) {
+    List<DispatchCommand> dispatches =
+        decision.effects().stream()
+            .filter(DispatchCommand.class::isInstance)
+            .map(DispatchCommand.class::cast)
+            .toList();
+    assertEquals(1, dispatches.size(), "expected exactly one dispatched command");
+    return dispatches.get(0).command();
+  }
+
+  private static <T> T onlyEffectOfType(
+      ProcessDecision<OrderFulfilmentState> decision, Class<T> type) {
+    List<T> matching =
+        decision.effects().stream().filter(type::isInstance).map(type::cast).toList();
+    assertEquals(1, matching.size(), "expected exactly one " + type.getSimpleName());
+    return matching.get(0);
+  }
+
+  private static void assertNoEffectOfType(
+      ProcessDecision<OrderFulfilmentState> decision, Class<?> type) {
+    assertTrue(
+        decision.effects().stream().noneMatch(type::isInstance),
+        "expected no " + type.getSimpleName());
   }
 
   private static OrderFulfilmentState awaitingStock() {

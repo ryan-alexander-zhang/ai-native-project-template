@@ -4,9 +4,12 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
+import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
+import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
+import com.aipersimmon.ddd.processmanager.model.DeadlineName;
 import com.aipersimmon.ddd.processmanager.model.DecisionCode;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
@@ -22,8 +25,10 @@ import com.example.ordering.domain.order.PaymentDeclineRef;
 import com.example.ordering.domain.order.ReservationFailureRef;
 import com.example.ordering.domain.order.StockReleaseRef;
 import com.example.ordering.process.fulfilment.OrderFulfilmentState.Step;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,16 +42,24 @@ import org.springframework.stereotype.Component;
  *
  * <pre>
  *   OrderReadyForFulfilment ─▶ AWAITING_STOCK
- *     StockReserved ─▶ RequestPayment ─▶ AWAITING_PAYMENT
- *       PaymentAuthorized ─▶ ConfirmOrder ─▶ AWAITING_ORDER_CONFIRMATION
+ *     StockReserved ─▶ RequestPayment + arm PAYMENT deadline ─▶ AWAITING_PAYMENT
+ *       PaymentAuthorized ─▶ ConfirmOrder, cancel deadline ─▶ AWAITING_ORDER_CONFIRMATION
  *         OrderConfirmed ─▶ COMPLETED (ORDER_CONFIRMED)
- *       PaymentDeclined  ─▶ COMPENSATING, RequestStockRelease ─▶ AWAITING_STOCK_RELEASE
+ *       PaymentDeclined  ─▶ COMPENSATING, RequestStockRelease, cancel deadline ─▶ AWAITING_STOCK_RELEASE
+ *       PaymentTimedOut  ─▶ COMPENSATING, RequestStockRelease ─▶ AWAITING_STOCK_RELEASE
  *         StockReleased  ─▶ CancelOrder(PaymentDeclinedAfterStockReleased) ─▶ AWAITING_ORDER_CANCELLATION
  *           OrderCancelled ─▶ COMPLETED (ORDER_CANCELLED)
  *     StockReservationFailed ─▶ COMPENSATING, CancelOrder(InventoryUnavailable) ─▶ AWAITING_ORDER_CANCELLATION
  * </pre>
  *
- * It reaches a terminal lifecycle only on {@code OrderConfirmed}/{@code OrderCancelled} — the
+ * <p><strong>A flow that waits must be able to stop waiting.</strong> Payment is the only step
+ * whose answer comes from outside and may simply never arrive, so it is the only step with a timer.
+ * The timeout takes the decline's compensation path unchanged — release the stock, then cancel —
+ * because the customer's position is the same however the payment failed to happen; only the
+ * recorded code differs. Without it, an order whose payment context went quiet holds its stock
+ * forever, and the reservation is invisible to everyone except a stock count that will not add up.
+ *
+ * <p>It reaches a terminal lifecycle only on {@code OrderConfirmed}/{@code OrderCancelled} — the
  * actual outcome — never when a confirm/cancel command is merely dispatched. And compensation is
  * ordered: a payment decline goes through stock release before cancellation, so the
  * evidence-bearing {@link CancellationReason.PaymentDeclinedAfterStockReleased} can only be built
@@ -83,6 +96,27 @@ import org.springframework.stereotype.Component;
 public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilmentState> {
 
   public static final ProcessType PROCESS_TYPE = new ProcessType("ordering.fulfilment");
+
+  /**
+   * The timer armed while payment is outstanding. A name rather than an id: rescheduling the same
+   * name supersedes the previous generation, and cancelling it cancels only the current one, so a
+   * timer that fires just as the answer arrives cannot resurrect a settled flow.
+   */
+  static final DeadlineName PAYMENT_DEADLINE = new DeadlineName("PAYMENT");
+
+  /** Recorded as the decline code when the timer, not the payment context, ended the wait. */
+  static final String PAYMENT_TIMEOUT_CODE = "PAYMENT_TIMEOUT";
+
+  /**
+   * How long payment may take before the flow gives up on it. Held as a field rather than read from
+   * a clock or a property inside {@link #react}, so the decision stays a function of its arguments.
+   */
+  private final Duration paymentTimeout;
+
+  public OrderFulfilmentDefinition(
+      @Value("${ordering.fulfilment.payment-timeout:PT2M}") Duration paymentTimeout) {
+    this.paymentTimeout = paymentTimeout;
+  }
 
   @Override
   public ProcessType processType() {
@@ -136,11 +170,19 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     if (in instanceof OrderFulfilmentInput.StockReserved reserved) {
       String orderId = state.orderId();
       String paymentOperationId = context.cause().messageId();
+      // Asking for payment and arming the timer are one decision, so the flow can never end up
+      // waiting on an answer nobody is obliged to send. The due time comes from context.now(),
+      // supplied by the runtime — reading a clock here would make the decision untestable and
+      // non-repeatable on redelivery.
       return running(
           state.reserved(reserved.reservationId(), Step.AWAITING_PAYMENT),
           Step.AWAITING_PAYMENT,
           "stock-reserved",
-          new DispatchCommand(new RequestPayment(orderId, paymentOperationId)));
+          new DispatchCommand(new RequestPayment(orderId, paymentOperationId)),
+          new ScheduleDeadline(
+              PAYMENT_DEADLINE,
+              context.now().plus(paymentTimeout),
+              new OrderFulfilmentInput.PaymentTimedOut(orderId)));
     }
     if (in instanceof OrderFulfilmentInput.StockReservationFailed failed) {
       ReservationFailureRef failure =
@@ -160,7 +202,13 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     return ignore(state, in, context);
   }
 
-  /** Stock reserved, waiting for payment: authorise advances to confirm; decline compensates. */
+  /**
+   * Stock reserved, waiting for payment: authorise advances to confirm; decline compensates; and if
+   * neither arrives, the timer does. Every branch that leaves this step cancels the deadline —
+   * leaving it armed would fire a timeout at a flow that has already moved on, and while the
+   * generation guard and {@link #ignore} would both absorb it, relying on that is relying on a
+   * safety net instead of not falling.
+   */
   private ProcessDecision<OrderFulfilmentState> onAwaitingPayment(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
     if (in instanceof OrderFulfilmentInput.PaymentAuthorized) {
@@ -168,13 +216,28 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           state.withStep(Step.AWAITING_ORDER_CONFIRMATION),
           Step.AWAITING_ORDER_CONFIRMATION,
           "payment-authorized",
-          new DispatchCommand(new ConfirmOrder(state.orderId())));
+          new DispatchCommand(new ConfirmOrder(state.orderId())),
+          new CancelDeadline(PAYMENT_DEADLINE));
     }
     if (in instanceof OrderFulfilmentInput.PaymentDeclined declined) {
       return compensating(
           state.declined(declined.code(), context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
           Step.AWAITING_STOCK_RELEASE,
           "payment-declined",
+          new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          new CancelDeadline(PAYMENT_DEADLINE));
+    }
+    if (in instanceof OrderFulfilmentInput.PaymentTimedOut) {
+      // Silence is an answer. The compensation is the decline's, unchanged — release the stock the
+      // order is holding, then cancel it — because the customer's position is identical either way.
+      // The recorded code is what tells them apart afterwards, and the evidence id is the timer's
+      // own delivery, so the eventual cancellation names the firing rather than a decline that
+      // never happened. No deadline is cancelled here: this decision *is* the deadline.
+      return compensating(
+          state.declined(
+              PAYMENT_TIMEOUT_CODE, context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
+          Step.AWAITING_STOCK_RELEASE,
+          "payment-timed-out",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())));
     }
     return ignore(state, in, context);

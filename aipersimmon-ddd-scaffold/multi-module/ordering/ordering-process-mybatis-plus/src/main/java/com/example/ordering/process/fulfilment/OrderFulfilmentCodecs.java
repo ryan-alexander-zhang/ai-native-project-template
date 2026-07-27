@@ -19,6 +19,7 @@ import com.example.ordering.process.fulfilment.OrderFulfilmentInput.OrderCancell
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.OrderConfirmed;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.PaymentAuthorized;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.PaymentDeclined;
+import com.example.ordering.process.fulfilment.OrderFulfilmentInput.PaymentTimedOut;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.ReadyForFulfilment;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReleased;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.StockReservationFailed;
@@ -88,6 +89,9 @@ public class OrderFulfilmentCodecs {
         .payload("ordering.fulfilment.stock-reservation-failed", 1, StockReservationFailed.class)
         .payload("ordering.fulfilment.payment-authorized", 1, PaymentAuthorized.class)
         .payload("ordering.fulfilment.payment-declined", 1, PaymentDeclined.class)
+        // The flow's own timer, encoded like any other input: a deadline is delivered back through
+        // handle(), so its payload lives in the same catalog as the facts from other contexts.
+        .payload("ordering.fulfilment.payment-timed-out", 1, PaymentTimedOut.class)
         .payload("ordering.fulfilment.stock-released", 1, StockReleased.class)
         .payload("ordering.fulfilment.order-confirmed", 1, OrderConfirmed.class)
         .payload("ordering.fulfilment.order-cancelled", 1, OrderCancelled.class)

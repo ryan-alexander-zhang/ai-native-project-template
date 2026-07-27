@@ -47,10 +47,15 @@ PlaceOrder ─▶ Order.place ── needs review? ──▶ AWAITING_REVIEW ─
                     ├─▶ start durable process (AWAITING_STOCK)
                     └─▶ publish OrderReadyForFulfilment integration event  ─▶ inventory reserves stock
                                                                                         │
-   StockReserved ─▶ RequestPayment ─▶ payment authorizes ─▶ ConfirmOrder ─▶ CONFIRMED  │
+   StockReserved ─▶ RequestPayment + arm PAYMENT deadline ─▶ payment authorizes ─▶ CONFIRMED
    StockReservationFailed ─▶ compensate ─▶ CancelOrder ─▶ CANCELLED                     │
    PaymentDeclined ─▶ release stock ─▶ CancelOrder ─▶ CANCELLED                         ◀┘
+   PAYMENT deadline fires ─▶ same compensation ─▶ CANCELLED
 ```
+
+The deadline is why "payment never answers" is an outcome rather than a stuck order. It takes the
+decline's compensation path unchanged — release the stock, then cancel — because the customer's
+position is identical however the payment failed to happen; only the recorded code differs.
 
 Key point: **"placed" and "ready for fulfilment" are distinct facts.** An order held for manual
 review reserves nothing and starts no process until it is approved. Only `OrderReadyForFulfilment`
@@ -69,6 +74,10 @@ drives inventory and the process manager.
 | Anti-corruption layers | `StockAvailabilityGateway` (ordering port + infra adapter); `OrderReadyForFulfilmentListener`, `PaymentRequestedListener` (inbound ACLs) | `OrderingFlowTest`, `PaymentCompensationFlowTest` |
 | Durable process manager | `OrderFulfilmentDefinition` (pure decision), `OrderFulfilmentCodecs` (a `ProcessSerializationCatalog` for 12 payloads + one hand-written codec where a sealed domain type forbids Jackson annotations), `RuntimeOrderFulfilmentProcess` | `OrderFulfilmentDefinitionTest` (unit), `OrderingFlowTest` (e2e) |
 | Ordered compensation (release then cancel) | `OrderFulfilmentDefinition` compensation branches | `PaymentCompensationFlowTest` |
+| Deadlines (a wait that can end) | `OrderFulfilmentDefinition` arms/cancels the `PAYMENT` deadline; `OrderFulfilmentInput.PaymentTimedOut` | `OrderFulfilmentDefinitionTest` (unit), `PaymentTimeoutFlowTest` (e2e, payment silent) |
+| Cursor-paged read model (no aggregate loaded) | `OrderQueries` + `OrderListMapper` → `GET /orders?customerId=`; `Slice`/`Cursor` | `OrderListPagingTest`, `FindCustomerOrdersHandlerTest` |
+| HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-jdbc` on `POST /orders` | `OrderIdempotencyTest` |
+| Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
 | Business-key idempotency (at-most-once) | `AuthorizePaymentHandler` + `PaymentOperations` port | `AuthorizePaymentIdempotencyTest` |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
 | Web error contract (RFC 9457) | `OrderingProblemCatalog` (composition root) | `ExceptionContractTest` |
@@ -105,8 +114,11 @@ is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it 
 
 ## Known demo gaps (not defects)
 
-- **Deadlines / max-lifetime are not wired.** The process manager supports `ScheduleDeadline` and a
-  `MaxLifetimeExceeded` backstop, but this scaffold arms neither, so a stuck order waits
-  indefinitely. `OrderFulfilmentDefinition.react` guards the backstop input so enabling it cannot
-  crash the definition (it rejects cleanly for the runtime to suspend); wiring a real deadline/
-  timeout-compensation path is left as an extension.
+- **The max-lifetime backstop is not armed.** The payment step *is* covered by a real deadline (see
+  the flow above), which is the case that matters: it is the only step whose answer comes from
+  outside and may never arrive. `instance.max-lifetime` is a blunter, whole-instance cap for flows
+  that stall somewhere nobody anticipated, and arming it means deciding what a lifetime-exceeded
+  order should do — compensate from an arbitrary step, or suspend for an operator. That is a real
+  design choice, not a wiring exercise, so it is left out rather than guessed at.
+  `OrderFulfilmentDefinition.react` still guards the `MaxLifetimeExceeded` input so enabling it
+  cannot crash the definition: it rejects cleanly and the runtime suspends the instance.

@@ -35,6 +35,14 @@ spring:
 # contract is always served at /v3/api-docs; the interactive Swagger UI at /swagger-ui.html is gated
 # so a production profile can expose the contract without the UI. Default on for local dev — override
 # SWAGGER_UI_ENABLED=false (or set springdoc.swagger-ui.enabled=false in a prod profile) to hide it.
+# How long the fulfilment flow waits for the payment context before giving up and compensating
+# (release the stock, cancel the order). Two minutes is a development number: long enough that a
+# local run never trips it by accident, short enough to watch it happen. A deployment sets it from
+# what the payment provider actually promises.
+ordering:
+  fulfilment:
+    payment-timeout: PT2M
+
 springdoc:
   swagger-ui:
     enabled: ${SWAGGER_UI_ENABLED:true}
@@ -90,6 +98,14 @@ aipersimmon:
       kafka:
         consumer:
           enabled: true
+    # The durable process manager. deadline-worker.poll-delay is how often due timers are looked
+    # for, so it bounds how late a timeout fires — the order-fulfilment flow arms a PAYMENT
+    # deadline while it waits for the payment context (see OrderFulfilmentDefinition). The worker
+    # is on by default; it is named here so it is visible that something fires those timers, and
+    # so the polling interval is a deliberate number rather than a default nobody read.
+    process-manager:
+      deadline-worker:
+        poll-delay: 1s
     # Multi-tenancy (design-00009). enabled=true turns on end-to-end tenant isolation: the web edge
     # resolves the tenant from the X-Tenant-Id header (default HeaderTenantResolver) and binds it for
     # the request; the command bus seeds it onto CommandContext.tenantId; the outbox stamps it onto

@@ -30,6 +30,16 @@ public sealed interface OrderFulfilmentInput extends ProcessInput {
   record PaymentDeclined(String orderId, String code, String reason)
       implements OrderFulfilmentInput {}
 
+  /**
+   * The payment deadline fired: the payment context answered neither way in time.
+   *
+   * <p>Not a fact from another context — it is the flow's own timer coming back as an ordinary
+   * input, which is what makes a timeout just another row in the transition table rather than a
+   * callback with its own rules. It is treated exactly like a decline, because from the order's
+   * point of view "payment did not happen" is the same answer whichever way it arrived.
+   */
+  record PaymentTimedOut(String orderId) implements OrderFulfilmentInput {}
+
   /** Inventory released the previously reserved stock. */
   record StockReleased(String orderId, String reservationId) implements OrderFulfilmentInput {}
 
