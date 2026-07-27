@@ -84,6 +84,22 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-openapi-spring-boot-starter</artifactId>
     </dependency>
+    <!--
+      Shared storage for the HTTP edge's stateful protections — here, the idempotency store behind
+      POST /orders (aipersimmon.ddd.web.idempotency in application.yml). Without it those
+      protections fall back to per-JVM maps, which stop protecting anything the moment a second
+      instance exists; allow-in-memory-stores=false turns that fallback into a startup failure
+      rather than a silent weakening.
+
+      Note the suffix: -web-store-jdbc, in an application whose other tables are MyBatis-Plus. The
+      framework's edge stores speak plain JdbcTemplate on the same DataSource, and there is no
+      -mybatis-plus variant, so a MyBatis-Plus application still declares this one. It shares the
+      transaction and the connection pool, so nothing else changes.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web-store-jdbc</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
