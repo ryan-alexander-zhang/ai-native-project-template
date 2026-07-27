@@ -2,7 +2,7 @@
 id: issue-00066-dead-letter-store-can-replay-but-cannot-be-read
 type: issue
 role: main
-status: open
+status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---
 
@@ -41,26 +41,53 @@ parent: plan-00015-scaffold-depth-and-evaluability
 `DeadLetterOpsController#list` 必须绕过端口手写 SQL，其类注释逐条记录了原因；
 `DeadLetterReplayTest` 证明整条"发现 → 重放"的路只有后半段是框架给的。
 
-## 修复（建议，未实施）
+## 修复
 
-在端口上加一个只读的分页查询，与 `-cqrs` 的 `Slice`/`Cursor` 对齐，例如：
+新增**独立的只读端口** `DeadLetters`（`-outbox`），与 `-cqrs` 的 `Slice`/`Cursor` 对齐：
 
 ```java
-Slice<DeadLetterRecord> list(Cursor after, int size);
-Optional<DeadLetterRecord> find(String eventId);
+Slice<DeadLetter> list(Cursor after, int size);
+Optional<DeadLetter> find(String eventId);
 ```
 
-`DeadLetterRecord` 应当是端口自己的只读视图（event id、type/version、attempts、reason、
-last error、failed at、tenant），而不是把 `OutboxMessage` 直接暴露出去——运维要看的是
-"为什么没送出去"，不是消息体本身。
+四个决定，每个都有取舍：
 
-顺带值得考虑：`replay` 目前只按单个 id，批量重放（"把某个类型在某段时间内的全部重放"）是
-运维的真实动作，但那属于下一步，不应与本 issue 的最小修复混在一起。
+1. **另立端口，而不是给 `DeadLetterStore` 加方法**。`DeadLetterStore` 的 Javadoc 明确邀请消费方
+   替换 bean 去"报警或转发到隔离 topic"——这样的实现**没有可列的东西**，逼它实现 `list` 是错的。
+   加抽象方法还会当场打断现有实现方（库内 `OutboxRelayDeadLetterFailureTest` 的
+   `FailingDeadLetterStore` 就是一个）。拆开后：存储型后端两个 bean 都注册；转发型实现让读端口缺席，
+   于是运维界面**装配失败而不是假装能看**。
+2. **`DeadLetter` 是端口自己的只读视图**，不含 `payload`。运维问的是"为什么没送出去"，
+   消息体答不了这个问题，而把每条消息体都搬到运维界面既贵又是一种泄漏。
+3. **按表自增 `id` 分页，不按 `failed_at`**。id 在"放弃投递"那一刻分配，所以 `id DESC` 已经是
+   "最近失败优先"；它唯一（同一毫秒放弃的两行仍有全序），且本身是主键，不需要额外索引。
+   cursor 就是这个 id 的字符串形式，对调用方不透明。
+4. **`-outbox` 因此新增对 `-cqrs` 的依赖**（仅为 `Slice`/`Cursor`）。取舍是：宁可多一条模块边，
+   也不为一个运维列表另造一套分页词汇（`CONTEXT.md` 的"一个概念一个名字"）。两边都 framework-free，
+   `-outbox` 的"无 Spring"红线不变，无环。
+
+未做（有意）：批量重放（"把某类型某时间段内的全部重放"）是运维的真实动作，但属于下一步。
 
 ## 验证结果
 
-（未修复。样例以手写 SQL 绕行，并在
-`DeadLetterOpsController` 的类注释里指向本 issue。）
+**已修复。**
+
+- `aipersimmon-ddd-outbox`：新增 `DeadLetters`（端口）+ `DeadLetter`（只读视图）。
+- 两个后端各一份实现与 bean：`JdbcDeadLetters` / `MybatisDeadLetters`，
+  `@ConditionalOnMissingBean(DeadLetters.class)`。
+- 库侧测试：`DeadLetterReadTest`（outbox-jdbc，4 项）走完整条运维路径——
+  `anOperatorArrivesKnowingNothingAndLeavesHavingRequeuedTheMessage` 明确从"什么都不知道"开始，
+  用列表拿到的 id 直接喂给 `replay`，即本 issue 说断掉的那个接缝；另有分页（最近优先、每行只访问一次、
+  末页无 cursor）、空表、以及"拒绝什么"（`size<1`、非本端口签发的 cursor）。
+  `DeadLetterReadTest`（outbox-mybatis-plus，2 项）钉住两后端**答案一致**。
+- 样例侧的绕行代码消失：`DeadLetterMapper` 已删除，`DeadLetterOpsController` 不再持有任何 SQL，
+  改为注入两个端口；顺带 `GET /ops/dead-letters/{eventId}` 用上了 `find`，
+  列表改为 cursor 分页（`?cursor=&size=`），与 `GET /orders` 同形。
+  `DeadLetterReplayTest` 相应改为读 `items` 并新增按 id 取回的断言。
+- 附带效果：样例那处 SpotBugs `EI_EXPOSE_REP2` 摩擦（控制器持有注入的 `JdbcTemplate`）随之消失；
+  该 finding 现在落在库自己的 `JdbcDeadLetters` 上，按共享过滤器既有约定按类名登记
+  （与 `JdbcDeadLetterStore` 等 40 余个同形基础设施 bean 一致）。
+- 库 BUILD SUCCESS（773 项，0 失败）；样例 `verify` BUILD SUCCESS（189 项，0 失败）。
 
 ## 关联
 

@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
+import com.aipersimmon.ddd.outbox.DeadLetters;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
@@ -94,6 +95,18 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
       JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager, Clock outboxClock) {
     return new JdbcDeadLetterStore(
         jdbcTemplate, new TransactionTemplate(transactionManager), outboxClock);
+  }
+
+  /**
+   * The read side of the dead-letter table, so an operations surface can find what to replay. A
+   * separate bean from the store because the two are separate ports: an application that replaces
+   * {@link DeadLetterStore} with a forwarder keeps this reader only if its rows are still here.
+   */
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean(DeadLetters.class)
+  public DeadLetters outboxDeadLetters(JdbcTemplate jdbcTemplate) {
+    return new JdbcDeadLetters(jdbcTemplate);
   }
 
   @Bean

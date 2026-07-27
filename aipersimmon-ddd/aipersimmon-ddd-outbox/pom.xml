@@ -35,6 +35,14 @@
       <artifactId>aipersimmon-ddd-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Slice/Cursor only: the dead-letter read port (DeadLetters) pages the same way a
+         consumer's read models do, rather than inventing a second pagination vocabulary for
+         one operations listing. Framework-free like this module, so the no-Spring rule holds. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- jackson-core only (not databind): DefaultFailureClassifier classifies a
          JsonProcessingException as a permanent failure. No Spring here, by design — this is a
          contract module a domain layer may depend on (design-00012). -->

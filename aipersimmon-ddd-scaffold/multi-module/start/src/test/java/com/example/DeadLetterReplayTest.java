@@ -89,6 +89,13 @@ class DeadLetterReplayTest {
         listed.path("lastError").asText().contains(UNKNOWN_TYPE),
         "the recorded error must name what could not be delivered");
 
+    // The same row is reachable by id, for the operator who arrives from an alert instead of a
+    // list.
+    JsonNode fetched =
+        http.exchange("/ops/dead-letters/" + eventId, HttpMethod.GET, empty(), JsonNode.class)
+            .getBody();
+    assertEquals("PERMANENT", fetched.path("reason").asText());
+
     // The operator fixes the cause — here, nothing to fix, the point is the requeue — and replays.
     ResponseEntity<Void> replayed =
         http.exchange(
@@ -148,11 +155,16 @@ class DeadLetterReplayTest {
     return eventId;
   }
 
+  /**
+   * Found the way an operator would find it: page the listing, no id known in advance. The rows
+   * come from the {@code DeadLetters} port, so this walks the framework's own read side rather than
+   * a query the sample wrote against a table it does not own.
+   */
   private JsonNode deadLetterFor(String eventId) {
-    JsonNode listing =
-        http.exchange("/ops/dead-letters?limit=50", HttpMethod.GET, empty(), JsonNode.class)
+    JsonNode page =
+        http.exchange("/ops/dead-letters?size=50", HttpMethod.GET, empty(), JsonNode.class)
             .getBody();
-    for (JsonNode row : listing) {
+    for (JsonNode row : page.path("items")) {
       if (eventId.equals(row.path("eventId").asText())) {
         return row;
       }
