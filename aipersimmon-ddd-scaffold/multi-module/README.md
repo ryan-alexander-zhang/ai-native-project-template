@@ -34,8 +34,11 @@ mvn -o test -pl start -am
 mvn verify        # full gate: unit + Testcontainers integration tests, and the quality gates
                   # (Spotless, PMD/CPD, SpotBugs, JaCoCo + PIT on *-domain). Needs Docker, and
                   # takes a while: containers are Spring beans, so each distinct test context
-                  # gets its own PostgreSQL + Kafka pair (roughly a dozen across the module).
-                  # That is what lets a test assert against an entire empty database.
+                  # gets its own PostgreSQL + Kafka pair. There are 17 distinct contexts and 16
+                  # such pairs (ProductionProfileBootTest reuses a raw container and starts no
+                  # broker). That is what lets a test assert against an entire empty database.
+                  # TestContextCountTest pins the number, so adding one property to one test
+                  # class cannot quietly buy another pair.
 
 # Run the app locally (starts PostgreSQL + Kafka via Docker Compose):
 mvn -pl start -am spring-boot:run     # infrastructure comes up from start/compose.yaml

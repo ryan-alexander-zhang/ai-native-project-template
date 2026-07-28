@@ -2,7 +2,7 @@
 id: issue-00092-each-test-context-starts-its-own-container-pair
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -101,16 +101,52 @@ void theNumberOfDistinctTestContextsIsDeliberate() {
 
 ## 验证结果
 
-部分已修（保持 open）。
+已修。
 
 - **已做（修复第 1、3 条）**：`README.md` 的 Build and run 一节说明了
   `mvn verify` 会为每个不同的测试上下文各起一对容器、以及这换来的是什么，
   并给出了不需要 Docker 的快路径（三个 `*-domain` 模块的单测，秒级）。
   `TestInfrastructure` 的 javadoc 把"哪些因素会让上下文分裂"写在了公共位置——
   此前只有 `SelfCancelTest` 的一句局部注释提过。
-- **未做（修复第 2 条的 JUnit tag 分组，以及复现一节的上下文计数断言）**：
-  快路径目前靠 `-pl` 列模块，比 tag 粗糙；计数断言可防止容器数量无声增长，仍值得补。
-- 验证：README 与 javadoc 改动无行为影响；`spotless:check` 通过。
+- **已做（复现一节的计数断言，本轮补上）**：`TestContextCountTest`。
+
+  **关键实现选择：不自己推算缓存键，直接问 Spring 要。**
+  原稿设想的是"扫 `properties` / `webEnvironment` / 嵌套 `@TestConfiguration` / `@MockitoBean`
+  聚合成 key"——那等于手写一份 Spring 缓存键的近似实现，而这个近似**一定会漂**：
+  真正的键还包含 context customizer、bean override、`@ActiveProfiles`、
+  `@DynamicPropertySource` 的存在与否等等，Spring 每个版本都可能再加。
+
+  实际做法：`MergedContextConfiguration` **就是**那个缓存键
+  （Spring 的 `ContextCache` 按它查表），而
+  `BootstrapUtils.resolveTestContextBootstrapper(clazz).buildMergedContextConfiguration()`
+  能把它构造出来而**不启动任何上下文**。测试跑完 1.1 秒，不起容器。
+  测试类的枚举复用 ArchUnit（`ArchitectureTest` 已在用），
+  并显式带上 `@Nested` 内部类——它们继承外层的 `@SpringBootTest`，
+  却能靠 `@TestPropertySource` 再分裂出自己的上下文（`BackgroundWorkerControlTest` 正是如此）。
+
+- **一个实测结论，与 issue 原稿的估计不符**：**实际是 17 个不同上下文，不是原稿粗估的 9–11 个。**
+  原稿那张表是靠读测试源码归纳的，漏掉了若干分裂因素。
+  这个差距本身就是"必须算而不能估"的最好论据，已写进测试的 javadoc。
+  17 个里 16 个各带一对容器；例外是 `ProductionProfileBootTest`——
+  它从 `SharedContainers` 取裸容器且完全不起 broker（理由在它自己的 javadoc 里）。
+  README 的数字已从"roughly a dozen"改成实测的 17/16。
+
+  断言失败时打印的是**分组**（哪些测试类共享一个上下文），不是一个数字，
+  所以读的人能直接看出新上下文是从哪一组里分裂出去的。
+
+- **负向对照（实测）**：给 `SelfCancelTest` 的 `properties` 加一条
+  `spring.application.name=negative-control`，计数从 17 变 18，
+  且分组里 `SelfCancelTest` 从原来那组
+  （`OrderListPagingTest` / `ReadmeQuickstartTest` / `DeadLetterReplayTest` / `OrderIdempotencyTest`）
+  里单独裂了出来 —— 正是本 issue 描述的"随手加一条 property 就静默多一对容器"。
+  改回后恢复 17。（对照用备份文件还原，不是 `git checkout --`。）
+
+- **仍未做（有意的）**：修复第 2 条里的 **JUnit tag 分组**（`unit` / `acceptance`）。
+  快路径目前仍靠 `-pl` 列三个 `*-domain` 模块。tag 会更细，但它要求给几十个测试类逐个打标签，
+  收益相对 `-pl` 那条现成命令有限，且与本 issue 的核心（容量不可见）无关。
+  单开一条更合适，不再挡着本 issue。
+- 验证：README 与 javadoc 改动无行为影响；`spotless:check` 通过；
+  `mvn -o test -pl start -am -Dtest=TestContextCountTest` 绿。
 
 ## 关联
 
