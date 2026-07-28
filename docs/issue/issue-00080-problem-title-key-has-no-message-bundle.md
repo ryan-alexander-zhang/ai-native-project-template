@@ -2,7 +2,7 @@
 id: issue-00080-problem-title-key-has-no-message-bundle
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -81,7 +81,40 @@ ordering.insufficient-credit.title=Insufficient credit
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修，修复一节的三条全做了。
+
+**1. `messages.properties`（`start/src/main/resources/`）**：**九个 key，不是一个**。
+原稿只举了 `ordering.insufficient-credit.title` 一例，但真正缺的大头是**家族兜底标题**——
+`OrderingErrorCode` 里 17 个码只有 1 个有 override，其余 16 个全部渲染家族标题。
+对着库侧 `DefaultProblemFamilies` 抄全了 8 个：`domain-rule-violation` / `resource-not-found` /
+`resource-conflict` / `validation-failed` / `unauthorized` / `forbidden` / `internal-error`，
+加上那一条 override。`unauthorized` / `forbidden` 目前不可达（无安全域），
+但资源包是它们该在的地方，先备着不算超范围。
+
+**2. `messages_zh_CN.properties`（i18n 真的演示了）**，并在 `ExceptionContractTest` 里加了一条
+带 `Accept-Language: zh-CN` 的用例。这条顺带补上评审列的"i18n 未演示"缺口，成本确实很低。
+
+**3. `OrderingProblemCatalog` 的类 javadoc** 点明第三个参数是 key，
+并且**写清了缺文件时的失败形态**——`ProblemTitleResolver` 兜底返回 key 而不是抛异常，
+所以启动不失败、请求不失败、日志不告警，只有客户端作者会发现。
+这个"静默降级"才是本 issue 能存活到评审才被发现的原因。
+
+**测试三条（原有 `ExceptionContractTest`，不新建上下文）**：
+override 的 title、家族兜底的 title、zh-CN 的 title。
+
+**负向对照（实测）**：把两个 `.properties` 移走（并清掉 `start/target/classes` 下的副本，
+否则 Flyway/classpath 会从陈旧副本命中，假绿），三条全红，拿到的正是裸 key：
+
+```
+creditExceededRendersProblemWith422AndCode:93
+  JSON path "$.title" expected:<Insufficient credit> but was:<ordering.insufficient-credit.title>
+duplicateSkuViolatesAggregateRuleWith422AndCode:140
+  JSON path "$.title" expected:<Business rule violated> but was:<problem.domain-rule-violation.title>
+theProblemTitleIsRenderedInTheRequestedLanguage:115
+  JSON path "$.title" expected:<信用额度不足> but was:<ordering.insufficient-credit.title>
+```
+
+`mvn -o test -pl start -am -Dtest=ExceptionContractTest` 12 条全绿。
 
 ## 关联
 

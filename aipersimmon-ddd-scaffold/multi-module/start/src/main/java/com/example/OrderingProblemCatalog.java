@@ -18,6 +18,15 @@ import java.util.Map;
  * even as domain error codes grow — only {@code CREDIT_EXCEEDED} here warrants a dedicated type
  * (the client shows a top-up flow), so it overrides; {@code ORDER_EMPTY} / {@code TOO_MANY_LINES} /
  * {@code DUPLICATE_SKU} / the not-found codes ride their families.
+ *
+ * <p>{@link ProblemDescriptor}'s third argument is a <strong>message-source key</strong>, not the
+ * title text — hence {@code ordering.insufficient-credit.title} rather than "Insufficient credit".
+ * The text lives in {@code messages.properties} (and {@code messages_zh_CN.properties}), which is
+ * what lets one error code answer in the caller's language. Note the failure mode if that file is
+ * missing: {@code ProblemTitleResolver} falls back to the key rather than throwing, so the
+ * application starts, the request succeeds, and the client is handed a dotted identifier in the
+ * field RFC 9457 reserves for a human-readable summary (issue-00080). The same key must exist for
+ * every family a code can fall back to, not only for the codes overridden here.
  */
 public class OrderingProblemCatalog implements ProblemCatalog {
 

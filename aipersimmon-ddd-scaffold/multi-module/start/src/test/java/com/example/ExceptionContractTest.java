@@ -85,7 +85,34 @@ class ExceptionContractTest {
         .andExpect(jsonPath("$.status").value(422))
         // CREDIT_EXCEEDED is overridden to its own problem type (client shows a top-up flow).
         .andExpect(jsonPath("$.type").value("/problems/insufficient-credit"))
-        .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"));
+        .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"))
+        // RFC 9457's title is the human-readable half of the contract, and the descriptor holds a
+        // message-source KEY for it. Until messages.properties existed this returned the key
+        // itself — the resolver falls back rather than failing, so nothing anywhere said so
+        // (issue-00080).
+        .andExpect(jsonPath("$.title").value("Insufficient credit"));
+  }
+
+  @Test
+  void theProblemTitleIsRenderedInTheRequestedLanguage() throws Exception {
+    // What the key indirection is for. Same code, same type, same status — a different title,
+    // chosen by Accept-Language. A literal title in the descriptor could not do this, and with no
+    // message bundle at all neither could a key.
+    String body =
+        """
+                {"customerId":"CUST-1",
+                 "lines":[{"sku":"SKU-1","quantity":1,"unitAmountMinor":200000,"currency":"USD"}]}
+                """;
+
+    mvc.perform(
+            post("/orders")
+                .header("X-Tenant-Id", TENANT)
+                .header("Accept-Language", "zh-CN")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"))
+        .andExpect(jsonPath("$.title").value("信用额度不足"));
   }
 
   @Test
@@ -107,7 +134,10 @@ class ExceptionContractTest {
         .andExpect(jsonPath("$.status").value(422))
         .andExpect(jsonPath("$.code").value("ordering.duplicate-sku"))
         // No override → rides the DOMAIN_RULE family type, distinguished by its code.
-        .andExpect(jsonPath("$.type").value("/problems/domain-rule-violation"));
+        .andExpect(jsonPath("$.type").value("/problems/domain-rule-violation"))
+        // And its family's title, so the sixteen codes with no override of their own are readable
+        // too — not just the one that overrides.
+        .andExpect(jsonPath("$.title").value("Business rule violated"));
   }
 
   @Test
