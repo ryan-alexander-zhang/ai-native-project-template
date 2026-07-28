@@ -2,7 +2,7 @@
 id: issue-00086-customer-is-an-aggregate-nothing-writes
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -81,7 +81,34 @@ static final ArchRule anAggregateRootMustBeWritable =
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。**采用方案 1（让它成为真聚合）**，作为
+[[issue-00071-credit-limit-is-checked-but-not-enforced]] 强一致决定的另一面，一次改动同修两个。
+
+`Customer` 现在有：可变状态（`usedCredit`）、要守的不变量（`used + amount <= limit`）、
+生命周期行为（`reserveCredit` / `releaseCredit`）、写入路径（`Customers.save`）、
+version 列（`V5`，撤销 `V3` 的豁免）。本 issue 列的"没有一致性边界、没有生命周期、没有不变量"
+三条现在都不成立了。
+
+**但方案 1 与本 issue 根因第 3 条（"`Customer` 的真正归属不在 ordering"）是有张力的，
+处理方式写在类注释里而不是被忽略**：聚合被**刻意收窄为"信用"**，不是"客户"。
+它守的是额度与已用额度；姓名只是随行的标签，没有任何东西会改它，也不该有。
+客户的创建、改名、联系方式、生命周期仍然属于 CRM 上下文——
+把那些一并提升为本地聚合，才是本 issue 警告的那种上下文映射错误。
+而"这个客户还能再下多少单"确实由 ordering 拥有，因为**花掉它和还回它的都是 ordering**。
+换句话说：本 issue 的战略判断被采纳了，只是它划的线比"整个 Customer 都不属于这里"更细一点。
+
+方案 3（`CustomerCreditGateway` + ACL）在建模上依然最干净，代价是新建一个 customer 上下文
+或承认它是外部系统；一旦额度需要**跨上下文强制**，那就是必须走的路。
+现在没走，是因为额度的争用点确实在 ordering 的库里，跨上下文只会把一个可事务化的不变量
+变成不可事务化的。这一点也记在类注释里。
+
+**未做**：本 issue 复现段建议的 ArchUnit 规则
+`anAggregateRootMustBeWritable`（要求每个 `@AggregateRoot` 有带 `save` 的仓储端口）。
+`Customer` 现在能通过它，但这条规则本身值得单独评估——它会把"只读投影不得标注为聚合"
+变成结构性约束，影响面超出本 issue，且需要考虑读模型与聚合共存的情形。留作后续。
+
+验证：`mvn -o verify -pl start -am` 全绿，70 个测试 0 失败。
+`CustomerTest` 从 3 条扩到 10 条；`CreditLimitTest` 三条端到端用例（含并发）见 issue-00071。
 
 ## 关联
 

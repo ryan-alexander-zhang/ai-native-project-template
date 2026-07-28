@@ -120,6 +120,7 @@ drives inventory and the process manager.
 | Integration events + transactional outbox → Kafka → inbox | `OrderReadyForFulfilment`, `PaymentRequested` (`*-api`); `PlaceOrderHandler`/`FulfilmentTrigger` publish | `OutboxAtomicityTest`, `IntegrationEventTransportTest` |
 | Anti-corruption layers | `StockAvailabilityGateway` (ordering port + infra adapter); `OrderReadyForFulfilmentListener`, `PaymentRequestedListener` (inbound ACLs) | `OrderingFlowTest`, `PaymentCompensationFlowTest` |
 | Multi-aggregate transaction that is really all-or-nothing | `ReserveStockHandler` decides over a `Map<Sku, Stock>` in memory, then writes; `ReserveStock` merges lines repeating a SKU | `StockReservationAtomicityTest` |
+| Cross-aggregate invariant held strongly (not eventually) | `Customer.reserveCredit` + version column; committed on placement, released by `CustomerCredit` on every cancellation | `CreditLimitTest`, `CustomerTest` |
 | The quickstart below actually runs | this README's own `curl` commands, parsed rather than copied | `ReadmeQuickstartTest` |
 | Durable process manager | `OrderFulfilmentDefinition` (pure decision), `OrderFulfilmentCodecs` (a `ProcessSerializationCatalog` for 12 payloads + one hand-written codec where a sealed domain type forbids Jackson annotations), `RuntimeOrderFulfilmentProcess` | `OrderFulfilmentDefinitionTest` (unit), `OrderingFlowTest` (e2e) |
 | Ordered compensation (release then cancel) | `OrderFulfilmentDefinition` compensation branches | `PaymentCompensationFlowTest` |

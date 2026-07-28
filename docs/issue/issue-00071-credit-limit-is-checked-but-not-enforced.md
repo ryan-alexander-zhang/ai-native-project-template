@@ -2,7 +2,7 @@
 id: issue-00071-credit-limit-is-checked-but-not-enforced
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -95,7 +95,55 @@ scaffold 的其它权衡处（多聚合事务、hybrid 编排）都有这样的�
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。**采用修复方案 1（强一致）**，与
+[[issue-00086-customer-is-an-aggregate-nothing-writes]] 的方案 1 联合决定、同一次改动落地。
+
+**为什么是强一致而不是最终一致**（这条 issue 最要紧的是"必须有立场"，所以立场写在这里，
+也写进了 `PlaceOrderHandler` 的注释）：最终一致的正当理由是**不变量跨越了一条无法事务化的边界**。
+库存就是这样——它在另一个上下文、另一个 schema，只能经 Kafka 抵达，所以异步预留 + 补偿是对的。
+**信用额度不在这个位置**：`ordering.customers` 与 `ordering.orders` 同库同事务，
+强一致的代价只是一个 version 列和一次 `save`。选最终一致等于**人为制造**一个分布式问题
+再去演示它的解法，并且欠下一个对账流程——而一个没建完的对账，正是本 issue 批评的那件事：
+把一条没人强制的规则说成已强制。
+
+另一个角度：最终一致 + 补偿已经是本 scaffold 演示得最充分的技术（整个履约流程管理器就是）；
+**单事务内的跨聚合强一致**只在 `ReserveStockHandler` 出现过一次，而那一处还被刻意描述为
+"一事务一聚合"的例外。再加一个朴素的正例，比再加第四条补偿链价值更大。
+
+**两个缺陷是独立的，都修了**：
+
+1. **口径**（不需要并发就能触发）：`canAfford` 比的是单笔 vs 额度。
+   现在 `Customer.reserveCredit` 比的是 `used + amount <= limit`。
+   `V5` 加 `used_minor` 列承载"已用额度"。
+2. **并发**：`Customers` 补 `save`，`ordering.customers` 补 version 列（撤销 `V3` 的豁免——
+   `V3` 的理由在当时成立，变的是它的前提）。`CustomerDo` 实现 `VersionedRow` + `@Version`。
+
+信用在下单时占用、取消时归还、确认时保留（那时客户确实欠了）。
+归还收口在新增的 `CustomerCredit.releaseFor(order)`，由两个 cancel handler 调用——
+它们合起来覆盖五条业务路径（自助取消、审核拒绝、预留失败、支付拒付、支付超时）。
+**这是本次改动最容易腐烂的地方**：漏掉任一条路径，额度会静默泄漏，不报错，
+只是客户被一堆已不存在的订单慢慢锁死。
+
+`CreditLimitTest` 三条用例，负向对照都实测过：
+
+- `creditAlreadyCommittedCountsAgainstTheNextOrder` —— 把判据改回 `amount <= limit` 后，
+  第二笔 60000 返回 **201** 而不是 422。
+- `twoSimultaneousOrdersCannotBetweenThemExceedTheLimit` —— 摘掉 `@Version` 后，
+  两笔并发得到 **[201, 201]**，合计 120000 突破 100000 的额度，正是本 issue 复现段预言的
+  `placed == 2`。barrier 手法照抄 `ConcurrentApprovalTest.StageTheRace`，
+  装饰对象从 `Orders` 换成 `Customers`，与本 issue 的建议一致。
+  注意输家拿到的是 **409 而非 422**：它在自己看得见的快照上并没有超额，只是输了版本竞争，
+  重试才会拿到 422——这个区分本身值得留下。
+- `cancellingAnOrderReturnsItsCreditByEitherRoute` —— 两条归还路径都走一遍
+  （命令总线的补偿入口 + HTTP 自助取消），最后用"整额度重新可用"证明归还是真的。
+
+`CustomerTest` 从 3 条扩到 10 条，覆盖累计、拒绝、归还、超额归还失败、reconstitute。
+
+**未做**：方案 3（改名承认现状）被放弃是显然的；方案 2（最终一致 + 对账）见上文理由。
+`Money` 新增 `minus`（拒绝为负）；`Money` 的溢出保护仍是
+[[issue-00077-money-arithmetic-has-no-overflow-guard]]，不在本次范围。
+
+验证：`mvn -o verify -pl start -am` 全绿，70 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
 
 ## 关联
 

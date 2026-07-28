@@ -27,9 +27,11 @@ import org.springframework.stereotype.Component;
 public class CancelOwnOrderHandler implements CommandHandler<CancelOwnOrder, Void> {
 
   private final Orders orders;
+  private final CustomerCredit credit;
 
-  public CancelOwnOrderHandler(Orders orders) {
+  public CancelOwnOrderHandler(Orders orders, CustomerCredit credit) {
     this.orders = orders;
+    this.credit = credit;
   }
 
   @Override
@@ -46,6 +48,7 @@ public class CancelOwnOrderHandler implements CommandHandler<CancelOwnOrder, Voi
     order.cancel(new CancellationReason.CustomerRequested(new CustomerId(command.customerId())));
 
     orders.save(order);
+    credit.releaseFor(order);
     return null;
   }
 }

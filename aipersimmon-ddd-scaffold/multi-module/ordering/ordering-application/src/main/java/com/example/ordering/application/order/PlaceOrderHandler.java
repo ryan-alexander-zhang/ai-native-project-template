@@ -7,7 +7,6 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.ordering.application.fulfilment.FulfilmentTrigger;
 import com.example.ordering.application.order.StockAvailabilityGateway.Availability;
-import com.example.ordering.domain.customer.CreditExceededException;
 import com.example.ordering.domain.customer.Customer;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.customer.Customers;
@@ -104,10 +103,21 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     ReviewRequirement review = REVIEW.assess(lines);
     Order order = Order.place(orderId, customerId, lines, review);
 
-    if (!customer.canAfford(order.total())) {
-      throw new CreditExceededException(
-          "customer " + customerId.value() + " cannot afford " + order.total());
-    }
+    // Commit the order's total against the customer's credit, in this transaction, alongside the
+    // order itself. A deliberate two-aggregate write, and the same trade-off ReserveStockHandler
+    // argues for stock: the invariant spans Customer and Order, both live in this database, so it
+    // is held in one unit of work rather than chased afterwards with a compensation flow.
+    //
+    // This is a choice and it has an alternative — treat the check as advisory and reconcile
+    // over-limit orders later, which is closer to how real credit systems behave. It was not taken
+    // because eventual consistency here would be manufactured: nothing forces these two aggregates
+    // apart, and an unreconciled "advisory" check is what issue-00071 found — a rule presented as
+    // enforced (its own error code, its own problem type, a top-up flow) with nothing enforcing it.
+    //
+    // reserveCredit refuses by throwing CreditExceededException; the version check on the customer
+    // row is what makes two concurrent placements conflict rather than both succeed.
+    customer.reserveCredit(order.total());
+    customers.save(customer);
 
     if (review.isRequired()) {
       // Held for manual review: record the placement, but reserve nothing until it clears. The

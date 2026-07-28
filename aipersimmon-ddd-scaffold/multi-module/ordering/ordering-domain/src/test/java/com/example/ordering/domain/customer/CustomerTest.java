@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
@@ -29,18 +28,82 @@ class CustomerTest {
   }
 
   @Test
-  void canAffordAtOrBelowTheCreditLimit() {
+  void creditUpToTheLimitCanBeCommitted() {
     Customer customer = customerWithLimit(10_000);
 
-    assertTrue(customer.canAfford(Money.of(10_000, "USD")), "exactly the limit is affordable");
-    assertTrue(customer.canAfford(Money.of(9_999, "USD")));
+    customer.reserveCredit(Money.of(10_000, "USD"));
+
+    assertEquals(10_000, customer.usedCredit().amountMinor(), "exactly the limit is committable");
+    assertEquals(0, customer.availableCredit().amountMinor());
   }
 
   @Test
-  void cannotAffordAboveTheCreditLimit() {
+  void creditBeyondTheLimitIsRefused() {
     Customer customer = customerWithLimit(10_000);
 
-    assertFalse(customer.canAfford(Money.of(10_001, "USD")));
+    assertThrows(
+        CreditExceededException.class, () -> customer.reserveCredit(Money.of(10_001, "USD")));
+    assertEquals(0, customer.usedCredit().amountMinor(), "a refusal commits nothing");
+  }
+
+  /**
+   * The distinction the old {@code canAfford} could not make, and the reason issue-00071 called the
+   * rule misnamed: each of these is under the limit on its own, and together they are not. No
+   * concurrency is involved — the previous check compared every order against the untouched limit,
+   * so it would have allowed both.
+   */
+  @Test
+  void creditAlreadyCommittedCountsAgainstTheLimit() {
+    Customer customer = customerWithLimit(10_000);
+
+    customer.reserveCredit(Money.of(6_000, "USD"));
+
+    assertThrows(
+        CreditExceededException.class,
+        () -> customer.reserveCredit(Money.of(6_000, "USD")),
+        "6000 + 6000 exceeds 10000, though neither does alone");
+    assertEquals(6_000, customer.usedCredit().amountMinor());
+    assertEquals(4_000, customer.availableCredit().amountMinor());
+  }
+
+  @Test
+  void releasedCreditBecomesAvailableAgain() {
+    Customer customer = customerWithLimit(10_000);
+    customer.reserveCredit(Money.of(8_000, "USD"));
+
+    customer.releaseCredit(Money.of(8_000, "USD"));
+
+    assertEquals(0, customer.usedCredit().amountMinor());
+    // The whole point of releasing: an order that used to be refused now fits.
+    customer.reserveCredit(Money.of(10_000, "USD"));
+    assertEquals(10_000, customer.usedCredit().amountMinor());
+  }
+
+  @Test
+  void releasingMoreThanWasCommittedFailsRatherThanInventingHeadroom() {
+    Customer customer = customerWithLimit(10_000);
+    customer.reserveCredit(Money.of(3_000, "USD"));
+
+    assertThrows(DomainException.class, () -> customer.releaseCredit(Money.of(4_000, "USD")));
+  }
+
+  @Test
+  void aFreshCustomerHasCommittedNothing() {
+    Customer customer = customerWithLimit(10_000);
+
+    assertEquals(0, customer.usedCredit().amountMinor());
+    assertEquals(10_000, customer.availableCredit().amountMinor());
+    assertEquals(10_000, customer.creditLimit().amountMinor());
+  }
+
+  @Test
+  void aReconstitutedCustomerCarriesItsCommittedCreditAndVersion() {
+    Customer customer =
+        Customer.reconstitute(ID, "Ada", Money.of(10_000, "USD"), Money.of(2_500, "USD"), 7L);
+
+    assertEquals(2_500, customer.usedCredit().amountMinor());
+    assertEquals(7_500, customer.availableCredit().amountMinor());
+    assertFalse(customer.version() == 0, "a stored customer is not a new one");
   }
 
   @Test

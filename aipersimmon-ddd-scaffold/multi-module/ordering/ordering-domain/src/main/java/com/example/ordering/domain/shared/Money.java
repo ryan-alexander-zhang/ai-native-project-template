@@ -25,6 +25,21 @@ public record Money(long amountMinor, String currency) {
     return new Money(amountMinor + other.amountMinor, currency);
   }
 
+  /**
+   * The difference, which must not go negative — the record's own guard enforces that. Callers
+   * subtracting a committed amount (releasing reserved credit, say) should already know the amount
+   * was committed; a negative result means their bookkeeping is wrong, and failing here is how they
+   * find out rather than silently carrying a nonsensical balance.
+   */
+  public Money minus(Money other) {
+    requireSameCurrency(other);
+    if (other.amountMinor > amountMinor) {
+      throw new DomainException(
+          "cannot subtract " + other.amountMinor + " from " + amountMinor + " " + currency);
+    }
+    return new Money(amountMinor - other.amountMinor, currency);
+  }
+
   public Money times(int factor) {
     if (factor < 0) {
       throw new DomainException("factor must be >= 0");

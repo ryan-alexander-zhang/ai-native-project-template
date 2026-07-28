@@ -9,14 +9,22 @@ import com.example.ordering.domain.order.Orders;
 import com.example.ordering.domain.shared.OrderingErrorCode;
 import org.springframework.stereotype.Component;
 
-/** Handles {@link CancelOrder}: drives the aggregate's state machine, then publishes its events. */
+/**
+ * Handles {@link CancelOrder}: drives the aggregate's state machine, then publishes its events.
+ *
+ * <p>This is the compensation entry point — the process manager sends it when stock cannot be
+ * reserved, when payment is declined, and when the payment deadline expires — so it is also where
+ * most of the credit released in this system comes back (see {@link CustomerCredit}).
+ */
 @Component
 public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
 
   private final Orders orders;
+  private final CustomerCredit credit;
 
-  public CancelOrderHandler(Orders orders) {
+  public CancelOrderHandler(Orders orders, CustomerCredit credit) {
     this.orders = orders;
+    this.credit = credit;
   }
 
   @Override
@@ -33,6 +41,7 @@ public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {
     order.cancel(command.reason());
 
     orders.save(order);
+    credit.releaseFor(order);
     return null;
   }
 }
