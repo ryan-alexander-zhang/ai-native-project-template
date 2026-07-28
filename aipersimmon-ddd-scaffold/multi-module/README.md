@@ -145,10 +145,10 @@ drives inventory and the process manager.
 | Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
 | Dead letters and operator replay | `DeadLetterOpsController` over the `DeadLetters` + `DeadLetterStore` ports (`GET /ops/dead-letters` cursor-paged, `GET /ops/dead-letters/{id}`, `POST /ops/dead-letters/{id}/replay`) | `DeadLetterReplayTest` |
 | `Specification` answers, `Invariant` refuses | `CancellableByCustomer` (on `OrderSnapshot.cancellableByCustomer`) vs `OrderLifecyclePolicy`; `POST /orders/{id}/cancel` | `CancellableByCustomerTest`, `SelfCancelTest` |
-| Business-key idempotency (at-most-once) | `AuthorizePaymentHandler` + `PaymentOperations` port | `AuthorizePaymentIdempotencyTest` |
+| Business-key idempotency (decide once, announce every time) | `AuthorizePaymentHandler` + `PaymentOperations` over `payment_operations` — claimed in the command's own transaction, so a rolled-back publish takes the claim with it | `AuthorizePaymentIdempotencyTest` (unit), `PaymentOperationAtomicityTest` (e2e) |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
 | Web error contract (RFC 9457) | `OrderingProblemCatalog` (composition root) | `ExceptionContractTest` |
-| Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/src/main/resources/db/migration/` (`V1` tables → `V2` tenancy → `V3` version → `V4` tenant-scoped keys + indexes) | `OutboxAtomicityTest` |
+| Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/src/main/resources/db/migration/` (`V1` tables → `V2` tenancy → `V3` version → `V4` tenant-scoped keys + indexes → `V5` customer credit → `V6` payment operations) | `OutboxAtomicityTest` |
 | Architecture rules (layering, context isolation, event placement) | `AiPersimmonDddRules` applied over `com.example` | `ArchitectureTest`, `PackageInfoTest` |
 
 ## What each capability cost to adopt

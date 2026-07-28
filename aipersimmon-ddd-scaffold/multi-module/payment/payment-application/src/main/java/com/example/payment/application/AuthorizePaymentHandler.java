@@ -7,6 +7,7 @@ import com.example.payment.api.PaymentAuthorized;
 import com.example.payment.api.PaymentDeclined;
 import com.example.payment.domain.AuthorizationPolicy;
 import com.example.payment.domain.PaymentDecision;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,11 +18,26 @@ import org.springframework.stereotype.Component;
  *
  * <p>Authorising a payment is an irreversible action, so it is guarded by the {@code
  * paymentOperationId} business idempotency key rather than trusting transport-level dedupe alone
- * (design-00004 §13.2). The handler claims the operation in {@link PaymentOperations} before it
- * authorises: the first delivery of an operation wins the claim, decides, and announces the
- * outcome; any redelivery of the same operation loses the claim and returns without authorising or
- * re-announcing — so an at-least-once redelivery produces exactly one authorisation and one outcome
- * event.
+ * (design-00004 §13.2).
+ *
+ * <h2>Decide once, announce every time</h2>
+ *
+ * <p>The shape below is the point of this class, and it is not the obvious one. A redelivery does
+ * <em>not</em> return silently: it looks up the decision already recorded and republishes it. The
+ * authorization happens at most once — that is what the log is for — but the outcome event is
+ * emitted on every delivery, because the whole premise of at-least-once delivery is that the
+ * previous one may never have arrived. Returning silently would make the guarantee "exactly one
+ * authorization and <em>at most</em> one outcome", which is a different and much weaker promise
+ * than the one this flow is built on (issue-00069).
+ *
+ * <p>Republishing is safe because the reader is idempotent by construction: {@code
+ * OrderFulfilmentDefinition} dispatches on {@code (step, input)}, so a second {@code
+ * PaymentAuthorized} arriving after the flow has moved on is ignored rather than acted on.
+ *
+ * <p>Both halves run in the command's transaction, which is the property the pattern actually
+ * depends on — see {@link PaymentOperations}. If the publish rolls back, so does the record, and
+ * the redelivery genuinely re-authorises rather than finding a claim left behind by work that never
+ * committed.
  */
 @Component
 public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment, Void> {
@@ -38,11 +54,20 @@ public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment,
 
   @Override
   public Void handle(AuthorizePayment command, CommandContext context) {
-    PaymentDecision decision = authorization.decide(command.amountMinor(), command.currency());
-    if (!operations.recordIfFirst(command.paymentOperationId(), decision)) {
-      // A redelivery of an already-authorised operation: idempotent no-op, do not authorise again.
-      return null;
+    Optional<PaymentDecision> recorded = operations.find(command.paymentOperationId());
+
+    // Decide only when this operation has never been decided. On a redelivery the recorded
+    // decision is reused verbatim — re-running the policy could reach a different answer if a
+    // rule or a rate changed in between, and an operation must not have two outcomes.
+    PaymentDecision decision =
+        recorded.orElseGet(() -> authorization.decide(command.amountMinor(), command.currency()));
+    if (recorded.isEmpty()) {
+      operations.record(command.paymentOperationId(), decision);
     }
+
+    // One exit for both paths: first delivery and redelivery announce the same outcome the same
+    // way. Nothing here distinguishes them, which is exactly the property that makes a lost
+    // outcome event recoverable.
     switch (decision) {
       case PaymentDecision.Authorized ignored ->
           integrationEvents.publish(new PaymentAuthorized(command.orderId()), context);

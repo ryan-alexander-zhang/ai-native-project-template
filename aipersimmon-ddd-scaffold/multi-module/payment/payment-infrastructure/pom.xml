@@ -39,5 +39,26 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
     </dependency>
+    <!--
+      MyBatis, for the payment_operations table. This context still owns no persisted aggregate —
+      the table is a business-idempotency log, a technical outbound adapter — but the log has to be
+      written through the *caller's* transaction, on the same DataSource as the outbox. That
+      co-transactionality, not durability, is what makes the at-most-once authorization pattern
+      correct (issue-00069), and it is why a ConcurrentHashMap could not stand in for it.
+
+      A plain @Mapper with two statements, not the MybatisPlusAggregateRepository the other two
+      contexts use: there is no aggregate here, no identity to load and no version to check.
+    -->
+    <!-- No <version>: the reactor root imports mybatis-plus-bom, which manages it. Same
+         dependency the other two infrastructure modules take; it carries the org.apache.ibatis
+         annotations this mapper uses. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+    </dependency>
   </dependencies>
 </project>

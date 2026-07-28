@@ -2,7 +2,7 @@
 id: issue-00069-payment-idempotency-claim-is-outside-the-transaction
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -108,7 +108,50 @@ publish(decision, command, context);            // 首次与重投递走同一�
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。三条修复全做。
+
+- **（1）认领进事务**：`InMemoryPaymentOperations` 删除，改为 `MyBatisPaymentOperations` +
+  `PaymentOperationMapper` 两条语句，落在 `V6__payment_operations.sql` 的
+  `payment_operations(tenant_id, operation_id, outcome, decline_code, decline_reason, recorded_at)`，
+  主键 `(tenant_id, operation_id)`。mapper 走命令的 `SqlSession`，与 outbox 同事务同生共死。
+  payment 因此获得第一张表——如本 issue 所述，这不违背"payment 不拥有持久化聚合"，
+  幂等日志本来就是技术性出站适配器。
+- **（2）重投递改重发**：`AuthorizePaymentHandler` 改成本 issue 给的形状
+  （`find` → `orElseGet(decide)` → 仅首次 `record` → **首投与重投走同一条出口**）。
+  `find()` 从此不再是死方法（[[issue-00082-domain-surface-no-use-case-can-reach]] 的一处随之消除）。
+  重发安全性按本 issue 的要求先确认过：`OrderFulfilmentDefinition` 的 `(step, input)` 分派
+  对重复 `PaymentAuthorized` 走 `ignore`。
+- **（3）注释改对**：`PaymentOperations`、`MyBatisPaymentOperations`、`payment/pom.xml`、
+  `V6` 全部改写为——**要的不是"持久"，是"与副作用同事务"**，持久只是必要条件之一。
+  端口的 javadoc 还解释了为什么拆成 `find` + `record` 而不保留 `recordIfFirst`：
+  布尔只能回答"我能继续吗"，这个形状会把调用方推向"重投递静默返回"，而静默正是错的。
+
+**端口签名换了，不只是实现换了**：`recordIfFirst(id, decision) -> boolean` 删除，
+改为 `find(id)` + `record(id, decision)`（重复即抛）。并发不再靠 check-then-act：
+两个首投都 `find` 到空、都 `decide`、输家 `INSERT` 撞主键 → 回滚 → 重试时 `find` 到赢家的决定并重发。
+**约束本身就是认领**，中间没有窗口。
+
+**决定性的负向对照**（正是本 issue 论点的要害）：把实现换成一张**真表、但用
+`PROPAGATION_REQUIRES_NEW` 写**，`aClaimDoesNotSurviveARolledBackTransaction` 立刻红——
+`the claim must roll back ... expected: <0> but was: <1>`。
+**持久化没有修好任何东西**，认领照样活过了回滚。这条对照比"换回 ConcurrentHashMap"更有说服力，
+后者因为根本不写表，会以错误的理由失败。
+
+测试：
+- `AuthorizePaymentIdempotencyTest`（单元，4 条）**原有两条断言被改了**——
+  它们此前钉的是"重投递只发一个事件"，也就是本 issue 要修掉的行为。
+  现在断言"授权一次、事件两次"，并新增一条：输掉并发认领的一方抛异常且不发布任何东西。
+- `PaymentOperationAtomicityTest`（端到端，2 条）按本 issue 复现段落地，
+  事务内拦截器照抄 `OutboxAtomicityTest.FailInsideTransaction` 的形状（改为可按测试武装）。
+
+**未做**：`payment_operations` 没有清理任务。幂等日志会无界增长，
+真实部署需要按保留期清理（框架的 outbox/inbox 都有 `cleanup`，这张表没有）。
+不在本 issue 范围，值得单独落一条。
+
+验证：`mvn -o verify -pl start -am` 全绿，73 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
+（SpotBugs 顺带影响了实现选择：持有注入的 `JdbcTemplate` 触发 `EI_EXPOSE_REP2`，
+而共享豁免清单在库的 `aipersimmon-ddd-quality-config` 里、且只列库自己的类；
+改用 `@Mapper` 接口既避开了这个问题，也与另外两个上下文的持久化写法一致。）
 
 ## 关联
 

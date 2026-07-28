@@ -15,9 +15,15 @@
     Aggregator for the payment bounded context. Like inventory it has no HTTP surface: it
     reacts to ordering's PaymentRequested integration event and answers with its own. Its
     authorization decision is a pure rule, but it is not stateless: it keeps an at-most-once
-    operation-dedupe log behind the PaymentOperations port. That log is an outbound adapter,
-    so it lives in payment-infrastructure (in memory here — this context owns no persisted
-    aggregate, so it has no MyBatis persistence module the way ordering/inventory do).
+    operation-dedupe log behind the PaymentOperations port. That log is an outbound adapter, so it
+    lives in payment-infrastructure — a payment_operations table (V6) reached with a plain
+    JdbcTemplate, not a MyBatis persistence module, because this context still owns no persisted
+    aggregate and the log needs no mapping.
+
+    It has to be a table, and specifically a table on the shared DataSource. The requirement is not
+    durability but co-transactionality: recording a decision and publishing its outcome must commit
+    or roll back together, or a claim can outlive the event it was claimed for and the outcome is
+    lost permanently. See issue-00069 and the PaymentOperations javadoc.
   -->
   <artifactId>payment</artifactId>
   <packaging>pom</packaging>
