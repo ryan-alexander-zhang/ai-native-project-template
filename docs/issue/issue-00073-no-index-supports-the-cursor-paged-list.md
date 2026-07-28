@@ -2,7 +2,7 @@
 id: issue-00073-no-index-supports-the-cursor-paged-list
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -94,7 +94,36 @@ CREATE INDEX reservations_by_order     ON inventory.reservations (tenant_id, ord
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。四条索引落在 `V4__tenant_scoped_keys_and_indexes.sql`（与
+[[issue-00091-the-order-lines-foreign-key-omits-the-tenant]] 合并为同一个迁移，如本 issue 所建议）。
+
+- 索引按修复方案原样落地：`orders_by_customer_newest_first (tenant_id, customer_id, id DESC)`、
+  `order_lines_by_order`、`reservation_lines_by_reservation`、`reservations_by_order`。
+- 断言方式改了。**原设想的 `assertFalse(plan.contains("Seq Scan"))` 会假通过**——这一点是实测出来的：
+  拿掉 `V4` 跑负向对照，计划是
+
+  ```
+  Limit  (cost=0.13..12.20 rows=3 width=37)
+    ->  Index Scan Backward using orders_pkey on orders o
+          Index Cond: ((id)::text < 'ffff...'::text)
+          Filter: (((tenant_id)::text = 'acme') AND ((customer_id)::text = 'CUST-PLAN'))
+  ```
+
+  没有索引时规划器并不退化成 Seq Scan，而是走主键索引再 `Filter` 掉两个谓词——
+  代价仍是"扫完该租户全部订单"，但计划里没有 `Seq Scan` 三个字。
+  所以测试改为断言**计划点名了那条索引**（`orders_by_customer_newest_first` /
+  `order_lines_by_order`），这也更贴合本 issue 要钉的东西：不是"有某条索引可用"，
+  而是"有一条索引恰好覆盖了谓词 + 游标 + 排序"。
+- 测试落在 `OrderListPagingTest.aPageIsAnsweredByAnIndexRangeScanNotAFullScan`，
+  刻意与该类既有的正确性用例同处一室——本 issue 的论点就是两者是两件事，放在一起才看得见。
+  用 `ConnectionCallback` 在同一条连接上 `SET enable_seqscan = off` → `EXPLAIN` → `RESET`
+  （`JdbcTemplate` 每次调用各借一条连接，SET 会落到别的会话上）。
+- 注释按要求补了，且是本 issue 真正的产出：`OrderListMapper` javadoc 新增一段讲
+  **正确性来自 UUIDv7、性能来自复合索引，缺任一都不报错**；`FindCustomerOrders` 的
+  "游标消除重扫"论断补上了"但只有索引让一页的代价等于一页"。
+- 负向对照：移走 `V4` 后该测试红（上面的计划即其失败输出）；恢复后绿。
+  注意 `target/classes` 里的旧副本会让对照失效，须一并删除。
+- 验证：`mvn -o test -pl start -am` 全绿，`start` 模块 56 个测试 0 失败。
 
 ## 关联
 

@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +24,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -218,5 +223,87 @@ class OrderListPagingTest {
     List<String> ids = new ArrayList<>();
     page.path("items").forEach(item -> ids.add(item.path("id").asText()));
     return ids;
+  }
+
+  /**
+   * The tests above prove the cursor is <em>correct</em>. This one proves it is <em>cheap</em>, and
+   * nothing else here can: an unindexed cursor query returns exactly the same right pages, just by
+   * reading the whole table to find them — which is the cost cursor paging exists to avoid. The two
+   * properties come from different places (time-ordered ids; an index) and only one of them was
+   * ever asserted, which is how a scaffold ends up teaching half a technique (issue-00073).
+   */
+  @Test
+  void aPageIsAnsweredByAnIndexRangeScanNotAFullScan() {
+    String customer = customer(TENANT, "CUST-PLAN");
+    for (int i = 0; i < 3; i++) {
+      placeOrder(TENANT, customer, 1);
+    }
+    jdbc.execute("ANALYZE ordering.orders");
+    jdbc.execute("ANALYZE ordering.order_lines");
+
+    String listPlan =
+        plan(
+            "SELECT o.id FROM ordering.orders o"
+                + " WHERE o.tenant_id = ? AND o.customer_id = ? AND o.id < ?"
+                + " ORDER BY o.id DESC LIMIT 21",
+            TENANT,
+            customer,
+            "ffffffff-ffff-ffff-ffff-ffffffffffff");
+    assertTrue(
+        listPlan.contains("orders_by_customer_newest_first"),
+        () ->
+            "the page must be one range scan of the (tenant_id, customer_id, id DESC) index:\n"
+                + listPlan);
+
+    String linesPlan =
+        plan(
+            "SELECT line_no FROM ordering.order_lines WHERE tenant_id = ? AND order_id = ?",
+            TENANT,
+            "any-order-id");
+    assertTrue(
+        linesPlan.contains("order_lines_by_order"),
+        () ->
+            "the join/child-read side needs its own index — PostgreSQL does not index the child"
+                + " side of a foreign key:\n"
+                + linesPlan);
+  }
+
+  /**
+   * {@code EXPLAIN} with sequential scans priced out of reach, so the plan shows which index path
+   * <em>exists</em> rather than which one the planner happens to prefer on a table this small.
+   *
+   * <p>The caller asserts on the index's <em>name</em>, not on the absence of "Seq Scan", and that
+   * is deliberate: with no index at all the planner does not fall back to a full scan here, it
+   * walks the primary key and applies the two predicates as a Filter — same cost, no "Seq Scan" in
+   * the plan. Naming the index is the only assertion that actually distinguishes the two.
+   *
+   * <p>Run through a single {@link Connection} because the SET is session state and {@link
+   * JdbcTemplate} borrows a fresh connection per call; RESET in a finally so the pooled connection
+   * goes back unchanged.
+   */
+  private String plan(String sql, Object... args) {
+    return jdbc.execute(
+        (ConnectionCallback<String>)
+            connection -> {
+              try (Statement session = connection.createStatement()) {
+                session.execute("SET enable_seqscan = off");
+              }
+              try (PreparedStatement explain = connection.prepareStatement("EXPLAIN " + sql)) {
+                for (int i = 0; i < args.length; i++) {
+                  explain.setObject(i + 1, args[i]);
+                }
+                StringBuilder plan = new StringBuilder();
+                try (ResultSet rows = explain.executeQuery()) {
+                  while (rows.next()) {
+                    plan.append(rows.getString(1)).append('\n');
+                  }
+                }
+                return plan.toString();
+              } finally {
+                try (Statement session = connection.createStatement()) {
+                  session.execute("RESET enable_seqscan");
+                }
+              }
+            });
   }
 }

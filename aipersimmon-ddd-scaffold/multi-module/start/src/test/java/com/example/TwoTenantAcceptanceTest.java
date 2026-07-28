@@ -2,6 +2,7 @@ package com.example;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -113,6 +115,33 @@ class TwoTenantAcceptanceTest {
             String.class,
             "%" + order + "%");
     assertEquals("acme", tenant);
+  }
+
+  /**
+   * The isolation above is enforced by the MyBatis-Plus tenant-line interceptor — that is, by the
+   * application. This asserts the other half: the database refuses a cross-tenant reference on its
+   * own, so a data-fix script, a migration, an operator at a psql prompt, or the raw {@link
+   * JdbcTemplate} used right here cannot file one tenant's row under another tenant's parent.
+   *
+   * <p>Deliberately written with the raw template, which the interceptor never sees. Before {@code
+   * V4} the foreign key was {@code order_lines.order_id} alone and this INSERT succeeded
+   * (issue-00091): tenant isolation had exactly one enforcement point, and everything that went
+   * around it had none.
+   */
+  @Test
+  void anOrderLineCannotBeFiledUnderAnotherTenantsOrder() {
+    String acmeOrder = TenantContext.runAs(ACME, () -> place());
+
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () ->
+            jdbc.update(
+                "INSERT INTO ordering.order_lines"
+                    + " (order_id, line_no, sku, quantity, unit_minor, currency, tenant_id)"
+                    + " VALUES (?, 99, 'SKU-1', 1, 100, 'USD', ?)",
+                acmeOrder,
+                GLOBEX.value()),
+        "the composite foreign key must refuse an acme order's line filed under globex");
   }
 
   /** Places a no-review order for CUST-1/SKU-1 and awaits the process manager confirming it. */

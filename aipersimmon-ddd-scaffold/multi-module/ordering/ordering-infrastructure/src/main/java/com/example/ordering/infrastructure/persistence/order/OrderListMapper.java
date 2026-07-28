@@ -19,6 +19,16 @@ import org.apache.ibatis.annotations.Select;
  * re-scan. This only works because ids are time-ordered — with random UUIDs this query would need
  * its own timestamp column and index.
  *
+ * <p><strong>Two separate things hold this up, and losing either is silent.</strong> The
+ * <em>correctness</em> of the cursor — no repeats, no gaps, however many orders arrive mid-walk —
+ * comes from the time-ordered id above. The <em>performance</em> of the cursor comes from an index
+ * that turns this whole statement into one range scan: {@code orders_by_customer_newest_first} on
+ * {@code (tenant_id, customer_id, id DESC)}, which is exactly the predicate below plus the
+ * interceptor's tenant column plus the sort, and {@code order_lines_by_order} for the join side
+ * (both in {@code V4}). Without them the query still returns the right page — it just reads the
+ * whole table to find it, which is the cost cursor paging exists to avoid. A functional test cannot
+ * tell those two apart, so {@code OrderListPagingTest} asserts the query plan as well as the pages.
+ *
  * <p><strong>Tenancy is not written here on purpose.</strong> {@code ordering.orders} and {@code
  * ordering.order_lines} are both in {@code aipersimmon.ddd.tenancy.mybatis-plus.tenant-tables}, so
  * the tenant-line interceptor adds {@code tenant_id = ?} to each of them as this statement is

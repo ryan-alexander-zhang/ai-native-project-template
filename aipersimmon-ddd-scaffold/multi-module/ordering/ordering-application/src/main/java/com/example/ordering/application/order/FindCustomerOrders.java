@@ -13,6 +13,10 @@ import com.aipersimmon.ddd.cqrs.page.Slice;
  * lexicographic order <em>is</em> their creation order. The time-ordered id decision pays for
  * itself twice: once in index locality on insert, once in not needing a separate sort key here.
  *
+ * <p>Worth being precise about what the cursor buys, because it is easy to over-claim: it removes
+ * the re-scan and the drift, but only an index makes a page cost the page rather than the table.
+ * Both halves are real work — see {@code OrderListMapper} and the {@code V4} migration.
+ *
  * @param customerId whose orders to list
  * @param cursor position from the previous page; null for the first page
  * @param size page size; the handler clamps it

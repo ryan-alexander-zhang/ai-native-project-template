@@ -2,7 +2,7 @@
 id: issue-00091-the-order-lines-foreign-key-omits-the-tenant
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -107,7 +107,28 @@ ALTER TABLE inventory.reservation_lines
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。落在 `V4__tenant_scoped_keys_and_indexes.sql`，与
+[[issue-00073-no-index-supports-the-cursor-paged-list]] 合并为同一个迁移。
+
+- **修复方案里的语句顺序是错的，已调整**：原稿先 `DROP CONSTRAINT orders_pkey`，
+  但子表外键正依赖该主键背后的唯一索引，PostgreSQL 会拒绝
+  （`cannot drop constraint ... because other objects depend on it`）。
+  正确顺序是 **先删子表外键 → 再换父表主键 → 最后加复合外键**，迁移里按此写，
+  并把"外键依赖它所指向的键的唯一索引"这句话留在注释里。
+- 两处父表主键改为 `(tenant_id, id)`，两处子表外键改为复合，约束显式命名
+  （`order_lines_order_fkey` / `reservation_lines_reservation_fkey`），不再依赖 PostgreSQL 的
+  自动命名——V1 的 `order_lines_order_id_fkey` 这类名字正是这次要靠猜的东西。
+- 主键形状变更对持久层无影响，如本 issue 所预判：`@TableId(type = IdType.INPUT)` 仍标在单列，
+  `StockDo` 早就是这个形态（`stocks` 自 V2 起就是复合主键）。全量测试确认。
+  另核对了全仓 `ON CONFLICT` 用法，14 处全部针对 `customers` / `stocks`，无一涉及本次改动的两张表。
+- `V2:25-27` 那段注释按要求更新：论断保留（它对主键成立），补一句它被误读到了外键上，
+  并指向 V4。这正是根因分析第 3 条要留下的东西。
+- 测试落在 `TwoTenantAcceptanceTest.anOrderLineCannotBeFiledUnderAnotherTenantsOrder`，
+  与该类既有的拦截器隔离用例并列——一条证明应用层拦得住，一条证明绕过应用层也拦得住。
+- 负向对照：移走 `V4` 后该测试红
+  （`Expected DataIntegrityViolationException to be thrown, but nothing was thrown`），
+  即本 issue 复现步骤所述的"当前这条 INSERT 会成功"；恢复后绿。
+- 验证：`mvn -o test -pl start -am` 全绿，`start` 模块 56 个测试 0 失败。
 
 ## 关联
 

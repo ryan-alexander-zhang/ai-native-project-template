@@ -25,6 +25,11 @@ ALTER TABLE inventory.reservation_lines ADD COLUMN tenant_id VARCHAR(64) NOT NUL
 -- the composite key would be silently defeated — the §6 unique-key trap). orders.id and
 -- reservations.id are framework-side globally-unique UUIDs, so their key is left single-column and
 -- tenant_id is a plain data column there.
+--
+-- That last sentence is true about collisions and was wrongly read as true about references: it
+-- explains why two tenants cannot pick the same order id, not why a child row may point at a
+-- parent in another tenant. V4 corrects it — orders and reservations get composite primary keys
+-- after all, so the child foreign keys can carry tenant_id (issue-00091).
 ALTER TABLE ordering.customers DROP CONSTRAINT customers_pkey;
 ALTER TABLE ordering.customers ADD  PRIMARY KEY (tenant_id, id);
 

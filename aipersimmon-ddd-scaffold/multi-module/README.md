@@ -106,7 +106,7 @@ drives inventory and the process manager.
 | Business-key idempotency (at-most-once) | `AuthorizePaymentHandler` + `PaymentOperations` port | `AuthorizePaymentIdempotencyTest` |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
 | Web error contract (RFC 9457) | `OrderingProblemCatalog` (composition root) | `ExceptionContractTest` |
-| Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/.../V1__aggregates.sql` | `OutboxAtomicityTest` |
+| Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/src/main/resources/db/migration/` (`V1` tables → `V2` tenancy → `V3` version → `V4` tenant-scoped keys + indexes) | `OutboxAtomicityTest` |
 | Architecture rules (layering, context isolation, event placement) | `AiPersimmonDddRules` applied over `com.example` | `ArchitectureTest`, `PackageInfoTest` |
 
 ## What each capability cost to adopt
@@ -121,7 +121,7 @@ list tells you.
 | Versioned aggregate write | ~0 | — | row implements `VersionedRow` **and** carries `@Version`; table needs `version DEFAULT 1` | none — the base class carries it |
 | Conflict → 409 | 0 | — | none | the lock 409 is `about:blank` with no `code`, while a *domain* 409 is coded: the one a client should retry is the one it cannot recognise |
 | HTTP idempotency | ~8 (yaml) | `Idempotency-Key` | a MyBatis-Plus app still takes a **`-jdbc`** store module; `flyway.components` needs `web-store` | issue-00062, issue-00063 (startup failure), issue-00064 (replay lost `Location`) — all three fixed |
-| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 | issue-00065 (a missing query param was a 500) — fixed |
+| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 — and a page costs the page **only because** an index covers `(tenant_id, customer_id, id DESC)`; the two are separate, and losing either is silent | issue-00065 (a missing query param was a 500) — fixed; issue-00073 (no index existed; the paging tests passed anyway) — fixed in `V4` |
 | Deadlines | ~25 | `DeadlineName`, `ScheduleDeadline`, `CancelDeadline` | arm and cancel on every branch leaving the step; due time must come from `context.now()` | none — this API fits |
 | Dead letters + replay | ~45 | `DeadLetters` (read), `DeadLetterStore` (replay) | none | issue-00066: `replay(eventId)` with no way to obtain an `eventId` — fixed by the read port, which deleted this project's hand-written query |
 | `Specification` | ~30 | `Specification` | keep one statement of the rule, or the answer and the refusal drift | none |
