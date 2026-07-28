@@ -17,6 +17,15 @@ public class OrderDo implements VersionedRow {
   private String status;
 
   /**
+   * The order's total, frozen at write time from {@code Order.total()} (issue-00083). The read
+   * model selects these two columns instead of re-deriving the total in SQL, so the rule has one
+   * definition — the aggregate's — and the list query needs no join.
+   */
+  private Long totalMinor;
+
+  private String currency;
+
+  /**
    * Optimistic-lock version. {@code @Version} makes the MyBatis-Plus
    * OptimisticLockerInnerInterceptor rewrite an {@code updateById} into {@code SET version =
    * version + 1 ... WHERE version = ?}, so a writer working from a stale snapshot updates 0 rows
@@ -46,6 +55,22 @@ public class OrderDo implements VersionedRow {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public Long getTotalMinor() {
+    return totalMinor;
+  }
+
+  public void setTotalMinor(Long totalMinor) {
+    this.totalMinor = totalMinor;
+  }
+
+  public String getCurrency() {
+    return currency;
+  }
+
+  public void setCurrency(String currency) {
+    this.currency = currency;
   }
 
   @Override

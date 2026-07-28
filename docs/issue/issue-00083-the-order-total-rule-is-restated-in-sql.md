@@ -2,7 +2,7 @@
 id: issue-00083-the-order-total-rule-is-restated-in-sql
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -103,7 +103,26 @@ void aMixedCurrencyOrderCannotBeSummedByTheListQuery() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。**采用修复方案 1（物化总额）**，方案 2 因此不需要，方案 3 随之消失。
+
+- `V7__order_total.sql` 给 `ordering.orders` 加 `total_minor` / `currency`，
+  三步走（可空 → 回填 → `SET NOT NULL`），回填刻意复刻旧的读侧表达式：
+  对迁移前写入的行，那个表达式**就是**它们的历史总额。
+- `MyBatisOrders.toRow` 从 `order.total()` 写入两列——口径回到聚合这一处。
+- `OrderListMapper` 的 `LEFT JOIN` 与 `GROUP BY` 一起消失，查询退化为单表扫描，
+  如本 issue 所预测，顺带让 `orders_by_customer_newest_first`（V4）覆盖整条语句。
+  `MAX(l.currency)` 与 `COALESCE(..., 0)` 两个问题随之不复存在——
+  前者是"猜测而非规则"，后者让读侧给非法状态准备了一个显示值。
+- 复现段第一条（读写口径一致）落为 `theListedTotalIsTheAggregatesOwnTotal`。
+  它今天通过、修复前也会通过——**价值在口径分叉的那天变红**，这一点写进了测试 javadoc。
+  第二条（混币种）没有单独写：物化之后读侧根本不再做跨行求和，
+  混币种在写侧就被 `Money.plus` 拒绝，SQL 里已经没有可以出错的地方。
+
+顺带清理了两处因这次改动而失效的描述：`OrderListPagingTest` 的类 javadoc
+（"Each row is one SQL join with the line totals summed"）与用例名
+`aLineTotalIsSummedBySqlNotByLoadingTheAggregate` → `aPageIsAnsweredWithoutRehydratingAnyOrder`
+（[[issue-00070-ready-for-fulfilment-is-never-persisted]] 里的引用已同步更新）。
+留着它们就正好是本次评审反复在修的那类文档漂移。
 
 ## 关联
 

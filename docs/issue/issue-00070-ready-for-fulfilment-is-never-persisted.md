@@ -74,7 +74,8 @@ void aReviewFreeOrderIsCancellableByItsCustomerBeforeFulfilmentActuallyStarts() 
 }
 ```
 
-另有一条现成的反向证据可直接引用：`OrderListPagingTest.aLineTotalIsSummedBySqlNotByLoadingTheAggregate`
+另有一条现成的反向证据可直接引用：`OrderListPagingTest.aPageIsAnsweredWithoutRehydratingAnyOrder`
+（issue-00083 修复时由 `aLineTotalIsSummedBySqlNotByLoadingTheAggregate` 改名）
 （`:140`）断言刚下单的订单状态是 `FULFILMENT_IN_PROGRESS`——它把当前行为**钉住**了，
 修复时这条断言必须一起改。
 

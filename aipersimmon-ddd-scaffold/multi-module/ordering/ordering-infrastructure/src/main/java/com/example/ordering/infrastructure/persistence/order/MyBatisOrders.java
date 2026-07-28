@@ -46,6 +46,10 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
     header.setId(order.id().value());
     header.setCustomerId(order.customerId().value());
     header.setStatus(order.status().name());
+    // Frozen here rather than re-derived by the read model, so "total = Σ line subtotals" has one
+    // definition and the currency rule (Money.plus refuses to mix) travels with it (issue-00083).
+    header.setTotalMinor(order.total().amountMinor());
+    header.setCurrency(order.total().currency());
     return header;
   }
 

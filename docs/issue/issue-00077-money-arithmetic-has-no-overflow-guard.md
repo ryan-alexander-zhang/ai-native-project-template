@@ -2,7 +2,7 @@
 id: issue-00077-money-arithmetic-has-no-overflow-guard
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -105,7 +105,27 @@ private static long exact(LongSupplier op) {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修，按修复方案原样落地。
+
+- `Money.plus` / `times` 改用 `Math.addExact` / `Math.multiplyExact`，
+  经 `exact(LongSupplier)` 把 `ArithmeticException` 转成带码的 `DomainException`。
+- 新增 `OrderingErrorCode.AMOUNT_OVERFLOW`（建议项，已采纳）与 `QUANTITY_OUT_OF_RANGE`；
+  后者也补给了 `OrderLine` 原来无码的 `quantity must be > 0`。
+- `OrderLine.MAX_QUANTITY = 10_000`，与 `Order.MAX_LINES = 100` 对称。
+  注释写明理由：一行能有多少件是业务问题，交给 `int` 的宽度回答等于选了 2,147,483,647。
+- `Money.minus`（issue-00071 时新增）本来就拒绝为负，无需改动。
+- javadoc 记下了本 issue 根因第 3 条：真正的不变量是"金额可表示"，
+  而"金额非负"是它的**有损投影**——回绕成正数的情况完整地落在"非负"里。
+
+**本 issue 关于测试的警告是对的，而且实测验证了**：负向对照（把两处改回裸运算）中，
+`aMultiplicationThatWouldWrapToAPositiveNumberIsRefused` 与另两条一起红，其中一条的输出正是
+
+```
+must be reported as overflow, not as a negative amount: amount must be >= 0
+```
+
+——如果只写 `assertThrows(DomainException.class, ...)`，这条测试会**假绿**。
+所以三条断言全部检查 `errorCode()` 而不是异常类型。`MoneyTest` 从 10 条增至 14 条。
 
 ## 关联
 

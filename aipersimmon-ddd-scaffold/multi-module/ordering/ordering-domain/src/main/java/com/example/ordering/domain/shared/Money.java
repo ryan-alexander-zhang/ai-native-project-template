@@ -2,6 +2,7 @@ package com.example.ordering.domain.shared;
 
 import com.aipersimmon.ddd.core.annotation.ValueObject;
 import com.aipersimmon.ddd.core.exception.DomainException;
+import java.util.function.LongSupplier;
 
 /** A monetary amount in minor units (for example cents) with a currency. */
 @ValueObject
@@ -22,7 +23,7 @@ public record Money(long amountMinor, String currency) {
 
   public Money plus(Money other) {
     requireSameCurrency(other);
-    return new Money(amountMinor + other.amountMinor, currency);
+    return new Money(exact(() -> Math.addExact(amountMinor, other.amountMinor)), currency);
   }
 
   /**
@@ -44,7 +45,30 @@ public record Money(long amountMinor, String currency) {
     if (factor < 0) {
       throw new DomainException("factor must be >= 0");
     }
-    return new Money(amountMinor * factor, currency);
+    return new Money(exact(() -> Math.multiplyExact(amountMinor, (long) factor)), currency);
+  }
+
+  /**
+   * Runs a checked arithmetic operation, turning Java's wrap-around into a refusal.
+   *
+   * <p>The invariant this record actually needs is "the amount is representable", and "amount >= 0"
+   * in the constructor is a lossy projection of it: an addition that overflows into a positive
+   * number lands squarely inside "non-negative" and is accepted as a perfectly ordinary total
+   * (issue-00077). Where it overflows into a negative one the constructor does reject it — but
+   * reports "amount must be >= 0", which sends the reader looking for a negative input that does
+   * not exist. Both failures are worse than an explicit one.
+   *
+   * <p>Not an argument against {@code long} over {@code BigDecimal}: minor units in a {@code long}
+   * is the right model and the one payment processors use. It only has to be arithmetic that can
+   * fail.
+   */
+  private static long exact(LongSupplier operation) {
+    try {
+      return operation.getAsLong();
+    } catch (ArithmeticException overflow) {
+      throw new DomainException(
+          OrderingErrorCode.AMOUNT_OVERFLOW, "monetary amount is too large to represent");
+    }
   }
 
   public boolean lessThanOrEqual(Money other) {

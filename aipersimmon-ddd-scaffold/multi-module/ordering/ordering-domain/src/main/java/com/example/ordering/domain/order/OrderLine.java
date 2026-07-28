@@ -3,6 +3,7 @@ package com.example.ordering.domain.order;
 import com.aipersimmon.ddd.core.annotation.Entity;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.shared.Money;
+import com.example.ordering.domain.shared.OrderingErrorCode;
 
 /**
  * A line of an {@link Order}. Package-private on purpose: it is an internal entity of the
@@ -11,6 +12,16 @@ import com.example.ordering.domain.shared.Money;
  */
 @Entity
 class OrderLine {
+
+  /**
+   * The most of one SKU a single line may carry.
+   *
+   * <p>Symmetrical with {@link Order#MAX_LINES}: how many of something a customer can order is a
+   * business question, and leaving it to the width of {@code int} answers it with 2,147,483,647 — a
+   * number nobody chose. It also caps the multiplication in {@link #subtotal()}, which is one of
+   * the two places a monetary amount could be driven out of range (issue-00077).
+   */
+  static final int MAX_QUANTITY = 10_000;
 
   private final String sku;
   private final int quantity;
@@ -21,7 +32,13 @@ class OrderLine {
       throw new DomainException("sku required");
     }
     if (quantity <= 0) {
-      throw new DomainException("quantity must be > 0");
+      throw new DomainException(
+          OrderingErrorCode.QUANTITY_OUT_OF_RANGE, "quantity must be > 0, was " + quantity);
+    }
+    if (quantity > MAX_QUANTITY) {
+      throw new DomainException(
+          OrderingErrorCode.QUANTITY_OUT_OF_RANGE,
+          "quantity must be <= " + MAX_QUANTITY + ", was " + quantity);
     }
     this.sku = sku;
     this.quantity = quantity;

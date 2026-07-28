@@ -69,4 +69,54 @@ class MoneyTest {
     assertThrows(
         DomainException.class, () -> Money.of(100, "USD").lessThanOrEqual(Money.of(100, "EUR")));
   }
+
+  // ---------- overflow (issue-00077) ----------
+
+  /**
+   * The assertions check the message, not just the exception type, and that is the point. Before
+   * the fix an overflowing addition wrapped to a negative number and the constructor rejected it
+   * with "amount must be >= 0" — so a bare {@code assertThrows(DomainException.class, ...)} passed
+   * while the defect was fully present. A test that cannot tell the two refusals apart is a test
+   * that certifies the bug.
+   */
+  @Test
+  void additionRefusesToOverflowRatherThanWrappingAround() {
+    Money huge = Money.of(Long.MAX_VALUE, "USD");
+
+    DomainException overflow =
+        assertThrows(DomainException.class, () -> huge.plus(Money.of(1, "USD")));
+
+    assertEquals(
+        OrderingErrorCode.AMOUNT_OVERFLOW,
+        overflow.errorCode().orElse(null),
+        () -> "must be reported as overflow, not as a negative amount: " + overflow.getMessage());
+  }
+
+  @Test
+  void multiplicationRefusesToOverflowRatherThanWrappingAround() {
+    Money half = Money.of(Long.MAX_VALUE / 2, "USD");
+
+    DomainException overflow = assertThrows(DomainException.class, () -> half.times(4));
+
+    assertEquals(OrderingErrorCode.AMOUNT_OVERFLOW, overflow.errorCode().orElse(null));
+  }
+
+  /** The wrap-around that used to be silent: a positive, plausible, wrong answer. */
+  @Test
+  void aMultiplicationThatWouldWrapToAPositiveNumberIsRefused() {
+    // (2^63 / 3) * 4 wraps to a positive value well inside "non-negative", so the constructor
+    // would have accepted it and the caller would have been handed a smaller number than it asked
+    // for, with nothing to indicate anything had happened.
+    Money third = Money.of(Long.MAX_VALUE / 3, "USD");
+
+    DomainException overflow = assertThrows(DomainException.class, () -> third.times(4));
+
+    assertEquals(OrderingErrorCode.AMOUNT_OVERFLOW, overflow.errorCode().orElse(null));
+  }
+
+  @Test
+  void arithmeticWellInsideTheRangeIsUnaffected() {
+    assertEquals(300, Money.of(100, "USD").times(3).amountMinor());
+    assertEquals(150, Money.of(100, "USD").plus(Money.of(50, "USD")).amountMinor());
+  }
 }

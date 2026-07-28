@@ -133,16 +133,43 @@ class OrderListPagingTest {
   }
 
   @Test
-  void aLineTotalIsSummedBySqlNotByLoadingTheAggregate() {
+  void aPageIsAnsweredWithoutRehydratingAnyOrder() {
     String customer = customer(TENANT, "CUST-TOTALS");
     String id = placeOrder(TENANT, customer, 3);
 
     JsonNode item = itemFor(list(TENANT, customer, null, 20), id);
     assertNotNull(item, "the placed order must appear in its customer's list");
-    // 3 x 100 minor units, summed in the statement that read the row.
+    // 3 x 100 minor units, frozen onto the row at placement and read back verbatim.
     assertEquals(300, item.path("totalMinor").asLong());
     assertEquals("USD", item.path("currency").asText());
     assertEquals("FULFILMENT_IN_PROGRESS", item.path("status").asText());
+  }
+
+  /**
+   * The list's total is the aggregate's total, because there is only one of them (issue-00083).
+   *
+   * <p>This passes today and would have passed before the change too — its value is the day it
+   * stops passing. The read side used to re-derive {@code Σ quantity × unit_minor} in SQL, so the
+   * rule had two implementations; the first line discount, tax line or free-gift line added to the
+   * write side would have silently desynchronised them, and no existing assertion would have
+   * noticed, because they all use numbers both implementations happen to produce. Comparing the two
+   * sides directly is what turns that into a failure.
+   */
+  @Test
+  void theListedTotalIsTheAggregatesOwnTotal() {
+    String customer = customer(TENANT, "CUST-TOTAL-PARITY");
+    String id = placeOrder(TENANT, customer, 7);
+
+    long fromList = itemFor(list(TENANT, customer, null, 20), id).path("totalMinor").asLong();
+    Long fromRow =
+        jdbc.queryForObject(
+            "SELECT total_minor FROM ordering.orders WHERE tenant_id = ? AND id = ?",
+            Long.class,
+            TENANT,
+            id);
+
+    assertEquals(700, fromList, "7 x 100 minor units");
+    assertEquals(fromList, fromRow, "the list reads the total the write side froze, not its own");
   }
 
   @Test

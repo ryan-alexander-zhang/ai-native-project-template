@@ -16,6 +16,13 @@ public enum OrderingErrorCode implements ErrorCode {
   TOO_MANY_LINES("ordering.too-many-lines", ErrorCategory.DOMAIN_RULE),
   DUPLICATE_SKU("ordering.duplicate-sku", ErrorCategory.DOMAIN_RULE),
   /**
+   * A monetary amount, or a quantity feeding one, is too large to represent. Coded rather than a
+   * bare DomainException so the refusal survives to the API edge as something a client can branch
+   * on instead of landing in the about:blank family (issue-00077).
+   */
+  AMOUNT_OVERFLOW("ordering.amount-overflow", ErrorCategory.DOMAIN_RULE),
+  QUANTITY_OUT_OF_RANGE("ordering.quantity-out-of-range", ErrorCategory.DOMAIN_RULE),
+  /**
    * An ordered SKU cannot currently be offered by the inventory context (unknown or out of stock).
    */
   STOCK_UNAVAILABLE("ordering.stock-unavailable", ErrorCategory.DOMAIN_RULE),
