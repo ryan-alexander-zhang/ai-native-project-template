@@ -7,6 +7,7 @@ import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
 import com.example.inventory.domain.stock.Reservations;
 import com.example.inventory.domain.stock.Sku;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,18 +48,32 @@ public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservat
     return header;
   }
 
+  /**
+   * Writes the held quantities, and only when the aggregate says they changed.
+   *
+   * <p>A release changes {@code released} and nothing else, so rewriting every held row on that
+   * save deleted and re-inserted the rows already there — pure cost, scaling with the line count
+   * (issue-00090). The aggregate is asked rather than tracked, and the delete is kept for when the
+   * flag is set, so a future partial-release use case gets replace semantics with no change here.
+   */
   @Override
   protected void saveChildren(Reservation reservation) {
+    if (!reservation.heldSetChanged()) {
+      return;
+    }
     String id = reservation.id().value();
     lines.delete(
         new LambdaQueryWrapper<ReservationLineDo>().eq(ReservationLineDo::getReservationId, id));
+    List<ReservationLineDo> rows = new ArrayList<>();
     for (Map.Entry<Sku, Integer> held : reservation.held()) {
       ReservationLineDo row = new ReservationLineDo();
       row.setReservationId(id);
       row.setSku(held.getKey().value());
       row.setQuantity(held.getValue());
-      lines.insert(row);
+      rows.add(row);
     }
+    // One statement rather than one per SKU; creation is the only path that writes these rows.
+    lines.insert(rows);
   }
 
   @Override

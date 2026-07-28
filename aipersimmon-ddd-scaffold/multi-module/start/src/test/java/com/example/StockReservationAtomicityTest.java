@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.aipersimmon.ddd.tenancy.TenantId;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import com.example.inventory.application.stock.ReleaseStock;
 import com.example.inventory.application.stock.ReserveStock;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -135,6 +136,55 @@ class StockReservationAtomicityTest {
                 Integer.class,
                 "order-merge",
                 "SKU-MERGE"));
+  }
+
+  /**
+   * A status-only save leaves the child rows alone (issue-00090).
+   *
+   * <p>Asserted with PostgreSQL's {@code xmin} — the id of the transaction that last wrote each
+   * row. Rewriting a row produces a new version with a new {@code xmin}, so an unchanged value is
+   * direct evidence the rows were not touched. Nothing else here could show it: a
+   * delete-and-reinsert of identical data is invisible in the data itself, which is exactly why the
+   * wasted work went unnoticed.
+   */
+  @Test
+  void aLifecycleTransitionDoesNotRewriteTheReservationLines() {
+    stock("SKU-KEEP", 100);
+    reserve("order-keep", new ReserveStock.Line("SKU-KEEP", 4));
+
+    List<Long> before = lineVersionsFor("order-keep");
+    assertEquals(1, before.size(), "one held line to watch");
+
+    // Releasing changes only the reservation header's `released` flag; its held quantities are
+    // untouched, so saveChildren has nothing to do.
+    TenantContext.runAs(TENANT, () -> commandBus.send(new ReleaseStock(reservationIdFor())));
+
+    assertEquals(
+        before,
+        lineVersionsFor("order-keep"),
+        "the reservation's lines must not be deleted and re-inserted to arrive at the rows that"
+            + " were already there");
+  }
+
+  /** Each held line's row version — PostgreSQL's own last-writer transaction id. */
+  private List<Long> lineVersionsFor(String orderId) {
+    return jdbc.queryForList(
+        "SELECT l.xmin::text::bigint FROM inventory.reservation_lines l"
+            + " JOIN inventory.reservations r"
+            + "   ON r.tenant_id = l.tenant_id AND r.id = l.reservation_id"
+            + " WHERE r.tenant_id = ? AND r.order_id = ?"
+            + " ORDER BY l.sku",
+        Long.class,
+        TENANT.value(),
+        orderId);
+  }
+
+  private String reservationIdFor() {
+    return jdbc.queryForObject(
+        "SELECT id FROM inventory.reservations WHERE tenant_id = ? AND order_id = ?",
+        String.class,
+        TENANT.value(),
+        "order-keep");
   }
 
   private void reserve(String orderId, ReserveStock.Line... lines) {

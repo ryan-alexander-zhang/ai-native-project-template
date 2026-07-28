@@ -2,7 +2,7 @@
 id: issue-00090-order-lines-are-rewritten-on-every-save
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -95,7 +95,28 @@ void confirmingAnOrderDoesNotRewriteItsLines() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。修复方案 1 + 2 都做了；第 3 条（索引）已随
+[[issue-00073-no-index-supports-the-cursor-paged-list]] 在 `V4` 落地。
+
+- **方案 1**：`Order.lineSetChanged` / `Reservation.heldSetChanged` —— 瞬态标志，只在
+  `place` / 构造器置位，`reconstitute` 清零；两个 `saveChildren` 据此短路。
+  **两个聚合都做了**：本 issue 标题说的是 order_lines，但 `MyBatisReservations` 有完全相同的形状，
+  而且释放（只改 `released`）正是那条最典型的浪费路径。
+  没有把能力上提到库的 `MybatisPlusAggregateRepository`（本 issue 提到的"更彻底的做法"）——
+  那要改库的公开 API，且 scaffold 侧先证明这个形状有用更合理。
+- **方案 2**：`lines.insert(row)` 逐行 → `lines.insert(rows)` 批量，N 次往返变 1 次。
+- **注释按要求重写**，这是本 issue 真正的产出：不再说"行集很小所以整体重写"，
+  而是说明**为什么此处不做变更追踪**（问聚合，而不是猜）以及**这个短路的正确性边界**
+  （只在"没有东西能在不声明的情况下改行集"时成立，而这正是 `lineSetChanged()` 显式化的东西）。
+  `delete` 保留在标志置位的分支里，所以将来加行编辑用例仍是 replace 语义，适配器无需改动。
+
+测试用 PostgreSQL 的 `xmin`（最后写入该行的事务号）来断言"行没有被重写"——
+delete + 重新 insert 相同数据在数据本身里是**不可见的**，这也正是这份浪费一直没被发现的原因。
+`StockReservationAtomicityTest.aLifecycleTransitionDoesNotRewriteTheReservationLines`；
+负向对照（去掉短路）实测 `expected: <[800]> but was: <[801]>`。
+另有三条领域单测钉住标志本身的生命周期（place=true / reconstitute=false / 状态迁移后仍 false）。
+
+验证：`mvn -o verify -pl start -am` 全绿，75 个测试 0 失败。
 
 ## 关联
 

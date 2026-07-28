@@ -22,6 +22,20 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
   private final Map<Sku, Integer> heldBySku;
   private boolean released;
 
+  /**
+   * Whether this instance's held quantities differ from what is stored.
+   *
+   * <p>Transient — never persisted, never part of identity. It lets a persistence adapter ask the
+   * aggregate a question only the aggregate can answer instead of guessing, which it previously did
+   * by rewriting every held line on each save. A release changes only {@link #released}, yet the
+   * quantities were deleted and re-inserted to arrive at the rows already there (issue-00090).
+   *
+   * <p>Only ever true for a newly created reservation, because the held set is fixed at creation.
+   * Stated as a flag rather than assumed, so a future partial-release use case sets it and the
+   * adapter needs no change.
+   */
+  private boolean heldSetChanged;
+
   public Reservation(ReservationId id, String orderId, Map<Sku, Integer> heldBySku) {
     if (orderId == null || orderId.isBlank()) {
       throw new DomainException("a reservation must reference an order");
@@ -33,6 +47,7 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
     this.orderId = orderId;
     this.heldBySku = Map.copyOf(heldBySku);
     this.released = false;
+    this.heldSetChanged = true;
   }
 
   /**
@@ -51,12 +66,23 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
       long version) {
     Reservation reservation = new Reservation(id, orderId, heldBySku);
     reservation.released = released;
+    // These held rows came *from* the database, so there is nothing to write back. The public
+    // constructor marks them as new, which is right for a fresh reservation and wrong here.
+    reservation.heldSetChanged = false;
     reservation.restoreVersion(version);
     return reservation;
   }
 
   public String orderId() {
     return orderId;
+  }
+
+  /**
+   * Whether the stored held-quantity rows need rewriting — see {@link #heldSetChanged}. Called by
+   * the persistence adapter; {@code false} on a reconstituted reservation.
+   */
+  public boolean heldSetChanged() {
+    return heldSetChanged;
   }
 
   public boolean isReleased() {

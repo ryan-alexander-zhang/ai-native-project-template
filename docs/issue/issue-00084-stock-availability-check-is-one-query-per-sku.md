@@ -2,7 +2,7 @@
 id: issue-00084-stock-availability-check-is-one-query-per-sku
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -98,7 +98,24 @@ public interface StockQueries {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修，四条修复原样落地。
+
+- `inventory-application` 新增 `StockQueries` 读端口（非仓储，放 application 层）。
+- `inventory-infrastructure` 新增 `StockLevelMapper`（一条 `WHERE sku IN (<foreach>)`）、
+  `StockLevelRow`、`MyBatisStockQueries`。租户谓词交给拦截器，**没有手写**。
+- `CheckStockAvailabilityHandler` 改依赖 `StockQueries`，从"每个 SKU 一次 `findBySku`
+  并 rehydrate 一个 `Stock` 聚合去读一个 int"变成一次查询。
+- 实现类用 `@Component` 而非 `@Repository`，理由照 `MyBatisOrderQueries` 抄。
+- `inventory-infrastructure` 因此新增对 `inventory-application` 的依赖（此前只依赖 domain）：
+  读端口属于应用层，这一点在 pom 注释里写明了。
+
+**本 issue 特别提醒的语义保持住了并且被钉住**：`IN` 查不到的 SKU 由适配器补一行 `available = 0`，
+所以"未收录"与"缺货"对调用方仍然一样。`MyBatisStockQueriesTest` 三条：
+每个请求的 SKU 都有一行且顺序不变、重复 SKU 只查一次但按行数作答、空列表不发查询
+（空 `IN` 不是合法 SQL）。
+SQL 本身不单独测：`PlaceOrder` 每次下单都要查它，`start` 里所有验收测试都在跑这条语句。
+
+验证：`mvn -o verify -pl start -am` 全绿，75 个测试 0 失败。
 
 ## 关联
 

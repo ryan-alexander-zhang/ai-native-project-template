@@ -41,6 +41,17 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>inventory-domain</artifactId>
     </dependency>
+    <!--
+      inventory-application, for the StockQueries read port this module now implements. The other
+      adapters here implement domain repository ports, so inventory-domain was enough; a READ port
+      belongs to the application layer (the aggregate boundary governs writes, not reads), which is
+      why answering it needs this dependency. Same shape as ordering-infrastructure implementing
+      OrderQueries (issue-00084).
+    -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>inventory-application</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
@@ -50,6 +61,14 @@
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-core</artifactId>
+    </dependency>
+
+    <!-- Unit tests for the read adapter's own logic (filling in SKUs the IN clause did not find);
+         the SQL itself is covered end to end by every placement in `start`. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

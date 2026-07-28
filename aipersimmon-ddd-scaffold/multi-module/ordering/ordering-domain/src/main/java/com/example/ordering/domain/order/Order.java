@@ -47,6 +47,21 @@ public class Order extends AbstractAggregateRoot<OrderId> {
   private final List<OrderLine> lines;
   private OrderStatus status;
 
+  /**
+   * Whether this instance's line set differs from what is stored.
+   *
+   * <p>Transient — never persisted, never part of the aggregate's identity or equality. It exists
+   * so a persistence adapter can ask the aggregate a question only the aggregate can answer ("have
+   * my lines changed?") instead of guessing, which it previously did by rewriting the whole line
+   * set on every save: a confirm or a cancel touches only {@code status}, yet each one deleted and
+   * re-inserted every line at its own version (issue-00090).
+   *
+   * <p>Today it is only ever true for a freshly {@link #place}d order, because nothing else mutates
+   * the line set. That is the point rather than a shortcut: if a line-editing use case is added
+   * later, it sets this flag and the persistence adapter needs no change.
+   */
+  private boolean lineSetChanged;
+
   private Order(
       OrderId id, CustomerId customerId, List<OrderLine> lines, OrderStatus initialStatus) {
     this.id = id;
@@ -83,6 +98,7 @@ public class Order extends AbstractAggregateRoot<OrderId> {
     OrderStatus initial =
         review.isRequired() ? OrderStatus.AWAITING_REVIEW : OrderStatus.READY_FOR_FULFILMENT;
     Order order = new Order(id, customerId, lines, initial);
+    order.lineSetChanged = true;
     order.checkInvariant(new OrderHasDistinctSkus(lines));
     order.registerEvent(new OrderPlacedEvent(id, order.total()));
     if (initial == OrderStatus.READY_FOR_FULFILMENT) {
@@ -115,6 +131,14 @@ public class Order extends AbstractAggregateRoot<OrderId> {
     Order order = new Order(id, customerId, lines, status);
     order.restoreVersion(version);
     return order;
+  }
+
+  /**
+   * Whether the stored line set needs rewriting — see {@link #lineSetChanged}. Called by the
+   * persistence adapter; {@code false} on a reconstituted order whose lines were never touched.
+   */
+  public boolean lineSetChanged() {
+    return lineSetChanged;
   }
 
   /** This order's lines as raw {@link LineData}, so a persistence adapter can store them. */

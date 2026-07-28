@@ -53,12 +53,31 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
     return header;
   }
 
-  /** An order's line set is small and only set at placement, so it is rewritten wholesale. */
+  /**
+   * Writes the line set, and only when the aggregate says it changed.
+   *
+   * <p>There is no change tracking here on purpose — the aggregate is asked instead. It used to
+   * rewrite unconditionally, described as safe because "an order's line set is small and only set
+   * at placement". Both halves of that were true and the conclusion did not follow: precisely
+   * because lines are only set at placement, every <em>other</em> save — a confirm, a cancel, a
+   * begin-fulfilment, each of which touches only {@code status} — deleted and re-inserted the whole
+   * set to arrive at the rows already there. Pure cost, scaling with the line count, on every
+   * lifecycle transition (issue-00090).
+   *
+   * <p>Its bound is worth stating because it is what keeps the shortcut honest: this is only
+   * correct while nothing can mutate lines without saying so, which is exactly what {@code
+   * Order.lineSetChanged()} makes explicit rather than assumed. The delete is kept for when the
+   * flag is set, so a future line-editing use case gets replace semantics with no change here.
+   */
   @Override
   protected void saveChildren(Order order) {
+    if (!order.lineSetChanged()) {
+      return;
+    }
     String id = order.id().value();
     lines.delete(new LambdaQueryWrapper<OrderLineDo>().eq(OrderLineDo::getOrderId, id));
     List<LineData> lineData = order.lineData();
+    List<OrderLineDo> rows = new ArrayList<>(lineData.size());
     for (int i = 0; i < lineData.size(); i++) {
       LineData line = lineData.get(i);
       OrderLineDo row = new OrderLineDo();
@@ -68,8 +87,11 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
       row.setQuantity(line.quantity());
       row.setUnitMinor(line.unitPrice().amountMinor());
       row.setCurrency(line.unitPrice().currency());
-      lines.insert(row);
+      rows.add(row);
     }
+    // One statement rather than one per line: the placement path is the only one that writes lines,
+    // so this is where a multi-line order's round trips actually are.
+    lines.insert(rows);
   }
 
   @Override

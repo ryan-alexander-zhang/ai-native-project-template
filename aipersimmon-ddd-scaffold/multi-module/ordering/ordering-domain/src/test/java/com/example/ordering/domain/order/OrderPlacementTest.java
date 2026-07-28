@@ -1,6 +1,7 @@
 package com.example.ordering.domain.order;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -168,5 +169,41 @@ class OrderPlacementTest {
             DomainException.class,
             () -> order.approveReview(new ReviewDecisionRef("rev-1", ID, true)));
     assertEquals(OrderingErrorCode.ORDER_NOT_AWAITING_REVIEW, codeOf(ex));
+  }
+
+  // ---------- the line set knows whether it changed (issue-00090) ----------
+
+  /**
+   * A persistence adapter used to rewrite the whole line set on every save, justified by "an
+   * order's line set is small and only set at placement". Both halves were true and the conclusion
+   * did not follow: precisely because lines are only set at placement, every other save — confirm,
+   * cancel, begin fulfilment, all of which touch only the status — deleted and re-inserted rows to
+   * arrive at the ones already there. Asking the aggregate is what replaced the guess.
+   */
+  @Test
+  void aFreshlyPlacedOrderHasAChangedLineSet() {
+    Order order = Order.place(ID, CUSTOMER, oneLine(), ReviewRequirement.notRequired());
+
+    assertTrue(order.lineSetChanged(), "a new order's lines have never been stored");
+  }
+
+  @Test
+  void aReconstitutedOrderHasNotChangedItsLineSet() {
+    Order stored =
+        Order.reconstitute(ID, CUSTOMER, oneLine(), OrderStatus.READY_FOR_FULFILMENT, 3L);
+
+    assertFalse(stored.lineSetChanged(), "loaded lines are already stored");
+  }
+
+  @Test
+  void aLifecycleTransitionDoesNotTouchTheLineSet() {
+    Order stored =
+        Order.reconstitute(ID, CUSTOMER, oneLine(), OrderStatus.READY_FOR_FULFILMENT, 3L);
+
+    stored.beginFulfilment();
+
+    assertFalse(
+        stored.lineSetChanged(),
+        "changing status must not make a persistence adapter rewrite the lines");
   }
 }
