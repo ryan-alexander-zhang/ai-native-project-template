@@ -76,6 +76,22 @@ class OrderingFlowTest {
   }
 
   @Test
+  void aZeroAmountOrderIsConfirmedRatherThanQuietlyCancelledTwoMinutesLater() {
+    // The cross-context amount range, end to end (issue-00075). Ordering accepts a zero-amount
+    // line; payment used to reject the resulting authorization as a constraint violation, which
+    // is not a rejection anyone sees — the command never reached its handler and no outcome event
+    // was ever published, so the process parked on its AWAITING_PAYMENT step and the order sat at
+    // FULFILMENT_IN_PROGRESS (which is what this test observes with the deadline worker off). In
+    // production the payment deadline then cancelled it as PAYMENT_TIMEOUT, a reason unrelated to
+    // the truth. Either way the symptom is nowhere near the cause.
+    String orderId =
+        commandBus.send(
+            new PlaceOrder("CUST-1", List.of(new PlaceOrder.Line("SKU-1", 1, 0, "USD"))));
+
+    await().atMost(SETTLE).untilAsserted(() -> assertEquals("CONFIRMED", status(orderId)));
+  }
+
+  @Test
   void whenSkuIsUnknownTheOrderIsRejectedSynchronouslyByTheInventoryGateway() {
     // SKU-404 is not carried by inventory. The synchronous availability gateway
     // (ordering's anti-corruption layer over inventory's StockAvailabilityApi) fails

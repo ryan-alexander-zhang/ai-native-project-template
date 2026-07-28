@@ -12,6 +12,15 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * plus its currency, and a {@code paymentOperationId} — the business idempotency key the payment
  * context dedupes by, so an at-least-once redelivery of this event authorizes only once
  * (design-00004 §13.2).
+ *
+ * <p><strong>Range of {@code amountMinor}: zero or greater.</strong> Zero is a legal amount — a
+ * gift line or a fully discounted basket totals zero, and ordering accepts one (the place-order
+ * line is {@code @PositiveOrZero}), so this contract carries it and a consumer must handle it. This
+ * sentence is the whole point of the fix behind issue-00075: the two sides each declared a range in
+ * their own validation annotations, ordering's wider than payment's, and nothing connected them — a
+ * zero-amount order was accepted, its authorization was rejected as a constraint violation, and the
+ * order was cancelled two minutes later as a payment timeout. The published language is where a
+ * range like this becomes one agreement instead of two guesses.
  */
 @EventType(name = "com.example.ordering.PaymentRequested", version = 1)
 @Externalized("ordering.events")

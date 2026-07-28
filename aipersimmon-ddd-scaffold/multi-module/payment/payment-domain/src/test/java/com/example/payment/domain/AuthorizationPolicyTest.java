@@ -28,6 +28,17 @@ class AuthorizationPolicyTest {
   }
 
   @Test
+  void authorizesAZeroAmountOutright() {
+    // A gift or fully discounted order reaches payment with nothing to charge. It is authorised
+    // by its own branch, not by happening to sit under the ceiling — see issue-00075.
+    PaymentDecision decision = policy.decide(0L, "USD");
+
+    assertTrue(
+        decision.isAuthorized(), "there is nothing to charge, so there is nothing to refuse");
+    assertInstanceOf(PaymentDecision.Authorized.class, decision);
+  }
+
+  @Test
   void declinesAmountJustAboveTheCeiling_withCodeAndReason() {
     long amount = AuthorizationPolicy.AUTHORISATION_CEILING_MINOR + 1;
 

@@ -2,7 +2,7 @@
 id: issue-00075-a-zero-amount-order-can-be-placed-but-not-paid
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -95,7 +95,57 @@ void aZeroAmountAuthorizeIsRejectedByTheBus() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。**采用了"0 元订单合法"这条**（修复一节的推荐项）：赠品行与全额折扣行是真实业务，
+把它们挡在下单入口反而是把一条合理的业务规则删掉。
+
+**实际改动四处**：
+
+1. `AuthorizePayment.amountMinor`：`@Positive` → `@PositiveOrZero`。
+   javadoc 说明了为什么这条约束的违例不是"给调用方一个 400"——命令来自事件监听器，
+   被拒的命令是一条毒消息，重试到进死信为止，而订单在另一侧等到 deadline。
+2. `AuthorizationPolicy.decide`：新增 `amountMinor == 0 → Authorized` 的**独立分支**。
+   行为与改前完全相同（`0 <= 50000` 本来就会授权），改的是它为什么被授权：
+   从"恰好落在天花板以下"变成"没有东西要收，所以不做网关往返"。
+   这一点值得强调——如果不写这个分支，某次调低天花板就会静默改变 0 元的行为。
+3. `PaymentRequested` javadoc：**写下值域**（"零或更大"）。这是本 issue 真正的修复，
+   前两条只是让两侧一致，这一条让下一个消费方不必再猜。
+4. `PlaceOrder` / `PlaceOrderRequest` **未动**——它们本来就是对的。
+
+**三条测试，逐条验证过会红**：
+
+- `AuthorizePaymentBusValidationTest`（新建，payment-application）：
+  照搬 ordering 侧 `PlaceOrderBusValidationTest` 的手法，手工装配真实的
+  `RegistryCommandBus` + `ValidationCommandInterceptor`。三条用例：
+  0 抵达 handler（改前红：`ConstraintViolationException: amountMinor: must be greater than 0`）、
+  **负数仍被拒**、缺 `paymentOperationId` 仍被拒。
+  后两条是防止"把约束删掉让红变绿"的对照——issue 的修复一节明确警告过这一点。
+  为此给 `payment-application` 加了两个 test-scope 依赖
+  （`aipersimmon-ddd-cqrs-spring-boot-starter`、`spring-boot-starter-validation`），
+  注释与 ordering 侧那段逐字一致。
+- `AuthorizationPolicyTest.authorizesAZeroAmountOutright`：钉住第 2 条那个分支。
+- `OrderingFlowTest.aZeroAmountOrderIsConfirmedRatherThanQuietlyCancelledTwoMinutesLater`：
+  端到端。**放进已有的 `OrderingFlowTest` 而不是新建测试类**，
+  因为它的 `properties` 与嵌套 `RecorderConfig` 已经界定了一个上下文，
+  新建一个会多起一对容器（[[issue-00092-each-test-context-starts-its-own-container-pair]]）。
+
+**负向对照的实测输出**（把 `@PositiveOrZero` 改回 `@Positive`，备份原文件而非 `git checkout --`）：
+
+```
+OrderingFlowTest.aZeroAmountOrderIsConfirmedRatherThanQuietlyCancelledTwoMinutesLater
+  ConditionTimeoutException: expected: <CONFIRMED> but was: <FULFILMENT_IN_PROGRESS> within 30 seconds
+```
+
+**与 issue 原稿的一处出入**：原稿的复现段写"停在 `AWAITING_PAYMENT`"。
+`AWAITING_PAYMENT` 是**流程步骤**的名字，不是订单状态；订单状态停在 `FULFILMENT_IN_PROGRESS`。
+测试注释已按实测更正。另外该测试类关掉了 deadline worker，所以对照里看到的是"流程永不终结"
+而不是"两分钟后 CANCELLED"——两者是同一个缺陷的两种表现。
+
+**未做的一条**：原稿"同时建议"把 `PaymentTimedOut` 的取消理由区分为
+"支付超时"与"支付请求根本没被受理"。修完之后 0 元不再走超时路径，这条建议失去了它的触发场景，
+留给一个真正需要区分的场景再做。
+
+`mvn -o test -pl payment/payment-application,payment/payment-domain -am` 全绿；
+`mvn -o test -pl start -am -Dtest=OrderingFlowTest` 4 条全绿。
 
 ## 关联
 
