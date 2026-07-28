@@ -23,8 +23,31 @@ import org.springframework.stereotype.Component;
  * Handles {@link ReserveStock} and announces the outcome: a {@link StockReserved} event on success,
  * or a {@link StockReservationFailed} event if any line cannot be reserved. Reporting failure as an
  * event (rather than throwing) lets the ordering context's process manager react to it and
- * compensate. It validates every line before reserving any, so a failure leaves no partial
- * reservation.
+ * compensate.
+ *
+ * <h2>Decide, then write</h2>
+ *
+ * <p>The handler runs in two phases with a hard line between them: it loads every {@link Stock} it
+ * needs and applies every line <em>in memory</em>, and only once no decision is left does it write
+ * anything. A business failure therefore happens while the transaction is still clean, and the
+ * failure event is the only thing that commits.
+ *
+ * <p>That split is load-bearing, not tidiness. Reporting failure as an event and using exceptions
+ * to control the transaction are two mechanisms that want opposite things from a {@code
+ * DomainException}: the cross-context protocol needs it turned into an event, Spring's declarative
+ * transaction needs it to escape. This code has to choose the protocol — so it must not have any
+ * uncommitted change left to undo at the moment it chooses. It previously did: lines were validated
+ * up front and then re-loaded and saved one at a time, and because a save is visible to the re-load
+ * that follows it, a later line could fail against stock the earlier lines had already consumed.
+ * The catch then swallowed the exception, the transaction committed, and the deducted quantity was
+ * stranded — no {@link Reservation} existed, so nothing could ever release it (issue-00094).
+ *
+ * <p>The other half of the same rule: <strong>one aggregate is loaded at most once per
+ * transaction</strong>. Two instances of one {@code Stock} are two writers racing inside a single
+ * transaction, each unaware of the other's deduction. The map below makes that structural rather
+ * than incidental, and {@link ReserveStock} merges lines repeating a SKU before the handler ever
+ * sees them, so inventory no longer depends on ordering's {@code OrderHasDistinctSkus} to stay
+ * correct (issue-00076).
  *
  * <p>On success it also records a {@link Reservation} keyed by a freshly minted {@link
  * ReservationId}, and publishes that id on the event. That id is what makes the later release exact
@@ -40,9 +63,12 @@ import org.springframework.stereotype.Component;
  * aggregate per transaction" guideline, made because a {@code Stock} row per SKU is the natural
  * consistency and contention boundary for inventory, and forcing all SKUs into one aggregate would
  * serialise unrelated stock. The all-or-nothing guarantee is real but transactional, not
- * aggregate-level; a distributed inventory would instead model this as its own process manager. The
- * validate-all-before-mutate-any loop above is what keeps a mid-line failure from leaving a partial
- * reservation even before the transaction rolls back.
+ * aggregate-level; a distributed inventory would instead model this as its own process manager.
+ *
+ * <p>Its boundary condition is the "loaded at most once" rule above. A multi-aggregate transaction
+ * is only all-or-nothing if each aggregate in it has exactly one in-memory representative; the
+ * moment one appears twice, the transaction is racing itself and neither the version check nor the
+ * rollback means what it appears to mean.
  */
 @Component
 public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
@@ -65,42 +91,51 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
 
   @Override
   public Void handle(ReserveStock command, CommandContext context) {
+    Map<Sku, Stock> reserved = new LinkedHashMap<>();
+    Map<Sku, Integer> held = new LinkedHashMap<>();
     try {
-      // Validate all lines first, so a later failure leaves no partial reservation.
+      // DECIDE. Every load and every domain decision happens here, and nothing is written. Each
+      // SKU is loaded at most once and mutated in memory, so the aggregate that answers "is there
+      // enough left?" is the same object that already absorbed this command's earlier lines.
       for (ReserveStock.Line line : command.lines()) {
-        Stock stock = stockFor(line.sku());
-        if (line.quantity() <= 0 || line.quantity() > stock.available()) {
-          throw new DomainException(
-              InventoryErrorCode.INSUFFICIENT_STOCK,
-              "cannot reserve " + line.quantity() + " of " + line.sku());
-        }
-      }
-      Map<Sku, Integer> held = new LinkedHashMap<>();
-      for (ReserveStock.Line line : command.lines()) {
-        Stock stock = stockFor(line.sku());
+        Sku sku = new Sku(line.sku());
+        Stock stock = reserved.computeIfAbsent(sku, this::stockFor);
         stock.reserve(line.quantity());
-        stocks.save(stock);
-        held.merge(new Sku(line.sku()), line.quantity(), Integer::sum);
+        held.merge(sku, line.quantity(), Integer::sum);
       }
-      // Time-ordered (UUIDv7) primary key from IdGenerator, not UUID.randomUUID() (issue-00054).
-      ReservationId reservationId = new ReservationId(idGenerator.newId());
-      reservations.save(new Reservation(reservationId, command.orderId(), held));
-      integrationEvents.publish(
-          new StockReserved(command.orderId(), reservationId.value()), context);
     } catch (DomainException failure) {
+      // Nothing has been written, so there is nothing to undo and no reason to roll back: the
+      // transaction commits carrying only the failure event. That is the whole point of deciding
+      // before writing — see the class javadoc.
+      //
       // The failing code (if any) rides the event: a BC with no HTTP edge still
       // surfaces a stable machine identity for the reacting process manager to branch on.
       String code = failure.errorCode().map(ErrorCode::code).orElse(null);
       integrationEvents.publish(
           new StockReservationFailed(command.orderId(), code, failure.getMessage()), context);
+      return null;
     }
+
+    // WRITE. No decision is left to make, so no DomainException can arrive from here — anything
+    // that does throw is technical (an optimistic-lock conflict against a concurrent writer) and
+    // is deliberately NOT caught: it must escape so the transaction rolls back and the delivery is
+    // retried. Catching it here would commit exactly the partial deduction this split prevents.
+    for (Stock stock : reserved.values()) {
+      stocks.save(stock);
+    }
+    // Time-ordered (UUIDv7) primary key from IdGenerator, not UUID.randomUUID() (issue-00054).
+    ReservationId reservationId = new ReservationId(idGenerator.newId());
+    reservations.save(new Reservation(reservationId, command.orderId(), held));
+    integrationEvents.publish(new StockReserved(command.orderId(), reservationId.value()), context);
     return null;
   }
 
-  private Stock stockFor(String sku) {
+  private Stock stockFor(Sku sku) {
     return stocks
-        .findBySku(new Sku(sku))
+        .findBySku(sku)
         .orElseThrow(
-            () -> new DomainException(InventoryErrorCode.STOCK_NOT_FOUND, "unknown sku: " + sku));
+            () ->
+                new DomainException(
+                    InventoryErrorCode.STOCK_NOT_FOUND, "unknown sku: " + sku.value()));
   }
 }

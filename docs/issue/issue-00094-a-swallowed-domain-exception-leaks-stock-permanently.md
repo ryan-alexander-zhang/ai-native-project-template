@@ -2,7 +2,7 @@
 id: issue-00094-a-swallowed-domain-exception-leaks-stock-permanently
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -139,7 +139,48 @@ void aMidLineFailureLeavesNoStockDeducted() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘（评审 B2），尚未实施。
+已修。采用**修复方案 2（纯决策 + 单次落库）**，如本 issue 所判断，它最贴合本项目风格，
+并按 relation 所述**一并修掉** [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]。
+
+- `ReserveStockHandler.handle` 拆成两段，中间一条硬边界：
+  - **DECIDE**：把每个 SKU 加载进 `Map<Sku, Stock>`（`computeIfAbsent`，**每个聚合至多一次**），
+    全部 `reserve` 在内存里完成，**不写任何东西**。任一行失败 ⇒ catch 里发失败事件后 `return`，
+    此时事务干净，没有要撤销的改动，也就不需要回滚——失败事件是唯一提交的东西。
+  - **WRITE**：决策已定，此处不可能再抛 `DomainException`；能抛出的只有技术异常
+    （并发写者造成的乐观锁冲突），**刻意不捕获**，让它逸出、回滚、由投递重试。
+    在这里捕获等于提交本次拆分要防的那半个扣减。
+- 原来的"先验后改"双循环整个删掉了：它存在的唯一理由是变更与落库交织，
+  两段式之后 `reserve()` 自己就是校验。
+- 类注释按要求重写。`even before the transaction rolls back` 那句描述的兜底当时并不存在，
+  现在换成一节 "Decide, then write"，说明**为什么**必须先决策后写：
+  "用事件报告失败"与"用异常控制事务"对同一个 `DomainException` 的要求正好相反，
+  代码必须选协议，那就不能在做选择的那一刻还留着未提交的改动。
+  "刻意的多聚合事务"那一节补上了它真正的边界条件（同一聚合在一个事务里只能有一个实例）。
+
+**复现方式与本 issue 设想的不同，而且更好**：原方案要用装饰器在两次读之间制造并发变更。
+实测发现**根本不需要并发**——重复 SKU 就是一条确定性路径：
+`save` 对同事务内随后的 `findBySku` 可见（MyBatis 的 update 会清本地缓存），
+所以两行同 SKU、各自够、合起来不够时，第一行扣减落库、第二行读到减少后的余量而失败、
+catch 吞掉、事务提交。负向对照实测：SKU 从 10 变成 **4**，6 件永久搁浅、无 `Reservation` 可释放。
+
+顺带更正本 issue 的一处分析：`stealBStockOnSecondRead()` 那个装饰器方案不必要；
+而 [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] 判断重复 SKU 会引发
+`OptimisticLockingFailureException` 也不成立——第二次加载拿到的是**已更新**的版本号（同事务可见自己的写），
+所以不是乐观锁失败，而是本 issue 的这条泄漏路径。两个 issue 指向的是同一个 bug，
+只是 00076 推断的失败形态错了。
+
+`StockReservationAtomicityTest` 三个用例，且**两半一起断言**（库存未动 + 失败事件仍然发出）——
+这正是本 issue 复现段指出的难点：只断言库存的测试，会被一个"把事件也回滚掉"的修复骗过。
+与 `AggregateIdIsTimeOrderedTest` 共用同一个 context（properties 完全一致），不新增容器对。
+
+验证：`mvn -o verify -pl start -am` 全绿，67 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
+（SpotBugs 抓到过一次 `EI_EXPOSE_REP`：防御性拷贝被挪进 helper 后它跟不进去，已把 `List.copyOf`
+放回紧凑构造器里。）
+
+**未纳入本次范围**：技术异常逸出后流程停在 `AWAITING_STOCK` 的问题。两段式之后它的**数据**
+后果已经正确（回滚、无部分扣减），剩下的"等不到答复"属于
+[[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] 的 deadline 兜底，
+不在这里顺手扩大。
 
 ## 关联
 

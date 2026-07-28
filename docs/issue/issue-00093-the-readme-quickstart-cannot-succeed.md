@@ -2,7 +2,7 @@
 id: issue-00093-the-readme-quickstart-cannot-succeed
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -118,7 +118,7 @@ curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
 
 ## 验证结果
 
-部分已修（保持 open）。
+已修（第 4 条补齐后 resolved）。
 
 - **已做（修复第 1、2、3 条）**：两条 curl 改为 8090、补 `-H 'X-Tenant-Id: __root__'`，
   并在上方用两句话说明为什么需要它（`missing-policy=REJECT`）以及为什么是 `__root__`
@@ -128,9 +128,22 @@ curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
 - **顺带消除了一条歧路**：kafka-ui 已移进 compose 的 `tools` profile
   （[[issue-00088-dependency-and-image-versions-escape-the-boms]]），
   8080 默认不再被监听，将来打错端口会直接连接被拒，而不是拿到一个 HTML 页面。
-- **未做（修复第 4 条）**：`ReadmeQuickstartTest`——从 README 解析命令并真的发一次请求。
-  这是本 issue 唯一能防止再犯的东西，未补之前 quickstart 仍然只是一段没人执行的文本，
-  所以本 issue 保持 open。
+- **已做（修复第 4 条，本 issue 因此 resolved）**：`ReadmeQuickstartTest` 落地，两条断言：
+  - `theQuickstartPlacesAnOrderAndReadsItBack` —— **从 README 解析**（不复制）第一条 curl 的
+    path / headers / body，真的发出去，要求 201 + `Location`，再用返回的 location 跑第二条 curl 要求 200。
+    按修复第 4 条的要点：复制出来的副本会和 README 一起漂且照样通过，解析出来的不会。
+  - `theReadmePortIsThePortTheApplicationBinds` —— README 里出现的每个 `localhost:<port>/`
+    必须等于 `application.yml` 的 `server.port`（用 `YamlPropertySourceLoader` 读，
+    不用正则去啃 YAML）。这补上了随机端口测不到的那一项。
+- **C 的答案在此期间变了**：修复第 2、3 条当时写的是 `-H 'X-Tenant-Id: __root__'`，
+  而那个 header 值是**必然被拒**的——见
+  [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]]。
+  quickstart 现在用 `demo`（种子同时播在 `__root__` 与 `demo` 两个租户下）。
+  **这条测试如果早存在，issue-00096 当天就会被抓到**，这也正是本 issue 第 4 条的价值所在。
+- 负向对照：把 README 改回 `__root__` + 8080，两条断言同时红，
+  分别报出 `400 Bad Request` 与 `sends the reader to [localhost:8080/, localhost:8080/]`——
+  正是本 issue A、C 两项原始缺陷。
+- 验证：`mvn -o verify -pl start -am` 全绿，67 个测试 0 失败。
 
 ## 关联
 

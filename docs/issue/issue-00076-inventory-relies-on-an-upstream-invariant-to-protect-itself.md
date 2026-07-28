@@ -2,7 +2,7 @@
 id: issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -88,7 +88,34 @@ void aReserveStockWithARepeatedSkuIsRejectedCleanly() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。三层修复全做，与 [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] 同一次改动
+（方案 2 一并覆盖，如两个 issue 互相预判的那样）。
+
+- **第 1 层（命令自保）**：`ReserveStock` 紧凑构造器按 `Line::sku` 分组求和，
+  采用"合并"而非"拒绝"——调用方意图明确，合并比一个它无法处理的校验错误更友好。
+  **格式不合法的行原样放行**（null / 空白 sku / 非正 quantity），交给 Bean Validation 报告：
+  把 `quantity=0` 合并进一个正数会**掩盖** `@Positive` 违规而不是暴露它。
+- **第 2 层（消除重复加载）**：handler 用 `Map<Sku, Stock>` + `computeIfAbsent`，
+  加载次数从 2N 降到 N，且"同一事务内同一聚合只有一个实例"成为结构性保证。
+- **第 3 层（收窄失败语义）**：两段式拆分之后，业务失败（`DomainException`）在决策阶段被转成事件，
+  技术失败在写入阶段**刻意逸出**并回滚。两者不再共用一个出口，
+  也不再有"该回滚的没回滚"。详见 issue-00094。
+- 类注释按要求补上了那条隐含前提，并把它写成"刻意的多聚合事务"这一权衡的**边界条件**：
+  多聚合事务只有在每个聚合恰有一个内存代表时才是 all-or-nothing。
+
+**本 issue 的失败形态推断有误，实测更正**：根因分析第 2 条预期重复 SKU 会让第二个对象持有
+陈旧 version N、从而 `OptimisticLockingFailureException`。实际不会——
+第二次 `findBySku` 是同事务内的一次新 SELECT，**看得见自己刚写的 UPDATE**，
+拿到的是 version N+1 与已减少的余量。所以真实后果不是技术异常挂死，
+而是 issue-00094 的那条静默泄漏（余量够就多扣一次，不够就部分扣减后提交）。
+"同一聚合被加载两次"这个根因判断完全正确，只是它的可观测症状是另一个。
+
+`StockReservationAtomicityTest.aRepeatedSkuIsHeldAsOneLineForTheSummedQuantity` 钉住合并语义
+（2 + 3 ⇒ 一条 reservation_line，quantity 5）；
+`aRepeatedSkuDeductsNothingWhenTheCombinedQuantityIsTooLarge` 钉住合并后不够时的干净失败。
+两者都按本 issue 复现段的要求**绕过 ordering 直接发命令**——这正是"BC 自保"要测的东西。
+
+验证：`mvn -o verify -pl start -am` 全绿，67 个测试 0 失败。
 
 ## 关联
 

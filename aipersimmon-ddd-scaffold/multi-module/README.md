@@ -119,6 +119,8 @@ drives inventory and the process manager.
 | Domain events (subscriber in application layer) | `OrderFulfilmentStarter` on `OrderReadyForFulfilmentEvent` | `ReviewFlowTest`, `OrderingFlowTest` |
 | Integration events + transactional outbox → Kafka → inbox | `OrderReadyForFulfilment`, `PaymentRequested` (`*-api`); `PlaceOrderHandler`/`FulfilmentTrigger` publish | `OutboxAtomicityTest`, `IntegrationEventTransportTest` |
 | Anti-corruption layers | `StockAvailabilityGateway` (ordering port + infra adapter); `OrderReadyForFulfilmentListener`, `PaymentRequestedListener` (inbound ACLs) | `OrderingFlowTest`, `PaymentCompensationFlowTest` |
+| Multi-aggregate transaction that is really all-or-nothing | `ReserveStockHandler` decides over a `Map<Sku, Stock>` in memory, then writes; `ReserveStock` merges lines repeating a SKU | `StockReservationAtomicityTest` |
+| The quickstart below actually runs | this README's own `curl` commands, parsed rather than copied | `ReadmeQuickstartTest` |
 | Durable process manager | `OrderFulfilmentDefinition` (pure decision), `OrderFulfilmentCodecs` (a `ProcessSerializationCatalog` for 12 payloads + one hand-written codec where a sealed domain type forbids Jackson annotations), `RuntimeOrderFulfilmentProcess` | `OrderFulfilmentDefinitionTest` (unit), `OrderingFlowTest` (e2e) |
 | Ordered compensation (release then cancel) | `OrderFulfilmentDefinition` compensation branches | `PaymentCompensationFlowTest` |
 | Deadlines (a wait that can end) | `OrderFulfilmentDefinition` arms/cancels the `PAYMENT` deadline; `OrderFulfilmentInput.PaymentTimedOut` | `OrderFulfilmentDefinitionTest` (unit), `PaymentTimeoutFlowTest` (e2e, payment silent) |
