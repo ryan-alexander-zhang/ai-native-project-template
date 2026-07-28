@@ -14,6 +14,51 @@ parent: plan-00015-scaffold-depth-and-evaluability
 
 ---
 
+## 0.5 修复进度（2026-07-28 更新）
+
+**全部 High 已修完。29 个 issue 中 22 已 resolved，7 open，全为 Medium/Low。**
+每个 resolved issue 的「验证结果」一节记录了实际改法、与原修复方案的差异、以及负向对照的实测输出——
+**接手时读那一节，不要只读「修复」一节**，两者有出入的地方不少。
+
+九个提交（分支 `lang/java/ddd`，基线 `259199a`）：
+
+| Commit | 内容 |
+|---|---|
+| `1c4a682` | issue-00073 索引 + issue-00091 复合外键（`V4`） |
+| `d026050` | issue-00074 profile 拆分 + issue-00072 种子移出生产迁移；连带发现并修 issue-00096 |
+| `c67c387` | issue-00094 库存泄漏（评审 B2，最严重一条）+ issue-00076 + issue-00093 |
+| `ce85174` | issue-00071 信用额度强一致 + issue-00086 Customer 收窄为「信用」聚合（`V5`） |
+| `27c640c` | issue-00068 三个 deadline（STOCK / PAYMENT / STOCK_RELEASE） |
+| `97c5a6c` | issue-00069 支付幂等：端口改 `find`+`record`，`payment_operations` 表（`V6`） |
+| `383e7cc` | issue-00077 Money 溢出保护 + issue-00083 总额物化（`V7`） |
+| `66cad29` | issue-00090 子行不再无条件重写 + issue-00084 库存批量读端口 |
+| `238d0de` | issue-00070 `READY_FOR_FULFILMENT` 真实落库 + 自助取消/预留竞态 |
+
+**尚未修（7 条）**：
+
+| Issue | 等级 | 一句话 |
+|---|---|---|
+| [[issue-00075-a-zero-amount-order-can-be-placed-but-not-paid]] | Medium | 0 元订单跨上下文契约不一致 |
+| [[issue-00095-a-partial-reactor-build-silently-tests-stale-siblings]] | Medium | `-am` 陷阱；核心警告已在 README，剩护栏 |
+| [[issue-00097-the-payment-operation-log-has-no-cleanup]] | Low | **修 00069 时新引入**：幂等日志无保留期 |
+| [[issue-00080-problem-title-key-has-no-message-bundle]] | Low | RFC 9457 的 title 是 message key，无资源包 |
+| [[issue-00082-domain-surface-no-use-case-can-reach]] | Low | 不可达领域能力；`PaymentOperations.find` 那一处已消解 |
+| [[issue-00085-ordering-carries-sku-as-a-bare-string]] | Low | 同一概念两种建模精度 |
+| [[issue-00087-a-raw-control-character-is-the-codec-separator]] | Low | codec 分隔符是裸控制字符，字段无转义 |
+| [[issue-00092-each-test-context-starts-its-own-container-pair]] | Low | 容器数量未文档化 |
+
+**两条跨 issue 的经验，接手前值得知道**：
+
+1. **`mvn` 命令必须带 `-am`**。不带会静默用 `~/.m2` 里的陈旧兄弟构件，
+   症状指向完全错误的方向（本轮踩了三次：`POST /orders` 返回 405、找不到刚加的类）。
+   见 [[issue-00095-a-partial-reactor-build-silently-tests-stale-siblings]]。
+2. **每条修复都做了负向对照**（临时破坏修复、确认测试真的会红），
+   而且**多次发现 issue 里提议的断言会假绿**——最典型的是 issue-00077：
+   `assertThrows(DomainException.class, ...)` 在溢出回绕成负数时会被"金额不能为负"满足。
+   接手时请沿用这个做法：新写的测试先破坏实现验证它会红。
+
+---
+
 ## 0. 总体判断
 
 **战术建模层面，这是同类参考实现里的第一梯队。** 真正做对而多数项目做不对的地方：
@@ -95,6 +140,10 @@ B3 是从"演示"到"骨架"最大的一道坎，且它会让其它所有优点�
 - [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]] ——
   README 快速开始的 curl 必然 400：种子只在 `__root__`，而该值是客户端不可命名的保留租户。
   由 [[issue-00072-demo-seed-data-ships-in-a-production-migration]] 第 4 条实施时撞出，已修。
+- [[issue-00097-the-payment-operation-log-has-no-cleanup]] ——
+  `payment_operations` 无保留期。由 [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]]
+  的修复引入：把 `ConcurrentHashMap` 换成表时，"进程重启即清空"这条**隐含**的保留策略消失了，
+  而它从未被写下来过，所以替换时没有东西提醒需要一个替代品。**未修。**
 
 ---
 
