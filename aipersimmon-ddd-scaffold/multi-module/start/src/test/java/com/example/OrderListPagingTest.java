@@ -142,7 +142,10 @@ class OrderListPagingTest {
     // 3 x 100 minor units, frozen onto the row at placement and read back verbatim.
     assertEquals(300, item.path("totalMinor").asLong());
     assertEquals("USD", item.path("currency").asText());
-    assertEquals("FULFILMENT_IN_PROGRESS", item.path("status").asText());
+    // READY_FOR_FULFILMENT, not FULFILMENT_IN_PROGRESS: the relays are off in this context, so
+    // nothing has reserved stock yet and the order has not advanced. Before issue-00070 it was
+    // INSERTed as FULFILMENT_IN_PROGRESS regardless — the ready state never reached a row.
+    assertEquals("READY_FOR_FULFILMENT", item.path("status").asText());
   }
 
   /**

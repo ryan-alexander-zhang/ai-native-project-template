@@ -22,6 +22,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessRevision;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
@@ -71,7 +72,11 @@ class OrderFulfilmentDefinitionTest {
     assertEquals(Step.AWAITING_PAYMENT.name(), decision.step().value());
     assertEquals("res-1", decision.state().reservationId());
 
-    RequestPayment command = assertInstanceOf(RequestPayment.class, dispatchedCommand(decision));
+    // Two commands, and the pairing is the point: the reservation now exists, so this is the moment
+    // the order is genuinely under fulfilment and the moment payment can be asked for. Ordering's
+    // own state used to be advanced at placement, before anything had been reserved (issue-00070).
+    assertEquals(ORDER, dispatchedCommandOfType(decision, BeginFulfilment.class).orderId());
+    RequestPayment command = dispatchedCommandOfType(decision, RequestPayment.class);
     assertEquals(ORDER, command.orderId());
     // The business idempotency key is the stable identity of the triggering fact (the cause), so a
     // redelivery of the same StockReserved yields the same paymentOperationId (issue-00041).
@@ -508,6 +513,20 @@ class OrderFulfilmentDefinitionTest {
             .toList();
     assertEquals(1, dispatches.size(), "expected exactly one dispatched command");
     return dispatches.get(0).command();
+  }
+
+  /** The one dispatched command of the given type; a decision may dispatch several. */
+  private static <T> T dispatchedCommandOfType(
+      ProcessDecision<OrderFulfilmentState> decision, Class<T> type) {
+    List<T> matching =
+        decision.effects().stream()
+            .filter(DispatchCommand.class::isInstance)
+            .map(effect -> ((DispatchCommand) effect).command())
+            .filter(type::isInstance)
+            .map(type::cast)
+            .toList();
+    assertEquals(1, matching.size(), "expected exactly one dispatched " + type.getSimpleName());
+    return matching.get(0);
   }
 
   private static <T> T onlyEffectOfType(

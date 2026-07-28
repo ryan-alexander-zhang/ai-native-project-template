@@ -15,6 +15,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
 import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
+import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
@@ -212,8 +213,11 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     }
     return switch (state.step()) {
       case AWAITING_STOCK -> onAwaitingStock(state, in, context);
+      case AWAITING_STOCK_ORDER_CANCELLED -> onAwaitingStockOrderCancelled(state, in, context);
       case AWAITING_PAYMENT -> onAwaitingPayment(state, in, context);
       case AWAITING_STOCK_RELEASE -> onAwaitingStockRelease(state, in, context);
+      case AWAITING_STOCK_RELEASE_ORDER_CANCELLED ->
+          onAwaitingStockReleaseOrderCancelled(state, in, context);
       case AWAITING_ORDER_CONFIRMATION -> onAwaitingOrderConfirmation(state, in, context);
       case AWAITING_ORDER_CANCELLATION -> onAwaitingOrderCancellation(state, in, context);
       // A react on a terminal step should not occur (the runtime no-ops terminal instances); if
@@ -236,6 +240,10 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           state.reserved(reserved.reservationId(), Step.AWAITING_PAYMENT),
           Step.AWAITING_PAYMENT,
           "stock-reserved",
+          // The reservation exists, so now — and only now — the order really is under fulfilment.
+          // Ordering's own state used to be advanced at placement, before anyone had reserved
+          // anything (issue-00070).
+          new DispatchCommand(new BeginFulfilment(orderId)),
           new DispatchCommand(new RequestPayment(orderId, paymentOperationId)),
           new CancelDeadline(STOCK_DEADLINE),
           new ScheduleDeadline(
@@ -246,6 +254,16 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     if (in instanceof OrderFulfilmentInput.StockReservationFailed failed) {
       return cancelForInventory(
           state, context, failed.code(), failed.reason(), "stock-reservation-failed", true);
+    }
+    if (in instanceof OrderFulfilmentInput.OrderCancelled) {
+      // The customer used their self-cancel window while inventory was still working. Nothing can
+      // be concluded yet: the reservation may already exist, may be about to, or may fail. So the
+      // flow keeps waiting — with its STOCK deadline deliberately still armed, since a cancelled
+      // order whose inventory never answers must not wait forever either.
+      return compensating(
+          state.withStep(Step.AWAITING_STOCK_ORDER_CANCELLED),
+          Step.AWAITING_STOCK_ORDER_CANCELLED,
+          "order-cancelled-while-awaiting-stock");
     }
     if (in instanceof OrderFulfilmentInput.StockReservationTimedOut) {
       // Silence from inventory, handled exactly as a refusal from inventory: nothing was reserved,
@@ -297,6 +315,39 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   }
 
   /**
+   * The order is already cancelled and inventory has not answered yet. Only one question remains —
+   * is there stock to give back? — so there are exactly two ways out and neither involves the
+   * order: it is in its terminal state already.
+   */
+  private ProcessDecision<OrderFulfilmentState> onAwaitingStockOrderCancelled(
+      OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
+    if (in instanceof OrderFulfilmentInput.StockReserved reserved) {
+      // Reserved for an order that no longer exists: hand it straight back. No BeginFulfilment and
+      // no RequestPayment — the cancellation happened while the order was still the customer's to
+      // cancel, and it stands.
+      return compensating(
+          state.reserved(reserved.reservationId(), Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED),
+          Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
+          "stock-reserved-for-cancelled-order",
+          new DispatchCommand(new RequestStockRelease(state.orderId(), reserved.reservationId())),
+          new CancelDeadline(STOCK_DEADLINE),
+          releaseDeadline(state, context));
+    }
+    if (in instanceof OrderFulfilmentInput.StockReservationFailed
+        || in instanceof OrderFulfilmentInput.StockReservationTimedOut) {
+      // Nothing was ever reserved and the order is already cancelled, so there is no compensation
+      // to run and no command to send. The flow is simply finished.
+      boolean timedOut = in instanceof OrderFulfilmentInput.StockReservationTimedOut;
+      return completed(
+          state.withStep(Step.CANCELLED),
+          Step.CANCELLED,
+          timedOut ? "cancelled-order-stock-timed-out" : "cancelled-order-stock-failed",
+          "ORDER_CANCELLED");
+    }
+    return ignore(state, in, context);
+  }
+
+  /**
    * Stock reserved, waiting for payment: authorise advances to confirm; decline compensates; and if
    * neither arrives, the timer does. Every branch that leaves this step cancels the deadline —
    * leaving it armed would fire a timeout at a flow that has already moved on, and while the
@@ -318,6 +369,18 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           state.declined(declined.code(), context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
           Step.AWAITING_STOCK_RELEASE,
           "payment-declined",
+          new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          new CancelDeadline(PAYMENT_DEADLINE),
+          releaseDeadline(state, context));
+    }
+    if (in instanceof OrderFulfilmentInput.OrderCancelled) {
+      // The residual window: the customer's cancellation committed while this flow was moving from
+      // AWAITING_STOCK to here, so BeginFulfilment found a cancelled order and did nothing. Stock
+      // is held, and the order is terminal — release it and finish, without a second CancelOrder.
+      return compensating(
+          state.withStep(Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED),
+          Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
+          "order-cancelled-while-awaiting-payment",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
           new CancelDeadline(PAYMENT_DEADLINE),
           releaseDeadline(state, context));
@@ -388,6 +451,34 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     return ignore(state, in, context);
   }
 
+  /**
+   * Releasing stock for an order that was already cancelled. Identical to {@link
+   * #onAwaitingStockRelease} except at the end: there is no {@code CancelOrder} to dispatch, so the
+   * release itself is the last thing that had to happen.
+   */
+  private ProcessDecision<OrderFulfilmentState> onAwaitingStockReleaseOrderCancelled(
+      OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
+    if (in instanceof OrderFulfilmentInput.StockReleased) {
+      return completed(
+          state.withStep(Step.CANCELLED),
+          Step.CANCELLED,
+          "stock-released-for-cancelled-order",
+          "ORDER_CANCELLED",
+          new CancelDeadline(STOCK_RELEASE_DEADLINE));
+    }
+    if (in instanceof OrderFulfilmentInput.StockReleaseTimedOut) {
+      // Same reasoning as the other release step: this wait cannot be ended, only satisfied, so
+      // the flow asks again rather than declaring stock returned that is still held.
+      return compensating(
+          state,
+          Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
+          "cancelled-order-stock-release-timed-out",
+          new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          releaseDeadline(state, context));
+    }
+    return ignore(state, in, context);
+  }
+
   /** Success branch, waiting for the order-confirmed fact to reach the terminal outcome. */
   private ProcessDecision<OrderFulfilmentState> onAwaitingOrderConfirmation(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
@@ -419,9 +510,18 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   }
 
   private static ProcessDecision<OrderFulfilmentState> completed(
-      OrderFulfilmentState state, Step step, String code, String outcome) {
+      OrderFulfilmentState state,
+      Step step,
+      String code,
+      String outcome,
+      ProcessEffect... effects) {
     return decision(
-        state, ProcessLifecycle.COMPLETED, step, Optional.of(new ProcessOutcome(outcome)), code);
+        state,
+        ProcessLifecycle.COMPLETED,
+        step,
+        Optional.of(new ProcessOutcome(outcome)),
+        code,
+        effects);
   }
 
   /**

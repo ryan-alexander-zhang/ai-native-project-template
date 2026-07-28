@@ -71,10 +71,16 @@ public final class OrderLifecyclePolicy {
   private void ensureInventoryCancellationAllowed(
       OrderId orderId, OrderStatus status, CancellationReason.InventoryUnavailable failure) {
 
-    if (status != OrderStatus.FULFILMENT_IN_PROGRESS) {
+    // READY_FOR_FULFILMENT as well as FULFILMENT_IN_PROGRESS, and the first is now the ordinary
+    // case. An inventory failure means the reservation never succeeded — and since the order only
+    // advances to FULFILMENT_IN_PROGRESS once it has (issue-00070), a failed or timed-out
+    // reservation finds the order still merely ready. Requiring "under fulfilment" here would
+    // refuse the compensation for exactly the outcome that compensation exists for.
+    if (status != OrderStatus.READY_FOR_FULFILMENT
+        && status != OrderStatus.FULFILMENT_IN_PROGRESS) {
       throw new DomainException(
           INVENTORY_FAILURE_NOT_APPLICABLE,
-          "an inventory failure only cancels an order under fulfilment");
+          "an inventory failure only cancels an order that was cleared for fulfilment");
     }
     if (!failure.failure().belongsTo(orderId)) {
       throw new DomainException(

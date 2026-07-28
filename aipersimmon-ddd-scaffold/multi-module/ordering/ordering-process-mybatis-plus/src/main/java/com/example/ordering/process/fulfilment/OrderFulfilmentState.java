@@ -36,6 +36,26 @@ public record OrderFulfilmentState(
     AWAITING_STOCK_RELEASE,
     AWAITING_ORDER_CONFIRMATION,
     AWAITING_ORDER_CANCELLATION,
+
+    /**
+     * Waiting for inventory, for an order the customer has already cancelled.
+     *
+     * <p>Reachable because {@code READY_FOR_FULFILMENT} is now a state a row actually holds
+     * (issue-00070), so the self-cancel window overlaps the reservation. Whether there is stock to
+     * hand back is not yet known — that is what this step is still waiting to find out.
+     */
+    AWAITING_STOCK_ORDER_CANCELLED,
+
+    /**
+     * Releasing stock for an order that is already cancelled.
+     *
+     * <p>Distinct from {@link #AWAITING_STOCK_RELEASE} in exactly one respect, and it is the reason
+     * for a separate step rather than a flag: that step ends by dispatching {@code CancelOrder},
+     * and here the order has been cancelled already. Dispatching it again would be refused by the
+     * aggregate and would poison the effect relay.
+     */
+    AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
+
     CONFIRMED,
     CANCELLED
   }

@@ -62,9 +62,40 @@ class SelfCancelTest {
         TENANT);
     jdbc.update(
         "INSERT INTO inventory.stocks (sku, available, tenant_id)"
-            + " VALUES ('SKU-RESTRICTED', 100, ?)"
+            + " VALUES ('SKU-RESTRICTED', 100, ?), ('SKU-1', 100, ?)"
             + " ON CONFLICT (tenant_id, sku) DO NOTHING",
+        TENANT,
         TENANT);
+  }
+
+  /**
+   * The case that was unreachable (issue-00070).
+   *
+   * <p>{@code CancellableByCustomer.BEFORE_FULFILMENT} is {@code {AWAITING_REVIEW,
+   * READY_FOR_FULFILMENT}}, and the second of those never reached a database row: {@code
+   * FulfilmentTrigger} advanced the order to {@code FULFILMENT_IN_PROGRESS} in the very transaction
+   * that placed it. So only an order that happened to be held for manual review could ever be
+   * cancelled by its customer — which is why every other test in this class has to order {@code
+   * SKU-RESTRICTED} to have anything to cancel. A capability the README listed as demonstrated was
+   * demonstrated on an edge path only.
+   *
+   * <p>This one orders an ordinary SKU: no review, straight to ready, and cancellable because
+   * nothing has reserved anything yet.
+   */
+  @Test
+  void anOrderNeedingNoReviewIsCancellableBeforeFulfilmentActuallyStarts() {
+    String order = placeOrder("SKU-1");
+
+    assertEquals(
+        "READY_FOR_FULFILMENT",
+        snapshot(order).path("status").asText(),
+        "asking inventory to reserve is not the same as fulfilment having begun");
+    assertTrue(
+        snapshot(order).path("cancellableByCustomer").asBoolean(),
+        "the window is real for a review-free order, not only for a held one");
+
+    assertEquals(204, cancel(order, "CUST-CANCEL").getStatusCode().value());
+    assertEquals("CANCELLED", snapshot(order).path("status").asText());
   }
 
   @Test
@@ -100,11 +131,16 @@ class SelfCancelTest {
   }
 
   private String placeHeldOrder() {
+    return placeOrder("SKU-RESTRICTED");
+  }
+
+  private String placeOrder(String sku) {
     String body =
         """
         {"customerId":"CUST-CANCEL",
-         "lines":[{"sku":"SKU-RESTRICTED","quantity":1,"unitAmountMinor":100,"currency":"USD"}]}
-        """;
+         "lines":[{"sku":"%s","quantity":1,"unitAmountMinor":100,"currency":"USD"}]}
+        """
+            .formatted(sku);
     HttpHeaders headers = tenantHeader();
     headers.setContentType(MediaType.APPLICATION_JSON);
     ResponseEntity<Void> placed =

@@ -91,10 +91,12 @@ PlaceOrder ─▶ Order.place ── needs review? ──▶ AWAITING_REVIEW ─
                     ▼                                                                                 ▼
              OrderReadyForFulfilmentEvent  ◀──────────────────────────────────────  approveReview clears it
                     │  (domain event ⇒ FulfilmentTrigger)
+                    ├─▶ order saved as READY_FOR_FULFILMENT  (customer may still self-cancel)
                     ├─▶ start durable process (AWAITING_STOCK) + arm STOCK deadline
                     └─▶ publish OrderReadyForFulfilment integration event  ─▶ inventory reserves stock
                                                                                         │
-   StockReserved ─▶ RequestPayment + arm PAYMENT deadline ─▶ payment authorizes ─▶ CONFIRMED
+   StockReserved ─▶ BeginFulfilment + RequestPayment + arm PAYMENT deadline ─▶ authorized ─▶ CONFIRMED
+   CancelOwnOrder while READY ─▶ CANCELLED; a late StockReserved is released, not fulfilled
    StockReservationFailed ─▶ compensate ─▶ CancelOrder ─▶ CANCELLED                     │
    PaymentDeclined ─▶ release stock ─▶ CancelOrder ─▶ CANCELLED                         ◀┘
    STOCK deadline fires   ─▶ CancelOrder (nothing reserved yet) ─▶ CANCELLED
@@ -119,9 +121,18 @@ re-sends the release request and re-arms the timer — it keeps asking rather th
 evidence. That is the evidence-bearing `CancellationReason` earning its complexity: a looser design
 would have "recovered" by declaring released stock that is still held.
 
-Key point: **"placed" and "ready for fulfilment" are distinct facts.** An order held for manual
-review reserves nothing and starts no process until it is approved. Only `OrderReadyForFulfilment`
-drives inventory and the process manager.
+Key point: **"placed", "ready for fulfilment" and "fulfilment in progress" are three distinct
+facts, and each one is a state a row actually holds.** An order held for manual review reserves
+nothing and starts no process until approved. A cleared order is saved as `READY_FOR_FULFILMENT`
+and *stays* there while inventory works — asking for a reservation is not having one — so the
+customer's self-cancel window is real for every order, not only for the ones that happened to be
+held for review. `BeginFulfilment`, dispatched by the process manager when the reservation actually
+exists, is what advances it (issue-00070).
+
+That makes the window overlap the reservation, which is a race worth knowing about: the customer can
+cancel while inventory is still working. The cancellation wins — it was made while the order was
+still theirs to cancel — and the flow releases the stock that arrives for it rather than reviving
+the order. `SelfCancelDuringReservationTest` covers it.
 
 ## Component → example → verifying test
 
@@ -144,7 +155,7 @@ drives inventory and the process manager.
 | HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-jdbc` on `POST /orders` | `OrderIdempotencyTest` |
 | Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
 | Dead letters and operator replay | `DeadLetterOpsController` over the `DeadLetters` + `DeadLetterStore` ports (`GET /ops/dead-letters` cursor-paged, `GET /ops/dead-letters/{id}`, `POST /ops/dead-letters/{id}/replay`) | `DeadLetterReplayTest` |
-| `Specification` answers, `Invariant` refuses | `CancellableByCustomer` (on `OrderSnapshot.cancellableByCustomer`) vs `OrderLifecyclePolicy`; `POST /orders/{id}/cancel` | `CancellableByCustomerTest`, `SelfCancelTest` |
+| `Specification` answers, `Invariant` refuses | `CancellableByCustomer` (on `OrderSnapshot.cancellableByCustomer`) vs `OrderLifecyclePolicy`; `POST /orders/{id}/cancel` — reachable for every order, not just reviewed ones | `CancellableByCustomerTest`, `SelfCancelTest`, `SelfCancelDuringReservationTest` |
 | Business-key idempotency (decide once, announce every time) | `AuthorizePaymentHandler` + `PaymentOperations` over `payment_operations` — claimed in the command's own transaction, so a rolled-back publish takes the claim with it | `AuthorizePaymentIdempotencyTest` (unit), `PaymentOperationAtomicityTest` (e2e) |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
 | Web error contract (RFC 9457) | `OrderingProblemCatalog` (composition root) | `ExceptionContractTest` |

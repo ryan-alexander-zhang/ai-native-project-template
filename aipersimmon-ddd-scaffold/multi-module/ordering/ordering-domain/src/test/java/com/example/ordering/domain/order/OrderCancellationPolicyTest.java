@@ -59,10 +59,39 @@ class OrderCancellationPolicyTest {
     assertEquals(CancellationCategory.INVENTORY_UNAVAILABLE, event.category());
   }
 
+  /**
+   * A <em>ready</em> order is the ordinary case for an inventory failure, and this assertion used
+   * to say the opposite.
+   *
+   * <p>It encoded the assumption behind issue-00070: that an order under an outstanding reservation
+   * request was already {@code FULFILMENT_IN_PROGRESS}. It no longer is — the order advances only
+   * once inventory has actually reserved — so a failed or timed-out reservation now finds it merely
+   * ready, and refusing the compensation there would refuse it for precisely the outcome
+   * compensation exists for.
+   */
   @Test
-  void inventoryFailureDoesNotApplyBeforeFulfilment() {
+  void inventoryFailureAppliesToAnOrderThatWasOnlyEverReady() {
     OrderId id = new OrderId("order-1");
     Order order = Order.place(id, CUSTOMER, oneLine(), ReviewRequirement.notRequired());
+    assertEquals(OrderStatus.READY_FOR_FULFILMENT, order.status());
+
+    order.cancel(
+        new CancellationReason.InventoryUnavailable(
+            new ReservationFailureRef("fail-1", id, "out_of_stock", "SKU-1")));
+
+    assertEquals(OrderStatus.CANCELLED, order.status());
+  }
+
+  /**
+   * Still refused where no reservation can be outstanding: an order held for manual review has not
+   * asked inventory for anything, so an inventory failure cannot be about it.
+   */
+  @Test
+  void inventoryFailureDoesNotApplyToAnOrderAwaitingReview() {
+    OrderId id = new OrderId("order-1");
+    Order order =
+        Order.place(id, CUSTOMER, oneLine(), ReviewRequirement.required(Set.of("watchlist")));
+    assertEquals(OrderStatus.AWAITING_REVIEW, order.status());
 
     DomainException ex =
         assertThrows(

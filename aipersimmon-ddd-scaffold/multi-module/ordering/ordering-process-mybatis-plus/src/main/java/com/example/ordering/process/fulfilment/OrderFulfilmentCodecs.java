@@ -6,6 +6,7 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.engine.autoconfigure.codec.ProcessSerializationCatalog;
 import com.aipersimmon.ddd.processmanager.exception.ProcessSerializationException;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
+import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
@@ -114,6 +115,7 @@ public class OrderFulfilmentCodecs {
         .payload("ordering.fulfilment.order-cancelled", 1, OrderCancelled.class)
         // command effects — what the flow dispatches (CancelOrder is the exception, below)
         .payload("ordering.fulfilment.request-payment", 1, RequestPayment.class)
+        .payload("ordering.fulfilment.begin-fulfilment", 1, BeginFulfilment.class)
         .payload("ordering.fulfilment.confirm-order", 1, ConfirmOrder.class)
         .payload("ordering.fulfilment.request-stock-release", 1, RequestStockRelease.class)
         // the flow's own state

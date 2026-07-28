@@ -2,7 +2,7 @@
 id: issue-00070-ready-for-fulfilment-is-never-persisted
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -101,7 +101,61 @@ README 的「Intentional design decisions」一节（`README.md:155-160`）把
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。三步全做，另外补了修复方案没有提到的一件必须做的事（见下）。
+
+1. `FulfilmentTrigger.begin` 不再调 `order.beginFulfilment()`：只保存 **ready** 的订单并发布
+   `OrderReadyForFulfilment`。订单从此以 `READY_FOR_FULFILMENT` 落库。
+2. 新增 `BeginFulfilment` 命令 + handler（如方案 3 所说，独立命令而非并入 `RequestPayment`），
+   由流程管理器在收到 `StockReserved` 时与 `RequestPayment` 一起派发。
+   `FULFILMENT_IN_PROGRESS` 从此名副其实：库存真的被占住了。
+3. 类注释按方案要求改写；README 的流程图、要点段与能力表同步更新。
+   方案里"预留由应用发起而非流程效果"这一条设计说明仍然成立，注释里明确说了只有**推进聚合状态的时刻**变了。
+
+**方案没写、但不做就会造成库存泄漏的一件事：自助取消与预留的竞态。**
+`READY_FOR_FULFILMENT` 一旦真实可达，自助取消窗口就与预留过程重叠——
+客户可以在 inventory 还在干活时取消，而 inventory 随后为一张已不存在的订单回 `StockReserved`。
+不处理的话有两个后果：`BeginFulfilment` 撞上 `CANCELLED` 订单被聚合拒绝、效果中继重试到死信；
+且那份库存永远回不来（补偿路径只从支付失败进入）——
+与 [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] 同一类泄漏，从反方向到达。
+
+处理方式利用了既有机制：`OrderCancelledEvent` 本来就经 `OrderFulfilmentStarter` 变成流程的
+`OrderCancelled` 输入，此前在 `AWAITING_STOCK` 走 `ignore`。现在：
+- 新增两个 Step（不改 state schema，枚举值是可加的）：
+  `AWAITING_STOCK_ORDER_CANCELLED`（订单已取消，尚不知有无库存要还，**STOCK deadline 刻意保持武装**）
+  与 `AWAITING_STOCK_RELEASE_ORDER_CANCELLED`（与既有 release 步骤只差一点：结尾不再派发
+  `CancelOrder`，因为订单已经取消了，再派发会被聚合拒绝并毒化中继）。
+- `AWAITING_PAYMENT` 也接 `OrderCancelled`，兜住"取消在流程已经推进之后才提交"的残余窗口。
+- `BeginFulfilmentHandler` 对 `FULFILMENT_IN_PROGRESS`（效果重投递）与 `CANCELLED`（客户赢了）
+  都是 no-op 并写明理由，所以残余窗口不会产生死信。
+
+**还有一处必须跟着改，是三个测试红了才发现的**：
+`OrderLifecyclePolicy.ensureInventoryCancellationAllowed` 要求
+`status == FULFILMENT_IN_PROGRESS`。那条断言本身就编码了本 issue 的错误假设——
+预留失败 / 预留超时现在发现订单**只是 ready**，于是补偿被拒。
+已放宽为 `READY_FOR_FULFILMENT || FULFILMENT_IN_PROGRESS`，并保留对 `AWAITING_REVIEW` 的拒绝
+（待审订单没有向 inventory 要过任何东西）。领域测试
+`inventoryFailureDoesNotApplyBeforeFulfilment` 改名为
+`inventoryFailureAppliesToAnOrderThatWasOnlyEverReady`，另补一条 `AWAITING_REVIEW` 的拒绝用例。
+
+测试：
+- `SelfCancelTest.anOrderNeedingNoReviewIsCancellableBeforeFulfilmentActuallyStarts` ——
+  本 issue 复现段那条用例。订普通 SKU（不是 `SKU-RESTRICTED`），断言状态为 `READY_FOR_FULFILMENT`、
+  `cancellableByCustomer` 为真、取消返回 204。
+- `SelfCancelDuringReservationTest` —— 竞态的端到端：下单后立刻取消，然后要求流程
+  COMPLETED/ORDER_CANCELLED、`reservations.released` 为真、库存回到原值、订单仍 CANCELLED、
+  **且没有死信**。写这条测试时先犯了两个错并修掉：`processView` 必须绑定租户才查得到实例；
+  以及"库存等于原值"这个断言在 t=0 就成立（预留是异步的），所以改为先等流程终态、
+  再用 `released = true` 证明预留确实发生过又确实被释放。
+- 负向对照：去掉 `AWAITING_STOCK` 的取消分支，流程在 30 秒窗口内一直 `RUNNING` 并持有预留。
+- 按本 issue 的提示，两处钉住旧行为的断言一并改了：`OrderListPagingTest`（原
+  `aLineTotalIsSummedBySqlNotByLoadingTheAggregate`，现
+  `aPageIsAnsweredWithoutRehydratingAnyOrder`）与 `ConcurrentApprovalTest`，
+  都改为 `READY_FOR_FULFILMENT` 并写明为什么。
+
+代价与收益如方案所述：多一次聚合写入，换回一个真实存在的自助取消窗口、一个语义正确的状态机，
+以及 README 那一行不再是空头支票。
+
+验证：`mvn -o verify -pl start -am` 全绿，77 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
 
 ## 关联
 
