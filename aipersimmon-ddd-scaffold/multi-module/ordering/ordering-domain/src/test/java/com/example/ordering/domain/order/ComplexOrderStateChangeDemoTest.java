@@ -11,6 +11,7 @@ import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +35,7 @@ class ComplexOrderStateChangeDemoTest {
   private static final CustomerId SOMEONE_ELSE = new CustomerId("cust-2");
 
   private static Order placeReviewFreeOrder(OrderId id) {
-    List<LineData> lines = List.of(new LineData("SKU-1", 2, Money.of(1_000, "USD")));
+    List<LineData> lines = List.of(new LineData(new Sku("SKU-1"), 2, Money.of(1_000, "USD")));
     return Order.place(id, CUSTOMER, lines, ReviewRequirement.notRequired());
   }
 
@@ -221,7 +222,7 @@ class ComplexOrderStateChangeDemoTest {
     @DisplayName("an order needing review waits, then becomes fulfilment-eligible on approval")
     void reviewApprovalOpensFulfilment() {
       OrderId id = new OrderId("order-1");
-      List<LineData> lines = List.of(new LineData("SKU-1", 1, Money.of(500, "USD")));
+      List<LineData> lines = List.of(new LineData(new Sku("SKU-1"), 1, Money.of(500, "USD")));
       Order order =
           Order.place(id, CUSTOMER, lines, ReviewRequirement.required(Set.of("high_value")));
       assertEquals(OrderStatus.AWAITING_REVIEW, order.status());

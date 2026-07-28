@@ -64,6 +64,8 @@ public class FulfilmentTrigger {
   }
 
   private static OrderReadyForFulfilment.Line toLine(LineData line) {
-    return new OrderReadyForFulfilment.Line(line.sku(), line.quantity());
+    // Unwrapped on the way out: the published contract stays flat, so a consumer never has to
+    // depend on ordering's Sku to read ordering's events (issue-00085).
+    return new OrderReadyForFulfilment.Line(line.sku().value(), line.quantity());
   }
 }

@@ -10,6 +10,7 @@ import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.OrderStatus;
 import com.example.ordering.domain.order.Orders;
 import com.example.ordering.domain.shared.Money;
+import com.example.ordering.domain.shared.Sku;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -83,7 +84,7 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
       OrderLineDo row = new OrderLineDo();
       row.setOrderId(id);
       row.setLineNo(i);
-      row.setSku(line.sku());
+      row.setSku(line.sku().value());
       row.setQuantity(line.quantity());
       row.setUnitMinor(line.unitPrice().amountMinor());
       row.setCurrency(line.unitPrice().currency());
@@ -109,7 +110,9 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
     for (OrderLineDo row : rows) {
       lineData.add(
           new LineData(
-              row.getSku(), row.getQuantity(), Money.of(row.getUnitMinor(), row.getCurrency())));
+              new Sku(row.getSku()),
+              row.getQuantity(),
+              Money.of(row.getUnitMinor(), row.getCurrency())));
     }
     return Optional.of(
         Order.reconstitute(

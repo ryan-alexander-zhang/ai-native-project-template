@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -92,7 +93,7 @@ class CancellableByCustomerTest {
     return Order.reconstitute(
         new OrderId("order-1"),
         OWNER,
-        List.of(new LineData("SKU-1", 1, Money.of(100, "USD"))),
+        List.of(new LineData(new Sku("SKU-1"), 1, Money.of(100, "USD"))),
         status,
         1);
   }

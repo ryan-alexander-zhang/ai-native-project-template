@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.state.IllegalStateTransitionException;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class OrderLifecycleTransitionsTest {
     return Order.place(
         new OrderId("order-1"),
         CUSTOMER,
-        List.of(new LineData("SKU-1", 1, Money.of(1_000, "USD"))),
+        List.of(new LineData(new Sku("SKU-1"), 1, Money.of(1_000, "USD"))),
         ReviewRequirement.notRequired());
   }
 
@@ -70,7 +71,7 @@ class OrderLifecycleTransitionsTest {
         Order.place(
             new OrderId("order-2"),
             CUSTOMER,
-            List.of(new LineData("SKU-1", 1, Money.of(1_000, "USD"))),
+            List.of(new LineData(new Sku("SKU-1"), 1, Money.of(1_000, "USD"))),
             ReviewRequirement.required(Set.of("high_value")));
     assertThrows(IllegalStateTransitionException.class, awaiting::beginFulfilment);
 

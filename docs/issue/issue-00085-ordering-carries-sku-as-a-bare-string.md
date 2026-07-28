@@ -2,7 +2,7 @@
 id: issue-00085-ordering-carries-sku-as-a-bare-string
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -85,7 +85,51 @@ static final ArchRule domainIdentifiersAreValueObjects =
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。选了**方案 1（提升）**：ordering 有了自己的 `Sku`，与 inventory 的同名、独立、各自演进。
+
+**放在 `ordering-domain/shared/`，与 `Money` 并列，而不是 `domain/order/`**，
+理由是它**不是**任何 ordering 聚合的标识：
+
+- inventory 的 `Sku implements Identifier`——它是 `Stock` 聚合的身份；
+- ordering 的 `Sku` 只 `@ValueObject`，**不实现 `Identifier`**——在这里它标识不了任何 ordering 拥有的东西，
+  它是订单行携带的一个值。
+
+这个差别正是本 issue 想演示的那一课的落点：同一个概念，两个上下文，
+连"它是不是一个身份"的答案都不一样。写进了 `Sku` 的 javadoc。
+
+**改动范围（转换点收在一处）**：
+
+| 位置 | 变化 |
+|---|---|
+| `LineData.sku` / `OrderLine.sku` / `OrderLine` 构造器 | `String` → `Sku`；构造器里那段 blank 校验**删掉**（`Sku` 已管） |
+| `ManualReviewPolicy.RESTRICTED_SKUS` | `Set<String>` → `Set<Sku>` |
+| `PlaceOrderHandler` | `new Sku(line.sku())`——**原语变类型的那一个边界** |
+| `FulfilmentTrigger` / `MyBatisOrders` | 出站时 `.value()` 拆包 |
+| `OrderReadyForFulfilment.Line.sku` / `StockAvailabilityGateway` | **不动**，仍是 `String` |
+
+最后一行是有意的：发布契约与跨上下文端口保持扁平，
+消费方不该为了读 ordering 的事件而依赖 ordering 的类型。
+
+**ArchUnit 规则收窄了，与原稿提议不同**。原稿写的是
+`haveNameMatching(".*(Sku|Id|Code)")` 不得为 `String`。**照抄会当场红三处，且那三处都是对的**：
+`ReservationFailureRef.reasonCode`、`ReservationFailureRef.failureId`、`PaymentDeclineRef.declineCode`——
+它们承载的是别的上下文的不透明码，ordering 既不定义也不解释，为它们造类型是为建模而建模。
+实际落地的规则只管**字段名恰好是 `sku`** 的：两个上下文都覆盖，也不需要任何豁免。
+"一条上来就要豁免三次的规则不是规则"这句写进了它的 javadoc。
+
+**一个必须记下的操作陷阱**：`mvn -o test-compile`（不带 `clean`）**BUILD SUCCESS，是假的**。
+`LineData` 是主源码，改动后主源码重编了；测试源码没变，
+maven-compiler-plugin 的增量判断就认为 test 无需重编，于是 20 处
+`new LineData("SKU-1", ...)` 一个都没报。加上 `clean` 才暴露出来。
+**改了被测试大量引用的类型签名之后，验证必须带 `clean`。**
+
+**测试**：新增 `SkuTest`（相等性、blank 拒绝、`toString` 返回裸值——
+`ManualReviewPolicy` 会把它拼进给运维看的文本，默认的 `Sku[value=SKU-1]` 会漏出包装类型）。
+既有 8 个 domain 测试类的构造调用一并更新；
+`OrderLineAndInvariantTest` 里"blank sku 被拒"这条**从 `OrderLine` 移到了 `Sku`**——
+校验只写一处，测试也该只测那一处。
+
+验证：`mvn -o clean verify`（全 reactor）通过。
 
 ## 关联
 

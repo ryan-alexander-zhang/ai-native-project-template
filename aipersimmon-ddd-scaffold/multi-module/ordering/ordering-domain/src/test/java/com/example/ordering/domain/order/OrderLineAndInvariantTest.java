@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -16,14 +17,14 @@ import org.junit.jupiter.api.Test;
 class OrderLineAndInvariantTest {
 
   private static OrderLine line(String sku, int qty) {
-    return new OrderLine(sku, qty, Money.of(1_000, "USD"));
+    return new OrderLine(new Sku(sku), qty, Money.of(1_000, "USD"));
   }
 
   @Test
   void orderLineExposesItsFieldsAndComputesSubtotal() {
     OrderLine line = line("SKU-1", 3);
 
-    assertEquals("SKU-1", line.sku());
+    assertEquals(new Sku("SKU-1"), line.sku());
     assertEquals(3, line.quantity());
     assertEquals(Money.of(1_000, "USD"), line.unitPrice());
     assertEquals(Money.of(3_000, "USD"), line.subtotal());
@@ -31,9 +32,12 @@ class OrderLineAndInvariantTest {
 
   @Test
   void orderLineRejectsBlankSkuAndNonPositiveQuantity() {
-    assertThrows(DomainException.class, () -> new OrderLine(" ", 1, Money.of(1, "USD")));
+    // The blank rejection now happens in Sku's own constructor rather than OrderLine's — one
+    // definition of "a SKU is not blank", which is the point of the type (issue-00085).
+    assertThrows(DomainException.class, () -> new Sku(" "));
     assertThrows(DomainException.class, () -> new OrderLine(null, 1, Money.of(1, "USD")));
-    assertThrows(DomainException.class, () -> new OrderLine("SKU-1", 0, Money.of(1, "USD")));
+    assertThrows(
+        DomainException.class, () -> new OrderLine(new Sku("SKU-1"), 0, Money.of(1, "USD")));
   }
 
   @Test

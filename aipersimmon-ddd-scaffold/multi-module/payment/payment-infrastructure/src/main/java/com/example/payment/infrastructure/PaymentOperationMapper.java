@@ -56,8 +56,16 @@ public interface PaymentOperationMapper {
    * like the framework's own background-polled deletes: expiry is a property of age, and a relay
    * running under no tenant must still be able to clear every tenant's expired rows.
    *
+   * <p>Named {@code purge}, matching {@code PaymentOperationCleanup.purge()} — and it has to stay
+   * that way (issue-00098). SpotBugs decides whether a type is mutable partly by guessing setters
+   * from method-name prefixes, and {@code delete} is one of them. Calling this {@code
+   * deleteRecordedBefore} makes this whole interface "mutable" in its eyes, which then raises
+   * {@code EI_EXPOSE_REP2} against <em>every class that holds a mapper</em> — including {@code
+   * MyBatisPaymentOperations}, which has nothing to do with the change. The report lands on the
+   * holder's constructor and the cause is in this method's name, with nothing connecting them.
+   *
    * @return how many rows went, so the caller can say so
    */
   @Delete("DELETE FROM payment_operations WHERE recorded_at < #{cutoff}")
-  int deleteRecordedBefore(@Param("cutoff") Instant cutoff);
+  int purgeRecordedBefore(@Param("cutoff") Instant cutoff);
 }

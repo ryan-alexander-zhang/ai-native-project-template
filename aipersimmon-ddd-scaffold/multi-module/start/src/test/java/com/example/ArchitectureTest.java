@@ -1,5 +1,7 @@
 package com.example;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+
 import com.aipersimmon.ddd.archunit.AiPersimmonDddRules;
 import com.aipersimmon.ddd.archunit.BoundedContextRules;
 import com.aipersimmon.ddd.archunit.EventRules;
@@ -67,4 +69,30 @@ class ArchitectureTest {
   @ArchTest
   static final ArchRule adaptersDoNotDependOnDomain =
       LayeringRules.adapterShouldNotDependOnDomain();
+
+  /**
+   * A SKU inside a domain is a {@code Sku}, never a {@code String} (issue-00085). Both contexts
+   * model one, separately and on purpose, and this keeps the next line-carrying type from quietly
+   * regressing to a string that no validation and no type check protects.
+   *
+   * <p>Narrowed to {@code sku} deliberately. The obvious generalisation — no domain field named
+   * {@code *Id} or {@code *Code} may be a String — is wrong here, and the counterexamples are in
+   * this repository: {@code ReservationFailureRef.reasonCode} and {@code
+   * PaymentDeclineRef.declineCode} carry another context's opaque codes, and inventing a type for a
+   * value ordering neither defines nor interprets would be modelling for its own sake. A rule that
+   * has to be suppressed on its first three encounters is not a rule.
+   */
+  @ArchTest
+  static final ArchRule skuIsAValueObjectInEveryDomain =
+      noFields()
+          .that()
+          .areDeclaredInClassesThat()
+          .resideInAPackage("..domain..")
+          .and()
+          .haveName("sku")
+          .should()
+          .haveRawType(String.class)
+          .because(
+              "a SKU is a value object in both contexts, so its validation is written once and the"
+                  + " type system can tell it from any other string");
 }

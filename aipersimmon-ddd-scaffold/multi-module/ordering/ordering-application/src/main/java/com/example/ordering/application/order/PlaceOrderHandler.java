@@ -18,6 +18,7 @@ import com.example.ordering.domain.order.Orders;
 import com.example.ordering.domain.order.ReviewRequirement;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -87,12 +88,14 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
           "inventory cannot currently offer: " + availability.unavailableSkus());
     }
 
+    // The boundary where primitives become the context's own types: a command carries strings and
+    // longs because that is what arrives over HTTP or a bus, and the domain takes Sku and Money.
     List<LineData> lines =
         command.lines().stream()
             .map(
                 line ->
                     new LineData(
-                        line.sku(),
+                        new Sku(line.sku()),
                         line.quantity(),
                         Money.of(line.unitAmountMinor(), line.currency())))
             .toList();

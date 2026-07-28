@@ -12,6 +12,7 @@ import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -23,7 +24,7 @@ class OrderPlacementTest {
   private static final CustomerId CUSTOMER = new CustomerId("cust-1");
 
   private static List<LineData> oneLine() {
-    return List.of(new LineData("SKU-1", 2, Money.of(1_000, "USD")));
+    return List.of(new LineData(new Sku("SKU-1"), 2, Money.of(1_000, "USD")));
   }
 
   private static OrderingErrorCode codeOf(DomainException ex) {
@@ -72,7 +73,7 @@ class OrderPlacementTest {
   void rejectsTooManyLines() {
     List<LineData> many = new ArrayList<>();
     for (int i = 0; i < 101; i++) {
-      many.add(new LineData("SKU-" + i, 1, Money.of(100, "USD")));
+      many.add(new LineData(new Sku("SKU-" + i), 1, Money.of(100, "USD")));
     }
 
     DomainException ex =
@@ -86,7 +87,7 @@ class OrderPlacementTest {
   void exactlyTheMaximumNumberOfLinesIsAllowed() {
     List<LineData> hundred = new ArrayList<>();
     for (int i = 0; i < 100; i++) {
-      hundred.add(new LineData("SKU-" + i, 1, Money.of(100, "USD")));
+      hundred.add(new LineData(new Sku("SKU-" + i), 1, Money.of(100, "USD")));
     }
 
     Order order = Order.place(ID, CUSTOMER, hundred, ReviewRequirement.notRequired());
@@ -111,8 +112,8 @@ class OrderPlacementTest {
   void rejectsDuplicateSkus() {
     List<LineData> dupes =
         List.of(
-            new LineData("SKU-1", 1, Money.of(100, "USD")),
-            new LineData("SKU-1", 2, Money.of(100, "USD")));
+            new LineData(new Sku("SKU-1"), 1, Money.of(100, "USD")),
+            new LineData(new Sku("SKU-1"), 2, Money.of(100, "USD")));
 
     DomainException ex =
         assertThrows(
@@ -125,8 +126,8 @@ class OrderPlacementTest {
   void totalSumsEveryLineSubtotal() {
     List<LineData> lines =
         List.of(
-            new LineData("SKU-1", 2, Money.of(1_000, "USD")),
-            new LineData("SKU-2", 1, Money.of(500, "USD")));
+            new LineData(new Sku("SKU-1"), 2, Money.of(1_000, "USD")),
+            new LineData(new Sku("SKU-2"), 1, Money.of(500, "USD")));
 
     Order order = Order.place(ID, CUSTOMER, lines, ReviewRequirement.notRequired());
 

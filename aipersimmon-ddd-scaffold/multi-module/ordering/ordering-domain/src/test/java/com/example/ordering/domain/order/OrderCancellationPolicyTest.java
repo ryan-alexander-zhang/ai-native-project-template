@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ class OrderCancellationPolicyTest {
   private static final CustomerId CUSTOMER = new CustomerId("cust-1");
 
   private static List<LineData> oneLine() {
-    return List.of(new LineData("SKU-1", 1, Money.of(1_000, "USD")));
+    return List.of(new LineData(new Sku("SKU-1"), 1, Money.of(1_000, "USD")));
   }
 
   private static Order underFulfilment(OrderId id) {

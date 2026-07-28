@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.core.annotation.Entity;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
+import com.example.ordering.domain.shared.Sku;
 
 /**
  * A line of an {@link Order}. Package-private on purpose: it is an internal entity of the
@@ -23,12 +24,15 @@ class OrderLine {
    */
   static final int MAX_QUANTITY = 10_000;
 
-  private final String sku;
+  private final Sku sku;
   private final int quantity;
   private final Money unitPrice;
 
-  OrderLine(String sku, int quantity, Money unitPrice) {
-    if (sku == null || sku.isBlank()) {
+  OrderLine(Sku sku, int quantity, Money unitPrice) {
+    // No blank check here: Sku enforces that in its own constructor, once, for everybody
+    // (issue-00085). This used to repeat it, and two copies of a rule are two rules waiting to
+    // disagree.
+    if (sku == null) {
       throw new DomainException("sku required");
     }
     if (quantity <= 0) {
@@ -45,7 +49,7 @@ class OrderLine {
     this.unitPrice = unitPrice;
   }
 
-  String sku() {
+  Sku sku() {
     return sku;
   }
 

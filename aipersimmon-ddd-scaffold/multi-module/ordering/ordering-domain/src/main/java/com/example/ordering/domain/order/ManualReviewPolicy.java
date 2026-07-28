@@ -1,5 +1,6 @@
 package com.example.ordering.domain.order;
 
+import com.example.ordering.domain.shared.Sku;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,8 +20,12 @@ import java.util.Set;
  */
 public final class ManualReviewPolicy {
 
-  /** Demo watchlist: orders containing one of these SKUs are held for manual review. */
-  private static final Set<String> RESTRICTED_SKUS = Set.of("SKU-RESTRICTED");
+  /**
+   * Demo watchlist: orders containing one of these SKUs are held for manual review. Typed as {@code
+   * Set<Sku>} rather than {@code Set<String>} so it cannot be confused with — or accidentally
+   * checked against — any other collection of strings this context holds (issue-00085).
+   */
+  private static final Set<Sku> RESTRICTED_SKUS = Set.of(new Sku("SKU-RESTRICTED"));
 
   /** Assess raw line data (before the aggregate exists), returning the review verdict. */
   public ReviewRequirement assess(List<LineData> lines) {

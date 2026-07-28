@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.ordering.domain.shared.Money;
+import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +17,7 @@ class ManualReviewPolicyTest {
   private final ManualReviewPolicy policy = new ManualReviewPolicy();
 
   private static LineData line(String sku) {
-    return new LineData(sku, 1, Money.of(100, "USD"));
+    return new LineData(new Sku(sku), 1, Money.of(100, "USD"));
   }
 
   @Test

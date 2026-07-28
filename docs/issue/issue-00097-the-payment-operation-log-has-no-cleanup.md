@@ -136,6 +136,11 @@ and the rows would grow forever
 `slf4j-api`（清理任务要报告删了多少行——一个删数据却什么都不说的定时任务，
 坏掉一个月也不会有人发现）。
 
+**一个后续**：本修复给 mapper 加的方法最初叫 `deleteRecordedBefore`，
+这个名字让 SpotBugs 把整个 mapper 接口判为可变类型，进而把**所有持有它的类**判红——
+包括本次没改过的 `MyBatisPaymentOperations`。`mvn verify` 因此在 `f350e03` 之后一度是红的。
+见 [[issue-00098-a-mapper-method-name-turns-spotbugs-against-its-callers]]，已改名 `purgeRecordedBefore` 修复。
+
 验证：`mvn -o test -pl payment/payment-infrastructure -am` 绿；
 `mvn -o test -pl start -am -Dtest=ApplicationSmokeTest,PaymentOperationAtomicityTest,TableRetentionTest` 5 条全绿
 （应用带着新 bean 正常启动，`@Value` 解析到位）。

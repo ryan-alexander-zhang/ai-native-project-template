@@ -44,7 +44,7 @@ public class PaymentOperationCleanup {
 
   @Scheduled(fixedDelayString = "${payment.operations.cleanup.poll-delay-ms:3600000}")
   public void purge() {
-    int deleted = operations.deleteRecordedBefore(clock.instant().minusSeconds(retentionSeconds));
+    int deleted = operations.purgeRecordedBefore(clock.instant().minusSeconds(retentionSeconds));
     if (deleted > 0) {
       log.info(
           "payment operation cleanup removed {} rows older than {}s", deleted, retentionSeconds);

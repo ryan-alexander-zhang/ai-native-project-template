@@ -52,7 +52,7 @@ class PaymentOperationCleanupTest {
     }
 
     @Override
-    public int deleteRecordedBefore(Instant cutoff) {
+    public int purgeRecordedBefore(Instant cutoff) {
       this.cutoff = cutoff;
       return 0;
     }
