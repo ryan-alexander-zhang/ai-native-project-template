@@ -43,8 +43,13 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
     volumes:
       - ordering_kafka_data:/bitnami/kafka
+  # A developer convenience, not part of the application: behind the `tools` profile so a plain
+  # `up` does not publish 8080. That port used to be occupied by default, which meant a request
+  # aimed at the app (8090) and mistyped as 8080 got kafka-ui's HTML instead of a connection
+  # refused — see issue-00093. Start it with `docker compose --profile tools up -d kafka-ui`.
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:v0.7.2
+    profiles: ["tools"]
     ports:
       - "8080:8080"
     environment:

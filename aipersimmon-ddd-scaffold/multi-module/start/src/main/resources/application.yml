@@ -1,4 +1,6 @@
-# Tomcat runs on 8090: kafka-ui in compose.yaml publishes host port 8080.
+# Tomcat runs on 8090. Historically because kafka-ui held 8080; that service now sits behind the
+# compose `tools` profile, so 8080 is free — the port stays 8090 so existing docs and requests
+# keep working.
 server:
   port: 8090
 
@@ -98,8 +100,8 @@ aipersimmon:
       kafka:
         consumer:
           enabled: true
-    # The transactional outbox. Two settings here are the ones CONFIGURATION.md's production
-    # checklist asks to be decided rather than inherited:
+    # The transactional outbox. Two settings here are the ones the framework's production
+    # configuration checklist asks to be decided rather than inherited (see DOCS.md):
     #
     #   - the lease budget: a whole poll of stalled sends must not outlive the ShedLock lease, or a
     #     second instance starts dispatching the same rows. batch-size (100) x

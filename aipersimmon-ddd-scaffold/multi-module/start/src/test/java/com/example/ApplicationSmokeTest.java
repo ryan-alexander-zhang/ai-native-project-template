@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Import;
 
 /**
  * Boots the full application to prove every layer wires together: the web adapter, the use-case
- * services, the in-memory repositories, and the domain-event publisher all resolve.
+ * services, the aggregate repositories, and the domain-event publisher all resolve.
  */
 @SpringBootTest
 @Import(TestInfrastructure.class)

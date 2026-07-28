@@ -11,10 +11,11 @@
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
-  <!-- Infrastructure layer of the inventory context: in-memory stock and the event transport. -->
+  <!-- Infrastructure layer of the inventory context: the Stock and Reservation aggregate
+       repositories. The storage each one speaks is stated on the implementing class. -->
   <artifactId>inventory-infrastructure</artifactId>
   <name>inventory-infrastructure</name>
-  <description>Technical port implementations of the inventory context (in-memory).</description>
+  <description>Technical port implementations of the inventory context.</description>
 
   <dependencies>
     <!-- Version-checked aggregate repository base + the optimistic-locker InnerInterceptor
@@ -44,12 +45,11 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
     </dependency>
-    <!-- MyBatis-Plus for the JDBC persistence adapters (BaseMapper, wrappers, @TableName). Version
-         pinned — the scaffold does not manage MyBatis-Plus (plan-00007). -->
+    <!-- MyBatis-Plus for the JDBC persistence adapters (BaseMapper, wrappers, @TableName). No
+         <version> here: the reactor root imports mybatis-plus-bom, which manages it (issue-00088). -->
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-core</artifactId>
-      <version>3.5.15</version>
     </dependency>
   </dependencies>
 </project>

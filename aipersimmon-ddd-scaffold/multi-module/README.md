@@ -21,19 +21,42 @@ durable process manager) and `start` (the Spring Boot composition root + archite
 # Java 21 is required.
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 
-mvn verify        # full gate: unit + Testcontainers integration tests, and the quality gates
-                  # (Spotless, PMD/CPD, SpotBugs, JaCoCo + PIT on *-domain). Needs Docker.
+# Fast loop, no Docker: the framework-free domain modules and their unit tests (seconds).
+# Safe without -am: a *-domain module depends on the library only, never on a sibling.
+mvn -pl ordering/ordering-domain,inventory/inventory-domain,payment/payment-domain test
 
-# Run the app locally (starts PostgreSQL + Kafka + SigNoz via Docker Compose):
-mvn -pl start spring-boot:run     # infrastructure comes up from start/compose.yaml
+# The acceptance tests. ALWAYS -am: `start` depends on all sixteen sibling modules, and without
+# -am Maven resolves them from ~/.m2 instead of building them — so you would be testing whatever
+# was last installed there, silently. The symptoms are wildly misleading (an endpoint you just
+# wrote appears not to exist). -am costs a few seconds of compilation and is always correct.
+mvn -o test -pl start -am
+
+mvn verify        # full gate: unit + Testcontainers integration tests, and the quality gates
+                  # (Spotless, PMD/CPD, SpotBugs, JaCoCo + PIT on *-domain). Needs Docker, and
+                  # takes a while: containers are Spring beans, so each distinct test context
+                  # gets its own PostgreSQL + Kafka pair (roughly a dozen across the module).
+                  # That is what lets a test assert against an entire empty database.
+
+# Run the app locally (starts PostgreSQL + Kafka via Docker Compose):
+mvn -pl start -am spring-boot:run     # infrastructure comes up from start/compose.yaml
+
+# Optional extras, each behind a compose profile:
+docker compose -f start/compose.yaml --profile observability up -d   # SigNoz (traces/metrics/logs)
+docker compose -f start/compose.yaml --profile tools         up -d   # kafka-ui on :8080
 ```
 
-Place an order, then read it back:
+Place an order, then read it back. The app listens on **8090**, and every request carries a
+tenant: multi-tenancy is on with `missing-policy=REJECT`, so a header-less call is a 400 before it
+reaches the controller. The Flyway demo data (`CUST-1`, `SKU-1`) is seeded under the `__root__`
+sentinel, which is why that is the tenant used here — your own tenant needs its own rows.
 
 ```bash
-curl -i -X POST localhost:8080/orders -H 'content-type: application/json' \
+curl -i -X POST localhost:8090/orders \
+  -H 'content-type: application/json' \
+  -H 'X-Tenant-Id: __root__' \
   -d '{"customerId":"CUST-1","lines":[{"sku":"SKU-1","quantity":2,"unitAmountMinor":100,"currency":"USD"}]}'
-curl localhost:8080/orders/<id>
+
+curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
 ```
 
 ## The fulfilment flow
@@ -125,7 +148,7 @@ Four patterns are worth more than the individual rows:
 
 | | Why |
 |---|---|
-| The JDBC stack (`-starter-jdbc`, `-persistence-jdbc`, …) | A second backend would double the build for a story already told. `CHOOSING-MODULES.md` presents it as an equal path; only this one has a worked example. |
+| The JDBC stack (`-starter-jdbc`, `-persistence-jdbc`, …) | A second backend would double the build for a story already told. The library's module guide presents it as an equal path ([DOCS.md](DOCS.md)); only this one has a worked example. |
 | Redis web stores, rate limiting, replay protection | Idempotency already demonstrates the edge-store wiring; the other two differ only in what they count. |
 | `sendAs` / `publishAs` | The replay path preserves identity structurally — the row keeps its id — so nothing here needed the explicit carry-an-existing-identity entry points. They remain unexercised. |
 | A second topology (modulith, microservice) | Dropped in `605fab3`; the transport story is the same one, packaged differently. |
@@ -138,7 +161,7 @@ is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it 
 
 - **No public `confirm` endpoint.** Confirming is an *internal* step of the fulfilment process
   (dispatched only after payment is authorized). Exposing it would let a client bypass the process
-  manager's preconditions, so `OrderController` offers only `place`, `approve-review`, and `read`. Approving a
+  manager's preconditions, so `OrderController` exposes no `confirm` at all. Approving a
   held review *is* a legitimate operator action, and hosts the 404/409 error-contract demos.
 - **Payment speaks one word — *authorize*.** This reference demonstrates the authorization step
   only, not a later capture, so `AuthorizePayment`/`AuthorizationPolicy`/`PaymentAuthorized` are used

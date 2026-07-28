@@ -74,7 +74,18 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OrderFulfilmentCodecs {
 
-  private static final String US = "";
+  /**
+   * The field separator of this codec's wire format: ASCII 0x1F (unit separator).
+   *
+   * <p>Written as an escape, never as a raw byte. A raw 0x1F is invisible in an editor and in a
+   * diff, and this constant defines a <em>persisted</em> format — changing it silently would leave
+   * already-stored rows undecodable (issue-00087).
+   *
+   * <p>It cannot occur in an id or an enum name, so those fields need no escaping. The one field
+   * that is free text — a reservation failure's {@code detail}, carrying the inventory context's
+   * message verbatim — is not escaped yet; that half of issue-00087 is still open.
+   */
+  private static final String US = "\u001F";
 
   /**
    * The default route. One line per payload: logical type, version, Java type. Version 1 for all of

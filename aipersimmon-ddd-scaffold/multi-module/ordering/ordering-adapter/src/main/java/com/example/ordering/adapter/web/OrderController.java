@@ -72,7 +72,7 @@ public class OrderController {
   public ResponseEntity<Void> approveReview(
       @Parameter(
               description = "Identifier of the order whose review to approve.",
-              example = "ord-123")
+              example = "0197c1e2-0a3b-7c4d-8e5f-6a7b8c9d0e1f")
           @PathVariable
           String id) {
     commandBus.send(new ApproveReview(id));
@@ -126,7 +126,9 @@ public class OrderController {
   @ApiResponse(responseCode = "200", description = "The current snapshot of the order.")
   @GetMapping("/{id}")
   public ResponseEntity<OrderSnapshot> get(
-      @Parameter(description = "Identifier of the order to fetch.", example = "ord-123")
+      @Parameter(
+              description = "Identifier of the order to fetch.",
+              example = "0197c1e2-0a3b-7c4d-8e5f-6a7b8c9d0e1f")
           @PathVariable
           String id) {
     Optional<OrderSnapshot> snapshot = queryBus.ask(new FindOrder(id));

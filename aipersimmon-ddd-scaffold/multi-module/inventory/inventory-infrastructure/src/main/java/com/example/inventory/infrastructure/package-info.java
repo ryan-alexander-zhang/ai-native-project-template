@@ -1,7 +1,6 @@
 /**
  * Infrastructure layer of the inventory context: technical implementations of the domain and
- * application ports (the in-memory stock store and the event transport), organised by technical
- * concern.
+ * application ports (the Stock and Reservation repositories), organised by technical concern.
  */
 @InfrastructureLayer
 package com.example.inventory.infrastructure;
