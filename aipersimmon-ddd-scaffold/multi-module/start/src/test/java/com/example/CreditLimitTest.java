@@ -128,9 +128,9 @@ class CreditLimitTest {
             + " limit, which is exactly what was possible before the customer row was versioned");
   }
 
-  /** Cancellation returns the credit, by both routes that reach {@code Order.cancel}. */
+  /** Cancellation returns the credit, by every route that reaches {@code Order.cancel}. */
   @Test
-  void cancellingAnOrderReturnsItsCreditByEitherRoute() {
+  void cancellingAnOrderReturnsItsCreditByEveryRoute() {
     String customer = customerWithLimit("CUST-RELEASE", 100_000);
 
     // Route 1: the process manager's compensation entry point, which is how a declined payment, a
@@ -166,6 +166,23 @@ class CreditLimitTest {
             .getStatusCode()
             .value());
     assertEquals(0, usedCreditOf(customer), "self-cancellation must give the credit back too");
+
+    // Route 3: a reviewer rejecting a held order (issue-00082). It is the newest route, and the
+    // one most likely to have been forgotten — the credit was committed at placement, before
+    // anyone looked at the order, so a rejection that did not release would shrink the limit for
+    // an order the business explicitly refused.
+    String rejected = orderIdOf(placeRestricted(customer));
+    assertEquals(10_000, usedCreditOf(customer));
+    assertEquals(
+        204,
+        http.exchange(
+                "/orders/" + rejected + "/reject-review",
+                HttpMethod.POST,
+                new HttpEntity<>(jsonHeaders()),
+                Void.class)
+            .getStatusCode()
+            .value());
+    assertEquals(0, usedCreditOf(customer), "a rejected review must give the credit back as well");
 
     // The proof that release is real rather than cosmetic: the full limit is committable again.
     assertEquals(201, place(customer, 1000).getStatusCode().value());

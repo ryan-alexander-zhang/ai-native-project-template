@@ -10,6 +10,8 @@ import com.example.ordering.application.order.FindCustomerOrders;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.OrderListItem;
 import com.example.ordering.application.order.OrderSnapshot;
+import com.example.ordering.application.order.RejectReview;
+import com.example.ordering.application.order.ShipOrder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.headers.Header;
@@ -76,6 +78,32 @@ public class OrderController {
           @PathVariable
           String id) {
     commandBus.send(new ApproveReview(id));
+    return ResponseEntity.noContent().build();
+  }
+
+  // The other half of a review. Approval had an endpoint and refusal did not, so an order held for
+  // review could only ever be let through — the domain modelled the refusal (ReviewRejected, its
+  // own cancellation category, its own policy branch) and nothing could reach it (issue-00082).
+  @Operation(summary = "Reject the manual review of an order awaiting it")
+  @ApiResponse(responseCode = "204", description = "Review rejected; the order is cancelled.")
+  @PostMapping("/{id}/reject-review")
+  public ResponseEntity<Void> rejectReview(
+      @Parameter(
+              description = "Identifier of the order whose review to reject.",
+              example = "0197c1e2-0a3b-7c4d-8e5f-6a7b8c9d0e1f")
+          @PathVariable
+          String id) {
+    commandBus.send(new RejectReview(id));
+    return ResponseEntity.noContent().build();
+  }
+
+  @Operation(summary = "Dispatch a confirmed order")
+  @ApiResponse(responseCode = "204", description = "Shipped; the order is complete.")
+  @PostMapping("/{id}/ship")
+  public ResponseEntity<Void> ship(
+      @Parameter(description = "Identifier of the confirmed order to dispatch.") @PathVariable
+          String id) {
+    commandBus.send(new ShipOrder(id));
     return ResponseEntity.noContent().build();
   }
 

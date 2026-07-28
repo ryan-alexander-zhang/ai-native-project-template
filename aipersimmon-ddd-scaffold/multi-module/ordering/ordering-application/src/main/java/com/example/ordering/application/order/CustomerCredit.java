@@ -17,10 +17,11 @@ import org.springframework.stereotype.Component;
  * route and the customer is progressively locked out by orders that no longer exist, which is the
  * quietest possible failure — nothing errors, the limit just silently shrinks.
  *
- * <p>So the release lives here rather than being written out at each call site. There are only two
- * such sites today ({@link CancelOrderHandler}, {@link CancelOwnOrderHandler}) and both are thin,
- * but the two of them already cover five business paths, and the next cancellation route added
- * should have exactly one obvious thing to call.
+ * <p>So the release lives here rather than being written out at each call site. There are three
+ * such sites today ({@link CancelOrderHandler}, {@link CancelOwnOrderHandler}, {@link
+ * RejectReviewHandler}) and all three are thin, but between them they cover six business paths. The
+ * third arrived after this paragraph promised the next cancellation route exactly one obvious thing
+ * to call, and it found one — which is the only evidence that a claim like that is worth anything.
  *
  * <p>Not folded into {@code Order.cancel} itself, tempting as that is: the order aggregate must not
  * reach across into another aggregate's state. Coordinating the two is the application's job, which

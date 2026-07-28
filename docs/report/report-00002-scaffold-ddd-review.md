@@ -14,13 +14,13 @@ parent: plan-00015-scaffold-depth-and-evaluability
 
 ---
 
-## 0.5 修复进度（2026-07-28 更新）
+## 0.5 修复进度（2026-07-28 更新，第二轮后）
 
-**全部 High 已修完。29 个 issue 中 22 已 resolved，7 open，全为 Medium/Low。**
-每个 resolved issue 的「验证结果」一节记录了实际改法、与原修复方案的差异、以及负向对照的实测输出——
-**接手时读那一节，不要只读「修复」一节**，两者有出入的地方不少。
+**评审开出的 29 个 issue 全部 resolved，另有 1 个在修复过程中新开并已修完（`issue-00098`）。**
+每个 issue 的「验证结果」一节记录了实际改法、与原修复方案的差异、以及负向对照的实测输出——
+**接手时读那一节，不要只读「修复」一节**，两者有出入的地方很多。
 
-九个提交（分支 `lang/java/ddd`，基线 `259199a`）：
+### 第一轮：九个提交（基线 `259199a`），把全部 High 修完
 
 | Commit | 内容 |
 |---|---|
@@ -34,28 +34,46 @@ parent: plan-00015-scaffold-depth-and-evaluability
 | `66cad29` | issue-00090 子行不再无条件重写 + issue-00084 库存批量读端口 |
 | `238d0de` | issue-00070 `READY_FOR_FULFILMENT` 真实落库 + 自助取消/预留竞态 |
 
-**尚未修（7 条）**：
+### 第二轮：七个提交，把剩下的 8 条 Medium/Low 修完
 
-| Issue | 等级 | 一句话 |
+| Commit | Issue | 内容 |
 |---|---|---|
-| [[issue-00075-a-zero-amount-order-can-be-placed-but-not-paid]] | Medium | 0 元订单跨上下文契约不一致 |
-| [[issue-00095-a-partial-reactor-build-silently-tests-stale-siblings]] | Medium | `-am` 陷阱；核心警告已在 README，剩护栏 |
-| [[issue-00097-the-payment-operation-log-has-no-cleanup]] | Low | **修 00069 时新引入**：幂等日志无保留期 |
-| [[issue-00080-problem-title-key-has-no-message-bundle]] | Low | RFC 9457 的 title 是 message key，无资源包 |
-| [[issue-00082-domain-surface-no-use-case-can-reach]] | Low | 不可达领域能力；`PaymentOperations.find` 那一处已消解 |
-| [[issue-00085-ordering-carries-sku-as-a-bare-string]] | Low | 同一概念两种建模精度 |
-| [[issue-00087-a-raw-control-character-is-the-codec-separator]] | Low | codec 分隔符是裸控制字符，字段无转义 |
-| [[issue-00092-each-test-context-starts-its-own-container-pair]] | Low | 容器数量未文档化 |
+| `cacb962` | 00075 | 0 元订单跨上下文契约：值域写进发布语言，两侧对齐 |
+| `9d6bace` | 00095 | 陈旧兄弟构件护栏（判据是「从哪里加载」，不是「用什么命令构建」） |
+| `d5c9596` | 00092 | 测试上下文计数（直接问 Spring 要 `MergedContextConfiguration`；**实测 17 个，不是原估的 9–11**） |
+| `f350e03` | 00097 | `payment_operations` 保留期 + 「每张表都要有保留期决策」的护栏 |
+| `a146f3a` | 00080 | problem title 的 messages 资源包（**九个 key**，含 i18n 演示） |
+| `c6e72c9` | 00087 | codec 自由文本字段错位（定界 split，**并非 wire change**） |
+| `3cd0cee` | 00085 + 00098 | ordering 自己的 `Sku`；顺带修好被上一个提交弄红的 SpotBugs 门 |
+| （本提交） | 00082 | `RejectReview` 与 `ShipOrder`：不可达的领域能力有了出口 |
 
-**两条跨 issue 的经验，接手前值得知道**：
+### 第二轮里值得单独记住的六条
 
-1. **`mvn` 命令必须带 `-am`**。不带会静默用 `~/.m2` 里的陈旧兄弟构件，
-   症状指向完全错误的方向（本轮踩了三次：`POST /orders` 返回 405、找不到刚加的类）。
-   见 [[issue-00095-a-partial-reactor-build-silently-tests-stale-siblings]]。
-2. **每条修复都做了负向对照**（临时破坏修复、确认测试真的会红），
-   而且**多次发现 issue 里提议的断言会假绿**——最典型的是 issue-00077：
-   `assertThrows(DomainException.class, ...)` 在溢出回绕成负数时会被"金额不能为负"满足。
-   接手时请沿用这个做法：新写的测试先破坏实现验证它会红。
+1. **多处 issue 原稿的提议照做会错**，且错法各不相同：
+   - 00095 的「断言 `target/classes`」会把全 reactor `verify` 判红（`package` 之后是 target jar）；
+   - 00092 的「自己聚合上下文 key」等于手写一份 Spring 缓存键的近似实现，注定漂移；
+   - 00085 的 ArchUnit 规则 `.*(Sku|Id|Code)` 上来就要豁免三处**合理**的 String；
+   - 00087 说定界 split 是 wire change——不是，只有转义才是；
+   - 00097 说要 ShedLock——框架自己的 cleanup 都不加锁，并写明了理由。
+   **读 issue 的「修复」一节要当提议看，不要当规格看。**
+2. **护栏本身会假绿**。00097 的表-保留期护栏若只断言「`DECISIONS` 里有这一条」，
+   写一句 `purgedAfter(...)` 就能变绿而什么都没配；必须再断言那个 property 真的存在。
+   同理 00082 的 `RETURN_REQUIRED` 用例：只断言 409 的话，订单没发货时也会绿。
+3. **`mvn` 不带 `clean` 会假绿**。改了被大量引用的类型签名（00085 的 `LineData`）后，
+   `mvn test-compile` 报 BUILD SUCCESS，而 20 处调用点根本没编译——
+   增量判断认为未改动的测试源码无需重编。**改签名后验证必须带 `clean`。**
+4. **SpotBugs 的 `EI_EXPOSE_REP2` 可以由别人的方法名引发**（issue-00098）：
+   给 mapper 加一个 `delete` 开头的方法，会让**所有持有该 mapper 的类**变红，
+   包括你没碰过的那些。报告在持有者的构造器上，原因在被持有者的方法名里。
+5. **两个数字被实测纠正**：测试上下文是 **17** 个（原估 9–11）；
+   problem title 缺的是 **9** 个 key（原稿只举了 1 个，大头是 16 个错误码共用的家族兜底标题）。
+6. **每条修复都做了负向对照**，多次发现原提议的断言会假绿。沿用这个做法。
+
+### 仍然开着的一条（不在这 30 个 issue 里）
+
+`design-00013`（认证授权 seam）**故意保持 `draft`**，用户尚未 review。
+`AGENTS.md` 禁止对 draft 文档写代码，所以「安全域缺席」这个最大缺口暂时动不了。
+这也是总体判断里「差三步」中唯一没走的那一步。
 
 ---
 

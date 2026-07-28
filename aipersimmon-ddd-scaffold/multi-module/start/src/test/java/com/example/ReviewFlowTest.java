@@ -10,6 +10,7 @@ import com.example.inventory.domain.stock.Stocks;
 import com.example.ordering.application.order.ApproveReview;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.PlaceOrder;
+import com.example.ordering.application.order.RejectReview;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -74,5 +75,27 @@ class ReviewFlowTest {
                     stockBefore - 1,
                     available("SKU-RESTRICTED"),
                     "the approved order reserves its stock exactly once"));
+  }
+
+  @Test
+  void aRestrictedOrderCanAlsoBeRejected() {
+    // The other answer a reviewer can give (issue-00082). Until RejectReview existed the operator
+    // could only approve, and a held order had no way out but through — while the domain already
+    // modelled the refusal down to its own cancellation category.
+    int stockBefore = available("SKU-RESTRICTED");
+
+    String orderId =
+        commandBus.send(
+            new PlaceOrder(
+                "CUST-1", List.of(new PlaceOrder.Line("SKU-RESTRICTED", 1, 100, "USD"))));
+    assertEquals("AWAITING_REVIEW", status(orderId));
+
+    commandBus.send(new RejectReview(orderId));
+
+    // Synchronous, unlike approval: rejection cancels the order here and now, because nothing was
+    // ever announced to inventory and so there is no compensation to wait for.
+    assertEquals("CANCELLED", status(orderId));
+    assertEquals(
+        stockBefore, available("SKU-RESTRICTED"), "a rejected order never reserved anything");
   }
 }

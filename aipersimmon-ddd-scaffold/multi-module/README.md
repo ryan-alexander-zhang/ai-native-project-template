@@ -105,6 +105,9 @@ PlaceOrder ─▶ Order.place ── needs review? ──▶ AWAITING_REVIEW ─
    STOCK deadline fires   ─▶ CancelOrder (nothing reserved yet) ─▶ CANCELLED
    PAYMENT deadline fires ─▶ same compensation as a decline     ─▶ CANCELLED
    STOCK_RELEASE deadline fires ─▶ ask for the release again (it cannot give up — see below)
+
+   RejectReview while AWAITING_REVIEW ─▶ CANCELLED (synchronous; nothing was ever reserved)
+   ShipOrder while CONFIRMED          ─▶ SHIPPED, and from there cancelling is RETURN_REQUIRED
 ```
 
 Deadlines are why "nobody answered" is an outcome rather than a stuck order. **Every step that
@@ -144,7 +147,8 @@ the order. `SelfCancelDuringReservationTest` covers it.
 | CQRS command/query buses | `OrderController` → `CommandBus`/`QueryBus`; `PlaceOrderHandler`, `FindOrderHandler` | `OrderControllerValidationTest`, `PlaceOrderBusValidationTest` |
 | Aggregate + explicit lifecycle | `ordering-domain/…/order/Order.java`, `OrderStatus` | `OrderPlacementTest`, `OrderLifecycleTransitionsTest`, `ComplexOrderStateChangeDemoTest` |
 | Evidence-bearing policy (not a flat table) | `OrderLifecyclePolicy`, `CancellationReason` | `OrderCancellationPolicyTest`, `OrderEvidenceRefTest` |
-| Manual-review classification | `ManualReviewPolicy` (decision) vs `Order`/`ReviewRequirement` (lifecycle) | `ManualReviewPolicyTest`, `ReviewFlowTest` (end-to-end) |
+| Manual-review classification | `ManualReviewPolicy` (decision) vs `Order`/`ReviewRequirement` (lifecycle); both answers reachable — `POST /orders/{id}/approve-review` and `POST /orders/{id}/reject-review` | `ManualReviewPolicyTest`, `ReviewFlowTest` (end-to-end, both answers) |
+| A terminal success, and the rule that guards it | `POST /orders/{id}/ship` → `Order.ship`; cancelling a `SHIPPED` order is refused with `RETURN_REQUIRED`, because undoing a dispatch is a return | `OrderLifecycleTransitionsTest`, `ExceptionContractTest` (the 409, over HTTP) |
 | Domain events (subscriber in application layer) | `OrderFulfilmentStarter` on `OrderReadyForFulfilmentEvent` | `ReviewFlowTest`, `OrderingFlowTest` |
 | Integration events + transactional outbox → Kafka → inbox | `OrderReadyForFulfilment`, `PaymentRequested` (`*-api`); `PlaceOrderHandler`/`FulfilmentTrigger` publish | `OutboxAtomicityTest`, `IntegrationEventTransportTest` |
 | Anti-corruption layers | `StockAvailabilityGateway` (ordering port + infra adapter); `OrderReadyForFulfilmentListener`, `PaymentRequestedListener` (inbound ACLs) | `OrderingFlowTest`, `PaymentCompensationFlowTest` |

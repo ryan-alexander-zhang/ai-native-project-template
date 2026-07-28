@@ -1,5 +1,6 @@
 package com.example;
 
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -258,5 +260,67 @@ class ExceptionContractTest {
         // CONFLICT-category error the aggregate raises for a review action on a non-reviewable
         // order.
         .andExpect(jsonPath("$.code").value("ordering.order-not-awaiting-review"));
+  }
+
+  @Test
+  void rejectingTheReviewOfAnOrderNotAwaitingReviewRenders409AndCode() throws Exception {
+    // The refusal side of the same guard (issue-00082). SKU-1 needs no review, so there is no
+    // review to reject; the aggregate's policy says so with the same coded conflict.
+    String location = placeOrder("SKU-1", 100);
+
+    mvc.perform(post(location + "/reject-review").header("X-Tenant-Id", TENANT))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.code").value("ordering.order-not-awaiting-review"));
+  }
+
+  @Test
+  void cancellingAShippedOrderRenders409AndAsksForAReturnInstead() throws Exception {
+    // RETURN_REQUIRED is a good rule that no running application could ever reach: without a ship
+    // command there was no way to put an order into SHIPPED, so the branch fired only in the
+    // aggregate's own unit tests (issue-00082). This is that rule seen from outside, over HTTP,
+    // which is where a client would meet it.
+    String location = placeOrder("SKU-1", 100);
+    awaitStatus(location, "CONFIRMED");
+
+    mvc.perform(post(location + "/ship").header("X-Tenant-Id", TENANT))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(
+            post(location + "/cancel")
+                .header("X-Tenant-Id", TENANT)
+                .queryParam("customerId", "CUST-1"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.code").value("ordering.return-required"));
+  }
+
+  /** Places a single-line order and returns its {@code Location}. */
+  private String placeOrder(String sku, int unitAmountMinor) throws Exception {
+    String body =
+        """
+        {"customerId":"CUST-1",
+         "lines":[{"sku":"%s","quantity":1,"unitAmountMinor":%d,"currency":"USD"}]}
+        """
+            .formatted(sku, unitAmountMinor);
+    return mvc.perform(
+            post("/orders")
+                .header("X-Tenant-Id", TENANT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isCreated())
+        .andReturn()
+        .getResponse()
+        .getHeader("Location");
+  }
+
+  /** Waits for the asynchronous cascade to bring the order to {@code expected}. */
+  private void awaitStatus(String location, String expected) {
+    await()
+        .atMost(Duration.ofSeconds(30))
+        .untilAsserted(
+            () ->
+                mvc.perform(get(location).header("X-Tenant-Id", TENANT))
+                    .andExpect(jsonPath("$.status").value(expected)));
   }
 }

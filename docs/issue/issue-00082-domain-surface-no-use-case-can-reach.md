@@ -2,7 +2,7 @@
 id: issue-00082-domain-surface-no-use-case-can-reach
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -89,7 +89,63 @@ void everyAggregateStateIsReachableFromSomeUseCase() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修，三项都接上了出口——**没有一项走"移出去 + README 记一笔"那条路**。
+
+**B. 审核拒绝（issue 建议优先做的一条，确实几乎不需要新代码）**
+
+`RejectReview` 命令 + `RejectReviewHandler` + `POST /orders/{id}/reject-review`。
+零件全是现成的：`CancellationReason.ReviewRejected`、`CancellationCategory.REVIEW_REJECTED`、
+`OrderLifecyclePolicy.ensureReviewCancellationAllowed`、以及 `ReviewDecisionRef.approved`——
+那个字段**此前从未有调用方传过 `false`**。
+
+**实施时发现的一件 issue 没提的事**：这条路径必须**归还信用额度**。
+信用在下单时就已提交，而拒绝发生在有人看这张单之前；不归还的话，
+一张业务上被明确拒绝的订单会永久占住额度，且**没有任何报错**——
+正是 `CustomerCredit` 的 javadoc 描述的那种"最安静的失败"。
+有意思的是那段 javadoc **早就把"a rejected review"列进了会走到 `Order.cancel` 的路径里**，
+而当时那条路径并不存在。它还写着"下一个新增的取消路径应该只需要调用一个明显的东西"——
+这次就是那个"下一个"，而它确实只需要调一个。javadoc 里 "two such sites" 已改为三处。
+
+**A. 发货（选了补命令，而不是移出去）**
+
+`ShipOrder` + `ShipOrderHandler` + `POST /orders/{id}/ship`。
+真正的收益不是 `SHIPPED` 这个状态，而是**`RETURN_REQUIRED` 从此可达**：
+`OrderLifecyclePolicy` 里"已发货必须走退货流程"这条规则，
+在此之前**运行中的应用永远触发不到**，只有聚合自己的单测能碰到它。
+一条永远不会触发的好规则，与没有这条规则在外部是无法区分的。
+`ExceptionContractTest` 现在从 HTTP 外部覆盖了那个 409。
+（退货流程本身仍未演示，`ShipOrder` 的 javadoc 写明了这是建模生命周期的终点。）
+
+**C. `PaymentOperations.find`**：已由 [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]] 用起来，本轮无事。
+
+**测试全部加进已有的测试类**（`ReviewFlowTest` / `ExceptionContractTest` / `CreditLimitTest`），
+不新建 `@SpringBootTest`——`TestContextCountTest` 仍是 17，没有多起一对容器
+（[[issue-00092-each-test-context-starts-its-own-container-pair]]）。
+
+**两条负向对照，都实测过，而且都证明了断言的针对性**：
+
+```
+# A. 拿掉 RejectReviewHandler 里的 credit.releaseFor(order)
+CreditLimitTest.cancellingAnOrderReturnsItsCreditByEveryRoute:185
+  a rejected review must give the credit back as well ==> expected: <0> but was: <10000>
+
+# B. 在 RETURN_REQUIRED 用例里跳过 ship 那一步
+ExceptionContractTest.cancellingAShippedOrderRenders409AndAsksForAReturnInstead:294
+  JSON path "$.code" expected:<ordering.return-required>
+                     but was:<ordering.customer-cancellation-window-closed>
+```
+
+第二条尤其值得记：**两种情况都是 409**。
+如果只断言状态码，这条测试在订单根本没发货时也会绿——
+它测的就不再是"已发货的订单不能取消"，而只是"取消失败了"。
+断言 `code` 而不只是 status 是这条用例成立的全部原因。
+
+**关于复现一节那条"状态可达性"断言**：没有实现。
+`SHIPPED` 现在可达了，`OrderStatus` 六个状态全部有出口，那条断言当下会绿；
+而要写对它需要静态分析 application 层对聚合的调用，
+成本远高于它现在能拦住的东西。**这一点是有意跳过的，不是遗漏。**
+
+验证：`mvn -o clean verify`（全 reactor）通过。
 
 ## 关联
 
