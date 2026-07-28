@@ -86,7 +86,10 @@ public class OrderFulfilmentCodecs {
    *
    * <p>It cannot occur in an id or an enum name, so those fields need no escaping. The one field
    * that is free text — a reservation failure's {@code detail}, carrying the inventory context's
-   * message verbatim — is not escaped yet; that half of issue-00087 is still open.
+   * message verbatim — could contain it, and is handled by {@link #decodeCancel} bounding its split
+   * so that field absorbs the remainder rather than shifting the ones after it. Fields are
+   * therefore still written unescaped, which is what keeps the format unchanged; the constraint
+   * this buys is that a free-text field must be last in its variant.
    */
   private static final String US = "\u001F";
 
@@ -191,21 +194,51 @@ public class OrderFulfilmentCodecs {
     };
   }
 
+  /**
+   * Reads the fields back by position, with each variant's split bounded to its own field count so
+   * the <em>last</em> field takes whatever remains (issue-00087).
+   *
+   * <p>An unbounded {@code split(US, -1)} read every field positionally, which is only safe while
+   * no field value can contain the separator. One can: a reservation failure's {@code detail} is
+   * the inventory context's message passed through verbatim. A separator inside it produced one
+   * extra field, shifted everything after it, and the positional reads then either threw {@code
+   * ArrayIndexOutOfBoundsException} or — worse — built a reason out of values taken from the wrong
+   * fields. Decode-time only, long after the causing event is gone.
+   *
+   * <p>Bounding the split fixes it because {@code detail} is last in its variant, so there is
+   * nothing after it to shift. It is worth being clear that this is <strong>not</strong> a wire
+   * change, and so needs no version bump: the encoder is untouched, every row that decoded
+   * correctly before still decodes to the same command, and the only rows whose meaning changes are
+   * the ones that previously decoded to the wrong thing. Escaping the field would have been a wire
+   * change — a different, larger fix for the same defect, and it is not needed while the free-text
+   * field stays last. If a second free-text field is ever added, or one is added after this one,
+   * that larger fix becomes the only option.
+   */
   private static CancelOrder decodeCancel(String text) {
-    String[] fields = text.split(US, -1);
+    // orderId, kind, and everything else — the variant decides how the rest divides.
+    String[] head = text.split(US, 3);
+    if (head.length < 3) {
+      throw new ProcessSerializationException("malformed cancel-order payload");
+    }
     CancellationReason reason =
-        switch (fields[1]) {
-          case "INVENTORY_UNAVAILABLE" ->
-              new CancellationReason.InventoryUnavailable(
-                  new ReservationFailureRef(
-                      fields[2], new OrderId(fields[3]), fields[4], fields[5]));
-          case "PAYMENT_DECLINED" ->
-              new CancellationReason.PaymentDeclinedAfterStockReleased(
-                  new PaymentDeclineRef(fields[2], new OrderId(fields[3]), fields[4]),
-                  new StockReleaseRef(fields[5], new OrderId(fields[6])));
+        switch (head[1]) {
+          case "INVENTORY_UNAVAILABLE" -> {
+            // failureId, orderId, reasonCode, detail — detail is free text and absorbs the rest.
+            String[] fields = head[2].split(US, 4);
+            yield new CancellationReason.InventoryUnavailable(
+                new ReservationFailureRef(fields[0], new OrderId(fields[1]), fields[2], fields[3]));
+          }
+          case "PAYMENT_DECLINED" -> {
+            // declineId, orderId, declineCode, releaseId, releaseOrderId — all ids and codes,
+            // none of which can carry a separator, but bounded for the same reason regardless.
+            String[] fields = head[2].split(US, 5);
+            yield new CancellationReason.PaymentDeclinedAfterStockReleased(
+                new PaymentDeclineRef(fields[0], new OrderId(fields[1]), fields[2]),
+                new StockReleaseRef(fields[3], new OrderId(fields[4])));
+          }
           default ->
-              throw new ProcessSerializationException("unknown cancel reason kind: " + fields[1]);
+              throw new ProcessSerializationException("unknown cancel reason kind: " + head[1]);
         };
-    return new CancelOrder(fields[0], reason);
+    return new CancelOrder(head[0], reason);
   }
 }

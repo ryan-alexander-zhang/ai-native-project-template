@@ -2,7 +2,7 @@
 id: issue-00087-a-raw-control-character-is-the-codec-separator
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -98,16 +98,53 @@ void aDetailContainingTheSeparatorRoundTrips() {
 
 ## 验证结果
 
-部分已修（保持 open）。
+已修（两半都修完）。
 
 - **已做（修复第 1 条，零风险）**：`OrderFulfilmentCodecs` 的分隔符由裸 0x1F 字节改为
   `"\u001F"` 转义写法，行为完全不变（同一码点），但它在编辑器、diff 与代码评审里终于可见。
   字段 javadoc 说明了它是一份**持久化格式**的定义，以及为什么必须写成转义。
-- **未做（修复第 2、3 条）**：自由文本字段（`ReservationFailureRef.detail`）仍未转义，
-  含 0x1F 的 detail 仍会让 `decodeCancel` 按位置读取时错位。
-  该改动会改变 wire format，按本 codec 自己的规则需要 bump `PayloadType` 版本并保留 v1 解码器，
-  因此与"零风险速修"分开处理。javadoc 已就地标注这半仍然开着。
-- 验证：`mvn -o compile`、`spotless:check` 通过；`OrderFulfilmentDefinitionTest` 18 条全绿。
+- **已做（修复第 2、3 条，本轮补上）**：`decodeCancel` 改为**按变体定界的 split**——
+  先 `split(US, 3)` 取出 `orderId` / 判别符 / 其余，再按变体
+  `split(US, 4)`（INVENTORY_UNAVAILABLE）或 `split(US, 5)`（PAYMENT_DECLINED）切开，
+  **最后一个字段吸收剩余内容**。`detail` 恰好是它那个变体的最后一个字段，所以它后面没有可被挤位的东西。
+
+  **一处必须纠正原稿的判断**：原稿在末尾写"改格式（第 2 条）按该 codec 自己的规则是 wire change，
+  需要 bump `PayloadType` 版本并为 v1 保留解码器"。**这条对"转义"成立，对"定界 split"不成立。**
+  定界 split **编码器一个字节都没动**：
+  - 已落库的行，凡是此前能正确解出的，解出的结果完全相同；
+  - 唯一改变含义的，是此前**解错**的那些行。
+
+  所以**不需要 bump 版本，也不需要 v1 解码器**。两个方案修的是同一个缺陷，代价差一个数量级，
+  原稿把它们混成了一条。选了便宜的那条，代价是引入一条约束：
+  **自由文本字段必须是它那个变体的最后一个字段**——这条约束已写进 `US` 常量与 `decodeCancel` 的 javadoc。
+  将来若新增第二个自由文本字段、或在 `detail` 之后再加字段，转义（连同版本 bump）就成了唯一选项。
+
+  顺带把"字段数不足"从 `ArrayIndexOutOfBoundsException` 改成
+  `ProcessSerializationException("malformed cancel-order payload")`——
+  解码期的故障应当自报家门。
+
+- **测试放在新建的 `OrderFulfilmentCodecsTest`，不是原稿说的 `OrderFulfilmentDefinitionTest`**：
+  后者的 javadoc 明说自己测的是纯转移表，而 codec 是一份**持久化格式**，
+  变更理由完全不同，混在一起会让两者都变模糊。5 条：两个变体各一条 round-trip、
+  **detail 含分隔符**的 round-trip、字段不足、判别符未知。
+  测试里的分隔符同样写成 `\u001F` 转义（理由与主文件一致：源码里看不见的输入不算规格说明）。
+
+- **负向对照（实测，且结果比 issue 预测的更糟）**：把定界 split 改回 `split(US, -1)`：
+
+```
+aDetailContainingTheSeparatorRoundTripsInsteadOfShiftingTheFields
+  expected: <... detail=asked 999<US>available 10]]>
+  but was:  <... detail=asked 999]]>
+```
+
+  原稿预测的失败形态是"`ArrayIndexOutOfBoundsException`，或把错误的值装进证据 ref"。
+  **实际是第三种：静默截断。** 多切出来的那一段落在 `fields[4]`，
+  而 INVENTORY_UNAVAILABLE 只读到 `fields[3]`，于是它被无声丢弃——
+  既不抛异常，也不装错值，只是证据里的失败原因少了半句。
+  这比原稿设想的两种都更难发现。
+
+- 验证：`mvn -o test -pl ordering/ordering-process-mybatis-plus -am` 29 条全绿
+  （`OrderFulfilmentDefinitionTest` 24 + `OrderFulfilmentCodecsTest` 5）；`spotless` 通过。
 
 ## 关联
 
