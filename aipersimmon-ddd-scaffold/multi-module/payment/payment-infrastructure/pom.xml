@@ -60,5 +60,18 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-tenancy</artifactId>
     </dependency>
+    <!-- The retention job says how many rows it dropped. A scheduled task that deletes data and
+         reports nothing is the kind of thing that is only ever noticed when it has been broken for
+         a month. Version managed by the Spring Boot BOM. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!-- Unit test for the retention cutoff: a stub mapper, no database. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

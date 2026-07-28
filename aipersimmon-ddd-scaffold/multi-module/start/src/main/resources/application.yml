@@ -173,6 +173,8 @@ aipersimmon:
       cleanup:
         enabled: true
         retention-seconds: 2592000
+        # The same question, asked of this application's own dedupe table, is answered under
+        # `payment:` at the bottom of this file — the paragraph above is the reasoning for both.
     # The durable process manager. deadline-worker.poll-delay is how often due timers are looked
     # for, so it bounds how late a timeout fires — the order-fulfilment flow arms a PAYMENT
     # deadline while it waits for the payment context (see OrderFulfilmentDefinition). The worker
@@ -247,3 +249,20 @@ logging:
     ecs:
       service:
         node-name: ${HOSTNAME:localhost}
+
+# This application's own append-only dedupe table (issue-00097). payment_operations records that a
+# paymentOperationId has been authorized so a redelivery cannot authorize it twice, which is exactly
+# what aipersimmon.ddd.inbox does one layer down — the key is a business id rather than a transport
+# message id, but the retention question and its answer are the same one. So this window is the
+# inbox's window, not an independently chosen number: it must exceed the longest redelivery the
+# broker can produce, because a purged key is a key no longer recognised as a duplicate.
+#
+# The table had no retention at all until this block existed. It replaced a ConcurrentHashMap, whose
+# retention policy — gone on restart — was never written down anywhere, so nothing signalled that
+# the swap had removed one. Off is a legitimate answer here (an idempotency log has some audit
+# value); having never asked is not.
+payment:
+  operations:
+    cleanup:
+      enabled: true
+      retention-seconds: 2592000

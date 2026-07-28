@@ -2,7 +2,7 @@
 id: issue-00097-the-payment-operation-log-has-no-cleanup
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -86,7 +86,59 @@ void everyAppendOnlyTableHasARetentionDecision() {
 
 ## 验证结果
 
-未修。本 issue 由 [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]] 的实施暴露。
+已修。选了**修复方案 1（加清理任务，与框架一致）**，并补上了那条护栏。方案 2（上提成框架组件）
+成本过高且只有一个使用者；方案 3（显式豁免）不成立——保留期判据已经在同一个文件里了。
+
+**实际改动，有两处与 issue 原稿不同**：
+
+1. **不用 ShedLock**。原稿写"一个 ShedLock 保护的定时任务"。但去读框架自己的
+   `InboxCleanup` / `OutboxCleanup`，它们**都没有加锁**，且注明了理由：
+   删除是一条以 cutoff 为界的单语句，多实例同时跑是冗余但无害（幂等）。
+   照抄框架的做法比照抄 issue 的提议更对，`PaymentOperationCleanup` 的 javadoc 逐字记了这个理由。
+2. **bean 注册在组合根，不在 adapter 上**。`PaymentOperationCleanup` 是
+   `payment-infrastructure` 里一个不带 Spring 注解的普通类；
+   `start` 的 `PaymentOperationCleanupConfig` 用 `@ConditionalOnProperty` 决定要不要装配它。
+   这与框架"类在 store 模块、装配在 auto-config"的分法一致，
+   而且说的是同一件事：**要不要删数据、留多久，是部署决策，不是这个适配器的属性**。
+
+**保留期取 30 天，与 inbox 同源**——不是各自选的数字。`application.yml` 里两处互相指：
+inbox 那段末尾加了一行指向文件底部的 `payment:` 块，`payment:` 块说明为什么判据是同一条
+（都是"一条被清掉的键就不再被识别为重复"，所以都必须长于 broker 最长重投递窗口）。
+
+**产出的护栏是 `TableRetentionTest`，它才是本 issue 的重点**：
+
+- 从 `db/migration` 里**扫出** `CREATE TABLE`，逐张要求在 `DECISIONS` 里有条目——
+  所以**新加一张表就会红**，直到有人写下它属于哪一类。
+- 两类都是合法答案：`purgedAfter("<property>")`（并且该 property 必须在 `application.yml` 里真的存在）
+  或 `keptForever("<理由>")`。当前 7 张表里 6 张是后者（订单、库存都是业务数据），
+  只有 `payment_operations` 是前者。**"没写"才是这条护栏要挡的状态。**
+- 范围只限本应用自己的迁移；框架的 outbox/inbox/operation-log/process-manager 四类表由组件迁移建、
+  在 `aipersimmon.ddd.*` 下配置，不归这里管。javadoc 写明了。
+
+**负向对照（两条都实测过）**：
+
+```
+# A. 新增一张没有决策的表（临时 V8__control.sql）
+these tables have no retention decision: [payment_attempts]. Add one to DECISIONS. ...
+
+# B. 把 retention-seconds 改名，让决策指向一个不存在的 property
+payment_operations is documented as purged after payment.operations.cleanup.retention-seconds,
+but no such property is set in application.yml — the decision exists only in this test,
+and the rows would grow forever
+```
+
+第二条尤其重要：没有它，`DECISIONS` 里写一句 `purgedAfter(...)` 就能让第一条断言变绿，
+而实际什么都没配——**护栏本身会变成那种"写下来就算数"的假绿**。
+
+另有 `PaymentOperationCleanupTest`（`payment-infrastructure` 的第一个单测）钉住 cutoff 的**符号**：
+窗口方向搞反会删掉所有近期操作、留下已过期的，恰好是 dedupe 日志需要的反面，
+且症状是重复授权而不是报错。为此给该模块加了 `junit-jupiter`（test）与
+`slf4j-api`（清理任务要报告删了多少行——一个删数据却什么都不说的定时任务，
+坏掉一个月也不会有人发现）。
+
+验证：`mvn -o test -pl payment/payment-infrastructure -am` 绿；
+`mvn -o test -pl start -am -Dtest=ApplicationSmokeTest,PaymentOperationAtomicityTest,TableRetentionTest` 5 条全绿
+（应用带着新 bean 正常启动，`@Value` 解析到位）。
 
 ## 关联
 
