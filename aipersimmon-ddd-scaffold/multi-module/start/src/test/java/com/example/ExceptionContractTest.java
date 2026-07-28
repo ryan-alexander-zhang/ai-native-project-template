@@ -183,6 +183,24 @@ class ExceptionContractTest {
   }
 
   @Test
+  void livenessAndReadinessAreSeparateProbes() throws Exception {
+    // The merged /actuator/health above answers "is anything wrong?", which is not a question a
+    // deployment platform can act on: the two things it can do — restart the pod, or stop routing
+    // to it — need different answers. management.endpoint.health.probes.enabled maps them
+    // separately (issue-00074); without it both of these are 404 and the platform has to make do
+    // with the merged endpoint, treating a lost database as a reason to restart.
+    mvc.perform(get("/actuator/health/liveness"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UP"));
+
+    // Readiness includes db, so it answers "can this instance actually serve a command?" — a
+    // command's first act is to open a transaction. Liveness deliberately does not include it.
+    mvc.perform(get("/actuator/health/readiness"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UP"));
+  }
+
+  @Test
   void approvingReviewOfAnOrderNotAwaitingReviewRenders409AndCode() throws Exception {
     // SKU-1 needs no manual review, so placing it clears the order for fulfilment immediately
     // (it is already past AWAITING_REVIEW when the POST returns). Approving a review it never

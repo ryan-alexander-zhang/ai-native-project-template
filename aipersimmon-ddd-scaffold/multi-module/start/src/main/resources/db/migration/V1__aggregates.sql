@@ -52,12 +52,8 @@ CREATE TABLE inventory.reservation_lines (
     PRIMARY KEY (reservation_id, sku)
 );
 
--- seed (same demo data the in-memory repositories used) ----------------------
-
-INSERT INTO ordering.customers (id, name, credit_minor, currency)
-VALUES ('CUST-1', 'Acme', 100000, 'USD');
-
--- SKU-RESTRICTED is stocked like any other, but ordering's ManualReviewPolicy flags it, so an
--- order containing it is held for manual review before any reservation — the review-path demo.
-INSERT INTO inventory.stocks (sku, available)
-VALUES ('SKU-1', 10), ('SKU-2', 5), ('SKU-RESTRICTED', 10);
+-- No seed data here, and none in any other versioned migration. A versioned migration runs exactly
+-- once in EVERY environment and Flyway gives it no way to opt out, so the demo rows this scaffold
+-- needs (CUST-1, SKU-1, ...) would arrive in a real production database too. They now live in
+-- db/dev/afterMigrate__seed.sql, a location only the dev profile loads (issue-00072).
+-- MigrationContentTest keeps this true.

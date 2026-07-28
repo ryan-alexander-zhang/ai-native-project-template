@@ -2,7 +2,7 @@
 id: issue-00072-demo-seed-data-ships-in-a-production-migration
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -86,7 +86,31 @@ spring:
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。四条修复全部落地，与
+[[issue-00074-one-config-file-with-development-values-only]] 同批（profile 拆分是前置）。
+
+- 种子从 `V1__aggregates.sql` 移到 `db/dev/afterMigrate__seed.sql`；V1 原处留一段注释说明
+  **为什么这里不能有数据**，而不是留白——留白会被下一个人填回去。
+- `application-dev.yml` 的 `spring.flyway.locations: classpath:db/migration,classpath:db/dev`；
+  prod 显式写 `classpath:db/migration` 单条。生产库永远看不到 Acme。
+- 种子行显式写 `tenant_id`，按第 3 条：不再靠列默认值兜。
+- 全部语句 `ON CONFLICT DO NOTHING`，冲突目标是 V2 起的**复合键** `(tenant_id, id)` / `(tenant_id, sku)`，
+  所以 afterMigrate 每次 migrate 重跑都无害。
+
+**第 4 条（README quickstart 租户前提）实施时发现它本身是错的**：
+方案要求写 `-H 'X-Tenant-Id: __root__'`，而 `__root__` 是客户端按设计**不可命名**的保留租户，
+那条 curl 必然 400。已另落 [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]]
+并一并修掉：种子改为同时种 `__root__`（供 7 个走 `commandBus` 不绑租户的测试）与
+`demo`（供 README 的 curl），README 改用 `demo` 并解释为什么不是 `__root__`。
+
+`MigrationContentTest` 按复现段落地为结构断言，并且是**回归护栏优先**：
+它读源码树而不是 classpath——`target/classes` 里的陈旧副本会让 classpath 扫描检查上一次构建。
+（这个坑在上一组修复里真实踩过一次。）
+
+验证：`mvn -o test -pl start -am` 全绿，62 个测试 0 失败。7 个仍依赖种子的验收测试不受影响。
+负向对照：往 `V3` 塞一条 `INSERT`，`MigrationContentTest` 立刻红并点名文件；移除后绿。
+另有 `ProductionProfileBootTest.theDemoSeedIsNotInAProductionDatabase` 从另一端钉住同一件事——
+prod profile 下两张表 count 为 0，而 schema 完整可查。
 
 ## 关联
 

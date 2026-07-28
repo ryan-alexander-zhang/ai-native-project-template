@@ -45,19 +45,43 @@ docker compose -f start/compose.yaml --profile observability up -d   # SigNoz (t
 docker compose -f start/compose.yaml --profile tools         up -d   # kafka-ui on :8080
 ```
 
+### Configuration profiles
+
+`dev` is the default, so everything above needs no profile argument. The three files divide by one
+question — *would this value still be right somewhere else?*
+
+| File | Holds | Examples |
+|---|---|---|
+| `application.yml` | Decisions. Same value wherever it runs | outbox lease arithmetic, inbox retention, tenancy policy, health probes, graceful shutdown |
+| `application-dev.yml` | Local addresses and demo conveniences | compose lifecycle, `localhost:9092`, Swagger UI on, `payment-timeout: PT2M`, the `db/dev` seed location |
+| `application-prod.yml` | Everything from the environment | `${DB_URL}`, `${KAFKA_BOOTSTRAP_SERVERS}`, Swagger UI off, `require-key: true`, migrations without `db/dev` |
+
+Production is an explicit opt-in — `SPRING_PROFILES_ACTIVE=prod` — and requires `DB_URL`,
+`DB_USER`, `DB_PASSWORD` and `KAFKA_BOOTSTRAP_SERVERS`. Those placeholders carry no defaults on
+purpose: a missing one fails at startup rather than silently pointing somewhere wrong.
+`application-prod.yml` lists the optional variables and their defaults, and
+`ProductionProfileBootTest` starts the application under that profile with nothing but those
+variables, so the file cannot rot.
+
 Place an order, then read it back. The app listens on **8090**, and every request carries a
 tenant: multi-tenancy is on with `missing-policy=REJECT`, so a header-less call is a 400 before it
-reaches the controller. The Flyway demo data (`CUST-1`, `SKU-1`) is seeded under the `__root__`
-sentinel, which is why that is the tenant used here — your own tenant needs its own rows.
+reaches the controller. Use `demo` — `db/dev/afterMigrate__seed.sql` (dev profile only) seeds
+`CUST-1` and the SKUs under it. Your own tenant needs its own rows, and a production database has
+none of it.
 
 ```bash
 curl -i -X POST localhost:8090/orders \
   -H 'content-type: application/json' \
-  -H 'X-Tenant-Id: __root__' \
+  -H 'X-Tenant-Id: demo' \
   -d '{"customerId":"CUST-1","lines":[{"sku":"SKU-1","quantity":2,"unitAmountMinor":100,"currency":"USD"}]}'
 
-curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
+curl -H 'X-Tenant-Id: demo' localhost:8090/orders/<id>
 ```
+
+> Not `__root__`, even though the same rows exist there too. `__root__` is the sentinel the command
+> bus binds when nothing else is, and `Tenants.of()` rejects the reserved `__` prefix at the edge on
+> purpose — so a client can never name a framework sentinel. A curl carrying it is a 400
+> (issue-00096).
 
 ## The fulfilment flow
 

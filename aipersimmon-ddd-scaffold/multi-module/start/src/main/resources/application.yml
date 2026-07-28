@@ -1,24 +1,24 @@
-# Tomcat runs on 8090. Historically because kafka-ui held 8080; that service now sits behind the
-# compose `tools` profile, so 8080 is free — the port stays 8090 so existing docs and requests
-# keep working.
-server:
-  port: 8090
+# This file holds the DECISIONS — the settings whose value is the same wherever the application
+# runs, because they follow from how the system is built rather than from where it is deployed.
+# Anything whose right value depends on the environment (an address, a credential, a timeout tuned
+# to a real provider, whether an interactive UI is exposed) lives in application-dev.yml or
+# application-prod.yml instead.
+#
+# The split is worth the two extra files for one reason: a reader can no longer confuse "this is a
+# choice you must understand" with "this is my laptop's address". Before it, both were the same
+# file and only the comments told them apart (issue-00074).
+#
+# dev is the default profile, so `mvn spring-boot:run` and the tests behave as they always have.
+# Production is an explicit opt-in: SPRING_PROFILES_ACTIVE=prod.
 
 spring:
+  profiles:
+    default: dev
   application:
     name: ordering
-  # Local infrastructure (PostgreSQL + Kafka) is started from compose.yaml by Spring Boot's
-  # docker-compose support. start-only means the app boots the containers but does NOT tear them
-  # down on exit, so `mvn spring-boot:run` iterations are fast and the SigNoz stack (behind the
-  # `observability` compose profile, started out-of-band with `docker compose --profile observability
-  # up -d`) is left untouched. The DataSource and Kafka bootstrap-servers are auto-wired from the
-  # running compose services; tests skip compose (spring.docker.compose.skip.in-tests=true) and use
-  # Testcontainers instead.
-  docker:
-    compose:
-      lifecycle-management: start-only
   kafka:
-    bootstrap-servers: localhost:9092
+    # Serializers are a decision (the transport carries CloudEvents-shaped JSON with String keys),
+    # not an environment value; the broker address is, and lives in the profile files.
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -33,21 +33,60 @@ spring:
     listener:
       concurrency: 3
 
-# OpenAPI / Swagger UI (springdoc, via aipersimmon-ddd-openapi-spring-boot-starter). The JSON
-# contract is always served at /v3/api-docs; the interactive Swagger UI at /swagger-ui.html is gated
-# so a production profile can expose the contract without the UI. Default on for local dev — override
-# SWAGGER_UI_ENABLED=false (or set springdoc.swagger-ui.enabled=false in a prod profile) to hide it.
-# How long the fulfilment flow waits for the payment context before giving up and compensating
-# (release the stock, cancel the order). Two minutes is a development number: long enough that a
-# local run never trips it by accident, short enough to watch it happen. A deployment sets it from
-# what the payment provider actually promises.
-ordering:
-  fulfilment:
-    payment-timeout: PT2M
+# Tomcat runs on 8090. Historically because kafka-ui held 8080; that service now sits behind the
+# compose `tools` profile, so 8080 is free — the port stays 8090 so existing docs and requests
+# keep working.
+server:
+  port: 8090
+  # In-flight requests get to finish when the process is asked to stop, instead of having their
+  # connections cut. This matters more here than in a plain CRUD service: a command in flight is
+  # inside a transaction that also writes the outbox row, and killing it mid-way means the work is
+  # rolled back and retried rather than half-done — but only if the request is allowed to reach
+  # its commit. A rolling deployment sends SIGTERM to every instance in turn, so this is the
+  # difference between a clean release and a burst of 502s on each one.
+  shutdown: graceful
+
+# How the deployment platform asks whether this process is alive and whether it should receive
+# traffic. Two different questions, which is the point of the probe split:
+#
+#   - liveness  = "is this JVM wedged?" If it goes DOWN the platform RESTARTS the pod. It must not
+#                 depend on any external system, or an outage of that system turns into a restart
+#                 loop that makes the outage worse.
+#   - readiness = "can this instance serve a request right now?" If it goes DOWN the platform
+#                 stops routing traffic here but leaves the process alone. This one SHOULD depend
+#                 on the database, because an instance that cannot reach PostgreSQL cannot serve a
+#                 command, and quietly taking it out of the load balancer is exactly right.
+#
+# Without probes.enabled there is only the single merged /actuator/health, which conflates the two
+# and gives the platform no way to tell "restart me" from "skip me for now".
+#
+# The two settings below are coupled: `readinessState` is a contributor that only exists once
+# probes are enabled, so turning probes off while leaving the group listing it fails at STARTUP
+# with NoSuchHealthContributorException rather than quietly falling back. That is the better of
+# the two failures — a readiness group that silently stopped including readiness would be worse —
+# but it is worth knowing before you toggle the flag to see what happens.
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  endpoints:
+    web:
+      exposure:
+        # health and info only. There is deliberately no `prometheus` here: this application does
+        # not expose a scrape endpoint — its Micrometer meters are bridged onto the OpenTelemetry
+        # SDK and pushed over OTLP (see the otel block below). Listing an endpoint the app does
+        # not have would be cargo cult.
+        include: health,info
 
 springdoc:
+  # The JSON contract is always served — it is the API's published description, useful in every
+  # environment. The interactive Swagger UI is a different question (it is a UI, and it invites
+  # writes), so `swagger-ui.enabled` is set per profile: on in dev, off in prod.
   swagger-ui:
-    enabled: ${SWAGGER_UI_ENABLED:true}
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
@@ -59,8 +98,12 @@ aipersimmon:
       source: ${spring.application.name}
     # The shared Flyway starter applies each component's schema on its own history table
     # (flyway_schema_history_aipersimmon_<component>): the four process-manager tables, the
-    # outbox + dead-letter + shedlock tables, and the inbox table. PostgreSQL in dev
-    # (docker-compose), Testcontainers in tests.
+    # outbox + dead-letter + shedlock tables, and the inbox table.
+    #
+    # This is the COMPONENT list, which is environment-independent — the application needs the
+    # same component schemas wherever it runs. The application's OWN migrations are a separate
+    # setting (spring.flyway.locations) and that one IS per profile, because dev additionally
+    # loads the demo seed from db/dev (issue-00072).
     flyway:
       components:
         - process-manager
@@ -77,12 +120,14 @@ aipersimmon:
     #
     # require-key stays false here so the reference app can still be driven with a plain curl. A
     # production API that means it sets require-key=true, which turns a keyless POST into a 400
-    # instead of an unprotected write.
+    # instead of an unprotected write — application-prod.yml does exactly that.
     #
     # allow-in-memory-stores=false is the production posture (issue-00058): the three stateful
     # protections may not silently fall back to per-JVM maps, which the second instance would make
     # useless. With aipersimmon-ddd-web-store-jdbc on the classpath the real store is present, so
-    # this only guards against someone removing that dependency — at startup, loudly.
+    # this only guards against someone removing that dependency — at startup, loudly. It is in the
+    # base file, not the prod one, because a fallback that is wrong in production is also wrong in
+    # the environment where you would like to find out about it.
     web:
       allow-in-memory-stores: false
       idempotency:
@@ -170,11 +215,8 @@ aipersimmon:
           - reservations
           - reservation_lines
 
-# OpenTelemetry export to the SigNoz otel-collector. In dev the collector listens on the host at
-# 44317 (gRPC) / 44318 (HTTP) — see compose.yaml (started with the `observability` profile). These
-# are the standard OTel SDK autoconfigure knobs read by the opentelemetry-spring-boot-starter; the
-# aipersimmon observability starter binds the domain spine (command / process.advance / outbox.publish
-# spans) to the same OpenTelemetry instance. Tests disable the SDK (no collector there).
+# OpenTelemetry. What is exported and how it is instrumented is a decision and lives here; WHERE it
+# is exported to is an address and lives in the profile files.
 otel:
   service:
     name: ${spring.application.name}
@@ -188,7 +230,6 @@ otel:
       enabled: true
   exporter:
     otlp:
-      endpoint: http://localhost:44317
       protocol: grpc
   # Export logs as OTLP too (not just traces): the logback OpenTelemetryAppender (attached in
   # logback-spring.xml, SDK installed by the aipersimmon observability starter) emits each log as a
@@ -199,10 +240,10 @@ otel:
 
 # Console logs are structured ECS JSON (Elastic Common Schema) — Spring Boot 3.4+ built-in
 # StructuredLogEncoder (see logback-spring.xml). These labels ride on every record so SigNoz / any
-# ECS-aware store can filter by service + environment + node.
+# ECS-aware store can filter by service + environment + node. `environment` is per profile: naming
+# the environment is the whole point of the label, so a single hard-coded value defeats it.
 logging:
   structured:
     ecs:
       service:
-        environment: local
         node-name: ${HOSTNAME:localhost}

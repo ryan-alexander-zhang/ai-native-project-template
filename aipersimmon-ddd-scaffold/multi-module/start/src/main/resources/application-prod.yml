@@ -1,0 +1,86 @@
+# The prod profile — activate with SPRING_PROFILES_ACTIVE=prod.
+#
+# This file is a worked example, not a drop-in production configuration: a real deployment adds
+# TLS, authentication (which this scaffold does not have at all — see design-00013), and whatever
+# its platform needs. What it does give is the SHAPE, which is the thing that was missing: every
+# address and credential arrives from the environment, nothing is inherited from a developer's
+# laptop, and the settings that differ from dev differ for a stated reason.
+#
+# Required environment variables — the application will refuse to start without them, which is the
+# intended behaviour. A placeholder with no default is a deployment contract:
+#
+#   DB_URL                     jdbc:postgresql://host:5432/ordering
+#   DB_USER
+#   DB_PASSWORD
+#   KAFKA_BOOTSTRAP_SERVERS    broker-1:9092,broker-2:9092
+#
+# Optional, with defaults shown below: DB_POOL_MAX, PAYMENT_TIMEOUT, OTEL_EXPORTER_OTLP_ENDPOINT,
+# DEPLOY_ENVIRONMENT.
+
+spring:
+  # There is no docker-compose in production. The dependency is `optional` and runtime-scoped, but
+  # it activates on finding a compose.yaml, and compose.yaml is packaged next to the application —
+  # so this is turned off explicitly rather than left to chance. ProductionProfileBootTest asserts
+  # the app starts with no compose involvement at all.
+  docker:
+    compose:
+      enabled: false
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      # The pool is the real limit on write concurrency here: every command runs in a transaction
+      # that writes the aggregate AND its outbox row, and the outbox relay plus the process
+      # manager's workers each take connections of their own on a timer. Size it above the
+      # request concurrency you intend to serve, not at it.
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      # Fail a connection request rather than let a request thread wait indefinitely on a pool
+      # that is exhausted because something downstream is slow. Milliseconds, as a plain number:
+      # these keys bind straight onto HikariConfig's own long fields, so the Duration syntax that
+      # works everywhere else in this file (PT30S, 24h, 1s) is a startup failure here.
+      connection-timeout: 10000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+  flyway:
+    # Versioned migrations only. db/dev — the CUST-1 / SKU-1 demo seed — is deliberately absent,
+    # which is the point of issue-00072: a real database must never be handed a customer named
+    # Acme because the scaffold it was copied from needed one.
+    locations: classpath:db/migration
+
+# The JSON contract at /v3/api-docs stays served; the interactive UI does not. It is a write-
+# capable console on the live API, and there is no authentication in front of it.
+springdoc:
+  swagger-ui:
+    enabled: false
+
+ordering:
+  fulfilment:
+    # Dev uses two minutes so a demo is watchable. A deployment sets this from what the payment
+    # provider actually promises — the value's job is to be longer than a healthy authorization
+    # and shorter than a customer's patience, and only the provider's SLA says what that is.
+    payment-timeout: ${PAYMENT_TIMEOUT:PT30S}
+
+aipersimmon:
+  ddd:
+    web:
+      idempotency:
+        # Dev leaves this false so the reference app can be driven with a plain curl. A production
+        # API that means it makes the key mandatory: a keyless POST becomes a 400 instead of an
+        # unprotected write that a client retry could duplicate.
+        require-key: true
+
+otel:
+  exporter:
+    otlp:
+      # An in-cluster collector, not a developer's laptop. The default names the conventional
+      # sidecar/service address so a standard deployment needs no variable at all.
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4317}
+
+logging:
+  structured:
+    ecs:
+      service:
+        # Whatever this instance actually is — staging, prod-eu, prod-us. The label exists to tell
+        # deployments apart in the log store, so it has to come from the deployment.
+        environment: ${DEPLOY_ENVIRONMENT:production}

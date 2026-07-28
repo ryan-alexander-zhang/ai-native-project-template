@@ -2,7 +2,7 @@
 id: issue-00074-one-config-file-with-development-values-only
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -108,7 +108,50 @@ server:
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。按修复方案拆三层，与
+[[issue-00072-demo-seed-data-ships-in-a-production-migration]] 同批。
+
+- `application.yml` 只留**决策**（outbox 租约算术、inbox 保留期、tenancy 策略、flyway components、
+  序列化器、routing），高质量注释原样保留；`application-dev.yml` 收 compose lifecycle、
+  `localhost:9092`、swagger on、`PT2M`、`environment: local`、`db/dev` 种子 location；
+  `application-prod.yml` 全部走环境变量。判据写在 base 文件抬头：
+  **换个环境这个值还对吗**——对则留 base，不对则进 profile。
+- `spring.profiles.default: dev`，所以 `spring-boot:run` 与全部测试行为不变，生产是显式 opt-in。
+- datasource 骨架按方案落在 prod：`${DB_URL}` / `${DB_USER}` / `${DB_PASSWORD}` /
+  `${KAFKA_BOOTSTRAP_SERVERS}` **一律不给默认值**——缺一个就启动失败，这正是想要的；
+  可选项（`DB_POOL_MAX`、`PAYMENT_TIMEOUT`、`OTEL_EXPORTER_OTLP_ENDPOINT`、`DEPLOY_ENVIRONMENT`）
+  给默认值并在文件抬头列清单。
+- **探针与优雅停机放进了 base，不是方案说的 prod**。理由：
+  "这个应用要不要暴露 K8s 探针"是决策不是环境值，且放 prod 会让探针只能在 prod profile 下被测到——
+  scaffold 里一条测不到的配置等于没有。`ExceptionContractTest.livenessAndReadinessAreSeparateProbes`
+  因此能在默认 profile 下跑。
+- `management.endpoints.web.exposure.include` 定为 `health,info`，**没有** `prometheus`：
+  本应用的 Micrometer 指标是经 OTel bridge 走 OTLP 推出去的，根本没有 scrape 端点，
+  列一个不存在的端点是 cargo cult。
+- prod 还翻转了 `idempotency.require-key: true` 与 `swagger-ui.enabled: false`，两处都在注释里给了理由。
+
+**两处实施中才暴露的问题**，都是这个 test-first 测试抓的：
+
+1. `spring.datasource.hikari.connection-timeout: 10s` **启动失败**——
+   这些 key 直接绑到 HikariConfig 自己的 `long` 字段（毫秒），
+   本文件其他地方通用的 Duration 写法（`PT30S` / `24h` / `1s`）在这里是
+   `NumberFormatException: For input string: "10s"`。已改为 `10000` 并在注释里点明这个不一致。
+2. `management.endpoint.health.group.readiness.include: readinessState,db` 与
+   `probes.enabled` **耦合**：关掉 probes 会让 `readinessState` contributor 不存在，
+   启动即 `NoSuchHealthContributorException`。这个失败方向是对的（好过 readiness 静默不含 readiness），
+   但会绊到想试着关掉探针的读者，已在注释里写明。
+
+`ProductionProfileBootTest` 落地了方案的第 1 条复现测试，且刻意**不用** `@ServiceConnection`：
+容器取自 `SharedContainers`（非 Spring 托管），坐标以 `DB_URL` 等**prod profile 真正读的名字**注入。
+用 `@ServiceConnection` 会更短但什么也证明不了——它自己就提供 DataSource，
+`${DB_URL}` 占位符根本不会被解析，prod 文件写成空的测试也会绿。
+不起 Kafka 容器（关掉 relay 与 consumer bridge），避免为一个配置解析测试再付一对容器（issue-00092）。
+
+第 4 条 README 已写：新增「Configuration profiles」小节 + 三层对照表 + 必需环境变量清单。
+实施该条时撞出 [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]]。
+
+验证：`mvn -o test -pl start -am` 全绿，62 个测试 0 失败。
+负向对照：移除探针配置后 `/actuator/health/readiness` 返回 **404**，与本 issue 复现段的预言一致。
 
 ## 关联
 

@@ -90,6 +90,12 @@ B3 是从"演示"到"骨架"最大的一道坎，且它会让其它所有优点�
 [[issue-00091-the-order-lines-foreign-key-omits-the-tenant]] ·
 [[issue-00092-each-test-context-starts-its-own-container-pair]]
 
+**评审之后新增**（修复过程中暴露，非本次评审所见）：
+
+- [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]] ——
+  README 快速开始的 curl 必然 400：种子只在 `__root__`，而该值是客户端不可命名的保留租户。
+  由 [[issue-00072-demo-seed-data-ships-in-a-production-migration]] 第 4 条实施时撞出，已修。
+
 ---
 
 ## 4. 能力覆盖度
