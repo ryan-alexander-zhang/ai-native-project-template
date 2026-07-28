@@ -2,7 +2,7 @@
 id: issue-00095-a-partial-reactor-build-silently-tests-stale-siblings
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -113,14 +113,46 @@ mvn -o test -pl start -am -Dtest=ExceptionContractTest  # 绿
 
 ## 验证结果
 
-部分已修（保持 open）。
+已修（三条修复全部落地）。
 
 - **已做（修复第 1、2 条）**：README 的 Build and run 一节现在逐条标注了每个部分构建是否需要 `-am`——
   三个 `*-domain` 模块只依赖库，`-pl` 单独跑安全；凡涉及 `start` 的一律带 `-am`，
   并写明了不带会发生什么以及症状为什么具有误导性。`spring-boot:run` 那条也补上了 `-am`。
-- **未做（修复第 3 条）**：那条能真正防住的护栏——在 `start` 的测试里断言兄弟模块的
-  `CodeSource` 指向 `target/classes` 而非 `~/.m2/repository`。
-  文档只能提醒读过它的人，断言才能拦住所有人，所以本 issue 保持 open。
+- **已做（修复第 3 条，本轮补上，issue 关闭）**：`SiblingModuleFreshnessTest`（`start` 测试）。
+
+  **实现与原提议不同，且这个差异是关键**。原稿说"比较 `CodeSource` 是否指向 `target/classes`"。
+  照做会在**全 reactor `mvn verify`** 上假红：`package` 之后，依赖模块提供给下游的是
+  `target/*.jar` 而不是 `target/classes`，一条"必须是 `target/classes`"的断言会把正确的构建判红。
+
+  实际的判据落在**"从哪里加载"**而不是"用什么命令构建"：
+  - 类读自**目录** → 一定是刚编译出来的产物，无论 Maven 还是 IDE 的输出目录，放行；
+  - 类读自 **jar** → 只有当这个 jar 位于某个模块的 `target/` 下才可信（全 reactor `package` 的产物）；
+  - 其余的 jar 就是仓库构件 → 红。
+
+  这样三种情形都对：`-pl start -am`（目录）绿、根上 `mvn verify`（reactor 的 target jar）绿、
+  `-pl start` 不带 `-am`（`~/.m2` 的 jar）红。IDE 里跑也不会假红。
+
+  类的来源用 ArchUnit 的 `JavaClass.getSource().getUri()` 取，不用反射——
+  `ArchitectureTest` 已经在用 ArchUnit 扫 `com.example`，而且它按包扫描，
+  **新增模块自动纳入**，不需要维护一份"每个模块挑一个代表类"的清单。
+
+  报错信息按 jar 聚合（一个陈旧模块报一行，不是它每个类报一行），并附一句
+  "加 `-am` 重跑；在此之前看到的失败都不可信"。
+
+- **负向对照（实测）**：`mvn -o install -DskipTests` 装好兄弟模块后，
+  `mvn -o test -pl start -Dtest=SiblingModuleFreshnessTest`（**不带 `-am`**）红，列出 10 个模块：
+
+```
+these classes came from the local Maven repository, not from this working copy, so
+the tests below would have run against whatever was installed there last:
+  jar:file:/Users/.../.m2/repository/com/example/ordering-adapter/0.0.1-SNAPSHOT/ordering-adapter-0.0.1-SNAPSHOT.jar
+    e.g. com.example.ordering.adapter.package-info
+  ... (10 个模块)
+Re-run with -am (mvn -o test -pl start -am), which builds the sibling modules from source first.
+Any failures you saw before adding -am are suspect.
+```
+
+  带 `-am` 同一条测试绿。这正是当初那次误诊本应看到的东西。
 
 本 issue 的来历：评审执行者用 `mvn -pl start`（未带 `-am`）跑测试，得到两条失败
 （`ExceptionContractTest` 期望 400 得到 405、`ReviewFlowTest` 30 秒超时），
