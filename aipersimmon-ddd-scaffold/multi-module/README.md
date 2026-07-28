@@ -91,18 +91,33 @@ PlaceOrder ─▶ Order.place ── needs review? ──▶ AWAITING_REVIEW ─
                     ▼                                                                                 ▼
              OrderReadyForFulfilmentEvent  ◀──────────────────────────────────────  approveReview clears it
                     │  (domain event ⇒ FulfilmentTrigger)
-                    ├─▶ start durable process (AWAITING_STOCK)
+                    ├─▶ start durable process (AWAITING_STOCK) + arm STOCK deadline
                     └─▶ publish OrderReadyForFulfilment integration event  ─▶ inventory reserves stock
                                                                                         │
    StockReserved ─▶ RequestPayment + arm PAYMENT deadline ─▶ payment authorizes ─▶ CONFIRMED
    StockReservationFailed ─▶ compensate ─▶ CancelOrder ─▶ CANCELLED                     │
    PaymentDeclined ─▶ release stock ─▶ CancelOrder ─▶ CANCELLED                         ◀┘
-   PAYMENT deadline fires ─▶ same compensation ─▶ CANCELLED
+   STOCK deadline fires   ─▶ CancelOrder (nothing reserved yet) ─▶ CANCELLED
+   PAYMENT deadline fires ─▶ same compensation as a decline     ─▶ CANCELLED
+   STOCK_RELEASE deadline fires ─▶ ask for the release again (it cannot give up — see below)
 ```
 
-The deadline is why "payment never answers" is an outcome rather than a stuck order. It takes the
-decline's compensation path unchanged — release the stock, then cancel — because the customer's
-position is identical however the payment failed to happen; only the recorded code differs.
+Deadlines are why "nobody answered" is an outcome rather than a stuck order. **Every step that
+waits on another context has one.** The earlier claim that payment was the only such step used the
+wrong test — "will this context refuse me?" Inventory does answer `StockReservationFailed`, but
+only for a *business* failure; a technical one (an optimistic-lock conflict, a validation error, a
+database outage) throws out of its handler and publishes nothing, and that silence is
+indistinguishable from the payment context's (issue-00068).
+
+The three are not symmetrical, because what a step can do about silence differs. Nothing is
+reserved at `AWAITING_STOCK`, so a timeout cancels outright. Stock is held at `AWAITING_PAYMENT`,
+so a timeout releases it and then cancels — the decline's path unchanged, because the customer's
+position is identical however the payment failed to happen. And a timeout at
+`AWAITING_STOCK_RELEASE` **cannot** end the wait: cancelling from there needs a `StockReleaseRef`
+proving the stock came back, and a timeout is precisely the absence of that proof. So the flow
+re-sends the release request and re-arms the timer — it keeps asking rather than fabricating
+evidence. That is the evidence-bearing `CancellationReason` earning its complexity: a looser design
+would have "recovered" by declaring released stock that is still held.
 
 Key point: **"placed" and "ready for fulfilment" are distinct facts.** An order held for manual
 review reserves nothing and starts no process until it is approved. Only `OrderReadyForFulfilment`
@@ -124,7 +139,7 @@ drives inventory and the process manager.
 | The quickstart below actually runs | this README's own `curl` commands, parsed rather than copied | `ReadmeQuickstartTest` |
 | Durable process manager | `OrderFulfilmentDefinition` (pure decision), `OrderFulfilmentCodecs` (a `ProcessSerializationCatalog` for 12 payloads + one hand-written codec where a sealed domain type forbids Jackson annotations), `RuntimeOrderFulfilmentProcess` | `OrderFulfilmentDefinitionTest` (unit), `OrderingFlowTest` (e2e) |
 | Ordered compensation (release then cancel) | `OrderFulfilmentDefinition` compensation branches | `PaymentCompensationFlowTest` |
-| Deadlines (a wait that can end) | `OrderFulfilmentDefinition` arms/cancels the `PAYMENT` deadline; `OrderFulfilmentInput.PaymentTimedOut` | `OrderFulfilmentDefinitionTest` (unit), `PaymentTimeoutFlowTest` (e2e, payment silent) |
+| Deadlines (a wait that can end) | `OrderFulfilmentDefinition` arms/cancels the `STOCK`, `PAYMENT` and `STOCK_RELEASE` deadlines; `*TimedOut` inputs | `OrderFulfilmentDefinitionTest` (unit), `PaymentTimeoutFlowTest` and `StockReservationTimeoutFlowTest` (e2e, each context silent in turn) |
 | Cursor-paged read model (no aggregate loaded) | `OrderQueries` + `OrderListMapper` → `GET /orders?customerId=`; `Slice`/`Cursor` | `OrderListPagingTest`, `FindCustomerOrdersHandlerTest` |
 | HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-jdbc` on `POST /orders` | `OrderIdempotencyTest` |
 | Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
@@ -211,9 +226,9 @@ is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it 
 
 ## Known demo gaps (not defects)
 
-- **The max-lifetime backstop is not armed.** The payment step *is* covered by a real deadline (see
-  the flow above), which is the case that matters: it is the only step whose answer comes from
-  outside and may never arrive. `instance.max-lifetime` is a blunter, whole-instance cap for flows
+- **The max-lifetime backstop is not armed.** Every step that waits on another context now has its
+  own deadline (see the flow above), which covers the cases that can be anticipated.
+  `instance.max-lifetime` is a blunter, whole-instance cap for flows
   that stall somewhere nobody anticipated, and arming it means deciding what a lifetime-exceeded
   order should do — compensate from an arbitrary step, or suspend for an operator. That is a real
   design choice, not a wiring exercise, so it is left out rather than guessed at.

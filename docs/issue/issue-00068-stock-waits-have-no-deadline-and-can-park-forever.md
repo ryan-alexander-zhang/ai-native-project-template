@@ -2,7 +2,7 @@
 id: issue-00068-stock-waits-have-no-deadline-and-can-park-forever
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00002-scaffold-ddd-review
 ---
 
@@ -100,7 +100,53 @@ void aReserveStockThatDeadLettersDoesNotParkTheOrderForever() {
 
 ## 验证结果
 
-未修。本 issue 由 [[report-00002-scaffold-ddd-review]] 落盘，尚未实施。
+已修。**采用修复方案 1**（给两个 step 各装 deadline），并连带做了方案 3（把理由改对）——
+方案 3 本来是"若决定不修"的退路，但那句错误论断即使修了也必须改，所以两条一起做。
+
+- 新增 `STOCK_DEADLINE`（`start` 时武装）与 `STOCK_RELEASE_DEADLINE`（进入 `AWAITING_STOCK_RELEASE`
+  的两条路径都武装）；两个新输入 `StockReservationTimedOut` / `StockReleaseTimedOut`，
+  连同 codec 注册（现在共三个计时器输入）。
+- `AWAITING_STOCK` 超时**完全复用**既有补偿分支，如本 issue 所预判——无需新补偿路径。
+  抽出 `cancelForInventory(...)`，refusal 与 silence 只差一个 code 和"是否还要取消计时器"。
+  记录码 `STOCK_TIMEOUT`，证据 id 是计时器自己的投递。
+- 超时时长可配：`ordering.fulfilment.stock-timeout`（默认 PT1M）与
+  `ordering.fulfilment.stock-release-timeout`（默认 PT1M）。默认比 payment 的 PT2M 短，
+  理由写在字段注释里：预留库存是我们自己运维的上下文里的本地决策，授权支付要等第三方。
+
+**方案 1 关于 `AWAITING_STOCK_RELEASE` 的建议与运行时契约冲突，已改为另一种做法**：
+本 issue 说超时应"suspend 供人工介入"，但 `ProcessLifecycle` 的 javadoc 明确写着
+**"a `ProcessDefinition` must never return SUSPENDED"**——SUSPENDED 是运行时在投递/deadline
+重试耗尽时自己设的运维状态，定义端无法请求它。
+
+改为**再问一次**：超时后重发 `RequestStockRelease` 并重新武装计时器，留在原 step。
+本 issue 对这一步的核心判断完全正确且是这么做的理由——
+从这里取消需要 `StockReleaseRef`，而超时恰恰是这份证据的缺席，
+`PaymentDeclinedAfterStockReleased` 在类型上就构造不出来。
+所以这个等待**不能被结束，只能被满足**；放弃等于记录"库存已归还"而它并没有。
+`ReleaseStock` 幂等（reservation 有 `released` 标志），deadline 按名字重排会顶替上一代，
+所以既不会重复扣减也不会堆积计时器；inventory 一恢复，流程立刻正常走完。
+刻意不设上限：一个持续在问的流程表现为长期 COMPENSATING 实例，这正是 process backlog 指标要看的；
+要硬上限就该用 `instance.max-lifetime`（README「Known demo gaps」已相应更新）。
+
+测试：
+- 单元 6 条（`OrderFulfilmentDefinitionTest`，共 24 条全绿）：start 武装 STOCK deadline、
+  两条正常出口都取消它、超时走 refusal 的同一分支且码为 STOCK_TIMEOUT、
+  release 超时重发+重排且**不**取消、release 完成取消计时器、两条进入 release 的路径都武装计时器。
+- 端到端 `StockReservationTimeoutFlowTest`：用 `@MockitoBean` 静默 `OrderReadyForFulfilmentListener`
+  （与 `PaymentTimeoutFlowTest` 对称，正如本 issue 的模板所示），断言订单最终 CANCELLED、
+  类别 INVENTORY_UNAVAILABLE、**库存一件没动**（不同于 payment 超时，这里没有要归还的东西）、
+  流程实例 COMPLETED/ORDER_CANCELLED。
+- 负向对照：拆掉 `start` 里的 ScheduleDeadline，该测试在 30 秒窗口内始终
+  `expected: <CANCELLED> but was: <FULFILMENT_IN_PROGRESS>`——正是本 issue 描述的永久停滞。
+
+**未做**：本 issue 复现段的第二条（用 `@Primary Stocks` 装饰器抛
+`OptimisticLockingFailureException` 直到进死信）。技术失败逃出 catch 这条路径的**数据**后果
+已由 [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] 修好（回滚、无部分扣减），
+而"没人再喂事实"的后果正由本次的 STOCK deadline 兜住——两者叠加已覆盖该场景，
+再造一个死信编排测试收益有限。
+[[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] 的失败语义收窄也已完成。
+
+验证：`mvn -o verify -pl start -am` 全绿，71 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
 
 ## 关联
 

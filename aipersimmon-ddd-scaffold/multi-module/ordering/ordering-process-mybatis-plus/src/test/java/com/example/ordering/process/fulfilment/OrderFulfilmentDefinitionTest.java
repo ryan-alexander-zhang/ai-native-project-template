@@ -51,8 +51,10 @@ class OrderFulfilmentDefinitionTest {
 
   private static final String ORDER = "order-1";
   private static final Duration PAYMENT_TIMEOUT = Duration.ofMinutes(2);
+  private static final Duration STOCK_TIMEOUT = Duration.ofMinutes(1);
+  private static final Duration STOCK_RELEASE_TIMEOUT = Duration.ofSeconds(45);
   private final OrderFulfilmentDefinition definition =
-      new OrderFulfilmentDefinition(PAYMENT_TIMEOUT);
+      new OrderFulfilmentDefinition(PAYMENT_TIMEOUT, STOCK_TIMEOUT, STOCK_RELEASE_TIMEOUT);
 
   // ---------- happy path ----------
 
@@ -180,6 +182,124 @@ class OrderFulfilmentDefinitionTest {
     // because an ignored late timer must not undo a confirmation.
     assertEquals(Step.AWAITING_ORDER_CONFIRMATION.name(), decision.step().value());
     assertTrue(decision.effects().isEmpty());
+  }
+
+  // ---------- the stock deadlines (issue-00068) ----------
+
+  @Test
+  void startingTheFlowArmsTheStockDeadline() {
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.start(
+            new OrderFulfilmentInput.ReadyForFulfilment(ORDER),
+            context("msg-ready", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK));
+
+    // A wait must not be able to begin without a way out. Inventory answers only when it judges a
+    // *business* failure; a technical one throws and publishes nothing, and that silence used to
+    // park the order in FULFILMENT_IN_PROGRESS with no timer, no alert and no operator route out.
+    ScheduleDeadline armed = onlyEffectOfType(decision, ScheduleDeadline.class);
+    assertEquals(OrderFulfilmentDefinition.STOCK_DEADLINE, armed.name());
+    assertEquals(Instant.EPOCH.plus(STOCK_TIMEOUT), armed.dueAt());
+    assertEquals(new OrderFulfilmentInput.StockReservationTimedOut(ORDER), armed.input());
+  }
+
+  @Test
+  void answeringTheReservationCancelsTheStockDeadline() {
+    ProcessDecision<OrderFulfilmentState> reserved =
+        definition.react(
+            awaitingStock(),
+            new OrderFulfilmentInput.StockReserved(ORDER, "res-1"),
+            context("msg-reserved", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK));
+    ProcessDecision<OrderFulfilmentState> failed =
+        definition.react(
+            awaitingStock(),
+            new OrderFulfilmentInput.StockReservationFailed(ORDER, "NO_STOCK", "sold out"),
+            context("msg-failed", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK));
+
+    assertEquals(
+        OrderFulfilmentDefinition.STOCK_DEADLINE,
+        onlyEffectOfType(reserved, CancelDeadline.class).name());
+    assertEquals(
+        OrderFulfilmentDefinition.STOCK_DEADLINE,
+        onlyEffectOfType(failed, CancelDeadline.class).name());
+  }
+
+  @Test
+  void aTimedOutReservationCancelsTheOrderExactlyAsARefusalDoes() {
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingStock(),
+            new OrderFulfilmentInput.StockReservationTimedOut(ORDER),
+            context("msg-stock-timeout", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK));
+
+    assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
+    assertEquals(Step.AWAITING_ORDER_CANCELLATION.name(), decision.step().value());
+
+    // Nothing was reserved, so there is nothing to release: straight to cancellation, the same
+    // branch a refusal takes. A new way to fail did not need a new way to recover.
+    CancelOrder cancel = assertInstanceOf(CancelOrder.class, dispatchedCommand(decision));
+    CancellationReason.InventoryUnavailable reason =
+        assertInstanceOf(CancellationReason.InventoryUnavailable.class, cancel.reason());
+    assertEquals("STOCK_TIMEOUT", reason.failure().reasonCode(), "silence, not a refusal");
+    assertEquals("msg-stock-timeout", reason.failure().failureId(), "evidence is the firing");
+    // Nothing to cancel: this decision is the deadline firing.
+    assertNoEffectOfType(decision, CancelDeadline.class);
+  }
+
+  @Test
+  void aTimedOutReleaseAsksAgainInsteadOfCancellingWithoutEvidence() {
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingStockRelease("msg-declined"),
+            new OrderFulfilmentInput.StockReleaseTimedOut(ORDER),
+            context(
+                "msg-release-timeout", ProcessLifecycle.COMPENSATING, Step.AWAITING_STOCK_RELEASE));
+
+    // The one timeout that must not end its wait. Cancelling from here needs a StockReleaseRef,
+    // and a timeout is the absence of one — giving up would mean recording that stock came back
+    // when it has not. So the flow stays put and re-sends the request.
+    assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
+    assertEquals(Step.AWAITING_STOCK_RELEASE.name(), decision.step().value());
+    RequestStockRelease again =
+        assertInstanceOf(RequestStockRelease.class, dispatchedCommand(decision));
+    assertEquals("res-1", again.reservationId(), "the same handle, asked for again");
+
+    ScheduleDeadline rearmed = onlyEffectOfType(decision, ScheduleDeadline.class);
+    assertEquals(OrderFulfilmentDefinition.STOCK_RELEASE_DEADLINE, rearmed.name());
+    assertEquals(Instant.EPOCH.plus(STOCK_RELEASE_TIMEOUT), rearmed.dueAt());
+  }
+
+  @Test
+  void aCompletedReleaseCancelsTheReleaseDeadline() {
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingStockRelease("msg-declined"),
+            new OrderFulfilmentInput.StockReleased(ORDER, "res-1"),
+            context("msg-released", ProcessLifecycle.COMPENSATING, Step.AWAITING_STOCK_RELEASE));
+
+    assertEquals(
+        OrderFulfilmentDefinition.STOCK_RELEASE_DEADLINE,
+        onlyEffectOfType(decision, CancelDeadline.class).name());
+  }
+
+  @Test
+  void bothRoutesIntoStockReleaseArmItsDeadline() {
+    ProcessDecision<OrderFulfilmentState> declined =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentDeclined(ORDER, "DECLINED", "over ceiling"),
+            context("msg-declined", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+    ProcessDecision<OrderFulfilmentState> timedOut =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentTimedOut(ORDER),
+            context("msg-timeout", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+
+    assertEquals(
+        OrderFulfilmentDefinition.STOCK_RELEASE_DEADLINE,
+        onlyEffectOfType(declined, ScheduleDeadline.class).name());
+    assertEquals(
+        OrderFulfilmentDefinition.STOCK_RELEASE_DEADLINE,
+        onlyEffectOfType(timedOut, ScheduleDeadline.class).name());
   }
 
   // ---------- compensation branches + evidence identity (issue-00042) ----------

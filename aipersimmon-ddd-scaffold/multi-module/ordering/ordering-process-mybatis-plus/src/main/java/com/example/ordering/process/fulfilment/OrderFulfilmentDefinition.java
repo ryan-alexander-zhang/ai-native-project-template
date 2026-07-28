@@ -52,12 +52,36 @@ import org.springframework.stereotype.Component;
  *     StockReservationFailed ─▶ COMPENSATING, CancelOrder(InventoryUnavailable) ─▶ AWAITING_ORDER_CANCELLATION
  * </pre>
  *
- * <p><strong>A flow that waits must be able to stop waiting.</strong> Payment is the only step
- * whose answer comes from outside and may simply never arrive, so it is the only step with a timer.
- * The timeout takes the decline's compensation path unchanged — release the stock, then cancel —
- * because the customer's position is the same however the payment failed to happen; only the
- * recorded code differs. Without it, an order whose payment context went quiet holds its stock
- * forever, and the reservation is invisible to everyone except a stock count that will not add up.
+ * <p><strong>Every step that waits on another context has a timer.</strong> This used to say that
+ * payment was the only such step, and the test for it was the wrong one: "will this context refuse
+ * me?" Inventory does answer {@code StockReservationFailed} — but only when it judges a
+ * <em>business</em> failure. A technical failure (an optimistic-lock conflict against a concurrent
+ * reservation, a validation error, a database outage) throws out of its handler and publishes
+ * nothing, and from here that silence is indistinguishable from the payment context's. The right
+ * test is "can this step's answer fail to arrive?", and for every {@code AWAITING_*} step that
+ * waits on a broker the answer is yes (issue-00068).
+ *
+ * <p>The timeouts are not symmetrical, because what a step can do about silence differs:
+ *
+ * <ul>
+ *   <li>{@code AWAITING_STOCK} — nothing is reserved yet, so a timeout cancels the order outright,
+ *       down the same path a reservation failure takes. Only the recorded code differs.
+ *   <li>{@code AWAITING_PAYMENT} — stock is held, so a timeout releases it and then cancels, down
+ *       the same path a decline takes. The customer's position is identical however the payment
+ *       failed to happen.
+ *   <li>{@code AWAITING_STOCK_RELEASE} — a timeout <em>cannot</em> end the wait, and this is the
+ *       interesting one. Cancelling from here needs a {@link
+ *       CancellationReason.PaymentDeclinedAfterStockReleased}, which cannot be constructed without
+ *       a {@link StockReleaseRef} — evidence the stock came back. A timeout is exactly the absence
+ *       of that evidence. So the flow re-sends the release request and re-arms the timer: it keeps
+ *       asking rather than either fabricating evidence or sitting silent. {@code ReleaseStock} is
+ *       idempotent, and rescheduling a deadline by name supersedes the previous generation, so
+ *       neither the repeat nor the timer accumulates anything.
+ * </ul>
+ *
+ * <p>The third case is where the evidence-bearing cancellation reason earns its complexity: a
+ * design that let the flow cancel without proof would have "recovered" here by declaring released
+ * stock that is still held.
  *
  * <p>It reaches a terminal lifecycle only on {@code OrderConfirmed}/{@code OrderCancelled} — the
  * actual outcome — never when a confirm/cancel command is merely dispatched. And compensation is
@@ -104,18 +128,43 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
    */
   static final DeadlineName PAYMENT_DEADLINE = new DeadlineName("PAYMENT");
 
+  /** The timer armed while the reservation is outstanding. Same naming rationale as PAYMENT. */
+  static final DeadlineName STOCK_DEADLINE = new DeadlineName("STOCK");
+
+  /**
+   * The timer armed while a compensating release is outstanding. Re-armed on every firing, since
+   * this wait can only end when the release actually happens.
+   */
+  static final DeadlineName STOCK_RELEASE_DEADLINE = new DeadlineName("STOCK_RELEASE");
+
   /** Recorded as the decline code when the timer, not the payment context, ended the wait. */
   static final String PAYMENT_TIMEOUT_CODE = "PAYMENT_TIMEOUT";
 
+  /** Recorded as the failure code when the timer, not inventory, ended the reservation wait. */
+  static final String STOCK_TIMEOUT_CODE = "STOCK_TIMEOUT";
+
   /**
-   * How long payment may take before the flow gives up on it. Held as a field rather than read from
-   * a clock or a property inside {@link #react}, so the decision stays a function of its arguments.
+   * How long each outstanding answer may take before the flow acts on the silence. Held as fields
+   * rather than read from a clock or a property inside {@link #react}, so the decision stays a
+   * function of its arguments.
+   *
+   * <p>The reservation budget is shorter than payment's by default: reserving stock is a local
+   * decision in a context we operate, while authorising a payment waits on a third party. A
+   * deployment sets both from what its dependencies actually promise.
    */
   private final Duration paymentTimeout;
 
+  private final Duration stockTimeout;
+
+  private final Duration stockReleaseTimeout;
+
   public OrderFulfilmentDefinition(
-      @Value("${ordering.fulfilment.payment-timeout:PT2M}") Duration paymentTimeout) {
+      @Value("${ordering.fulfilment.payment-timeout:PT2M}") Duration paymentTimeout,
+      @Value("${ordering.fulfilment.stock-timeout:PT1M}") Duration stockTimeout,
+      @Value("${ordering.fulfilment.stock-release-timeout:PT1M}") Duration stockReleaseTimeout) {
     this.paymentTimeout = paymentTimeout;
+    this.stockTimeout = stockTimeout;
+    this.stockReleaseTimeout = stockReleaseTimeout;
   }
 
   @Override
@@ -133,7 +182,16 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     if (input instanceof OrderFulfilmentInput.ReadyForFulfilment ready) {
       OrderFulfilmentState state =
           new OrderFulfilmentState(ready.orderId(), Step.AWAITING_STOCK, null, null, null);
-      return running(state, Step.AWAITING_STOCK, "ready-for-fulfilment");
+      // Starting the flow and arming its first timer are one decision, for the same reason asking
+      // for payment and arming that timer are: a wait must not be able to begin without a way out.
+      return running(
+          state,
+          Step.AWAITING_STOCK,
+          "ready-for-fulfilment",
+          new ScheduleDeadline(
+              STOCK_DEADLINE,
+              context.now().plus(stockTimeout),
+              new OrderFulfilmentInput.StockReservationTimedOut(ready.orderId())));
     }
     throw new IllegalStateException("unexpected start input: " + input);
   }
@@ -179,27 +237,63 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           Step.AWAITING_PAYMENT,
           "stock-reserved",
           new DispatchCommand(new RequestPayment(orderId, paymentOperationId)),
+          new CancelDeadline(STOCK_DEADLINE),
           new ScheduleDeadline(
               PAYMENT_DEADLINE,
               context.now().plus(paymentTimeout),
               new OrderFulfilmentInput.PaymentTimedOut(orderId)));
     }
     if (in instanceof OrderFulfilmentInput.StockReservationFailed failed) {
-      ReservationFailureRef failure =
-          new ReservationFailureRef(
-              context.cause().messageId(),
-              new OrderId(state.orderId()),
-              failed.code(),
-              failed.reason());
-      return compensating(
-          state.withStep(Step.AWAITING_ORDER_CANCELLATION),
-          Step.AWAITING_ORDER_CANCELLATION,
-          "stock-reservation-failed",
-          new DispatchCommand(
-              new CancelOrder(
-                  state.orderId(), new CancellationReason.InventoryUnavailable(failure))));
+      return cancelForInventory(
+          state, context, failed.code(), failed.reason(), "stock-reservation-failed", true);
+    }
+    if (in instanceof OrderFulfilmentInput.StockReservationTimedOut) {
+      // Silence from inventory, handled exactly as a refusal from inventory: nothing was reserved,
+      // so there is nothing to release and the order is cancelled outright. Only the code differs,
+      // which is what lets an operator tell "inventory said no" from "inventory said nothing".
+      // No deadline is cancelled here — this decision *is* the deadline.
+      return cancelForInventory(
+          state,
+          context,
+          STOCK_TIMEOUT_CODE,
+          "inventory did not answer within " + stockTimeout,
+          "stock-reservation-timed-out",
+          false);
     }
     return ignore(state, in, context);
+  }
+
+  /**
+   * The one compensation both inventory outcomes take: cancel the order, carrying the failure as
+   * evidence. A refusal and a silence differ only in their code and in whether a timer is still
+   * armed, so they share the branch rather than duplicating it — the same economy the payment
+   * timeout gets from reusing the decline's path.
+   */
+  private ProcessDecision<OrderFulfilmentState> cancelForInventory(
+      OrderFulfilmentState state,
+      ProcessContext context,
+      String code,
+      String reason,
+      String decisionCode,
+      boolean cancelTimer) {
+    ReservationFailureRef failure =
+        new ReservationFailureRef(
+            context.cause().messageId(), new OrderId(state.orderId()), code, reason);
+    DispatchCommand cancel =
+        new DispatchCommand(
+            new CancelOrder(state.orderId(), new CancellationReason.InventoryUnavailable(failure)));
+    return cancelTimer
+        ? compensating(
+            state.withStep(Step.AWAITING_ORDER_CANCELLATION),
+            Step.AWAITING_ORDER_CANCELLATION,
+            decisionCode,
+            cancel,
+            new CancelDeadline(STOCK_DEADLINE))
+        : compensating(
+            state.withStep(Step.AWAITING_ORDER_CANCELLATION),
+            Step.AWAITING_ORDER_CANCELLATION,
+            decisionCode,
+            cancel);
   }
 
   /**
@@ -225,7 +319,8 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           Step.AWAITING_STOCK_RELEASE,
           "payment-declined",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
-          new CancelDeadline(PAYMENT_DEADLINE));
+          new CancelDeadline(PAYMENT_DEADLINE),
+          releaseDeadline(state, context));
     }
     if (in instanceof OrderFulfilmentInput.PaymentTimedOut) {
       // Silence is an answer. The compensation is the decline's, unchanged — release the stock the
@@ -238,9 +333,18 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
               PAYMENT_TIMEOUT_CODE, context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
           Step.AWAITING_STOCK_RELEASE,
           "payment-timed-out",
-          new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())));
+          new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          releaseDeadline(state, context));
     }
     return ignore(state, in, context);
+  }
+
+  /** Arms (or re-arms) the timer that watches an outstanding release request. */
+  private ScheduleDeadline releaseDeadline(OrderFulfilmentState state, ProcessContext context) {
+    return new ScheduleDeadline(
+        STOCK_RELEASE_DEADLINE,
+        context.now().plus(stockReleaseTimeout),
+        new OrderFulfilmentInput.StockReleaseTimedOut(state.orderId()));
   }
 
   /** Compensating, waiting for the reserved stock to be released before cancelling. */
@@ -259,7 +363,27 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           state.withStep(Step.AWAITING_ORDER_CANCELLATION),
           Step.AWAITING_ORDER_CANCELLATION,
           "stock-released",
-          new DispatchCommand(new CancelOrder(state.orderId(), reason)));
+          new DispatchCommand(new CancelOrder(state.orderId(), reason)),
+          new CancelDeadline(STOCK_RELEASE_DEADLINE));
+    }
+    if (in instanceof OrderFulfilmentInput.StockReleaseTimedOut) {
+      // The only timeout here that does not end its wait. Cancelling needs a StockReleaseRef and a
+      // timeout is the absence of one, so the flow asks again instead: re-send the release, re-arm
+      // the timer, stay where it is. ReleaseStock is idempotent (the reservation carries a
+      // `released` flag), and rescheduling by name supersedes the previous generation, so neither
+      // repeats nor timers accumulate — and the moment inventory answers, the flow completes
+      // normally.
+      //
+      // Deliberately unbounded. Giving up would mean recording that stock came back when it has
+      // not; a flow that keeps asking is visible as a long-lived COMPENSATING instance, which is
+      // what the process backlog metrics are for. A deployment that wants a hard stop arms
+      // instance.max-lifetime and handles MaxLifetimeExceeded in react (see below).
+      return compensating(
+          state,
+          Step.AWAITING_STOCK_RELEASE,
+          "stock-release-timed-out",
+          new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          releaseDeadline(state, context));
     }
     return ignore(state, in, context);
   }
