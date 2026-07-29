@@ -75,8 +75,10 @@ class OutboxJdbcTest {
 
   @Test
   void writesUnsentRowThenRelayDispatchesAndMarksSent() {
-    integrationEvents.publish(
-        new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
 
     assertEquals(
         Integer.valueOf(1),
@@ -102,8 +104,10 @@ class OutboxJdbcTest {
 
   @Test
   void annotatedLogicalTypeIsStampedOnTheWireAndResolvesBackToTheLocalClass() {
-    integrationEvents.publish(
-        new NamespacedEvent("O-9"), CommandContext.root(Tenants.ROOT.value(), "cmd-9"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new NamespacedEvent("O-9"), CommandContext.root(Tenants.ROOT.value(), "cmd-9")));
 
     relay.relay();
 
@@ -135,9 +139,11 @@ class OutboxJdbcTest {
     // redelivery minted a new random event id.
     CommandContext effectContext = new CommandContext("__root__", "txn-1#0", "corr-1", "cause-1");
 
-    integrationEvents.publishAs(new SampleEvent("O-7"), effectContext);
-    integrationEvents.publishAs(
-        new SampleEvent("O-7"), effectContext); // relay redelivers the same effect
+    publishInTransaction(() -> integrationEvents.publishAs(new SampleEvent("O-7"), effectContext));
+    publishInTransaction(
+        () ->
+            integrationEvents.publishAs(
+                new SampleEvent("O-7"), effectContext)); // relay redelivers the same effect
 
     assertEquals(
         Integer.valueOf(1),
@@ -155,5 +161,16 @@ class OutboxJdbcTest {
         "cause-1",
         jdbc.queryForObject("SELECT causation_id FROM aipersimmon_outbox", String.class),
         "publishAs carries the effect context's causation verbatim, not the effect id");
+  }
+
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /**
+   * Publish the way production does: inside a transaction. The writer refuses otherwise, because a
+   * row that commits on its own would let the relay announce a change that was rolled back.
+   */
+  private void publishInTransaction(Runnable publish) {
+    new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> publish.run());
   }
 }

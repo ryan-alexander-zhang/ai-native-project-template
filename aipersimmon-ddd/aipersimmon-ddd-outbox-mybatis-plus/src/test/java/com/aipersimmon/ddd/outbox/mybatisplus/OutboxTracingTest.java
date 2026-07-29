@@ -91,8 +91,10 @@ class OutboxTracingTest {
 
   @Test
   void writerCapturesTraceContextOntoTheRow() {
-    integrationEvents.publish(
-        new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1")));
 
     String traceparent =
         jdbc.queryForObject("SELECT traceparent FROM aipersimmon_outbox", String.class);
@@ -104,8 +106,10 @@ class OutboxTracingTest {
 
   @Test
   void relayRestoresTheCapturedContextAroundDispatch() {
-    integrationEvents.publish(
-        new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1")));
 
     relay.relay();
 
@@ -115,5 +119,16 @@ class OutboxTracingTest {
     assertTrue(
         tracer.restoredSpanNames.get(0).startsWith("outbox.publish "),
         "restored span name was " + tracer.restoredSpanNames.get(0));
+  }
+
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /**
+   * Publish the way production does: inside a transaction. The writer refuses otherwise, because a
+   * row that commits on its own would let the relay announce a change that was rolled back.
+   */
+  private void publishInTransaction(Runnable publish) {
+    new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> publish.run());
   }
 }

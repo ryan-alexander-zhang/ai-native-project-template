@@ -16,6 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration;
 import org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,6 +28,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@link CommandInterceptor} beans; the built-in interceptors are logging (always) and transaction
  * (when a transaction manager is present), with validation added when a Bean Validation provider is
  * on the classpath. Applications can add their own interceptors as beans or replace any bean here.
+ *
+ * <p>"When a transaction manager is present" is a condition, not a fallback: if none is, {@link
+ * CommandTransactionGuard} refuses to start rather than letting every command run untransacted
+ * unannounced. See {@code aipersimmon.ddd.cqrs.transaction.required}.
  */
 @AutoConfiguration(
     after = {
@@ -34,7 +39,22 @@ import org.springframework.transaction.support.TransactionTemplate;
       TransactionAutoConfiguration.class,
       ValidationAutoConfiguration.class
     })
+@EnableConfigurationProperties(AipersimmonDddCqrsProperties.class)
 public class AipersimmonDddCqrsAutoConfiguration {
+
+  /**
+   * Decides what a missing transaction manager means before anything relies on it. The two beans
+   * below that implement "one command, one transaction" are conditional on that manager, so without
+   * this guard their absence is the silent loss of the starter's headline guarantee.
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  public CommandTransactionGuard commandTransactionGuard(
+      ObjectProvider<PlatformTransactionManager> transactionManager,
+      AipersimmonDddCqrsProperties properties) {
+    return new CommandTransactionGuard(
+        transactionManager, properties.getTransaction().isRequired());
+  }
 
   @Bean
   @ConditionalOnMissingBean

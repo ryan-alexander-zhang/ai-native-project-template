@@ -1,0 +1,4 @@
+# Turns a missing PlatformTransactionManager into an actionable startup error rather than commands
+# that silently run without a transaction.
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.aipersimmon.ddd.cqrs.spring.MissingTransactionManagerFailureAnalyzer

@@ -49,12 +49,25 @@ class OutboxIdGeneratorWiringTest {
   void freshEventIdComesFromTheInjectedGenerator() {
     jdbc.update("DELETE FROM aipersimmon_outbox");
 
-    integrationEvents.publish(
-        new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
 
     assertEquals(
         "outbox-id-sentinel",
         jdbc.queryForObject("SELECT event_id FROM aipersimmon_outbox", String.class),
         "a brand-new event id is minted by the injected IdGenerator");
+  }
+
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /**
+   * Publish the way production does: inside a transaction. The writer refuses otherwise, because a
+   * row that commits on its own would let the relay announce a change that was rolled back.
+   */
+  private void publishInTransaction(Runnable publish) {
+    new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> publish.run());
   }
 }

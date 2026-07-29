@@ -74,13 +74,27 @@ class InProcessOutboxDispatcherTest {
   void relayRepublishesTheEventInProcess() {
     assertInstanceOf(InProcessOutboxDispatcher.class, dispatcher);
 
-    integrationEvents.publish(
-        new InProcessSampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new InProcessSampleEvent("O-1"),
+                CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
     relay.relay();
 
     assertEquals(1, listener.received.size());
     EventEnvelope<InProcessSampleEvent> envelope = listener.received.get(0);
     assertEquals("O-1", envelope.payload().orderId());
     assertEquals("cmd-1", envelope.correlationId(), "correlation survives the outbox round-trip");
+  }
+
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /**
+   * Publish the way production does: inside a transaction. The writer refuses otherwise, because a
+   * row that commits on its own would let the relay announce a change that was rolled back.
+   */
+  private void publishInTransaction(Runnable publish) {
+    new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> publish.run());
   }
 }

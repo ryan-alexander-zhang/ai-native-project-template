@@ -14,11 +14,13 @@ import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * The base class writes under the loaded version, refuses a write that matches no row, and drains
@@ -108,10 +110,40 @@ class MybatisPlusAggregateRepositoryTest {
 
   private final CapturingDomainEvents events = new CapturingDomainEvents();
   private Things things;
+  private Long versionSeenByUpdate;
 
   @BeforeEach
   void setUp() {
     things = new Things(mapper, events);
+    // These cases are about the version protocol, not transactionality; the refusal to write
+    // outside
+    // a transaction has its own case below.
+    TransactionSynchronizationManager.setActualTransactionActive(true);
+  }
+
+  @AfterEach
+  void unbindTransaction() {
+    TransactionSynchronizationManager.setActualTransactionActive(false);
+  }
+
+  /**
+   * Stub updateById the way the optimistic-locker interceptor actually behaves: it rewrites the
+   * statement AND writes the incremented version back onto the entity. That write-back is the
+   * witness saveAggregate checks, so a mock that skipped it would be modelling a database with no
+   * optimistic locking at all — which is what {@link
+   * #anUpdateWhoseVersionWasNotCheckedIsRefusedRatherThanTrusted} models on purpose.
+   */
+  private void updateSucceedsWithOptimisticLocking() {
+    when(mapper.updateById(any(ThingRow.class)))
+        .thenAnswer(
+            invocation -> {
+              ThingRow row = invocation.getArgument(0);
+              // Read it here, not from a captor afterwards: a captor keeps the reference, and the
+              // write-back below would make the assertion see the post-update value.
+              versionSeenByUpdate = row.getVersion();
+              row.setVersion(row.getVersion() + 1);
+              return 1;
+            });
   }
 
   private Long versionPassedTo(java.util.function.Consumer<ArgumentCaptor<ThingRow>> verification) {
@@ -135,12 +167,12 @@ class MybatisPlusAggregateRepositoryTest {
 
   @Test
   void anExistingAggregateIsUpdatedUnderTheVersionItWasLoadedAt() {
-    when(mapper.updateById(any(ThingRow.class))).thenReturn(1);
+    updateSucceedsWithOptimisticLocking();
     Thing thing = Thing.loadedAt("t-1", 4L);
 
     things.save(thing);
 
-    assertThat(versionPassedTo(captor -> verify(mapper).updateById(captor.capture())))
+    assertThat(versionSeenByUpdate)
         .as("the loaded version is what @Version turns into WHERE version = ?")
         .isEqualTo(4L);
     verify(mapper, never()).insert(any(ThingRow.class));
@@ -166,7 +198,7 @@ class MybatisPlusAggregateRepositoryTest {
 
   @Test
   void aSuccessfulSaveWritesChildrenThenPublishesAndClearsEvents() {
-    when(mapper.updateById(any(ThingRow.class))).thenReturn(1);
+    updateSucceedsWithOptimisticLocking();
     Thing thing = Thing.loadedAt("t-1", 1L);
     thing.rename();
 
@@ -180,14 +212,53 @@ class MybatisPlusAggregateRepositoryTest {
   @Test
   void savingTwiceInOneTransactionChecksAgainstTheAdvancedVersion() {
     when(mapper.insert(any(ThingRow.class))).thenReturn(1);
-    when(mapper.updateById(any(ThingRow.class))).thenReturn(1);
+    updateSucceedsWithOptimisticLocking();
     Thing thing = Thing.brandNew("t-1");
 
     things.save(thing);
     assertThatCode(() -> things.save(thing)).doesNotThrowAnyException();
 
-    assertThat(versionPassedTo(captor -> verify(mapper).updateById(captor.capture())))
+    assertThat(versionSeenByUpdate)
         .as("the second save must neither re-insert nor check the stale version 0")
         .isEqualTo(1L);
+  }
+
+  @Test
+  void anUpdateWhoseVersionWasNotCheckedIsRefusedRatherThanTrusted() {
+    // A mapper whose update reports success without advancing the version: the shape of a missing
+    // OptimisticLockerInnerInterceptor (a consumer-declared MybatisPlusInterceptor replaced the
+    // framework's assembly) or of a row whose version field lacks @Version. Either way no
+    // "WHERE version = ?" was applied, so this write would have silently discarded a concurrent
+    // change — and the affected-rows check cannot notice, because it passes for exactly that
+    // reason.
+    when(mapper.updateById(any(ThingRow.class))).thenReturn(1);
+    Thing thing = Thing.loadedAt("t-1", 4L);
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("optimistic locking is not in effect")
+        .hasMessageContaining("@Version")
+        .hasMessageContaining("OptimisticLockerInnerInterceptor");
+
+    assertThat(events.published)
+        .as("and nothing is published on a write we cannot vouch for")
+        .isEmpty();
+    assertThat(things.childWrites).as("nor are children written").isZero();
+  }
+
+  @Test
+  void writesOutsideATransactionAreRefused() {
+    TransactionSynchronizationManager.setActualTransactionActive(false);
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("no active transaction")
+        .hasMessageContaining("t-1");
+
+    verify(mapper, never()).insert(any(ThingRow.class));
+    assertThat(events.published).isEmpty();
   }
 }

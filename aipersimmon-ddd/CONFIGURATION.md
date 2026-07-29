@@ -11,6 +11,23 @@ Ordered roughly as you meet them.
 
 ---
 
+## `aipersimmon.ddd.cqrs` — the command bus
+
+| Property | Default | Effect |
+| --- | --- | --- |
+| `transaction.required` | `true` | Whether the application refuses to start without a `PlatformTransactionManager`. |
+
+The starter's guarantee is that one command is one transaction: the aggregate write, the outbox row
+and the domain events commit together or not at all. That is implemented by two beans conditional on a
+transaction manager, so without one they are simply absent — every command runs untransacted and
+nothing says so. Hence the refusal, and a startup report naming both ways out. Set it to `false` for a
+service that deliberately has no database; that logs a WARN on every start, so it cannot become the
+unnoticed state of a service that later grows one.
+
+Independently of this setting, the aggregate repository bases and the outbox writer each refuse to
+write outside a transaction — the guarantee is checked where it is relied on, not only where it is
+configured.
+
 ## `aipersimmon.ddd.integration` — event identity
 
 | Property | Default | Effect |

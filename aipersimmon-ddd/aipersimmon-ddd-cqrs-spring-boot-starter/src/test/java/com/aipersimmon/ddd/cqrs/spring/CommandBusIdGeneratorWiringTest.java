@@ -50,9 +50,13 @@ class CommandBusIdGeneratorWiringTest {
     }
   }
 
+  // This context has no database, so no transaction manager either — the one shape that
+  // aipersimmon.ddd.cqrs.transaction.required=false exists for. Declaring it keeps these assertions
+  // about id minting, and keeps the no-IdGenerator case failing for the reason it names.
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
           .withConfiguration(AutoConfigurations.of(AipersimmonDddCqrsAutoConfiguration.class))
+          .withPropertyValues("aipersimmon.ddd.cqrs.transaction.required=false")
           .withUserConfiguration(HandlerConfig.class);
 
   @Test
@@ -81,6 +85,7 @@ class CommandBusIdGeneratorWiringTest {
             assertThat(context)
                 .as(
                     "a missing IdGenerator must fail startup, not degrade silently to random (v4) ids")
-                .hasFailed());
+                .getFailure()
+                .hasMessageContaining("IdGenerator"));
   }
 }

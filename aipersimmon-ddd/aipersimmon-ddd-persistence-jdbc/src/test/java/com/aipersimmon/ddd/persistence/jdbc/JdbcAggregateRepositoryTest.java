@@ -8,8 +8,11 @@ import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * The JDBC base routes a new aggregate to {@code insert} and an existing one to {@code update},
@@ -83,6 +86,37 @@ class JdbcAggregateRepositoryTest {
       expectedVersionSeen = expectedVersion;
       return updateAffects;
     }
+  }
+
+  // saveAggregate refuses to run outside a transaction, and rightly: rows and events must commit
+  // together. These cases are about the version protocol, not about transactionality, so they mark
+  // the thread as transactional rather than standing up a database — the refusal itself is asserted
+  // by writesOutsideATransactionAreRefused below.
+  @BeforeEach
+  void bindTransaction() {
+    TransactionSynchronizationManager.setActualTransactionActive(true);
+  }
+
+  @AfterEach
+  void unbindTransaction() {
+    TransactionSynchronizationManager.setActualTransactionActive(false);
+  }
+
+  @Test
+  void writesOutsideATransactionAreRefused() {
+    TransactionSynchronizationManager.setActualTransactionActive(false);
+    CapturingDomainEvents events = new CapturingDomainEvents();
+    Things things = new Things(events, 1);
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("no active transaction")
+        .hasMessageContaining("t-1");
+
+    assertThat(things.calls).as("nothing was written").isEmpty();
+    assertThat(events.published).as("and nothing was published").isEmpty();
   }
 
   @Test

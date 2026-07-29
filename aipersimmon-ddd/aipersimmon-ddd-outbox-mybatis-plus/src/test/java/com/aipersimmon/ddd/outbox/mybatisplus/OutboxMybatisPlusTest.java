@@ -68,8 +68,10 @@ class OutboxMybatisPlusTest {
 
   @Test
   void writesUnsentRowThenRelayDispatchesAndMarksSent() {
-    integrationEvents.publish(
-        new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
+    publishInTransaction(
+        () ->
+            integrationEvents.publish(
+                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
 
     assertEquals(
         Integer.valueOf(1),
@@ -96,5 +98,16 @@ class OutboxMybatisPlusTest {
   @Test
   void autoConfiguresWriterAsIntegrationEventsPublisher() {
     assertInstanceOf(OutboxWriter.class, integrationEvents);
+  }
+
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /**
+   * Publish the way production does: inside a transaction. The writer refuses otherwise, because a
+   * row that commits on its own would let the relay announce a change that was rolled back.
+   */
+  private void publishInTransaction(Runnable publish) {
+    new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> publish.run());
   }
 }

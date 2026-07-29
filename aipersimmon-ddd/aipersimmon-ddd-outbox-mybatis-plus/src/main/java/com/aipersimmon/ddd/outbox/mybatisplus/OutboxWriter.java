@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.function.Supplier;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Writes an integration event into the outbox table in the caller's transaction through the
@@ -102,6 +103,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
       String correlationId,
       String causationId,
       boolean idempotent) {
+    requireActiveTransaction(event);
     String payload = serialize(event);
     // Capture the writing thread's trace context so the relay can restore it when it
     // dispatches the row later — the outbox hop that ambient context cannot bridge.
@@ -144,6 +146,30 @@ public class OutboxWriter implements DurableIntegrationEvents {
       // Same event id already in the outbox: an earlier delivery of this staged effect
       // committed the row before the relay could mark the effect delivered. Nothing to do.
     }
+  }
+
+  /**
+   * Refuse to write the row outside a transaction.
+   *
+   * <p>An outbox exists for exactly one property: the event and the state change that caused it
+   * commit together. Untransacted, this row commits on its own — and then the caller's own work
+   * fails, or is rolled back by something above it, and the relay faithfully publishes an event
+   * announcing a change that never happened. Downstream cannot tell the difference, there is no
+   * error anywhere, and the row has left the outbox by the time anyone looks. That is strictly
+   * worse than not having an outbox, which is why the one guarantee it sells is checked rather than
+   * assumed.
+   */
+  private void requireActiveTransaction(IntegrationEvent event) {
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      return;
+    }
+    throw new IllegalStateException(
+        "no active transaction while writing "
+            + IntegrationEvent.eventTypeOf(event.getClass())
+            + " to the outbox: the row must commit with the state change that caused it, or the"
+            + " relay will publish an event for a change that was rolled back. Publish from inside"
+            + " a command handler (the CommandBus opens a transaction), or annotate the calling"
+            + " application service with @Transactional.");
   }
 
   private String serialize(IntegrationEvent event) {

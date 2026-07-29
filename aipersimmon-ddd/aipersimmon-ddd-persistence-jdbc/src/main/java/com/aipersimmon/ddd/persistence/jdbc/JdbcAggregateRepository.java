@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import java.util.Objects;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Base for a plain-JDBC repository of one aggregate: it centralises the affected-rows check and the
@@ -53,6 +54,7 @@ public abstract class JdbcAggregateRepository<A extends AbstractAggregateRoot<?>
    * @throws OptimisticLockingFailureException if the aggregate was modified concurrently
    */
   protected final void saveAggregate(A aggregate) {
+    requireActiveTransaction(aggregate);
     long expected = aggregate.version();
     if (expected == 0) {
       insert(aggregate);
@@ -68,6 +70,30 @@ public abstract class JdbcAggregateRepository<A extends AbstractAggregateRoot<?>
     }
     aggregate.versionAdvanced();
     domainEvents.publishAndClear(aggregate);
+  }
+
+  /**
+   * Refuse to write outside a transaction.
+   *
+   * <p>{@link #saveAggregate} makes two writes that only mean something together: the rows, and the
+   * domain events. Untransacted, each commits on its own — a failure between them leaves rows
+   * written with no event, or an event published for a state the database never reached, and
+   * nothing left to roll back. The javadoc has always said "runs in the caller's transaction"; this
+   * is that sentence made enforceable, because the failure it describes stays invisible until
+   * something throws midway.
+   */
+  private void requireActiveTransaction(A aggregate) {
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      return;
+    }
+    throw new IllegalStateException(
+        "no active transaction while saving aggregate "
+            + aggregate.getClass().getSimpleName()
+            + "["
+            + aggregate.id()
+            + "]: its rows and its domain events must commit or roll back together. Send the"
+            + " operation through the CommandBus (its transaction interceptor opens one), or"
+            + " annotate the calling application service with @Transactional.");
   }
 
   /**

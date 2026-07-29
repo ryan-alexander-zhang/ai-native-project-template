@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import java.util.Objects;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Base for a MyBatis-Plus repository of one aggregate. It makes the two things that are easy to get
@@ -40,8 +41,14 @@ import org.springframework.dao.OptimisticLockingFailureException;
  *
  * <p>Requires the optimistic-locker interceptor to be installed, which {@code
  * AipersimmonDddPersistenceMybatisPlusAutoConfiguration} contributes. Without it the {@code WHERE
- * version = ?} predicate is never added and {@link #saveAggregate} silently degrades to a
- * last-writer-wins update — see {@code design-00011} §3.
+ * version = ?} predicate is never added and the update degrades to last-writer-wins — see {@code
+ * design-00011} §3. {@link #saveAggregate} no longer takes that on trust: it checks the
+ * interceptor's own witness (the version it writes back onto the row) and fails loudly, because the
+ * affected-rows check cannot detect a missing predicate — it passes precisely because the predicate
+ * is gone.
+ *
+ * <p>It also requires an active transaction, for the same reason it publishes events: the root row,
+ * the child rows and the events are one atomic outcome or they are a corrupted aggregate.
  *
  * @param <A> the aggregate root type
  * @param <D> the row type for the root's own table
@@ -72,6 +79,7 @@ public abstract class MybatisPlusAggregateRepository<
    * @throws OptimisticLockingFailureException if the aggregate was modified concurrently
    */
   protected final void saveAggregate(A aggregate) {
+    requireActiveTransaction(aggregate);
     D row = toRow(aggregate);
     long expected = aggregate.version();
     if (expected == 0) {
@@ -89,10 +97,76 @@ public abstract class MybatisPlusAggregateRepository<
                 + expected
                 + ")");
       }
+      requireVersionWasChecked(row, expected, aggregate);
     }
     saveChildren(aggregate);
     aggregate.versionAdvanced();
     domainEvents.publishAndClear(aggregate);
+  }
+
+  /**
+   * Refuse to write outside a transaction.
+   *
+   * <p>{@link #saveAggregate} makes three writes that only mean something together: the root row,
+   * the child rows, and the domain events. Untransacted, each commits on its own — a failure
+   * between them leaves the aggregate half-written with events already published for a state the
+   * database never reached, and there is nothing left to roll back. The javadoc has always said
+   * "runs in the caller's transaction"; this is that sentence made enforceable, because the failure
+   * it describes is invisible until the day something throws midway.
+   */
+  private void requireActiveTransaction(A aggregate) {
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      return;
+    }
+    throw new IllegalStateException(
+        "no active transaction while saving aggregate "
+            + aggregate.getClass().getSimpleName()
+            + "["
+            + aggregate.id()
+            + "]: the root row, its child rows and its domain events must commit or roll back"
+            + " together. Send the operation through the CommandBus (its transaction interceptor"
+            + " opens one), or annotate the calling application service with @Transactional.");
+  }
+
+  /**
+   * Prove the optimistic-locker interceptor actually rewrote this update.
+   *
+   * <p>Its rewrite has a witness: after building {@code SET version = version + 1 ... WHERE version
+   * = ?} the interceptor writes the incremented value back onto the entity. So a row that comes
+   * back still holding the version we set means no {@code WHERE version} predicate was added — the
+   * update matched its row unconditionally, reported one row changed, and a writer working from a
+   * stale snapshot just discarded a concurrent change. The affected-rows check above cannot see
+   * that: it passes precisely because the predicate is missing.
+   *
+   * <p>Two ways to arrive here, both silent until now. A consumer declaring their own {@code
+   * MybatisPlusInterceptor} takes over assembly wholesale, so the framework's contribution backs
+   * off — and the log line announcing it lives in the bean that backed off. Or the row's version
+   * field lacks MyBatis-Plus's {@code @Version} annotation, which is what the interceptor keys on,
+   * so it finds nothing to rewrite. The message names both.
+   */
+  private void requireVersionWasChecked(D row, long expected, A aggregate) {
+    Long written = row.getVersion();
+    if (written != null && written == expected + 1) {
+      return;
+    }
+    throw new IllegalStateException(
+        "optimistic locking is not in effect for "
+            + row.getClass().getName()
+            + ": updating aggregate "
+            + aggregate.getClass().getSimpleName()
+            + "["
+            + aggregate.id()
+            + "] at version "
+            + expected
+            + " left the row at version "
+            + written
+            + " instead of "
+            + (expected + 1)
+            + ", so no 'WHERE version = ?' predicate was applied and the write would have"
+            + " overwritten any concurrent change. Either the row's version field is missing"
+            + " MyBatis-Plus's @Version annotation, or the OptimisticLockerInnerInterceptor is not"
+            + " installed — a consumer-declared MybatisPlusInterceptor bean replaces the"
+            + " framework's assembly entirely, and must add the interceptors it displaced.");
   }
 
   /** Map the aggregate onto its own table's row. The version is set by {@link #saveAggregate}. */

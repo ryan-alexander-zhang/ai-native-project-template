@@ -63,6 +63,7 @@ class ConnectedTraceEndToEndTest {
   private OutboxWriter writer;
   private OutboxRelay relay;
   private CapturingDispatcher dispatcher;
+  private TransactionTemplate commandTransaction;
 
   @BeforeEach
   void setUp() {
@@ -75,6 +76,7 @@ class ConnectedTraceEndToEndTest {
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V3__add_tenant_id.sql")
             .build();
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    commandTransaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
 
     exporter = InMemorySpanExporter.create();
     OpenTelemetrySdk sdk =
@@ -111,10 +113,15 @@ class ConnectedTraceEndToEndTest {
 
   @Test
   void outboxDispatchSpanLinksBackToTheCommandSpanAcrossTheHop() {
-    // A command is being handled: its span is active while the handler publishes an event.
+    // A command is being handled: its span is active, and its transaction is open, while the
+    // handler publishes an event. Both are part of the shape being tested — the writer refuses to
+    // write outside a transaction, since a row that commits alone could announce a rolled-back
+    // change.
     try (Tracer.SpanScope ignored = domainTracer.startSpan("command PlaceOrder")) {
-      writer.publish(
-          new OrderPlaced("order-1"), CommandContext.root(Tenants.ROOT.value(), "msg-1"));
+      commandTransaction.executeWithoutResult(
+          status ->
+              writer.publish(
+                  new OrderPlaced("order-1"), CommandContext.root(Tenants.ROOT.value(), "msg-1")));
     }
 
     // Later, on the scheduler thread with no ambient context, the relay dispatches the row.
