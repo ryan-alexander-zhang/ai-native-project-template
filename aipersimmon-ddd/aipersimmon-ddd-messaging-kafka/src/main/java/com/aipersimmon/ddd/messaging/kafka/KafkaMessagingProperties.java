@@ -43,11 +43,11 @@ public class KafkaMessagingProperties {
 
     /**
      * Upper bound, in milliseconds, on awaiting a broker ack for one send before the relay gives up
-     * and retries the row on the next poll. Bounds the single relay thread so one stuck send cannot
-     * pin it (and stall all delivery on the instance), and so a wait cannot outlive the relay's
-     * {@code lock-at-most-for} and let another instance dispatch the same rows concurrently. Keep
-     * {@code outbox.batch-size × this} comfortably below the relay's {@code
-     * relay.lock-at-most-for}.
+     * and retries the row on the next poll. Bounds the relay thread so one stuck send cannot pin it
+     * and stall delivery on the instance, and so a send cannot outlive the relay's claim on the row
+     * it is sending — which would let another instance dispatch that row too. Keep it comfortably
+     * below half of {@code outbox.relay.lease-duration}; {@code batch-size} does not enter into it,
+     * because a poll bounds itself and hands back what it has not reached.
      */
     private long sendTimeoutMs = 30000;
 

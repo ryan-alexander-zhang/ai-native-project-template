@@ -159,53 +159,48 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   }
 
   /**
-   * Startup WARN when the relay's worst-case per-poll budget can outlive its lease. The relay
-   * dispatches a batch one row at a time and blocks on each broker ack up to {@code
-   * producer.send-timeout-ms}, so a whole poll of stalled sends takes up to {@code batch-size ×
-   * send-timeout}; if that exceeds {@code relay.lock-at-most-for} the ShedLock lease can expire
-   * mid-poll and a second instance can dispatch the same rows concurrently. The shipped defaults
-   * (batch 100 × 30s = 50min &lt; 60min) satisfy this, so this only fires when a custom
-   * configuration breaks the invariant — a WARN, not a failure, because the worst case needs a
-   * sustained broker outage and the operator may accept it knowingly. Gated like the durable guard:
-   * only with a Kafka transport and actual {@code @Externalized} events. {@link OutboxProperties}
-   * is optional (via {@link ObjectProvider}) so a Kafka-consumer-only app without an outbox is left
-   * alone.
+   * Startup WARN when one send can outlive the relay's claim on the row it is sending.
+   *
+   * <p>A poll stops working after half of {@code relay.lease-duration} and hands back whatever it
+   * has not reached, so a whole batch of stalled sends can no longer overrun the lease — but the
+   * dispatch already in flight when that budget runs out still has to finish inside the remaining
+   * half. Blocking on a broker ack for longer than that leaves the row claimable again while this
+   * instance is still sending it, and another instance may send it too. The cost is a duplicate
+   * (which a consumer's inbox dedups), never a lost or reordered message, so this is a WARN rather
+   * than a failure.
+   *
+   * <p>Note what is <em>not</em> in this arithmetic: {@code batch-size}. How much a poll may take
+   * on and how long a claim survives a dead instance are now separate knobs, and only the per-send
+   * bound has to fit inside the lease. The shipped defaults (30s send timeout against half of 5
+   * minutes) satisfy it with room to spare.
+   *
+   * <p>Gated like the durable guard: only with a Kafka transport and actual {@code @Externalized}
+   * events. {@link OutboxProperties} is optional (via {@link ObjectProvider}) so a
+   * Kafka-consumer-only app without an outbox is left alone.
    */
   @Bean
   @ConditionalOnBean(KafkaTemplate.class)
   @Conditional(OnExternalizedEventsCondition.class)
   public SmartInitializingSingleton aipersimmonDddOutboxLeaseBudgetCheck(
-      ObjectProvider<OutboxProperties> outboxProperties,
-      KafkaMessagingProperties properties,
-      @Value("${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}") String lockAtMostFor) {
+      ObjectProvider<OutboxProperties> outboxProperties, KafkaMessagingProperties properties) {
     return () -> {
       OutboxProperties outbox = outboxProperties.getIfAvailable();
       if (outbox == null) {
         return;
       }
-      // ISO-8601 (the default and the form the ShedLock annotations feed on). If a deployment
-      // overrides it with an unparseable value the lease budget can't be checked — skip the
-      // advisory WARN rather than fail startup over it.
-      Duration lease;
-      try {
-        lease = Duration.parse(lockAtMostFor);
-      } catch (RuntimeException e) {
-        return;
-      }
-      long worstCaseMs = (long) outbox.getBatchSize() * properties.getProducer().getSendTimeoutMs();
-      long leaseMs = lease.toMillis();
-      if (worstCaseMs > leaseMs) {
+      Duration lease = outbox.getRelay().getLeaseDuration();
+      long sendTimeoutMs = properties.getProducer().getSendTimeoutMs();
+      long pollBudgetMs = lease.toMillis() / 2;
+      if (sendTimeoutMs > pollBudgetMs) {
         log.warn(
-            "aipersimmon-ddd outbox relay budget: worst-case poll = batch-size ({}) × "
-                + "producer.send-timeout-ms ({}ms) = {}ms, which exceeds relay.lock-at-most-for "
-                + "({}ms). Under a sustained broker outage the ShedLock lease can expire mid-poll and "
-                + "a second instance may dispatch the same rows concurrently. Lower batch-size or "
-                + "send-timeout, or raise relay.lock-at-most-for, so batch-size × send-timeout stays "
-                + "below the lease.",
-            outbox.getBatchSize(),
-            properties.getProducer().getSendTimeoutMs(),
-            worstCaseMs,
-            leaseMs);
+            "aipersimmon-ddd outbox relay budget: producer.send-timeout-ms ({}ms) exceeds half of "
+                + "relay.lease-duration ({}ms), leaving a send able to outlive the claim on the row "
+                + "it is sending — another instance may then dispatch that row too (a duplicate the "
+                + "consumer's inbox dedups). Lower send-timeout or raise relay.lease-duration so one "
+                + "send fits in {}ms.",
+            sendTimeoutMs,
+            lease.toMillis(),
+            pollBudgetMs);
       }
     };
   }

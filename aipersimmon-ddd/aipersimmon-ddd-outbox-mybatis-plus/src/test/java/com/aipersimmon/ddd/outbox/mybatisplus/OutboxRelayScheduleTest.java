@@ -1,11 +1,14 @@
 package com.aipersimmon.ddd.outbox.mybatisplus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelayScheduler;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
@@ -17,14 +20,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The schedule exists by default and its poll is lock-guarded, so a deployment that changes nothing
- * still drains its outbox and several instances do not poll the same rows at once.
+ * The schedule exists by default, so a deployment that changes nothing still drains its outbox —
+ * and it takes no lock, so delivery does not sit behind a single holder that a killed instance
+ * would leave held. Several instances polling at once is safe because the rows themselves are
+ * claimed; that claim is covered by {@link OutboxRelayClaimTest}.
  *
- * <p>The lock lives on the scheduled poll rather than on {@link OutboxRelay#relay()} deliberately:
- * it guards the <em>schedule</em>. A caller invoking the relay directly is one deliberate act and
- * needs no lock — and must not be silently skipped by one, which is what used to happen when the
- * startup poll held it. The switched-off side is covered on the JDBC store, where the two
- * schedulers are the same three-line delegation.
+ * <p>The trigger stays a separate bean from {@link OutboxRelay} so a dedicated relay instance, or a
+ * test, can drive delivery itself. The switched-off side is covered on the JDBC store, where the
+ * two schedulers are the same three-line delegation.
  */
 @SpringBootTest(classes = OutboxRelayScheduleTest.TestApp.class)
 class OutboxRelayScheduleTest {
@@ -38,7 +41,6 @@ class OutboxRelayScheduleTest {
     }
   }
 
-  /** Present only so dispatcher selection has something to pick. */
   static final class CapturingDispatcher implements OutboxDispatcher {
     final List<OutboxMessage> messages = new CopyOnWriteArrayList<>();
 
@@ -49,16 +51,29 @@ class OutboxRelayScheduleTest {
   }
 
   @Autowired OutboxRelayScheduler scheduler;
+  @Autowired CapturingDispatcher dispatcher;
   @Autowired JdbcTemplate jdbc;
 
   @Test
-  void theScheduledPollIsGuardedByShedLock() {
+  void theScheduledPollDeliversWithoutTakingAnyLock() {
+    jdbc.update(
+        "INSERT INTO aipersimmon_outbox (event_id, source, type, version, payload, occurred_at, "
+            + "subject, correlation_id, sent, attempts, created_at) "
+            + "VALUES ('scheduled-1', 'test', 'SampleEvent', 1, '{}', ?, 'agg-1', 'corr', ?, 0, ?)",
+        Timestamp.from(Instant.now()),
+        false,
+        Timestamp.from(Instant.now()));
+
     scheduler.poll();
 
+    assertTrue(
+        dispatcher.messages.stream().anyMatch(m -> "scheduled-1".equals(m.eventId())),
+        "the shipped schedule must drain the outbox with no configuration at all");
     assertEquals(
-        Integer.valueOf(1),
+        Integer.valueOf(0),
         jdbc.queryForObject(
-            "SELECT COUNT(*) FROM shedlock WHERE name = 'aipersimmon-outbox-relay'", Integer.class),
-        "the scheduled poll must take a ShedLock lock so only one instance polls at a time");
+            "SELECT COUNT(*) FROM shedlock WHERE name LIKE '%outbox-relay%'", Integer.class),
+        "the relay must not take a schedule-wide lock: a killed instance cannot release one, and "
+            + "every other instance would then skip its poll until that lock expired");
   }
 }

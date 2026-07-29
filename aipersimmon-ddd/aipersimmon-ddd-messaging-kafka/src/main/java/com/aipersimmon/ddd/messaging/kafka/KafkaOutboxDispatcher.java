@@ -32,11 +32,12 @@ import org.springframework.kafka.core.KafkaTemplate;
  * fixedDelay} scheduled poll that dispatches rows one at a time and blocks on each broker ack, so
  * an unbounded wait would pin that one thread forever on a single stuck send (broker partition
  * unwritable, metadata stall) — stopping <em>all</em> outbox delivery on that instance and, once
- * the wait outlives the ShedLock lease, letting another instance take the lock and dispatch the
- * same rows concurrently. A timed-out send is cancelled and surfaced as a failure, which the {@code
- * FailureClassifier} treats as transient, so the row stays unsent and is retried with backoff on
- * the next poll. Keep {@code batch-size × sendTimeout} comfortably below the relay's {@code
- * lock-at-most-for} so a whole poll of stalled sends cannot outlive the lease either.
+ * the wait outlives the relay's lease on the row, letting another instance dispatch that row too. A
+ * timed-out send is cancelled and surfaced as a failure, which the {@code FailureClassifier} treats
+ * as transient, so the row stays unsent and is retried with backoff on the next poll. Keep {@code
+ * sendTimeout} below half of {@code outbox.relay.lease-duration}; a whole batch of stalled sends
+ * needs no such arithmetic, because a poll stops at that halfway point and hands back the rows it
+ * has not reached.
  */
 public class KafkaOutboxDispatcher {
 

@@ -14,6 +14,7 @@ import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
+import com.aipersimmon.ddd.outbox.engine.relay.RelayLeases;
 import com.aipersimmon.ddd.outbox.engine.write.OutboxWriter;
 import com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore;
 import com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxStore;
@@ -28,6 +29,7 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -75,6 +77,7 @@ class ConnectedTraceEndToEndTest {
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V1__aipersimmon_outbox.sql")
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V2__drop_trace_id.sql")
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V3__add_tenant_id.sql")
+            .addScript("classpath:aipersimmon/db/migration/outbox/h2/V4__relay_row_lease.sql")
             .build();
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     commandTransaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
@@ -110,6 +113,7 @@ class ConnectedTraceEndToEndTest {
             CLOCK,
             100,
             10,
+            RelayLeases.ownedBy("otel-test", Duration.ofMinutes(5)),
             storeTracer);
   }
 

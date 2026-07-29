@@ -7,10 +7,10 @@ import java.time.Instant;
 
 /**
  * One stored integration event in the outbox table: the transport metadata, the serialized JSON
- * payload, and the delivery bookkeeping (sent flag, sent time, attempt count). Uses MyBatis-Plus
- * {@code @TableName}/{@code @TableId}, not a JPA {@code @Entity}, so it never affects a consumer's
- * JPA entity scanning. Column names are the snake_case of the field names (MyBatis-Plus maps them
- * by default).
+ * payload, the delivery bookkeeping (sent flag, sent time, attempt count) and the relay's lease on
+ * the row while it is being dispatched. Uses MyBatis-Plus {@code @TableName}/{@code @TableId}, not
+ * a JPA {@code @Entity}, so it never affects a consumer's JPA entity scanning. Column names are the
+ * snake_case of the field names (MyBatis-Plus maps them by default).
  */
 @TableName("aipersimmon_outbox")
 public class OutboxRecord {
@@ -35,6 +35,9 @@ public class OutboxRecord {
   private Integer attempts;
   private Instant nextAttemptAt;
   private Instant createdAt;
+  private String leaseOwner;
+  private String leaseToken;
+  private Instant leaseUntil;
 
   // CPD-OFF — boilerplate get/set accessors; their inevitable overlap with the twin
   // DeadLetterRecord entity is not meaningful duplication.
@@ -180,5 +183,29 @@ public class OutboxRecord {
 
   public void setCreatedAt(Instant createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public String getLeaseOwner() {
+    return leaseOwner;
+  }
+
+  public void setLeaseOwner(String leaseOwner) {
+    this.leaseOwner = leaseOwner;
+  }
+
+  public String getLeaseToken() {
+    return leaseToken;
+  }
+
+  public void setLeaseToken(String leaseToken) {
+    this.leaseToken = leaseToken;
+  }
+
+  public Instant getLeaseUntil() {
+    return leaseUntil;
+  }
+
+  public void setLeaseUntil(Instant leaseUntil) {
+    this.leaseUntil = leaseUntil;
   }
 }

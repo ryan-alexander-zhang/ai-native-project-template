@@ -148,11 +148,13 @@ aipersimmon:
     # The transactional outbox. Two settings here are the ones the framework's production
     # configuration checklist asks to be decided rather than inherited (see DOCS.md):
     #
-    #   - the lease budget: a whole poll of stalled sends must not outlive the ShedLock lease, or a
-    #     second instance starts dispatching the same rows. batch-size (100) x
-    #     messaging.kafka.producer.send-timeout-ms (30s default) = 50 minutes, which is under the
-    #     60-minute lease — so the shipped arithmetic holds. Raising batch-size means raising
-    #     lock-at-most-for with it.
+    #   - the lease: every instance polls, and each claims the rows it is about to dispatch. The
+    #     lease length is therefore only "how long a killed instance's rows stay stuck" — the other
+    #     instances keep delivering the whole time. Five minutes is short enough that a lost pod is
+    #     not noticeable and long enough to cover a GC pause. It does not have to cover a whole
+    #     batch: a poll stops after half the lease and hands back what it did not reach. What must
+    #     hold is that one send fits in that half — messaging.kafka.producer.send-timeout-ms (30s)
+    #     against 2m30s, comfortably. Note batch-size is not part of that arithmetic any more.
     #   - cleanup: on, because a sent row has no further purpose and an outbox that only grows
     #     eventually makes the unsent-row scan slower for no benefit. Seven days of retention is
     #     long enough to answer "did we send it?" during an incident. Leaving it off is a valid
@@ -160,7 +162,7 @@ aipersimmon:
     outbox:
       batch-size: 100
       relay:
-        lock-at-most-for: PT60M
+        lease-duration: PT5M
       cleanup:
         enabled: true
         retention-seconds: 604800

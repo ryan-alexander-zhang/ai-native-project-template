@@ -9,6 +9,8 @@ import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,8 +28,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * that reached the broker but whose {@code sent=TRUE} update then failed must not be dead-lettered
  * or counted against the retry budget — it is re-dispatched (an accepted at-least-once duplicate),
  * which the consumer's inbox dedups. The mapper issues the mark-sent through the SqlSessionFactory
- * (not the JdbcTemplate), so the failure is forced with an H2 trigger that rejects any update to
- * the outbox table.
+ * (not the JdbcTemplate), so the failure is forced with an H2 trigger that rejects the update which
+ * sets {@code sent = TRUE} — and only that one, so the relay's claim on the row and the release
+ * that follows still work.
  *
  * <p>{@code max-attempts=1} makes the sharp edge explicit: before the fix a single mark-sent
  * failure exhausts the budget and dead-letters a message that was already delivered.
@@ -94,11 +97,12 @@ class OutboxRelayMarkSentFailureTest {
   @Test
   void aMarkSentFailureAfterASuccessfulDispatchIsNotTreatedAsADispatchFailure() {
     insert("e1");
-    // The relay's only update to the outbox on the success path is the mark-sent; reject it.
+    // Reject the mark-sent specifically. The relay also updates the row to claim it and to hand it
+    // back, and blocking those would test something else entirely.
     jdbc.execute(
         "CREATE TRIGGER trg_block_outbox_update BEFORE UPDATE ON aipersimmon_outbox "
             + "FOR EACH ROW CALL \""
-            + BlockUpdateTrigger.class.getName()
+            + BlockMarkSentTrigger.class.getName()
             + "\"");
 
     assertDoesNotThrow(relay::relay);
@@ -137,11 +141,39 @@ class OutboxRelayMarkSentFailureTest {
         "the unsent row is re-dispatched on the next poll (an at-least-once duplicate)");
   }
 
-  /** H2 trigger: reject any update to the outbox table (the relay's mark-sent). */
-  public static class BlockUpdateTrigger implements org.h2.api.Trigger {
+  /**
+   * H2 trigger: reject the update that marks a row sent, and nothing else. The column position of
+   * {@code sent} is looked up once rather than hard-coded, so adding a column cannot quietly turn
+   * this into a trigger that blocks the wrong statement.
+   */
+  public static class BlockMarkSentTrigger implements org.h2.api.Trigger {
+
+    private int sentColumn = -1;
+
+    @Override
+    public void init(
+        Connection conn,
+        String schemaName,
+        String triggerName,
+        String tableName,
+        boolean before,
+        int type)
+        throws SQLException {
+      try (ResultSet columns = conn.getMetaData().getColumns(null, schemaName, tableName, "SENT")) {
+        if (columns.next()) {
+          sentColumn = columns.getInt("ORDINAL_POSITION") - 1;
+        }
+      }
+    }
+
     @Override
     public void fire(Connection conn, Object[] oldRow, Object[] newRow) {
-      throw new RuntimeException("simulated failure marking the row sent");
+      if (sentColumn < 0) {
+        throw new IllegalStateException("the outbox table has no sent column to watch");
+      }
+      if (newRow != null && Boolean.TRUE.equals(newRow[sentColumn])) {
+        throw new RuntimeException("simulated failure marking the row sent");
+      }
     }
   }
 }

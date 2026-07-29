@@ -11,26 +11,30 @@ import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import com.aipersimmon.ddd.outbox.engine.store.PendingMessage;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.HashSet;
+import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Polls the outbox for unsent rows that are due and dispatches them, marking each sent on success.
- * Each row is marked on its own, so one failure does not undo already-dispatched rows —
- * at-least-once delivery.
+ * Claims unsent rows that are due and dispatches them, marking each sent on success. Each row is
+ * marked on its own, so one failure does not undo already-dispatched rows — at-least-once delivery.
  *
- * <p>Rows are dispatched oldest-first ({@code created_at}, then the identity column as a
- * tiebreaker), so an aggregate's events are delivered in the order they were written. To keep that
- * order under failure, a failed dispatch that is going to be retried also holds back the rest of
- * that aggregate's ({@code subject}'s) events for the current poll, instead of letting a later
- * event overtake the stuck one.
+ * <p>Rows are claimed, not merely selected. Each claim stamps a lease on the rows it wins, so every
+ * instance can poll at the same time and they simply take disjoint work. That is what keeps a lost
+ * instance from stopping delivery: it cannot release anything when it is killed, but its rows come
+ * back on their own once the lease expires, and in the meantime every other instance keeps
+ * dispatching. Nothing has to detect the death.
+ *
+ * <p>Per-aggregate ordering is a property of the claim, not of this loop: only the head of each
+ * {@code subject}'s live queue is claimable, so an aggregate has at most one row in flight anywhere
+ * and a later event cannot overtake an earlier one however many instances are polling. See {@link
+ * OutboxStore#claimDue}. This class therefore does not track blocked aggregates itself — a
+ * guarantee that lived in one node's memory could not have survived concurrent pollers.
  *
  * <p>A failed dispatch is classified by the {@link FailureClassifier}. A <em>permanent</em> failure
  * is dead-lettered at once (no retries wasted). A <em>transient</em> failure is retried with
- * exponential backoff: its next attempt is pushed out (see {@link RetryBackoff}) so the poll skips
+ * exponential backoff: its next attempt is pushed out (see {@link RetryBackoff}) so the claim skips
  * it until then, rather than re-attempting it every second. When a transient failure has burned
  * through {@code max-attempts} it too is dead-lettered. In every give-up case the row is
  * <em>moved</em> to the {@link DeadLetterStore} (out of the outbox), so the hot table holds only
@@ -38,13 +42,24 @@ import org.slf4j.LoggerFactory;
  * dead-lettered row leaves the table, its aggregate's later events then proceed — ordering is
  * preserved only up to the point a message is given up on.
  *
- * <p>The poll is guarded by ShedLock in {@link OutboxRelayScheduler}, so across a multi-instance
- * deployment only one instance runs a given poll at a time; the others skip it rather than
- * re-selecting and re-dispatching the same unsent rows.
+ * <p>One poll is bounded twice: it dispatches at most {@code batch-size} rows, and it stops
+ * altogether once half the lease has elapsed, releasing whatever it had claimed but not reached.
+ * Bounding it here is what lets the lease be short: a poll cannot outlive the lease it holds as
+ * long as a single dispatch takes less than half of one, so the length of the lease is free to be
+ * chosen for how fast a dead instance's rows should come back rather than for how slow a whole
+ * batch of stalled sends might be.
  *
- * <p>This class is storage-agnostic on purpose. Every judgement above — the ordering hold-back, the
- * classification, the retry budget, what a mark-sent failure means, how a dead-letter move that
- * itself fails is handled — is reasoning that must not differ between backends, so it lives here
+ * <p>Because only the head of an aggregate is claimable, one claim yields at most one row per
+ * aggregate. A poll therefore claims repeatedly — as each row is sent or given up on, its successor
+ * becomes the head — until the batch is spent, nothing is claimable, or a row is left in the table
+ * still immediately claimable. That last condition is what keeps a retry scheduled with little or
+ * no backoff from being re-attempted straight away, spending its whole attempt budget in one tight
+ * loop. A dead-lettered row is not such a case, having left the table altogether, so giving up on a
+ * message still frees its aggregate's next event within the same poll.
+ *
+ * <p>This class is storage-agnostic on purpose. Every judgement above — the classification, the
+ * retry budget, what a mark-sent failure means, how a dead-letter move that itself fails is
+ * handled, the poll budget — is reasoning that must not differ between backends, so it lives here
  * once and runs against {@link OutboxStore}.
  */
 public class OutboxRelay {
@@ -59,6 +74,7 @@ public class OutboxRelay {
   private final Clock clock;
   private final int batchSize;
   private final int maxAttempts;
+  private final RelayLeases leases;
   private final StoreAndForwardTracer tracer;
 
   public OutboxRelay(
@@ -69,7 +85,8 @@ public class OutboxRelay {
       RetryBackoff backoff,
       Clock clock,
       int batchSize,
-      int maxAttempts) {
+      int maxAttempts,
+      RelayLeases leases) {
     this(
         store,
         dispatcher,
@@ -79,6 +96,7 @@ public class OutboxRelay {
         clock,
         batchSize,
         maxAttempts,
+        leases,
         NoOpStoreAndForwardTracer.INSTANCE);
   }
 
@@ -91,6 +109,7 @@ public class OutboxRelay {
       Clock clock,
       int batchSize,
       int maxAttempts,
+      RelayLeases leases,
       StoreAndForwardTracer tracer) {
     this.store = store;
     this.dispatcher = dispatcher;
@@ -100,69 +119,116 @@ public class OutboxRelay {
     this.clock = clock;
     this.batchSize = batchSize;
     this.maxAttempts = maxAttempts;
+    this.leases = leases;
     this.tracer = tracer;
   }
 
   /**
-   * Drain one batch of due rows. Scheduling and the multi-instance lock live in {@link
-   * OutboxRelayScheduler}, so this method is safe to call directly — no lock can silently skip it.
+   * Drain up to one batch of claimable rows. Scheduling lives in {@link OutboxRelayScheduler}; no
+   * lock guards this, so a direct call always runs — the claim is what keeps concurrent callers off
+   * each other's rows.
    */
   public void relay() {
-    List<PendingMessage> batch = store.findDue(clock.instant(), maxAttempts, batchSize);
-    Set<String> blockedSubjects = new HashSet<>();
-    for (PendingMessage pending : batch) {
-      OutboxMessage message = pending.message();
-      String subject = orderingKey(message.subject());
-      if (subject != null && blockedSubjects.contains(subject)) {
-        // An earlier event for this aggregate failed this round; hold its
-        // later events back so they are not delivered out of order.
-        continue;
+    Instant budgetEndsAt = clock.instant().plus(pollBudget());
+    int remaining = batchSize;
+    while (remaining > 0 && !clock.instant().isAfter(budgetEndsAt)) {
+      Instant now = clock.instant();
+      List<PendingMessage> claimed = store.claimDue(now, maxAttempts, remaining, leases.next(now));
+      if (claimed.isEmpty()) {
+        return;
       }
-      try (StoreAndForwardTracer.Scope span =
-          tracer.restore(
-              pending.traceparent(), pending.traceState(), "outbox.publish " + message.eventId())) {
-        // The restored span is current here, so the Kafka producer instrumentation stamps
-        // the message headers with this dispatch span — which links back to the span that
-        // wrote the row — rather than with the (unrelated) scheduler thread's context.
-        try {
-          dispatcher.dispatch(message);
-        } catch (RuntimeException e) {
-          span.recordFailure(e);
-          throw e;
-        }
-      } catch (RuntimeException e) {
-        if (handleFailure(pending, e) && subject != null) {
-          blockedSubjects.add(subject);
-        }
-        continue;
-      }
-      // The message is delivered (at-least-once satisfied). A failure to record that is
-      // NOT a dispatch failure: never dead-letter or count it against the retry budget —
-      // that would discard or misreport a message the broker already has. Leave the row
-      // unsent so the next poll re-dispatches it (an accepted at-least-once duplicate,
-      // which the consumer's inbox dedups).
-      try {
-        store.markSent(message.eventId(), clock.instant());
-      } catch (RuntimeException e) {
-        log.warn(
-            "outbox dispatch for eventId={} succeeded but marking it sent failed; "
-                + "it will be re-dispatched (a duplicate) on the next poll",
-            message.eventId(),
-            e);
+      remaining -= claimed.size();
+      if (!dispatchAll(claimed, budgetEndsAt)) {
+        return;
       }
     }
   }
 
+  /** What became of a row, from the point of view of whether this poll should claim again. */
+  private enum Outcome {
+    /** Delivered and recorded. Its aggregate's next event is now the head. */
+    SENT,
+    /** Given up on and moved out of the outbox. Its aggregate is free of it too. */
+    RETIRED,
+    /**
+     * Still in the table and claimable again at once — a scheduled retry with little or no backoff,
+     * or a row handed back. Claiming again in this same poll would re-attempt it immediately, so
+     * the poll ends instead and the schedule decides when to look again.
+     */
+    HELD
+  }
+
   /**
-   * Handles a failed dispatch. Returns {@code true} if the row remains live (a retry was
-   * scheduled), so the caller holds back the rest of its aggregate this round; {@code false} if the
-   * row was dead-lettered (given up on) and its aggregate may proceed.
+   * Dispatch every claimed row, stopping if the poll's time budget runs out and handing back what
+   * is left so it does not sit unavailable for the rest of its lease.
+   *
+   * @return {@code true} if claiming again is worthwhile — no row was left immediately re-claimable
    */
-  private boolean handleFailure(PendingMessage pending, RuntimeException error) {
+  private boolean dispatchAll(List<PendingMessage> claimed, Instant budgetEndsAt) {
+    boolean keepClaiming = true;
+    for (int i = 0; i < claimed.size(); i++) {
+      if (clock.instant().isAfter(budgetEndsAt)) {
+        List<String> untouched =
+            claimed.subList(i, claimed.size()).stream().map(p -> p.message().eventId()).toList();
+        log.warn(
+            "outbox poll spent its time budget of {} with {} claimed row(s) not yet dispatched; "
+                + "releasing them for the next poll (or another instance). Lower batch-size, speed "
+                + "up dispatch, or raise the relay lease if this recurs",
+            pollBudget(),
+            untouched.size());
+        release(untouched);
+        return false;
+      }
+      if (dispatch(claimed.get(i)) == Outcome.HELD) {
+        keepClaiming = false;
+      }
+    }
+    return keepClaiming;
+  }
+
+  /** Dispatch one claimed row and record the outcome. */
+  private Outcome dispatch(PendingMessage pending) {
+    OutboxMessage message = pending.message();
+    try (StoreAndForwardTracer.Scope span =
+        tracer.restore(
+            pending.traceparent(), pending.traceState(), "outbox.publish " + message.eventId())) {
+      // The restored span is current here, so the Kafka producer instrumentation stamps
+      // the message headers with this dispatch span — which links back to the span that
+      // wrote the row — rather than with the (unrelated) scheduler thread's context.
+      try {
+        dispatcher.dispatch(message);
+      } catch (RuntimeException e) {
+        span.recordFailure(e);
+        throw e;
+      }
+    } catch (RuntimeException e) {
+      return handleFailure(pending, e);
+    }
+    // The message is delivered (at-least-once satisfied). A failure to record that is
+    // NOT a dispatch failure: never dead-letter or count it against the retry budget —
+    // that would discard or misreport a message the broker already has. Release the row
+    // instead, so the next poll re-dispatches it (an accepted at-least-once duplicate,
+    // which the consumer's inbox dedups) rather than waiting out the lease.
+    try {
+      store.markSent(message.eventId(), clock.instant());
+      return Outcome.SENT;
+    } catch (RuntimeException e) {
+      log.warn(
+          "outbox dispatch for eventId={} succeeded but marking it sent failed; "
+              + "it will be re-dispatched (a duplicate) on the next poll",
+          message.eventId(),
+          e);
+      release(List.of(message.eventId()));
+      return Outcome.HELD;
+    }
+  }
+
+  /** Handles a failed dispatch: dead-letter it, or schedule the next attempt. */
+  private Outcome handleFailure(PendingMessage pending, RuntimeException error) {
     OutboxMessage message = pending.message();
     int attempts = pending.attempts() + 1;
     if (failureClassifier.classify(error) == FailureClassifier.Failure.PERMANENT) {
-      return !deadLetter(
+      return deadLetter(
           message,
           attempts,
           DeadLetterStore.Reason.PERMANENT,
@@ -170,7 +236,7 @@ public class OutboxRelay {
           "failed permanently; dead-lettered without retry");
     }
     if (attempts >= maxAttempts) {
-      return !deadLetter(
+      return deadLetter(
           message,
           attempts,
           DeadLetterStore.Reason.RETRIES_EXHAUSTED,
@@ -186,20 +252,20 @@ public class OutboxRelay {
         attempts,
         maxAttempts,
         error);
-    return true;
+    return Outcome.HELD;
   }
 
   /**
    * Moves a given-up row to the {@link DeadLetterStore} (out of the outbox). If that move fails —
    * the store is unavailable — it does not let the failure propagate and abort the poll, nor leave
-   * the row due (which would have the poll re-select and re-dispatch it every second). Instead it
-   * backs the row off without counting an attempt, so the move is retried at the backoff cadence
-   * and self-heals once the store recovers.
+   * the row claimable at once (which would have the poll re-select and re-dispatch it every
+   * second). Instead it backs the row off without counting an attempt, so the move is retried at
+   * the backoff cadence and self-heals once the store recovers.
    *
-   * @return {@code true} if the row was moved out (its aggregate may proceed); {@code false} if the
-   *     move failed and a backoff was scheduled instead (the row stays live)
+   * @return {@link Outcome#RETIRED} once the row is out of the table — its aggregate is unblocked
+   *     and this poll may go on — or {@link Outcome#HELD} if the move failed and the row stayed put
    */
-  private boolean deadLetter(
+  private Outcome deadLetter(
       OutboxMessage message,
       int attempts,
       DeadLetterStore.Reason reason,
@@ -208,7 +274,7 @@ public class OutboxRelay {
     try {
       deadLetterStore.store(message, attempts, reason, summarize(error));
       log.error("outbox dispatch for eventId={} {}", message.eventId(), givingUp, error);
-      return true;
+      return Outcome.RETIRED;
     } catch (RuntimeException storeError) {
       storeError.addSuppressed(error);
       Duration delay = backoff.nextDelay(attempts);
@@ -219,19 +285,36 @@ public class OutboxRelay {
           message.eventId(),
           delay.toMillis(),
           storeError);
-      return false;
+      return Outcome.HELD;
     }
+  }
+
+  /**
+   * Hands rows back so they are claimable again immediately. A failure here is not worth failing
+   * the poll over: the lease expiring achieves the same thing, only later.
+   */
+  private void release(List<String> eventIds) {
+    try {
+      store.release(eventIds);
+    } catch (RuntimeException e) {
+      log.warn(
+          "outbox could not release {} claimed row(s); they become claimable again when their "
+              + "lease expires",
+          eventIds.size(),
+          e);
+    }
+  }
+
+  /**
+   * How long one poll may keep working. Half the lease, so the remaining half is slack for the
+   * dispatch already in flight when the budget runs out — a poll cannot outlive its own lease as
+   * long as a single dispatch is shorter than this.
+   */
+  private Duration pollBudget() {
+    return leases.duration().dividedBy(2);
   }
 
   private static String summarize(Throwable error) {
     return error.getClass().getName() + ": " + error.getMessage();
-  }
-
-  /**
-   * A null or blank subject carries no per-aggregate ordering key (matching the store's due-work
-   * query and the Kafka partition key), so it never blocks or is blocked.
-   */
-  private static String orderingKey(String subject) {
-    return subject == null || subject.isBlank() ? null : subject;
   }
 }

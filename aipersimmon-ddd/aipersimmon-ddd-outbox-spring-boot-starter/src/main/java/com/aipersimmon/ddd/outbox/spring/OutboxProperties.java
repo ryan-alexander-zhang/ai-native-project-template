@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.outbox.spring;
 
+import java.time.Duration;
 import java.util.Set;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -16,13 +17,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * non-positive {@code batch-size} makes the relay poll zero rows and never progress; a non-positive
  * {@code max-attempts} dead-letters a healthy message on its first failure; a negative backoff or
  * {@code max-backoff < base-backoff} inverts the retry schedule; a negative {@code
- * retention-seconds} puts the cleanup cutoff in the future and deletes still-live rows. Binding a
- * bad value fails startup with a concrete message.
+ * retention-seconds} puts the cleanup cutoff in the future and deletes still-live rows; a
+ * non-positive {@code relay.lease-duration} leaves a poll no time to work in. Binding a bad value
+ * fails startup with a concrete message.
  *
- * <p>The scheduling-annotation knobs ({@code poll-delay-ms}, {@code relay.lock-at-most-for}, {@code
- * relay.lock-name}, {@code cleanup.enabled}, {@code relay.enabled}) stay as property placeholders
- * on their annotations — annotation attributes cannot read a bound bean — so they are intentionally
- * not mirrored here. {@code dispatch} is the exception: the beans still select themselves by
+ * <p>The scheduling-annotation knobs ({@code poll-delay-ms}, {@code cleanup.enabled}, {@code
+ * cleanup.lock-at-most-for}, {@code relay.enabled}) stay as property placeholders on their
+ * annotations — annotation attributes cannot read a bound bean — so they are intentionally not
+ * mirrored here. {@code dispatch} is the exception: the beans still select themselves by
  * placeholder, but it is bound here as well so that an unrecognised value is rejected outright
  * instead of matching no bean and surfacing as a missing dependency somewhere downstream.
  */
@@ -58,6 +60,8 @@ public class OutboxProperties implements InitializingBean {
   private boolean allowUnreachableExternalEvents = false;
 
   private final Retry retry = new Retry();
+
+  private final Relay relay = new Relay();
 
   private final Cleanup cleanup = new Cleanup();
 
@@ -96,6 +100,7 @@ public class OutboxProperties implements InitializingBean {
               + " the cutoff in the future and deletes still-live rows), got "
               + cleanup.retentionSeconds);
     }
+    validateLeaseDuration();
     if (dispatch == null || !DISPATCH_MODES.contains(dispatch)) {
       throw new IllegalStateException(
           "aipersimmon.ddd.outbox.dispatch must be one of "
@@ -105,6 +110,16 @@ public class OutboxProperties implements InitializingBean {
               + "'. A broker transport is not selected here — add its starter (e.g."
               + " aipersimmon-ddd-messaging-kafka) or define your own OutboxDispatcher bean, and"
               + " leave this unset.");
+    }
+  }
+
+  private void validateLeaseDuration() {
+    Duration lease = relay.leaseDuration;
+    if (lease == null || lease.isZero() || lease.isNegative()) {
+      throw new IllegalStateException(
+          "aipersimmon.ddd.outbox.relay.lease-duration must be positive (a poll is given half the"
+              + " lease to work in, so a non-positive lease leaves it no time at all), got "
+              + lease);
     }
   }
 
@@ -144,6 +159,10 @@ public class OutboxProperties implements InitializingBean {
     return retry;
   }
 
+  public Relay getRelay() {
+    return relay;
+  }
+
   public Cleanup getCleanup() {
     return cleanup;
   }
@@ -169,6 +188,52 @@ public class OutboxProperties implements InitializingBean {
 
     public void setMaxBackoffMs(long maxBackoffMs) {
       this.maxBackoffMs = maxBackoffMs;
+    }
+  }
+
+  /** How the relay claims the rows it dispatches. */
+  public static class Relay {
+
+    /**
+     * How long a poll's claim on a row lasts.
+     *
+     * <p>This is the relay's recovery bound, and nothing else. An instance killed mid-poll releases
+     * nothing, so the rows it had claimed stay untouchable for exactly this long and then become
+     * claimable by any instance. Every other instance keeps delivering throughout — the rows in one
+     * dead instance's hands are all that is delayed. Shorten it for faster recovery.
+     *
+     * <p>It does not have to cover a whole batch of slow dispatches, because a poll bounds itself:
+     * it stops after half the lease and hands back what it has not reached. The one thing to keep
+     * true is that a <em>single</em> dispatch finishes within that half — with a Kafka transport
+     * that means {@code producer.send-timeout-ms} below half of this, which the shipped defaults
+     * satisfy with room to spare, and which the Kafka starter warns about if a custom configuration
+     * breaks it. Cross that line and the cost is duplicate deliveries (which a consumer's inbox
+     * dedups), not lost or reordered ones.
+     */
+    private Duration leaseDuration = Duration.ofMinutes(5);
+
+    /**
+     * Identity written into the lease of every row this instance claims. Diagnostics only — it
+     * answers "which node is sitting on these rows" when a relay looks stuck, and decides nothing.
+     * Left empty, a random per-process id is generated; set it to something stable (the pod name,
+     * say) to make that question answerable from the table alone.
+     */
+    private String workerId = "";
+
+    public Duration getLeaseDuration() {
+      return leaseDuration;
+    }
+
+    public void setLeaseDuration(Duration leaseDuration) {
+      this.leaseDuration = leaseDuration;
+    }
+
+    public String getWorkerId() {
+      return workerId;
+    }
+
+    public void setWorkerId(String workerId) {
+      this.workerId = workerId;
     }
   }
 

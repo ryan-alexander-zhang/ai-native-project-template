@@ -93,17 +93,18 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
 
   /**
    * Enables ShedLock and provides its {@link LockProvider} whenever a {@link DataSource} is
-   * present, so the scheduled relay holds a database lock and runs on only one instance at a time —
-   * a multi-instance deployment does not poll and dispatch the same rows once per instance. The
-   * lock table ({@code shedlock}) must exist (see the reference DDL); the provider uses the
-   * database clock ({@code usingDbTime}) so the lock does not depend on the instances' wall clocks
-   * being in sync. An application can override the {@code LockProvider} bean (for example a
-   * Redis-backed one) to lock elsewhere.
+   * present, so the retention purge runs on one instance at a time rather than having every
+   * instance delete the same rows. The relay does not use it: delivery is guarded per row by the
+   * lease it claims, which is what lets every instance poll and lets a lost instance cost only its
+   * own claimed rows. The lock table ({@code shedlock}) must exist (see the reference DDL); the
+   * provider uses the database clock ({@code usingDbTime}) so the lock does not depend on the
+   * instances' wall clocks being in sync. An application can override the {@code LockProvider} bean
+   * (for example a Redis-backed one) to lock elsewhere.
    */
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnBean(DataSource.class)
   @EnableSchedulerLock(
-      defaultLockAtMostFor = "${aipersimmon.ddd.outbox.relay.lock-at-most-for:PT60M}")
+      defaultLockAtMostFor = "${aipersimmon.ddd.outbox.cleanup.lock-at-most-for:PT10M}")
   static class OutboxSchedulerLockConfiguration {
 
     @Bean

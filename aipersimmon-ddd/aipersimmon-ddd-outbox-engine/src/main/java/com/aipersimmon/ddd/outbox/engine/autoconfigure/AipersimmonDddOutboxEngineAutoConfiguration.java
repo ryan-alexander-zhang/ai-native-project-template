@@ -11,12 +11,14 @@ import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.aipersimmon.ddd.outbox.engine.cleanup.OutboxCleanup;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelayScheduler;
+import com.aipersimmon.ddd.outbox.engine.relay.RelayLeases;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import com.aipersimmon.ddd.outbox.engine.write.OutboxWriter;
 import com.aipersimmon.ddd.outbox.spring.AipersimmonDddOutboxAutoConfiguration;
 import com.aipersimmon.ddd.outbox.spring.OutboxProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -95,6 +97,8 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
       Clock outboxClock,
       OutboxProperties properties,
       ObjectProvider<StoreAndForwardTracer> tracer) {
+    String workerId = properties.getRelay().getWorkerId();
+    Duration lease = properties.getRelay().getLeaseDuration();
     return new OutboxRelay(
         outboxStore,
         outboxDispatcher,
@@ -105,6 +109,9 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
         outboxClock,
         properties.getBatchSize(),
         properties.getMaxAttempts(),
+        workerId.isBlank()
+            ? RelayLeases.forThisProcess(lease)
+            : RelayLeases.ownedBy(workerId, lease),
         tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
 
