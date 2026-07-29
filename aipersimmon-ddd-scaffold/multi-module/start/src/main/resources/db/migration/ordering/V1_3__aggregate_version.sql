@@ -1,0 +1,28 @@
+-- issue-00051 / design-00011: optimistic-lock version on the ordering tables that are written.
+--
+-- Without it two concurrent commands each pass the aggregate's own state guards on the snapshot they
+-- loaded and both write, so the later write silently discards the earlier one: concurrent
+-- ConfirmOrder/CancelOrder both "succeed" while emitting contradictory domain events.
+--
+-- The column is what makes the aggregate a real transactional consistency unit: the repository puts
+-- the loaded value in the UPDATE's WHERE clause (MyBatis-Plus @Version + OptimisticLockerInnerInterceptor
+-- rewrite it in), so the losing write affects 0 rows and surfaces as OptimisticLockingFailureException
+-- -> ConcurrencyConflictException -> HTTP 409 rather than as silent data loss.
+--
+-- DEFAULT 1, not 0: version 0 is reserved to mean "not yet persisted", which is how the repository
+-- tells an INSERT from an UPDATE without a preceding existence query. Existing rows ARE persisted, so
+-- they must start at 1 — with DEFAULT 0 they would load as version 0, the repository would take them
+-- for new aggregates, and the save would attempt an INSERT and fail on the primary key. A freshly
+-- inserted row is likewise written at version 1.
+--
+-- Only tables whose aggregate has a save() port get the column:
+--   ordering.orders  - saved by PlaceOrder / ConfirmOrder / CancelOrder / FulfilmentTrigger
+--
+-- ordering.customers is deliberately absent HERE: at this point Customers exposes only findById, so
+-- the Customer aggregate is never written and a version column would be dead weight. That premise is
+-- what changes in V1_5, which adds it — enforcing a credit limit requires writing.
+--
+-- order_lines is not versioned: it is inside the aggregate boundary and is rewritten wholesale under
+-- the root's version check, which already serialises concurrent writers of the whole aggregate.
+
+ALTER TABLE ordering.orders ADD COLUMN version BIGINT NOT NULL DEFAULT 1;

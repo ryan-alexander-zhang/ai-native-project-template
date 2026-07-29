@@ -96,7 +96,7 @@ class PaymentOperationAtomicityTest {
   private int claimsFor(String operationId) {
     Integer rows =
         jdbc.queryForObject(
-            "SELECT count(*) FROM payment_operations WHERE operation_id = ?",
+            "SELECT count(*) FROM payment.payment_operations WHERE operation_id = ?",
             Integer.class,
             operationId);
     return rows == null ? 0 : rows;

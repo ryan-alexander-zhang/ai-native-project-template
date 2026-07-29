@@ -13,11 +13,11 @@
 --               it is cancelled, kept when it is confirmed (the customer owes it by then). This is
 --               the column that turns "is this order under the limit?" into "is this order under
 --               what is LEFT of the limit?".
---   version     the optimistic lock. V3 deliberately skipped this table, and was right to at the
+--   version     the optimistic lock. V1_3 deliberately skipped this table, and was right to at the
 --               time: "Customers exposes only findById, so the Customer aggregate is never written
 --               and a version column there would be dead weight." That reasoning was sound and its
 --               premise is what changed — enforcing credit requires writing, and writing requires
---               the version. DEFAULT 1 for the same reason as V3's other tables: version 0 means
+--               the version. DEFAULT 1 for the same reason as V1_3's orders table: version 0 means
 --               "not yet persisted", and the seeded rows are persisted.
 --
 -- Backfilling used_minor to 0 is correct rather than convenient: no existing order ever reserved
@@ -29,5 +29,5 @@ ALTER TABLE ordering.customers ADD COLUMN used_minor BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE ordering.customers ADD COLUMN version    BIGINT NOT NULL DEFAULT 1;
 
 -- The list of open orders per customer is now a hot read for any credit question an operator asks
--- ("what is holding this customer's credit?"), and orders_by_customer_newest_first (V4) already
+-- ("what is holding this customer's credit?"), and orders_by_customer_newest_first (V1_4) already
 -- serves it: (tenant_id, customer_id, id DESC) covers the customer predicate. No new index here.

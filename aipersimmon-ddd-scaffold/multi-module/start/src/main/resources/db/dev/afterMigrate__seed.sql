@@ -2,11 +2,11 @@
 -- application-dev.yml and absent from application-prod.yml, which is the entire mechanism: a
 -- production database never sees a customer named Acme.
 --
--- afterMigrate, not V5: a versioned migration runs once per database and is then frozen by its
+-- afterMigrate, not a versioned migration: those run once per database and are then frozen by their
 -- checksum, which is the wrong shape for sample data. A callback runs after every migrate, so the
 -- rows come back if someone deletes them while poking at the demo, and re-running it must
 -- therefore be harmless — hence ON CONFLICT DO NOTHING on every statement. Note the conflict
--- targets are the COMPOSITE keys: (tenant_id, id) and (tenant_id, sku) since V2.
+-- targets are the COMPOSITE keys: (tenant_id, id) and (tenant_id, sku), per ordering/V1_2 and inventory/V2_2.
 --
 -- TWO TENANTS, because the demo has two entry points and they resolve their tenant differently
 -- (issue-00096):

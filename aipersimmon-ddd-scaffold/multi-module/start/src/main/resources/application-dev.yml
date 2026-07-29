@@ -30,6 +30,10 @@ spring:
     # out, so demo data placed there would land in a real production database.
     #
     # application-prod.yml sets this to db/migration alone. That is the whole mechanism.
+    #
+    # db/migration has one subdirectory per bounded context (ordering/ inventory/ payment/), each
+    # owning a version major — Flyway scans a location RECURSIVELY, so that layout needs no entry of
+    # its own here. See db/migration/README.md for why the files are grouped that way.
     locations: classpath:db/migration,classpath:db/dev
 
 # The interactive UI is on locally: it is the fastest way to see the API this scaffold publishes.

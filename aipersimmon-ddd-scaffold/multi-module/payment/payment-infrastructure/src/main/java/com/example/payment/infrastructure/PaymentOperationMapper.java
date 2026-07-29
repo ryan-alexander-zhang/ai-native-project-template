@@ -26,7 +26,7 @@ public interface PaymentOperationMapper {
   @Select(
       """
       SELECT outcome, decline_code, decline_reason
-        FROM payment_operations
+        FROM payment.payment_operations
        WHERE tenant_id = #{tenantId} AND operation_id = #{operationId}
       """)
   PaymentOperationRow find(
@@ -39,7 +39,7 @@ public interface PaymentOperationMapper {
    */
   @Insert(
       """
-      INSERT INTO payment_operations
+      INSERT INTO payment.payment_operations
              (tenant_id, operation_id, outcome, decline_code, decline_reason, recorded_at)
       VALUES (#{tenantId}, #{operationId}, #{outcome}, #{declineCode}, #{declineReason},
               CURRENT_TIMESTAMP)
@@ -66,6 +66,6 @@ public interface PaymentOperationMapper {
    *
    * @return how many rows went, so the caller can say so
    */
-  @Delete("DELETE FROM payment_operations WHERE recorded_at < #{cutoff}")
+  @Delete("DELETE FROM payment.payment_operations WHERE recorded_at < #{cutoff}")
   int purgeRecordedBefore(@Param("cutoff") Instant cutoff);
 }

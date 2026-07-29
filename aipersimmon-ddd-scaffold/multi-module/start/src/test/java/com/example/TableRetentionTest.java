@@ -72,7 +72,7 @@ class TableRetentionTest {
                   "a reservation is the evidence behind a confirmed or compensated order"),
           "inventory.reservation_lines",
               Decision.keptForever("owned by inventory.reservations, same lifetime"),
-          "payment_operations",
+          "payment.payment_operations",
               Decision.purgedAfter("payment.operations.cleanup.retention-seconds"));
 
   @Test

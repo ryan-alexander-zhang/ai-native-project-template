@@ -14,13 +14,24 @@
 --
 -- payment therefore gets its first table, and this does not contradict "payment owns no persisted
 -- aggregate": an idempotency log is a technical outbound adapter, which is how payment/pom.xml has
--- always described it. It sits in the default schema rather than a payment one, alongside the
--- framework's own aipersimmon_* tables, because that is what it is — plumbing, not a domain model.
+-- always described it.
+--
+-- It now sits in a `payment` schema. It used to be created unqualified, which put it in the default
+-- schema next to the framework's own tables — justified at the time as "plumbing, not a domain model".
+-- That reasoning confused two different questions. Whether a table holds a domain model decides
+-- whether it needs an aggregate; which context OWNS it decides where it lives. This table is
+-- unambiguously payment's: payment's code is the only thing that reads or writes it, and its retention
+-- is payment's decision. Leaving it unqualified made the payment context the one context whose storage
+-- you could not point at, and it would have been the one loose end when extracting payment into its own
+-- service. A schema per context, with no exceptions, is both cheaper and easier to explain than a rule
+-- with one.
 
-CREATE TABLE payment_operations (
+CREATE SCHEMA IF NOT EXISTS payment;
+
+CREATE TABLE payment.payment_operations (
     -- (tenant_id, operation_id) rather than operation_id alone: the id is derived from a message id
     -- in the originating tenant's own causal chain, so two tenants may legitimately produce the
-    -- same one. Same reasoning as the composite keys in V2/V4.
+    -- same one. Same reasoning as the composite keys in ordering/V1_2 and V1_4.
     tenant_id       VARCHAR(64)  NOT NULL DEFAULT '__root__',
     operation_id    VARCHAR(64)  NOT NULL,
     -- AUTHORIZED / DECLINED. Stored as the decision's shape rather than a boolean so a third
