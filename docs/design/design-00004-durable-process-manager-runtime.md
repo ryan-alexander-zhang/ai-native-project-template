@@ -632,6 +632,7 @@ erDiagram
     string operation_reason
     text failure
     timestamp created_at
+    timestamp replayed_at
   }
 
   PROCESS_EFFECT {
@@ -695,8 +696,12 @@ erDiagram
 - `INDEX(instance.process_type, instance.definition_version)`（限 live lifecycle）：支撑启动期「旧 DefinitionVersion 是否
   仍有运行实例」的校验（§5.6），避免大表全扫。
 - `INDEX(instance.lifecycle, instance.updated_at)`：支撑卡死实例扫描（§4.7 兜底 TTL）。
+- `INDEX(transition.transition_kind, transition.replayed_at, transition.instance_id)`：parked-input worker
+  的工作清单（§4.6）。索引窄到让扫描代价不随已重放的历史增长——这正是 `replayed_at` 标记存在的意义。
 
-Transition 是 append-only 审计记录；Instance 是当前快照。不能为了节省空间覆盖历史 transition。**四表都无自动保留/清理**
+Transition 是 append-only 审计记录；Instance 是当前快照。不能为了节省空间覆盖历史 transition。
+唯一的例外是 PARKED 行的 `replayed_at`：它记录那条输入的**处置**（还欠 / 已交回），
+不改写行所记录的决策；`transition_kind = 'PARKED' AND replayed_at IS NULL` 就是重放队列（§4.6）。**四表都无自动保留/清理**
 （§5.4）：`process_transition` 与 `DELIVERED` 的 `process_effect` 会持续增长，故**生产部署必须把分区/归档/retention 作为
 本模块的必需配套**（不是可选优化），否则 claim 与运维查询会随数据量退化。
 
@@ -728,8 +733,19 @@ PENDING -> IN_FLIGHT -> DELIVERED
   `DEAD` effect 后，才恢复到 `resumeLifecycle` 并清空 suspension metadata。
 - Instance 挂起期间，普通 `handle` **不向消息层无界回弹**：到达的输入以 `transition_kind = PARKED` 幂等地 append 进
   `process_transition`（复用现有 `input_message_id`/`input_payload` 列与 `UNIQUE(instance_id, input_message_id)` 去重，
-  不新增表），且**不推进** state/step，并向调用方返回 parked 结果；实例恢复后按 `created_at` 顺序重放这些 PARKED 输入。
+  不新增表），且**不推进** state/step，并向调用方返回 parked 结果。
   既不静默丢消息，也不让传输层对一个卡住的实例持续重投形成 backpressure。已经提交的 PENDING/IN_FLIGHT effect 仍可完成。
+- **parked 输入的重放是一条持久队列，不是 resume 调用栈里的一步**（[[issue-00103-parked-input-replay-is-not-crash-safe]]）：
+  `replayed_at IS NULL` 的 PARKED 行即「还欠一次重放」。这是 transition 行唯一在插入后被写过的字段，
+  它记录那条**输入的处置**、不改写行所记录的决策。重放由**第三个 worker**（parked-input worker，与 effect relay /
+  deadline worker 并列）排空：只挑**活跃**实例，按 `transition_seq`（不是 `created_at`，见
+  [[issue-00037-parked-input-replay-order-non-monotonic]]）顺序交回 `handle`，**每条 advance 提交后**才写标记。
+  于是崩溃只会导致再重放一次（由 `UNIQUE(instance_id, 'parked:'+id)` 去重成 no-op），不会导致遗漏。
+  两节点同时排空同一实例无需租约：任一节点都必须先走完第 k 条才能碰到第 k+1 条（`handle` 阻塞在实例行锁上），
+  故到达顺序在重叠下仍然成立。重放抛异常时以 `suspensionSource=PARKED_INPUT` 挂起实例——与 effect/deadline
+  耗尽重试同一形状，避免对一条毒输入每个 poll 热重试一次。
+  重放在落地前若发现实例又被挂起，runtime **不再 park 这条重放**（否则 `parked:parked:…` 前缀链会撑爆
+  `input_message_id`），而是返回 SUSPENDED，由 worker 把债务留在原处。
 
 `ProcessEffectDispatcher` 是 JDBC 模块的受控扩展点：
 
@@ -775,8 +791,22 @@ deadline worker
 - reschedule 必须增加 generation。
 - cancel 只取消当前 generation。
 - deadline messageId 由 `deadlineId + generation` 确定性生成。
-- deadline transition 与 `FIRED` 状态必须原子提交；宕机后允许安全重试。
+- deadline transition 与 `FIRED` 状态必须原子提交；宕机后允许安全重试。**`FIRED` 在同一事务内、
+  `handle` 之前落**：原子性不变，但这样一来「本次触发让流程结束」时，下面的终态回收不会把一个
+  确实触发过的 timer 改写成 CANCELLED（[[issue-00104-an-ended-instance-keeps-its-timers-forever]]）。
 - 已终态实例、已取消或旧 generation 的 deadline 是可审计 no-op。
+- **终态实例不留活着的 timer**：决策进入终态时，在**同一个推进事务**内回收该实例所有
+  `PENDING`/`IN_FLIGHT` 的 deadline（含每次 start 武装的 max-lifetime 兜底）。staged effect **不**受影响——
+  一条流程的最后一个集成事件正是终态决策产出的 effect。不回收的后果不是「多几行垃圾」：
+  claim 查询只提供活跃实例的 deadline，故这些行永不可领取；而积压 SLI 只按 `status='PENDING' AND due`
+  统计、不看生命周期，于是健康检查会从此**永久** DEGRADED 且年龄单调增长。
+  读侧不做「join 生命周期」的补丁——那会让 SLI 再也发现不了同类残留。
+- 失败转移（`scheduleRetry` / `markDead`）除 lease token 外**还要求 `status = 'IN_FLIGHT'`**：
+  它们跑在 fire 事务回滚之后、任何锁之外，若不设栅栏，一次晚到的失败处理会把已被回收的 deadline
+  写回 `PENDING`，重新造出一行不可领取的行。
+- **终态决策里 schedule deadline 是错误，直接抛异常**：这种 timer 永不可能触发，
+  与其静默丢弃 Definition 的意图，不如让这个 Definition bug 响亮暴露——它否则会伪装成
+  「一个始终没到的超时」。
 - deadline 处理也使用有上限的退避；达到 max attempts 后 deadline 进入 `DEAD`，以
   `suspensionSource=DEADLINE` 和 deadline identity 按与 effect 相同的规则挂起实例。
 - Deadline worker 不 claim `SUSPENDED` 实例的新 deadline；实例恢复后，已过期 deadline 立即重新进入到期候选集。
@@ -790,6 +820,15 @@ deadline worker
 
 - `revision` 乐观锁保证同一实例每次只有一个 transition 提交。
 - revision 冲突时，runtime 回滚、重新加载并重新执行 Definition；重试次数有小上限，超过后交还消息层重投。
+  **但只在推进拥有自己的事务时才重试**（[[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]）：
+  加入调用方事务时，第一次尝试的回滚已经把共享事务标记 rollback-only（唯一键冲突在 PostgreSQL 上更是直接 aborted），
+  第二次尝试只可能再失败、并用一个新异常盖掉第一手原因。此时让冲突上抛，
+  由调用方回滚 + 传输层重投充当那次重试。propagation 保持 `REQUIRED` 不改成 `REQUIRES_NEW`——
+  推进与 Inbox 去重行必须同生同死，这条保证比"能多试两次"重要。
+- 存储层的冲突必须翻成引擎的冲突：`instance` 的 `UNIQUE(tenant_id, process_type, business_key)`
+  与 `transition` 的 `UNIQUE(instance_id, input_message_id)` 都映射为 `ConcurrentTransitionException`。
+  少翻译一处，`withRetry` 就接不住，`start-duplicate-business-key` 的 reject/fold 承诺就被绕过、
+  消费方拿到一个持久化框架的异常。
 - `input_message_id` 唯一约束是 process-level 幂等。
 - 现有 `Inbox` 是 transport-level 幂等。两者同时使用时，外层 listener 事务与 runtime 的 REQUIRED 事务必须是同一个
   `PlatformTransactionManager`，不能先提交 Inbox 再推进 Process。
@@ -832,8 +871,14 @@ JDBC runtime 同时版本化：
 - 不提供任意改 step/state payload 的 API。
 
 每个运维动作都必须在 transition/timeline 中留下 operator、reason、时间与旧/新状态。`cancelProcess` 只终止协调器并取消
-尚未派发的 effect/deadline，不代表任何业务聚合已经被取消，也不会暗中发送补偿命令；业务取消仍必须作为
+尚未派发的 effect 与所有活着的 deadline，不代表任何业务聚合已经被取消，也不会暗中发送补偿命令；业务取消仍必须作为
 `ProcessInput` 交给 Definition 决策。
+
+两个 redrive 都是**单事务**，只做「effect/deadline 回到 PENDING + 审计 transition + 必要时 resume」；
+parked 输入的重放不在其中，由 §4.6 的 parked-input worker 从持久队列排空。理由是姿态性的：
+**一次重放的债务不能只存在于操作员那次调用的调用栈里**，否则 resume 提交后崩溃就永久丢失该输入
+（[[issue-00103-parked-input-replay-is-not-crash-safe]]）。代价是重放延迟一个 poll 间隔，
+与 effect/deadline 的既有形状一致。
 
 ## 五、`aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`
 

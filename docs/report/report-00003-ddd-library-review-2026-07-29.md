@@ -50,8 +50,8 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 | C1 | `IdempotencyFilter` + `AipersimmonDddWebAutoConfiguration:173` | 幂等过滤器注册在 `HIGHEST_PRECEDENCE+40`（Spring Security 链 order −100 **之前**），存储键仅 `tenant + key`，不含认证主体/方法/路径。攻击者带受害者的 `Idempotency-Key` 与租户值发任意请求即可取回其已存响应，全程绕过安全链 | **已修** `issue-00101` |
 | C2 | `IdempotencyFilter:83-95` | "只执行一次"不成立：时序为 `find`(miss) → `doFilter`(副作用提交) → `saveIfAbsent`，无执行前 claim。两个并发首次请求都执行；`saveIfAbsent` 只决定谁的**响应**被存 → 重复扣款 | **已修** `issue-00101` |
 | C3 | `FailedOperationLogInterceptor:89` | 以"存在活动事务"判定自己是嵌套子命令而让根去记录；但若最外层 `commandBus.send()` 本身在 `@Transactional` 内被调用（消费方极常见），根本不存在记录者 → 整条流程的失败审计被静默跳过，无日志、无 `failureRecordLost` 指标 | **已修** `issue-00102` |
-| C4 | `ProcessOperations:80-118,180-200` | redrive 先提交 resume 事务，再在**任何事务之外**重放 parked 输入且无持久化待重放标记。注释声称 `handle()` never throws，实际可抛四类异常。崩溃/抛异常落在提交之后 → 实例停在 RUNNING、parked 输入永久丢失（broker 已 ack），全树无任何扫描去捡 | 待修 |
-| C5 | `DefaultProcessRuntime:426-540` + `ProcessOutcomeWriter` | 终态决策从不取消未决 deadline（含每次 start 都武装的 max-lifetime backstop）；claim 查询要求 `lifecycle IN ('RUNNING','COMPENSATING')` 故永不可领取，`cancelPending` 唯一调用点是操作员 cancel → 健康检查永久 DEGRADED、年龄单调增长、轮询扫描无界膨胀 | 待修 |
+| C4 | `ProcessOperations:80-118,180-200` | redrive 先提交 resume 事务，再在**任何事务之外**重放 parked 输入且无持久化待重放标记。注释声称 `handle()` never throws，实际可抛四类异常。崩溃/抛异常落在提交之后 → 实例停在 RUNNING、parked 输入永久丢失（broker 已 ack），全树无任何扫描去捡 | **已修** `issue-00103` |
+| C5 | `DefaultProcessRuntime:426-540` + `ProcessOutcomeWriter` | 终态决策从不取消未决 deadline（含每次 start 都武装的 max-lifetime backstop）；claim 查询要求 `lifecycle IN ('RUNNING','COMPENSATING')` 故永不可领取，`cancelPending` 唯一调用点是操作员 cancel → 健康检查永久 DEGRADED、年龄单调增长、轮询扫描无界膨胀 | **已修** `issue-00104` |
 
 ---
 
@@ -71,10 +71,9 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   `DefaultErrorHandler` 重新 seek 重试整轮 → 毒消息永远出不去、分区无限停滞，与 DLT 目的完全相反。
 
 **Process Manager**
-- `withRetry` 在加入外层事务时失效——而这正是 javadoc 宣传的组合模式：首次尝试的 `StaleProcessRevisionException`
-  把共享物理事务标记 rollback-only（PostgreSQL 上直接 aborted），重试循环永不可能成功，只靠传输层重投兜底。
-- 并发首次 start 漏 `DuplicateKeyException` 映射（`JdbcProcessInstanceStore:92`）：输家以 Spring 原生异常冒出，
-  `withRetry` 不接，文档承诺的 duplicate/fold/reject 语义被绕过（transition store 做了映射，instance store 没做）。
+- ~~`withRetry` 在加入外层事务时失效~~ / ~~并发首次 start 漏 `DuplicateKeyException` 映射~~ →
+  **已修** `issue-00105`：joined 事务下只尝试一次并让冲突上抛（重试的前提是"失败只作废这一次尝试"，
+  加入别人的事务时该前提不成立），两个 instance store 都补上唯一键映射。
 - Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢（索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq`
   系统性饿死长寿实例；四张表**全无保留/清理策略**——成本无界增长。
 - SKIP LOCKED 的 deadline claim SQL 在两个真实数据库上零测试覆盖；MariaDB 被识别为 mysql 走 SKIP LOCKED，
@@ -127,7 +126,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 1. 租户改为 fail-closed（`issue-00099`，**已完成**）
 2. 幂等 SPI 重写为 claim 状态机 + 移到安全链之后 + 键含主体与请求指纹 + 5xx 不落库（`issue-00101`，**已完成**）
 3. operation-log 失败路径：真 `REQUIRES_NEW` 记录 + 修两个默认分类器（`issue-00102`，**已完成**）
-4. process-manager C4/C5，并把 `withRetry` 改 `REQUIRES_NEW`、给 instance store 补异常映射
+   （注：第 4 项原写作"把 `withRetry` 改 `REQUIRES_NEW`"，实施时否决了这个方向——
+   `REQUIRES_NEW` 会毁掉推进与 Inbox 去重行的原子提交，见 `issue-00105`）
+4. process-manager C4/C5，并修正 `withRetry` 的重试前提、给 instance store 补异常映射
+   （`issue-00103` / `issue-00104` / `issue-00105`，**已完成**）
 5. 把静默降级统统改成响亮失败（无 TM 拒绝启动、两个仓储基类加活动事务断言、MP 乐观锁版本回写断言、
    `OutboxWriter` 事务断言）——框架已为 `IdGenerator` 立了 fail-loud 先例，照它办
 
@@ -157,4 +159,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - 子：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]、
   [[issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test]]、
   [[issue-00101-idempotency-records-instead-of-claiming]]、
-  [[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction]]
+  [[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction]]、
+  [[issue-00103-parked-input-replay-is-not-crash-safe]]、
+  [[issue-00104-an-ended-instance-keeps-its-timers-forever]]、
+  [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]
