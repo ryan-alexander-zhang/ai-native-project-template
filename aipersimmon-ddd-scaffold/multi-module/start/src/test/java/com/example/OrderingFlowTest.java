@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -47,6 +48,7 @@ import org.springframework.context.event.EventListener;
       "aipersimmon.ddd.outbox.poll-delay-ms=200",
     })
 @Import(TestInfrastructure.class)
+@ExtendWith(BoundTenant.class)
 class OrderingFlowTest {
 
   private static final Duration SETTLE = Duration.ofSeconds(30);

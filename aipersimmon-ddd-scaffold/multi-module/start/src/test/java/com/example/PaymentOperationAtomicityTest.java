@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import com.example.payment.application.AuthorizePayment;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -42,6 +43,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
       "aipersimmon.ddd.outbox.relay.enabled=false",
     })
 @Import({TestInfrastructure.class, PaymentOperationAtomicityTest.FailInsideTransaction.class})
+@ExtendWith(BoundTenant.class)
 class PaymentOperationAtomicityTest {
 
   @Autowired CommandBus commandBus;

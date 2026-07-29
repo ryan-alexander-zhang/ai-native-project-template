@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.store.redis;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import java.time.Clock;
@@ -34,7 +32,7 @@ public class RedisRateLimiter implements RateLimiter {
     long nowMillis = clock.millis();
     long alignedStart = (nowMillis / windowMillis) * windowMillis;
     // Namespace the bucket under the ambient tenant so quota is never shared across tenants.
-    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    String tenant = TenantContext.effective().value();
     String windowKey = PREFIX + tenant + ":" + key + ":" + alignedStart;
 
     Long count = redis.opsForValue().increment(windowKey);

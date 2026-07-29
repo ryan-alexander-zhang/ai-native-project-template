@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.spring;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
 import java.time.Clock;
@@ -62,8 +60,6 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
    * so no tenant/key pair can collide with another.
    */
   private static String tenantKey(String key) {
-    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value())
-        + "\u0000"
-        + key;
+    return TenantContext.effective().value() + "\u0000" + key;
   }
 }

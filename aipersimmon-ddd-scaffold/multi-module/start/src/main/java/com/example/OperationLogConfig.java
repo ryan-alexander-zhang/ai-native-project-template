@@ -4,8 +4,6 @@ import com.aipersimmon.ddd.operationlog.cqrs.capture.OperationActorResolver;
 import com.aipersimmon.ddd.operationlog.cqrs.capture.OperationTenantResolver;
 import com.aipersimmon.ddd.operationlog.model.Actor;
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -36,10 +34,13 @@ public class OperationLogConfig {
 
   /**
    * The tenant stamped on each audit row is the one bound to the current {@link TenantContext} (the
-   * trusted boundary), or the {@code __root__} sentinel when none is bound.
+   * trusted boundary). {@code effective()} rather than {@code current().orElse(...)}: with tenancy
+   * enabled an unbound thread is a bug in the calling path, and an audit row filed under the shared
+   * sentinel is worse than a loud failure. It still yields the sentinel when tenancy is switched
+   * off.
    */
   @Bean
   OperationTenantResolver operationTenantResolver() {
-    return () -> TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return () -> TenantContext.effective().value();
   }
 }

@@ -10,14 +10,24 @@ import java.util.function.Supplier;
  * entry), read by the read side and by infrastructure where no {@code CommandContext} is threaded,
  * and always cleared when the scope ends. The write-side authority remains {@code
  * CommandContext.tenantId}; this holder carries an immutable request identity, not mutable
- * per-command state (aligned with {@code decision-00012}).
+ * per-command state.
  *
  * <p>{@link #set(TenantId)} and {@link #clear()} are trusted-boundary only — business code must not
  * write to this holder. Programmatic scopes should prefer {@link #runAs(TenantId, Supplier)}.
+ *
+ * <p>Infrastructure that stamps or filters a tenant column reads {@link #effective()} rather than
+ * {@link #current()}, so the "what if nothing is bound" decision is made once, here, from the
+ * deployment's {@linkplain #isRequired() tenancy mode} — never re-decided per call site.
  */
 public final class TenantContext {
 
   private static final ThreadLocal<TenantId> CURRENT = new ThreadLocal<>();
+
+  /**
+   * Whether a binding is mandatory. Deployment-wide and set once during bootstrap, so it is plain
+   * {@code volatile} rather than thread-scoped: it describes the deployment, not the request.
+   */
+  private static volatile boolean required;
 
   private TenantContext() {}
 
@@ -26,13 +36,33 @@ public final class TenantContext {
     return Optional.ofNullable(CURRENT.get());
   }
 
-  /** The tenant bound to the current thread, or throws if none is bound. */
-  public static TenantId require() {
+  /**
+   * The tenant that a tenant-scoped read or write must use.
+   *
+   * <p>Returns the bound tenant when one is bound. With multi-tenancy switched off it returns the
+   * {@link Tenants#ROOT} sentinel, because single-tenant is N=1 multi-tenancy and every row still
+   * carries a tenant. With multi-tenancy {@linkplain #isRequired() enabled} and nothing bound it
+   * throws {@link MissingTenantException} instead of silently narrowing the operation to the
+   * sentinel — a query that quietly returns another bucket's rows (or writes into it) is a data
+   * isolation failure, so this path fails closed.
+   *
+   * @throws MissingTenantException when multi-tenancy is enabled and no tenant is bound
+   */
+  public static TenantId effective() {
     TenantId tenant = CURRENT.get();
-    if (tenant == null) {
-      throw new IllegalStateException("no tenant bound to the current context");
+    if (tenant != null) {
+      return tenant;
     }
-    return tenant;
+    if (required) {
+      throw new MissingTenantException(
+          "multi-tenancy is enabled but no tenant is bound to the current thread ("
+              + Thread.currentThread().getName()
+              + "). A tenant is bound at a trusted boundary (the edge resolution filter or a"
+              + " message-consumer entry) and does not cross thread hops on its own: wrap"
+              + " asynchronous work in TenantContext.runAs(tenant, ...), or propagate the binding"
+              + " with the tenancy TaskDecorator, before touching tenant-scoped data.");
+    }
+    return Tenants.ROOT;
   }
 
   /** Binds the tenant for the current thread. Trusted-boundary only. */
@@ -74,5 +104,25 @@ public final class TenantContext {
           work.run();
           return null;
         });
+  }
+
+  /**
+   * Whether a tenant binding is mandatory for tenant-scoped work, i.e. whether multi-tenancy is
+   * enabled for this deployment.
+   */
+  public static boolean isRequired() {
+    return required;
+  }
+
+  /**
+   * Declares whether a binding is mandatory, switching {@link #effective()} between fail-closed and
+   * sentinel behaviour.
+   *
+   * <p>Bootstrap only: the tenancy auto-configuration sets this while the application context
+   * starts and unsets it when the context closes. Application code must not call it — flipping it
+   * at runtime changes an isolation guarantee under in-flight requests.
+   */
+  public static void setRequired(boolean value) {
+    required = value;
   }
 }

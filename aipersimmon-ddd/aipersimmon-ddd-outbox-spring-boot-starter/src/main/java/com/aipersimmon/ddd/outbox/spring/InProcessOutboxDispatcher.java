@@ -6,6 +6,8 @@ import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -57,7 +59,14 @@ public class InProcessOutboxDispatcher implements OutboxDispatcher {
     // match despite erasure.
     ResolvableType type =
         ResolvableType.forClassWithGenerics(EventEnvelope.class, envelope.payload().getClass());
-    publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type));
+    // Bind the message's tenant around the delivery, exactly as the Kafka consumer bridge does:
+    // handlers run on the relay's scheduler thread, which carries no binding of its own, and a
+    // handler that reads or writes tenant-scoped data must see the same tenant either way. Without
+    // this, the same handler receiving the same envelope would be tenant-scoped over Kafka and
+    // tenant-less in-process.
+    TenantContext.runAs(
+        Tenants.fromValue(message.tenantId()),
+        () -> publisher.publishEvent(new PayloadApplicationEvent<>(this, envelope, type)));
   }
 
   private EventEnvelope<IntegrationEvent> reconstruct(OutboxMessage message) {

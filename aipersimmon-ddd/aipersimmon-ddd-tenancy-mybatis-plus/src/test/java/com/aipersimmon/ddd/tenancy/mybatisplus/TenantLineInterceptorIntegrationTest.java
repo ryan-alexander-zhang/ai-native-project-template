@@ -1,7 +1,10 @@
 package com.aipersimmon.ddd.tenancy.mybatisplus;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.aipersimmon.ddd.tenancy.MissingTenantException;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,9 +50,13 @@ class TenantLineInterceptorIntegrationTest {
   }
 
   @Test
-  void withNoTenantBoundTheRootSentinelIsUsedAndMatchesNothing() {
-    // No ambient tenant -> the handler falls back to the root sentinel; no __root__ rows exist.
-    assertEquals(0, mapper.selectList(null).size());
+  void withNoTenantBoundTheQueryIsRefusedRatherThanNarrowedToTheSentinel() {
+    // Falling back to the sentinel here would return an empty list: indistinguishable, to the
+    // caller, from "this tenant has no rows". A missing binding is a bug in the calling path (an
+    // async hop, a scheduler thread), so it has to surface as one.
+    assertThat(catchThrowable(() -> mapper.selectList(null)))
+        .rootCause()
+        .isInstanceOf(MissingTenantException.class);
   }
 
   @SpringBootConfiguration

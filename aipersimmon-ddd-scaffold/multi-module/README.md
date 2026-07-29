@@ -82,10 +82,14 @@ curl -i -X POST localhost:8090/orders \
 curl -H 'X-Tenant-Id: demo' localhost:8090/orders/<id>
 ```
 
-> Not `__root__`, even though the same rows exist there too. `__root__` is the sentinel the command
-> bus binds when nothing else is, and `Tenants.of()` rejects the reserved `__` prefix at the edge on
-> purpose — so a client can never name a framework sentinel. A curl carrying it is a 400
-> (issue-00096).
+> Not `__root__`. That is the sentinel a single-tenant (N=1) deployment stores on every row, and
+> `Tenants.of()` rejects the reserved `__` prefix at the edge on purpose — so a client can never name
+> a framework sentinel. A curl carrying it is a 400 (issue-00096).
+>
+> It is also not a fallback: with multi-tenancy enabled, work that reaches a tenant-scoped table with
+> no tenant bound fails loudly instead of quietly using the sentinel (issue-00099). That is why the
+> acceptance tests which dispatch straight on the command bus bind `demo` for the test thread — they
+> skip the web edge, so they have to do the edge's job.
 
 ## The fulfilment flow
 

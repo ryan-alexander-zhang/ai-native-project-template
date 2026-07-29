@@ -73,7 +73,7 @@ class OrderIdempotencyTest {
 
   @BeforeEach
   void seedTenants() {
-    // The Flyway seed lives under __root__; each tenant needs its own customer and stock.
+    // The Flyway seed lives under the 'demo' tenant; each tenant needs its own customer and stock.
     for (String tenant : new String[] {TENANT, OTHER_TENANT}) {
       jdbc.update(
           "INSERT INTO ordering.customers (id, name, credit_minor, currency, tenant_id)"

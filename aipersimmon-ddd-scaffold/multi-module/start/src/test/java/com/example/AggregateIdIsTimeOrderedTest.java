@@ -49,7 +49,7 @@ class AggregateIdIsTimeOrderedTest {
 
   @BeforeEach
   void seedTenant() {
-    // The V1 seed rows belong to the __root__ sentinel, and (tenant_id, id) / (tenant_id, sku) are
+    // The dev seed rows belong to the 'demo' tenant, and (tenant_id, id) / (tenant_id, sku) are
     // composite keys, so this tenant needs its own CUST-1 / SKU-1. Seeded with the raw
     // JdbcTemplate,
     // which the tenant-line interceptor does not rewrite, so tenant_id is explicit.

@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.tenancy.mybatisplus;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
 import java.util.Collection;
 import java.util.Locale;
@@ -33,8 +31,7 @@ public final class TenantContextTenantLineHandler implements TenantLineHandler {
 
   @Override
   public Expression getTenantId() {
-    return new StringValue(
-        TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value()));
+    return new StringValue(TenantContext.effective().value());
   }
 
   @Override

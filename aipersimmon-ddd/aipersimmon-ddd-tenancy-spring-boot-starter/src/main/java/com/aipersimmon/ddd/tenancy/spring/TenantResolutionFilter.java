@@ -13,9 +13,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.MDC;
 import org.springframework.util.AntPathMatcher;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -55,16 +57,55 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
 
   /**
    * Skip the filter for configured public/management paths (the tenant is neither read nor set).
+   *
+   * <p>Matches the path the servlet container will dispatch on, not the raw request line. The two
+   * differ: a container resolves {@code /actuator/../orders} to {@code /orders} when choosing a
+   * handler, while {@code getRequestURI()} still reports the traversal — so matching the raw value
+   * would let {@code /actuator/../orders} match an {@code /actuator/**} exclude and reach a
+   * business endpoint with no tenant resolved at all. Anything that cannot be reduced to a plain
+   * absolute path is treated as not excluded, so a hostile path is resolved (and rejected) rather
+   * than skipped.
    */
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    String path = request.getRequestURI().substring(request.getContextPath().length());
+    String path = dispatchPath(request);
+    if (path == null) {
+      return false;
+    }
     for (String pattern : excludePaths) {
       if (pathMatcher.match(pattern, path)) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * The normalized, context-relative path, or {@code null} when the request path is suspicious
+   * enough that no exclude should apply: an unresolvable traversal, an encoded separator, or an
+   * embedded path parameter, each of which can make one path match two patterns.
+   */
+  private static String dispatchPath(HttpServletRequest request) {
+    String uri = request.getRequestURI();
+    if (uri == null) {
+      return null;
+    }
+    String path = uri.substring(request.getContextPath().length());
+    // A path parameter (;jsessionid=..., ;/..) is not part of the path the container matches on and
+    // is a classic way to smuggle a pattern match; refuse rather than guess.
+    if (path.indexOf(';') >= 0) {
+      return null;
+    }
+    // %2F / %5C decode to separators after matching, so a pattern could match a path that the
+    // container later resolves elsewhere.
+    String lower = path.toLowerCase(Locale.ROOT);
+    if (lower.contains("%2f") || lower.contains("%5c") || lower.contains("%2e")) {
+      return null;
+    }
+    String normalized = StringUtils.cleanPath(path.replace('\\', '/'));
+    // cleanPath leaves leading traversal it cannot resolve ("/../x"), which means the path escapes
+    // the context and there is nothing safe to match.
+    return normalized.startsWith("/../") || normalized.equals("/..") ? null : normalized;
   }
 
   @Override

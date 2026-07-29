@@ -8,35 +8,29 @@
 -- therefore be harmless — hence ON CONFLICT DO NOTHING on every statement. Note the conflict
 -- targets are the COMPOSITE keys: (tenant_id, id) and (tenant_id, sku), per ordering/V1_2 and inventory/V2_2.
 --
--- TWO TENANTS, because the demo has two entry points and they resolve their tenant differently
--- (issue-00096):
+-- ONE TENANT, 'demo' — an ordinary tenant that exists and has stock. Both demo entry points use it:
+-- the README quickstart sends 'X-Tenant-Id: demo', and the acceptance tests that dispatch straight on
+-- the command bus bind it for the test thread (see BoundTenant), standing in for the edge.
 --
---   '__root__'  the sentinel the command bus binds when nothing else is bound — how the
---               acceptance tests that dispatch straight on the bus, with no HTTP request and no
---               TenantContext, end up scoped. It CANNOT be requested over HTTP: Tenants.of()
---               rejects the reserved '__' prefix precisely so a client can never name a framework
---               sentinel, so a curl carrying X-Tenant-Id: __root__ is a 400.
---   'demo'      an ordinary tenant, which is what the README quickstart uses. Nothing reserved
---               about it; it is simply a tenant that exists and has stock.
+-- These rows used to be seeded under the '__root__' sentinel as well, because an unbound dispatch
+-- silently fell back to it — so bus-driven tests landed in the sentinel bucket without saying so.
+-- With multi-tenancy enabled the framework now refuses to run tenant-scoped work on an unbound
+-- thread (issue-00099), so a caller that skips the edge has to name its tenant; there is nothing left
+-- for a sentinel copy to serve. The sentinel still exists, and every row still carries a tenant — it
+-- is just what a single-tenant (N=1) deployment uses, not a fallback a multi-tenant one drifts into.
 --
--- Seeding both is not redundancy — it is the same natural keys under two tenants, which is the
--- composite primary key (tenant_id, id) doing its job in the smallest possible example. 'acme' and
--- 'globex' are deliberately NOT seeded here: the multi-tenant tests own those and set their own
--- credit and stock levels, and rows here would win the ON CONFLICT and silently change their
--- fixtures.
+-- 'acme' and 'globex' are deliberately NOT seeded here: the multi-tenant tests own those and set
+-- their own credit and stock levels, and rows here would win the ON CONFLICT and silently change
+-- their fixtures.
 
 INSERT INTO ordering.customers (id, name, credit_minor, currency, tenant_id)
-VALUES ('CUST-1', 'Acme', 100000, 'USD', '__root__'),
-       ('CUST-1', 'Acme', 100000, 'USD', 'demo')
+VALUES ('CUST-1', 'Acme', 100000, 'USD', 'demo')
 ON CONFLICT (tenant_id, id) DO NOTHING;
 
 -- SKU-RESTRICTED is stocked like any other, but ordering's ManualReviewPolicy flags it, so an
 -- order containing it is held for manual review before any reservation — the review-path demo.
 INSERT INTO inventory.stocks (sku, available, tenant_id)
-VALUES ('SKU-1', 10, '__root__'),
-       ('SKU-2', 5, '__root__'),
-       ('SKU-RESTRICTED', 10, '__root__'),
-       ('SKU-1', 10, 'demo'),
+VALUES ('SKU-1', 10, 'demo'),
        ('SKU-2', 5, 'demo'),
        ('SKU-RESTRICTED', 10, 'demo')
 ON CONFLICT (tenant_id, sku) DO NOTHING;

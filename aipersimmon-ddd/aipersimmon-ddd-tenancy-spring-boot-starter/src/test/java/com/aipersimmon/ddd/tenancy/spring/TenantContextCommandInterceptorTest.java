@@ -26,7 +26,7 @@ class TenantContextCommandInterceptorTest {
     CommandContext ctx = CommandContext.root("acme", "cmd-1");
 
     String seenDuringHandling =
-        interceptor.intercept(new Ping(), ctx, () -> TenantContext.require().value());
+        interceptor.intercept(new Ping(), ctx, () -> TenantContext.effective().value());
 
     assertEquals("acme", seenDuringHandling);
     assertTrue(TenantContext.current().isEmpty(), "tenant is cleared after handling");
@@ -38,7 +38,7 @@ class TenantContextCommandInterceptorTest {
 
     interceptor.intercept(new Ping(), CommandContext.root("inner", "cmd-2"), () -> null);
 
-    assertEquals("outer", TenantContext.require().value());
+    assertEquals("outer", TenantContext.effective().value());
   }
 
   @Test

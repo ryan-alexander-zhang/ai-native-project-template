@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.store.redis;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +56,7 @@ public class RedisIdempotencyStore implements IdempotencyStore {
    * each other's stored response.
    */
   private static String tenantKey(String key) {
-    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    String tenant = TenantContext.effective().value();
     return PREFIX + tenant + ":" + key;
   }
 }

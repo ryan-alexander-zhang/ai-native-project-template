@@ -70,12 +70,64 @@ Entirely inert until enabled, so bundling it costs nothing at N=1.
 
 | Property | Default | Effect |
 | --- | --- | --- |
-| `enabled` | `false` | Resolves the tenant at the edge, binds `TenantContext` for the request, and seeds `CommandContext.tenantId`. |
+| `enabled` | `false` | Resolves the tenant at the edge, binds `TenantContext` for the request, seeds `CommandContext.tenantId`, and makes a missing binding an error rather than a fall back to the sentinel (see below). |
 | `header` | `X-Tenant-Id` | Where the default resolver reads the tenant. Replace `TenantResolver` for JWT claims, subdomains, and so on. |
-| `missing-policy` | `REJECT` | What to do when no tenant resolves: `REJECT` (fail the request) or `ROOT` (fall back to the single-tenant sentinel). `REJECT` is the safe default — silently defaulting to a tenant is how data crosses tenants. |
-| `exclude-paths` | `/actuator/**` | Paths the resolution filter skips. Probes have no tenant. |
+| `trust-header` | `false` | Whether that header may be believed. With tenancy on and no `TenantResolver` bean of your own, **startup fails** until you either define one or set this to `true`. |
+| `missing-policy` | `REJECT` | What to do when a request resolves no tenant: `REJECT` (fail the request with `400`) or `SYSTEM` (bind the `__root__` sentinel; controlled internal/migration use only). |
+| `exclude-paths` | `/actuator/**` | Paths the resolution filter skips. Probes have no tenant. Matched against the path the container dispatches on, so a traversal like `/actuator/../orders` cannot borrow an excluded prefix. |
 | `mybatis-plus.tenant-column` | `tenant_id` | The discriminator column name. |
 | `mybatis-plus.tenant-tables` | (empty) | **Opt-in allow-list** of tables the interceptor rewrites. Empty means no rewriting: naming your tables here is the deliberate act. The framework's own background-polled tables are deliberately absent — a poller runs with no request tenant. |
+
+### Isolation fails closed
+
+With tenancy enabled, anything that stamps or filters a `tenant_id` resolves the tenant through one
+decision point (`TenantContext.effective()`), and that point **throws `MissingTenantException` when
+no tenant is bound** instead of quietly using `__root__`. The sentinel fallback survives only while
+tenancy is off, where single-tenant is N=1 and every row legitimately carries `__root__`.
+
+This matters because the binding does not follow thread hops. It is established at a trusted
+boundary — the edge filter, or a message consumer — and a plain `ThreadLocal` does not survive
+`@Async`, a `CompletableFuture` callback, a scheduler thread, or a hand-rolled executor. Under the
+old fallback those paths read and wrote the shared sentinel bucket silently: a `SELECT` came back
+empty (indistinguishable from "this tenant has no rows") and an `INSERT` landed in a bucket that, in
+a migrated deployment, holds pre-migration production data.
+
+Three things follow:
+
+- **`@Async` and injected `TaskExecutor`s keep the tenant.** The starter registers a `TaskDecorator`
+  that captures the submitting request's tenant and re-binds it on the worker thread. Spring Boot
+  applies it to the executor it auto-configures. It cannot reach executors you construct yourself,
+  and it backs off entirely if you define your own `TaskDecorator` bean — Boot honours a decorator
+  only when exactly one exists, so contributing a second would silently disable yours. In both cases
+  compose tenant propagation into your own decorator, or wrap the work in `TenantContext.runAs(...)`.
+- **Background pollers are not tenant-scoped and must not be.** The relay, deadline worker, and
+  cleanup jobs run with no request tenant, which is why the framework's own tables are absent from
+  `mybatis-plus.tenant-tables`. Adding them there would make every poll fail.
+- **A consumed integration event must carry `ce_tenantid`.** With tenancy on, a record missing that
+  attribute is rejected as a malformed CloudEvent (permanent failure → dead-letter) rather than
+  attributed to the sentinel. Producers that predate tenancy are only accepted while tenancy is off.
+
+### Why the tenant header is not trusted by default
+
+`X-Tenant-Id` is supplied by the caller and nothing in the framework ties it to an authenticated
+principal, so believing it means anyone who can reach the service reads and writes any tenant's data
+by changing one header. There is no safe default the framework can pick — it cannot know the shape of
+your principal — so it refuses to start and asks for the decision:
+
+```yaml
+# Option 1 — resolve from the authenticated principal. Define a TenantResolver bean; no opt-in needed.
+# Option 2 — keep the header, because a gateway/mesh/BFF authenticates the caller and rewrites it,
+#            discarding whatever the client sent:
+aipersimmon:
+  ddd:
+    tenancy:
+      enabled: true
+      trust-header: true
+```
+
+Option 2 holds only while that component cannot be bypassed. If the service is reachable directly —
+in-cluster traffic, a port-forward, a misrouted ingress — the header is spoofable again and option 1
+is the correct choice.
 
 ## `aipersimmon.ddd.flyway` — the framework's own schema
 

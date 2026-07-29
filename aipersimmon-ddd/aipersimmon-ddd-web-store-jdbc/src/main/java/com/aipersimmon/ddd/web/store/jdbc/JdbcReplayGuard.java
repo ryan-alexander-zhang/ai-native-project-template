@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.store.jdbc;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -54,6 +52,6 @@ public class JdbcReplayGuard implements ReplayGuard {
    * part of its identity — see the composite primary key.
    */
   private static String tenant() {
-    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return TenantContext.effective().value();
   }
 }

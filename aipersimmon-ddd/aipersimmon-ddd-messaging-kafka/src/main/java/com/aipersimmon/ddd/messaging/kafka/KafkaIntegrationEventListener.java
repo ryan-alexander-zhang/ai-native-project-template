@@ -128,11 +128,10 @@ public class KafkaIntegrationEventListener {
     String source = require(record, IntegrationEventHeaders.SOURCE);
     // Bind the event's tenant for the whole transaction — the inbox dedup row, the ACL adapter, and
     // the command it issues — before anything touches the database. The tenant travels in
-    // ce_tenantid (absent on pre-tenancy messages -> root sentinel); reconstruct reads the same
-    // header into envelope.tenantId(), and the command also carries it via CommandContext.of. The
-    // inbox insert must see it here, since it happens before reconstruct.
-    String tenantId =
-        orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
+    // ce_tenantid; reconstruct reads the same header into envelope.tenantId(), and the command also
+    // carries it via CommandContext.of. The inbox insert must see it here, since it happens before
+    // reconstruct.
+    String tenantId = tenantId(record);
     TenantContext.runAs(
         Tenants.fromValue(tenantId),
         () -> {
@@ -194,10 +193,7 @@ public class KafkaIntegrationEventListener {
     try {
       IntegrationEvent payload = objectMapper.readValue(record.value(), eventType);
       String subject = header(record, IntegrationEventHeaders.SUBJECT);
-      // ce_tenantid is defaulted to the sentinel when absent, so events produced before tenancy
-      // was introduced (no header) reconstitute as single-tenant rather than being rejected.
-      String tenantId =
-          orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
+      String tenantId = tenantId(record);
       String correlationId =
           orElse(header(record, IntegrationEventHeaders.CORRELATION_ID), eventId);
       String causationId = header(record, IntegrationEventHeaders.CAUSATION_ID);
@@ -264,6 +260,23 @@ public class KafkaIntegrationEventListener {
       throw new MalformedIntegrationEventException(
           "ce_time is not an ISO-8601 instant: '" + value + "'");
     }
+  }
+
+  /**
+   * The event's owning tenant, read from {@code ce_tenantid}.
+   *
+   * <p>The attribute is absent on messages produced before tenancy existed, so while multi-tenancy
+   * is off it reconstitutes as the {@code __root__} sentinel rather than being rejected. While
+   * multi-tenancy is on, an absent value is a producer defect no retry can fix and there is no safe
+   * default — attributing the event to the shared sentinel bucket would misfile another tenant's
+   * data — so it is treated like any other missing required CloudEvents attribute and the record is
+   * rejected (permanent failure -&gt; dead-letter).
+   */
+  private static String tenantId(ConsumerRecord<String, String> record) {
+    if (TenantContext.isRequired()) {
+      return require(record, IntegrationEventHeaders.TENANT_ID);
+    }
+    return orElse(header(record, IntegrationEventHeaders.TENANT_ID), Tenants.ROOT.value());
   }
 
   private static String orElse(String value, String fallback) {

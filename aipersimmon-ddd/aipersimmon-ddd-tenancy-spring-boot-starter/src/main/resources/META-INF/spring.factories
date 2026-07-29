@@ -1,0 +1,3 @@
+# Turns the refusal to trust a client-supplied tenant header into an actionable startup error.
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.aipersimmon.ddd.tenancy.spring.UntrustedTenantHeaderFailureAnalyzer

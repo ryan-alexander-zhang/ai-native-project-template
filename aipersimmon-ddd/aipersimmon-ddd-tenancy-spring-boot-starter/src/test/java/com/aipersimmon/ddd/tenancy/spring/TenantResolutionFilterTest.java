@@ -37,7 +37,7 @@ class TenantResolutionFilterTest {
     String[] seen = new String[1];
     doAnswer(
             invocation -> {
-              seen[0] = TenantContext.require().value();
+              seen[0] = TenantContext.effective().value();
               return null;
             })
         .when(chain)
@@ -90,6 +90,29 @@ class TenantResolutionFilterTest {
 
     when(request.getRequestURI()).thenReturn("/orders");
     assertFalse(filter.shouldNotFilter(request), "a domain path must still be filtered");
+  }
+
+  @Test
+  void doesNotLetATraversalBorrowAnExcludedPrefix() {
+    TenantResolutionFilter filter =
+        new TenantResolutionFilter(
+            new HeaderTenantResolver("X-Tenant-Id"),
+            MissingTenantPolicy.REJECT,
+            List.of("/actuator/**"));
+    when(request.getContextPath()).thenReturn("");
+
+    // The container dispatches these to /orders, so the exclude must not apply: matching the raw
+    // request line would skip tenant resolution for a business endpoint.
+    for (String uri :
+        List.of(
+            "/actuator/../orders",
+            "/actuator/%2e%2e/orders",
+            "/actuator/..%2forders",
+            "/actuator/health;/../orders",
+            "/actuator\\..\\orders")) {
+      when(request.getRequestURI()).thenReturn(uri);
+      assertFalse(filter.shouldNotFilter(request), uri + " must not be excluded");
+    }
   }
 
   @Test

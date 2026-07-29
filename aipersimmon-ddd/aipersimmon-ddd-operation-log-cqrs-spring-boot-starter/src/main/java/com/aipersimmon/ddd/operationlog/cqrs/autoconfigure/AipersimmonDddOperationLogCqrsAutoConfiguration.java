@@ -18,8 +18,6 @@ import com.aipersimmon.ddd.operationlog.engine.observability.OperationLogMetrics
 import com.aipersimmon.ddd.operationlog.port.OperationLogs;
 import com.aipersimmon.ddd.operationlog.spi.FailureClassifier;
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +84,7 @@ public class AipersimmonDddOperationLogCqrsAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean(OperationTenantResolver.class)
   public OperationTenantResolver operationTenantResolver() {
-    return () -> TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return () -> TenantContext.effective().value();
   }
 
   @Bean

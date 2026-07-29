@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.spring;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import java.time.Clock;
@@ -60,8 +58,6 @@ public class InMemoryRateLimiter implements RateLimiter {
    * never shared across tenants. NUL separates the segments so no tenant/key pair collides.
    */
   private static String tenantKey(String key) {
-    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value())
-        + "\u0000"
-        + key;
+    return TenantContext.effective().value() + "\u0000" + key;
   }
 }

@@ -98,7 +98,8 @@ class ConcurrentApprovalTest {
 
   @BeforeEach
   void seedTenant() {
-    // The Flyway seed lives under __root__; this tenant needs its own copy. SKU-RESTRICTED is the
+    // The Flyway seed lives under the 'demo' tenant; this tenant needs its own copy. SKU-RESTRICTED
+    // is the
     // one ManualReviewPolicy flags, which is what parks the order in AWAITING_REVIEW.
     jdbc.update(
         "INSERT INTO ordering.customers (id, name, credit_minor, currency, tenant_id)"

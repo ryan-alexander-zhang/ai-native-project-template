@@ -29,7 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * controller. These requests therefore carry {@code X-Tenant-Id}, standing in for the real edge
  * (JWT/subdomain) that a deployment resolves the tenant from — the same trusted boundary that seeds
  * the tenant onto the command. The tenant's own {@code CUST-1} / {@code SKU-1} are seeded per test,
- * since reads and writes are now scoped to it and the Flyway seed lives under {@code __root__}.
+ * since reads and writes are now scoped to it and the Flyway seed lives under the {@code demo}
+ * tenant.
  */
 @SpringBootTest(
     properties = {
@@ -53,7 +54,8 @@ class ExceptionContractTest {
 
   @BeforeEach
   void seedTenant() {
-    // The Flyway seed (CUST-1 / SKU-1) lives under __root__; this tenant needs its own copy so the
+    // The Flyway seed (CUST-1 / SKU-1) lives under the 'demo' tenant; this tenant needs its own
+    // copy so the
     // tenant-scoped reads and the availability gateway see them. Idempotent across the class's
     // tests.
     jdbc.update(

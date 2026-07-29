@@ -22,8 +22,13 @@ public class TenancyMybatisPlusProperties {
   /**
    * Tables the interceptor scopes to the ambient tenant. Empty means the interceptor is a no-op.
    * Only list tables that (a) have the {@link #tenantColumn} and (b) are accessed exclusively under
-   * a bound {@code TenantContext} — never a background poller's tenant-less path, which would be
-   * narrowed to the root sentinel and silently return nothing.
+   * a bound {@code TenantContext} — never a background poller's tenant-less path.
+   *
+   * <p>Listing a table a poller reads makes every poll fail with {@code MissingTenantException}:
+   * with multi-tenancy enabled, rewriting a query for an unbound thread is refused rather than
+   * narrowed to the root sentinel. That is deliberate and it is why the framework's own
+   * store-and-forward tables are absent from this list — a relay scans them tenant-lessly and each
+   * row carries its tenant as a stamped data column, not as a query predicate.
    */
   private List<String> tenantTables = new ArrayList<>();
 

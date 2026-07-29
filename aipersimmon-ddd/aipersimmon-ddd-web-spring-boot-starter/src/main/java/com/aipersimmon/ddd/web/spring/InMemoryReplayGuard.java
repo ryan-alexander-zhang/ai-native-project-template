@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.spring;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
 import java.time.Clock;
 import java.time.Duration;
@@ -40,8 +38,6 @@ public class InMemoryReplayGuard implements ReplayGuard {
    * single-use per tenant. NUL separates the segments so no tenant/nonce pair collides.
    */
   private static String tenantKey(String nonce) {
-    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value())
-        + "\u0000"
-        + nonce;
+    return TenantContext.effective().value() + "\u0000" + nonce;
   }
 }

@@ -19,6 +19,22 @@ public class TenancyProperties {
   /** The request header the default resolver reads the tenant from. */
   private String header = "X-Tenant-Id";
 
+  /**
+   * Whether the {@link #getHeader() tenant header} may be trusted as the source of tenant identity.
+   *
+   * <p>The header is supplied by the caller and nothing in the framework ties it to an
+   * authenticated principal, so trusting it means any caller who can reach the service can read and
+   * write any tenant's data by changing one header. That is safe only when a component in front of
+   * the application — a gateway, service mesh, or BFF — authenticates the caller and rewrites the
+   * header itself, stripping whatever the client sent.
+   *
+   * <p>It therefore defaults to {@code false} and startup fails while multi-tenancy is enabled and
+   * no {@link com.aipersimmon.ddd.tenancy.TenantResolver} bean is defined: the choice between "my
+   * edge rewrites this header" and "resolve the tenant from the authenticated principal" belongs to
+   * the deployment, and neither can be guessed. Set it to {@code true} to affirm the former.
+   */
+  private boolean trustHeader = false;
+
   /** What to do when resolution is active but no tenant resolves from a request. */
   private MissingTenantPolicy missingPolicy = MissingTenantPolicy.REJECT;
 
@@ -45,6 +61,14 @@ public class TenancyProperties {
 
   public void setHeader(String header) {
     this.header = header;
+  }
+
+  public boolean isTrustHeader() {
+    return trustHeader;
+  }
+
+  public void setTrustHeader(boolean trustHeader) {
+    this.trustHeader = trustHeader;
   }
 
   public MissingTenantPolicy getMissingPolicy() {

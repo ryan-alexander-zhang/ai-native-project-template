@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -60,6 +61,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
       "ordering.fulfilment.stock-timeout=PT2S",
     })
 @Import({TestInfrastructure.class, StockReservationTimeoutFlowTest.Recording.class})
+@ExtendWith(BoundTenant.class)
 class StockReservationTimeoutFlowTest {
 
   private static final Duration SETTLE = Duration.ofSeconds(30);

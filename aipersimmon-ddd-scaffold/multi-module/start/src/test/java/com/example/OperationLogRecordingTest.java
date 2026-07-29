@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -36,6 +37,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
       "aipersimmon.ddd.outbox.poll-delay-ms=200",
     })
 @Import(TestInfrastructure.class)
+@ExtendWith(BoundTenant.class)
 class OperationLogRecordingTest {
 
   private static final Duration SETTLE = Duration.ofSeconds(30);
@@ -64,9 +66,12 @@ class OperationLogRecordingTest {
     assertEquals("CUST-1", place.get("target_id"));
     assertEquals("SYSTEM", place.get("actor_type"));
     assertEquals("ordering-scaffold", place.get("actor_id"));
-    // Dispatched straight on the bus with no tenant bound, so the command bus seeds the __root__
-    // sentinel (single-tenant N=1) and the tenant resolver reads it back onto the audit row.
-    assertEquals("__root__", place.get("tenant_id"));
+    // The tenant bound for this test (standing in for the edge) is seeded onto CommandContext by
+    // the
+    // command bus and read back onto the audit row by the tenant resolver — so the audit trail is
+    // attributable. It previously asserted the __root__ sentinel here, which is what an unbound
+    // dispatch used to silently produce: an audit row filed under the shared bucket.
+    assertEquals(BoundTenant.TENANT, place.get("tenant_id"));
     assertEquals("SUCCEEDED", place.get("outcome"));
     assertEquals("COMMITTED", place.get("completion"));
 

@@ -199,6 +199,14 @@ aipersimmon:
     tenancy:
       enabled: true
       header: X-Tenant-Id
+      # This reference deployment believes the header, which is only defensible behind a component
+      # that authenticates the caller and rewrites it (gateway / mesh / BFF). Nothing ties the header
+      # to a principal on its own, so trusting it in a directly reachable service would mean anyone
+      # can read and write any tenant by changing one header — which is why the framework refuses to
+      # start on the default rather than picking a side. A real service usually takes the other
+      # option instead: define a TenantResolver bean that reads the verified token claim, and drop
+      # this flag. See CONFIGURATION.md, "Why the tenant header is not trusted by default".
+      trust-header: true
       missing-policy: REJECT
       # Setting this REPLACES the default, so /actuator/** has to be re-listed. /ops/** is the
       # operator surface (the dead-letter listing and replay): those rows belong to the deployment,

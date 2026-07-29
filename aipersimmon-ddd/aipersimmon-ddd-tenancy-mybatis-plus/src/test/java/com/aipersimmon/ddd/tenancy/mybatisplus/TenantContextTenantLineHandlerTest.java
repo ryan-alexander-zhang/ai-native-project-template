@@ -1,17 +1,26 @@
 package com.aipersimmon.ddd.tenancy.mybatisplus;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.aipersimmon.ddd.tenancy.MissingTenantException;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import net.sf.jsqlparser.expression.StringValue;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class TenantContextTenantLineHandlerTest {
 
   private final TenantContextTenantLineHandler handler =
       new TenantContextTenantLineHandler("tenant_id", List.of("orders", "ORDER_LINE"));
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
+    TenantContext.setRequired(false);
+  }
 
   @Test
   void tenantIdReflectsTheAmbientContext() {
@@ -21,8 +30,18 @@ class TenantContextTenantLineHandlerTest {
   }
 
   @Test
-  void tenantIdFallsBackToTheRootSentinelWhenNoneBound() {
+  void tenantIdIsTheRootSentinelWhenNoneBoundAndTenancyIsOff() {
+    TenantContext.setRequired(false);
     assertThat(((StringValue) handler.getTenantId()).getValue()).isEqualTo(Tenants.ROOT.value());
+  }
+
+  @Test
+  void rewritingRefusesWhenTenancyIsOnAndNoTenantIsBound() {
+    // Narrowing the predicate to the sentinel here is what makes a tenant's rows silently
+    // "disappear" from a query (and land in the shared bucket on a write), so the handler must
+    // refuse instead of supplying a value nobody chose.
+    TenantContext.setRequired(true);
+    assertThatThrownBy(handler::getTenantId).isInstanceOf(MissingTenantException.class);
   }
 
   @Test

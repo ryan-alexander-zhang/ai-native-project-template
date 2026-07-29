@@ -2,8 +2,6 @@ package com.aipersimmon.ddd.inbox.jdbc;
 
 import com.aipersimmon.ddd.inbox.Inbox;
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import java.sql.Timestamp;
 import java.time.Clock;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -52,7 +50,7 @@ public class JdbcInbox implements Inbox {
     // The tenant is bound ambiently by the consume boundary (e.g. the Kafka listener's runAs);
     // absent that, a single-tenant caller records the root sentinel. Data column only — dedup is
     // still keyed by (consumer, source, message_key).
-    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    String tenant = TenantContext.effective().value();
     jdbc.update(INSERT, consumer, source, messageKey, tenant, Timestamp.from(clock.instant()));
     return false;
   }

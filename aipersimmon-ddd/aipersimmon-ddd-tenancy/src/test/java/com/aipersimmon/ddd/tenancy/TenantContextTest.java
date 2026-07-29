@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.tenancy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,6 +13,7 @@ class TenantContextTest {
   @AfterEach
   void tearDown() {
     TenantContext.clear();
+    TenantContext.setRequired(false);
   }
 
   @Test
@@ -20,20 +22,47 @@ class TenantContextTest {
   }
 
   @Test
-  void setThenRequireReturnsIt() {
+  void effectiveReturnsTheBoundTenant() {
     TenantContext.set(Tenants.of("acme"));
-    assertEquals(Tenants.of("acme"), TenantContext.require());
+    assertEquals(Tenants.of("acme"), TenantContext.effective());
   }
 
   @Test
-  void requireThrowsWhenUnbound() {
-    assertThrows(IllegalStateException.class, TenantContext::require);
+  void effectiveIsTheRootSentinelWhenUnboundAndTenancyIsOff() {
+    assertEquals(Tenants.ROOT, TenantContext.effective());
+  }
+
+  @Test
+  void effectiveThrowsWhenUnboundAndTenancyIsOn() {
+    TenantContext.setRequired(true);
+    MissingTenantException thrown =
+        assertThrows(MissingTenantException.class, TenantContext::effective);
+    assertTrue(
+        thrown.getMessage().contains("runAs"),
+        "the message should name the fix, was: " + thrown.getMessage());
+  }
+
+  @Test
+  void effectiveReturnsTheBoundTenantWhenTenancyIsOn() {
+    TenantContext.setRequired(true);
+    TenantContext.set(Tenants.of("acme"));
+    assertEquals(Tenants.of("acme"), TenantContext.effective());
+  }
+
+  @Test
+  void enforcementFlipsTheModeAndRestoresIt() {
+    TenantEnforcement enforcement = new TenantEnforcement();
+    assertFalse(TenantContext.isRequired());
+    enforcement.enable();
+    assertTrue(TenantContext.isRequired());
+    enforcement.disable();
+    assertFalse(TenantContext.isRequired());
   }
 
   @Test
   void runAsBindsForTheScopeAndClearsAfter() {
     assertTrue(TenantContext.current().isEmpty());
-    String seen = TenantContext.runAs(Tenants.of("acme"), () -> TenantContext.require().value());
+    String seen = TenantContext.runAs(Tenants.of("acme"), () -> TenantContext.effective().value());
     assertEquals("acme", seen);
     assertTrue(TenantContext.current().isEmpty());
   }
@@ -42,7 +71,7 @@ class TenantContextTest {
   void runAsRestoresThePreviousBindingWhenNested() {
     TenantContext.set(Tenants.of("outer"));
     TenantContext.runAs(
-        Tenants.of("inner"), () -> assertEquals("inner", TenantContext.require().value()));
-    assertEquals("outer", TenantContext.require().value());
+        Tenants.of("inner"), () -> assertEquals("inner", TenantContext.effective().value()));
+    assertEquals("outer", TenantContext.effective().value());
   }
 }

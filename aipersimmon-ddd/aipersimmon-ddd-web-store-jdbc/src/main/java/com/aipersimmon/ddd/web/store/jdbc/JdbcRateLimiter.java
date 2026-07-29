@@ -1,8 +1,6 @@
 package com.aipersimmon.ddd.web.store.jdbc;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import java.sql.Timestamp;
@@ -91,6 +89,6 @@ public class JdbcRateLimiter implements RateLimiter {
    * across tenants.
    */
   private static String tenant() {
-    return TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
+    return TenantContext.effective().value();
   }
 }

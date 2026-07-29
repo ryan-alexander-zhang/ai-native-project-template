@@ -14,6 +14,7 @@ import com.example.ordering.application.order.PlaceOrder;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -43,6 +44,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
       "aipersimmon.ddd.outbox.poll-delay-ms=200",
     })
 @Import(TestInfrastructure.class)
+@ExtendWith(BoundTenant.class)
 class IntegrationEventTransportTest {
 
   private static final Duration SETTLE = Duration.ofSeconds(30);
