@@ -72,21 +72,20 @@ class OperationLogInterceptorsTest {
   // --- Failed interceptor ---
 
   private FailedOperationLogInterceptor failed(
-      OperationLogDefinitionRegistry registry, CapturingOperationLogs logs, boolean nested) {
+      OperationLogDefinitionRegistry registry, CapturingOperationLogs logs) {
     return new FailedOperationLogInterceptor(
         registry,
         CaptureTestFixtures.invocationFactory(),
         logs,
         CLASSIFIER,
         throwable -> Completion.ROLLED_BACK,
-        () -> nested,
         Runnable::run);
   }
 
   @Test
   void failed_root_records_and_rethrows_original() {
     CapturingOperationLogs logs = new CapturingOperationLogs();
-    FailedOperationLogInterceptor interceptor = failed(registryWithUpdateRemark(), logs, false);
+    FailedOperationLogInterceptor interceptor = failed(registryWithUpdateRemark(), logs);
     Invocation<RemarkResult> boom =
         () -> {
           throw new IllegalStateException("original");
@@ -103,10 +102,17 @@ class OperationLogInterceptorsTest {
     assertEquals(Completion.ROLLED_BACK, draft.result().completion());
   }
 
+  /**
+   * Recording no longer depends on whether a transaction was already open on entry. It used to: an
+   * active transaction was read as "I am a nested child, the root will record for me". But a root
+   * dispatched from inside a caller's transaction is indistinguishable from that, so there was no
+   * root left and the failure vanished silently — and where a root did record, it recorded its own
+   * operation code, never the child's that failed. This test pinned the skip as intended behaviour.
+   */
   @Test
-  void failed_nested_defers_to_root() {
+  void failed_records_even_when_a_transaction_is_already_open() {
     CapturingOperationLogs logs = new CapturingOperationLogs();
-    FailedOperationLogInterceptor interceptor = failed(registryWithUpdateRemark(), logs, true);
+    FailedOperationLogInterceptor interceptor = failed(registryWithUpdateRemark(), logs);
     Invocation<RemarkResult> boom =
         () -> {
           throw new IllegalStateException("original");
@@ -115,14 +121,14 @@ class OperationLogInterceptorsTest {
     assertThrows(
         IllegalStateException.class,
         () -> interceptor.intercept(new UpdateRemark("o1", "hi"), CTX, boom));
-    assertTrue(logs.recorded.isEmpty());
+    assertEquals(1, logs.recorded.size(), "the failing command records its own failure");
   }
 
   @Test
   void failed_record_error_is_swallowed_and_original_rethrown() {
     CapturingOperationLogs logs = new CapturingOperationLogs();
     logs.failOnRecord = true;
-    FailedOperationLogInterceptor interceptor = failed(registryWithUpdateRemark(), logs, false);
+    FailedOperationLogInterceptor interceptor = failed(registryWithUpdateRemark(), logs);
     Invocation<RemarkResult> boom =
         () -> {
           throw new IllegalStateException("original");

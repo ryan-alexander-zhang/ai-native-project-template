@@ -20,12 +20,20 @@ import org.slf4j.LoggerFactory;
 /**
  * Records the failure outcome. Ordered outside concurrency translation, validation, and the
  * transaction ({@code ORDER = 25 < 50}), so it observes the translated domain exception, validation
- * rejections (NOT_STARTED), and rolled-back failures. Only a root dispatch writes — a nested child
- * (an outer transaction already active on entry) defers to the root to avoid REQUIRES_NEW pressure.
- * The record is written in an independent transaction and the original exception is always
- * rethrown; a record failure is swallowed and logged, never substituted for the business exception.
- * When that write is lost, {@link OperationLogMetrics#failureRecordLost} fires as an alertable
- * audit-gap signal.
+ * rejections (NOT_STARTED), and rolled-back failures. The record is written in an independent
+ * transaction and the original exception is always rethrown; a record failure is swallowed and
+ * logged, never substituted for the business exception. When that write is lost, {@link
+ * OperationLogMetrics#failureRecordLost} fires as an alertable audit-gap signal.
+ *
+ * <p><strong>Every failing command with a definition records its own failure.</strong> This used to
+ * skip the record whenever a transaction was already active on entry, on the reading that such a
+ * dispatch must be a nested child which the root would record for. Two things were wrong with it. A
+ * root dispatch invoked from inside a caller's transaction — a {@code @Transactional} service
+ * method, a scheduled job, a listener — looks exactly the same, so there was no root left to record
+ * and every failure in the flow was skipped in silence. And where a root did record, it recorded
+ * the root's operation code, so the child operation that actually failed never appeared. Recording
+ * per command costs a suspend-and-resume per level of nesting; an audit log that quietly omits
+ * failures is not worth saving that.
  */
 public final class FailedOperationLogInterceptor implements CommandInterceptor {
 
@@ -39,7 +47,6 @@ public final class FailedOperationLogInterceptor implements CommandInterceptor {
   private final OperationLogs operationLogs;
   private final FailureClassifier failureClassifier;
   private final FailureCompletionPolicy completionPolicy;
-  private final TransactionState transactionState;
   private final IndependentTransactionRunner independentTransaction;
   private final OperationLogMetrics metrics;
 
@@ -50,7 +57,6 @@ public final class FailedOperationLogInterceptor implements CommandInterceptor {
       OperationLogs operationLogs,
       FailureClassifier failureClassifier,
       FailureCompletionPolicy completionPolicy,
-      TransactionState transactionState,
       IndependentTransactionRunner independentTransaction) {
     this(
         registry,
@@ -58,7 +64,6 @@ public final class FailedOperationLogInterceptor implements CommandInterceptor {
         operationLogs,
         failureClassifier,
         completionPolicy,
-        transactionState,
         independentTransaction,
         OperationLogMetrics.noOp());
   }
@@ -69,7 +74,6 @@ public final class FailedOperationLogInterceptor implements CommandInterceptor {
       OperationLogs operationLogs,
       FailureClassifier failureClassifier,
       FailureCompletionPolicy completionPolicy,
-      TransactionState transactionState,
       IndependentTransactionRunner independentTransaction,
       OperationLogMetrics metrics) {
     this.registry = Objects.requireNonNull(registry, "registry");
@@ -77,7 +81,6 @@ public final class FailedOperationLogInterceptor implements CommandInterceptor {
     this.operationLogs = Objects.requireNonNull(operationLogs, "operationLogs");
     this.failureClassifier = Objects.requireNonNull(failureClassifier, "failureClassifier");
     this.completionPolicy = Objects.requireNonNull(completionPolicy, "completionPolicy");
-    this.transactionState = Objects.requireNonNull(transactionState, "transactionState");
     this.independentTransaction =
         Objects.requireNonNull(independentTransaction, "independentTransaction");
     this.metrics = Objects.requireNonNull(metrics, "metrics");
@@ -86,13 +89,10 @@ public final class FailedOperationLogInterceptor implements CommandInterceptor {
   @Override
   public <R> R intercept(Command<R> command, CommandContext context, Invocation<R> invocation) {
     Optional<OperationLogDefinition<Object, Object>> definition = registry.find(command.getClass());
-    boolean nested = transactionState.hasActiveTransaction();
     try {
       return invocation.proceed();
     } catch (RuntimeException failure) {
-      if (!nested && definition.isPresent()) {
-        recordQuietly(command, context, definition.get(), failure);
-      }
+      definition.ifPresent(d -> recordQuietly(command, context, d, failure));
       throw failure;
     }
   }

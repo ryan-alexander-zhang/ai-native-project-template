@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.operationlog.model.Outcome;
 import com.aipersimmon.ddd.operationlog.spi.ClassifiedOutcome;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class DefaultFailureClassifierTest {
@@ -48,6 +49,43 @@ class DefaultFailureClassifierTest {
     assertEquals(Outcome.REJECTED, out.outcome());
     assertEquals("domain.rejected", out.failure().code());
     assertEquals("DOMAIN_RULE", out.failure().category());
+  }
+
+  /**
+   * A rejection, not an unexpected fault: {@code Outcome.REJECTED} is defined as "rejected by a
+   * business rule, validation, or authorization decision". Left in the unexpected bucket, malformed
+   * input both mislabels its row and inflates the FAILED counter with every bad request — and the
+   * validation interceptor that raises it sits on the ordinary path, at order 100.
+   */
+  @Test
+  void aBeanValidationRejectionIsRejectedNotUnexpected() {
+    ClassifiedOutcome out =
+        classifier.classify(
+            new jakarta.validation.ConstraintViolationException("bad", Set.of()), null);
+    assertEquals(Outcome.REJECTED, out.outcome());
+    assertEquals("validation.rejected", out.failure().code());
+    assertEquals("VALIDATION", out.failure().category());
+  }
+
+  /**
+   * The same simple name as Bean Validation's exception, a different package, and the opposite
+   * meaning: a database constraint failing at flush is a technical fault, so it must stay in the
+   * unexpected bucket. Guards the classifier against the name-based match that misread it.
+   */
+  @Test
+  void aDatabaseConstraintViolationStaysUnexpectedDespiteSharingTheName() {
+    ClassifiedOutcome out = classifier.classify(new ConstraintViolationException(), null);
+    assertEquals(Outcome.FAILED, out.outcome());
+    assertEquals("unexpected", out.failure().code());
+  }
+
+  /** Stands in for {@code org.hibernate.exception.ConstraintViolationException}. */
+  static final class ConstraintViolationException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    ConstraintViolationException() {
+      super("duplicate key");
+    }
   }
 
   @Test

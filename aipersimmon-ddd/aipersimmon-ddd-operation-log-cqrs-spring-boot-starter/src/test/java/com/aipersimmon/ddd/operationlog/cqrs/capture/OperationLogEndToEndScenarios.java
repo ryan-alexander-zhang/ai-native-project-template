@@ -30,7 +30,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -84,6 +83,25 @@ public final class OperationLogEndToEndScenarios {
     bus.sendAs(new UpdateResource("res-4", "a", false), redelivered);
     assertEquals(1, logCount(jdbc, "res-4"));
     assertEquals(1, businessCount(jdbc, "res-4"));
+
+    // 5. The dispatch itself runs inside a caller's transaction (a @Transactional service method, a
+    // scheduled job, a listener). The failure record used to be skipped for exactly this shape: an
+    // already-open transaction was read as "a nested child whose root will record", but here there
+    // is no root, so the one row a failure audit exists for was lost in silence. The record now
+    // suspends the caller's transaction and survives its rollback.
+    TransactionTemplate callerTransaction = new TransactionTemplate(txManagerFor(dataSource));
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            callerTransaction.executeWithoutResult(status -> bus.send(new FailingUpdate("res-5"))));
+    assertEquals(0, businessCount(jdbc, "res-5"), "the caller's transaction rolled back");
+    assertEquals(1, logCount(jdbc, "res-5"), "the failure is still recorded");
+    assertEquals("FAILED", outcome(jdbc, "res-5"));
+    assertEquals("ROLLED_BACK", completion(jdbc, "res-5"));
+  }
+
+  private static DataSourceTransactionManager txManagerFor(DataSource dataSource) {
+    return new DataSourceTransactionManager(dataSource);
   }
 
   private static CommandBus buildBus(JdbcTemplate jdbc, DataSource dataSource) {
@@ -112,7 +130,6 @@ public final class OperationLogEndToEndScenarios {
             operationLogs,
             new DefaultFailureClassifier(),
             new DefaultFailureCompletionPolicy(),
-            TransactionSynchronizationManager::isActualTransactionActive,
             new SpringIndependentTransactionRunner(txManager));
     CommandInterceptor transaction =
         new TransactionCommandInterceptor(

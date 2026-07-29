@@ -100,7 +100,6 @@ class OperationLogInterceptorMetricsTest {
             logs,
             CLASSIFIER,
             throwable -> Completion.ROLLED_BACK,
-            () -> false,
             Runnable::run,
             metrics);
     Invocation<RemarkResult> boom =
@@ -126,7 +125,6 @@ class OperationLogInterceptorMetricsTest {
             new CapturingOperationLogs(),
             CLASSIFIER,
             throwable -> Completion.ROLLED_BACK,
-            () -> false,
             Runnable::run,
             metrics);
     Invocation<RemarkResult> boom =

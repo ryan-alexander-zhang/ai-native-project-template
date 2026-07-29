@@ -10,7 +10,6 @@ import com.aipersimmon.ddd.operationlog.cqrs.capture.OperationLogDefinitionRegis
 import com.aipersimmon.ddd.operationlog.cqrs.capture.OperationLogInvocationFactory;
 import com.aipersimmon.ddd.operationlog.cqrs.capture.OperationTenantResolver;
 import com.aipersimmon.ddd.operationlog.cqrs.capture.SpringIndependentTransactionRunner;
-import com.aipersimmon.ddd.operationlog.cqrs.capture.TransactionState;
 import com.aipersimmon.ddd.operationlog.definition.OperationLogDefinition;
 import com.aipersimmon.ddd.operationlog.engine.autoconfigure.AipersimmonDddOperationLogAutoConfiguration;
 import com.aipersimmon.ddd.operationlog.engine.autoconfigure.OperationLogProperties;
@@ -30,7 +29,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Wires the Operation Log capture layer. The definition registry (scanning {@code @OperationLog}
@@ -58,12 +56,6 @@ public class AipersimmonDddOperationLogCqrsAutoConfiguration {
   @ConditionalOnMissingBean(FailureCompletionPolicy.class)
   public FailureCompletionPolicy operationLogFailureCompletionPolicy() {
     return new DefaultFailureCompletionPolicy();
-  }
-
-  @Bean
-  @ConditionalOnMissingBean(TransactionState.class)
-  public TransactionState operationLogTransactionState() {
-    return TransactionSynchronizationManager::isActualTransactionActive;
   }
 
   @Bean
@@ -120,7 +112,6 @@ public class AipersimmonDddOperationLogCqrsAutoConfiguration {
       OperationLogs operationLogs,
       FailureClassifier failureClassifier,
       FailureCompletionPolicy completionPolicy,
-      TransactionState transactionState,
       IndependentTransactionRunner independentTransactionRunner,
       OperationLogMetrics metrics) {
     return new FailedOperationLogInterceptor(
@@ -129,7 +120,6 @@ public class AipersimmonDddOperationLogCqrsAutoConfiguration {
         operationLogs,
         failureClassifier,
         completionPolicy,
-        transactionState,
         independentTransactionRunner,
         metrics);
   }

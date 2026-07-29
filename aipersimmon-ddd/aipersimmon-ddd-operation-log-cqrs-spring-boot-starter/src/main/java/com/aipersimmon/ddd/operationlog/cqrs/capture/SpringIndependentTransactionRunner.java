@@ -7,8 +7,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Runs the failure record in its own transaction via a {@code TransactionTemplate} with {@code
- * PROPAGATION_REQUIRES_NEW}. The root failed interceptor invokes it only when no outer transaction
- * is active, so this is a plain new transaction rather than a suspend-and-resume.
+ * PROPAGATION_REQUIRES_NEW}.
+ *
+ * <p>Genuinely suspend-and-resume, not merely a new transaction: the failure interceptor calls this
+ * whatever is active, because a failure record that only survives when nothing else is running is
+ * not a record. That means one extra connection while the suspended transaction still holds its
+ * own, so a deployment whose pool is sized to exactly one connection per request will need a little
+ * headroom. The alternative — skipping the record when a transaction is open — is what left audit
+ * gaps for every dispatch made from inside a caller's transaction.
  */
 public final class SpringIndependentTransactionRunner implements IndependentTransactionRunner {
 

@@ -62,6 +62,14 @@
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The default completion policy has to tell a Bean Validation rejection (nothing started) from a
+         database constraint violation (started, then rolled back). The two share a simple name, so the
+         test asserts against the real type rather than a stand-in that merely looks like one. -->
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- End-to-end capture: real CommandBus + TransactionCommandInterceptor + JDBC backend. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
