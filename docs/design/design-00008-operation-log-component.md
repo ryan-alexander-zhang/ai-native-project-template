@@ -338,6 +338,18 @@ order   interceptor                          位置语义
 > order 数值（25 / 250）由集成测试锁定，但**包裹关系是硬约束**：`Failed < 50`（外于并发翻译）、
 > `200 < Completed`（内于事务）。这两条不满足则语义即错，不是可调参数。
 
+**默认策略识别 Bean Validation 只看包，不看 simple name**（`issue-00102`）。
+`DefaultFailureClassifier`（outcome）与 `DefaultFailureCompletionPolicy`（completion）都要回答同一个问题
+——"这是不是一次输入校验拒绝"——所以判定收口在 `BeanValidationFailures.isBeanValidation`，按包前缀
+`jakarta.validation.` 走 cause 链匹配（仍用字符串，避免 engine 硬依赖 Bean Validation API）。
+必须按包：`jakarta.validation.ConstraintViolationException` 与
+`org.hibernate.exception.ConstraintViolationException` **simple name 完全相同而含义相反**——
+前者是输入被拒、什么都没开始，后者是唯一/外键冲突在 flush 时抛出、事务开了又回滚。
+按名字匹配会把后者读成前者，于是一次回滚的写入被记成 `NOT_STARTED`，即 completion 维度给出与事实相反的答案。
+连带修正：Bean Validation 拒绝归 `REJECTED + validation.rejected + VALIDATION`，
+而非此前的兜底 `FAILED + unexpected`——`Outcome.REJECTED` 的定义原文就含 validation，
+且落在兜底分支会让每个格式错误的请求去抬高 `FAILED` 计数器。
+
 两个 interceptor **不共享 ThreadLocal frame**，各自创建 immutable actor/tenant snapshot；只共享可重复读取的
 compiled metadata（有界 cache）（对齐 [[decision-00012-no-ambient-per-command-state]]）。
 
@@ -348,11 +360,18 @@ compiled metadata（有界 cache）（对齐 [[decision-00012-no-ambient-per-com
 - 子命令抛异常会把共享事务标为 rollback-only：即使父 handler 吞掉子异常，父在 200 处提交也会 `UnexpectedRollbackException`。
   这是 Spring 既有行为，consumer 不应在事务内吞子命令异常——与 [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]
   “handler 不互调、命令是总线入口”一致（嵌套 dispatch 本就应罕见）。
-- **失败记录只由最外层（root）的 `Failed` 写**：`Failed(25)` 检测到当前仍有活动外层事务（即自己处于嵌套子链）时**不**开新事务，
-  直接重抛，交由 root 的 `Failed` 在整条链回滚完成、无活动事务后统一写 `FAILED`。这样避免“父事务仍开着就 `REQUIRES_NEW`”
-  导致的连接占用叠加与连接池耗尽死锁。root `Failed` 处已无活动事务，其独立写用普通新事务（`TransactionTemplate`）即可。
+- **每个失败的命令写自己的失败记录**（`issue-00102` 修订）：`Failed(25)` 不再检测活动事务，一律以
+  `REQUIRES_NEW` 写入——真正的挂起-恢复。
+  原设计是"只由最外层（root）写、嵌套子链上交 root"，为的是避免"父事务仍开着就 `REQUIRES_NEW`"的连接叠加。
+  它的判据是"当前线程有没有活动事务"，而这个信号**分不清**两件事：自己是别人事务里的子命令，
+  还是自己的调用者恰好开了事务。后者（最外层 `send()` 在 `@Transactional` 方法/调度任务/监听器内被调用）
+  下没有任何 root，**整条流程的失败被静默跳过**——不打日志、也不触发 `failureRecordLost`；
+  而 root 确实记录时记的是 root 的 operation code，真正失败的子操作从不出现在审计里。
+- 代价照实记：被挂起的事务仍持有自己的连接，故每层嵌套多占一个连接，
+  按"每请求恰好一个连接"配池的部署需留余量。子命令失败向上冒泡时子与父各记一行——
+  这不是重复，两个操作都被尝试过、都失败了，审计本就该都说；幂等键含 operation code，不会冲突。
 
-> 关键不变式：commit failure 时，`Completed` 的 append 随事务回滚消失，只有 root `Failed` 在新事务写入的 `FAILED` 存活 →
+> 关键不变式：commit failure 时，`Completed` 的 append 随事务回滚消失，只有 `Failed` 在独立事务写入的 `FAILED` 存活 →
 > 一条命令不产生重复 entry。两条 entry 只在“失败后重投成功”时出现，且因 `resultKind` 不同而各自幂等（§八）。
 
 ### 6.2 actor / tenant resolver
@@ -483,7 +502,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_log_correlation
     包一层 `SAVEPOINT` + 冲突时 `ROLLBACK TO SAVEPOINT`。收敛结果同样映射为 `RecordResult.DUPLICATE(existingRecordId)`。
   - **失败路径（隔离的独立事务 append）**：该事务内只有这一条 insert，catch `DuplicateKeyException` → `DUPLICATE`
     是安全的（无其他语句受连累）。
-- **事务语义一致**：append 都加入当前事务（成功路径 fail-closed），root `Failed` 的独立事务由 §六/§八 的 interceptor 负责，
+- **事务语义一致**：append 都加入当前事务（成功路径 fail-closed），`Failed` 的独立事务由 §六/§八 的 interceptor 负责，
   后端本身对事务无感。**genuine（非重复键）append 错误**在成功路径必须如实抛出以触发 fail-closed 回滚，只有冲突被收敛。
 - **分页排序一致**：`OperationLogReader` 的 cursor 语义（`(occurred_at, record_id)` 复合游标）在两个后端下结果一致。
 - **同一套集成测试**：验收矩阵（§十三）的存储相关项以“后端 × 方言”参数化，对 `-jdbc`/`-mybatis-plus` × H2/MySQL/PostgreSQL
@@ -509,8 +528,9 @@ CREATE INDEX IF NOT EXISTS idx_operation_log_correlation
 
 - 正常返回的 `SUCCEEDED/REJECTED`：sink 与业务同 datasource/事务，在事务内 append → 一起提交/回滚；append
   失败（genuine error）使业务回滚（**fail-closed**）；重投的重复键用方言原生 `ON CONFLICT DO NOTHING` 收敛而**不 abort 事务**（§7.3）。
-- 异常路径的 `REJECTED/FAILED`：root `Failed` interceptor 在业务事务回滚后（或事务未开始时）用**独立事务**追加；记录
-  失败**不替换**原业务异常，但必须打 metric + alert。嵌套子链的 `Failed` 不开独立事务、上交 root（§6.1）。
+- 异常路径的 `REJECTED/FAILED`：`Failed` interceptor 一律用 `REQUIRES_NEW` **独立事务**追加（挂起-恢复），
+  不论外层是否有活动事务；记录失败**不替换**原业务异常，但必须打 metric + alert。
+  每个失败的命令记录自己的失败，不推断谁负责记录（§6.1，`issue-00102`）。
 - `OperationLogSink` 对事务无感，只加入当前事务；独立事务由 interceptor 层（`TransactionTemplate`）负责，不藏进 sink 或 boolean 参数。
 - **已决定（§十四 D6 / [[decision-00017-operation-log-component-boundaries]] item 10）**：v1 要求业务与 operation-log
   同 `DataSource` / 同 `PlatformTransactionManager`；异源的 durable staging 另立 ADR。
@@ -1000,7 +1020,7 @@ class OrderOperationHistory {
 | CLI 无事务 | direct API | `SUCCEEDED / UNKNOWN` | 调用点 | 1 |
 
 > 注：嵌套 command（父 handler 内经 `CommandBus` 派发子命令）时，子命令成功日志加入父事务、与父一起提交/回滚；
-> 失败日志只由 root `Failed` 在整条链回滚后统一写（§6.1），消费方无需为嵌套写任何额外代码。
+> 失败日志由每个失败命令自己的 `Failed` 以独立事务写（§6.1），消费方无需为嵌套写任何额外代码。
 
 ---
 

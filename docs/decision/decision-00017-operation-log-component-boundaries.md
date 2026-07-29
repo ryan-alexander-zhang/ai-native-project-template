@@ -87,8 +87,14 @@ design-00008 已给出结构设计。本 ADR 把 analysis-00013 §12 / design-00
     前提，也是 v1 唯一模式；多事务管理器时用配置显式指定。异库 / 跨库的 durable staging 不在 v1，另立 ADR（见命题四）。
 11. **（D10）成功路径 fail-closed、失败路径不改写原异常。** 成功 append 加入当前业务事务、提交前写入，genuine append 失败使
     业务回滚（重投的**重复键**用方言原生 `ON CONFLICT DO NOTHING` 收敛而不 abort 事务，见命题五）；失败 append 由
-    **root**（最外层）`Failed` interceptor 在整条链回滚完成、无活动事务后以独立事务写入，随后**重新抛出原业务异常**；
-    嵌套子链的 `Failed` 检测到活动外层事务时不开新事务、上交 root，避免 `REQUIRES_NEW`-while-parent-open 的连接池耗尽。
+    `Failed` interceptor 以 `REQUIRES_NEW` 独立事务写入，随后**重新抛出原业务异常**。
+    **每个失败的命令记录自己的失败，不做"谁负责记录"的推断**（`issue-00102` 修订本条）：
+    原设计让嵌套子链检测到活动外层事务时上交 root，以省一次 `REQUIRES_NEW`-while-parent-open 的连接占用。
+    但"当前线程有活动事务"这个信号**无法区分**"我是别人事务里的子命令"与"我的调用者恰好开了事务"——
+    最外层 `commandBus.send()` 从 `@Transactional` 服务方法/调度任务/监听器里被调用时（消费方常见写法），
+    根本不存在会记录的 root，整条流程的失败被静默跳过；而 root 确实记录时记的是 root 的 operation code，
+    真正失败的子操作从不出现。省下的是连接压力，丢掉的是审计完整性，取舍反了。
+    代价照实记：被挂起的事务仍持有自己的连接，每层嵌套多占一个，连接池需留余量。
     失败日志自身写失败只吞并打 metric + alert。`OperationLogSink` 对事务无感，传播语义只在 interceptor 层表达。
 12. **（D9）时间有序 `recordId` + result-kind 感知的 `idempotencyKey`。** `recordId` 用 UUIDv7/ULID（经注入的
     `Supplier<String>`）；CQRS 路径 `idempotencyKey = SHA-256_hex(messageId|operationCode|outcome|completion)`（定宽 64、
