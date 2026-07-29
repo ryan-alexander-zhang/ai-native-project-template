@@ -150,7 +150,8 @@ public record CommandContext(String tenantId, String messageId, String correlati
 
 - **所有表都加 `tenant_id` 数据列**（用于 header 盖章 / 观测 / RLS 过滤），但**是否入唯一键**按上表判据区分。
 - `aipersimmon_process_instance` 的检索索引应以 `tenant_id` 为前导列（Salesforce 式），保证按租户扫描高效。
-- `shedlock` 是 ShedLock 契约表（固定列名），**不加 `tenant_id`**；pool 模型下 relay 仍是单一全局锁（见 §八）。
+- `shedlock` 是 ShedLock 契约表（固定列名），**不加 `tenant_id`**；pool 模型下它只服务 outbox cleanup
+  （relay 已改为每行租约、多实例并发轮询，见 §八与 [[issue-00108-a-killed-relay-instance-stops-all-delivery]]）。
 - web-store-redis 无 DDL → key 前缀加租户段：`aipersimmon:web:{tenant}:idem:` 等。
 
 存储端口（`ProcessInstanceStore` 等）与 `ProcessInstanceCriteria` 新增 `tenant` 维度；耐久行携带 `tenant_id`
@@ -204,8 +205,9 @@ SQL 的唯一约束里 **NULL ≠ NULL**。PostgreSQL / MySQL(InnoDB) / H2 默�
 
 pool 模型下，租户只是行上的数据：
 
-- outbox relay / process claim / saga deadline poll **保持全局单线程扫表**；每行的 `tenant_id` 在出站时盖到
-  `ce_tenantid`。**无需按租户命名锁**——现有单一 ShedLock relay 锁不变。这些连接走 §七 的 BYPASSRLS 角色。
+- outbox relay / process claim / deadline poll **不按租户分片扫表**；每行的 `tenant_id` 在出站时盖到
+  `ce_tenantid`。**无需按租户命名锁**——relay 与 process claim 都以行级租约互斥（无全局锁），
+  cleanup 的 ShedLock 锁名也与租户无关。这些连接走 §七 的 BYPASSRLS 角色。
 - 唯一注意：若将来要做**按租户公平调度 / 配额**，才需要按租户分片轮询 + 参数化锁名——列为 phase 2，不在 MVP。
 
 **silo 扩展 seam（现在零成本预留，owner 决策 1）**：将来若某租户要物理隔离，新增一个读 `TenantContext.current()`

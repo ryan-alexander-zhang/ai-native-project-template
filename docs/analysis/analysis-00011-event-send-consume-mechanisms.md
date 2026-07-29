@@ -97,8 +97,9 @@ Outbox 行由 `OutboxRelay`(`@Scheduled` 轮询)取出,交给以下 `OutboxDispa
 | 6 | `KafkaOutboxDispatcher` | 发到 Kafka,**CloudEvents 二进制绑定**(`ce_` 头 + 分区键=subject),`.get()` 等待、失败即抛以便重试 | `aipersimmon-ddd-messaging-kafka/.../messaging/kafka/KafkaOutboxDispatcher.java` |
 
 `OutboxRelay` 的生产级加固(JDBC 与 MyBatis-Plus 两套语义一致):**排序** `ORDER BY created_at, id`;**DLQ** `attempts < max-attempts`(默认 10);
-**按 subject 挂起**避免同聚合后续事件越过卡住的那条;**ShedLock `@SchedulerLock`** 多实例只允许一个轮询。
-配套 `OutboxCleanup`(`@Scheduled` + ShedLock,保留期默认 7 天,opt-in)。
+**只有聚合队头可领**避免同聚合后续事件越过卡住的那条;**每行一个租约**(`lease_owner`/`lease_token`/`lease_until`),
+多实例并发轮询各领互不相交的行,被杀实例的行在租约到期后自动可再领(见 [[issue-00108-a-killed-relay-instance-stops-all-delivery]])。
+配套 `OutboxCleanup`(`@Scheduled` + ShedLock,保留期默认 7 天,opt-in)——ShedLock 现在只用于它。
 
 ### 2.3 消费:2 种接收方式 + Inbox 幂等
 

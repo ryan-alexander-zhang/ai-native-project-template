@@ -69,6 +69,11 @@ relay 里被复制的那些**判断**，恰好是全框架最难写对的一批�
 契约写在端口的 javadoc 上，等价性由两个模块各自跑的用例守住。这是本次抽取**没有**消除的重复，
 必须说出口而不是假装它不存在。
 
+> **后续（[[issue-00108-a-killed-relay-instance-stops-all-delivery]]）**：`findDue` 已变成
+> `claimDue(now, maxAttempts, batchSize, OutboxLease)`，并新增 `release`；上面那条「唯一没去重的重复」
+> 因此变成了**候选查询**（选聚合队头）。方法数仍是 7，判据未变。租约互斥没有下沉成方言实现——claim 是三条
+> 方言无关的语句，理由见该 issue。
+
 **留在后端的另一件事：ShedLock 的 `LockProvider`。** 它是一张 JDBC 锁表，是真正与存储绑定的东西；
 engine 只声明「这次轮询持有租约」（`@SchedulerLock` 在 `OutboxRelayScheduler` 上），
 provider 由后端提供。未来一个 Redis 租约的后端因此不必绕过 engine。
@@ -83,6 +88,8 @@ provider 由后端提供。未来一个 Redis 租约的后端因此不必绕过 
 - 模块数 47 → 48。与报告 §3 第 13 项「收敛到约 20」方向相反**一步**，但那一项的目标是消除
   「一个 42 行接口一个模块」这类碎片，而不是把跨后端共用的运行时压回后端里；engine 层正是收敛的前提——
   第 7、8、10 项（行级 claim、持久化目的地、Kafka 腿流水线化）现在都只需改一处。
+  **第 7 项已验证这条**：行级 claim 的全部判断（队头谓词、轮询时间预算、三态 `SENT/RETIRED/HELD`、
+  release 的时机）都只写了一遍，两个后端各自只多了「怎么把租约写进这张表」。
 - 类名保持 `OutboxRelay` / `OutboxWriter` / `OutboxCleanup` / `OutboxRelayScheduler`，包名从
   `outbox.jdbc` / `outbox.mybatisplus` 变为 `outbox.engine.*`。消费方若直接引用过这些类（脚手架的两个测试、
   otel starter 的一个测试）需改 import；这是尚未上线时该付的价。

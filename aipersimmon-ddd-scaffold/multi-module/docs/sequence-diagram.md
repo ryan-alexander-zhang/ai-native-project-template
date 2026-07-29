@@ -465,7 +465,7 @@ sequenceDiagram
     end
 
     loop poll
-        RELAY->>DB: claim a batch under a lease<br/>(lock-at-most-for PT60M)
+        RELAY->>DB: claim rows under a per-row lease<br/>(head of each aggregate only, PT5M)
         RELAY->>K: send to @Externalized topic,<br/>key = subject() = orderId
         alt delivered
             RELAY->>DB: mark sent

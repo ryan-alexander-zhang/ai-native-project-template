@@ -235,13 +235,13 @@ Present with a storage module; the relay polls as soon as it is.
 | --- | --- | --- |
 | `dispatch` | `in-process` | Which built-in dispatcher delivers a relayed event when no messaging starter and no custom `OutboxDispatcher` bean supplies one. `in-process` republishes it through Spring's event publisher — the correct delivery for a LOCAL event. `logging` only logs it, so it delivers *nothing*; it is for watching the relay work, never for a deployment. An unrecognised value fails startup: a broker is chosen by adding its starter, not here. |
 | `allow-unreachable-external-events` | `false` | Lets the application start when it declares `@Externalized` events but the active dispatcher cannot reach an external target — accepting that those events get marked sent without leaving the process. Off, because that loss is invisible: the relay treats a dispatch that returns as delivered, so there is no exception, no dead letter and no consumer lag to alert on. Switch it on for a deliberately broker-less local run. |
-| `relay.enabled` | `true` | Whether the relay is *scheduled*. `false` removes only the schedule, not the relay: nothing polls on its own, and a caller can drive `OutboxRelay.relay()` directly with no lock in the way. Use it when one dedicated instance relays while the rest only write, or in an integration test that asserts on what a single poll did. |
+| `relay.enabled` | `true` | Whether the relay is *scheduled*. `false` removes only the schedule, not the relay: nothing polls on its own, and a caller can drive `OutboxRelay.relay()` directly. Use it when one dedicated instance relays while the rest only write, or in an integration test that asserts on what a single poll did. |
 | `poll-delay-ms` | `1000` | How often the relay looks for unsent rows, *after* the first poll. `@Scheduled(fixedDelay)` runs first and waits afterwards, so raising this does not prevent a poll at startup — that is what `relay.enabled=false` is for. Lower means lower latency and more empty queries. |
-| `batch-size` | `100` | Rows per poll. See the budget note below. |
+| `batch-size` | `100` | Rows one poll may dispatch. Every instance polls, so this bounds one poll's work, not the deployment's throughput. |
 | `max-attempts` | `10` | Attempts before a row moves to the dead-letter table. A *permanent* failure (unknown type, malformed payload) skips straight there — retrying cannot fix it. |
 | `retry.base-backoff-ms` / `retry.max-backoff-ms` | `1000` / `60000` | Exponential backoff between attempts on a transient failure. |
-| `relay.lock-name` | `${spring.application.name}` | The ShedLock name that keeps one instance polling at a time. |
-| `relay.lock-at-most-for` | `PT60M` | Lease length. **Keep `batch-size × producer.send-timeout-ms` below this**: a whole poll of stalled sends can otherwise outlive the lease and let a second instance dispatch the same rows. Startup WARNs if the shipped arithmetic is broken. |
+| `relay.lease-duration` | `PT5M` | How long a poll's claim on a row lasts, and therefore **how long a killed instance's rows stay stuck** — nothing else. The other instances keep delivering throughout; only the rows that instance was holding wait this out. Shorten it for faster recovery. A poll stops after half of it and hands back what it did not reach, so a slow batch cannot overrun it; the one thing to keep true is that a *single* dispatch fits in that half — with Kafka, that `producer.send-timeout-ms` stays below `PT2M30S`. Startup WARNs if a custom configuration breaks it; the cost of crossing the line is duplicate deliveries, which a consumer's inbox dedups. |
+| `relay.worker-id` | (generated) | Written into the lease of every row this instance claims, so a stuck relay can be traced to a node. Diagnostics only — it decides nothing. Set it to the pod name to make that answerable from the table alone. |
 | `cleanup.enabled` | `false` | Deletes sent rows past retention. Off by default — an unbounded table is visible, whereas deleting rows someone still wanted is not. |
 | `cleanup.retention-seconds` | `604800` (7 days) | How long a sent row is kept. |
 | `cleanup.poll-delay-ms` | `3600000` (1 hour) | How often cleanup runs. |
@@ -267,7 +267,7 @@ nothing while every producer mints UUIDs, and breaks the moment one uses per-sou
 | Property | Default | Effect |
 | --- | --- | --- |
 | `topic` | `aipersimmon.integration-events` | Fallback topic. Per-event routing comes from `@Externalized("...")`, which may itself contain a `${property}` placeholder. |
-| `producer.send-timeout-ms` | `30000` | How long the relay waits for a broker ack per message. Feeds the lease-budget arithmetic above. |
+| `producer.send-timeout-ms` | `30000` | How long the relay waits for a broker ack per message. Keep it below half of `outbox.relay.lease-duration`, so one send cannot outlive the claim on the row it is sending; `batch-size` does not enter into it, because a poll bounds itself. |
 | `consumer.enabled` | `false` | Registers the consumer bridge. Off by default because publishing and consuming are separate decisions — a service may only produce. |
 | `consumer.group-id` | `${spring.application.name}`, else `aipersimmon` | The consumer group. |
 | `consumer.skip-locally-unhandled` | `true` | Drop a record whose `(type, version)` no local `@EventListener` handles, before the inbox. Set `false` if you consume through a mechanism the scan cannot see. |
@@ -353,7 +353,8 @@ springdoc and OpenTelemetry:
 2. `aipersimmon.ddd.web.allow-in-memory-stores=false`, so an unshared store fails startup instead of
    silently weakening an enabled protection.
 3. `aipersimmon.ddd.flyway.components` lists exactly the components you use.
-4. `batch-size × producer.send-timeout-ms` below `relay.lock-at-most-for`.
+4. `producer.send-timeout-ms` below half of `outbox.relay.lease-duration`, and that lease short enough
+   that a killed instance's rows coming back that late is acceptable.
 5. `inbox.cleanup.retention-seconds` longer than your worst redelivery delay.
 6. `tenancy.mybatis-plus.tenant-tables` lists every tenant-owned table, if tenancy is on.
 7. `outbox.cleanup.enabled` considered — decided either way, not left unread.

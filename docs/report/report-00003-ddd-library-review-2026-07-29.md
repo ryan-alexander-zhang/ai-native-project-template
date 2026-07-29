@@ -59,9 +59,12 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 ## 2. Major（按模块族）
 
 **Outbox / 事件管道**
-- 崩溃即最长 60 分钟全线停摆：ShedLock 只在任务正常结束时清 `lock_until`，`kill -9`/OOM/掉节点后无人接手，
-  所有集成事件投递静默停摆且不报错。60 分钟默认值是被最坏批次预算（100 × 30s）顶上去的——
-  一个旋钮同时耦合"最大轮询时长"与"崩溃恢复时间"，是 relay 最大的架构弱点。
+- ~~崩溃即最长 60 分钟全线停摆~~ → **已修** `issue-00108`：互斥从调度移到行（`lease_owner`/`lease_token`/
+  `lease_until`），relay 的 `@SchedulerLock` 撤掉，所有实例并发轮询各领互不相交的行；崩溃代价缩到
+  "死节点手里那几行等一个租约（默认 PT5M）"，其余实例全程照常投递。**撤锁不是可选项**：只加行级 claim
+  而留着 60 分钟的调度锁，崩溃后依然没有实例在轮询，压根走不到 claim 查询。有序性随之从批内记账改为
+  "只有聚合队头可领"的存储谓词（活在单节点内存里的保证撑不住并发 poller），轮询自带"半个租约"的时间预算，
+  于是 Kafka 启动守卫的算式里 `batch-size` 整项消失——这就是解开耦合的具体形态。顺带：投递吞吐现在随实例数扩展。
 - 零 Micrometer 指标：积压深度、最老未发送年龄这两个最经典的 outbox 告警必须手写 SQL 才能得到。
 - 吞吐上限约 100 msg/s：每轮只抽一批、批间固定等 1s、每条 send 同步 `get(timeout)`（放弃 producer 批处理与流水线）、
   每条成功一次独立 `MARK_SENT`。1 小时故障积压 180 万行要排约 5 小时。
@@ -143,7 +146,11 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 **紧接其后**
 6. 抽出 `aipersimmon-ddd-outbox-engine`，让 inbox/outbox 与 process-manager 形状一致
    （`decision-00020`，**已完成**；第 7、8、10 项现在都只需改一处）
-7. relay 换行级 claim（`FOR UPDATE SKIP LOCKED`；H2 用 per-row `claimed_until`），解开 60 分钟停摆与预算耦合
+7. relay 换行级 claim，解开 60 分钟停摆与预算耦合（`issue-00108`，**已完成**。
+   最终**没有**用 `FOR UPDATE SKIP LOCKED`：三条方言无关的语句（选队头候选 → 按 id 列表原子打租约 →
+   按 token 读回）取代了每方言一份 SQL。理由就是本报告上面那条——process-manager 的 SKIP LOCKED claim
+   在两个真实数据库上零覆盖、MariaDB 误判即每轮语法错误，方言化 claim 是负债而非资产；
+   条件 UPDATE 在 H2 上可测，跑的就是生产那条路径）
 8. 写入时持久化目的地到 outbox 行：路由消失从静默本地投递变成死信
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）
 10. 流水线化 Kafka 腿（按 subject 有序发出、按序等 future、首个失败 fail-fast；语义不变，吞吐 10–50 倍）
@@ -160,6 +167,15 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   测试通过注入的代理直调同一方法时若撞上，ShedLock 拿不到锁便静默返回——断言于是作用在一次没发生的 purge 上。
   见 `issue-00100`。同类风险：任何 `@Scheduled + @SchedulerLock` 的方法被测试直调都有这个陷阱。
 
+- **新发现的间歇失败（未修，不属于上述任何条目）**：`Uuidv7IdGeneratorTest
+  .isStrictlyMonotonicWithinAndAcrossMilliseconds` 在第 7 项的全量 verify 中失败一次，
+  同一断言隔离重跑 5 次全过。失败对是 `019fae21-69e5-…` 紧跟在 `019fae21-69e6-…` 之后——
+  即嵌入时间戳**回退了 1 毫秒**，不是同毫秒内的次序问题。该用例断言 10 万次连续铸造严格递增，
+  而 JUG `timeBasedEpochGenerator()` 在突发下会把内部时间戳推到墙钟之前，随后重读墙钟即可回退。
+  影响面：UUIDv7 的卖点正是"可按 id 排序 = 按时间排序"，一次回退会让两行的相对顺序与写入顺序相反。
+  需要判断的是改用带单调计数器的构造方式、还是把断言降级为"非严格递增"并说明代价；
+  两者都要动 `decision-00019` / `design-00010` 的措辞。
+
 ## 关联
 
 - 父：[[report-00001-ddd-framework-review]]（第一次库评审）
@@ -172,4 +188,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00104-an-ended-instance-keeps-its-timers-forever]]、
   [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]、
   [[issue-00106-an-empty-flyway-component-list-created-every-table]]、
-  [[issue-00107-silent-degradations-become-loud-failures]]
+  [[issue-00107-silent-degradations-become-loud-failures]]、
+  [[issue-00108-a-killed-relay-instance-stops-all-delivery]]
