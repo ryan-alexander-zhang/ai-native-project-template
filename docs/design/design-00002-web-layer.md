@@ -121,11 +121,18 @@ com.aipersimmon.ddd.web
 ### 4.3 横切 SPI `spi/`（实现在 `-web-store-*` / starter 内存默认）
 
 ```java
-// 幂等:存首次响应并回放(键=Idempotency-Key)
+// 幂等:执行前抢占,执行后落定(issue-00101 起为 claim 状态机,不再是"先查后存")
 interface IdempotencyStore {
-    Optional<StoredResponse> find(String key);
-    boolean saveIfAbsent(String key, StoredResponse response, Duration ttl); // 原子占位
+    IdempotencyClaim claim(IdempotencyKey key, Duration leaseTtl);            // 原子抢占
+    void complete(IdempotencyKey key, StoredResponse response, Duration ttl); // 落定结果
+    void abandon(IdempotencyKey key);                                          // 释放,留给重试
 }
+// 四态:Won(执行) / InProgress(409) / Replay(回放) / Mismatch(422,键被用于另一请求)
+sealed interface IdempotencyClaim { record Won(); record InProgress();
+                                    record Replay(StoredResponse r); record Mismatch(); }
+// 身份三元组 (tenant, principal, key) + 被比对的 fingerprint。principal 必须进身份:
+// 键是调用方自己发明的值,不带调用方就等于"谁猜到键谁拿到别人的响应体"。
+record IdempotencyKey(String tenant, String principal, String key, String fingerprint) {}
 // 防重放:nonce 单次去重(时间窗校验在 filter,这里只管 nonce 唯一性)
 interface ReplayGuard {
     boolean seenBefore(String nonce, Duration ttl);   // 首见=false 并记下;再见=true
@@ -184,9 +191,24 @@ Boot 自动装配(`AutoConfiguration.imports`)。
 
 ### 5.5 幂等键(opt-in,`idempotency.enabled`)
 
-- **`IdempotencyFilter`**:对写方法读取 `Idempotency-Key` 头(可配);经 `IdempotencyStore.saveIfAbsent`
-  原子占位——首次放行并在完成后存 `StoredResponse`;重放命中则**回放首次响应**(status/body/headers)。
-  TTL 默认 24h(对齐 Stripe)。键缺失时按 `require-key` 策略选择放行或 400。
+- **`IdempotencyFilter`**:对写方法读取 `Idempotency-Key` 头(可配),**在执行前**经
+  `IdempotencyStore.claim` 原子抢占,按四态分派:`Won` 执行后 `complete`;`Replay` 回放首次响应
+  (status/body/allow-list headers);`InProgress` 返回 409 + `Retry-After`;`Mismatch` 返回 422。
+  TTL 默认 24h(对齐 Stripe),claim lease 默认 1min。键缺失时按 `require-key` 策略选择放行或 400;
+  超长键在执行前即 400。
+- **为什么是 claim 而不是"先查后存"**(`issue-00101`):后者无法给出"只执行一次"——两个并发首次请求都查不到、
+  都执行,原子的 `saveIfAbsent` 只决定谁的**响应**被留下,而两次副作用都已提交。而这恰是最普通的场景:
+  客户端首次超时后重试,首次仍在飞行中——它发幂等键就是为了这个。
+- **必须排在认证之后**(order `0`,Spring Security 链在 `-100`)。此前排在 `HIGHEST_PRECEDENCE + 40`
+  即安全链之前,且存储键只含 tenant:未认证者带上他人的 `Idempotency-Key` 即可取回其已存响应,
+  全程绕过安全链。现在 `principal` 进身份三元组,由 `IdempotencyPrincipalResolver`(SPI,
+  默认读 Spring Security 上下文;无认证端点返回空)提供。
+- **5xx 不落库**:瞬时失败被冻结在键上会让此后每次重试都拿到那个失败,正好废掉幂等键的用途,
+  故 `abandon` 释放;4xx 是已决结果,照常落库回放。响应体在 `finally` 里回写,
+  使落定阶段的存储故障不会吞掉一个副作用已提交的响应。
+- **fingerprint 不含请求体**:为哈希而缓冲每个请求体会给未认证调用方一个内存放大面;
+  而"读到别人的响应"这个真问题由 `principal` 关闭,不靠摘要。取舍写明:
+  同一键换端点/换载荷形状能抓到,同端点下两个等长同类型的不同请求体抓不到。
 
 ### 5.6 防重放(opt-in,`replay.enabled`)
 

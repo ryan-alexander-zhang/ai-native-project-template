@@ -47,8 +47,8 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 
 | # | 位置 | 缺陷 | 状态 |
 |---|---|---|---|
-| C1 | `IdempotencyFilter` + `AipersimmonDddWebAutoConfiguration:173` | 幂等过滤器注册在 `HIGHEST_PRECEDENCE+40`（Spring Security 链 order −100 **之前**），存储键仅 `tenant + key`，不含认证主体/方法/路径。攻击者带受害者的 `Idempotency-Key` 与租户值发任意请求即可取回其已存响应，全程绕过安全链 | 待修 |
-| C2 | `IdempotencyFilter:83-95` | "只执行一次"不成立：时序为 `find`(miss) → `doFilter`(副作用提交) → `saveIfAbsent`，无执行前 claim。两个并发首次请求都执行；`saveIfAbsent` 只决定谁的**响应**被存 → 重复扣款 | 待修 |
+| C1 | `IdempotencyFilter` + `AipersimmonDddWebAutoConfiguration:173` | 幂等过滤器注册在 `HIGHEST_PRECEDENCE+40`（Spring Security 链 order −100 **之前**），存储键仅 `tenant + key`，不含认证主体/方法/路径。攻击者带受害者的 `Idempotency-Key` 与租户值发任意请求即可取回其已存响应，全程绕过安全链 | **已修** `issue-00101` |
+| C2 | `IdempotencyFilter:83-95` | "只执行一次"不成立：时序为 `find`(miss) → `doFilter`(副作用提交) → `saveIfAbsent`，无执行前 claim。两个并发首次请求都执行；`saveIfAbsent` 只决定谁的**响应**被存 → 重复扣款 | **已修** `issue-00101` |
 | C3 | `FailedOperationLogInterceptor:89` | 以"存在活动事务"判定自己是嵌套子命令而让根去记录；但若最外层 `commandBus.send()` 本身在 `@Transactional` 内被调用（消费方极常见），根本不存在记录者 → 整条流程的失败审计被静默跳过，无日志、无 `failureRecordLost` 指标 | 待修 |
 | C4 | `ProcessOperations:80-118,180-200` | redrive 先提交 resume 事务，再在**任何事务之外**重放 parked 输入且无持久化待重放标记。注释声称 `handle()` never throws，实际可抛四类异常。崩溃/抛异常落在提交之后 → 实例停在 RUNNING、parked 输入永久丢失（broker 已 ack），全树无任何扫描去捡 | 待修 |
 | C5 | `DefaultProcessRuntime:426-540` + `ProcessOutcomeWriter` | 终态决策从不取消未决 deadline（含每次 start 都武装的 max-lifetime backstop）；claim 查询要求 `lifecycle IN ('RUNNING','COMPENSATING')` 故永不可领取，`cancelPending` 唯一调用点是操作员 cancel → 健康检查永久 DEGRADED、年龄单调增长、轮询扫描无界膨胀 | 待修 |
@@ -125,7 +125,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 
 **发布阻断（按序）**
 1. 租户改为 fail-closed（`issue-00099`，**已完成**）
-2. 幂等 SPI 重写为 claim 状态机 + 移到安全链之后 + 键含主体与请求指纹 + 5xx 不落库（一处修掉 C1/C2 与四条 major）
+2. 幂等 SPI 重写为 claim 状态机 + 移到安全链之后 + 键含主体与请求指纹 + 5xx 不落库（`issue-00101`，**已完成**）
 3. operation-log 失败路径：真 `REQUIRES_NEW` 记录，至少在跳过时 WARN + 指标；修两个默认分类器
 4. process-manager C4/C5，并把 `withRetry` 改 `REQUIRES_NEW`、给 instance store 补异常映射
 5. 把静默降级统统改成响亮失败（无 TM 拒绝启动、两个仓储基类加活动事务断言、MP 乐观锁版本回写断言、
@@ -145,14 +145,15 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 
 ## 4. 遗留观察（不在上述条目内）
 
-- `OutboxCleanupTest.removesSentRowsPastRetentionButKeepsRecentAndUnsent` 在一次全量 `mvn verify` 中失败过一次
-  （`a sent row past retention is removed ==> expected: <0> but was: <1>`），此后 3 次全量 verify（含原始 HEAD
-  的对照 worktree）与 3 次模块单跑均未复现，成因未查明。该测试用 `retention-seconds=1` 且 `recent-sent`
-  的 `sent_at = now()`，本身对时序敏感；同模块其他测试的 Spring 缓存上下文会在后台继续跑 relay/cleanup 定时器，
-  共享同一个内存 H2。属于测试隔离与时钟假设问题，非本次改动引入（改动未触及 outbox-jdbc 任何一行）。
+- ~~`OutboxCleanupTest` 间歇失败，成因未查明。~~ **已查明并修复**：`purge()` 同时挂
+  `@Scheduled(fixedDelay)` 与 `@SchedulerLock`，而 `@Scheduled` 的首跑在上下文就绪后**立即**发生并持有锁；
+  测试通过注入的代理直调同一方法时若撞上，ShedLock 拿不到锁便静默返回——断言于是作用在一次没发生的 purge 上。
+  见 `issue-00100`。同类风险：任何 `@Scheduled + @SchedulerLock` 的方法被测试直调都有这个陷阱。
 
 ## 关联
 
 - 父：[[report-00001-ddd-framework-review]]（第一次库评审）
 - 兄弟：[[report-00002-scaffold-ddd-review]]（脚手架评审，30 个 issue 已全部 resolved）
-- 子：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]
+- 子：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]、
+  [[issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test]]、
+  [[issue-00101-idempotency-records-instead-of-claiming]]
