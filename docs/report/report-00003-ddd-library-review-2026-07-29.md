@@ -32,8 +32,8 @@ tenancy / observability / web / 各组件契约）经字节码规则验证零 Sp
    `MissingTenantException` 是死代码，`MissingTenantPolicy` 只在 HTTP 边缘被咨询。丢绑定即静默读写
    `__root__` 哨兵桶。→ 已修，见 `issue-00099`。
 2. **静默降级。** 反复出现"文档承诺 A、代码行为 B、且无任何日志"：无事务管理器时命令裸跑；消费方自带
-   `MybatisPlusInterceptor` 时乐观锁整体消失；Flyway 组件默认全建表却在 bundle pom 里写着"打包不等于建表"。
-   同一份代码对缺失 `IdGenerator` 是启动即失败的——风险姿态自相矛盾。
+   `MybatisPlusInterceptor` 时乐观锁整体消失；Flyway 组件默认全建表却在 bundle pom 里写着"打包不等于建表"
+   （后者已修，`issue-00106`）。同一份代码对缺失 `IdGenerator` 是启动即失败的——风险姿态自相矛盾。
 
 **核实为扎实、不要动的部分：** outbox 的原子写入 / 诚实的 at-least-once / 按聚合有序的回退 `NOT EXISTS`
 方案（比多数生产级 outbox 更讲究）/ 死信迁移原子且存储故障能自愈 / `issue-00044` 修复验证无误 /
@@ -86,8 +86,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - 消费方自带 `MybatisPlusInterceptor` 时乐观锁拦截器整体消失、退化 last-writer-wins，且**启动日志恰好印在
   会 back-off 的那个 bean 里**；`InnerInterceptorCompositionTest` 已把这个失败模式测出来却仍然发货。
   三行可修：MP 的 locker 会把 `newVersion` 写回实体，`updateById` 成功后断言 `version == expected + 1`。
-- Flyway 组件默认 apply-all 与两个 bundle pom 宣称的"打包不等于建表"直接矛盾；`CONFIGURATION.md` 亦写着
-  "Empty creates nothing"。**同一行为三份文档两种说法**，必须先定方向再改文档。
+- ~~Flyway 组件默认 apply-all 与两个 bundle pom 宣称的"打包不等于建表"直接矛盾~~ →
+  **已修** `issue-00106`：用户定为「空 = 什么都不建」（opt-in）。代码是四份文档里的孤例；
+  而 `issue-00103` 把 schema 探针改成列级之后，漏配的代价从"运行期第一次写库才报错"
+  变成"启动即失败并报出迁移路径"，缺省值的安全性因此翻转。
 
 **CQRS / 核心**
 - handler 构造注入 `CommandBus` 会启动循环依赖（`AipersimmonDddCqrsAutoConfiguration:67-73` 在工厂方法内
@@ -131,7 +133,8 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 4. process-manager C4/C5，并修正 `withRetry` 的重试前提、给 instance store 补异常映射
    （`issue-00103` / `issue-00104` / `issue-00105`，**已完成**）
 5. 把静默降级统统改成响亮失败（无 TM 拒绝启动、两个仓储基类加活动事务断言、MP 乐观锁版本回写断言、
-   `OutboxWriter` 事务断言）——框架已为 `IdGenerator` 立了 fail-loud 先例，照它办
+   `OutboxWriter` 事务断言）——框架已为 `IdGenerator` 立了 fail-loud 先例，照它办。
+   其中 Flyway 那条**已先行完成**（`issue-00106`），因为它需要用户定契约、且依赖第 4 项的列级 schema 探测
 
 **紧接其后**
 6. 抽出 `aipersimmon-ddd-outbox-engine`，让 inbox/outbox 与 process-manager 形状一致
@@ -162,4 +165,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction]]、
   [[issue-00103-parked-input-replay-is-not-crash-safe]]、
   [[issue-00104-an-ended-instance-keeps-its-timers-forever]]、
-  [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]
+  [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]、
+  [[issue-00106-an-empty-flyway-component-list-created-every-table]]
