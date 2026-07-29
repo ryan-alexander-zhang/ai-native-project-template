@@ -64,6 +64,8 @@ class JdbcProcessTenantIsolationTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V4__parked_input_replay_marker.sql")
             .build();
     jdbc = new JdbcTemplate(dataSource);
     var instances = new JdbcProcessInstanceStore(jdbc);

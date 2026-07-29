@@ -9,7 +9,8 @@ import java.util.Optional;
 /**
  * Persists scheduled deadlines and drives their fire lifecycle. Rescheduling a name bumps its
  * generation so a stale generation firing late is a no-op; the mark/retry/dead/cancel transitions
- * are fenced by the lease token.
+ * are fenced by the lease token <em>and</em> by the {@code IN_FLIGHT} status, so a worker that lost
+ * a race cannot return a settled deadline to the queue.
  */
 public interface ProcessDeadlineStore {
 
@@ -21,7 +22,18 @@ public interface ProcessDeadlineStore {
 
   void cancelCurrent(ProcessInstanceId instanceId, DeadlineName name, Instant now);
 
-  int cancelPending(ProcessInstanceId instanceId, Instant now);
+  /**
+   * Cancel every still-live deadline of an instance — {@code PENDING} and already-claimed {@code
+   * IN_FLIGHT} — because the instance has ended and no timer of it can ever advance anything again.
+   *
+   * <p>Covering {@code IN_FLIGHT} is the same fence {@link #cancelCurrent} relies on: the deadline
+   * worker re-reads the status under the row lock before firing, so a cancel that lands first turns
+   * the fire into an auditable no-op. Leaving those rows live would strand them, since the claim
+   * query only offers deadlines of active instances and would never reclaim them.
+   *
+   * @return the number of deadlines cancelled
+   */
+  int cancelLive(ProcessInstanceId instanceId, Instant now);
 
   int cancelClaimed(String deadlineId, String leaseToken, Instant now);
 

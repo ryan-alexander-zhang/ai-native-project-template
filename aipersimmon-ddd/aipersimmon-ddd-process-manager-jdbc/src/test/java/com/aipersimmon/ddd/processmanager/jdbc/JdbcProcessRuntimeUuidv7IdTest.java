@@ -52,6 +52,8 @@ class JdbcProcessRuntimeUuidv7IdTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V4__parked_input_replay_marker.sql")
             .build();
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     DefaultProcessRuntime runtime =

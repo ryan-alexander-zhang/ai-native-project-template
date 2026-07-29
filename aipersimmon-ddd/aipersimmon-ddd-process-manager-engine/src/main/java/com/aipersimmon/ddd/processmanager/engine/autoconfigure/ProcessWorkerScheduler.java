@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
 import com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker;
 import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.replay.ParkedInputWorker;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,11 +16,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
 
 /**
- * Drives the effect relay and deadline worker in the background, each on its own single-thread
- * scheduler (never a shared one). A poll's failure is logged and swallowed so a bad batch never
- * kills the scheduler thread; on shutdown it stops claiming and waits up to the configured graceful
- * timeout for in-flight polls. Multi-instance safety comes from the lease in the claim, not from
- * this scheduler.
+ * Drives the effect relay, the deadline worker and the parked-input worker in the background, each
+ * on its own single-thread scheduler (never a shared one). A poll's failure is logged and swallowed
+ * so a bad batch never kills the scheduler thread; on shutdown it stops claiming and waits up to
+ * the configured graceful timeout for in-flight polls. Multi-instance safety comes from the lease
+ * in the claim (and, for parked inputs, from the idempotence of a replay), not from this scheduler.
  */
 public final class ProcessWorkerScheduler implements SmartLifecycle {
 
@@ -29,6 +30,8 @@ public final class ProcessWorkerScheduler implements SmartLifecycle {
   private final Duration effectPollDelay;
   private final ProcessDeadlineWorker deadlineWorker;
   private final Duration deadlinePollDelay;
+  private final ParkedInputWorker parkedInputWorker;
+  private final Duration parkedInputPollDelay;
   private final Duration shutdownTimeout;
 
   private final List<ScheduledExecutorService> executors = new ArrayList<>();
@@ -39,11 +42,15 @@ public final class ProcessWorkerScheduler implements SmartLifecycle {
       Duration effectPollDelay,
       ProcessDeadlineWorker deadlineWorker,
       Duration deadlinePollDelay,
+      ParkedInputWorker parkedInputWorker,
+      Duration parkedInputPollDelay,
       Duration shutdownTimeout) {
     this.effectRelay = effectRelay;
     this.effectPollDelay = effectPollDelay;
     this.deadlineWorker = deadlineWorker;
     this.deadlinePollDelay = deadlinePollDelay;
+    this.parkedInputWorker = parkedInputWorker;
+    this.parkedInputPollDelay = parkedInputPollDelay;
     this.shutdownTimeout = shutdownTimeout;
   }
 
@@ -57,6 +64,9 @@ public final class ProcessWorkerScheduler implements SmartLifecycle {
     }
     if (deadlineWorker != null) {
       schedule("process-deadline-worker", deadlinePollDelay, deadlineWorker::pollOnce);
+    }
+    if (parkedInputWorker != null) {
+      schedule("process-parked-input-worker", parkedInputPollDelay, parkedInputWorker::pollOnce);
     }
     running = true;
   }

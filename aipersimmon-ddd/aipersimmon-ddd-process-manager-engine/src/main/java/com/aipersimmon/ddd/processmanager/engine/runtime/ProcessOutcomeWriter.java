@@ -30,6 +30,10 @@ import java.util.function.Supplier;
  * this is the "write side" of a decision, cohesive around the transition/effect/deadline stores,
  * and distinct from the runtime's orchestration. Called under the instance row lock, so the
  * per-effect ordering base is stable across concurrent advances of the same instance.
+ *
+ * <p>It also enforces the one durable invariant that spans a decision and its timers: an ended
+ * instance has no live deadline. Staged effects still deliver after a terminal decision (the final
+ * event of a flow is exactly such an effect) — only the timers are cancelled.
  */
 final class ProcessOutcomeWriter {
 
@@ -91,6 +95,10 @@ final class ProcessOutcomeWriter {
       ProcessDecision<Object> decision,
       CommandContext cause,
       Instant now) {
+    boolean terminal = decision.lifecycle().isTerminal();
+    if (terminal) {
+      rejectDeadlineOnTerminal(ref, decision);
+    }
     // One monotonic base per transition; the per-instance ordering key is seqBase + index. This
     // runs under the instance row lock, so the base is stable across concurrent advances of the
     // instance.
@@ -122,6 +130,38 @@ final class ProcessOutcomeWriter {
         case CancelDeadline cancel -> deadlines.cancelCurrent(ref.instanceId(), cancel.name(), now);
       }
       index++;
+    }
+    if (terminal) {
+      // The instance has ended, so nothing it is still waiting for can ever advance it: cancel
+      // every live timer in this same advance transaction. Left behind, they would be permanent
+      // garbage — the claim query only offers deadlines of active instances, so no worker would
+      // ever pick them up, while a due PENDING row keeps the backlog SLI (and with it the health
+      // indicator) DEGRADED forever with a monotonically growing age. The whole-instance
+      // max-lifetime backstop armed at start is the one every ended instance would otherwise leave.
+      deadlines.cancelLive(ref.instanceId(), now);
+    }
+  }
+
+  /**
+   * A terminal decision must not schedule a deadline: the claim query only offers deadlines of
+   * active instances, so such a timer could never fire, and the cancellation below would settle it
+   * immediately anyway. Rather than silently discard what the definition asked for, say so — this
+   * is a definition bug, and one that would otherwise look like a timeout that simply never
+   * arrived.
+   */
+  private static void rejectDeadlineOnTerminal(ProcessRef ref, ProcessDecision<Object> decision) {
+    for (ProcessEffect effect : decision.effects()) {
+      if (effect instanceof ScheduleDeadline schedule) {
+        throw new IllegalStateException(
+            "decision for instance "
+                + ref.instanceId().value()
+                + " ends the process as "
+                + decision.lifecycle()
+                + " yet schedules deadline '"
+                + schedule.name().value()
+                + "'; a deadline on an ended instance can never fire, so schedule it in a"
+                + " non-terminal decision or drop it");
+      }
     }
   }
 

@@ -45,6 +45,8 @@ class JdbcProcessTransitionStoreTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V4__parked_input_replay_marker.sql")
             .build();
     transitions = new JdbcProcessTransitionStore(new JdbcTemplate(dataSource));
   }
@@ -57,12 +59,32 @@ class JdbcProcessTransitionStoreTest {
     appendParked("zzz-transition", "input-first", sameInstant);
     appendParked("aaa-transition", "input-second", sameInstant);
 
-    List<ParkedInput> parked = transitions.findParkedInputs(INSTANCE);
+    List<ParkedInput> parked = transitions.findUnreplayedParkedInputs(INSTANCE);
 
     assertEquals(
         List.of("input-first", "input-second"),
         parked.stream().map(ParkedInput::inputMessageId).toList(),
         "parked inputs replay in insertion order, not random transition_id order");
+  }
+
+  @Test
+  void aReplayedParkedInputLeavesTheQueueAndIsMarkedOnlyOnce() {
+    Instant at = CLOCK.instant();
+    appendParked("t-1", "input-first", at);
+    appendParked("t-2", "input-second", at);
+
+    assertEquals(1, transitions.markParkedReplayed(INSTANCE, "input-first", at));
+
+    assertEquals(
+        List.of("input-second"),
+        transitions.findUnreplayedParkedInputs(INSTANCE).stream()
+            .map(ParkedInput::inputMessageId)
+            .toList(),
+        "a replayed input is no longer owed");
+    assertEquals(
+        0,
+        transitions.markParkedReplayed(INSTANCE, "input-first", at),
+        "marking twice is a no-op, so two workers racing the same input cannot double-count it");
   }
 
   private void appendParked(String transitionId, String inputMessageId, Instant at) {

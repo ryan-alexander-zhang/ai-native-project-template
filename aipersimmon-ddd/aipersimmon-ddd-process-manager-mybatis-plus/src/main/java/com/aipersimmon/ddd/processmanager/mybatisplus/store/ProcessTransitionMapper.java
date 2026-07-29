@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.mybatisplus.store;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.annotations.Param;
@@ -60,6 +61,23 @@ public interface ProcessTransitionMapper {
   @Select(
       "SELECT tenant_id, input_message_id, input_type, input_version, input_payload, correlation_id"
           + " FROM aipersimmon_process_transition WHERE instance_id = #{instanceId} AND transition_kind"
-          + " = 'PARKED' ORDER BY transition_seq")
-  List<ParkedRow> findParkedInputs(@Param("instanceId") String instanceId);
+          + " = 'PARKED' AND replayed_at IS NULL ORDER BY transition_seq")
+  List<ParkedRow> findUnreplayedParkedInputs(@Param("instanceId") String instanceId);
+
+  @Update(
+      "UPDATE aipersimmon_process_transition SET replayed_at = #{now} WHERE instance_id ="
+          + " #{instanceId} AND input_message_id = #{inputMessageId} AND transition_kind = 'PARKED'"
+          + " AND replayed_at IS NULL")
+  int markParkedReplayed(
+      @Param("instanceId") String instanceId,
+      @Param("inputMessageId") String inputMessageId,
+      @Param("now") Timestamp now);
+
+  @Select(
+      "SELECT t.instance_id FROM aipersimmon_process_transition t JOIN"
+          + " aipersimmon_process_instance i ON i.instance_id = t.instance_id WHERE"
+          + " t.transition_kind = 'PARKED' AND t.replayed_at IS NULL AND i.lifecycle IN ('RUNNING',"
+          + " 'COMPENSATING') GROUP BY t.instance_id ORDER BY MIN(t.transition_seq), t.instance_id"
+          + " LIMIT #{limit}")
+  List<String> findInstancesOwedParkedReplay(@Param("limit") int limit);
 }

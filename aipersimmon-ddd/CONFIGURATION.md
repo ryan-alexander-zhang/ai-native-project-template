@@ -251,12 +251,12 @@ gets the bounded backoff and then the DLT.
 
 | Property | Default | Effect |
 | --- | --- | --- |
-| `enabled` | `true` | Registers the runtime, relay and deadline worker. |
+| `enabled` | `true` | Registers the runtime, the relay, the deadline worker and the parked-input worker. |
 | `dialect` | `auto` | SQL dialect for the claim query; detected from the `DataSource`. |
 | `worker-id` | (generated) | Identity in a lease. Leave it generated unless you need stable ids in logs. |
-| `schema-validation` | `validate` | Whether to check the four tables exist at startup. `validate` fails fast instead of at the first transition. |
-| `start-duplicate-business-key` | `reject` | What a second start for the same business key does: `reject`, or `ignore` for an idempotent trigger. |
-| `concurrency-max-retries` | `3` | In-process retries when two workers race one instance. |
+| `schema-validation` | `validate` | Whether to check at startup that the four tables exist **and carry the columns of the latest migration**. `validate` fails fast instead of at the first transition — or, worse, on a background worker's poll. |
+| `start-duplicate-business-key` | `reject` | What a second start for the same business key does: `reject`, or `fold` to return the existing instance for an idempotent trigger. |
+| `concurrency-max-retries` | `3` | In-process retries when two workers race one instance. Applies only when the advance owns its transaction; joined to a caller's transaction, a conflict propagates instead (retrying a doomed transaction cannot succeed). |
 | `shutdown-timeout` | `30s` | How long to let in-flight transitions finish. |
 | `instance.max-lifetime` | `none` | Optional cap after which an instance is force-terminated — a guard against a flow waiting forever on a fact that will never arrive. |
 | `payload.max-bytes` | `1048576` (1 MiB) | Refuses an oversized encoded payload rather than letting the row grow unbounded. |
@@ -267,8 +267,16 @@ gets the bounded backoff and then the DLT.
 | `effect-relay.max-attempts` | `12` | Attempts before an effect is parked. |
 | `effect-relay.backoff.initial` / `.max` / `.multiplier` / `.jitter` | `1s` / `5m` / `2.0` / `0.2` | Retry schedule. Jitter stops many workers retrying in lockstep. |
 | `deadline-worker.*` | same shape and defaults | Fires due deadlines (timeouts, escalations). |
+| `parked-input-worker.enabled` | `true` | Replays inputs that arrived while an instance was suspended, once it is active again. Turning it off leaves those inputs owed indefinitely — only appropriate while draining a node. |
+| `parked-input-worker.poll-delay` | `1s` | How often to look for instances that still owe a replay. |
+| `parked-input-worker.batch-size` | `50` | Instances per poll; every owed input of a picked instance is replayed. |
 | `observability.stuck-threshold` | `15m` | How long before an instance counts as stuck in the metrics. |
 | `observability.oldest-pending-warn` | `60s` | Backlog age that WARNs — the signal that the relay is falling behind. |
+
+The parked-input worker deliberately has no lease, attempt or backoff knobs: a replay is idempotent
+(deduped by the replay transition's unique input id), and an input the definition cannot digest
+suspends its instance for operator recovery instead of being retried on a schedule. Exposing those
+settings would describe a mechanism that is not there.
 
 ## `aipersimmon.ddd.operation-log` — business audit log
 

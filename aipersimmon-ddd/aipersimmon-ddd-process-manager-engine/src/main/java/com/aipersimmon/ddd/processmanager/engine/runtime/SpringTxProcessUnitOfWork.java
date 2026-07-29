@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.processmanager.engine.runtime;
 import java.util.function.Supplier;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -24,5 +25,12 @@ public final class SpringTxProcessUnitOfWork implements ProcessUnitOfWork {
   @Override
   public <R> R execute(Supplier<R> work) {
     return transactionTemplate.execute(status -> work.get());
+  }
+
+  @Override
+  public boolean inExistingTransaction() {
+    // isActualTransactionActive, not isSynchronizationActive: only a real, resource-bound
+    // transaction makes the next execute() a participating one whose rollback dooms the caller.
+    return TransactionSynchronizationManager.isActualTransactionActive();
   }
 }

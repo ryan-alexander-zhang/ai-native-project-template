@@ -20,6 +20,7 @@ import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver;
 import com.aipersimmon.ddd.processmanager.engine.store.ConcurrentTransitionException;
+import com.aipersimmon.ddd.processmanager.engine.store.ParkedInputs;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
@@ -54,7 +55,8 @@ import java.util.function.Supplier;
  *
  * <p>Process-level idempotency comes from the {@code UNIQUE(instance_id, input_message_id)}
  * constraint (a repeated input is a duplicate no-op); optimistic concurrency comes from the
- * revision guard on the snapshot update, with a bounded retry.
+ * revision guard on the snapshot update, with a bounded retry when this runtime owns the
+ * transaction and a propagated conflict when it joined the caller's (see {@code withRetry}).
  */
 public final class DefaultProcessRuntime implements ProcessRuntime {
 
@@ -436,9 +438,28 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
       return duplicateResult(row, duplicate.get());
     }
     if (row.lifecycle() == ProcessLifecycle.SUSPENDED) {
+      if (ParkedInputs.isReplayId(cause.messageId())) {
+        // A replay that lost the race with a fresh suspension. Park nothing: the input's park row
+        // still exists and is still owed a replay, so recording a second one would both duplicate
+        // the debt and start a 'parked:parked:…' chain that eventually overflows the id column.
+        // Returning the instance's SUSPENDED lifecycle is what tells the parked-input worker to
+        // leave the debt standing and stop draining this instance.
+        String parked =
+            transitions
+                .findTransitionIdByInput(
+                    ref.instanceId(), ParkedInputs.originalIdOf(cause.messageId()))
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "replay "
+                                + cause.messageId()
+                                + " has no parked input on instance "
+                                + ref.instanceId().value()));
+        return duplicateResult(row, parked);
+      }
       // Do not rebound to the message layer: park the input as an audit transition (deduped by
       // the UNIQUE input message id) and return, so the transport can ack. It is replayed in
-      // arrival order when the instance resumes.
+      // arrival order once the instance resumes and the parked-input worker drains the queue.
       String parkedId = idGenerator.get();
       Instant parkedAt = clock.instant();
       EncodedPayload parkedInput = serdes.encodePayload(input);
@@ -547,7 +568,23 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
         row.ref(), row.revision(), row.lifecycle(), row.step(), true, transitionId);
   }
 
+  /**
+   * Run one advance, retrying a concurrency conflict a bounded number of times — but only when this
+   * advance owns its transaction.
+   *
+   * <p>When the advance joins a caller's transaction (a command handler or an Inbox listener, the
+   * composition this runtime advertises), the first attempt's rollback has already doomed that
+   * shared transaction: Spring marks it rollback-only, and a {@code ConcurrentTransitionException}
+   * comes from a unique-key violation that leaves the transaction aborted on PostgreSQL. A second
+   * attempt could therefore only fail — and, worse, would report a fresh conflict in place of the
+   * original cause. So the conflict propagates to the caller, whose own rollback and the
+   * transport's redelivery of the input are the retry. Retrying inside the transaction we own is
+   * sound because only the attempt is rolled back.
+   */
   private ProcessAdvanceResult withRetry(Supplier<ProcessAdvanceResult> attempt) {
+    if (unitOfWork.inExistingTransaction()) {
+      return attempt.get();
+    }
     RuntimeException last = null;
     for (int i = 0; i <= maxRetries; i++) {
       try {

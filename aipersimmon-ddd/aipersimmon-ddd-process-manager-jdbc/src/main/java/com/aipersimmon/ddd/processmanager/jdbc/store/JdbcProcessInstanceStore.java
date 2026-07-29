@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.jdbc.store;
 
+import com.aipersimmon.ddd.processmanager.engine.store.ConcurrentTransitionException;
 import com.aipersimmon.ddd.processmanager.engine.store.Payloads;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceCriteria;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
@@ -23,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -89,8 +91,32 @@ public final class JdbcProcessInstanceStore implements ProcessInstanceStore {
         .findFirst();
   }
 
+  /**
+   * Insert a new instance. A {@code UNIQUE(tenant_id, process_type, business_key)} violation means
+   * a concurrent transaction started the same coordinator first; it is surfaced as {@link
+   * ConcurrentTransitionException} so the runtime retries the whole start store-neutrally and then
+   * resolves it against the now-visible instance under the configured duplicate-business-key policy
+   * (reject or fold) — rather than leaking a Spring-specific {@code DuplicateKeyException} the
+   * retry loop does not catch and no policy is applied to.
+   */
   public void insert(ProcessInstanceRow row, Instant now) {
     Timestamp ts = Timestamp.from(now);
+    try {
+      insertRow(row, ts);
+    } catch (DuplicateKeyException alreadyStarted) {
+      throw new ConcurrentTransitionException(
+          "instance for business key "
+              + row.ref().businessKey().value()
+              + " of process type "
+              + row.ref().processType().value()
+              + " in tenant "
+              + row.tenantId()
+              + " already exists",
+          alreadyStarted);
+    }
+  }
+
+  private void insertRow(ProcessInstanceRow row, Timestamp ts) {
     jdbc.update(
         """
                 INSERT INTO aipersimmon_process_instance (

@@ -162,7 +162,12 @@ public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
 
   /**
    * Return a deadline to PENDING for a later retry, counting the failed attempt; fenced by the
-   * lease token.
+   * lease token and by the {@code IN_FLIGHT} status.
+   *
+   * <p>The status fence matters because this runs after the fire transaction rolled back, outside
+   * any lock: a cancel that landed meanwhile (the instance ended, or the name was cancelled) has
+   * already settled the row, and returning it to {@code PENDING} would resurrect a timer that can
+   * never be claimed again.
    */
   public int scheduleRetry(
       String deadlineId, String leaseToken, Instant nextAttemptAt, String error, Instant now) {
@@ -171,18 +176,21 @@ public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
                 UPDATE aipersimmon_process_deadline
                 SET status = ?, attempts = attempts + 1, next_attempt_at = ?, last_error = ?, updated_at = ?,
                     lease_owner = NULL, lease_token = NULL, lease_until = NULL
-                WHERE deadline_id = ? AND lease_token = ?""",
+                WHERE deadline_id = ? AND lease_token = ? AND status = ?""",
         DeadlineStatus.PENDING.name(),
         Timestamp.from(nextAttemptAt),
         error,
         Timestamp.from(now),
         deadlineId,
-        leaseToken);
+        leaseToken,
+        DeadlineStatus.IN_FLIGHT.name());
   }
 
   /**
    * Move a deadline to DEAD after exhausting retries, counting the final failed attempt; fenced by
-   * the lease token.
+   * the lease token and by the {@code IN_FLIGHT} status, so a cancel that already settled the row
+   * (see {@link #scheduleRetry}) is not undone — and the caller's "did I mark it dead" check stays
+   * honest, since suspending the instance hangs off it.
    */
   public int markDead(String deadlineId, String leaseToken, String error, Instant now) {
     Timestamp ts = Timestamp.from(now);
@@ -191,12 +199,13 @@ public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
                 UPDATE aipersimmon_process_deadline
                 SET status = ?, attempts = attempts + 1, last_error = ?, updated_at = ?,
                     lease_owner = NULL, lease_token = NULL, lease_until = NULL
-                WHERE deadline_id = ? AND lease_token = ?""",
+                WHERE deadline_id = ? AND lease_token = ? AND status = ?""",
         DeadlineStatus.DEAD.name(),
         error,
         ts,
         deadlineId,
-        leaseToken);
+        leaseToken,
+        DeadlineStatus.IN_FLIGHT.name());
   }
 
   /** How many deadlines are DEAD across all instances (SLI: the redrive backlog). */
@@ -275,17 +284,22 @@ public final class JdbcProcessDeadlineStore implements ProcessDeadlineStore {
         limit);
   }
 
-  /** Cancel all pending deadlines of an instance when a process is cancelled by an operator. */
-  public int cancelPending(ProcessInstanceId instanceId, Instant now) {
+  /**
+   * Cancel every still-live deadline of an ended instance ({@code PENDING} and {@code IN_FLIGHT}).
+   */
+  public int cancelLive(ProcessInstanceId instanceId, Instant now) {
+    Timestamp ts = Timestamp.from(now);
     return jdbc.update(
         """
-                UPDATE aipersimmon_process_deadline SET status = ?, completed_at = ?, updated_at = ?
-                WHERE instance_id = ? AND status = ?""",
+                UPDATE aipersimmon_process_deadline SET status = ?, completed_at = ?, updated_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_until = NULL
+                WHERE instance_id = ? AND status IN (?, ?)""",
         DeadlineStatus.CANCELLED.name(),
-        Timestamp.from(now),
-        Timestamp.from(now),
+        ts,
+        ts,
         instanceId.value(),
-        DeadlineStatus.PENDING.name());
+        DeadlineStatus.PENDING.name(),
+        DeadlineStatus.IN_FLIGHT.name());
   }
 
   /** Cancel a claimed deadline as an auditable no-op (stale generation, or an ended instance). */

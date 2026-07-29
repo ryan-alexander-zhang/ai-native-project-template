@@ -12,4 +12,16 @@ public interface ProcessUnitOfWork {
 
   /** Run {@code work} inside one transaction and return its result. */
   <R> R execute(Supplier<R> work);
+
+  /**
+   * Whether a transaction is already active on the calling thread, so {@link #execute} would join
+   * it rather than own it.
+   *
+   * <p>The engine asks because a conflict inside a joined transaction is not retriable: the failed
+   * attempt has already doomed the whole transaction (Spring marks the shared one rollback-only,
+   * and a unique-key violation aborts it outright on PostgreSQL), so a second attempt in the same
+   * transaction could only fail again. When the unit of work owns the transaction, a conflict rolls
+   * back only the attempt and retrying is sound.
+   */
+  boolean inExistingTransaction();
 }

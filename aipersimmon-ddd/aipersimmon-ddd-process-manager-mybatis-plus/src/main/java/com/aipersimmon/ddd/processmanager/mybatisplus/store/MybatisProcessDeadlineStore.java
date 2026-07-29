@@ -71,8 +71,8 @@ public final class MybatisProcessDeadlineStore implements ProcessDeadlineStore {
   }
 
   @Override
-  public int cancelPending(ProcessInstanceId instanceId, Instant now) {
-    return mapper.cancelPending(instanceId.value(), Timestamp.from(now));
+  public int cancelLive(ProcessInstanceId instanceId, Instant now) {
+    return mapper.cancelLive(instanceId.value(), Timestamp.from(now));
   }
 
   @Override

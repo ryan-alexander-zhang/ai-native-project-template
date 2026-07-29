@@ -39,6 +39,7 @@ public class ProcessManagerProperties {
 
   private final Worker effectRelay = new Worker();
   private final Worker deadlineWorker = new Worker();
+  private final ParkedInputWorker parkedInputWorker = new ParkedInputWorker();
   private final Observability observability = new Observability();
   private final Instance instance = new Instance();
   private final Payload payload = new Payload();
@@ -128,6 +129,56 @@ public class ProcessManagerProperties {
           || oldestPendingWarn.isNegative()
           || oldestPendingWarn.isZero()) {
         throw new IllegalStateException("observability.oldest-pending-warn must be positive");
+      }
+    }
+  }
+
+  /**
+   * Parked-input worker polling. Deliberately not a {@link Worker}: this worker takes no lease and
+   * has no retry budget of its own, because a replay is idempotent (deduped by the replay
+   * transition's unique input id) and a failing input suspends its instance instead of being
+   * retried on a schedule. Exposing lease/attempt/backoff knobs here would describe a mechanism
+   * that does not exist.
+   */
+  public static class ParkedInputWorker {
+    private boolean enabled = true;
+
+    /** How often to look for instances that still owe a parked-input replay. */
+    private Duration pollDelay = Duration.ofSeconds(1);
+
+    /** How many instances one poll drains. Every owed input of a picked instance is replayed. */
+    private int batchSize = 50;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public Duration getPollDelay() {
+      return pollDelay;
+    }
+
+    public void setPollDelay(Duration pollDelay) {
+      this.pollDelay = pollDelay;
+    }
+
+    public int getBatchSize() {
+      return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+      this.batchSize = batchSize;
+    }
+
+    void validate() {
+      if (pollDelay == null || pollDelay.isNegative() || pollDelay.isZero()) {
+        throw new IllegalStateException("parked-input-worker.poll-delay must be positive");
+      }
+      if (batchSize < 1) {
+        throw new IllegalStateException("parked-input-worker.batch-size must be >= 1");
       }
     }
   }
@@ -276,6 +327,7 @@ public class ProcessManagerProperties {
     }
     effectRelay.validate("effect-relay");
     deadlineWorker.validate("deadline-worker");
+    parkedInputWorker.validate();
     observability.validate();
     instance.validate();
     payload.validate();
@@ -343,6 +395,10 @@ public class ProcessManagerProperties {
 
   public Worker getDeadlineWorker() {
     return deadlineWorker;
+  }
+
+  public ParkedInputWorker getParkedInputWorker() {
+    return parkedInputWorker;
   }
 
   public Observability getObservability() {

@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.mybatisplus.store;
 
+import com.aipersimmon.ddd.processmanager.engine.store.ConcurrentTransitionException;
 import com.aipersimmon.ddd.processmanager.engine.store.Payloads;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceCriteria;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
@@ -22,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.DuplicateKeyException;
 
 /**
  * MyBatis-Plus implementation of {@link ProcessInstanceStore}. It runs the same SQL as {@code
@@ -85,7 +87,22 @@ public final class MybatisProcessInstanceStore implements ProcessInstanceStore {
     m.put("createdAt", ts);
     m.put("updatedAt", ts);
     m.put("endedAt", row.lifecycle().isTerminal() ? ts : null);
-    mapper.insert(m);
+    try {
+      mapper.insert(m);
+    } catch (DuplicateKeyException alreadyStarted) {
+      // UNIQUE(tenant_id, process_type, business_key): a concurrent transaction started the same
+      // coordinator first. Surfaced store-neutrally so the runtime retries the start under the
+      // configured duplicate-business-key policy, exactly as the JDBC store does.
+      throw new ConcurrentTransitionException(
+          "instance for business key "
+              + row.ref().businessKey().value()
+              + " of process type "
+              + row.ref().processType().value()
+              + " in tenant "
+              + row.tenantId()
+              + " already exists",
+          alreadyStarted);
+    }
   }
 
   @Override

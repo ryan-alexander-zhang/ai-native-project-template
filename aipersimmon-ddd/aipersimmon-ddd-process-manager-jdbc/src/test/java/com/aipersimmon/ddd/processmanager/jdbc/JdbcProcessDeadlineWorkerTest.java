@@ -63,6 +63,8 @@ class JdbcProcessDeadlineWorkerTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V4__parked_input_replay_marker.sql")
             .build();
     jdbc = new JdbcTemplate(dataSource);
     instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -131,6 +133,36 @@ class JdbcProcessDeadlineWorkerTest {
     assertEquals(
         "REVIEW_EXPIRED",
         jdbc.queryForObject("SELECT outcome FROM aipersimmon_process_instance", String.class));
+  }
+
+  @Test
+  void aSettledDeadlineIsNotReturnedToTheQueueByALateFailureHandler() {
+    ProcessAdvanceResult started = start();
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.ArmDeadline(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+    String deadlineId =
+        jdbc.queryForObject("SELECT deadline_id FROM aipersimmon_process_deadline", String.class);
+    // Claim it, then let a cancel land — the shape of a fire whose transaction rolled back as the
+    // instance ended: its failure handler then runs outside any lock, on a stale view.
+    jdbc.update(
+        "UPDATE aipersimmon_process_deadline SET status = 'IN_FLIGHT', lease_token = 'lease-x'");
+    deadlineStore.cancelLive(started.processRef().instanceId(), CLOCK.instant());
+
+    assertEquals(
+        0,
+        deadlineStore.scheduleRetry(
+            deadlineId, "lease-x", CLOCK.instant(), "transient", CLOCK.instant()),
+        "a retry cannot resurrect a settled timer");
+    assertEquals(
+        0,
+        deadlineStore.markDead(deadlineId, "lease-x", "exhausted", CLOCK.instant()),
+        "nor can the dead-letter transition");
+    assertEquals(
+        "CANCELLED",
+        jdbc.queryForObject("SELECT status FROM aipersimmon_process_deadline", String.class),
+        "the cancel stands, so no unclaimable PENDING row is left behind");
   }
 
   @Test

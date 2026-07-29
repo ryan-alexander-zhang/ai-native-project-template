@@ -23,6 +23,7 @@ import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
 import com.aipersimmon.ddd.processmanager.engine.relay.IntegrationEventEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.replay.ParkedInputWorker;
 import com.aipersimmon.ddd.processmanager.engine.retry.ExponentialBackoffPolicy;
 import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
 import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery;
@@ -54,9 +55,9 @@ import org.springframework.transaction.PlatformTransactionManager;
  * the consumer's explicitly-registered Definitions, Codecs, and Dispatchers into their registries
  * (which fail fast on a conflict), and — once a backend has contributed the four store beans, a
  * {@link ProcessClaimStrategy}, and a transaction manager — wires the runtime, query, operations,
- * relay, and deadline worker over those ports and runs the workers on their own thread pools. Every
- * bean is {@link ConditionalOnMissingBean}, so a consumer overrides any of them. It scans no
- * business packages and never executes DDL.
+ * relay, deadline worker, and parked-input worker over those ports and runs the workers on their
+ * own thread pools. Every bean is {@link ConditionalOnMissingBean}, so a consumer overrides any of
+ * them. It scans no business packages and never executes DDL.
  *
  * <p>A storage backend ({@code aipersimmon-ddd-process-manager-jdbc}, {@code
  * aipersimmon-ddd-process-manager-mybatis-plus}) declares its store/claim beans and is ordered
@@ -211,8 +212,6 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
       ProcessTransitionStore transitions,
       ProcessEffectStore effects,
       ProcessDeadlineStore deadlines,
-      ProcessRuntime runtime,
-      ProcessPayloadCodecRegistry payloadCodecs,
       ProcessUnitOfWork unitOfWork,
       Clock processManagerClock,
       IdGenerator idGenerator) {
@@ -221,11 +220,44 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         transitions,
         effects,
         deadlines,
-        runtime,
-        payloadCodecs,
         unitOfWork,
         processManagerClock,
         ids(idGenerator));
+  }
+
+  /**
+   * Drains the parked-input replay queue. Gated on the runtime because a replay re-enters {@code
+   * handle}; disabling it leaves inputs parked during a suspension owed indefinitely, which is only
+   * ever appropriate while draining a node.
+   */
+  @Bean
+  @ConditionalOnBean({
+    ProcessInstanceStore.class,
+    ProcessTransitionStore.class,
+    ProcessRuntime.class,
+    ProcessUnitOfWork.class
+  })
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.process-manager.parked-input-worker",
+      name = "enabled",
+      matchIfMissing = true)
+  public ParkedInputWorker processParkedInputWorker(
+      ProcessInstanceStore instances,
+      ProcessTransitionStore transitions,
+      ProcessPayloadCodecRegistry payloadCodecs,
+      ProcessRuntime runtime,
+      ProcessUnitOfWork unitOfWork,
+      Clock processManagerClock,
+      ProcessManagerProperties properties) {
+    return new ParkedInputWorker(
+        instances,
+        transitions,
+        payloadCodecs,
+        runtime,
+        unitOfWork,
+        processManagerClock,
+        properties.getParkedInputWorker().getBatchSize());
   }
 
   @Bean
@@ -334,12 +366,15 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
   public ProcessWorkerScheduler processWorkerScheduler(
       ObjectProvider<ProcessEffectRelay> relay,
       ObjectProvider<ProcessDeadlineWorker> worker,
+      ObjectProvider<ParkedInputWorker> parkedInputWorker,
       ProcessManagerProperties properties) {
     return new ProcessWorkerScheduler(
         relay.getIfAvailable(),
         properties.getEffectRelay().getPollDelay(),
         worker.getIfAvailable(),
         properties.getDeadlineWorker().getPollDelay(),
+        parkedInputWorker.getIfAvailable(),
+        properties.getParkedInputWorker().getPollDelay(),
         properties.getShutdownTimeout());
   }
 

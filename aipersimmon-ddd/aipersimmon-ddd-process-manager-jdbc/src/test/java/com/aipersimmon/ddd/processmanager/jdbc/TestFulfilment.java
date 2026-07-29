@@ -66,6 +66,9 @@ final class TestFulfilment {
 
   record DeadlineFired() implements ProcessInput {}
 
+  /** Ends the process and schedules a deadline in the same decision — an unreachable timer. */
+  record FinishAndArmDeadline() implements ProcessInput {}
+
   // Command effect payload.
   record DoWork(String reference) implements Command<Void> {}
 
@@ -124,6 +127,16 @@ final class TestFulfilment {
                 new DecisionCode("finished"),
                 List.of());
         case Boom ignored -> throw new IllegalStateException("boom");
+        case FinishAndArmDeadline ignored ->
+            new ProcessDecision<>(
+                new State("DONE", state.count()),
+                ProcessLifecycle.COMPLETED,
+                new ProcessStep("DONE"),
+                Optional.of(new ProcessOutcome("OK")),
+                new DecisionCode("finished-with-timer"),
+                List.of(
+                    new ScheduleDeadline(
+                        new DeadlineName("REVIEW"), context.now(), new DeadlineFired())));
         case EnterCompensating ignored ->
             new ProcessDecision<>(
                 new State("COMP", state.count()),
@@ -243,6 +256,11 @@ final class TestFulfilment {
         payloadCodec("test.illegal-back", IllegalBack.class, i -> "", s -> new IllegalBack()),
         payloadCodec("test.arm-deadline", ArmDeadline.class, a -> "", s -> new ArmDeadline()),
         payloadCodec("test.deadline-fired", DeadlineFired.class, d -> "", s -> new DeadlineFired()),
+        payloadCodec(
+            "test.finish-arm-deadline",
+            FinishAndArmDeadline.class,
+            f -> "",
+            s -> new FinishAndArmDeadline()),
         payloadCodec("test.fan-out", FanOut.class, f -> "", s -> new FanOut()),
         payloadCodec(
             "test.arm-poison", ArmPoisonDeadline.class, a -> "", s -> new ArmPoisonDeadline()),

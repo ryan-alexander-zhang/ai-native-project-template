@@ -78,6 +78,7 @@
       <Class name="com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.operation.ProcessOperations"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay"/>
+      <Class name="com.aipersimmon.ddd.processmanager.engine.replay.ParkedInputWorker"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.JdbcProcessSchemaValidator"/>

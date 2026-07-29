@@ -140,8 +140,20 @@ public final class MybatisProcessTransitionStore implements ProcessTransitionSto
   }
 
   @Override
-  public List<ParkedInput> findParkedInputs(ProcessInstanceId instanceId) {
-    return mapper.findParkedInputs(instanceId.value()).stream()
+  public int markParkedReplayed(ProcessInstanceId instanceId, String inputMessageId, Instant now) {
+    return mapper.markParkedReplayed(instanceId.value(), inputMessageId, Timestamp.from(now));
+  }
+
+  @Override
+  public List<ProcessInstanceId> findInstancesOwedParkedReplay(int limit) {
+    return mapper.findInstancesOwedParkedReplay(limit).stream()
+        .map(ProcessInstanceId::new)
+        .toList();
+  }
+
+  @Override
+  public List<ParkedInput> findUnreplayedParkedInputs(ProcessInstanceId instanceId) {
+    return mapper.findUnreplayedParkedInputs(instanceId.value()).stream()
         .map(
             r ->
                 new ParkedInput(

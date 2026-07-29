@@ -41,8 +41,9 @@ public interface ProcessDeadlineMapper {
 
   @Update(
       "UPDATE aipersimmon_process_deadline SET status = 'CANCELLED', completed_at = #{now},"
-          + " updated_at = #{now} WHERE instance_id = #{instanceId} AND status = 'PENDING'")
-  int cancelPending(@Param("instanceId") String instanceId, @Param("now") Timestamp now);
+          + " updated_at = #{now}, lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE"
+          + " instance_id = #{instanceId} AND status IN ('PENDING', 'IN_FLIGHT')")
+  int cancelLive(@Param("instanceId") String instanceId, @Param("now") Timestamp now);
 
   @Update(
       "UPDATE aipersimmon_process_deadline SET status = 'CANCELLED', completed_at = #{now},"
@@ -74,7 +75,7 @@ public interface ProcessDeadlineMapper {
       "UPDATE aipersimmon_process_deadline SET status = 'PENDING', attempts = attempts + 1,"
           + " next_attempt_at = #{nextAttemptAt}, last_error = #{error}, updated_at = #{now},"
           + " lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE deadline_id ="
-          + " #{deadlineId} AND lease_token = #{leaseToken}")
+          + " #{deadlineId} AND lease_token = #{leaseToken} AND status = 'IN_FLIGHT'")
   int scheduleRetry(
       @Param("deadlineId") String deadlineId,
       @Param("leaseToken") String leaseToken,
@@ -86,7 +87,7 @@ public interface ProcessDeadlineMapper {
       "UPDATE aipersimmon_process_deadline SET status = 'DEAD', attempts = attempts + 1,"
           + " last_error = #{error}, updated_at = #{now}, lease_owner = NULL, lease_token = NULL,"
           + " lease_until = NULL WHERE deadline_id = #{deadlineId} AND lease_token ="
-          + " #{leaseToken}")
+          + " #{leaseToken} AND status = 'IN_FLIGHT'")
   int markDead(
       @Param("deadlineId") String deadlineId,
       @Param("leaseToken") String leaseToken,

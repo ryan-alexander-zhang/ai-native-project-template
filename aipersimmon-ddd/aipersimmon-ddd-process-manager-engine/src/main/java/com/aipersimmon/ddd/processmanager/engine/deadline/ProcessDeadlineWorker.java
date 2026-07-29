@@ -16,6 +16,8 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -126,6 +128,15 @@ public final class ProcessDeadlineWorker {
       return false;
     }
     DeadlineRow deadline = loaded.get();
+    // Rebind the deadline's tenant for the fire. The row carries the owning tenant precisely
+    // because this hop crosses threads: the advance the timer triggers, and anything it dispatches,
+    // may read the ambient tenant, and on a worker thread nothing bound it.
+    return TenantContext.runAs(
+        Tenants.fromValue(deadline.tenantId()), () -> fire(deadline, leaseToken));
+  }
+
+  private boolean fire(DeadlineRow deadline, String leaseToken) {
+    String deadlineId = deadline.deadlineId();
     try {
       // Everything runs in one fire transaction: locking the instance row first serializes any
       // concurrent CancelDeadline/reschedule advance, and re-reading the deadline status under its
@@ -150,14 +161,21 @@ public final class ProcessDeadlineWorker {
                   deadlines.cancelClaimed(deadlineId, leaseToken, clock.instant());
                   return Boolean.FALSE;
                 }
+                // Mark it FIRED before the advance, not after. Both are in this one transaction, so
+                // atomicity is unchanged — but the mark takes the timer out of the live set first,
+                // and that matters when the advance it triggers ends the process: a terminal
+                // decision cancels every live deadline, which would otherwise rewrite this timer as
+                // CANCELLED although it did fire. A 0 here means the lease is no longer ours.
+                if (deadlines.markFired(deadlineId, leaseToken, clock.instant()) != 1) {
+                  return Boolean.FALSE;
+                }
                 ProcessPayloadCodec<?> codec = payloadCodecs.forType(deadline.inputType());
                 ProcessInput input =
                     (ProcessInput)
                         codec.decode(
                             new EncodedPayload(deadline.inputType(), deadline.inputPayload()));
                 // Fire under the correlation/causation persisted when the timer was scheduled, so
-                // the
-                // timeout stays on the same causal chain as the flow that armed it.
+                // the timeout stays on the same causal chain as the flow that armed it.
                 CommandContext context =
                     new CommandContext(
                         deadline.tenantId(),
@@ -179,7 +197,6 @@ public final class ProcessDeadlineWorker {
                     throw e;
                   }
                 }
-                deadlines.markFired(deadlineId, leaseToken, clock.instant());
                 return Boolean.TRUE;
               }));
     } catch (RuntimeException failure) {

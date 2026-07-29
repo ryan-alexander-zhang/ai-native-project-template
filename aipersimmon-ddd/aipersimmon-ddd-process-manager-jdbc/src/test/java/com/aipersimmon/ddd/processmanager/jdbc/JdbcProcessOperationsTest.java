@@ -16,6 +16,7 @@ import com.aipersimmon.ddd.processmanager.engine.operation.ProcessOperations;
 import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
 import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
+import com.aipersimmon.ddd.processmanager.engine.replay.ParkedInputWorker;
 import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
 import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
 import com.aipersimmon.ddd.processmanager.engine.runtime.DuplicateBusinessKeyPolicy;
@@ -60,6 +61,7 @@ class JdbcProcessOperationsTest {
   private JdbcProcessDeadlineStore deadlineStore;
   private SpringTxProcessUnitOfWork unitOfWork;
   private ProcessOperations operations;
+  private ParkedInputWorker parkedInputWorker;
   private final AtomicUpdateProcessDialect dialect = new AtomicUpdateProcessDialect("h2");
   private final FailingBus bus = new FailingBus();
   private final AtomicInteger ids = new AtomicInteger();
@@ -77,6 +79,8 @@ class JdbcProcessOperationsTest {
                 "classpath:aipersimmon/db/migration/process-manager/h2/V2__drop_trace_id.sql")
             .addScript(
                 "classpath:aipersimmon/db/migration/process-manager/h2/V3__add_tenant_id.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/process-manager/h2/V4__parked_input_replay_marker.sql")
             .build();
     jdbc = new JdbcTemplate(dataSource);
     instanceStore = new JdbcProcessInstanceStore(jdbc);
@@ -106,11 +110,12 @@ class JdbcProcessOperationsTest {
             transitionStore,
             effectStore,
             deadlineStore,
-            runtime,
-            payloadCodecs,
             unitOfWork,
             CLOCK,
             () -> "op-" + ids.incrementAndGet());
+    parkedInputWorker =
+        new ParkedInputWorker(
+            instanceStore, transitionStore, payloadCodecs, runtime, unitOfWork, CLOCK, 10);
   }
 
   private ProcessAdvanceResult start() {
@@ -123,6 +128,26 @@ class JdbcProcessOperationsTest {
 
   private String lifecycle() {
     return jdbc.queryForObject("SELECT lifecycle FROM aipersimmon_process_instance", String.class);
+  }
+
+  private String step() {
+    return jdbc.queryForObject(
+        "SELECT business_step FROM aipersimmon_process_instance", String.class);
+  }
+
+  /** The decoded state payload ({@code step|count}); the column holds it base64-encoded. */
+  private String state() {
+    String encoded =
+        jdbc.queryForObject("SELECT state_payload FROM aipersimmon_process_instance", String.class);
+    return new String(
+        java.util.Base64.getDecoder().decode(encoded), java.nio.charset.StandardCharsets.UTF_8);
+  }
+
+  private long owedParkedInputs() {
+    return jdbc.queryForObject(
+        "SELECT COUNT(*) FROM aipersimmon_process_transition "
+            + "WHERE transition_kind = 'PARKED' AND replayed_at IS NULL",
+        Long.class);
   }
 
   private String suspendViaDeadDeadline() {
@@ -200,7 +225,7 @@ class JdbcProcessOperationsTest {
   }
 
   @Test
-  void redrivingTheLastDeadEffectResumesAndReplaysParkedInputs() {
+  void redriveResumesAndLeavesTheReplayOwedUntilTheWorkerDrainsIt() {
     ProcessAdvanceResult started = start();
     String deadEffectId = started.transitionId() + "#0";
     suspendViaDeadEffect();
@@ -212,10 +237,15 @@ class JdbcProcessOperationsTest {
     operations.redriveEffect(deadEffectId, "operator-1", "transient outage cleared");
 
     assertEquals("RUNNING", lifecycle(), "resumed to its recorded resume lifecycle");
-    assertEquals(
-        "S2",
-        jdbc.queryForObject("SELECT business_step FROM aipersimmon_process_instance", String.class),
-        "the parked Advance was replayed");
+    // The operator's call committed the resume and nothing else. The replay is owed, durably, so a
+    // crash here loses nothing — which is exactly why it is not done inside redrive.
+    assertEquals("S1", step(), "the parked input has not been replayed by redrive itself");
+    assertEquals(1, owedParkedInputs(), "the replay is recorded as still owed");
+
+    assertEquals(1, parkedInputWorker.pollOnce(), "the worker drains the queue");
+
+    assertEquals("S2", step(), "the parked Advance was replayed");
+    assertEquals(0, owedParkedInputs(), "and the debt is settled");
     assertEquals(
         "PENDING",
         jdbc.queryForObject(
@@ -291,13 +321,75 @@ class JdbcProcessOperationsTest {
             Long.class));
 
     operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
+    assertEquals(2, parkedInputWorker.pollOnce(), "both owed inputs drain in one poll");
 
     assertEquals("RUNNING", lifecycle());
     // Arrival order: Advance (S1->S2) then FanOut (S2->FAN); the reverse would leave step at S2.
+    assertEquals("FAN", step(), "parked inputs replayed in arrival order");
+  }
+
+  @Test
+  void aReplayThatAlreadyCommittedIsNotAppliedTwice() {
+    ProcessAdvanceResult started = start();
+    String deadEffectId = started.transitionId() + "#0";
+    suspendViaDeadEffect();
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+    operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
+    parkedInputWorker.pollOnce();
+    assertEquals("S2|1", state(), "Advance ran once, incrementing the counter once");
+
+    // Simulate a crash between the replay's commit and its marker: the debt reappears, and the next
+    // poll — on this node or another — replays an input whose advance is already recorded. The
+    // process-level dedup makes that a no-op, so the state must not move again.
+    jdbc.update(
+        "UPDATE aipersimmon_process_transition SET replayed_at = NULL "
+            + "WHERE transition_kind = 'PARKED'");
+    parkedInputWorker.pollOnce();
+
+    assertEquals("S2|1", state(), "the duplicate replay did not advance the process a second time");
+    assertEquals(0, owedParkedInputs(), "and the marker is settled after the retry");
+  }
+
+  @Test
+  void aParkedInputWhoseReplayFailsSuspendsTheInstanceInsteadOfRetryingForever() {
+    ProcessAdvanceResult started = start();
+    String deadEffectId = started.transitionId() + "#0";
+    suspendViaDeadEffect();
+    // Boom's decision throws, so its replay cannot succeed however often it is attempted.
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.Boom(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-boom"));
+    operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
+
+    assertEquals(0, parkedInputWorker.pollOnce(), "nothing was replayed");
+
+    assertEquals("SUSPENDED", lifecycle(), "the instance is parked for operator recovery");
     assertEquals(
-        "FAN",
-        jdbc.queryForObject("SELECT business_step FROM aipersimmon_process_instance", String.class),
-        "parked inputs replayed in arrival order");
+        "PARKED_INPUT",
+        jdbc.queryForObject(
+            "SELECT suspension_source FROM aipersimmon_process_instance", String.class),
+        "the suspension names the parked input as its source");
+    assertEquals(1, owedParkedInputs(), "the input is still owed, not silently dropped");
+    assertEquals(
+        0, parkedInputWorker.pollOnce(), "a suspended instance is no longer offered to the worker");
+  }
+
+  @Test
+  void aParkedInputIsNotReplayedWhileTheInstanceIsStillSuspended() {
+    ProcessAdvanceResult started = start();
+    suspendViaDeadEffect();
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.Advance(),
+        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+
+    assertEquals(0, parkedInputWorker.pollOnce(), "a suspended instance would only re-park it");
+    assertEquals("S1", step());
+    assertEquals(1, owedParkedInputs());
   }
 
   @Test
@@ -312,6 +404,7 @@ class JdbcProcessOperationsTest {
         CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
 
     operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
+    parkedInputWorker.pollOnce();
 
     // The replay runs under a synthetic message id but must keep the parked input's causal chain.
     var replayed =
@@ -327,11 +420,21 @@ class JdbcProcessOperationsTest {
   @Test
   void cancelProcessTerminatesAndCancelsPendingWork() {
     ProcessAdvanceResult started = start();
+    // Arm a timer so the cancel has a live deadline to retire, not just an effect.
+    ProcessAdvanceResult armed =
+        runtime.handle(
+            started.processRef(),
+            new TestFulfilment.ArmDeadline(),
+            CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
 
     operations.cancelProcess(
-        started.processRef(), started.revision().value(), "operator-1", "customer request");
+        started.processRef(), armed.revision().value(), "operator-1", "customer request");
 
     assertEquals("CANCELLED", lifecycle());
+    assertEquals(
+        "CANCELLED",
+        jdbc.queryForObject("SELECT status FROM aipersimmon_process_deadline", String.class),
+        "a cancelled coordinator leaves no live timer behind");
     assertEquals(
         "PROCESS_CANCELLED",
         jdbc.queryForObject("SELECT outcome FROM aipersimmon_process_instance", String.class));

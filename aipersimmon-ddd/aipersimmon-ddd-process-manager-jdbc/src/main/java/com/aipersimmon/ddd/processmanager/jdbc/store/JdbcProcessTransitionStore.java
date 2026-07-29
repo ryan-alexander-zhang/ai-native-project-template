@@ -20,8 +20,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Appends to the append-only transition log {@code aipersimmon_process_transition} and answers the
- * process-level dedup lookup by {@code (instance_id, input_message_id)}. A history row is never
- * overwritten.
+ * process-level dedup lookup by {@code (instance_id, input_message_id)}. What a row records is
+ * never overwritten; {@code replayed_at} on a parked input is the one field written after insert.
  */
 public final class JdbcProcessTransitionStore implements ProcessTransitionStore {
 
@@ -181,13 +181,13 @@ public final class JdbcProcessTransitionStore implements ProcessTransitionStore 
         instanceId.value());
   }
 
-  /** The inputs parked while the instance was suspended, in arrival order. */
-  public List<ParkedInput> findParkedInputs(ProcessInstanceId instanceId) {
+  /** The inputs parked while the instance was suspended and not yet replayed, in arrival order. */
+  public List<ParkedInput> findUnreplayedParkedInputs(ProcessInstanceId instanceId) {
     return jdbc.query(
         """
                 SELECT tenant_id, input_message_id, input_type, input_version, input_payload, correlation_id
                 FROM aipersimmon_process_transition
-                WHERE instance_id = ? AND transition_kind = 'PARKED'
+                WHERE instance_id = ? AND transition_kind = 'PARKED' AND replayed_at IS NULL
                 ORDER BY transition_seq""",
         (rs, n) ->
             new ParkedInput(
@@ -197,5 +197,35 @@ public final class JdbcProcessTransitionStore implements ProcessTransitionStore 
                 Payloads.fromText(rs.getString("input_payload")),
                 rs.getString("correlation_id")),
         instanceId.value());
+  }
+
+  /** Mark a parked input replayed, taking it out of the replay queue. */
+  public int markParkedReplayed(ProcessInstanceId instanceId, String inputMessageId, Instant now) {
+    return jdbc.update(
+        """
+                UPDATE aipersimmon_process_transition SET replayed_at = ?
+                WHERE instance_id = ? AND input_message_id = ?
+                  AND transition_kind = 'PARKED' AND replayed_at IS NULL""",
+        Timestamp.from(now),
+        instanceId.value(),
+        inputMessageId);
+  }
+
+  /** Active instances that still owe a parked-input replay, oldest debt first. */
+  public List<ProcessInstanceId> findInstancesOwedParkedReplay(int limit) {
+    return jdbc.query(
+        """
+                SELECT t.instance_id
+                FROM aipersimmon_process_transition t
+                JOIN aipersimmon_process_instance i ON i.instance_id = t.instance_id
+                WHERE t.transition_kind = 'PARKED' AND t.replayed_at IS NULL
+                  AND i.lifecycle IN (?, ?)
+                GROUP BY t.instance_id
+                ORDER BY MIN(t.transition_seq), t.instance_id
+                LIMIT ?""",
+        (rs, n) -> new ProcessInstanceId(rs.getString("instance_id")),
+        ProcessLifecycle.RUNNING.name(),
+        ProcessLifecycle.COMPENSATING.name(),
+        limit);
   }
 }

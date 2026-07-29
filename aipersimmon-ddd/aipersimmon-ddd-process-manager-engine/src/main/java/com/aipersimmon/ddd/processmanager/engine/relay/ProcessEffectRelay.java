@@ -14,6 +14,8 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
+import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -166,16 +168,23 @@ public final class ProcessEffectRelay {
       return false;
     }
     ClaimedEffect effect = loaded.get();
-    // Cancellation fence: if an operator cancel landed while this effect was in flight, its
-    // instance
-    // is now terminally CANCELLED. Skip the external dispatch and retire the effect under our
-    // lease,
-    // so no side effect escapes after cancel returned.
+    // Cancellation fence: if an operator cancel landed while this effect was in flight, its owning
+    // instance is now terminally CANCELLED. Skip the external dispatch and retire the effect under
+    // our lease, so no side effect escapes after cancel returned.
     Optional<ProcessInstanceRow> owner = instances.find(effect.instanceId());
     if (owner.isPresent() && owner.get().lifecycle() == ProcessLifecycle.CANCELLED) {
       effects.markCancelled(effectId, leaseToken, clock.instant());
       return false;
     }
+    // Rebind the effect's tenant for the duration of the dispatch. The row carries the owning
+    // tenant precisely because this hop crosses threads: the handler (or the event's producer) may
+    // read the ambient tenant to scope its own tables, and on a relay thread nothing bound it.
+    return TenantContext.runAs(
+        Tenants.fromValue(effect.context().tenantId()), () -> dispatch(effect, leaseToken));
+  }
+
+  private boolean dispatch(ClaimedEffect effect, String leaseToken) {
+    String effectId = effect.effectId();
     long dispatchStart = System.nanoTime();
     try {
       ProcessPayloadCodec<?> codec = payloadCodecs.forType(effect.payloadType());

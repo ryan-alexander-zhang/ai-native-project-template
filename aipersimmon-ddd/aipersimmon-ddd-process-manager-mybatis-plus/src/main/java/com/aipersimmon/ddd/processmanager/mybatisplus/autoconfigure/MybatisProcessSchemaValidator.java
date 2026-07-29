@@ -6,9 +6,10 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 
 /**
- * Verifies at startup that the four process tables exist, so a missing migration fails fast with a
- * clear message instead of at the first advance. It never creates tables — the DDL ships as a
- * sample (see {@code aipersimmon/db/migration/process-manager}) and is applied via
+ * Verifies at startup that the four process tables exist and carry the columns of the latest
+ * migrations, so a missing or partially-applied migration fails fast with a clear message instead
+ * of at the first advance — or, worse, on a background worker's poll. It never creates tables — the
+ * DDL ships as a sample (see {@code aipersimmon/db/migration/process-manager}) and is applied via
  * Flyway/Liquibase. Disabled when {@code schema-validation=none}. The MyBatis-Plus sibling of
  * {@code JdbcProcessSchemaValidator}.
  */
@@ -36,7 +37,8 @@ public final class MybatisProcessSchemaValidator implements InitializingBean {
             throw new IllegalStateException(
                 "process-manager table '"
                     + table
-                    + "' is missing or unreadable; apply the schema "
+                    + "' is missing, unreadable, or lacks a column added by a later migration;"
+                    + " apply the schema "
                     + "(see aipersimmon/db/migration/process-manager) via the "
                     + "aipersimmon-ddd-flyway-spring-boot-starter starter or your own Flyway/Liquibase, or set "
                     + "aipersimmon.ddd.process-manager.schema-validation=none",
