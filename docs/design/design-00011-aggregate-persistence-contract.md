@@ -12,6 +12,10 @@ parent: plan-00013-phase-one-correctness-remediation
 与状态变更同生共死。本设计定义三层：core 的**版本契约**、后端的**版本化仓储基类**、以及使二者在 MyBatis-Plus
 下真正生效所必需的**拦截器组合模型**。
 
+「同生共死」不是注释里的期望而是**两个仓储基类的前置条件**：`saveAggregate` 在无活动事务时拒绝写入
+（[[issue-00107-silent-degradations-become-loud-failures]]）。否则行与事件各自提交，中途失败就留下
+「写了行没有事件」或「发了事件而库里没有那个状态」，且没有任何东西可回滚——而这种失败在一切正常的日子里完全不可见。
+
 背景缺陷：[[issue-00051-aggregates-have-no-optimistic-locking]]、
 [[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]。
 
@@ -178,6 +182,15 @@ flowchart LR
 **逃生舱的代价已在测试中钉住**：消费方自定义 `MybatisPlusInterceptor` 时框架**整体**退让，不会把贡献合并进去。
 这是有意的（否则「自定义」名不副实），但意味着自定义者必须自己装齐框架的 inner interceptor；
 `InnerInterceptorCompositionTest.aConsumerOwnedInterceptorWinsWholesale` 断言了这一语义，Javadoc 也写明。
+
+**但「钉住代价」不等于「拦住后果」**（[[issue-00107-silent-degradations-become-loud-failures]]）：上面那段推理的结论是
+「乐观锁静默消失」，而当时唯一的补救是启动日志——**而那行日志恰好印在会退让的那个 bean 里**，所以真正发生时它也不打印。
+于是写路径改为**自证**：`MybatisPlusAggregateRepository.saveAggregate` 在 `updateById` 之后检查
+`row.getVersion() == expected + 1`。这个断言可行是因为拦截器留下了目击者——它在改写语句之后会把自增后的版本
+**写回实体**（`OptimisticLockerInnerInterceptor` 内 `versionField.set(et, updatedVersionVal)`）。
+版本没动，就说明没有 `WHERE version = ?`，那次 update 是无条件匹配的，受影响行数检查**恰恰因为谓词缺失而通过**。
+同一断言也顺带覆盖第二条路径：行对象的版本字段漏标 `@Version`（拦截器据此识别，漏标即找不到可改写的东西）。
+错误信息把两条路径都点出来。
 
 ## 四、边界（本设计不涵盖）
 

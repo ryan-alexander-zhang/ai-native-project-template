@@ -25,15 +25,16 @@ tenancy / observability / web / 各组件契约）经字节码规则验证零 Sp
 为 protected 只对重建工厂开放；`Invariant`（断言式、强制 ErrorCode）与 `Specification`（决策式、可组合）
 的切分有水准。
 
-**生产可用性：尚不可用。** 核心正确性扎实，**短板在运维层与降级路径**。缺陷高度收敛于两个系统性主题，
-不是散落的技术债：
+**生产可用性：尚不可用（评审时）。** 核心正确性扎实，**短板在运维层与降级路径**。缺陷高度收敛于两个系统性主题，
+不是散落的技术债——**两个主题现已全部收口**（§3 的五项发布阻断项均已完成），剩下的是第 6 项起的结构性工作：
 
 1. **租户体系全线 fail-open。** `orElse(Tenants.ROOT.value())` 散布 14 处 / 9 个模块，
    `MissingTenantException` 是死代码，`MissingTenantPolicy` 只在 HTTP 边缘被咨询。丢绑定即静默读写
    `__root__` 哨兵桶。→ 已修，见 `issue-00099`。
 2. **静默降级。** 反复出现"文档承诺 A、代码行为 B、且无任何日志"：无事务管理器时命令裸跑；消费方自带
-   `MybatisPlusInterceptor` 时乐观锁整体消失；Flyway 组件默认全建表却在 bundle pom 里写着"打包不等于建表"
-   （后者已修，`issue-00106`）。同一份代码对缺失 `IdGenerator` 是启动即失败的——风险姿态自相矛盾。
+   `MybatisPlusInterceptor` 时乐观锁整体消失；Flyway 组件默认全建表却在 bundle pom 里写着"打包不等于建表"。
+   同一份代码对缺失 `IdGenerator` 是启动即失败的——风险姿态自相矛盾。
+   → **已修**：`issue-00107`（四处断言/守卫）与 `issue-00106`（Flyway 契约）。姿态统一到 `IdGenerator` 那一侧。
 
 **核实为扎实、不要动的部分：** outbox 的原子写入 / 诚实的 at-least-once / 按聚合有序的回退 `NOT EXISTS`
 方案（比多数生产级 outbox 更讲究）/ 死信迁移原子且存储故障能自愈 / `issue-00044` 修复验证无误 /
@@ -82,10 +83,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 **持久化（写路径核心是全框架最扎实的部分，以下是其降级路径）**
 - `MybatisPlusAggregateRepository:82` 用 `updateById`，MP 默认 `NOT_NULL` 策略把 null 列从 SET 剔除 →
   领域方法清空可选字段：版本检查通过、事件发布、库里仍是旧值，重建时僵尸字段复活，全程无错。
-  这是该基类本该中和的头号 MP 陷阱，javadoc 亦无提醒。
-- 消费方自带 `MybatisPlusInterceptor` 时乐观锁拦截器整体消失、退化 last-writer-wins，且**启动日志恰好印在
-  会 back-off 的那个 bean 里**；`InnerInterceptorCompositionTest` 已把这个失败模式测出来却仍然发货。
-  三行可修：MP 的 locker 会把 `newVersion` 写回实体，`updateById` 成功后断言 `version == expected + 1`。
+  这是该基类本该中和的头号 MP 陷阱，javadoc 亦无提醒。**（仍然开着）**
+- ~~消费方自带 `MybatisPlusInterceptor` 时乐观锁拦截器整体消失~~ → **已修** `issue-00107`：
+  按预想的三行办——拦截器会把自增版本写回实体，故 `updateById` 成功后断言 `version == expected + 1`；
+  该断言顺带覆盖"行对象漏标 `@Version`"这条同样静默的路径。
 - ~~Flyway 组件默认 apply-all 与两个 bundle pom 宣称的"打包不等于建表"直接矛盾~~ →
   **已修** `issue-00106`：用户定为「空 = 什么都不建」（opt-in）。代码是四份文档里的孤例；
   而 `issue-00103` 把 schema 探针改成列级之后，漏配的代价从"运行期第一次写库才报错"
@@ -95,7 +96,8 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - handler 构造注入 `CommandBus` 会启动循环依赖（`AipersimmonDddCqrsAutoConfiguration:67-73` 在工厂方法内
   `handlers.stream().toList()` 提前实例化全部 handler），而这正是框架文档推荐的子命令派发写法。
 - `domainEvents()` javadoc 承诺快照，实际返回活视图 → 同步监听器回写同一聚合时 `ConcurrentModificationException`。
-- 无 `PlatformTransactionManager` 时 `UnitOfWork` 与事务拦截器静默 back-off，starter 的招牌保证蒸发且无警告。
+- ~~无 `PlatformTransactionManager` 时 `UnitOfWork` 与事务拦截器静默 back-off~~ → **已修** `issue-00107`：
+  默认拒绝启动 + FailureAnalyzer 报告，`aipersimmon.ddd.cqrs.transaction.required=false` 是显式逃生舱（每次启动 WARN）。
 - 命令失败只 DEBUG 记录，默认 INFO 生产配置下失败命令一行日志都没有。
 
 **Web / 可观测性**
@@ -133,8 +135,9 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 4. process-manager C4/C5，并修正 `withRetry` 的重试前提、给 instance store 补异常映射
    （`issue-00103` / `issue-00104` / `issue-00105`，**已完成**）
 5. 把静默降级统统改成响亮失败（无 TM 拒绝启动、两个仓储基类加活动事务断言、MP 乐观锁版本回写断言、
-   `OutboxWriter` 事务断言）——框架已为 `IdGenerator` 立了 fail-loud 先例，照它办。
-   其中 Flyway 那条**已先行完成**（`issue-00106`），因为它需要用户定契约、且依赖第 4 项的列级 schema 探测
+   `OutboxWriter` 事务断言）——框架已为 `IdGenerator` 立了 fail-loud 先例，照它办
+   （`issue-00107`，**已完成**；Flyway 那条先行完成于 `issue-00106`，因为它需要用户定契约、
+   且依赖第 4 项的列级 schema 探测）
 
 **紧接其后**
 6. 抽出 `aipersimmon-ddd-outbox-engine`，让 inbox/outbox 与 process-manager 形状一致
@@ -166,4 +169,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00103-parked-input-replay-is-not-crash-safe]]、
   [[issue-00104-an-ended-instance-keeps-its-timers-forever]]、
   [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]、
-  [[issue-00106-an-empty-flyway-component-list-created-every-table]]
+  [[issue-00106-an-empty-flyway-component-list-created-every-table]]、
+  [[issue-00107-silent-degradations-become-loud-failures]]
