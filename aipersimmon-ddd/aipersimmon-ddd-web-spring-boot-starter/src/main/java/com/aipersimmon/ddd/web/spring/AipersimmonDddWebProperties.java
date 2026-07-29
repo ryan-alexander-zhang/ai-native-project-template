@@ -119,8 +119,21 @@ public class AipersimmonDddWebProperties {
     /** Request header carrying the idempotency key. */
     private String header = "Idempotency-Key";
 
-    /** How long a stored first response is retained. */
+    /** How long a stored first response is retained — the retry window offered to clients. */
     private Duration ttl = Duration.ofHours(24);
+
+    /**
+     * How long a claim stays valid without completing, after which another attempt may take the key
+     * over.
+     *
+     * <p>The key is claimed before the request runs, so this is the window during which a
+     * concurrent duplicate is answered with {@code 409} instead of executing. It must outlast the
+     * slowest request the endpoint can serve: set it shorter and a still-running request can have
+     * its key claimed by a retry, which is the duplicate execution the claim exists to prevent. It
+     * should not be much longer than that either — a caller that dies mid-request leaves the key
+     * unusable until the lease passes.
+     */
+    private Duration claimLease = Duration.ofMinutes(1);
 
     /** Reject a write with 400 when the key is missing (otherwise pass through). */
     private boolean requireKey = false;
@@ -150,6 +163,14 @@ public class AipersimmonDddWebProperties {
 
     public void setTtl(Duration ttl) {
       this.ttl = ttl;
+    }
+
+    public Duration getClaimLease() {
+      return claimLease;
+    }
+
+    public void setClaimLease(Duration claimLease) {
+      this.claimLease = claimLease;
     }
 
     public boolean isRequireKey() {

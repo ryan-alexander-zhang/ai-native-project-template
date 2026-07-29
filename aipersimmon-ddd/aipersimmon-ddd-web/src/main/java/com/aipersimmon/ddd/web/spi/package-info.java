@@ -11,5 +11,13 @@
  *
  * <p>A starter ships in-memory defaults (single-node/dev only); Redis and JDBC modules provide the
  * production implementations, selected by classpath.
+ *
+ * <p>Idempotency is the one that is not merely keyed state: it is a three-call lifecycle ({@code
+ * claim} / {@code complete} / {@code abandon}) because the key must be taken <em>before</em> the
+ * request executes. Recording the finished response cannot make a write execute once — two
+ * concurrent first attempts both find nothing stored and both run. {@link
+ * com.aipersimmon.ddd.web.spi.IdempotencyKey} carries the caller as part of that key's identity,
+ * and {@link com.aipersimmon.ddd.web.spi.IdempotencyPrincipalResolver} is how a deployment says who
+ * the caller is.
  */
 package com.aipersimmon.ddd.web.spi;

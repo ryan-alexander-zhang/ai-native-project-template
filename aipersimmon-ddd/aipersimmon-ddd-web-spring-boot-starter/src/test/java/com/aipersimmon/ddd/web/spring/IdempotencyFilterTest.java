@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.web.spring;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -82,8 +83,59 @@ class IdempotencyFilterTest {
         .andExpect(header().doesNotExist("X-Trace-Note"));
   }
 
+  /**
+   * A 5xx must not be frozen under the key. The client retries a transient failure precisely
+   * because it was transient, so replaying the failure for the whole retention window would answer
+   * every retry with it and defeat the key's purpose. The claim is released instead, and the next
+   * attempt executes.
+   */
+  @Test
+  void aServerErrorIsNotStoredSoTheRetryStillExecutes() throws Exception {
+    mvc.perform(post("/idem/fail").header("Idempotency-Key", "e1"))
+        .andExpect(status().isInternalServerError());
+
+    // Same key, and the handler runs again rather than replaying the 500.
+    mvc.perform(post("/idem/fail").header("Idempotency-Key", "e1"))
+        .andExpect(status().isInternalServerError());
+    assertEquals(2, counter.failures.get(), "the failing handler ran on both attempts");
+  }
+
+  /** A 4xx is a decided outcome, so it is stored and replayed like any other. */
+  @Test
+  void aClientErrorIsADecidedOutcomeAndIsReplayed() throws Exception {
+    mvc.perform(post("/idem/reject").header("Idempotency-Key", "r1"))
+        .andExpect(status().isConflict());
+    mvc.perform(post("/idem/reject").header("Idempotency-Key", "r1"))
+        .andExpect(status().isConflict());
+    assertEquals(1, counter.rejections.get(), "the second attempt replayed rather than executing");
+  }
+
+  /**
+   * The same key against a different endpoint is neither replayable (the stored outcome answers a
+   * different question) nor executable (the caller believes the key names one operation), so it is
+   * refused.
+   */
+  @Test
+  void aKeyReusedForADifferentRequestIsRefused() throws Exception {
+    mvc.perform(post("/idem").header("Idempotency-Key", "x1")).andExpect(status().isOk());
+
+    mvc.perform(post("/idem/create").header("Idempotency-Key", "x1"))
+        .andExpect(status().isUnprocessableEntity());
+  }
+
+  /** A key longer than the store's column is rejected before the handler runs, not after. */
+  @Test
+  void anOversizedKeyIsRejectedBeforeExecuting() throws Exception {
+    int before = counter.value.get();
+    mvc.perform(post("/idem").header("Idempotency-Key", "k".repeat(256)))
+        .andExpect(status().isBadRequest());
+    assertEquals(before, counter.value.get(), "the handler must not have run");
+  }
+
   static class Counter {
     final AtomicInteger value = new AtomicInteger();
+    final AtomicInteger failures = new AtomicInteger();
+    final AtomicInteger rejections = new AtomicInteger();
   }
 
   @RestController
@@ -98,6 +150,20 @@ class IdempotencyFilterTest {
     @PostMapping("/idem")
     String create() {
       return Integer.toString(counter.value.incrementAndGet());
+    }
+
+    /** A transient server failure: nothing worth replaying. */
+    @PostMapping("/idem/fail")
+    ResponseEntity<String> fail() {
+      counter.failures.incrementAndGet();
+      return ResponseEntity.internalServerError().body("boom");
+    }
+
+    /** A decided rejection: a real outcome, so it is stored and replayed. */
+    @PostMapping("/idem/reject")
+    ResponseEntity<String> reject() {
+      counter.rejections.incrementAndGet();
+      return ResponseEntity.status(409).body("conflict");
     }
 
     /** A create: 201 plus the headers that say what was created and where. */

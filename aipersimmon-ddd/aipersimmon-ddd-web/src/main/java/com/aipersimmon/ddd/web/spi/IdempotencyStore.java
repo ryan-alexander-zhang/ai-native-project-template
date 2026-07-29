@@ -1,29 +1,56 @@
 package com.aipersimmon.ddd.web.spi;
 
 import java.time.Duration;
-import java.util.Optional;
 
 /**
- * Stores the first response for an idempotency key so a retried, authorised request is executed
- * once and subsequent replays return the original outcome. This is a reliability concern (safe
- * retries) — distinct from replay protection, which is a security concern; see {@link ReplayGuard}.
+ * Makes an authorised write safe to retry: one key means one execution, and later attempts with
+ * that key receive the first outcome. This is a reliability concern (safe retries) — distinct from
+ * replay protection, which is a security concern; see {@link ReplayGuard}.
  *
- * <p>Implementations must make {@link #saveIfAbsent} atomic (a single winner per key) so concurrent
- * first-time requests do not both execute.
+ * <p>The lifecycle is deliberately three calls rather than "look it up, run, save it". A key is
+ * claimed <em>before</em> the request executes, so a second attempt arriving while the first is
+ * still in flight — the timeout-and-retry case idempotency exists for — is told the truth instead
+ * of executing a second time. Recording only the finished response cannot do that: by the time
+ * there is something to record, both side effects have already happened.
+ *
+ * <pre>
+ *   claim(key, leaseTtl)
+ *     ├─ Won        → execute, then complete(...) on an outcome, or abandon(...) to release
+ *     ├─ InProgress → another attempt holds the claim; do not execute
+ *     ├─ Replay     → return the stored outcome; do not execute
+ *     └─ Mismatch   → the key names a different request; refuse
+ * </pre>
+ *
+ * <p>Implementations must make {@link #claim} atomic across instances — exactly one caller can hold
+ * a key at a time. A claim carries its own lease so a caller that dies mid-request cannot block the
+ * key until the (much longer) response retention expires: once the lease passes, the next attempt
+ * may take the claim over.
  */
 public interface IdempotencyStore {
 
-  /** The stored response for {@code key}, if one has been recorded and not expired. */
-  Optional<StoredResponse> find(String key);
+  /**
+   * Atomically take the claim for {@code key}, or report what already holds it.
+   *
+   * @param key the full identity of this attempt, including who is calling
+   * @param leaseTtl how long this claim stays valid without being completed, after which another
+   *     attempt may take it over
+   */
+  IdempotencyClaim claim(IdempotencyKey key, Duration leaseTtl);
 
   /**
-   * Atomically records {@code response} for {@code key} only if none exists yet.
+   * Record the outcome for a claim this caller won, so later attempts replay it.
    *
-   * @param key the idempotency key
-   * @param response the response to store
-   * @param ttl how long the entry should be retained
-   * @return {@code true} if this call recorded the entry (the caller "won"), {@code false} if an
-   *     entry already existed
+   * @param ttl how long the outcome is retained — the retry window offered to clients, typically
+   *     far longer than the claim lease
    */
-  boolean saveIfAbsent(String key, StoredResponse response, Duration ttl);
+  void complete(IdempotencyKey key, StoredResponse response, Duration ttl);
+
+  /**
+   * Release a claim without an outcome, leaving the key free for a later attempt.
+   *
+   * <p>Used when the request produced nothing worth replaying: a transient server failure, where
+   * freezing the failure under the key for the whole retention window would defeat the retry the
+   * key was issued for.
+   */
+  void abandon(IdempotencyKey key);
 }

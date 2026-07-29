@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.outbox.jdbc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,8 +30,22 @@ class OutboxCleanupTest {
   @EnableAutoConfiguration
   static class TestApp {}
 
-  @Autowired OutboxCleanup cleanup;
   @Autowired JdbcTemplate jdbc;
+
+  /**
+   * The purge under test is invoked directly rather than through the autowired bean.
+   *
+   * <p>{@code OutboxCleanup.purge} carries {@code @SchedulerLock}, and
+   * {@code @Scheduled(fixedDelay)} fires once as soon as the context is up — so a call through the
+   * proxy races that first scheduled run for the lock, and ShedLock's answer to losing is to skip
+   * the method silently. The test then asserted on a purge that never ran, and failed
+   * intermittently (issue-00100). Constructing the collaborator removes the lock from a question
+   * that is about which rows the DELETE matches. A concurrent scheduled purge cannot change the
+   * outcome either way: it can only delete the same expired row this test expects to be gone.
+   */
+  private OutboxCleanup cleanup() {
+    return new OutboxCleanup(jdbc, Clock.systemUTC(), 1);
+  }
 
   @BeforeEach
   void reset() {
@@ -73,7 +88,7 @@ class OutboxCleanupTest {
     insert("recent-sent", true, Instant.now());
     insert("unsent", false, null);
 
-    cleanup.purge();
+    cleanup().purge();
 
     assertEquals(Integer.valueOf(0), count("old-sent"), "a sent row past retention is removed");
     assertEquals(Integer.valueOf(1), count("recent-sent"), "a recently sent row is kept");

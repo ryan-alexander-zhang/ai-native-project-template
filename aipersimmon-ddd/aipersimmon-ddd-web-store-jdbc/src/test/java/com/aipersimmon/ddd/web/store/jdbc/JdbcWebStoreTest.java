@@ -1,12 +1,14 @@
 package com.aipersimmon.ddd.web.store.jdbc;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.Tenants;
+import com.aipersimmon.ddd.web.spi.IdempotencyClaim;
+import com.aipersimmon.ddd.web.spi.IdempotencyKey;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.RateLimitPolicy;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
@@ -18,7 +20,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -39,53 +40,132 @@ class JdbcWebStoreTest {
   @Autowired RateLimiter rateLimiter;
   @Autowired MutableClock clock;
 
-  @Test
-  void idempotencyKeyIsIsolatedPerTenant() {
-    // Two tenants send the SAME client-provided Idempotency-Key; each must keep its own response
-    // (the composite (tenant_id, idempotency_key) PK), never reading back the other's — the
-    // cross-tenant leak the tenant-scoped key prevents (T10).
-    StoredResponse acme = new StoredResponse(201, new byte[] {1}, Map.of());
-    StoredResponse globex = new StoredResponse(202, new byte[] {2}, Map.of());
+  private static final Duration LEASE = Duration.ofMinutes(1);
+  private static final Duration RETENTION = Duration.ofHours(1);
 
-    TenantContext.runAs(
-        Tenants.of("acme"),
-        () -> assertTrue(idempotencyStore.saveIfAbsent("shared-key", acme, Duration.ofHours(1))));
-    // globex reusing the key is a first write in its own namespace — it wins, not a duplicate.
-    TenantContext.runAs(
-        Tenants.of("globex"),
-        () -> assertTrue(idempotencyStore.saveIfAbsent("shared-key", globex, Duration.ofHours(1))));
-
-    TenantContext.runAs(
-        Tenants.of("acme"),
-        () -> assertEquals(201, idempotencyStore.find("shared-key").orElseThrow().status()));
-    TenantContext.runAs(
-        Tenants.of("globex"),
-        () -> assertEquals(202, idempotencyStore.find("shared-key").orElseThrow().status()));
-    // A third tenant that never wrote the key sees nothing, though two others hold it.
-    TenantContext.runAs(
-        Tenants.of("initech"), () -> assertTrue(idempotencyStore.find("shared-key").isEmpty()));
+  private static IdempotencyKey key(String tenant, String principal, String value) {
+    return new IdempotencyKey(tenant, principal, value, "fp-" + value);
   }
 
   @Test
-  void idempotencyStoresReplaysAndExpires() {
-    StoredResponse response =
-        new StoredResponse(201, new byte[] {1, 2, 3}, Map.of("Content-Type", "application/json"));
+  void theSameKeyUnderTwoTenantsAreTwoClaims() {
+    // Two tenants send the SAME client-provided Idempotency-Key; each must keep its own outcome
+    // (the
+    // composite (tenant_id, principal, idempotency_key) PK), never reading back the other's.
+    IdempotencyKey acme = key("acme", "", "shared-key");
+    IdempotencyKey globex = key("globex", "", "shared-key");
 
-    assertTrue(idempotencyStore.saveIfAbsent("k1", response, Duration.ofHours(1)));
-    assertFalse(
-        idempotencyStore.saveIfAbsent("k1", response, Duration.ofHours(1)), "second save loses");
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(acme, LEASE));
+    idempotencyStore.complete(acme, new StoredResponse(201, new byte[] {1}, Map.of()), RETENTION);
 
-    Optional<StoredResponse> found = idempotencyStore.find("k1");
-    assertTrue(found.isPresent());
-    assertEquals(201, found.get().status());
-    assertArrayEquals(new byte[] {1, 2, 3}, found.get().body());
-    assertEquals("application/json", found.get().headers().get("Content-Type"));
+    // globex reusing the key is a first attempt in its own namespace — it wins, not a duplicate.
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(globex, LEASE));
+    idempotencyStore.complete(globex, new StoredResponse(202, new byte[] {2}, Map.of()), RETENTION);
+
+    assertEquals(201, replayOf(acme).status());
+    assertEquals(202, replayOf(globex).status());
+    // A third tenant that never used the key gets a claim of its own, not someone else's answer.
+    assertInstanceOf(
+        IdempotencyClaim.Won.class,
+        idempotencyStore.claim(key("initech", "", "shared-key"), LEASE));
+  }
+
+  @Test
+  void theSameKeyUnderTwoPrincipalsAreTwoClaims() {
+    // The key is a value a caller invents. Without the principal in its identity, presenting a key
+    // someone else used returns THEIR response body — so alice's outcome must be unreachable to bob
+    // even within one tenant.
+    IdempotencyKey alice = key("acme", "alice", "per-principal-key");
+    IdempotencyKey bob = key("acme", "bob", "per-principal-key");
+
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(alice, LEASE));
+    idempotencyStore.complete(
+        alice, new StoredResponse(201, "alice's account".getBytes(UTF_8), Map.of()), RETENTION);
+
+    assertInstanceOf(
+        IdempotencyClaim.Won.class,
+        idempotencyStore.claim(bob, LEASE),
+        "bob's key must not resolve to alice's stored response");
+  }
+
+  @Test
+  void aSecondAttemptWhileTheFirstIsInFlightIsToldSoRatherThanExecuting() {
+    IdempotencyKey attempt = key("acme", "", "in-flight-key");
+
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(attempt, LEASE));
+    // No outcome recorded yet: the honest answer is "in progress", not a second Won (which would
+    // run
+    // the side effect twice) and not a Replay (there is nothing to replay).
+    assertInstanceOf(IdempotencyClaim.InProgress.class, idempotencyStore.claim(attempt, LEASE));
+  }
+
+  @Test
+  void aCompletedOutcomeIsReplayedVerbatimUntilItExpires() {
+    IdempotencyKey attempt = key("acme", "", "replay-key");
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(attempt, LEASE));
+    idempotencyStore.complete(
+        attempt,
+        new StoredResponse(201, new byte[] {1, 2, 3}, Map.of("Content-Type", "application/json")),
+        RETENTION);
+
+    StoredResponse replayed = replayOf(attempt);
+    assertEquals(201, replayed.status());
+    assertArrayEquals(new byte[] {1, 2, 3}, replayed.body());
+    assertEquals("application/json", replayed.headers().get("Content-Type"));
 
     clock.advance(Duration.ofHours(2));
-    assertTrue(idempotencyStore.find("k1").isEmpty(), "entry expired");
-    assertTrue(
-        idempotencyStore.saveIfAbsent("k1", response, Duration.ofHours(1)),
-        "expired key re-savable");
+    assertInstanceOf(
+        IdempotencyClaim.Won.class,
+        idempotencyStore.claim(attempt, LEASE),
+        "past the retry window the key is free again");
+  }
+
+  @Test
+  void aClaimWhoseLeaseRanOutIsTakenOver() {
+    IdempotencyKey attempt = key("acme", "", "lease-key");
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(attempt, LEASE));
+
+    // The holder died mid-request: nothing will ever complete this claim. Once the lease passes the
+    // key has to become usable again, or one crash would burn it for the whole retention window.
+    clock.advance(LEASE.plusSeconds(1));
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(attempt, LEASE));
+  }
+
+  @Test
+  void abandoningReleasesAClaimButNeverACompletedOutcome() {
+    IdempotencyKey attempt = key("acme", "", "abandon-key");
+
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(attempt, LEASE));
+    idempotencyStore.abandon(attempt);
+    assertInstanceOf(
+        IdempotencyClaim.Won.class,
+        idempotencyStore.claim(attempt, LEASE),
+        "an abandoned claim leaves the key free");
+
+    idempotencyStore.complete(attempt, new StoredResponse(201, new byte[0], Map.of()), RETENTION);
+    idempotencyStore.abandon(attempt);
+    assertEquals(
+        201, replayOf(attempt).status(), "a late abandon must not delete a replayable outcome");
+  }
+
+  @Test
+  void reusingAKeyForADifferentRequestIsRefusedRatherThanAnswered() {
+    IdempotencyKey first =
+        new IdempotencyKey("acme", "", "mismatch-key", "fingerprint-of-request-a");
+    assertInstanceOf(IdempotencyClaim.Won.class, idempotencyStore.claim(first, LEASE));
+    idempotencyStore.complete(first, new StoredResponse(201, new byte[0], Map.of()), RETENTION);
+
+    IdempotencyKey different =
+        new IdempotencyKey("acme", "", "mismatch-key", "fingerprint-of-request-b");
+    assertInstanceOf(
+        IdempotencyClaim.Mismatch.class,
+        idempotencyStore.claim(different, LEASE),
+        "neither executing nor replaying is right when the key names another request");
+  }
+
+  private StoredResponse replayOf(IdempotencyKey key) {
+    IdempotencyClaim claim = idempotencyStore.claim(key, LEASE);
+    return assertInstanceOf(IdempotencyClaim.Replay.class, claim).response();
   }
 
   @Test

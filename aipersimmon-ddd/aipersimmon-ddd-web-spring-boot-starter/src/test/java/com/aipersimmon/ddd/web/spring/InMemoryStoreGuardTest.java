@@ -2,10 +2,11 @@ package com.aipersimmon.ddd.web.spring;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.aipersimmon.ddd.web.spi.IdempotencyClaim;
+import com.aipersimmon.ddd.web.spi.IdempotencyKey;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.StoredResponse;
 import java.time.Duration;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -118,14 +119,15 @@ class InMemoryStoreGuardTest {
   /** Stands in for a {@code -web-store-*} backend: only its type matters here. */
   private static final class SharedStore implements IdempotencyStore {
     @Override
-    public Optional<StoredResponse> find(String key) {
-      return Optional.empty();
+    public IdempotencyClaim claim(IdempotencyKey key, Duration leaseTtl) {
+      return new IdempotencyClaim.Won();
     }
 
     @Override
-    public boolean saveIfAbsent(String key, StoredResponse response, Duration ttl) {
-      return true;
-    }
+    public void complete(IdempotencyKey key, StoredResponse response, Duration ttl) {}
+
+    @Override
+    public void abandon(IdempotencyKey key) {}
   }
 
   @Configuration(proxyBeanMethods = false)

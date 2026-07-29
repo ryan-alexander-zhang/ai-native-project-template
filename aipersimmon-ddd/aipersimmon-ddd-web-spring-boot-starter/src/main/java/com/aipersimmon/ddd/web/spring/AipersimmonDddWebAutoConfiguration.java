@@ -6,6 +6,7 @@ import com.aipersimmon.ddd.web.error.DefaultProblemFamilies;
 import com.aipersimmon.ddd.web.error.ProblemCatalog;
 import com.aipersimmon.ddd.web.error.ProblemDescriptor;
 import com.aipersimmon.ddd.web.error.ProblemRegistry;
+import com.aipersimmon.ddd.web.spi.IdempotencyPrincipalResolver;
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
 import com.aipersimmon.ddd.web.spi.RateLimiter;
 import com.aipersimmon.ddd.web.spi.ReplayGuard;
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +37,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.util.ClassUtils;
 
 /**
  * Auto-configures the web layer's zero-risk concerns — exception-to-ProblemDetail mapping, the
@@ -49,6 +52,19 @@ public class AipersimmonDddWebAutoConfiguration {
 
   private static final Logger log =
       LoggerFactory.getLogger(AipersimmonDddWebAutoConfiguration.class);
+
+  /**
+   * Where the idempotency filter sits: after Spring Security's chain (registered at {@code -100})
+   * so a principal is established, and before application filters, which default to {@code
+   * LOWEST_PRECEDENCE}. Not expressed as an offset from a Spring Security constant because that
+   * dependency is optional and this class must load without it.
+   */
+  private static final int IDEMPOTENCY_FILTER_ORDER = 0;
+
+  private static final boolean SECURITY_PRESENT =
+      ClassUtils.isPresent(
+          "org.springframework.security.core.context.SecurityContextHolder",
+          AipersimmonDddWebAutoConfiguration.class.getClassLoader());
 
   @Bean
   @ConditionalOnMissingBean
@@ -148,6 +164,24 @@ public class AipersimmonDddWebAutoConfiguration {
     return new InMemoryIdempotencyStore(clock.getIfUnique(Clock::systemUTC));
   }
 
+  /**
+   * The caller an idempotency key belongs to. Reads the Spring Security context when it is on the
+   * classpath; otherwise keys are scoped by tenant alone, which is what identity amounts to on an
+   * endpoint with no authentication.
+   */
+  @Bean
+  @ConditionalOnMissingBean(IdempotencyPrincipalResolver.class)
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.web.idempotency",
+      name = "enabled",
+      havingValue = "true")
+  public IdempotencyPrincipalResolver aipersimmonDddIdempotencyPrincipalResolver() {
+    if (SECURITY_PRESENT) {
+      return new SecurityContextPrincipalResolver();
+    }
+    return Optional::empty;
+  }
+
   @Bean
   @ConditionalOnMissingBean(name = "aipersimmonDddIdempotencyFilter")
   @ConditionalOnProperty(
@@ -156,21 +190,30 @@ public class AipersimmonDddWebAutoConfiguration {
       havingValue = "true")
   public FilterRegistrationBean<IdempotencyFilter> aipersimmonDddIdempotencyFilter(
       IdempotencyStore store,
+      IdempotencyPrincipalResolver principals,
       ProblemHttpResponseWriter writer,
       AipersimmonDddWebProperties properties) {
     AipersimmonDddWebProperties.Idempotency config = properties.getIdempotency();
     IdempotencyFilter filter =
         new IdempotencyFilter(
             store,
+            principals,
             writer,
             config.getHeader(),
             config.getTtl(),
+            config.getClaimLease(),
             config.isRequireKey(),
             config.getMethods().stream()
                 .map(m -> m.toUpperCase(Locale.ROOT))
                 .collect(Collectors.toSet()));
     FilterRegistrationBean<IdempotencyFilter> registration = new FilterRegistrationBean<>(filter);
-    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 40);
+    // After the security filter chain, unlike the framework's other filters. A key is scoped to the
+    // caller who owns it, so this filter has to see an established principal — and serving a stored
+    // response before authentication would hand a client another caller's response body on nothing
+    // more than a guessed key. Spring Security registers its chain at -100; anything above that
+    // runs
+    // once authentication has been applied.
+    registration.setOrder(IDEMPOTENCY_FILTER_ORDER);
     return registration;
   }
 

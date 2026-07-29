@@ -34,11 +34,51 @@ Two zero-risk concerns default **on**; three stateful ones default **off**.
 
 | Property | Default | Effect |
 | --- | --- | --- |
-| `idempotency.enabled` | `false` | Replays a stored response for a repeated `Idempotency-Key` instead of re-running the side effect. |
+| `idempotency.enabled` | `false` | Claims the key before executing, so one key means one execution; later attempts get the stored outcome. |
 | `idempotency.header` | `Idempotency-Key` | Where the key is read from. |
-| `idempotency.ttl` | `24h` | How long a stored response stays replayable. |
+| `idempotency.ttl` | `24h` | How long a stored outcome stays replayable — the retry window offered to clients. |
+| `idempotency.claim-lease` | `1m` | How long a claim survives without completing. Must outlast the slowest covered request (see below). |
 | `idempotency.require-key` | `false` | Reject a covered request that carries no key, rather than letting it through unprotected. |
 | `idempotency.methods` | `POST, PUT, PATCH, DELETE` | Which methods are covered. |
+
+The key is claimed **before** the request runs, which is what makes "executed once" true. Looking the
+key up, running, then saving the response cannot: two concurrent first attempts both miss the lookup
+and both execute, and the atomic save only picks whose response is kept — after both side effects have
+committed. That is the ordinary case, not an exotic one; a client whose first attempt timed out retries
+while it is still in flight, which is why it sent a key at all.
+
+So a covered request meets one of four answers:
+
+| Claim | Response |
+| --- | --- |
+| won | executes; a 2xx/4xx outcome is stored, a 5xx is not (see below) |
+| already held, not finished | `409 Conflict` + `Retry-After` — there is no outcome yet and executing would duplicate the side effect |
+| completed outcome exists | the stored status, body and meaning-carrying headers, replayed verbatim |
+| same key, different request | `422 Unprocessable Content` — neither executing nor replaying is right |
+
+Three consequences worth knowing:
+
+- **`claim-lease` bounds the 409 window.** Set it shorter than your slowest covered request and a
+  still-running request can have its key claimed by a retry — the duplicate execution the claim
+  exists to prevent. Set it far longer and a caller that dies mid-request leaves its key unusable
+  until the lease passes. It is deliberately separate from `ttl`, which is the client-facing retry
+  window and is normally hours.
+- **A 5xx is not stored.** Freezing a transient failure under the key would answer every later retry
+  with that failure, defeating the retry the key was issued for. The claim is released instead. A 4xx
+  is a decided outcome and is stored like any other.
+- **The filter runs after authentication**, unlike the framework's other filters. A key belongs to a
+  caller, so the identity is `(tenant, principal, key)`; the principal comes from an
+  `IdempotencyPrincipalResolver` bean, which by default reads the Spring Security context when it is
+  on the classpath and otherwise resolves to none — correct for an endpoint with no authentication,
+  where keys are scoped by tenant alone. Supply your own bean to key on something else, such as the
+  client a token was issued to rather than the end user acting through it.
+
+A `fingerprint` of the request (method, path, query, content type and length) is compared but is not
+part of the identity — that is what produces the `422`. It deliberately excludes the body: buffering
+every request body to hash it would hand an unauthenticated caller a memory cost, and the leak this
+guards alongside — one caller reading another's response — is closed by the principal, not the digest.
+A key reused against a different endpoint or a differently shaped payload is caught; two distinct
+bodies of identical length and type against the same endpoint are not.
 
 ### Replay protection (off by default; needs a `RequestSignatureVerifier` bean)
 
