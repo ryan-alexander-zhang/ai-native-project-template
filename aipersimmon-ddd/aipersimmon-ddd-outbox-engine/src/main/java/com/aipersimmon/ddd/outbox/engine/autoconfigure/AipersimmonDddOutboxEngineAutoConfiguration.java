@@ -10,6 +10,8 @@ import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.aipersimmon.ddd.outbox.engine.cleanup.OutboxCleanup;
+import com.aipersimmon.ddd.outbox.engine.observe.OutboxBacklog;
+import com.aipersimmon.ddd.outbox.engine.observe.OutboxObserver;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelayScheduler;
 import com.aipersimmon.ddd.outbox.engine.relay.RelayLeases;
@@ -103,7 +105,8 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
       FailureClassifier failureClassifier,
       Clock outboxClock,
       OutboxProperties properties,
-      ObjectProvider<StoreAndForwardTracer> tracer) {
+      ObjectProvider<StoreAndForwardTracer> tracer,
+      ObjectProvider<OutboxObserver> observer) {
     String workerId = properties.getRelay().getWorkerId();
     Duration lease = properties.getRelay().getLeaseDuration();
     return new OutboxRelay(
@@ -119,7 +122,8 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
         workerId.isBlank()
             ? RelayLeases.forThisProcess(lease)
             : RelayLeases.ownedBy(workerId, lease),
-        tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
+        tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE),
+        observer.getIfAvailable(() -> OutboxObserver.NOOP));
   }
 
   /**
@@ -136,6 +140,20 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
   @ConditionalOnMissingBean
   public OutboxRelayScheduler outboxRelayScheduler(OutboxRelay outboxRelay) {
     return new OutboxRelayScheduler(outboxRelay);
+  }
+
+  /**
+   * The backlog read: how much is waiting and how long the oldest has waited. Registered here
+   * rather than with the Micrometer beans because it is framework-free and useful on its own — an
+   * operations endpoint or a custom probe can read it with no metrics library at all — and because
+   * a condition in another auto-configuration can only see beans registered before it.
+   */
+  @Bean
+  @ConditionalOnBean(OutboxStore.class)
+  @ConditionalOnMissingBean
+  public OutboxBacklog outboxBacklog(
+      OutboxStore outboxStore, Clock outboxClock, OutboxProperties properties) {
+    return new OutboxBacklog(outboxStore, outboxClock, properties.getMaxAttempts());
   }
 
   @Bean

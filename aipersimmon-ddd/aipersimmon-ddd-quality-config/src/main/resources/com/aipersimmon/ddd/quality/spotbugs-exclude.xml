@@ -69,6 +69,7 @@
       <Class name="com.aipersimmon.ddd.outbox.engine.cleanup.OutboxCleanup"/>
       <Class name="com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay"/>
       <Class name="com.aipersimmon.ddd.outbox.engine.write.OutboxWriter"/>
+      <Class name="com.aipersimmon.ddd.outbox.engine.observe.OutboxBacklog"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetters"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxStore"/>

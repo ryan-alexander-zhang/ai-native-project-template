@@ -1,1 +1,2 @@
 com.aipersimmon.ddd.outbox.engine.autoconfigure.AipersimmonDddOutboxEngineAutoConfiguration
+com.aipersimmon.ddd.outbox.engine.autoconfigure.OutboxObservabilityConfiguration

@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxInsert;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxLease;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
+import com.aipersimmon.ddd.outbox.engine.store.PendingBacklog;
 import com.aipersimmon.ddd.outbox.engine.store.PendingMessage;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -138,6 +139,14 @@ public class MybatisOutboxStore implements OutboxStore {
         new LambdaQueryWrapper<OutboxRecord>()
             .eq(OutboxRecord::getSent, true)
             .lt(OutboxRecord::getSentAt, sentBefore));
+  }
+
+  @Override
+  public PendingBacklog pendingBacklog(int maxAttempts) {
+    PendingBacklogRow row = mapper.selectPendingBacklog(maxAttempts);
+    return row == null
+        ? PendingBacklog.EMPTY
+        : new PendingBacklog(row.getPending(), row.getOldest());
   }
 
   /**

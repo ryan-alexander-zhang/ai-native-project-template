@@ -45,4 +45,14 @@ public interface OutboxMapper extends BaseMapper<OutboxRecord> {
       @Param("maxAttempts") int maxAttempts,
       @Param("now") Instant now,
       @Param("batchSize") int batchSize);
+
+  /**
+   * The backlog gauges: how many messages are still waiting and when the oldest was written. One
+   * scan answers both, over the same liveness predicate the claim uses, so "waiting" means the same
+   * thing in both places. Read on demand by a metrics scrape, never by the relay.
+   */
+  @Select(
+      "SELECT COUNT(*) AS pending, MIN(created_at) AS oldest FROM aipersimmon_outbox "
+          + "WHERE sent = FALSE AND attempts < #{maxAttempts}")
+  PendingBacklogRow selectPendingBacklog(@Param("maxAttempts") int maxAttempts);
 }

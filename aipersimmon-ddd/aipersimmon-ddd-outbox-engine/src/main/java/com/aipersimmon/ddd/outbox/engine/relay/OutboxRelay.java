@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.aipersimmon.ddd.outbox.UnreachableDestinationException;
+import com.aipersimmon.ddd.outbox.engine.observe.OutboxObserver;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import com.aipersimmon.ddd.outbox.engine.store.PendingMessage;
 import java.time.Clock;
@@ -64,6 +65,11 @@ import org.slf4j.LoggerFactory;
  * delivering it locally would mark it sent while it never left the process. Which external target
  * it goes to is the transport dispatcher's business.
  *
+ * <p>Everything it does is reported through an {@link OutboxObserver} — claim and dispatch latency,
+ * what was given up on, what was handed back — so an operator can see the population rather than
+ * inferring it from logs. How much is <em>waiting</em> is a level rather than an event and is read
+ * separately, through {@code OutboxBacklog}.
+ *
  * <p>This class is storage-agnostic on purpose. Every judgement above — the classification, the
  * retry budget, what a mark-sent failure means, how a dead-letter move that itself fails is
  * handled, the poll budget — is reasoning that must not differ between backends, so it lives here
@@ -83,6 +89,7 @@ public class OutboxRelay {
   private final int maxAttempts;
   private final RelayLeases leases;
   private final StoreAndForwardTracer tracer;
+  private final OutboxObserver observer;
 
   public OutboxRelay(
       OutboxStore store,
@@ -104,7 +111,8 @@ public class OutboxRelay {
         batchSize,
         maxAttempts,
         leases,
-        NoOpStoreAndForwardTracer.INSTANCE);
+        NoOpStoreAndForwardTracer.INSTANCE,
+        OutboxObserver.NOOP);
   }
 
   public OutboxRelay(
@@ -118,6 +126,32 @@ public class OutboxRelay {
       int maxAttempts,
       RelayLeases leases,
       StoreAndForwardTracer tracer) {
+    this(
+        store,
+        dispatcher,
+        deadLetterStore,
+        failureClassifier,
+        backoff,
+        clock,
+        batchSize,
+        maxAttempts,
+        leases,
+        tracer,
+        OutboxObserver.NOOP);
+  }
+
+  public OutboxRelay(
+      OutboxStore store,
+      OutboxDispatcher dispatcher,
+      DeadLetterStore deadLetterStore,
+      FailureClassifier failureClassifier,
+      RetryBackoff backoff,
+      Clock clock,
+      int batchSize,
+      int maxAttempts,
+      RelayLeases leases,
+      StoreAndForwardTracer tracer,
+      OutboxObserver observer) {
     this.store = store;
     this.dispatcher = dispatcher;
     this.deadLetterStore = deadLetterStore;
@@ -128,6 +162,7 @@ public class OutboxRelay {
     this.maxAttempts = maxAttempts;
     this.leases = leases;
     this.tracer = tracer;
+    this.observer = observer;
   }
 
   /**
@@ -140,7 +175,9 @@ public class OutboxRelay {
     int remaining = batchSize;
     while (remaining > 0 && !clock.instant().isAfter(budgetEndsAt)) {
       Instant now = clock.instant();
+      long claimStart = System.nanoTime();
       List<PendingMessage> claimed = store.claimDue(now, maxAttempts, remaining, leases.next(now));
+      observer.claimed(claimed.size(), since(claimStart));
       if (claimed.isEmpty()) {
         return;
       }
@@ -183,6 +220,7 @@ public class OutboxRelay {
                 + "up dispatch, or raise the relay lease if this recurs",
             pollBudget(),
             untouched.size());
+        observer.released(untouched.size());
         release(untouched);
         return false;
       }
@@ -206,6 +244,7 @@ public class OutboxRelay {
           new UnreachableDestinationException(
               message.type(), message.version(), message.destination()));
     }
+    long dispatchStart = System.nanoTime();
     try (StoreAndForwardTracer.Scope span =
         tracer.restore(
             pending.traceparent(), pending.traceState(), "outbox.publish " + message.eventId())) {
@@ -219,8 +258,10 @@ public class OutboxRelay {
         throw e;
       }
     } catch (RuntimeException e) {
+      observer.dispatched(false, since(dispatchStart));
       return handleFailure(pending, e);
     }
+    observer.dispatched(true, since(dispatchStart));
     // The message is delivered (at-least-once satisfied). A failure to record that is
     // NOT a dispatch failure: never dead-letter or count it against the retry budget —
     // that would discard or misreport a message the broker already has. Release the row
@@ -235,6 +276,7 @@ public class OutboxRelay {
               + "it will be re-dispatched (a duplicate) on the next poll",
           message.eventId(),
           e);
+      observer.markSentFailed();
       release(List.of(message.eventId()));
       return Outcome.HELD;
     }
@@ -291,6 +333,7 @@ public class OutboxRelay {
     try {
       deadLetterStore.store(message, attempts, reason, summarize(error));
       log.error("outbox dispatch for eventId={} {}", message.eventId(), givingUp, error);
+      observer.deadLettered(reason);
       return Outcome.RETIRED;
     } catch (RuntimeException storeError) {
       storeError.addSuppressed(error);
@@ -329,6 +372,10 @@ public class OutboxRelay {
    */
   private Duration pollBudget() {
     return leases.duration().dividedBy(2);
+  }
+
+  private static Duration since(long startNanos) {
+    return Duration.ofNanos(System.nanoTime() - startNanos);
   }
 
   private static String summarize(Throwable error) {

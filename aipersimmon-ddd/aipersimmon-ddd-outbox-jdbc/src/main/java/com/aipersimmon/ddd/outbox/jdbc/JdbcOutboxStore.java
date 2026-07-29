@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxInsert;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxLease;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
+import com.aipersimmon.ddd.outbox.engine.store.PendingBacklog;
 import com.aipersimmon.ddd.outbox.engine.store.PendingMessage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -66,6 +67,11 @@ public class JdbcOutboxStore implements OutboxStore {
           + "lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE event_id = ?";
   private static final String DELETE_SENT =
       "DELETE FROM aipersimmon_outbox WHERE sent = TRUE AND sent_at < ?";
+  // One scan answers both gauges. COUNT and MIN over the same predicate the claim uses to decide a
+  // row is still live, so "waiting" here means the same thing it means there.
+  private static final String PENDING_BACKLOG =
+      "SELECT COUNT(*) AS pending, MIN(created_at) AS oldest FROM aipersimmon_outbox "
+          + "WHERE sent = FALSE AND attempts < ?";
 
   private final JdbcTemplate jdbc;
 
@@ -155,6 +161,23 @@ public class JdbcOutboxStore implements OutboxStore {
   @Override
   public int deleteSentBefore(Instant sentBefore) {
     return jdbc.update(DELETE_SENT, Timestamp.from(sentBefore));
+  }
+
+  @Override
+  public PendingBacklog pendingBacklog(int maxAttempts) {
+    PendingBacklog backlog =
+        jdbc.query(
+            PENDING_BACKLOG,
+            rs -> {
+              if (!rs.next()) {
+                return PendingBacklog.EMPTY;
+              }
+              Timestamp oldest = rs.getTimestamp("oldest");
+              return new PendingBacklog(
+                  rs.getLong("pending"), oldest == null ? null : oldest.toInstant());
+            },
+            maxAttempts);
+    return backlog == null ? PendingBacklog.EMPTY : backlog;
   }
 
   private static String placeholders(int count) {

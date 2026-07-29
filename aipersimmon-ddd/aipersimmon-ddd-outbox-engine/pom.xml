@@ -77,6 +77,13 @@
       <artifactId>aipersimmon-ddd-observability</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Metrics are an optional seam: the observer and backlog reads are framework-free, and the
+         Micrometer beans bind only when a MeterRegistry is present. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The writer serializes the event payload to JSON. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>

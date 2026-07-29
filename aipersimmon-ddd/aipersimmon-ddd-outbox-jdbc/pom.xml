@@ -32,6 +32,13 @@
   <description>Transactional-outbox starter over JdbcTemplate for reliable integration-event delivery.</description>
 
   <dependencies>
+    <!-- The observability seam is exercised here rather than in the engine, which has no test
+         harness of its own: Micrometer is optional there and test-scoped here. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Time-ordered (UUIDv7) IdGenerator. A required dependency, not optional: a silent
          fall back to UUID.randomUUID() would reintroduce exactly the random-VARCHAR-key write
          amplification this SPI exists to remove, with no startup signal (see issue-00053). -->

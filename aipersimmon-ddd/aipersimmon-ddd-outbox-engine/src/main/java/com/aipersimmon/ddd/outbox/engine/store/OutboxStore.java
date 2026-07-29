@@ -103,4 +103,15 @@ public interface OutboxStore {
    * @return how many rows were removed
    */
   int deleteSentBefore(Instant sentBefore);
+
+  /**
+   * How much live work is waiting: unsent rows below {@code maxAttempts}, and when the oldest of
+   * them was written.
+   *
+   * <p>Read on demand by a metrics scrape or an operator, never by the relay. One call rather than
+   * a count and a minimum, because one scan of the same predicate answers both and a metrics scrape
+   * should not cost two round trips per gauge. {@code maxAttempts} is passed in so "live" means the
+   * same thing here as it does to {@link #claimDue} — the engine owns that definition.
+   */
+  PendingBacklog pendingBacklog(int maxAttempts);
 }
