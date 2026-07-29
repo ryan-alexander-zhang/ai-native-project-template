@@ -65,7 +65,7 @@ flowchart TD
   end
   subgraph starter["可插拔 starter (Spring/JPA/Kafka)"]
     events["-events-spring"]
-    outbox["-outbox (core) / -outbox-jdbc / -outbox-mybatis-plus"]
+    outbox["-outbox (contracts) / -outbox-engine<br/>-outbox-jdbc / -outbox-mybatis-plus"]
     inbox["-inbox-jdbc / -inbox-mybatis-plus"]
     msg["-messaging-kafka / -rabbit"]
     cqrsSpring["-cqrs-spring"]
@@ -179,6 +179,12 @@ com.aipersimmon.ddd.core
 ### 5.8 `aipersimmon-ddd-outbox-jdbc`(starter,→ `-application` + `-integration` + `spring-boot-starter-jdbc` + Jackson)
 
 > **实现阶段发现**:库里放 JPA `@Entity` 有"实体扫描覆盖"陷阱——库的 `@EntityScan` 会让使用者靠默认扫描的自有实体失效。故**先做 `-outbox-jdbc`**(`JdbcTemplate`,无 `@Entity`/`@EntityScan`,零扫描冲突);`-outbox-jpa` 作为后续变体。发布 port `IntegrationEvents` 已加到 `-application`。
+
+> **第二次演进(已交付,[[decision-00020-outbox-engine-over-one-store-port]])**:writer / relay / 调度触发器 /
+> 保留期清理与共享的 Spring 装配再从两个后端上抽到 **`aipersimmon-ddd-outbox-engine`**,后端只留一个
+> `OutboxStore` 适配器 + 死信 store/读侧 + ShedLock 的 `LockProvider`。此前 relay 在两个后端各一份,
+> 而那份代码承载着按聚合顺序、mark-sent 不计重试预算、死信搬移失败不计尝试这三条各自换来一个 issue 的判断——
+> 存两份的代价是任何一次修正都可能只落在一半的部署上。与 `-process-manager-engine` / `-operation-log-engine` 同形。
 
 > **后续演进(已交付)**:抽出与存储无关的 **`aipersimmon-ddd-outbox`(core)**——投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、两个默认 dispatcher(logging / in-process)及其选择用的 `AipersimmonDddOutboxAutoConfiguration`,全无持久化。`-outbox-jdbc` 与新增的 **`-outbox-mybatis-plus`** 都依赖该 core,各自只提供 writer + relay(`-outbox-mybatis-plus` 用 MyBatis-Plus `BaseMapper`,`@TableName` 而非 JPA `@Entity`,且只经 `MapperFactoryBean` 注册自己的 mapper,不触发/劫持消费者 `@MapperScan`,同表结构可与 jdbc 互换)。**消费者需自选恰好一个 outbox 存储 starter**。broker starter(§5.14)改为依赖 core,故可与任一存储后端组合。
 

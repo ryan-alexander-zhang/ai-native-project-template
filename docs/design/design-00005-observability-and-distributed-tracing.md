@@ -272,7 +272,7 @@ flowchart TD
 
   core["core / cqrs / integration"]
   pm["process-manager-jdbc"]
-  ob["outbox-jdbc / outbox-mybatis-plus"]
+  ob["outbox-engine (over outbox-jdbc / -mybatis-plus)"]
   cqrsSpring["cqrs-spring / events-spring / web-spring / messaging-kafka"]
 
   core --> obs
@@ -317,7 +317,7 @@ flowchart TD
 - [[decision-00012-no-ambient-per-command-state]] —— 禁 ambient 业务状态（区别于 OTEL 基础设施 context）。
 - [[issue-00025-correlation-propagation-and-scrape-batching]] —— deadline/replay 处的链路断裂（本文覆盖其 trace 投影）。
 - [[process-manager-schema-copies]] —— DDL 多副本同步约束。
-- 代码：`aipersimmon-ddd-cqrs`（`CommandContext`、`CommandBus`、`QueryBus`、`CommandInterceptor`）、`aipersimmon-ddd-cqrs-spring`（`RegistryCommandBus`、`LoggingCommandInterceptor` 等）、`aipersimmon-ddd-application`（`Inbox`、`DomainEvents`）、`aipersimmon-ddd-events-spring`（`SpringDomainEvents`）、`aipersimmon-ddd-web-spring`（`TraceIdFilter`、`ProblemDetailFactory`）、`aipersimmon-ddd-messaging-kafka`（`KafkaIntegrationEventListener`、`IntegrationEventHeaders`）、`aipersimmon-ddd-outbox-jdbc` / `-mybatis-plus`（`OutboxRelay`、`OutboxWriter`）、`aipersimmon-ddd-process-manager-jdbc`（`JdbcProcessRuntime`、store/relay/deadline/operations）。
+- 代码：`aipersimmon-ddd-cqrs`（`CommandContext`、`CommandBus`、`QueryBus`、`CommandInterceptor`）、`aipersimmon-ddd-cqrs-spring`（`RegistryCommandBus`、`LoggingCommandInterceptor` 等）、`aipersimmon-ddd-application`（`Inbox`、`DomainEvents`）、`aipersimmon-ddd-events-spring`（`SpringDomainEvents`）、`aipersimmon-ddd-web-spring`（`TraceIdFilter`、`ProblemDetailFactory`）、`aipersimmon-ddd-messaging-kafka`（`KafkaIntegrationEventListener`、`IntegrationEventHeaders`）、`aipersimmon-ddd-outbox-engine`（`OutboxRelay`、`OutboxWriter` —— 自 `decision-00020` 起两个后端共用这一份）、`aipersimmon-ddd-process-manager-jdbc`（`JdbcProcessRuntime`、store/relay/deadline/operations）。
 
 外部：
 

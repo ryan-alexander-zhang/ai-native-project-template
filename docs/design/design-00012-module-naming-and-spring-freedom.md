@@ -60,7 +60,8 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 
 - `-id` 不含任何契约（`IdGenerator` 接口在 `core`），它只是「默认实现 + 装配」。领域层依赖 `core`，不依赖 `-id`。
 - 两个 `-engine` 是**存储无关的运行时**，不是契约：契约在 `-operation-log` / `-process-manager`（均零 Spring）。
-  领域层依赖后者。
+  领域层依赖后者。（后来 outbox 也照此分层，见
+  [[decision-00020-outbox-engine-over-one-store-port]]，故现在是三个 `-engine`。）
 
 它们的问题不是违反不变量，而是**名字没有传达自己是什么**。这是一个可用性问题，不是正确性问题——要分开处理。
 
@@ -110,6 +111,8 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 - 两个 `-engine`：`-engine` 是第四种后缀，但它表达的东西（存储无关运行时）真实存在且没有更好的词；
   改成 `-spring-boot-starter` 是错的（它们含大量实现代码），改成 `-<backend>` 也是错的（它们与后端无关）。
   **保留 `-engine`，并把它写进 3.1 的后缀表**，使其从「例外」变成「规则的一部分」。
+  这条裁定后来被兑现了一次：outbox 的 relay 在两个后端各存一份，抽成第三个 `-engine`
+  （[[decision-00020-outbox-engine-over-one-store-port]]）——后缀是规则而非例外，所以新模块无需再裁定一次。
 
 ### 3.3 一个需要裁定的边界：`-cqrs-spring` 含实现代码
 

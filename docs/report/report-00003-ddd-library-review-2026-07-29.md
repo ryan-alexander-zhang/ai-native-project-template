@@ -108,9 +108,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - `ReplayProtectionFilter` 默认作用于全部请求且认证前无上限缓冲请求体（探针被 401 打死 + 内存 DoS 面）。
 
 **架构层**
-- outbox 家族没有 engine 层：relay/retry/backoff/死信/租约轮询——全框架最关键的并发代码——在 jdbc 与
-  mybatis-plus 各维护一份（`OutboxRelayScheduler` 除包名外字节相同）。process-manager 与 operation-log
-  已用 engine-over-store-ports 解过两次，outbox 早于该重构且从未跟上。
+- ~~outbox 家族没有 engine 层~~ → **已修** `decision-00020`：新增 `aipersimmon-ddd-outbox-engine`
+  承载 writer/relay/调度/清理与共享装配，两个后端只剩 `OutboxStore` 适配器 + 死信 + ShedLock provider
+  （各约 90 行）。被收拢的正是那三条来自独立 issue 的判断（按聚合顺序、mark-sent 不计重试预算、
+  死信搬移失败不计尝试）。**未消除**的一处重复已写在端口 javadoc 上：`findDue` 的顺序谓词仍是两份 SQL。
 - BOM 继承 parent → Maven 解析被 import BOM 的**有效模型**，Spring Boot 3.5.10 等全部 pin 泄漏给消费方
   并压过对方选的 Boot 版本。BOM 自己特意重声明 springdoc/OTel"以便对齐"，说明作者以为其余不传播——但会传播。
 - `process-manager-engine` 4567 行零直接测试，且在所有覆盖率门禁之外（JaCoCo/PIT 只覆盖 6 个纯净层模块）。
@@ -141,6 +142,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 
 **紧接其后**
 6. 抽出 `aipersimmon-ddd-outbox-engine`，让 inbox/outbox 与 process-manager 形状一致
+   （`decision-00020`，**已完成**；第 7、8、10 项现在都只需改一处）
 7. relay 换行级 claim（`FOR UPDATE SKIP LOCKED`；H2 用 per-row `claimed_until`），解开 60 分钟停摆与预算耦合
 8. 写入时持久化目的地到 outbox 行：路由消失从静默本地投递变成死信
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）
