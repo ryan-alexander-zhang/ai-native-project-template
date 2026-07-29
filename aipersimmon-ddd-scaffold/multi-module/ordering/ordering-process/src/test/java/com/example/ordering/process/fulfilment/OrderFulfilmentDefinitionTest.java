@@ -39,8 +39,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the pure {@link OrderFulfilmentDefinition} transition table — the first tests in
- * the {@code ordering-process-mybatis-plus} module (issue-00035). They drive {@code react} directly
- * with a hand-built {@link ProcessContext}, so no runtime, database, or Spring context is involved.
+ * the {@code ordering-process} module (issue-00035). They drive {@code react} directly with a
+ * hand-built {@link ProcessContext}, so no runtime, database, or Spring context is involved.
  *
  * <p>They cover the whole {@code (step, input)} matrix: the happy path, both compensation branches,
  * and — the point of the fix — the out-of-order and duplicate facts that a type-only switch

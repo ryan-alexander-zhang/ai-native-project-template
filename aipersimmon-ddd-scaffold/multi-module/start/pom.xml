@@ -26,7 +26,7 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-application</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-infrastructure</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-adapter</artifactId></dependency>
-    <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-process-mybatis-plus</artifactId></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>ordering-process</artifactId></dependency>
 
     <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-api</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>inventory-domain</artifactId></dependency>
@@ -53,6 +53,14 @@
       Everything inside remains individually available: a project that wants, say, CQRS and the
       outbox but not the process manager declares those two modules instead. The bundle is the
       default path, not the only one.
+
+      THIS IS ALSO WHERE THE PROCESS MANAGER'S STORE IS CHOSEN. The bundle carries
+      aipersimmon-ddd-process-manager-mybatis-plus, which supplies the store beans that
+      `ordering-process` drives through the engine's ports. That module names no backend of its own
+      — it holds the pure ProcessDefinition, the codecs and the runtime driver, all storage-agnostic
+      — so the relational store is a composition decision and belongs here, next to the datasource
+      and the Flyway component list. Moving to the JDBC store is an edit to this dependency, and
+      `ordering-process` does not change.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

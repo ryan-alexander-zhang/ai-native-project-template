@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example</groupId>
+    <artifactId>multi-module</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The ordering context's order-fulfilment coordination policy: the pure ProcessDefinition,
+    its state and inputs, the persistence codecs, and the runtime-backed implementation of the
+    application's business port. Kept a separate module — not a sub-package of application —
+    so the process-manager framework dependency is compile-fenced out of the application
+    layer (design-00004 §六/§13.1; analysis-00012 §7).
+
+    STORAGE-AGNOSTIC, and named so. This module used to be called
+    `ordering-process-mybatis-plus`, which was wrong in a way worth recording: not one class
+    in it referenced MyBatis-Plus. It depends on process-manager (contracts) and
+    process-manager-engine (the runtime and the serialization catalog), both of which are
+    backend-neutral; the only MyBatis-Plus content was a *dependency* declaration that pulled
+    the relational store onto the classpath. That is a composition decision, so it now lives
+    in `start` with the other backend choices, and this module carries the name its contents
+    actually justify. The practical consequence: switching to the JDBC store is an edit to one
+    dependency in `start`, not a module rename plus a package move.
+  -->
+  <artifactId>ordering-process</artifactId>
+  <name>ordering-process</name>
+  <description>The ordering context's order-fulfilment Process Manager policy (storage-agnostic).</description>
+
+  <dependencies>
+    <!-- The business port this provider implements, plus the ordering commands it dispatches. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>ordering-application</artifactId>
+    </dependency>
+    <!-- Evidence-bearing domain types the compensating CancelOrder command carries. -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>ordering-domain</artifactId>
+    </dependency>
+    <!-- Durable Process Manager contracts: ProcessDefinition, effects, codecs, model. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager</artifactId>
+    </dependency>
+    <!-- The engine: ProcessRuntime is driven and DefaultProcessQuery resolves the instance ref,
+         both against store PORTS rather than any one backend. ProcessSerializationCatalog also
+         lives here — the Jackson convenience layer's registration list, so most payloads need one
+         declaration instead of a hand-written codec.
+
+         Note what is deliberately absent: no aipersimmon-ddd-process-manager-mybatis-plus. The
+         store implementation is a deployment choice and is declared in `start`. If it were
+         declared here, this module could not be reused by a JDBC-backed deployment without
+         dragging MyBatis-Plus onto its classpath. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
+    </dependency>
+    <!-- CQRS contracts: the CommandContext carried on each fact into the runtime. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+    </dependency>
+    <!-- Spring stereotypes: the definition, codecs, and runtime driver are wired beans. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <!-- Unit tests for the pure ProcessDefinition transition table; no runtime, no Spring context. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
