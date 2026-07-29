@@ -162,6 +162,6 @@ class TwoTenantAcceptanceTest {
 
   /** Reads the order status under whatever tenant is currently bound. */
   private String status(String orderId) {
-    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status();
+    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status().name();
   }
 }

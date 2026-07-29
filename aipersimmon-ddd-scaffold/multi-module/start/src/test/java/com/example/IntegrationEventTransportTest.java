@@ -69,7 +69,8 @@ class IntegrationEventTransportTest {
         .untilAsserted(
             () ->
                 assertEquals(
-                    "CONFIRMED", queryBus.ask(new FindOrder(orderId)).orElseThrow().status()));
+                    "CONFIRMED",
+                    queryBus.ask(new FindOrder(orderId)).orElseThrow().status().name()));
 
     // (2) Inbox rows exist only if the consumer bridge consumed externalized events off Kafka.
     Long inboxRows = jdbc.queryForObject("select count(*) from aipersimmon_inbox", Long.class);

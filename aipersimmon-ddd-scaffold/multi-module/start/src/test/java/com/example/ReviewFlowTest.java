@@ -41,7 +41,7 @@ class ReviewFlowTest {
   @Autowired Stocks stocks;
 
   private String status(String orderId) {
-    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status();
+    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status().name();
   }
 
   private int available(String sku) {

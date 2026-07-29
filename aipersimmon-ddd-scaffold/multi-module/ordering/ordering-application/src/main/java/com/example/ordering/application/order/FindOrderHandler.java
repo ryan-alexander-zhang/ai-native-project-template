@@ -41,7 +41,7 @@ public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderS
     return new OrderSnapshot(
         order.id().value(),
         order.customerId().value(),
-        order.status().name(),
+        order.status(),
         total.amountMinor(),
         total.currency(),
         cancellable);

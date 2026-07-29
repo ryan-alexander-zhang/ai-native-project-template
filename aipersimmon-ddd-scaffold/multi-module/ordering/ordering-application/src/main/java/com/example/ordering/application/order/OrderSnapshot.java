@@ -1,6 +1,7 @@
 package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.ReadModel;
+import com.example.ordering.domain.order.OrderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Read-side view of an order returned to callers, decoupled from the aggregate. */
@@ -11,22 +12,17 @@ public record OrderSnapshot(
         String id,
     @Schema(description = "Identifier of the customer who owns the order.", example = "CUST-1")
         String customerId,
-    // allowableValues rather than a hand-written example: the status set is an enum, so letting the
-    // schema name its members is what keeps the published contract from drifting when the state
-    // machine changes. A literal example here once advertised PLACED, a state this model does not
-    // have — see issue-00081.
-    @Schema(
-            description = "Current order status.",
-            example = "FULFILMENT_IN_PROGRESS",
-            allowableValues = {
-              "AWAITING_REVIEW",
-              "READY_FOR_FULFILMENT",
-              "FULFILMENT_IN_PROGRESS",
-              "CONFIRMED",
-              "SHIPPED",
-              "CANCELLED"
-            })
-        String status,
+    // Typed as the enum, so springdoc DERIVES the value list from OrderStatus instead of repeating
+    // it. The wire format is unchanged — Jackson writes an enum as its name — but the contract can
+    // no longer drift from the state machine, because there is nothing left to keep in step.
+    //
+    // It was a String with a hand-written allowableValues list, which is a duplicate of the enum
+    // maintained by memory, and it had already rotted once: a literal example advertised PLACED, a
+    // state this model does not have (issue-00081). Fixing that instance left the mechanism that
+    // produced it in place — adding a state still meant remembering to edit an annotation. Now
+    // adding a state to OrderStatus updates the published schema on the next build.
+    @Schema(description = "Current order status.", example = "FULFILMENT_IN_PROGRESS")
+        OrderStatus status,
     @Schema(
             description = "Order total in the currency's minor unit (e.g. cents/fen).",
             example = "3998")

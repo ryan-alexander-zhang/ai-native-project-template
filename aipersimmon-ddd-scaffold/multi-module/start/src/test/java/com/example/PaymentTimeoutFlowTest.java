@@ -123,7 +123,7 @@ class PaymentTimeoutFlowTest {
   }
 
   private String status(String orderId) {
-    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status();
+    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status().name();
   }
 
   private ProcessView processView(String orderId) {

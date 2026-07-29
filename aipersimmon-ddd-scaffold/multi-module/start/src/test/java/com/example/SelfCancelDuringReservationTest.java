@@ -144,7 +144,7 @@ class SelfCancelDuringReservationTest {
   }
 
   private String status(String orderId) {
-    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status();
+    return queryBus.ask(new FindOrder(orderId)).orElseThrow().status().name();
   }
 
   /** Bound to the tenant the flow was started under, or the lookup finds nothing. */
