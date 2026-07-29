@@ -17,17 +17,25 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.support.JdbcUtils;
 
 /**
- * Discovers and applies every aipersimmon-ddd component schema, each with its own dedicated Flyway
- * instance and history table.
+ * Applies the aipersimmon-ddd component schemas a consumer asked for, each with its own dedicated
+ * Flyway instance and history table.
+ *
+ * <p><strong>Bundling is not enabling.</strong> Nothing is applied until {@code
+ * aipersimmon.ddd.flyway.components} names a component. Creating tables in someone's database is an
+ * outward-facing, hard-to-reverse act, and a bundle starter puts five components' migrations on the
+ * classpath at once — so "on the classpath" must not mean "write DDL". The cost of the opt-in is
+ * one config line, and forgetting it fails loudly at startup: each component's schema validator
+ * refuses to start and names both the migration path and the key to set. The cost of the opposite
+ * default would be paid silently, by a production schema that grew a dozen tables nobody asked for.
  *
  * <p>Migrations ship with their owning module at {@code
  * classpath:aipersimmon/db/migration/{component}/{vendor}/V*.sql} — deliberately NOT under {@code
  * db/migration}, so Spring Boot's default Flyway (which scans {@code classpath:db/migration}) never
  * sees them and never trips over the multiple {@code V1}s. This runner resolves the database vendor
  * from the {@link DataSource}, scans the classpath for the component sets present for that vendor,
- * and migrates each into its own history table ({@code <prefix><component>}). Being
- * schema-agnostic, it needs no dependency on the storage modules — it applies exactly the ones the
- * consumer actually put on the classpath.
+ * and migrates the selected ones into their own history tables ({@code <prefix><component>}). Being
+ * schema-agnostic, it needs no dependency on the storage modules; the classpath scan is what a
+ * selection is checked against, so a name that ships no migrations is reported rather than ignored.
  *
  * <p>It is invoked from a {@link
  * org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy} AFTER the consumer's own
@@ -46,15 +54,31 @@ public final class AipersimmonFlywayMigrator {
     this.properties = properties;
   }
 
-  /** Apply every discovered aipersimmon component migration against the given data source. */
+  /** Apply the selected aipersimmon component migrations against the given data source. */
   public void migrate(DataSource dataSource) {
     String vendor = resolveVendor(dataSource);
-    TreeSet<String> components = discoverComponents(vendor);
-    if (components.isEmpty()) {
+    TreeSet<String> discovered = discoverComponents(vendor);
+    if (discovered.isEmpty()) {
       log.info("aipersimmon-ddd Flyway: no component migrations found for vendor '{}'", vendor);
       return;
     }
-    for (String component : components) {
+    if (properties.getComponents().isEmpty()) {
+      // Say what was available and how to ask for it. Silence here would look like the runner is
+      // broken; the alternative — creating all of it — is not ours to decide (see the class
+      // javadoc).
+      log.info(
+          "aipersimmon-ddd Flyway: applying nothing because aipersimmon.ddd.flyway.components is"
+              + " empty. Components available on the classpath for vendor '{}': {}. List the ones"
+              + " this application owns, or leave it empty and apply"
+              + " classpath:{}/<component>/{}/V*.sql with your own tool.",
+          vendor,
+          discovered,
+          BASE,
+          vendor);
+      return;
+    }
+    warnAboutUnknownSelections(discovered, vendor);
+    for (String component : discovered) {
       if (!isSelected(component)) {
         continue;
       }
@@ -79,7 +103,27 @@ public final class AipersimmonFlywayMigrator {
   }
 
   private boolean isSelected(String component) {
-    return properties.getComponents().isEmpty() || properties.getComponents().contains(component);
+    return properties.getComponents().contains(component);
+  }
+
+  /**
+   * A configured name that matches nothing on the classpath is almost always a typo or a module the
+   * consumer forgot to add — and its symptom is a missing table at the first write, far from here.
+   * Warn rather than fail: the runner does not know whether the component is meant to arrive later
+   * (a staged rollout), and refusing to start would be a worse answer to a spelling mistake.
+   */
+  private void warnAboutUnknownSelections(TreeSet<String> discovered, String vendor) {
+    for (String requested : properties.getComponents()) {
+      if (!discovered.contains(requested)) {
+        log.warn(
+            "aipersimmon-ddd Flyway: component '{}' is listed under"
+                + " aipersimmon.ddd.flyway.components but ships no migrations for vendor '{}'."
+                + " Available: {}. Its tables will NOT be created.",
+            requested,
+            vendor,
+            discovered);
+      }
+    }
   }
 
   /** Scan the classpath for {@code aipersimmon/db/migration/<component>/<vendor>/*.sql} sets. */

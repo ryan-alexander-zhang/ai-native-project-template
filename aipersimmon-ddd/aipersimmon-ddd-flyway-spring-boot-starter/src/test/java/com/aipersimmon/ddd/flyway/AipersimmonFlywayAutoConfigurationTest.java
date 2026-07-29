@@ -37,8 +37,9 @@ class AipersimmonFlywayAutoConfigurationTest {
   }
 
   @Test
-  void appliesComponentsAndCoexistsWithConsumerDefaultFlyway() {
+  void appliesEachListedComponentIntoItsOwnHistoryTableAlongsideConsumerFlyway() {
     runnerFor("flyway_all")
+        .withPropertyValues("aipersimmon.ddd.flyway.components=outbox,widget")
         .run(
             context -> {
               assertThat(context).hasNotFailed();
@@ -50,8 +51,8 @@ class AipersimmonFlywayAutoConfigurationTest {
                   .isZero();
               assertThat(historyTableCount(jdbc, "flyway_schema_history")).isEqualTo(1);
 
-              // Every aipersimmon component was applied too — the real outbox set plus a synthetic
-              // widget set.
+              // Both listed components were applied — the real outbox set plus a synthetic widget
+              // set.
               assertThat(
                       jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox", Integer.class))
                   .isZero();
@@ -64,6 +65,47 @@ class AipersimmonFlywayAutoConfigurationTest {
                   .isEqualTo(1);
               assertThat(historyTableCount(jdbc, "flyway_schema_history_aipersimmon_widget"))
                   .isEqualTo(1);
+            });
+  }
+
+  @Test
+  void bundlingIsNotEnabling() {
+    // Every component's migrations are on this test's classpath, exactly as a bundle starter puts
+    // them there. Writing DDL to a database is not something a dependency gets to decide, so an
+    // empty component list applies nothing — and the runner still hands control back to the
+    // consumer's own Flyway rather than short-circuiting it.
+    runnerFor("flyway_optin")
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              JdbcTemplate jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+
+              assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM business_widget", Integer.class))
+                  .isZero();
+              assertThat(historyTableCount(jdbc, "flyway_schema_history")).isEqualTo(1);
+
+              assertThat(historyTableCount(jdbc, "flyway_schema_history_aipersimmon_outbox"))
+                  .isZero();
+              assertThat(historyTableCount(jdbc, "flyway_schema_history_aipersimmon_widget"))
+                  .isZero();
+              assertThat(tableCount(jdbc, "aipersimmon_outbox")).isZero();
+              assertThat(tableCount(jdbc, "aipersimmon_widget")).isZero();
+            });
+  }
+
+  @Test
+  void aComponentThatShipsNoMigrationsIsSkippedWithoutFailingStartup() {
+    // A typo, or a module the consumer has not added yet. Refusing to start would be a worse answer
+    // to a spelling mistake than a WARN plus the component's own startup validator.
+    runnerFor("flyway_unknown")
+        .withPropertyValues("aipersimmon.ddd.flyway.components=widget,nosuchcomponent")
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              JdbcTemplate jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+              assertThat(
+                      jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_widget", Integer.class))
+                  .isZero();
             });
   }
 
@@ -101,6 +143,10 @@ class AipersimmonFlywayAutoConfigurationTest {
   }
 
   private static Integer historyTableCount(JdbcTemplate jdbc, String table) {
+    return tableCount(jdbc, table);
+  }
+
+  private static Integer tableCount(JdbcTemplate jdbc, String table) {
     return jdbc.queryForObject(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_NAME) = UPPER(?)",
         Integer.class,

@@ -22,7 +22,8 @@
     EventEnvelope and every durable row.
 
     Bundling is not enabling: Flyway applies only the components listed under
-    aipersimmon.ddd.flyway.components.
+    aipersimmon.ddd.flyway.components, which is empty by default. Naming none creates no tables;
+    each component then refuses to start until its schema exists.
   -->
   <artifactId>aipersimmon-ddd-starter-jdbc</artifactId>
   <name>aipersimmon-ddd-starter-jdbc</name>
@@ -80,7 +81,8 @@
       <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- Applies each bundled component's own migrations at startup, on its own history table. -->
+    <!-- Applies the migrations of each component named in aipersimmon.ddd.flyway.components, on
+         its own history table. Empty by default: see the header comment. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>

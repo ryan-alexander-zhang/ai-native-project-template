@@ -178,9 +178,24 @@ is the correct choice.
 | `baseline-on-migrate` / `baseline-version` | `true` / `0` | Lets the framework's migrations start cleanly on a database that already has your tables. |
 | `history-table-prefix` | `flyway_schema_history_aipersimmon_` | Each component gets its own history table, so framework migrations never interleave with yours. |
 
-Managing schema yourself is fine: copy the migrations from
-`aipersimmon/db/migration/<component>/<vendor>/` on the classpath into your own tool and leave
-`components` empty.
+**Bundling is not enabling.** A bundle starter (`aipersimmon-ddd-starter-jdbc`,
+`-starter-mybatis-plus`) puts five components' migrations on the classpath at once, and being on the
+classpath does not make the framework write DDL into your database — you name what you want:
+
+```yaml
+aipersimmon:
+  ddd:
+    flyway:
+      components: [outbox, inbox]   # nothing else is created
+```
+
+Forgetting the line is not silent: each component validates its own tables at startup and refuses to
+start, naming the migration path and the property. A name that matches no migration on the classpath
+(a typo, or a module not added yet) is a WARN and is skipped, so a spelling mistake does not become a
+failed deployment — the component's own validator is what stops it.
+
+Managing schema yourself is equally fine, and is what an empty list means: copy the migrations from
+`aipersimmon/db/migration/<component>/<vendor>/` on the classpath into your own tool.
 
 Two things worth knowing about how this runs. **Each listed component gets its own Flyway instance
 and its own history table, all against your schema** — several migration managers over one schema, so

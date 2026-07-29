@@ -92,8 +92,10 @@
       <version>${project.version}</version>
     </dependency>
     <!-- Applies each bundled component's own migrations at startup, on its own history table.
-         Which components apply is aipersimmon.ddd.flyway.components — bundling the module does
-         not silently create tables. -->
+         Which components apply is aipersimmon.ddd.flyway.components, and it is empty by default:
+         bundling the module does not silently create tables. Forgetting to list a component is
+         caught by that component's own startup schema validation, not by a missing table at the
+         first write. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>

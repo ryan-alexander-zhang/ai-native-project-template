@@ -5,18 +5,24 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration for the shared aipersimmon-ddd Flyway runner, under {@code aipersimmon.ddd.flyway}.
- * The defaults are chosen so that simply having this module on the classpath applies every
- * discovered component schema with no further configuration.
+ * The defaults are chosen so that having this module on the classpath applies <em>nothing</em>
+ * until {@link #getComponents() components} says what to apply.
  */
 @ConfigurationProperties(prefix = "aipersimmon.ddd.flyway")
 public class AipersimmonFlywayProperties {
 
-  /** Run the shared Flyway migration at startup. */
+  /** Run the shared Flyway migration at startup. Applies only what {@code components} lists. */
   private boolean enabled = true;
 
   /**
-   * Restrict to these component names (e.g. {@code outbox}, {@code inbox}). Empty means apply every
-   * component discovered on the classpath.
+   * The component schemas this application owns, by name ({@code outbox}, {@code inbox}, {@code
+   * process-manager}, {@code operation-log}, {@code web-store}).
+   *
+   * <p>Empty — the default — applies nothing: a bundle starter puts every component's migrations on
+   * the classpath, and being on the classpath must not mean writing DDL to a database. Name the
+   * ones you want, or leave it empty and copy {@code
+   * aipersimmon/db/migration/<component>/<vendor>/} into your own migration tool. A component whose
+   * tables are missing fails at startup, not at the first write.
    */
   private List<String> components = List.of();
 
