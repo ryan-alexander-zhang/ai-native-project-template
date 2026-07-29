@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.outbox.mybatisplus;
+package com.aipersimmon.ddd.outbox.engine.write;
 
 import com.aipersimmon.ddd.application.DurableIntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
@@ -7,6 +7,8 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
+import com.aipersimmon.ddd.outbox.engine.store.OutboxInsert;
+import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
@@ -15,13 +17,12 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Writes an integration event into the outbox table in the caller's transaction through the
- * MyBatis-Plus {@link OutboxMapper}. It stamps the transport metadata (an event id, the event's
- * class name as the type, the event's declared version, the current time) and the causal chain from
- * the emitting command's {@link CommandContext} — correlation, causation (the command's message
- * id), and trace — into an {@link EventEnvelope}, serializes the event payload to JSON, and inserts
- * one {@link OutboxRecord}. Being part of the caller's transaction, the row commits atomically with
- * the aggregate change.
+ * Writes an integration event into the outbox in the caller's transaction. It stamps the transport
+ * metadata (an event id, the event's declared logical type and version, the current time) and the
+ * causal chain from the emitting command's {@link CommandContext} — correlation, causation (the
+ * command's message id), and trace — into an {@link EventEnvelope}, serializes the event payload to
+ * JSON, and inserts one row through the {@link OutboxStore}. Being part of the caller's
+ * transaction, the row commits atomically with the aggregate change.
  *
  * <p>{@link #publish} mints a fresh event id for a new event; {@link #publishAs} reuses the
  * persisted identity a durable relay assigns (event id equal to the effect id) and inserts
@@ -29,7 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 public class OutboxWriter implements DurableIntegrationEvents {
 
-  private final OutboxMapper mapper;
+  private final OutboxStore store;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final String source;
@@ -37,12 +38,12 @@ public class OutboxWriter implements DurableIntegrationEvents {
   private final Supplier<String> idGenerator;
 
   public OutboxWriter(
-      OutboxMapper mapper,
+      OutboxStore store,
       ObjectMapper objectMapper,
       Clock clock,
       String source,
       Supplier<String> idGenerator) {
-    this(mapper, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE, idGenerator);
+    this(store, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE, idGenerator);
   }
 
   /**
@@ -53,13 +54,13 @@ public class OutboxWriter implements DurableIntegrationEvents {
    *     supplier.
    */
   public OutboxWriter(
-      OutboxMapper mapper,
+      OutboxStore store,
       ObjectMapper objectMapper,
       Clock clock,
       String source,
       StoreAndForwardTracer tracer,
       Supplier<String> idGenerator) {
-    this.mapper = mapper;
+    this.store = store;
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.source = source;
@@ -105,8 +106,9 @@ public class OutboxWriter implements DurableIntegrationEvents {
       boolean idempotent) {
     requireActiveTransaction(event);
     String payload = serialize(event);
-    // Capture the writing thread's trace context so the relay can restore it when it
-    // dispatches the row later — the outbox hop that ambient context cannot bridge.
+    // Capture the trace context active on this (writing) thread so the relay can restore it
+    // when it dispatches the row later on the scheduler thread — the one hop ambient context
+    // and Kafka producer auto-instrumentation cannot bridge across the outbox table.
     Captured captured = tracer.captureCurrent();
     EventEnvelope<IntegrationEvent> envelope =
         new EventEnvelope<>(
@@ -120,25 +122,22 @@ public class OutboxWriter implements DurableIntegrationEvents {
             correlationId,
             causationId,
             event);
-
-    OutboxRecord record = new OutboxRecord();
-    record.setEventId(envelope.eventId());
-    record.setSource(envelope.source());
-    record.setType(envelope.type());
-    record.setVersion(envelope.version());
-    record.setPayload(payload);
-    record.setOccurredAt(envelope.occurredAt());
-    record.setSubject(envelope.subject());
-    record.setCorrelationId(envelope.correlationId());
-    record.setCausationId(envelope.causationId());
-    record.setTenantId(envelope.tenantId());
-    record.setTraceparent(captured.traceparent());
-    record.setTraceState(captured.traceState());
-    record.setSent(false);
-    record.setAttempts(0);
-    record.setCreatedAt(clock.instant());
     try {
-      mapper.insert(record);
+      store.insert(
+          new OutboxInsert(
+              envelope.eventId(),
+              envelope.source(),
+              envelope.type(),
+              envelope.version(),
+              payload,
+              envelope.occurredAt(),
+              envelope.subject(),
+              envelope.tenantId(),
+              envelope.correlationId(),
+              envelope.causationId(),
+              captured.traceparent(),
+              captured.traceState(),
+              clock.instant()));
     } catch (DuplicateKeyException alreadyWritten) {
       if (!idempotent) {
         throw alreadyWritten;

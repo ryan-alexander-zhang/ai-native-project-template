@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.integration.UnknownIntegrationEventException;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;

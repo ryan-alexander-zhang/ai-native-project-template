@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;

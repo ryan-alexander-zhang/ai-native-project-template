@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The storage-agnostic engine of the transactional outbox: the writer, the relay (ordering,
+    classification, backoff, dead-lettering), the scheduled lease-guarded trigger, the retention
+    cleanup, and the shared Spring wiring — everything that is NOT tied to a particular database. It
+    runs against one store port (OutboxStore); a storage backend (aipersimmon-ddd-outbox-jdbc,
+    aipersimmon-ddd-outbox-mybatis-plus) supplies the adapter.
+
+    Why it exists: the relay is the most concurrency-sensitive code in the framework — per-aggregate
+    ordering under partial failure, a retry budget that must not be spent by a mark-sent failure, a
+    dead-letter move that must survive its own store being down — and it used to be maintained twice,
+    once per backend, with the scheduler byte-identical between them. Two copies of that reasoning is
+    one copy too many: a fix to either is a silent divergence in the other. This is the same
+    engine-over-store-ports shape aipersimmon-ddd-process-manager-engine and
+    aipersimmon-ddd-operation-log-engine already use.
+
+    It depends on Spring tx / context / boot-autoconfigure (the writer must assert the caller's
+    transaction, and the beans need an auto-config seam) but NOT on spring-jdbc or any ORM. One thing
+    deliberately stays with the backends: the ShedLock LockProvider, which is a JDBC lock table and
+    therefore genuinely storage-specific — the engine only declares that the poll holds a lease.
+  -->
+  <artifactId>aipersimmon-ddd-outbox-engine</artifactId>
+  <name>aipersimmon-ddd-outbox-engine</name>
+  <description>Storage-agnostic engine of the transactional outbox: writer, relay, scheduler, cleanup, and shared Spring wiring over one store port.</description>
+
+  <dependencies>
+    <!-- Time-ordered (UUIDv7) event ids. Required, not optional: falling back to
+         UUID.randomUUID() would reintroduce the random-key write amplification the SPI exists to
+         remove, with no startup signal (see issue-00053). -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The outbox contracts: OutboxMessage, OutboxDispatcher, DeadLetterStore, FailureClassifier,
+         RetryBackoff. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- OutboxProperties and the storage-agnostic dispatcher selection, which this engine's beans
+         read and order themselves after. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- DurableIntegrationEvents: the port the writer implements. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- EventEnvelope / IntegrationEvent: the wire identity the writer stamps onto a row. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Observability SPI (framework-free, no-op by default): the relay restores the writing
+         thread's trace context around each dispatch. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The writer serializes the event payload to JSON. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!-- TransactionSynchronizationManager (the writer's atomicity assertion) and
+         DuplicateKeyException (the idempotent insert). No spring-jdbc. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- @SchedulerLock on the poll: one instance relays at a time. The LockProvider itself is a
+         backend's concern. -->
+    <dependency>
+      <groupId>net.javacrumbs.shedlock</groupId>
+      <artifactId>shedlock-spring</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

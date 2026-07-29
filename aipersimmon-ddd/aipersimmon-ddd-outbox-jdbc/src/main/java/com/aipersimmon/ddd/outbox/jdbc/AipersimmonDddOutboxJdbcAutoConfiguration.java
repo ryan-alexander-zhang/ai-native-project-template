@@ -1,91 +1,46 @@
 package com.aipersimmon.ddd.outbox.jdbc;
 
-import com.aipersimmon.ddd.application.IntegrationEvents;
-import com.aipersimmon.ddd.core.id.IdGenerator;
-import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
-import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.DeadLetters;
-import com.aipersimmon.ddd.outbox.FailureClassifier;
-import com.aipersimmon.ddd.outbox.OutboxDispatcher;
-import com.aipersimmon.ddd.outbox.RetryBackoff;
-import com.aipersimmon.ddd.outbox.spring.AipersimmonDddOutboxAutoConfiguration;
-import com.aipersimmon.ddd.outbox.spring.OutboxProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import java.time.Clock;
 import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Wires the JdbcTemplate-backed outbox storage once a {@code JdbcTemplate} is available: a writer
- * that implements the integration-event publisher port and a scheduled relay that polls unsent rows
- * and hands them to the {@link OutboxDispatcher} chosen by the storage-agnostic {@link
- * AipersimmonDddOutboxAutoConfiguration} (ordered before this class). Enables scheduling so the
- * relay runs in the background; an application can override any of these beans.
+ * Contributes the JdbcTemplate-backed storage adapters once a {@code JdbcTemplate} is available:
+ * the {@link OutboxStore} the engine runs on, the dead-letter store, and the dead-letter read side.
+ *
+ * <p>That is deliberately all it does. The writer, relay, schedule and cleanup are assembled by
+ * {@code AipersimmonDddOutboxEngineAutoConfiguration} over the store port, so the two storage
+ * backends cannot drift in how they order, retry or give up on a message. What is left here is what
+ * only a JDBC backend can answer: the SQL, and the ShedLock lease — a lock table in the same
+ * database, hence not the engine's business.
  */
 @AutoConfiguration(
     after = {
       JdbcTemplateAutoConfiguration.class,
-      DataSourceTransactionManagerAutoConfiguration.class,
-      AipersimmonDddOutboxAutoConfiguration.class
-    },
-    // Register before the in-process events fallback so this durable writer claims the
-    // IntegrationEvents port and the fallback backs off. String form: this module
-    // does not depend on events-spring, and an absent target is simply ignored.
-    beforeName = "com.aipersimmon.ddd.events.spring.AipersimmonDddEventsAutoConfiguration")
-@EnableScheduling
+      DataSourceTransactionManagerAutoConfiguration.class
+    })
 public class AipersimmonDddOutboxJdbcAutoConfiguration {
-
-  private static final Logger log =
-      LoggerFactory.getLogger(AipersimmonDddOutboxJdbcAutoConfiguration.class);
-
-  // Name-scoped so this component always contributes its own named clock and injects it by name,
-  // rather than backing off when another component (process-manager, inbox) already registered a
-  // Clock of the same type — which would leave the by-name `outboxClock` injections unresolved.
-  @Bean
-  @ConditionalOnMissingBean(name = "outboxClock")
-  public Clock outboxClock() {
-    return Clock.systemUTC();
-  }
 
   @Bean
   @ConditionalOnBean(JdbcTemplate.class)
-  @ConditionalOnMissingBean(IntegrationEvents.class)
-  public IntegrationEvents outboxWriter(
-      JdbcTemplate jdbcTemplate,
-      ObjectProvider<ObjectMapper> objectMapper,
-      Clock outboxClock,
-      @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}")
-          String source,
-      ObjectProvider<StoreAndForwardTracer> tracer,
-      IdGenerator idGenerator) {
-    log.info(
-        "aipersimmon-ddd integration-event transport: durable transactional outbox (JdbcTemplate)");
-    return new OutboxWriter(
-        jdbcTemplate,
-        objectMapper.getIfAvailable(ObjectMapper::new),
-        outboxClock,
-        source,
-        tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE),
-        idGenerator::newId);
+  @ConditionalOnMissingBean(OutboxStore.class)
+  public OutboxStore outboxStore(JdbcTemplate jdbcTemplate) {
+    return new JdbcOutboxStore(jdbcTemplate);
   }
 
   @Bean
@@ -109,64 +64,14 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
     return new JdbcDeadLetters(jdbcTemplate);
   }
 
-  @Bean
-  @ConditionalOnBean(JdbcTemplate.class)
-  @ConditionalOnMissingBean
-  public OutboxRelay outboxRelay(
-      JdbcTemplate jdbcTemplate,
-      OutboxDispatcher outboxDispatcher,
-      DeadLetterStore deadLetterStore,
-      FailureClassifier failureClassifier,
-      Clock outboxClock,
-      OutboxProperties properties,
-      ObjectProvider<StoreAndForwardTracer> tracer) {
-    return new OutboxRelay(
-        jdbcTemplate,
-        outboxDispatcher,
-        deadLetterStore,
-        failureClassifier,
-        new RetryBackoff(
-            properties.getRetry().getBaseBackoffMs(), properties.getRetry().getMaxBackoffMs()),
-        outboxClock,
-        properties.getBatchSize(),
-        properties.getMaxAttempts(),
-        tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
-  }
-
-  /**
-   * The scheduled trigger. Conditional so a deployment that relays from one dedicated instance — or
-   * a test that drives the relay itself — can switch the schedule off without losing the relay. The
-   * relay bean above stays either way.
-   */
-  @Bean
-  @ConditionalOnBean(JdbcTemplate.class)
-  @ConditionalOnProperty(
-      name = "aipersimmon.ddd.outbox.relay.enabled",
-      havingValue = "true",
-      matchIfMissing = true)
-  @ConditionalOnMissingBean
-  public OutboxRelayScheduler outboxRelayScheduler(OutboxRelay outboxRelay) {
-    return new OutboxRelayScheduler(outboxRelay);
-  }
-
-  @Bean
-  @ConditionalOnBean(JdbcTemplate.class)
-  @ConditionalOnProperty(name = "aipersimmon.ddd.outbox.cleanup.enabled", havingValue = "true")
-  @ConditionalOnMissingBean
-  public OutboxCleanup outboxCleanup(
-      JdbcTemplate jdbcTemplate, Clock outboxClock, OutboxProperties properties) {
-    return new OutboxCleanup(
-        jdbcTemplate, outboxClock, properties.getCleanup().getRetentionSeconds());
-  }
-
   /**
    * Enables ShedLock and provides its {@link LockProvider} whenever a {@link DataSource} is
-   * present, so the scheduled {@link OutboxRelay} holds a database lock and runs on only one
-   * instance at a time — a multi-instance deployment does not poll and dispatch the same rows once
-   * per instance. The lock table ({@code shedlock}) must exist (see the reference DDL); the
-   * provider uses the database clock ({@code usingDbTime}) so the lock does not depend on the
-   * instances' wall clocks being in sync. An application can override the {@code LockProvider} bean
-   * (for example a Redis-backed one) to lock elsewhere.
+   * present, so the scheduled relay holds a database lock and runs on only one instance at a time —
+   * a multi-instance deployment does not poll and dispatch the same rows once per instance. The
+   * lock table ({@code shedlock}) must exist (see the reference DDL); the provider uses the
+   * database clock ({@code usingDbTime}) so the lock does not depend on the instances' wall clocks
+   * being in sync. An application can override the {@code LockProvider} bean (for example a
+   * Redis-backed one) to lock elsewhere.
    */
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnBean(DataSource.class)

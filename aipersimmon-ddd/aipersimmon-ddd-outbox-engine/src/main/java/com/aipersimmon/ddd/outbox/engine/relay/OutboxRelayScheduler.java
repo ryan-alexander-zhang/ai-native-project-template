@@ -1,4 +1,4 @@
-package com.aipersimmon.ddd.outbox.mybatisplus;
+package com.aipersimmon.ddd.outbox.engine.relay;
 
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;

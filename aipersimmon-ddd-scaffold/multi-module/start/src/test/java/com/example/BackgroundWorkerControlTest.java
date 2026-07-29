@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.aipersimmon.ddd.outbox.mybatisplus.OutboxRelayScheduler;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelayScheduler;
 import com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessManagerProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Nested;

@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.outbox.spring.InProcessOutboxDispatcher;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;

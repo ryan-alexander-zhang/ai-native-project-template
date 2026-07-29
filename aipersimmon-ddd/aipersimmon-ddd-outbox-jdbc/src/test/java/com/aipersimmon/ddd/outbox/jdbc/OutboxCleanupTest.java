@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.outbox.jdbc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.aipersimmon.ddd.outbox.engine.cleanup.OutboxCleanup;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -44,7 +45,7 @@ class OutboxCleanupTest {
    * outcome either way: it can only delete the same expired row this test expects to be gone.
    */
   private OutboxCleanup cleanup() {
-    return new OutboxCleanup(jdbc, Clock.systemUTC(), 1);
+    return new OutboxCleanup(new JdbcOutboxStore(jdbc), Clock.systemUTC(), 1);
   }
 
   @BeforeEach

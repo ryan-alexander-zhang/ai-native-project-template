@@ -1,11 +1,10 @@
-package com.aipersimmon.ddd.outbox.jdbc;
+package com.aipersimmon.ddd.outbox.engine.cleanup;
 
-import java.sql.Timestamp;
+import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import java.time.Clock;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
@@ -15,21 +14,21 @@ import org.springframework.scheduling.annotation.Scheduled;
  * delivery, and dead letters live in their own table (untouched by this purge) for inspection and
  * replay.
  *
- * <p>Guarded by ShedLock like the relay, so one instance runs the purge at a time.
+ * <p>Guarded by ShedLock like the relay, so one instance runs the purge at a time. Note that
+ * {@code @Scheduled} fires this once immediately at startup and holds that lock, so a caller
+ * invoking {@link #purge()} directly through the Spring proxy can be silently skipped — see {@code
+ * issue-00100}.
  */
 public class OutboxCleanup {
 
   private static final Logger log = LoggerFactory.getLogger(OutboxCleanup.class);
 
-  private static final String DELETE_SENT =
-      "DELETE FROM aipersimmon_outbox WHERE sent = TRUE AND sent_at < ?";
-
-  private final JdbcTemplate jdbc;
+  private final OutboxStore store;
   private final Clock clock;
   private final long retentionSeconds;
 
-  public OutboxCleanup(JdbcTemplate jdbc, Clock clock, long retentionSeconds) {
-    this.jdbc = jdbc;
+  public OutboxCleanup(OutboxStore store, Clock clock, long retentionSeconds) {
+    this.store = store;
     this.clock = clock;
     this.retentionSeconds = retentionSeconds;
   }
@@ -40,8 +39,7 @@ public class OutboxCleanup {
           "${aipersimmon.ddd.outbox.cleanup.lock-name:${spring.application.name:aipersimmon}-outbox-cleanup}",
       lockAtMostFor = "${aipersimmon.ddd.outbox.cleanup.lock-at-most-for:PT10M}")
   public void purge() {
-    Timestamp cutoff = Timestamp.from(clock.instant().minusSeconds(retentionSeconds));
-    int deleted = jdbc.update(DELETE_SENT, cutoff);
+    int deleted = store.deleteSentBefore(clock.instant().minusSeconds(retentionSeconds));
     if (deleted > 0) {
       log.info("outbox cleanup removed {} sent rows older than {}s", deleted, retentionSeconds);
     }

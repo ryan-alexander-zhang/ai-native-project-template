@@ -110,6 +110,7 @@
     <module>aipersimmon-ddd-events-spring-boot-starter</module>
     <module>aipersimmon-ddd-outbox</module>
     <module>aipersimmon-ddd-outbox-spring-boot-starter</module>
+    <module>aipersimmon-ddd-outbox-engine</module>
     <module>aipersimmon-ddd-outbox-jdbc</module>
     <module>aipersimmon-ddd-outbox-mybatis-plus</module>
     <module>aipersimmon-ddd-inbox</module>

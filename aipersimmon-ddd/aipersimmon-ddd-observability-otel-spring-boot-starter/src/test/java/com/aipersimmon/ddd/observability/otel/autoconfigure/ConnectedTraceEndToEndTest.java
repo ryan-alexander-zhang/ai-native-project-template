@@ -13,9 +13,10 @@ import com.aipersimmon.ddd.outbox.DefaultFailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
+import com.aipersimmon.ddd.outbox.engine.write.OutboxWriter;
 import com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore;
-import com.aipersimmon.ddd.outbox.jdbc.OutboxRelay;
-import com.aipersimmon.ddd.outbox.jdbc.OutboxWriter;
+import com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxStore;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
@@ -94,12 +95,13 @@ class ConnectedTraceEndToEndTest {
         new OpenTelemetryStoreAndForwardTracer(
             otelTracer, sdk.getPropagators().getTextMapPropagator());
 
+    JdbcOutboxStore store = new JdbcOutboxStore(jdbc);
     writer =
-        new OutboxWriter(jdbc, new ObjectMapper(), CLOCK, "test-src", storeTracer, () -> "EVT-1");
+        new OutboxWriter(store, new ObjectMapper(), CLOCK, "test-src", storeTracer, () -> "EVT-1");
     dispatcher = new CapturingDispatcher();
     relay =
         new OutboxRelay(
-            jdbc,
+            store,
             dispatcher,
             new JdbcDeadLetterStore(
                 jdbc, new TransactionTemplate(new DataSourceTransactionManager(dataSource)), CLOCK),

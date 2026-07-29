@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.id.AipersimmonDddIdAutoConfiguration;
+import com.aipersimmon.ddd.outbox.engine.autoconfigure.AipersimmonDddOutboxEngineAutoConfiguration;
 import com.aipersimmon.ddd.outbox.spring.AipersimmonDddOutboxAutoConfiguration;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,9 @@ class OutboxClockCoexistenceTest {
                   JdbcTemplateAutoConfiguration.class,
                   AipersimmonDddOutboxAutoConfiguration.class,
                   AipersimmonDddOutboxJdbcAutoConfiguration.class,
+                  // The clock and the writer live in the engine now; this backend contributes the
+                  // store they run on, so the minimal assembly is both.
+                  AipersimmonDddOutboxEngineAutoConfiguration.class,
                   // The outbox writer requires an IdGenerator (issue-00053), so the module that
                   // supplies it is part of the minimal assembly.
                   AipersimmonDddIdAutoConfiguration.class))

@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
