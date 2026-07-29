@@ -176,7 +176,7 @@ events and nothing else does not inherit the command bus.
 | `integration` | `IntegrationEvent` marker, `EventEnvelope` (CloudEvents-shaped), `@EventType`, `@Externalized`, the type catalogue |
 | `cqrs` | Command/query buses, handler markers, `CommandInterceptor` SPI, `CommandContext`, `UnitOfWork`, `Page`/`Slice`/`Cursor` |
 | `application` | `DomainEvents` / `IntegrationEvents` ports, application exceptions, `InboundEvents` (an inbound event's identity becoming the command's cause) |
-| `tenancy` | `TenantId`, the root sentinel, request-scoped `TenantContext`, `TenantResolver` / `MissingTenantPolicy` SPIs |
+| `tenancy` | `TenantId`, the root sentinel, request-scoped `TenantContext` (whose `effective()` is the one place the "nothing bound" case is decided — fail-closed once multi-tenancy is on), `TenantEnforcement`, `TenantResolver` / `MissingTenantPolicy` SPIs |
 | `web` | RFC 9457 problem model and registry, idempotency / replay / rate-limit / signature SPIs |
 | `outbox` | `OutboxMessage`, `OutboxDispatcher`, `FailureClassifier`, `RetryBackoff`, `DeadLetterStore` |
 | `inbox` | The `Inbox` idempotency port, and the table both adapters write to |

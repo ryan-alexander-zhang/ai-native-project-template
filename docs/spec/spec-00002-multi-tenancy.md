@@ -76,6 +76,18 @@ silo **seam** 预留在范围内（XFR-12），其路由实现不在。
 
 - **spec-00002-XFR-11**（Where 多租户开启）当请求解析不出租户时，`MissingTenantPolicy` 默认 `REJECT`（400/401）；
   全仓库共用单一哨兵 `__root__`（operation-log 链已对齐）。
+- **spec-00002-XFR-11b**（Where 多租户开启）当**基础设施**要盖章或过滤 `tenant_id` 而当前线程无绑定时，
+  系统应抛 `MissingTenantException`，**不得**回退哨兵。该决策应收口在 `TenantContext.effective()` 单点，
+  调用点不得各自决定回退值。多租户关闭时同一入口回退 `__root__`（N=1）。
+- **spec-00002-XFR-11c**（Where 多租户开启）系统应为自动装配的 executor 提供租户传播（`TaskDecorator`），
+  并在消费方已自带 `TaskDecorator` 时让位（Spring Boot 仅在唯一 bean 时应用，注册第二个会静默废掉对方）。
+  提交时无绑定不得凭空造租户。
+- **spec-00002-XFR-11d**（Where 多租户开启）系统**不应**把客户端可控的请求头作为默认租户来源：
+  无自定义 `TenantResolver` 且未显式 `trust-header=true` 时应拒绝启动，并在错误中给出安全接法。
+- **spec-00002-XFR-11e**（Where 多租户开启）消费的集成事件缺 `ce_tenantid` 时应按格式错误永久失败（死信），
+  不得归属哨兵；多租户关闭时应容忍缺失以兼容前租户时代的消息。
+- **spec-00002-XFR-11f**（Ubiquitous）`exclude-paths` 应按容器派发路径匹配，使路径穿越无法借用排除前缀
+  跳过租户解析。
 - **spec-00002-XFR-12**（Optional/预留）系统应把请求作用域数据源暴露为**单一可替换 bean**（读 `TenantContext`），
   使将来的 `TenantRoutingDataSource`（silo）无需改 mapper 即可替入；MVP 提供单库 pass-through。
 - **spec-00002-XFR-13**（Ubiquitous）系统应把租户作为维度加入 span（`tenant.id`）、MDC（`tenant`）；租户与 trace 分离传播。
@@ -122,6 +134,22 @@ silo **seam** 预留在范围内（XFR-12），其路由实现不在。
   Given `tenancy.enabled=false`
   When 正常读写与投递
   Then 所有行 `tenant_id=__root__`，行为等价于引入多租户前
+- **spec-00002-XAC-11b.1**（XFR-11b，边缘之下 fail-closed）
+  Given `tenancy.enabled=true`，三行分属两个租户，当前线程无绑定
+  When 经 MyBatis-Plus 查询已列入 `tenant-tables` 的表
+  Then 根因为 `MissingTenantException`；**不得**返回空结果集（空集与"该租户无数据"无法区分）
+- **spec-00002-XAC-11c.1**（XFR-11c，跨线程）
+  Given `tenancy.enabled=true`，请求已绑定租户 A
+  When 工作交给自动装配的 executor
+  Then 工作线程上 `effective()` 得到 A；任务结束后该池线程不残留任何绑定
+- **spec-00002-XAC-11d.1**（XFR-11d，不可信默认）
+  Given `tenancy.enabled=true`，无 `TenantResolver` bean，未设 `trust-header`
+  When 启动应用
+  Then 启动失败，错误指明"从认证主体解析"与"由不可绕过的边缘重写该头"两种接法
+- **spec-00002-XAC-11f.1**（XFR-11f，穿越）
+  Given `exclude-paths = /actuator/**`
+  When 请求 `/actuator/../orders`（容器派发到 `/orders`）
+  Then 过滤器**不**跳过，照常解析并按策略处置
 - **spec-00002-XAC-DDL.1**（迁移）
   Given 存量单租户库
   When 执行 `ADD COLUMN tenant_id NOT NULL DEFAULT '__root__'`（仅租户相对键表升级唯一约束）
@@ -150,8 +178,10 @@ silo **seam** 预留在范围内（XFR-12），其路由实现不在。
   `TenantContext`，mapper/`JdbcTemplate` 代码零改动。
 
 ### 4.4 配置键
-- `aipersimmon.tenancy.enabled`（默认 false）、`aipersimmon.tenancy.missing-policy`（默认 `REJECT`）、
-  `aipersimmon.tenancy.resolver.source`（header/subdomain/jwt-claim）、`aipersimmon.tenancy.resolver.header`。
+前缀为 `aipersimmon.ddd.tenancy`：`enabled`（默认 false）、`missing-policy`（默认 `REJECT`）、
+`header`（默认 `X-Tenant-Id`）、`trust-header`（默认 false，见 XFR-11d）、`exclude-paths`（默认 `/actuator/**`）、
+`mybatis-plus.tenant-column`、`mybatis-plus.tenant-tables`。
+自定义解析来源（subdomain / jwt-claim）由消费方提供 `TenantResolver` bean 实现，不再是配置枚举。
 
 ## 5. 关联文档
 - 决策：[[decision-00018-multi-tenancy-boundaries]]

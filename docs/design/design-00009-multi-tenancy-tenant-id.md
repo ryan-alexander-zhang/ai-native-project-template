@@ -65,8 +65,22 @@ parent: decision-00018-multi-tenancy-boundaries
 - `TenantContext`：**ThreadLocal 持有者**，类比 MDC。`current()` / `set(TenantId)` / `runAs(TenantId, Supplier)` / `clear()`。
   这是读侧仓储与基础设施实现读取环境租户的唯一入口。**不开放可变属性池、不做通用变量袋**（沿用
   [[decision-00012-no-ambient-per-command-state]] 的克制）。
-- `TenantResolver`（SPI）：`Optional<TenantId> resolve(TenantResolutionContext)`。默认实现由 spring 模块提供。
+  - **`effective()`：缺绑定决策的唯一收口点**（`issue-00099`）。凡是盖章或过滤 `tenant_id` 的基础设施都调用它，
+    不再各自 `orElse(ROOT)`：有绑定用之；多租户关且无绑定 → `Tenants.ROOT`；多租户开且无绑定 →
+    抛 `MissingTenantException`。**不提供**无条件抛出的 `require()`——与 `effective()` 同概念两个名字。
+  - `isRequired()` / `setRequired(boolean)`：部署级模式旗标。旗标是部署事实而非请求事实，故为 `volatile` 静态，
+    唯一合法的搬动方式是 `TenantEnforcement`。
+- `TenantEnforcement`：框架无关的模式开关（`enable()` / `disable()`）。两个 tenancy auto-config 都以
+  `@Bean(initMethod="enable", destroyMethod="disable")` 把它绑到上下文生命周期；
+  `tenancy-mybatis-plus` 也注册是因为它不依赖 starter 却是真正改写 SQL 的模块，安全性不能取决于兄弟模块在不在，
+  `@ConditionalOnMissingBean` 保证只建一个。destroy 降旗，避免同 JVM 内先后两个上下文互相继承模式。
+- `MissingTenantException`：多租户开启且租户必需却缺失时抛出。两个边界会抛：边缘解析不出（`REJECT` 策略）、
+  以及 `effective()` 在无绑定线程上被调用。**后者是调用方的 bug（绑定跨线程丢了或从未建立），不是坏输入，
+  故不得映射成 4xx。**
+- `TenantResolver`（SPI）：`Optional<TenantId> resolve(TenantResolutionContext)`。默认实现由 spring 模块提供，
+  **须显式 opt-in**（§十一）。
 - `MissingTenantPolicy`（SPI）：`REJECT`（多租户开启且解析失败 → 拒绝请求）/ `SYSTEM`（回退哨兵）。
+  作用域只到**边缘**：它按"一个请求"决策，表达不了"基础设施层当前线程没有绑定"，后者归 `effective()`。
 
 ### 2.2 `aipersimmon-ddd-tenancy-spring`（装配）
 
@@ -225,10 +239,23 @@ pool 模型下，租户只是行上的数据：
 
 ## 十一、开关与兼容/迁移
 
-- `aipersimmon.tenancy.enabled`（默认 `false`）：`false` → `TenantResolver` 恒返回 `Tenants.ROOT`，`MissingTenantPolicy`
-  不生效；`true` → 从配置来源解析，解析失败按 `MissingTenantPolicy`。
+- `aipersimmon.ddd.tenancy.enabled`（默认 `false`）：`false` → `TenantResolver` 恒返回 `Tenants.ROOT`，
+  `MissingTenantPolicy` 不生效，`effective()` 在无绑定时回退哨兵；
+  `true` → 从配置来源解析，解析失败按 `MissingTenantPolicy`，且 `effective()` 在无绑定时**抛异常**。
 - **`MissingTenantPolicy` 默认 = `REJECT`**（owner 决策 6，安全默认）：多租户开启却解析不出租户时直接拒绝请求
   （400/401），绝不悄悄回退到共享桶；`SYSTEM`（回退哨兵）仅供受控内部/迁移场景显式选用。
+- **`aipersimmon.ddd.tenancy.trust-header`（默认 `false`）**（`issue-00099`）：是否信任 `header` 指定的请求头。
+  多租户开启 + 无自定义 `TenantResolver` + 未 opt-in → **拒绝启动**（`UntrustedTenantHeaderException` +
+  FailureAnalyzer 给出两种安全接法）。理由见 [[decision-00018-multi-tenancy-boundaries]] 命题 13c。
+- **跨线程传播**：`TenantContextTaskDecorator`（tenancy-spring 提供，`@ConditionalOnMissingBean(TaskDecorator)`）。
+  Spring Boot 只在恰好一个 `TaskDecorator` bean 时应用它，故消费方自带 decorator 时本 bean 主动让位——
+  否则会静默把对方的也一起废掉；这种情形下消费方须把租户传播组合进自己的 decorator。
+  它**不覆盖**自建 executor。后台轮询器（relay / deadline worker / cleanup）本就无请求租户，
+  这也是框架自有表刻意不进 `tenant-tables` 的原因——加进去会让每次轮询都失败。
+- **`exclude-paths` 按容器派发路径匹配**（`issue-00099`）：原先用 `getRequestURI()` 原始值匹配，
+  而容器会把 `/actuator/../orders` 规约成 `/orders` 才选 handler，于是穿越串能借用 `/actuator/**` 排除项
+  跳过整个租户解析。现改为规约后匹配，且对 `;` 路径参数、`%2f`/`%5c`/`%2e` 编码、无法消解的前导 `../`
+  一律视为"不排除"——宁可去解析并拒绝，也不跳过。
 - **迁移安全**：既有单租户库执行 `ALTER TABLE ... ADD COLUMN tenant_id VARCHAR(64) NOT NULL DEFAULT '__root__'`，
   存量行自动落哨兵；仅**租户相对键的表**（§五：`process_instance` / 三张 web-store）需把唯一约束升级为含 `tenant_id`
   的复合键（存量哨兵行不冲突），其余表只加列不改约束。全程无需停机改代码路径。

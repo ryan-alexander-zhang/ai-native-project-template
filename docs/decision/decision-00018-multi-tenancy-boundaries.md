@@ -19,7 +19,9 @@ parent:
 ## 结论先行
 
 > **采用 pool 模型（共享 schema + `tenant_id` 判别列），不做分库/分 schema（silo 留作 phase 2 可选后端并零成本预留
-> seam）。`tenant_id` 恒非空、默认哨兵 `__root__`——单租户即 N=1 的多租户，开关只切解析行为、不改 schema 与代码路径。
+> seam）。`tenant_id` 恒非空、默认哨兵 `__root__`——单租户即 N=1 的多租户，开关只切解析行为与缺绑定姿态、
+> 不改 schema 与代码路径。多租户开启后隔离**fail-closed**：缺绑定即 `MissingTenantException`，
+> 决策收口在 `TenantContext.effective()` 一处（命题 13b）；默认的 header 解析器不可信任，须显式 opt-in（命题 13c）。
 > 租户是旁路元数据：写侧权威载体是 `CommandContext.tenantId`（显式传值），跨线程/读侧/基础设施才用受限的
 > `TenantContext`（请求内单值、trusted-boundary 一次写入、不可变、非开放变量池），跨进程走 `EventEnvelope` 扩展属性 +
 > `ce_tenantid` header。租户只进"租户相对"的唯一键（`business_key`、web `idempotency_key` 等），不进框架生成的全局唯一 id
@@ -49,8 +51,9 @@ design-00009 的四路代码勘察确认框架当前对多租户**零支持**（
    `tenant_id` 列在 silo 下只是无害冗余。现在不写路由代码。
 2. **`tenant_id` 恒非空，哨兵 `__root__`。** 列定义 `NOT NULL DEFAULT '__root__'`；`TenantId` 校验禁止用户租户以
    `__` 开头，结构上杜绝碰撞。**不用 `0`**——真实租户 id 可能恰为 `"0"`，撞上即跨租户泄漏。
-3. **单租户 = N=1。** `aipersimmon.tenancy.enabled`（默认 `false`）只切换"解析器读请求 / 硬返回 `__root__`"，
-   schema、谓词、代码路径恒定。**禁止用 NULL 表示"无租户"**（命题二）。
+3. **单租户 = N=1。** `aipersimmon.ddd.tenancy.enabled`（默认 `false`）切换两件事：解析行为（读请求 / 硬返回
+   `__root__`），以及**缺绑定时的姿态**（见命题 13b）。schema、谓词、代码路径恒定。
+   **禁止用 NULL 表示"无租户"**（命题二）。
 3b. **`tenant_id` 是外部不透明标识，框架不生成、不强制格式，但要求不可变 + 有界长度（建议 ≤32）。**
    **不采用 UUIDv7 作 `tenant_id`**：其时间有序收益只对高基数高频插入的每行 id 成立，`tenant_id` 低基数极少插入，
    杠杆在窄+不可变+作索引前导列（命题四）。UUIDv7/ULID 用于 per-row id 是正交的独立改进，不在本 ADR。
@@ -97,7 +100,23 @@ design-00009 的四路代码勘察确认框架当前对多租户**零支持**（
 ### F. 缺租户策略与模块
 
 13. **`MissingTenantPolicy` 默认 `REJECT`。** 多租户开启却解析不出租户时拒绝请求（400/401），绝不悄悄回退共享桶；
-    `SYSTEM`（回退哨兵）仅受控内部/迁移场景显式选用。
+    `SYSTEM`（回退哨兵）仅受控内部/迁移场景显式选用。**注意其作用域只到边缘**——它按"一个请求"决策，
+    表达不了"基础设施层当前线程没有绑定"，后者由命题 13b 覆盖。
+13b. **边缘之下同样 fail-closed，且决策只有一个收口点。**（`issue-00099` 补充；原 ADR 缺此命题，导致 14 处
+    调用点各自 `orElse(ROOT)`，`MissingTenantException` 沦为死代码。）凡是盖章或过滤 `tenant_id` 的基础设施
+    一律经 `TenantContext.effective()` 取租户：有绑定用之；多租户**关**且无绑定用 `__root__`（N=1，每行本就带哨兵）；
+    多租户**开**且无绑定**抛 `MissingTenantException`**。
+    理由：哨兵设计本身正确，但它让"没绑定"与"单租户"共用同一个返回值，于是每个局部看 `orElse(ROOT)` 都像对的。
+    缺的不是各处判断，而是一个知道**部署处于哪种模式**的收口点——模式是部署级事实，故建模为
+    `TenantEnforcement`（框架无关，绑定到 Spring 上下文生命周期），而非按请求传递。
+    推论：`TenantContext` 不再提供无条件抛出的 `require()`（与 `effective()` 同概念两名字）;
+    跨线程传播由 `TenantContextTaskDecorator` 负责，未绑定即提交时不凭空造租户，交给 `effective()` 响亮失败;
+    消费的集成事件在多租户开启时，`ce_tenantid` 升级为必需 CloudEvents 属性（缺失 → 永久失败 → 死信）。
+13c. **默认解析器不可被信任，须显式 opt-in。**（`issue-00099` 补充。）`X-Tenant-Id` 由调用方提供，
+    框架无任何环节把它与认证主体关联，且租户过滤器排在 Spring Security 之前——信它等于"改一个 header
+    就能读写任意租户"。框架**没有可猜的安全默认**（不知道消费方 principal 的形状），故多租户开启 +
+    无自定义 `TenantResolver` + 未设 `aipersimmon.ddd.tenancy.trust-header=true` 时**拒绝启动**，
+    并由 FailureAnalyzer 把两种安全接法（从认证主体解析 / 由不可绕过的边缘重写该 header）写进启动错误。
 14. **新增两个薄模块** `aipersimmon-ddd-tenancy`（framework-free：`TenantId`/`TenantContext`/`TenantResolver`/
     `MissingTenantPolicy`/哨兵）+ `aipersimmon-ddd-tenancy-spring`（边缘 Filter + 绑定 interceptor）。真正的隔离靠改造既有
     组件（design-00009 §十二清单），租户是横切标识，不像 operation-log 能自成一体。
