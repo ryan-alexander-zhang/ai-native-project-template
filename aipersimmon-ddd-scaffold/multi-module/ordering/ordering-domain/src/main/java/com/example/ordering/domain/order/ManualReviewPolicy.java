@@ -1,9 +1,6 @@
 package com.example.ordering.domain.order;
 
-import com.example.ordering.domain.shared.Sku;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Decides whether a freshly placed order must be held for manual review, producing the {@link
@@ -12,33 +9,32 @@ import java.util.Set;
  * Order} is deliberate: the aggregate only knows how to move between states, not the business rule
  * for when review applies.
  *
- * <p>This reference implementation flags any order that contains a <em>restricted SKU</em> — a
- * deliberately amount-independent rule, so it never entangles with the payment authorization
- * ceiling or a customer's credit limit (both of which are value-based). A real policy would consult
- * a fraud/compliance or product-classification service; the hard-coded watchlist here is the honest
- * stand-in a scaffold needs to make the review branch reachable from a test.
+ * <p><strong>A port, not a class, because this is the rule most likely to be replaced.</strong> It
+ * used to be a final class holding a hard-coded SKU watchlist, instantiated with {@code new} in a
+ * {@code private static final} field of {@code PlaceOrderHandler}. That made the single most
+ * business-variable rule in the context the one thing a consuming project could not change without
+ * editing a handler — the opposite of what a scaffold should offer. {@link
+ * RestrictedSkuReviewPolicy} is still here and still simple; it is now <em>one</em> implementation
+ * of a port rather than the only possible answer.
+ *
+ * <p>What a real deployment substitutes: a fraud or compliance service, a product-classification
+ * lookup, a rules engine, or a value-based rule. Declare a bean of this type and the scaffold's
+ * default backs off — see {@code OrderingPolicyConfig} in {@code start}.
+ *
+ * <p>Implementations must stay <em>pure</em>: given the same lines, the same verdict. This is
+ * consulted inside the placement transaction, before the aggregate exists, so an implementation
+ * that reaches out to a slow or flaky service is putting that call on the write path. If review
+ * classification has to be remote, prefer holding every order and clearing it asynchronously over
+ * making placement depend on a network hop.
  */
-public final class ManualReviewPolicy {
+public interface ManualReviewPolicy {
 
   /**
-   * Demo watchlist: orders containing one of these SKUs are held for manual review. Typed as {@code
-   * Set<Sku>} rather than {@code Set<String>} so it cannot be confused with — or accidentally
-   * checked against — any other collection of strings this context holds (issue-00085).
+   * Assess raw line data (before the aggregate exists), returning the review verdict.
+   *
+   * @param lines the order's lines; may be {@code null} or empty, and that must not throw — {@link
+   *     Order#place} rejects an empty order itself, and a policy that threw first would surface the
+   *     wrong error
    */
-  private static final Set<Sku> RESTRICTED_SKUS = Set.of(new Sku("SKU-RESTRICTED"));
-
-  /** Assess raw line data (before the aggregate exists), returning the review verdict. */
-  public ReviewRequirement assess(List<LineData> lines) {
-    Set<String> reasons = new LinkedHashSet<>();
-    if (lines != null) {
-      for (LineData line : lines) {
-        if (RESTRICTED_SKUS.contains(line.sku())) {
-          reasons.add("restricted SKU requires manual review: " + line.sku());
-        }
-      }
-    }
-    return reasons.isEmpty()
-        ? ReviewRequirement.notRequired()
-        : ReviewRequirement.required(reasons);
-  }
+  ReviewRequirement assess(List<LineData> lines);
 }

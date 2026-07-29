@@ -21,7 +21,7 @@ import com.example.ordering.domain.order.CancellationCategory;
 import com.example.ordering.domain.order.OrderCancelledEvent;
 import com.example.ordering.process.fulfilment.OrderFulfilmentDefinition;
 import com.example.payment.api.PaymentDeclined;
-import com.example.payment.domain.AuthorizationPolicy;
+import com.example.payment.domain.CeilingAuthorizationPolicy;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -103,7 +103,8 @@ class PaymentCompensationFlowTest {
                   CancellationCategory.PAYMENT_DECLINED, recorder.cancelledCategory(orderId));
               // Payment really declined, with the domain's stable code...
               assertNotNull(recorder.declined(orderId));
-              assertEquals(AuthorizationPolicy.DECLINE_CODE, recorder.declined(orderId).code());
+              assertEquals(
+                  CeilingAuthorizationPolicy.DECLINE_CODE, recorder.declined(orderId).code());
               // ...and the stock really was released (a StockReleased event fired).
               assertNotNull(
                   recorder.released(orderId), "stock must be released before cancellation");

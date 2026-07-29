@@ -44,25 +44,32 @@ import org.springframework.stereotype.Component;
 @Component
 public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
 
-  private static final ManualReviewPolicy REVIEW = new ManualReviewPolicy();
-
   private final Orders orders;
   private final Customers customers;
   private final IdGenerator idGenerator;
   private final StockAvailabilityGateway stockAvailability;
   private final FulfilmentTrigger fulfilmentTrigger;
 
+  /**
+   * Injected, not instantiated. This was a {@code private static final new ManualReviewPolicy()},
+   * which made the context's most business-variable rule the one thing a consuming project could
+   * not replace without editing this class.
+   */
+  private final ManualReviewPolicy review;
+
   public PlaceOrderHandler(
       Orders orders,
       Customers customers,
       IdGenerator idGenerator,
       StockAvailabilityGateway stockAvailability,
-      FulfilmentTrigger fulfilmentTrigger) {
+      FulfilmentTrigger fulfilmentTrigger,
+      ManualReviewPolicy review) {
     this.orders = orders;
     this.customers = customers;
     this.idGenerator = idGenerator;
     this.stockAvailability = stockAvailability;
     this.fulfilmentTrigger = fulfilmentTrigger;
+    this.review = review;
   }
 
   @Override
@@ -103,8 +110,8 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     // The aggregate's primary key comes from IdGenerator (UUIDv7), not UUID.randomUUID(): orders is
     // the highest-volume table here, so a time-ordered key is worth most on it (issue-00054).
     OrderId orderId = new OrderId(idGenerator.newId());
-    ReviewRequirement review = REVIEW.assess(lines);
-    Order order = Order.place(orderId, customerId, lines, review);
+    ReviewRequirement reviewRequirement = review.assess(lines);
+    Order order = Order.place(orderId, customerId, lines, reviewRequirement);
 
     // Commit the order's total against the customer's credit, in this transaction, alongside the
     // order itself. A deliberate two-aggregate write, and the same trade-off ReserveStockHandler
@@ -122,7 +129,7 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     customer.reserveCredit(order.total());
     customers.save(customer);
 
-    if (review.isRequired()) {
+    if (reviewRequirement.isRequired()) {
       // Held for manual review: record the placement, but reserve nothing until it clears. The
       // repository drains the recorded events as part of saving (issue-00052).
       orders.save(order);

@@ -42,12 +42,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment, Void> {
 
-  private final AuthorizationPolicy authorization = new AuthorizationPolicy();
+  /**
+   * Injected, not instantiated. This was a {@code new AuthorizationPolicy()} field, which made the
+   * one rule every real deployment must replace the one thing it could not replace without editing
+   * this class.
+   */
+  private final AuthorizationPolicy authorization;
+
   private final IntegrationEvents integrationEvents;
   private final PaymentOperations operations;
 
   public AuthorizePaymentHandler(
-      IntegrationEvents integrationEvents, PaymentOperations operations) {
+      AuthorizationPolicy authorization,
+      IntegrationEvents integrationEvents,
+      PaymentOperations operations) {
+    this.authorization = authorization;
     this.integrationEvents = integrationEvents;
     this.operations = operations;
   }

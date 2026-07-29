@@ -10,7 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.payment.api.PaymentAuthorized;
 import com.example.payment.api.PaymentDeclined;
-import com.example.payment.domain.AuthorizationPolicy;
+import com.example.payment.domain.CeilingAuthorizationPolicy;
 import com.example.payment.domain.PaymentDecision;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,10 +40,11 @@ class AuthorizePaymentIdempotencyTest {
 
   private final RecordingIntegrationEvents events = new RecordingIntegrationEvents();
   private final FakePaymentOperations operations = new FakePaymentOperations();
-  private final AuthorizePaymentHandler handler = new AuthorizePaymentHandler(events, operations);
+  private final AuthorizePaymentHandler handler =
+      new AuthorizePaymentHandler(new CeilingAuthorizationPolicy(), events, operations);
 
-  private static final long UNDER_CEILING = AuthorizationPolicy.AUTHORISATION_CEILING_MINOR - 1;
-  private static final long OVER_CEILING = AuthorizationPolicy.AUTHORISATION_CEILING_MINOR + 1;
+  private static final long UNDER_CEILING = CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR - 1;
+  private static final long OVER_CEILING = CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR + 1;
 
   @Test
   void aRedeliveryAuthorisesOnceAndRepublishesTheRecordedOutcome() {
@@ -79,7 +80,7 @@ class AuthorizePaymentIdempotencyTest {
     // between deliveries cannot give one operation two different outcomes.
     PaymentDeclined first = assertInstanceOf(PaymentDeclined.class, events.published.get(0));
     PaymentDeclined replayed = assertInstanceOf(PaymentDeclined.class, events.published.get(1));
-    assertEquals(AuthorizationPolicy.DECLINE_CODE, first.code());
+    assertEquals(CeilingAuthorizationPolicy.DECLINE_CODE, first.code());
     assertEquals(first.code(), replayed.code(), "the same decision, not a fresh one");
     assertEquals(first.reason(), replayed.reason());
   }

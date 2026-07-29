@@ -266,3 +266,27 @@ payment:
     cleanup:
       enabled: true
       retention-seconds: 2592000
+  # The authorization ceiling: amounts at or below it are authorised, above it declined. A decision,
+  # not a local address, so it lives here rather than in a profile.
+  #
+  # This is configuration because it is a NUMBER a deployment picks. It is not, however, the
+  # interesting axis of change: the whole policy is a stand-in for a payment provider, and a real
+  # deployment replaces the RULE rather than tuning the threshold. That is a bean, not a property —
+  # declare an AuthorizationPolicy and PaymentPolicyConfig's default backs off. Both levels exist
+  # because they cost different amounts, and before they did, both meant editing a handler.
+  authorization:
+    ceiling-minor: 50000
+
+# The ordering context's replaceable policies. Same two levels as payment's: the LIST is a property,
+# the RULE is a bean (declare a ManualReviewPolicy and OrderingPolicyConfig's default backs off).
+#
+# SKU-RESTRICTED is what makes the manual-review branch reachable — an order containing it is held in
+# AWAITING_REVIEW until approve-review or reject-review answers. The dev seed stocks it in both
+# tenants. An empty list is legitimate and means no order is ever held.
+#
+# The strings become Sku value objects at startup, so a blank entry fails the context rather than
+# silently never matching a line.
+ordering:
+  review:
+    restricted-skus:
+      - SKU-RESTRICTED
