@@ -6,6 +6,9 @@ import com.example.ordering.api.OrderReadyForFulfilment;
 import com.example.ordering.domain.order.LineData;
 import com.example.ordering.domain.order.Order;
 import com.example.ordering.domain.order.Orders;
+import java.time.Clock;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -43,10 +46,25 @@ public class FulfilmentTrigger {
 
   private final Orders orders;
   private final IntegrationEvents integrationEvents;
+  private final Clock clock;
 
-  public FulfilmentTrigger(Orders orders, IntegrationEvents integrationEvents) {
+  /**
+   * How long the fulfilment process will wait for a reservation before compensating. Read from the
+   * same property {@code OrderFulfilmentDefinition} arms its STOCK deadline from, so the deadline
+   * this context publishes and the deadline it actually enforces cannot disagree — two properties
+   * would drift, and the published one would become a promise nothing kept.
+   */
+  private final Duration stockTimeout;
+
+  public FulfilmentTrigger(
+      Orders orders,
+      IntegrationEvents integrationEvents,
+      Clock clock,
+      @Value("${ordering.fulfilment.stock-timeout:PT1M}") Duration stockTimeout) {
     this.orders = orders;
     this.integrationEvents = integrationEvents;
+    this.clock = clock;
+    this.stockTimeout = stockTimeout;
   }
 
   /**
@@ -58,9 +76,13 @@ public class FulfilmentTrigger {
     integrationEvents.publish(reservationRequest(order), context);
   }
 
-  private static OrderReadyForFulfilment reservationRequest(Order order) {
+  private OrderReadyForFulfilment reservationRequest(Order order) {
     var lines = order.lineData().stream().map(FulfilmentTrigger::toLine).toList();
-    return new OrderReadyForFulfilment(order.id().value(), lines);
+    // Revision 2 of the contract, and the only revision anything publishes. The deadline is stated
+    // rather than implied: inventory would otherwise have no way to know how long this context is
+    // prepared to wait, and no way to derive it — the budget is ordering's own configuration.
+    return new OrderReadyForFulfilment(
+        order.id().value(), lines, clock.instant().plus(stockTimeout));
   }
 
   private static OrderReadyForFulfilment.Line toLine(LineData line) {
