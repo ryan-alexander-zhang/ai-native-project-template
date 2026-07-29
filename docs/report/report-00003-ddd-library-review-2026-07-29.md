@@ -65,7 +65,13 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   而留着 60 分钟的调度锁，崩溃后依然没有实例在轮询，压根走不到 claim 查询。有序性随之从批内记账改为
   "只有聚合队头可领"的存储谓词（活在单节点内存里的保证撑不住并发 poller），轮询自带"半个租约"的时间预算，
   于是 Kafka 启动守卫的算式里 `batch-size` 整项消失——这就是解开耦合的具体形态。顺带：投递吞吐现在随实例数扩展。
-- 零 Micrometer 指标：积压深度、最老未发送年龄这两个最经典的 outbox 告警必须手写 SQL 才能得到。
+- ~~零 Micrometer 指标~~ → **已修** `issue-00110`：照 process-manager 的形状分家——push 钩子
+  `OutboxObserver`（claim/dispatch 延迟、按 reason 打标的 `dead.lettered`、`mark.sent.failures`、`released`）
+  + pull 读 `OutboxBacklog`（gauge `pending` / `oldest.pending.age`）。两条 gauge 出自**一次扫描**
+  （端口只加一个 `pendingBacklog`），且「等待中」与 claim 的存活判据是同一条谓词。
+  **「是否丢过消息」按事件告警**（`dead.lettered` counter，所有 reason 启动即注册好，仪表盘有 0 值曲线可告警），
+  而不是看死信表深度——一条被重放的死信会让深度回落、告警随之消失。**刻意不加健康检查**：
+  一个连不上 broker 的 relay 不是有病的实例，而本次评审的 C5 正是一个卡在 DEGRADED 的健康检查。
 - 吞吐上限约 100 msg/s：每轮只抽一批、批间固定等 1s、每条 send 同步 `get(timeout)`（放弃 producer 批处理与流水线）、
   每条成功一次独立 `MARK_SENT`。1 小时故障积压 180 万行要排约 5 小时。
 - ~~**静默丢失**：outbox 行不存目的地，路由在派发时按当前注解决定~~ → **已修** `issue-00109`：
@@ -159,7 +165,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
    实际收益比"变成死信"更强：目的地留在行上意味着注解消失后那些行**照样正确投出**，
    死信只留给"传输整个不在了"这种真配置错。第 7 项让所有实例并发轮询，也把"滚动发布期间按谁的表判"
    从概率事件变成常态，这一项因此更紧要)
-9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）
+9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）（`issue-00110`，**已完成**；无新配置项）
 10. 流水线化 Kafka 腿（按 subject 有序发出、按序等 future、首个失败 fail-fast；语义不变，吞吐 10–50 倍）
 11. BOM 去 parent，只管理 `com.aipersimmon.ddd:*` 与刻意再导出的坐标
 12. 测试门禁反转：两个 engine 补内存 store 单测 + JaCoCo；加 reactor 级 ArchUnit 用字节码强制契约模块无框架依赖
@@ -197,4 +203,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00106-an-empty-flyway-component-list-created-every-table]]、
   [[issue-00107-silent-degradations-become-loud-failures]]、
   [[issue-00108-a-killed-relay-instance-stops-all-delivery]]、
-  [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]
+  [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]、
+  [[issue-00110-the-outbox-had-no-metrics-at-all]]

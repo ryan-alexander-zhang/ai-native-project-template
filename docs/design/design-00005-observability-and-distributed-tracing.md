@@ -215,7 +215,16 @@ trace_state VARCHAR(512)   -- 可选，可空
 
 ### 10.2 trace ↔ metric（exemplar）
 
-[[design-00004-durable-process-manager-runtime]] §5.3 已定 SLI（`oldest_pending_effect_age`、`dead_effects`、`suspended_instances`、`claim_latency`、`dispatch_latency`、`advance_conflict_retries` …）。闭环缺的是 **exemplar**——把 `trace_id` 附到指标数据点，从延迟毛刺一键跳到样本 trace。**由 starter 交付**：`opentelemetry-spring-boot-starter` 传递依赖带 `opentelemetry-micrometer-1.5`，把 Micrometer 指标桥接到 OTLP；只要指标在 span 内记录（如 `dispatch_latency` 在 `effect.dispatch` span 内），exemplar 自动附上 `trace_id`。消费方选支持 exemplar 的后端（OTLP → Prometheus/Tempo）即可。
+[[design-00004-durable-process-manager-runtime]] §5.3 已定 SLI（`oldest_pending_effect_age`、`dead_effects`、`suspended_instances`、`claim_latency`、`dispatch_latency`、`advance_conflict_retries` …）。
+
+**outbox 侧的同形 SLI 已补齐（[[issue-00110-the-outbox-had-no-metrics-at-all]]）**：此前 outbox 零 Micrometer 指标，
+「积压深度」与「最老未发送年龄」这两条最经典的告警必须手写 SQL 打库才能得到——而那是消费方并不拥有的表。
+现在与 process-manager 同一形状：push 钩子 `OutboxObserver`（`claim.latency`、`dispatch.latency` 按 outcome 打标、
+`dead.lettered` 按 reason 打标、`mark.sent.failures`、`released`）+ pull 读 `OutboxBacklog`
+（gauge `aipersimmon.outbox.pending`、`aipersimmon.outbox.oldest.pending.age`），
+两者都与框架无关，Micrometer 仅在 `MeterRegistry` 存在时绑定。**刻意没有健康检查**——理由见该 issue。
+
+闭环缺的是 **exemplar**——把 `trace_id` 附到指标数据点，从延迟毛刺一键跳到样本 trace。**由 starter 交付**：`opentelemetry-spring-boot-starter` 传递依赖带 `opentelemetry-micrometer-1.5`，把 Micrometer 指标桥接到 OTLP；只要指标在 span 内记录（如 `dispatch_latency` 在 `effect.dispatch` span 内），exemplar 自动附上 `trace_id`。消费方选支持 exemplar 的后端（OTLP → Prometheus/Tempo）即可。
 
 ### 10.3 span 属性目录（语义约定）
 
