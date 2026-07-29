@@ -27,6 +27,7 @@ public class DeadLetterRecord {
   private String correlationId;
   private String causationId;
   private String tenantId;
+  private String destination;
   private Integer attempts;
   private String reason;
   private String lastError;
@@ -152,5 +153,13 @@ public class DeadLetterRecord {
 
   public void setFailedAt(Instant failedAt) {
     this.failedAt = failedAt;
+  }
+
+  public String getDestination() {
+    return destination;
+  }
+
+  public void setDestination(String destination) {
+    this.destination = destination;
   }
 }

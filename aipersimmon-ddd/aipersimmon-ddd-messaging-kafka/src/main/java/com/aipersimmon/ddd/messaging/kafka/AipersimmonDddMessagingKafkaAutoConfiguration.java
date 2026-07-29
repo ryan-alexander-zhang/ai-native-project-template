@@ -217,7 +217,6 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   public OutboxDispatcher routingOutboxDispatcher(
       KafkaTemplate<String, String> kafkaTemplate,
       KafkaMessagingProperties properties,
-      ExternalizedRoutes routes,
       ApplicationEventPublisher publisher,
       ObjectProvider<ObjectMapper> objectMapper,
       IntegrationEventCatalog catalog) {
@@ -227,7 +226,10 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     KafkaOutboxDispatcher externalLeg =
         new KafkaOutboxDispatcher(
             kafkaTemplate, Duration.ofMillis(properties.getProducer().getSendTimeoutMs()));
-    return new RoutingOutboxDispatcher(localLeg, externalLeg, routes);
+    // No ExternalizedRoutes here: the router reads the destination off the row, which the writer
+    // resolved from those routes in the publishing transaction. Consulting them again at dispatch
+    // time is what let a vanished route turn an externalized event into a local one.
+    return new RoutingOutboxDispatcher(localLeg, externalLeg);
   }
 
   @Bean

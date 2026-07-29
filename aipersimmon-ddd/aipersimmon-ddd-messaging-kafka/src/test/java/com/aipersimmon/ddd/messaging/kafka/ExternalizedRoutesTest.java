@@ -11,12 +11,12 @@ import org.junit.jupiter.api.Test;
 class ExternalizedRoutesTest {
 
   @Test
-  void topicForReturnsTheMappedTopicOrEmptyForLocal() {
+  void destinationForReturnsTheMappedTopicOrEmptyForLocal() {
     ExternalizedRoutes routes = new ExternalizedRoutes(Map.of(new Key("A", 1), "topic-a"));
 
-    assertThat(routes.topicFor("A", 1)).contains("topic-a");
-    assertThat(routes.topicFor("A", 2)).isEmpty();
-    assertThat(routes.topicFor("B", 1)).isEmpty();
+    assertThat(routes.destinationFor("A", 1)).contains("topic-a");
+    assertThat(routes.destinationFor("A", 2)).isEmpty();
+    assertThat(routes.destinationFor("B", 1)).isEmpty();
   }
 
   @Test

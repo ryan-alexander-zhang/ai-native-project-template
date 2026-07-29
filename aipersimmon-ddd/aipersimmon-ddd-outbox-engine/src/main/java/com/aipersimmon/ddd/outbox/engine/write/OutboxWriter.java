@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer.Captured;
+import com.aipersimmon.ddd.outbox.EventDestinations;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxInsert;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,6 +25,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * JSON, and inserts one row through the {@link OutboxStore}. Being part of the caller's
  * transaction, the row commits atomically with the aggregate change.
  *
+ * <p>It also resolves the event's destination here, in the writing transaction, and stores it on
+ * the row (see {@link EventDestinations}). Deciding it later, from the annotations of whatever code
+ * is deployed when the row is dispatched, is what let an externalized event whose route had since
+ * vanished be delivered in process and marked sent.
+ *
  * <p>{@link #publish} mints a fresh event id for a new event; {@link #publishAs} reuses the
  * persisted identity a durable relay assigns (event id equal to the effect id) and inserts
  * idempotently, so an at-least-once redelivery of the same staged effect writes the row once.
@@ -34,6 +40,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final String source;
+  private final EventDestinations destinations;
   private final StoreAndForwardTracer tracer;
   private final Supplier<String> idGenerator;
 
@@ -42,28 +49,44 @@ public class OutboxWriter implements DurableIntegrationEvents {
       ObjectMapper objectMapper,
       Clock clock,
       String source,
+      EventDestinations destinations,
       Supplier<String> idGenerator) {
-    this(store, objectMapper, clock, source, NoOpStoreAndForwardTracer.INSTANCE, idGenerator);
+    this(
+        store,
+        objectMapper,
+        clock,
+        source,
+        destinations,
+        NoOpStoreAndForwardTracer.INSTANCE,
+        idGenerator);
   }
 
   /**
-   * @param idGenerator supplies each brand-new event's id. Required: there is no defaulting
-   *     overload, so a caller cannot accidentally fall back to a random UUID and lose index
-   *     locality on the {@code event_id} unique index (see {@code issue-00053}). Auto-configuration
-   *     passes the {@link com.aipersimmon.ddd.core.id.IdGenerator} bean; tests pass a deterministic
-   *     supplier.
+   * @param destinations resolves where each event is externalized to. Required, and deliberately
+   *     without a defaulting overload: a writer that quietly fell back to {@link
+   *     EventDestinations#ALL_IN_PROCESS} would stamp every row as in-process, and every
+   *     externalized event would then be delivered locally and marked sent — the exact silent loss
+   *     storing the destination exists to end. A deployment with no transport passes {@code
+   *     ALL_IN_PROCESS} explicitly, because there it is the truth rather than a fallback.
+   * @param idGenerator supplies each brand-new event's id. Required for the same reason: no
+   *     defaulting overload, so a caller cannot accidentally fall back to a random UUID and lose
+   *     index locality on the {@code event_id} unique index (see {@code issue-00053}).
+   *     Auto-configuration passes the {@link com.aipersimmon.ddd.core.id.IdGenerator} bean; tests
+   *     pass a deterministic supplier.
    */
   public OutboxWriter(
       OutboxStore store,
       ObjectMapper objectMapper,
       Clock clock,
       String source,
+      EventDestinations destinations,
       StoreAndForwardTracer tracer,
       Supplier<String> idGenerator) {
     this.store = store;
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.source = source;
+    this.destinations = destinations;
     this.tracer = tracer;
     this.idGenerator = idGenerator;
   }
@@ -135,6 +158,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
               envelope.tenantId(),
               envelope.correlationId(),
               envelope.causationId(),
+              destinations.destinationFor(envelope.type(), envelope.version()).orElse(null),
               captured.traceparent(),
               captured.traceState(),
               clock.instant()));

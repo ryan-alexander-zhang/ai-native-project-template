@@ -23,9 +23,9 @@ public class JdbcOutboxStore implements OutboxStore {
   private static final String INSERT =
       "INSERT INTO aipersimmon_outbox "
           + "(event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id, traceparent, trace_state, sent, attempts, "
-          + "created_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+          + "tenant_id, correlation_id, causation_id, destination, traceparent, trace_state, sent, "
+          + "attempts, created_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
   /**
    * The claimable rows: unsent, not given up on, due, unleased, and the head of their aggregate's
@@ -48,7 +48,8 @@ public class JdbcOutboxStore implements OutboxStore {
 
   private static final String SELECT_LEASED =
       "SELECT o.event_id, o.source, o.type, o.version, o.payload, o.occurred_at, o.subject, "
-          + "o.tenant_id, o.correlation_id, o.causation_id, o.traceparent, o.trace_state, o.attempts "
+          + "o.tenant_id, o.correlation_id, o.causation_id, o.destination, o.traceparent, "
+          + "o.trace_state, o.attempts "
           + "FROM aipersimmon_outbox o WHERE o.lease_token = ? "
           + "ORDER BY o.created_at ASC, o.id ASC";
   private static final String RELEASE =
@@ -86,6 +87,7 @@ public class JdbcOutboxStore implements OutboxStore {
         row.tenantId(),
         row.correlationId(),
         row.causationId(),
+        row.destination(),
         row.traceparent(),
         row.traceState(),
         false,
@@ -171,7 +173,8 @@ public class JdbcOutboxStore implements OutboxStore {
             rs.getString("subject"),
             rs.getString("tenant_id"),
             rs.getString("correlation_id"),
-            rs.getString("causation_id"));
+            rs.getString("causation_id"),
+            rs.getString("destination"));
     return new PendingMessage(
         message, rs.getInt("attempts"), rs.getString("traceparent"), rs.getString("trace_state"));
   }

@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
+import com.aipersimmon.ddd.outbox.EventDestinations;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
@@ -75,13 +76,19 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
       @Value("${aipersimmon.ddd.integration.source:${spring.application.name:aipersimmon}}")
           String source,
       ObjectProvider<StoreAndForwardTracer> tracer,
+      ObjectProvider<EventDestinations> destinations,
       IdGenerator idGenerator) {
     log.info("aipersimmon-ddd integration-event transport: durable transactional outbox");
+    // No transport starter means nothing is externalized, so ALL_IN_PROCESS is the truth here
+    // rather than a degraded fallback: there is no target for the writer to have missed. When a
+    // transport is installed it contributes the real resolver, and the startup guard on
+    // @Externalized events refuses to run a deployment where those events have nowhere to go.
     return new OutboxWriter(
         outboxStore,
         objectMapper.getIfAvailable(ObjectMapper::new),
         outboxClock,
         source,
+        destinations.getIfAvailable(() -> EventDestinations.ALL_IN_PROCESS),
         tracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE),
         idGenerator::newId);
   }

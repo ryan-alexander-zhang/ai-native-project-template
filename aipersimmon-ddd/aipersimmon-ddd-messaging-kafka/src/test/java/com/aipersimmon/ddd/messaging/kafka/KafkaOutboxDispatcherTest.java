@@ -37,7 +37,8 @@ class KafkaOutboxDispatcherTest {
           "o-1",
           "acme",
           "corr-1",
-          "cause-1");
+          "cause-1",
+          "ordering.events");
 
   @Test
   @SuppressWarnings("unchecked")

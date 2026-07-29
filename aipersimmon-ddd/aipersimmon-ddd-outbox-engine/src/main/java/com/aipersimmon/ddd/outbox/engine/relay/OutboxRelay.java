@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.outbox.FailureClassifier;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
+import com.aipersimmon.ddd.outbox.UnreachableDestinationException;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import com.aipersimmon.ddd.outbox.engine.store.PendingMessage;
 import java.time.Clock;
@@ -56,6 +57,12 @@ import org.slf4j.LoggerFactory;
  * no backoff from being re-attempted straight away, spending its whole attempt budget in one tight
  * loop. A dead-lettered row is not such a case, having left the table altogether, so giving up on a
  * message still frees its aggregate's next event within the same poll.
+ *
+ * <p>Where a row goes was decided when it was written, not here: the destination is a column. This
+ * loop only enforces the one invariant that follows from that — a row naming an external
+ * destination is never handed to a dispatcher that has admitted it cannot reach one, because
+ * delivering it locally would mark it sent while it never left the process. Which external target
+ * it goes to is the transport dispatcher's business.
  *
  * <p>This class is storage-agnostic on purpose. Every judgement above — the classification, the
  * retry budget, what a mark-sent failure means, how a dead-letter move that itself fails is
@@ -189,6 +196,16 @@ public class OutboxRelay {
   /** Dispatch one claimed row and record the outcome. */
   private Outcome dispatch(PendingMessage pending) {
     OutboxMessage message = pending.message();
+    if (message.destination() != null && !dispatcher.reachesExternalTargets()) {
+      // The row names an external destination, decided when it was written, and the active
+      // dispatcher has admitted it cannot reach one. Delivering it locally would archive it as
+      // sent while it never left the process — the loss that storing the destination exists to
+      // end. Fail instead, so it retries and then becomes a visible dead letter.
+      return handleFailure(
+          pending,
+          new UnreachableDestinationException(
+              message.type(), message.version(), message.destination()));
+    }
     try (StoreAndForwardTracer.Scope span =
         tracer.restore(
             pending.traceparent(), pending.traceState(), "outbox.publish " + message.eventId())) {

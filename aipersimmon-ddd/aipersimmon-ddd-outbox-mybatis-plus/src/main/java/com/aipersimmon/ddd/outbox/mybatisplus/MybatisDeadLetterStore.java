@@ -46,6 +46,7 @@ public class MybatisDeadLetterStore implements DeadLetterStore {
           record.setCorrelationId(message.correlationId());
           record.setCausationId(message.causationId());
           record.setTenantId(message.tenantId());
+          record.setDestination(message.destination());
           record.setAttempts(attempts);
           record.setReason(reason.name());
           record.setLastError(lastError);
@@ -80,6 +81,7 @@ public class MybatisDeadLetterStore implements DeadLetterStore {
               record.setCorrelationId(dead.getCorrelationId());
               record.setCausationId(dead.getCausationId());
               record.setTenantId(dead.getTenantId());
+              record.setDestination(dead.getDestination());
               record.setSent(false);
               record.setAttempts(0);
               record.setNextAttemptAt(null);

@@ -19,19 +19,21 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
   private static final String INSERT_DEAD_LETTER =
       "INSERT INTO aipersimmon_dead_letter "
           + "(event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id, attempts, reason, last_error, failed_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+          + "tenant_id, correlation_id, causation_id, destination, attempts, reason, last_error, "
+          + "failed_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
   private static final String DELETE_OUTBOX = "DELETE FROM aipersimmon_outbox WHERE event_id = ?";
 
   private static final String SELECT_DEAD_LETTER =
       "SELECT event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id "
+          + "tenant_id, correlation_id, causation_id, destination "
           + "FROM aipersimmon_dead_letter WHERE event_id = ?";
   private static final String REQUEUE_OUTBOX =
       "INSERT INTO aipersimmon_outbox "
           + "(event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id, sent, attempts, next_attempt_at, created_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 0, NULL, ?)";
+          + "tenant_id, correlation_id, causation_id, destination, sent, attempts, next_attempt_at, "
+          + "created_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 0, NULL, ?)";
   private static final String DELETE_DEAD_LETTER =
       "DELETE FROM aipersimmon_dead_letter WHERE event_id = ?";
 
@@ -62,6 +64,7 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
               message.tenantId(),
               message.correlationId(),
               message.causationId(),
+              message.destination(),
               attempts,
               reason.name(),
               lastError,
@@ -90,7 +93,8 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
                                   rs.getString("subject"),
                                   rs.getString("tenant_id"),
                                   rs.getString("correlation_id"),
-                                  rs.getString("causation_id"))
+                                  rs.getString("causation_id"),
+                                  rs.getString("destination"))
                               : null,
                       eventId);
               if (message == null) {
@@ -108,6 +112,7 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
                   message.tenantId(),
                   message.correlationId(),
                   message.causationId(),
+                  message.destination(),
                   Timestamp.from(clock.instant()));
               jdbc.update(DELETE_DEAD_LETTER, eventId);
               return true;

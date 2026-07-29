@@ -139,10 +139,13 @@ class EventRoutingIntegrationTest {
   @Test
   void externalizedEventsRouteToTheirTopicAndComeBackExactlyOnceWhileLocalStaysInProcess()
       throws Exception {
-    dispatcher.dispatch(message("a1", "com.example.routing.A", "{\"value\":\"x\"}"));
-    dispatcher.dispatch(message("b1", "com.example.routing.B", "{\"value\":\"y\"}"));
-    // A LOCAL event: the in-process leg republishes it synchronously, before any broker hop.
-    dispatcher.dispatch(message("l1", "com.example.routing.Local", "{\"value\":\"z\"}"));
+    // The destination is what the writer resolved from @Externalized when the row was written,
+    // so the rows carry it here exactly as they would in production.
+    dispatcher.dispatch(message("a1", "com.example.routing.A", "{\"value\":\"x\"}", "routing.a"));
+    dispatcher.dispatch(message("b1", "com.example.routing.B", "{\"value\":\"y\"}", "routing.b"));
+    // A LOCAL event carries no destination: the in-process leg republishes it synchronously,
+    // before any broker hop.
+    dispatcher.dispatch(message("l1", "com.example.routing.Local", "{\"value\":\"z\"}", null));
 
     // LOCAL delivery is synchronous and never reaches the broker.
     assertEquals(List.of("l1"), handler.local, "the local event is delivered in process");
@@ -206,7 +209,7 @@ class EventRoutingIntegrationTest {
         : new String(record.headers().lastHeader(name).value(), StandardCharsets.UTF_8);
   }
 
-  private static OutboxMessage message(String id, String type, String payload) {
+  private static OutboxMessage message(String id, String type, String payload, String destination) {
     return new OutboxMessage(
         id,
         "/routing-test",
@@ -217,6 +220,7 @@ class EventRoutingIntegrationTest {
         "agg-" + id,
         "__root__",
         id,
-        null);
+        null,
+        destination);
   }
 }

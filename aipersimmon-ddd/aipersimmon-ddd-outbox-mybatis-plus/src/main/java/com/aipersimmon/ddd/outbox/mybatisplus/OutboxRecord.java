@@ -28,6 +28,7 @@ public class OutboxRecord {
   private String correlationId;
   private String causationId;
   private String tenantId;
+  private String destination;
   private String traceparent;
   private String traceState;
   private Boolean sent;
@@ -207,5 +208,13 @@ public class OutboxRecord {
 
   public void setLeaseUntil(Instant leaseUntil) {
     this.leaseUntil = leaseUntil;
+  }
+
+  public String getDestination() {
+    return destination;
+  }
+
+  public void setDestination(String destination) {
+    this.destination = destination;
   }
 }

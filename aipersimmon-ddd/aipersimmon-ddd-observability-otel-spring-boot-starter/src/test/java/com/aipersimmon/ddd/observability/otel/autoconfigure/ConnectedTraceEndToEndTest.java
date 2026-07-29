@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.observability.Tracer;
 import com.aipersimmon.ddd.observability.otel.OpenTelemetryStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.otel.OpenTelemetryTracer;
 import com.aipersimmon.ddd.outbox.DefaultFailureClassifier;
+import com.aipersimmon.ddd.outbox.EventDestinations;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
@@ -78,6 +79,8 @@ class ConnectedTraceEndToEndTest {
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V2__drop_trace_id.sql")
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V3__add_tenant_id.sql")
             .addScript("classpath:aipersimmon/db/migration/outbox/h2/V4__relay_row_lease.sql")
+            .addScript(
+                "classpath:aipersimmon/db/migration/outbox/h2/V5__destination_on_the_row.sql")
             .build();
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     commandTransaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
@@ -100,7 +103,14 @@ class ConnectedTraceEndToEndTest {
 
     JdbcOutboxStore store = new JdbcOutboxStore(jdbc);
     writer =
-        new OutboxWriter(store, new ObjectMapper(), CLOCK, "test-src", storeTracer, () -> "EVT-1");
+        new OutboxWriter(
+            store,
+            new ObjectMapper(),
+            CLOCK,
+            "test-src",
+            EventDestinations.ALL_IN_PROCESS,
+            storeTracer,
+            () -> "EVT-1");
     dispatcher = new CapturingDispatcher();
     relay =
         new OutboxRelay(

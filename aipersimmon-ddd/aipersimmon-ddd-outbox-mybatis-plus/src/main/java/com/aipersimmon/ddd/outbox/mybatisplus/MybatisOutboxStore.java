@@ -42,6 +42,7 @@ public class MybatisOutboxStore implements OutboxStore {
     record.setTenantId(row.tenantId());
     record.setCorrelationId(row.correlationId());
     record.setCausationId(row.causationId());
+    record.setDestination(row.destination());
     record.setTraceparent(row.traceparent());
     record.setTraceState(row.traceState());
     record.setSent(false);
@@ -163,7 +164,8 @@ public class MybatisOutboxStore implements OutboxStore {
             record.getSubject(),
             record.getTenantId(),
             record.getCorrelationId(),
-            record.getCausationId());
+            record.getCausationId(),
+            record.getDestination());
     return new PendingMessage(
         message, record.getAttempts(), record.getTraceparent(), record.getTraceState());
   }

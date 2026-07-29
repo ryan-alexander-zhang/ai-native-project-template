@@ -55,7 +55,8 @@ class InProcessOutboxDispatcherTest {
                 "O-1",
                 "acme",
                 "corr-1",
-                "cause-1"));
+                "cause-1",
+                null));
 
     assertEquals(1, published.size());
     PayloadApplicationEvent<?> event =
@@ -87,6 +88,7 @@ class InProcessOutboxDispatcherTest {
                         null,
                         "__root__",
                         "corr-1",
+                        null,
                         null)));
   }
 
@@ -108,6 +110,7 @@ class InProcessOutboxDispatcherTest {
                         "O-1",
                         "__root__",
                         "corr-1",
+                        null,
                         null)));
   }
 }
