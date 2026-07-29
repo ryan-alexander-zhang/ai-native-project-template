@@ -195,6 +195,13 @@ com.aipersimmon.ddd.core
 > 活在单节点内存里的保证撑不住并发 poller。轮询自带"半个租约"的时间预算,于是租约长度只表示
 > "崩溃后多久有人接手",而 Kafka 启动守卫的算式里 `batch-size` 整项消失。
 
+> **第四次演进(已交付,[[issue-00109-a-vanished-route-turned-an-externalized-event-local]])**:
+> 事件的**目的地**也成为行上的一列。原来 reach 在派发时按当前 `@Externalized` 注解重新判定,
+> 于是版本升级漏标或滚动发布期间路由表 miss → 落进程内腿 → 正常返回 → 标记已发送,永不到 broker 且
+> 全程无迹象。现在 writer 在写入事务里解析并落 `destination`(NULL = 进程内),`aipersimmon_dead_letter`
+> 同样带这一列(否则重放会把外发事件复活成本地投递)。查询端口 `EventDestinations` 在 outbox core,
+> `ExternalizedRoutes` 实现之;relay 另守一条:带目的地的行不得交给到不了外部的 dispatcher。
+
 > **后续演进(已交付)**:抽出与存储无关的 **`aipersimmon-ddd-outbox`(core)**——投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、两个默认 dispatcher(logging / in-process)及其选择用的 `AipersimmonDddOutboxAutoConfiguration`,全无持久化。`-outbox-jdbc` 与新增的 **`-outbox-mybatis-plus`** 都依赖该 core,各自只提供 writer + relay(`-outbox-mybatis-plus` 用 MyBatis-Plus `BaseMapper`,`@TableName` 而非 JPA `@Entity`,且只经 `MapperFactoryBean` 注册自己的 mapper,不触发/劫持消费者 `@MapperScan`,同表结构可与 jdbc 互换)。**消费者需自选恰好一个 outbox 存储 starter**。broker starter(§5.14)改为依赖 core,故可与任一存储后端组合。
 
 - **事务性 outbox**:集成事件与聚合变更**同事务**写入 `aipersimmon_outbox` 表;relay 轮询未发送行,发到 broker,置 `sent`。**at-least-once**(dispatch 后置 sent 前崩溃会重投 → 消费方需幂等)。

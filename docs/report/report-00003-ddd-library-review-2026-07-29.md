@@ -68,9 +68,13 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - 零 Micrometer 指标：积压深度、最老未发送年龄这两个最经典的 outbox 告警必须手写 SQL 才能得到。
 - 吞吐上限约 100 msg/s：每轮只抽一批、批间固定等 1s、每条 send 同步 `get(timeout)`（放弃 producer 批处理与流水线）、
   每条成功一次独立 `MARK_SENT`。1 小时故障积压 180 万行要排约 5 小时。
-- **静默丢失**：outbox 行不存目的地，路由在派发时按当前注解决定。写入时带 `@Externalized`、派发时路由表已无该
-  `(type, version)`（版本升级保留 v1 类但漏注解、滚动发布期间）→ `topicFor()` miss → 投给进程内腿 → 标记已发送。
-  永不到 broker、无报错、无死信、无消费延迟可观测；两个启动守卫都看不见这条路径。
+- ~~**静默丢失**：outbox 行不存目的地，路由在派发时按当前注解决定~~ → **已修** `issue-00109`：
+  目的地在**写入事务里**解析并落成 `destination` 列，派发读列不查表。于是主场景从「失败」变成
+  「根本不会发生」——注解在版本升级里被删掉，已写入的行照样送到原目的地。新端口 `EventDestinations`
+  （`ExternalizedRoutes` 实现之），`RoutingOutboxDispatcher` 因此不再需要路由表（构造参数 3→2）。
+  relay 另加一条不变式：带目的地的行不得交给 `reachesExternalTargets()==false` 的 dispatcher，
+  归为**瞬态**失败（传输缺失常是滚动发布的时间窗而非判决），耗尽尝试后进死信。
+  **死信表同样加这一列**——`replay` 把行拷回 outbox，否则重放会把外发事件复活成本地投递，同一个 bug 换个入口。
 - DLT 固定源分区号（`MessagingKafkaAutoConfiguration:286-290`）：`.DLT` 分区数少于源主题时发布失败 →
   `DefaultErrorHandler` 重新 seek 重试整轮 → 毒消息永远出不去、分区无限停滞，与 DLT 目的完全相反。
 
@@ -151,7 +155,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
    按 token 读回）取代了每方言一份 SQL。理由就是本报告上面那条——process-manager 的 SKIP LOCKED claim
    在两个真实数据库上零覆盖、MariaDB 误判即每轮语法错误，方言化 claim 是负债而非资产；
    条件 UPDATE 在 H2 上可测，跑的就是生产那条路径）
-8. 写入时持久化目的地到 outbox 行：路由消失从静默本地投递变成死信
+8. 写入时持久化目的地到 outbox 行：路由消失从静默本地投递变成死信（`issue-00109`，**已完成**。
+   实际收益比"变成死信"更强：目的地留在行上意味着注解消失后那些行**照样正确投出**，
+   死信只留给"传输整个不在了"这种真配置错。第 7 项让所有实例并发轮询，也把"滚动发布期间按谁的表判"
+   从概率事件变成常态，这一项因此更紧要)
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）
 10. 流水线化 Kafka 腿（按 subject 有序发出、按序等 future、首个失败 fail-fast；语义不变，吞吐 10–50 倍）
 11. BOM 去 parent，只管理 `com.aipersimmon.ddd:*` 与刻意再导出的坐标
@@ -189,4 +196,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]、
   [[issue-00106-an-empty-flyway-component-list-created-every-table]]、
   [[issue-00107-silent-degradations-become-loud-failures]]、
-  [[issue-00108-a-killed-relay-instance-stops-all-delivery]]
+  [[issue-00108-a-killed-relay-instance-stops-all-delivery]]、
+  [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]

@@ -87,6 +87,16 @@ flowchart LR
 - **单张 outbox 表**：原子性/顺序不变（前提是聚合与 outbox 同库同事务，见 §八与 [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]）。
 - 分区 key 仍 = 聚合 `subject`（per-aggregate 保序，decision-00014 不变）。
 
+> **修正（[[issue-00109-a-vanished-route-turned-an-externalized-event-local]]）：reach 在写入时决定，
+> 不在派发时。** 上图里 router "按 reach 分流" 的实现原本是派发时查 `ExternalizedRoutes`，于是路由成了
+> 「relay 捞到这行时当前部署的代码怎么说」的函数。版本升级漏标注解、或滚动发布期间新旧实例并存，
+> `(type, version)` 从路由表消失，而库里还躺着写入时确实要外发的行——miss 落进程内腿、正常返回、
+> 标记已发送，永不到 broker 且全程无迹象。现在 writer 在**写入事务里**解析目的地并落成
+> `aipersimmon_outbox.destination` 一列（NULL = 进程内），router 读列不查表；`aipersimmon_dead_letter`
+> 同样带这一列，否则死信重放会把外发事件复活成本地投递。relay 另加一条不变式：带目的地的行不得交给
+> `reachesExternalTargets() == false` 的 dispatcher。查询端口是新增的 `EventDestinations`，
+> `ExternalizedRoutes` 实现它。
+
 ### 4.3 入站：避免双投
 
 - 消费桥**只订阅被外发的 topic**（按声明集合），inbox 去重后进程内重投。
