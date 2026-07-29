@@ -12,8 +12,9 @@ setting** — not to be a complete product. Three bounded contexts collaborate t
 Each context is split into the standard layers, one Maven module each:
 `*-api` (published cross-context contract) · `*-domain` (model + rules, framework-free) ·
 `*-application` (use cases + ports) · `*-infrastructure` (technical port implementations) ·
-`*-adapter` (inbound transport). Ordering additionally has `ordering-process-mybatis-plus` (the
-durable process manager) and `start` (the Spring Boot composition root + architecture tests).
+`*-adapter` (inbound transport). Ordering additionally has `ordering-process` (the durable process
+manager's policy — storage-agnostic; the store it runs on is chosen in `start`) and `start` (the
+Spring Boot composition root + architecture tests).
 
 ## Build and run
 
@@ -166,8 +167,53 @@ the order. `SelfCancelDuringReservationTest` covers it.
 | Business-key idempotency (decide once, announce every time) | `AuthorizePaymentHandler` + `PaymentOperations` over `payment_operations` — claimed in the command's own transaction, so a rolled-back publish takes the claim with it | `AuthorizePaymentIdempotencyTest` (unit), `PaymentOperationAtomicityTest` (e2e) |
 | Payment authorization rule | `AuthorizationPolicy`, `PaymentDecision` | `AuthorizationPolicyTest`, `PaymentDecisionTest` |
 | Web error contract (RFC 9457) | `OrderingProblemCatalog` (composition root) | `ExceptionContractTest` |
-| Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/src/main/resources/db/migration/` (`V1` tables → `V2` tenancy → `V3` version → `V4` tenant-scoped keys + indexes → `V5` customer credit → `V6` payment operations) | `OutboxAtomicityTest` |
+| Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/src/main/resources/db/migration/`, **one directory per bounded context** with a version major each — `ordering/` (`1.x`), `inventory/` (`2.x`), `payment/` (`3.x`). See that directory's `README.md` | `OutboxAtomicityTest`, `MigrationContentTest`, `TableRetentionTest` |
+| Replaceable business policies | `ManualReviewPolicy` + `RestrictedSkuReviewPolicy` (ordering), `AuthorizationPolicy` + `CeilingAuthorizationPolicy` (payment); bound in `OrderingPolicyConfig` / `PaymentPolicyConfig` | `ManualReviewPolicyTest`, `AuthorizationPolicyTest` (incl. a non-default ceiling) |
+| Published-event schema evolution | `OrderReadyForFulfilment` (v2) alongside `OrderReadyForFulfilmentV1`, both consumed by `OrderReadyForFulfilmentListener` | `OrderReadyForFulfilmentVersionsTest` |
 | Architecture rules (layering, context isolation, event placement) | `AiPersimmonDddRules` applied over `com.example` | `ArchitectureTest`, `PackageInfoTest` |
+
+## Replaceable policies
+
+Two rules in this project are the ones a real deployment is most likely to need different, so both
+are ports with a configurable default rather than classes:
+
+| Rule | Change the *value* | Change the *rule* |
+|---|---|---|
+| Which orders need manual review | `ordering.review.restricted-skus` | declare a `ManualReviewPolicy` bean |
+| Which payments are authorized | `payment.authorization.ceiling-minor` | declare an `AuthorizationPolicy` bean |
+
+Both defaults are `@ConditionalOnMissingBean`, so supplying your own is additive — nothing has to be
+deleted or edited. The two levels exist because they cost different amounts: a threshold is a
+property, a fraud service is a bean.
+
+Both used to be `new`ed into a `private static final` field of their handler, which meant the two
+most business-variable rules in the codebase were the two you could not change without editing a use
+case. The ports live in the `*-domain` modules (framework-free, so they take their configuration as
+constructor arguments and know nothing about YAML) and the binding lives in `start`, next to the
+other composition decisions.
+
+The rule that is deliberately **not** replaceable is `OrderLifecyclePolicy`: it is an aggregate
+invariant, and the aggregate must not let anyone swap out the arbiter of its own legality.
+
+## Published-event schema evolution
+
+`OrderReadyForFulfilment` is at `version = 2`, and `OrderReadyForFulfilmentV1` is kept beside it. It
+is the only event here that has been through a revision, and it exists to show what the operation
+costs — schema evolution of a published contract is the hardest part of integrating bounded contexts,
+and every other event sitting at `version = 1` demonstrated nothing about it.
+
+The mechanism: the catalog keys classes by `(name, version)`, so both revisions register under one
+logical name and both stay on one topic (a version bump is not a new topic — splitting would break
+per-order ordering for exactly the window the migration has to survive). Only v2 is ever published;
+v1 exists to be read, because at the moment of a rollout the topic still holds v1 messages and the
+inbox may still redeliver older ones.
+
+Where the difference is absorbed: `OrderReadyForFulfilmentListener` in `inventory-adapter`, which has
+one listener per revision funnelling into one internal call. **`ReserveStock` and
+`ReserveStockHandler` did not change and do not know a version exists** — that is what an
+anticorruption layer is for, and it is the property `OrderReadyForFulfilmentVersionsTest` pins. No
+end-to-end test can cover the retired path, because a producer only ever publishes the current
+revision.
 
 ## What each capability cost to adopt
 
@@ -214,8 +260,10 @@ Four patterns are worth more than the individual rows:
 | A second topology (modulith, microservice) | Dropped in `605fab3`; the transport story is the same one, packaged differently. |
 | `instance.max-lifetime` | See "Known demo gaps" below. |
 
-Try it: `SKU-RESTRICTED` is on the review watchlist (`ManualReviewPolicy`), so an order containing it
-is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it — see `ReviewFlowTest`.
+Try it: `SKU-RESTRICTED` is on the review watchlist (`ordering.review.restricted-skus`), so an order
+containing it is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it — see
+`ReviewFlowTest`. The watchlist is configuration and the rule behind it is a bean, so both the list
+and the whole policy are replaceable without editing a handler — see "Replaceable policies" below.
 
 ## Intentional design decisions worth knowing
 
@@ -227,9 +275,12 @@ is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-review` clears it 
   only, not a later capture, so `AuthorizePayment`/`AuthorizationPolicy`/`PaymentAuthorized` are used
   end to end (no "charge"/"capture" mixing).
 - **Payment owns no persisted aggregate.** Its only technical state is an at-most-once operation-
-  dedupe log behind the `PaymentOperations` port, kept in memory in `payment-infrastructure`
-  (`InMemoryPaymentOperations`). Even in memory it is an outbound adapter, so it lives in the
-  infrastructure layer, not the application layer.
+  dedupe log behind the `PaymentOperations` port, held in `payment.payment_operations` and
+  implemented by `MyBatisPaymentOperations` in `payment-infrastructure`. It is an outbound adapter,
+  so it lives in the infrastructure layer, not the application layer — and it is a table rather than
+  a map because claiming an operation and announcing its outcome have to be one commit
+  (issue-00069). A `ConcurrentHashMap` could not be rolled back, so a failed transaction kept the
+  claim and lost the authorization permanently.
 - **Inventory uses a deliberate multi-aggregate transaction.** Reserving mutates several `Stock`
   roots and creates one `Reservation`; the "all lines or none" rule is enforced by the application
   transaction, not a single aggregate (see the note in `ReserveStockHandler`). A `Stock`-per-SKU is

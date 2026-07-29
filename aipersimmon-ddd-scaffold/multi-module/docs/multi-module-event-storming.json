@@ -1,0 +1,1534 @@
+{
+  "version": "4.0",
+  "meta": {
+    "name": "AiPersimmon DDD multi-module reference",
+    "level": "design",
+    "createdAt": "2026-07-28T00:00:00Z"
+  },
+  "contexts": [
+    {
+      "id": "ord",
+      "name": "Ordering",
+      "order": 0,
+      "classification": "core"
+    },
+    {
+      "id": "inv",
+      "name": "Inventory",
+      "order": 1,
+      "classification": "supporting"
+    },
+    {
+      "id": "pay",
+      "name": "Payment",
+      "order": 2,
+      "classification": "generic"
+    }
+  ],
+  "contextRelationships": [
+    {
+      "id": "cr-01",
+      "source": "ord",
+      "target": "inv",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-02",
+      "source": "ord",
+      "target": "inv",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-03",
+      "source": "inv",
+      "target": "ord",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-04",
+      "source": "inv",
+      "target": "ord",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-05",
+      "source": "inv",
+      "target": "ord",
+      "type": "openHostService"
+    },
+    {
+      "id": "cr-06",
+      "source": "inv",
+      "target": "ord",
+      "type": "acl"
+    },
+    {
+      "id": "cr-07",
+      "source": "ord",
+      "target": "pay",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-08",
+      "source": "ord",
+      "target": "pay",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-09",
+      "source": "pay",
+      "target": "ord",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-10",
+      "source": "pay",
+      "target": "ord",
+      "type": "publishedLanguage"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ord-a-customer",
+      "type": "actor",
+      "label": "Customer",
+      "context": "ord",
+      "properties": {
+        "description": "Places orders and may cancel their own while the window is open. POST /orders, POST /orders/{id}/cancel."
+      }
+    },
+    {
+      "id": "ord-a-reviewer",
+      "type": "actor",
+      "label": "Review Operator",
+      "context": "ord",
+      "properties": {
+        "description": "Clears or refuses an order held for manual review. POST /orders/{id}/approve-review, POST /orders/{id}/reject-review."
+      }
+    },
+    {
+      "id": "ord-a-dispatcher",
+      "type": "actor",
+      "label": "Dispatch Operator",
+      "context": "ord",
+      "properties": {
+        "description": "Dispatches a confirmed order. POST /orders/{id}/ship."
+      }
+    },
+    {
+      "id": "ord-ag-order",
+      "type": "aggregate",
+      "label": "Order",
+      "context": "ord",
+      "properties": {
+        "description": "ordering-domain order.Order. Owns its lines and its lifecycle; guards mechanical moves with a Transitions table and cancellation with OrderLifecyclePolicy. Optimistic-locked (ordering.orders.version)."
+      }
+    },
+    {
+      "id": "ord-ag-customer",
+      "type": "aggregate",
+      "label": "Customer",
+      "context": "ord",
+      "properties": {
+        "description": "ordering-domain customer.Customer. Holds the credit limit and the credit currently committed by open orders (used_minor). Written in the same transaction as the order, so the cross-aggregate credit invariant is strong, not eventual."
+      }
+    },
+    {
+      "id": "ord-c-place",
+      "type": "command",
+      "label": "Place Order",
+      "context": "ord",
+      "properties": {
+        "description": "PlaceOrder → PlaceOrderHandler. Reserves credit, creates the order, and either holds it for review or triggers fulfilment."
+      }
+    },
+    {
+      "id": "ord-c-approve-review",
+      "type": "command",
+      "label": "Approve Review",
+      "context": "ord",
+      "properties": {
+        "description": "ApproveReview → ApproveReviewHandler."
+      }
+    },
+    {
+      "id": "ord-c-reject-review",
+      "type": "command",
+      "label": "Reject Review",
+      "context": "ord",
+      "properties": {
+        "description": "RejectReview → RejectReviewHandler."
+      }
+    },
+    {
+      "id": "ord-c-cancel-own",
+      "type": "command",
+      "label": "Cancel Own Order",
+      "context": "ord",
+      "properties": {
+        "description": "CancelOwnOrder → CancelOwnOrderHandler."
+      }
+    },
+    {
+      "id": "ord-c-ship",
+      "type": "command",
+      "label": "Ship Order",
+      "context": "ord",
+      "properties": {
+        "description": "ShipOrder → ShipOrderHandler."
+      }
+    },
+    {
+      "id": "ord-c-begin",
+      "type": "command",
+      "label": "Begin Fulfilment",
+      "context": "ord",
+      "properties": {
+        "description": "BeginFulfilment → BeginFulfilmentHandler. Dispatched by the process manager once a reservation actually exists. Idempotent: already-in-progress or cancelled is a no-op."
+      }
+    },
+    {
+      "id": "ord-c-confirm",
+      "type": "command",
+      "label": "Confirm Order",
+      "context": "ord",
+      "properties": {
+        "description": "ConfirmOrder → ConfirmOrderHandler. Internal to the process manager; deliberately has no HTTP endpoint so a client cannot bypass its preconditions."
+      }
+    },
+    {
+      "id": "ord-c-cancel",
+      "type": "command",
+      "label": "Cancel Order",
+      "context": "ord",
+      "properties": {
+        "description": "CancelOrder → CancelOrderHandler. The compensating cancellation, carrying an evidence-bearing CancellationReason."
+      }
+    },
+    {
+      "id": "ord-c-request-payment",
+      "type": "command",
+      "label": "Request Payment",
+      "context": "ord",
+      "properties": {
+        "description": "RequestPayment → RequestPaymentHandler."
+      }
+    },
+    {
+      "id": "ord-c-request-release",
+      "type": "command",
+      "label": "Request Stock Release",
+      "context": "ord",
+      "properties": {
+        "description": "RequestStockRelease → RequestStockReleaseHandler."
+      }
+    },
+    {
+      "id": "ord-x-lines",
+      "type": "constraint",
+      "label": "Order line rules",
+      "context": "ord",
+      "properties": {
+        "rule": "at least one line; at most 100 lines; no SKU repeated across lines; quantity in 1..10000",
+        "description": "Order.place + OrderHasDistinctSkus invariant + OrderLine guards."
+      }
+    },
+    {
+      "id": "ord-x-credit",
+      "type": "constraint",
+      "label": "Remaining credit must cover the total",
+      "context": "ord",
+      "properties": {
+        "rule": "customer.usedCredit + order.total <= customer.creditLimit",
+        "description": "Customer.reserveCredit, committed in the placement transaction and version-checked, so two concurrent placements conflict instead of both succeeding."
+      }
+    },
+    {
+      "id": "ord-x-offerable",
+      "type": "constraint",
+      "label": "Every SKU must be offerable by inventory",
+      "context": "ord",
+      "properties": {
+        "rule": "StockAvailabilityGateway.check(skus).allAvailable()",
+        "description": "A synchronous fail-fast through the anticorruption gateway before the order exists. Availability only — the authoritative quantity reservation is still asynchronous."
+      }
+    },
+    {
+      "id": "ord-x-self-cancel",
+      "type": "constraint",
+      "label": "Self-cancel window",
+      "context": "ord",
+      "properties": {
+        "rule": "requestedBy == order.customerId AND status IN (AWAITING_REVIEW, READY_FOR_FULFILMENT)",
+        "description": "CancellableByCustomer.BEFORE_FULFILMENT — one statement of the rule, asked by the read model (cancellableByCustomer) and enforced by OrderLifecyclePolicy."
+      }
+    },
+    {
+      "id": "ord-x-awaiting-review",
+      "type": "constraint",
+      "label": "Only an order awaiting review can be reviewed",
+      "context": "ord",
+      "properties": {
+        "rule": "status == AWAITING_REVIEW AND reviewDecision.belongsTo(orderId)",
+        "description": "Order.approveReview and OrderLifecyclePolicy's ReviewRejected branch."
+      }
+    },
+    {
+      "id": "ord-x-evidence",
+      "type": "constraint",
+      "label": "A cancellation must carry evidence for its reason",
+      "context": "ord",
+      "properties": {
+        "rule": "InventoryUnavailable needs a ReservationFailureRef; PaymentDeclinedAfterStockReleased needs BOTH a PaymentDeclineRef and a StockReleaseRef; every ref must belong to this order",
+        "description": "The sealed CancellationReason makes the evidence unforgeable at construction time, and OrderLifecyclePolicy checks that the evidence and the current state line up."
+      }
+    },
+    {
+      "id": "ord-x-return",
+      "type": "constraint",
+      "label": "A shipped order cannot be cancelled",
+      "context": "ord",
+      "properties": {
+        "rule": "status != SHIPPED, else RETURN_REQUIRED",
+        "description": "Undoing a dispatch is a return, not a cancellation. Checked before the reason is examined, because the rule holds regardless of why."
+      }
+    },
+    {
+      "id": "ord-x-transitions",
+      "type": "constraint",
+      "label": "Mechanical lifecycle transitions",
+      "context": "ord",
+      "properties": {
+        "rule": "AWAITING_REVIEW→READY_FOR_FULFILMENT→FULFILMENT_IN_PROGRESS→CONFIRMED→SHIPPED",
+        "description": "The Transitions table in Order. Legality depends only on the current state, which is why these live in a table and cancellation does not."
+      }
+    },
+    {
+      "id": "ord-x-review-watchlist",
+      "type": "constraint",
+      "label": "Restricted SKUs are held for manual review",
+      "context": "ord",
+      "properties": {
+        "rule": "lines contain a SKU on the configured watchlist (ordering.review.restricted-skus, default SKU-RESTRICTED) ⇒ initial status AWAITING_REVIEW instead of READY_FOR_FULFILMENT",
+        "description": "The rule routes rather than refuses: it decides the order's INITIAL STATE, so this is a qualification of Place Order's outcome, not a rejection of it. Deliberately amount-independent, so it never entangles with the payment ceiling or the credit limit. Implemented as the ManualReviewPolicy port: the watchlist is configuration and the whole rule is a bean, so a deployment can substitute a fraud or product-classification service without editing a use case."
+      }
+    },
+    {
+      "id": "ord-e-placed",
+      "type": "domainEvent",
+      "label": "Order Placed",
+      "context": "ord",
+      "order": 0,
+      "properties": {
+        "description": "OrderPlacedEvent. Means only 'the order was created' — eligibility for fulfilment is a separate fact."
+      }
+    },
+    {
+      "id": "ord-e-ready",
+      "type": "domainEvent",
+      "label": "Order Ready For Fulfilment",
+      "context": "ord",
+      "order": 1,
+      "properties": {
+        "pivotal": true,
+        "description": "OrderReadyForFulfilmentEvent — emitted at placement when no review is needed, or by approveReview. Also crosses the boundary as the OrderReadyForFulfilment integration event on topic ordering.events."
+      }
+    },
+    {
+      "id": "ord-e-fulfilment-started",
+      "type": "domainEvent",
+      "label": "Order Fulfilment Started",
+      "context": "ord",
+      "order": 3,
+      "properties": {
+        "pivotal": true,
+        "description": "OrderFulfilmentStartedEvent. Past this point the customer can no longer self-cancel. Reached only once a reservation actually exists (issue-00070)."
+      }
+    },
+    {
+      "id": "ord-e-payment-requested",
+      "type": "domainEvent",
+      "label": "Payment Requested",
+      "context": "ord",
+      "order": 4,
+      "properties": {
+        "description": "PaymentRequested integration event on ordering.events. Produced directly by RequestPaymentHandler — no ordering aggregate changes, so there is no domain event behind it. Carries the paymentOperationId that makes payment's decision idempotent."
+      }
+    },
+    {
+      "id": "ord-e-release-requested",
+      "type": "domainEvent",
+      "label": "Stock Release Requested",
+      "context": "ord",
+      "order": 6,
+      "properties": {
+        "description": "StockReleaseRequested integration event on ordering.events. Produced directly by RequestStockReleaseHandler."
+      }
+    },
+    {
+      "id": "ord-e-confirmed",
+      "type": "domainEvent",
+      "label": "Order Confirmed",
+      "context": "ord",
+      "order": 6,
+      "properties": {
+        "pivotal": true,
+        "description": "OrderConfirmedEvent — stock reserved and payment authorized. Fed back into the process manager, which is what lets it reach COMPLETED/ORDER_CONFIRMED on the actual outcome rather than on a command having been sent."
+      }
+    },
+    {
+      "id": "ord-e-cancelled",
+      "type": "domainEvent",
+      "label": "Order Cancelled",
+      "context": "ord",
+      "order": 8,
+      "properties": {
+        "pivotal": true,
+        "description": "OrderCancelledEvent, carrying the coarse CancellationCategory (CUSTOMER_REQUESTED / INVENTORY_UNAVAILABLE / PAYMENT_DECLINED / REVIEW_REJECTED) without the internal evidence refs. Also releases the customer's committed credit."
+      }
+    },
+    {
+      "id": "ord-e-shipped",
+      "type": "domainEvent",
+      "label": "Order Shipped",
+      "context": "ord",
+      "order": 9,
+      "properties": {
+        "pivotal": true,
+        "description": "OrderShippedEvent. The terminal success; from here cancelling is refused as RETURN_REQUIRED."
+      }
+    },
+    {
+      "id": "ord-e-stock-timeout",
+      "type": "domainEvent",
+      "label": "Stock Reservation Timed Out",
+      "context": "ord",
+      "order": 2,
+      "properties": {
+        "description": "The STOCK deadline firing (default PT1M). Ordering's own fact, not inventory's: it is how 'inventory said nothing' becomes an outcome instead of a stuck order."
+      }
+    },
+    {
+      "id": "ord-e-payment-timeout",
+      "type": "domainEvent",
+      "label": "Payment Timed Out",
+      "context": "ord",
+      "order": 5,
+      "properties": {
+        "description": "The PAYMENT deadline firing (default PT2M)."
+      }
+    },
+    {
+      "id": "ord-e-release-timeout",
+      "type": "domainEvent",
+      "label": "Stock Release Timed Out",
+      "context": "ord",
+      "order": 7,
+      "properties": {
+        "description": "The STOCK_RELEASE deadline firing (default PT1M). The one timeout that cannot end its wait — see the Re-ask For Release policy."
+      }
+    },
+    {
+      "id": "ord-p-start-fulfilment",
+      "type": "policy",
+      "label": "Start Fulfilment Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "description": "FulfilmentTrigger + OrderFulfilmentStarter. When an order becomes ready: save it as READY_FOR_FULFILMENT, start the durable process at AWAITING_STOCK with the STOCK deadline armed, and publish OrderReadyForFulfilment — all in the caller's transaction, so the causal CommandContext reaches the reservation. It deliberately does NOT advance the aggregate: asking for a reservation is not having one.",
+        "parameters": [
+          {
+            "name": "stockTimeout",
+            "value": "PT1M"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ord-p-on-reserved",
+      "type": "policy",
+      "label": "Fulfil On Reservation Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "description": "OrderFulfilmentDefinition at AWAITING_STOCK. When stock is reserved: begin fulfilment, ask for payment, cancel the STOCK deadline and arm the PAYMENT deadline. Asking for an answer and arming its timer are one decision, so a wait can never begin without a way out.",
+        "parameters": [
+          {
+            "name": "paymentTimeout",
+            "value": "PT2M"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ord-p-on-authorized",
+      "type": "policy",
+      "label": "Confirm On Authorization Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "description": "OrderFulfilmentDefinition at AWAITING_PAYMENT. When payment is authorized: confirm the order and cancel the PAYMENT deadline."
+      }
+    },
+    {
+      "id": "ord-p-on-declined",
+      "type": "policy",
+      "label": "Compensate On Decline Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "condition": "stock is held for this order",
+        "description": "OrderFulfilmentDefinition at AWAITING_PAYMENT. A decline and a payment timeout take the SAME path — release the held stock, then cancel — because the customer's position is identical however the payment failed to happen. Only the recorded decline code differs (PAYMENT_TIMEOUT vs the payment context's own code)."
+      }
+    },
+    {
+      "id": "ord-p-on-released",
+      "type": "policy",
+      "label": "Cancel After Release Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "description": "OrderFulfilmentDefinition at AWAITING_STOCK_RELEASE. Compensation is ORDERED: only once the release has actually happened can PaymentDeclinedAfterStockReleased be built, because it needs a StockReleaseRef."
+      }
+    },
+    {
+      "id": "ord-p-on-reservation-failed",
+      "type": "policy",
+      "label": "Cancel On Reservation Failure Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "description": "OrderFulfilmentDefinition at AWAITING_STOCK. A refusal and a silence share this branch: nothing was reserved, so there is nothing to release and the order is cancelled outright. They differ only in the recorded code (the failure's own, vs STOCK_TIMEOUT) and in whether the STOCK deadline still needs cancelling."
+      }
+    },
+    {
+      "id": "ord-p-on-release-timeout",
+      "type": "policy",
+      "label": "Re-ask For Release Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "description": "OrderFulfilmentDefinition at AWAITING_STOCK_RELEASE. The only timeout that does not end its wait: cancelling needs proof the stock came back, and a timeout is precisely the absence of that proof. So it re-sends the release and re-arms the timer — it keeps asking rather than fabricating evidence. ReleaseStock is idempotent and rescheduling by name supersedes the previous generation, so neither repeats nor timers accumulate.",
+        "parameters": [
+          {
+            "name": "stockReleaseTimeout",
+            "value": "PT1M"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ord-p-on-cancel-during-fulfilment",
+      "type": "policy",
+      "label": "Release Late Reservation Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "condition": "the order reached a cancelled terminal state while a reservation was outstanding or held",
+        "description": "OrderFulfilmentDefinition's AWAITING_STOCK_ORDER_CANCELLED and AWAITING_STOCK_RELEASE_ORDER_CANCELLED steps. The customer's cancellation wins — it was made while the order was still theirs to cancel — so stock that arrives for a cancelled order is handed straight back with no BeginFulfilment, no RequestPayment and no second CancelOrder. The STOCK deadline stays armed meanwhile, because a cancelled order whose inventory never answers must not wait forever either."
+      }
+    },
+    {
+      "id": "ord-rm-order",
+      "type": "readModel",
+      "label": "Order Snapshot",
+      "context": "ord",
+      "properties": {
+        "description": "OrderSnapshot via GET /orders/{id}. NOT a projected table: FindOrderHandler loads the Order aggregate and maps it, so it is derived on read and always current. Carries cancellableByCustomer, answered by the CancellableByCustomer specification, so a client can decide whether to offer the action instead of attempting it and reading the error — advice, not authorisation; the aggregate still decides at the moment of the write."
+      }
+    },
+    {
+      "id": "ord-rm-order-list",
+      "type": "readModel",
+      "label": "Customer Order List",
+      "context": "ord",
+      "properties": {
+        "description": "OrderListItem via GET /orders?customerId=, cursor-paged (Slice/Cursor). Read straight from ordering.orders through OrderListMapper — no aggregate is loaded. The cursor can be the id only because ids are UUIDv7, and a page costs the page only because orders_by_customer_newest_first covers (tenant_id, customer_id, id DESC)."
+      }
+    },
+    {
+      "id": "ord-h-max-lifetime",
+      "type": "hotspot",
+      "label": "What should a lifetime-exceeded order do — compensate from an arbitrary step, or suspend for an operator?",
+      "context": "ord",
+      "properties": {
+        "kind": "question",
+        "priority": "high",
+        "state": "open",
+        "description": "instance.max-lifetime is deliberately not armed: arming it means deciding the answer, which is a design choice rather than a wiring exercise. react() still rejects MaxLifetimeExceeded cleanly so enabling it cannot crash the definition."
+      }
+    },
+    {
+      "id": "ord-h-unbounded-release",
+      "type": "hotspot",
+      "label": "The stock-release retry is unbounded — a flow can stay COMPENSATING indefinitely",
+      "context": "ord",
+      "properties": {
+        "kind": "risk",
+        "priority": "medium",
+        "state": "open",
+        "description": "Deliberate: giving up would mean recording that stock came back when it has not. The exposure is visibility, not correctness — a long-lived COMPENSATING instance is what the process backlog metrics are for."
+      }
+    },
+    {
+      "id": "ord-h-cancel-principal",
+      "type": "hotspot",
+      "label": "POST /orders/{id}/cancel takes customerId as a query parameter",
+      "context": "ord",
+      "properties": {
+        "kind": "risk",
+        "priority": "high",
+        "state": "open",
+        "description": "A real deployment must take the requesting customer from the authenticated principal, never from the client. As it stands anyone can cancel anyone's order by naming them. Called out in OrderController; the scaffold has no security module wired."
+      }
+    },
+    {
+      "id": "ord-h-selfcancel-race",
+      "type": "hotspot",
+      "label": "The self-cancel window overlaps the reservation, so a cancellation races inventory",
+      "context": "ord",
+      "properties": {
+        "kind": "conflict",
+        "priority": "medium",
+        "state": "resolved",
+        "description": "Resolved by design rather than closed: the cancellation wins and the arriving stock is released instead of the order being revived. SelfCancelDuringReservationTest covers it."
+      }
+    },
+    {
+      "id": "ord-h-review-watchlist",
+      "type": "hotspot",
+      "label": "Who decides which SKUs need manual review?",
+      "context": "ord",
+      "properties": {
+        "kind": "question",
+        "priority": "medium",
+        "state": "open",
+        "description": "Still open, but narrowed: the RULE is now a port with a configurable watchlist, so substituting a fraud/compliance or product-classification service is a bean declaration rather than a code edit. What is still unanswered is the business question of who should own the verdict. A configurable stand-in is still a stand-in."
+      }
+    },
+    {
+      "id": "ord-o-full-orchestration",
+      "type": "opportunity",
+      "label": "Let the process manager issue the first reservation request too",
+      "context": "ord",
+      "properties": {
+        "description": "Today the application publishes OrderReadyForFulfilment from the ready moment, and the process issues every command after that — a hybrid of event-started process and application-issued first request. Fully process-driven is a reasonable variation."
+      }
+    },
+    {
+      "id": "ord-o-return-flow",
+      "type": "opportunity",
+      "label": "Build the return flow that RETURN_REQUIRED points at",
+      "context": "ord",
+      "properties": {
+        "description": "Cancelling a SHIPPED order is refused with RETURN_REQUIRED, naming a reverse flow that does not exist yet. The refusal is correct; the destination is missing."
+      }
+    },
+    {
+      "id": "inv-ag-stock",
+      "type": "aggregate",
+      "label": "Stock",
+      "context": "inv",
+      "properties": {
+        "description": "inventory-domain stock.Stock, one root per SKU — the natural contention boundary. Forcing all SKUs into one aggregate would serialise unrelated stock. Optimistic-locked (inventory.stocks.version)."
+      }
+    },
+    {
+      "id": "inv-ag-reservation",
+      "type": "aggregate",
+      "label": "Reservation",
+      "context": "inv",
+      "properties": {
+        "description": "inventory-domain stock.Reservation: what is held, for which order, and whether it has been released. The released flag is what makes ReleaseStock idempotent."
+      }
+    },
+    {
+      "id": "inv-c-reserve",
+      "type": "command",
+      "label": "Reserve Stock",
+      "context": "inv",
+      "properties": {
+        "description": "ReserveStock → ReserveStockHandler. Merges lines repeating a SKU, then DECIDES over a Map<Sku,Stock> in memory before WRITING anything — a deliberate multi-aggregate transaction where 'all lines or none' is held by the application transaction."
+      }
+    },
+    {
+      "id": "inv-c-release",
+      "type": "command",
+      "label": "Release Stock",
+      "context": "inv",
+      "properties": {
+        "description": "ReleaseStock → ReleaseStockHandler."
+      }
+    },
+    {
+      "id": "inv-x-sufficient",
+      "type": "constraint",
+      "label": "All lines reserve, or none do",
+      "context": "inv",
+      "properties": {
+        "rule": "for every line: quantity <= stock.available, evaluated against the same in-memory Stock that already absorbed this command's earlier lines",
+        "description": "Decide-then-write: a shortfall on any line throws before the first save, so the transaction commits carrying only StockReservationFailed and there is nothing to undo. A technical throw from the write phase is deliberately NOT caught, so the transaction rolls back and the delivery is retried."
+      }
+    },
+    {
+      "id": "inv-x-known-sku",
+      "type": "constraint",
+      "label": "Every SKU must be stocked in this tenant",
+      "context": "inv",
+      "properties": {
+        "rule": "stocks.findBySku(sku).isPresent(), else inventory.stock-not-found",
+        "description": "A business failure like any other: it publishes StockReservationFailed rather than throwing out of the handler."
+      }
+    },
+    {
+      "id": "inv-x-release-once",
+      "type": "constraint",
+      "label": "Stock is handed back once, but the release is always announced",
+      "context": "inv",
+      "properties": {
+        "rule": "reservation.markReleased() flips false→true exactly once; StockReleased is published on every delivery regardless",
+        "description": "The split that makes retries safe in both directions: the hand-back cannot double, and the process manager's wait for StockReleased always resolves."
+      }
+    },
+    {
+      "id": "inv-e-reserved",
+      "type": "domainEvent",
+      "label": "Stock Reserved",
+      "context": "inv",
+      "order": 2,
+      "properties": {
+        "description": "StockReserved on topic inventory.events, carrying the new reservationId."
+      }
+    },
+    {
+      "id": "inv-e-reservation-failed",
+      "type": "domainEvent",
+      "label": "Stock Reservation Failed",
+      "context": "inv",
+      "order": 2,
+      "properties": {
+        "description": "StockReservationFailed on inventory.events, carrying the failing ErrorCode. A bounded context with no HTTP edge still surfaces a stable machine identity for the reacting process manager to branch on."
+      }
+    },
+    {
+      "id": "inv-e-released",
+      "type": "domainEvent",
+      "label": "Stock Released",
+      "context": "inv",
+      "order": 7,
+      "properties": {
+        "description": "StockReleased on inventory.events."
+      }
+    },
+    {
+      "id": "inv-p-reserve-on-ready",
+      "type": "policy",
+      "label": "Reserve On Order Ready Policy",
+      "context": "inv",
+      "properties": {
+        "execution": "automatic",
+        "description": "OrderReadyForFulfilmentListener — the inbound anticorruption layer. Translates ordering's OrderReadyForFulfilment into inventory's own ReserveStock command and carries the causal CommandContext across the boundary. It absorbs TWO revisions of that contract (v2 and the retired v1) into one identical command, so neither ReserveStock nor its handler knows a version exists — the schema history of a producer stops at the boundary instead of leaking inward as a conditional."
+      }
+    },
+    {
+      "id": "inv-p-release-on-request",
+      "type": "policy",
+      "label": "Release On Request Policy",
+      "context": "inv",
+      "properties": {
+        "execution": "automatic",
+        "description": "StockReleaseRequestedListener — the inbound anticorruption layer for ordering's StockReleaseRequested."
+      }
+    },
+    {
+      "id": "inv-rm-availability",
+      "type": "readModel",
+      "label": "Stock Availability",
+      "context": "inv",
+      "properties": {
+        "description": "StockLevel via CheckStockAvailability, exposed to other contexts as the StockAvailabilityApi open host service (StockAvailabilityReport). Read through MyBatisStockQueries — no Stock aggregate is loaded."
+      }
+    },
+    {
+      "id": "inv-h-silent-technical-failure",
+      "type": "hotspot",
+      "label": "A technical failure publishes nothing, so silence is indistinguishable from a refusal",
+      "context": "inv",
+      "properties": {
+        "kind": "risk",
+        "priority": "high",
+        "state": "open",
+        "description": "Inventory answers StockReservationFailed only for a BUSINESS failure. An optimistic-lock conflict, a validation error or a database outage throws out of the handler and publishes nothing. Mitigated downstream — ordering's STOCK deadline turns the silence into an outcome — but not fixed here (issue-00068)."
+      }
+    },
+    {
+      "id": "inv-h-multi-aggregate-tx",
+      "type": "hotspot",
+      "label": "One transaction mutates several Stock roots and creates a Reservation",
+      "context": "inv",
+      "properties": {
+        "kind": "question",
+        "priority": "low",
+        "state": "resolved",
+        "description": "A deliberate, documented multi-aggregate transaction: the 'all lines or none' rule is enforced by the application transaction rather than by a single aggregate, because a Stock-per-SKU is the right contention boundary."
+      }
+    },
+    {
+      "id": "inv-o-replenish",
+      "type": "opportunity",
+      "label": "No command replenishes stock",
+      "context": "inv",
+      "properties": {
+        "description": "Levels only ever go down on reservation and back up on release; there is no Receive Stock / Adjust Stock command and no actor who could issue one. Every level in the demo comes from the dev seed."
+      }
+    },
+    {
+      "id": "pay-c-authorize",
+      "type": "command",
+      "label": "Authorize Payment",
+      "context": "pay",
+      "properties": {
+        "description": "AuthorizePayment → AuthorizePaymentHandler. Payment speaks exactly one word — authorize. There is no later capture, so no 'charge'/'capture' vocabulary is mixed in."
+      }
+    },
+    {
+      "id": "pay-x-ceiling",
+      "type": "constraint",
+      "label": "Authorisation ceiling",
+      "context": "pay",
+      "properties": {
+        "rule": "amountMinor == 0 OR amountMinor <= configured ceiling (payment.authorization.ceiling-minor, default 50000) ⇒ Authorized; otherwise Declined (payment.amount-exceeds-ceiling)",
+        "description": "It DECIDES rather than refuses: an over-ceiling amount is a legitimate Declined outcome, not a rejected command. A zero amount is explicitly authorized (issue-00075). Implemented as the AuthorizationPolicy port with CeilingAuthorizationPolicy as the default, so a deployment substitutes a real provider by declaring a bean. The port carries two obligations: never throw (a throw publishes nothing, and silence is indistinguishable from a dead broker), and carry the operation id as the provider's own idempotency key."
+      }
+    },
+    {
+      "id": "pay-x-decide-once",
+      "type": "constraint",
+      "label": "An operation is decided at most once, and announced every time",
+      "context": "pay",
+      "properties": {
+        "rule": "payment_operations (tenant_id, operation_id) is claimed in the command's own transaction; a redelivery reuses the recorded PaymentDecision verbatim",
+        "description": "Business-key idempotency. Re-running the policy on a redelivery could reach a different answer if a rule changed in between, and one operation must not have two outcomes. The primary key is the claim and is load-bearing: two concurrent first deliveries both insert, and the loser's constraint violation rolls its transaction back so its retry republishes the winner's decision. A rolled-back publish takes the claim with it."
+      }
+    },
+    {
+      "id": "pay-e-authorized",
+      "type": "domainEvent",
+      "label": "Payment Authorized",
+      "context": "pay",
+      "order": 5,
+      "properties": {
+        "description": "PaymentAuthorized on topic payment.events. Produced directly by the handler — payment owns no persisted aggregate, so there is no root to emit it."
+      }
+    },
+    {
+      "id": "pay-e-declined",
+      "type": "domainEvent",
+      "label": "Payment Declined",
+      "context": "pay",
+      "order": 5,
+      "properties": {
+        "description": "PaymentDeclined on payment.events, carrying the decline code and reason that become ordering's PaymentDeclineRef evidence."
+      }
+    },
+    {
+      "id": "pay-p-authorize-on-request",
+      "type": "policy",
+      "label": "Authorize On Payment Request Policy",
+      "context": "pay",
+      "properties": {
+        "execution": "automatic",
+        "description": "PaymentRequestedListener — the inbound anticorruption layer. Translates ordering's PaymentRequested into payment's own AuthorizePayment command, carrying the paymentOperationId that the idempotency claim is keyed on."
+      }
+    },
+    {
+      "id": "pay-h-no-aggregate",
+      "type": "hotspot",
+      "label": "Payment owns no persisted aggregate — is authorization really this context's whole vocabulary?",
+      "context": "pay",
+      "properties": {
+        "kind": "question",
+        "priority": "medium",
+        "state": "open",
+        "description": "Its only persisted state is the payment_operations dedupe log, which is technical, not a domain aggregate. A real payment context would own an Authorization or Payment root with a lifecycle of its own."
+      }
+    },
+    {
+      "id": "pay-h-no-provider",
+      "type": "hotspot",
+      "label": "There is no payment provider — the ceiling is a local rule",
+      "context": "pay",
+      "properties": {
+        "kind": "risk",
+        "priority": "medium",
+        "state": "open",
+        "description": "Narrowed but open: AuthorizationPolicy is a port, so calling a PSP is a bean declaration. The exposure that remains is everything a real provider brings with it — latency on the write path, its own idempotency keys, and partial-failure modes the PAYMENT deadline currently stands in for. None of that is exercised by anything here."
+      }
+    },
+    {
+      "id": "pay-o-capture",
+      "type": "opportunity",
+      "label": "Add the capture step after authorization",
+      "context": "pay",
+      "properties": {
+        "description": "Authorization holds funds; capture takes them. Only the first half is modelled, which is why the money never actually moves in this reference."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-001",
+      "source": "ord-a-customer",
+      "target": "ord-c-place",
+      "relation": "issues"
+    },
+    {
+      "id": "e-002",
+      "source": "ord-a-customer",
+      "target": "ord-c-cancel-own",
+      "relation": "issues"
+    },
+    {
+      "id": "e-003",
+      "source": "ord-a-reviewer",
+      "target": "ord-c-approve-review",
+      "relation": "issues"
+    },
+    {
+      "id": "e-004",
+      "source": "ord-a-reviewer",
+      "target": "ord-c-reject-review",
+      "relation": "issues"
+    },
+    {
+      "id": "e-005",
+      "source": "ord-a-dispatcher",
+      "target": "ord-c-ship",
+      "relation": "issues"
+    },
+    {
+      "id": "e-006",
+      "source": "ord-c-place",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-007",
+      "source": "ord-c-place",
+      "target": "ord-ag-customer",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-008",
+      "source": "ord-c-approve-review",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-009",
+      "source": "ord-c-reject-review",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-010",
+      "source": "ord-c-reject-review",
+      "target": "ord-ag-customer",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-011",
+      "source": "ord-c-cancel-own",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-012",
+      "source": "ord-c-cancel-own",
+      "target": "ord-ag-customer",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-013",
+      "source": "ord-c-cancel",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-014",
+      "source": "ord-c-cancel",
+      "target": "ord-ag-customer",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-015",
+      "source": "ord-c-begin",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-016",
+      "source": "ord-c-confirm",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-017",
+      "source": "ord-c-ship",
+      "target": "ord-ag-order",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-018",
+      "source": "ord-c-place",
+      "target": "ord-x-lines",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-019",
+      "source": "ord-c-place",
+      "target": "ord-x-credit",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-020",
+      "source": "ord-c-place",
+      "target": "ord-x-offerable",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-021",
+      "source": "ord-c-place",
+      "target": "ord-x-review-watchlist",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-022",
+      "source": "ord-c-approve-review",
+      "target": "ord-x-awaiting-review",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-023",
+      "source": "ord-c-approve-review",
+      "target": "ord-x-transitions",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-024",
+      "source": "ord-c-reject-review",
+      "target": "ord-x-awaiting-review",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-025",
+      "source": "ord-c-reject-review",
+      "target": "ord-x-evidence",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-026",
+      "source": "ord-c-cancel-own",
+      "target": "ord-x-self-cancel",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-027",
+      "source": "ord-c-cancel-own",
+      "target": "ord-x-return",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-028",
+      "source": "ord-c-cancel",
+      "target": "ord-x-evidence",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-029",
+      "source": "ord-c-cancel",
+      "target": "ord-x-return",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-030",
+      "source": "ord-c-begin",
+      "target": "ord-x-transitions",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-031",
+      "source": "ord-c-confirm",
+      "target": "ord-x-transitions",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-032",
+      "source": "ord-c-ship",
+      "target": "ord-x-transitions",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-033",
+      "source": "ord-ag-order",
+      "target": "ord-e-placed",
+      "relation": "emits"
+    },
+    {
+      "id": "e-034",
+      "source": "ord-ag-order",
+      "target": "ord-e-ready",
+      "relation": "emits"
+    },
+    {
+      "id": "e-035",
+      "source": "ord-ag-order",
+      "target": "ord-e-fulfilment-started",
+      "relation": "emits"
+    },
+    {
+      "id": "e-036",
+      "source": "ord-ag-order",
+      "target": "ord-e-confirmed",
+      "relation": "emits"
+    },
+    {
+      "id": "e-037",
+      "source": "ord-ag-order",
+      "target": "ord-e-cancelled",
+      "relation": "emits"
+    },
+    {
+      "id": "e-038",
+      "source": "ord-ag-order",
+      "target": "ord-e-shipped",
+      "relation": "emits"
+    },
+    {
+      "id": "e-039",
+      "source": "ord-c-request-payment",
+      "target": "ord-e-payment-requested",
+      "relation": "produces"
+    },
+    {
+      "id": "e-040",
+      "source": "ord-c-request-release",
+      "target": "ord-e-release-requested",
+      "relation": "produces"
+    },
+    {
+      "id": "e-041",
+      "source": "ord-e-ready",
+      "target": "ord-p-start-fulfilment",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-042",
+      "source": "inv-e-reserved",
+      "target": "ord-p-on-reserved",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-043",
+      "source": "inv-e-reservation-failed",
+      "target": "ord-p-on-reservation-failed",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-044",
+      "source": "ord-e-stock-timeout",
+      "target": "ord-p-on-reservation-failed",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-045",
+      "source": "pay-e-authorized",
+      "target": "ord-p-on-authorized",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-046",
+      "source": "pay-e-declined",
+      "target": "ord-p-on-declined",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-047",
+      "source": "ord-e-payment-timeout",
+      "target": "ord-p-on-declined",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-048",
+      "source": "inv-e-released",
+      "target": "ord-p-on-released",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-049",
+      "source": "ord-e-release-timeout",
+      "target": "ord-p-on-release-timeout",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-050",
+      "source": "ord-e-cancelled",
+      "target": "ord-p-on-cancel-during-fulfilment",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-051",
+      "source": "inv-e-reserved",
+      "target": "ord-p-on-cancel-during-fulfilment",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-052",
+      "source": "ord-p-on-reserved",
+      "target": "ord-c-begin",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-053",
+      "source": "ord-p-on-reserved",
+      "target": "ord-c-request-payment",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-054",
+      "source": "ord-p-on-authorized",
+      "target": "ord-c-confirm",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-055",
+      "source": "ord-p-on-declined",
+      "target": "ord-c-request-release",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-056",
+      "source": "ord-p-on-released",
+      "target": "ord-c-cancel",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-057",
+      "source": "ord-p-on-reservation-failed",
+      "target": "ord-c-cancel",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-058",
+      "source": "ord-p-on-release-timeout",
+      "target": "ord-c-request-release",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-059",
+      "source": "ord-p-on-cancel-during-fulfilment",
+      "target": "ord-c-request-release",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-060",
+      "source": "ord-e-placed",
+      "target": "ord-rm-order",
+      "relation": "updates"
+    },
+    {
+      "id": "e-061",
+      "source": "ord-e-ready",
+      "target": "ord-rm-order",
+      "relation": "updates"
+    },
+    {
+      "id": "e-062",
+      "source": "ord-e-fulfilment-started",
+      "target": "ord-rm-order",
+      "relation": "updates"
+    },
+    {
+      "id": "e-063",
+      "source": "ord-e-confirmed",
+      "target": "ord-rm-order",
+      "relation": "updates"
+    },
+    {
+      "id": "e-064",
+      "source": "ord-e-cancelled",
+      "target": "ord-rm-order",
+      "relation": "updates"
+    },
+    {
+      "id": "e-065",
+      "source": "ord-e-shipped",
+      "target": "ord-rm-order",
+      "relation": "updates"
+    },
+    {
+      "id": "e-066",
+      "source": "ord-e-placed",
+      "target": "ord-rm-order-list",
+      "relation": "updates"
+    },
+    {
+      "id": "e-067",
+      "source": "ord-e-confirmed",
+      "target": "ord-rm-order-list",
+      "relation": "updates"
+    },
+    {
+      "id": "e-068",
+      "source": "ord-e-cancelled",
+      "target": "ord-rm-order-list",
+      "relation": "updates"
+    },
+    {
+      "id": "e-069",
+      "source": "ord-e-shipped",
+      "target": "ord-rm-order-list",
+      "relation": "updates"
+    },
+    {
+      "id": "e-070",
+      "source": "ord-rm-order",
+      "target": "ord-a-customer",
+      "relation": "informs"
+    },
+    {
+      "id": "e-071",
+      "source": "ord-rm-order-list",
+      "target": "ord-a-customer",
+      "relation": "informs"
+    },
+    {
+      "id": "e-072",
+      "source": "ord-rm-order",
+      "target": "ord-a-reviewer",
+      "relation": "informs"
+    },
+    {
+      "id": "e-073",
+      "source": "ord-rm-order",
+      "target": "ord-a-dispatcher",
+      "relation": "informs"
+    },
+    {
+      "id": "e-074",
+      "source": "inv-c-reserve",
+      "target": "inv-ag-stock",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-075",
+      "source": "inv-c-reserve",
+      "target": "inv-ag-reservation",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-076",
+      "source": "inv-c-release",
+      "target": "inv-ag-stock",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-077",
+      "source": "inv-c-release",
+      "target": "inv-ag-reservation",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-078",
+      "source": "inv-c-reserve",
+      "target": "inv-x-sufficient",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-079",
+      "source": "inv-c-reserve",
+      "target": "inv-x-known-sku",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-080",
+      "source": "inv-c-release",
+      "target": "inv-x-release-once",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-081",
+      "source": "inv-ag-reservation",
+      "target": "inv-e-reserved",
+      "relation": "emits"
+    },
+    {
+      "id": "e-082",
+      "source": "inv-ag-stock",
+      "target": "inv-e-reservation-failed",
+      "relation": "emits"
+    },
+    {
+      "id": "e-083",
+      "source": "inv-ag-reservation",
+      "target": "inv-e-released",
+      "relation": "emits"
+    },
+    {
+      "id": "e-084",
+      "source": "ord-e-ready",
+      "target": "inv-p-reserve-on-ready",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-085",
+      "source": "ord-e-release-requested",
+      "target": "inv-p-release-on-request",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-086",
+      "source": "inv-p-reserve-on-ready",
+      "target": "inv-c-reserve",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-087",
+      "source": "inv-p-release-on-request",
+      "target": "inv-c-release",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-088",
+      "source": "inv-e-reserved",
+      "target": "inv-rm-availability",
+      "relation": "updates"
+    },
+    {
+      "id": "e-089",
+      "source": "inv-e-released",
+      "target": "inv-rm-availability",
+      "relation": "updates"
+    },
+    {
+      "id": "e-090",
+      "source": "pay-c-authorize",
+      "target": "pay-x-ceiling",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-091",
+      "source": "pay-c-authorize",
+      "target": "pay-x-decide-once",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-092",
+      "source": "pay-c-authorize",
+      "target": "pay-e-authorized",
+      "relation": "produces"
+    },
+    {
+      "id": "e-093",
+      "source": "pay-c-authorize",
+      "target": "pay-e-declined",
+      "relation": "produces"
+    },
+    {
+      "id": "e-094",
+      "source": "ord-e-payment-requested",
+      "target": "pay-p-authorize-on-request",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-095",
+      "source": "pay-p-authorize-on-request",
+      "target": "pay-c-authorize",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-096",
+      "source": "ord-h-max-lifetime",
+      "target": "ord-p-on-release-timeout",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-097",
+      "source": "ord-h-unbounded-release",
+      "target": "ord-p-on-release-timeout",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-098",
+      "source": "ord-h-cancel-principal",
+      "target": "ord-c-cancel-own",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-099",
+      "source": "ord-h-selfcancel-race",
+      "target": "ord-p-on-cancel-during-fulfilment",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-100",
+      "source": "ord-h-review-watchlist",
+      "target": "ord-x-review-watchlist",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-101",
+      "source": "inv-h-silent-technical-failure",
+      "target": "inv-c-reserve",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-102",
+      "source": "inv-h-silent-technical-failure",
+      "target": "ord-e-stock-timeout",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-103",
+      "source": "inv-h-multi-aggregate-tx",
+      "target": "inv-x-sufficient",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-104",
+      "source": "pay-h-no-aggregate",
+      "target": "pay-c-authorize",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-105",
+      "source": "pay-h-no-provider",
+      "target": "pay-x-ceiling",
+      "relation": "annotates"
+    },
+    {
+      "id": "e-106",
+      "source": "ord-o-full-orchestration",
+      "target": "ord-p-start-fulfilment",
+      "relation": "highlights"
+    },
+    {
+      "id": "e-107",
+      "source": "ord-o-return-flow",
+      "target": "ord-e-shipped",
+      "relation": "highlights"
+    },
+    {
+      "id": "e-108",
+      "source": "inv-o-replenish",
+      "target": "inv-ag-stock",
+      "relation": "highlights"
+    },
+    {
+      "id": "e-109",
+      "source": "pay-o-capture",
+      "target": "pay-e-authorized",
+      "relation": "highlights"
+    }
+  ]
+}
