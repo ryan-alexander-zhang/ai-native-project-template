@@ -113,12 +113,23 @@ public interface StoreAndForwardTracer {
 
     // 读侧：捞起后以存的 traceparent 起一个 LINK 回创建者 span 的作用域，派发期间活跃、结束时关闭
     Scope restore(String traceparent, String traceState, String workItemId);
-    interface Scope extends AutoCloseable { @Override void close(); }
+    interface Scope extends AutoCloseable {
+        default void recordFailure(Throwable error) {}
+        default void detach() {}   // 离开当前线程，但不结束 span
+        @Override void close();
+    }
 }
 ```
 
+> **`detach()` 的由来（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）**：outbox relay 流水线化之后，
+> 「span 要当当前上下文」（producer 埋点读 ambient 注入消息头，只发生在**交出去**那一刻）与
+> 「span 要活着」（等到 ack 才能定成败）不再重合。此前 SPI 把 OTEL 分开的两件事（Span 与 Scope）捏成了一个
+> `Scope`。三条备选都不行：交出去就结束 span → 失败的投递在链路里显示成功；N 个 scope 同时开着 →
+> 关闭顺序 FIFO 而非 LIFO，OTEL 报上下文错乱；失败时另开 span 记错 → 一条消息两个 span。
+> `detach()` 是 default 空实现，NoOp 与 PM 两侧零改动。
+
 - **写侧**：`JdbcProcessRuntime` 写 effect/deadline/transition 前、`OutboxWriter`（jdbc 与 **mybatis-plus** 两个实现）写 outbox 行前调用 `captureCurrent()`，把不透明串存进新列——**不经 `CommandContext`**，直接读命令线程 ambient。
-- **读侧**：PM relay/deadline worker、`OutboxRelay`（两实现）捞起后 `restore(...)` 起 link span 再派发。
+- **读侧**：PM relay/deadline worker、`OutboxRelay` 捞起后 `restore(...)` 起 link span 再派发。outbox 侧 span 在**交出去后 `detach()`**、在 ack 回来后 `close()`，所以一批 publish span 是重叠的——这正是「一轮 poll 一次往返」在链路上的样子。
 - 两侧都只搬运不透明字符串；未装配 OTEL 时 no-op。
 
 ```mermaid

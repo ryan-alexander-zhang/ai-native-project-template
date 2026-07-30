@@ -74,6 +74,11 @@ relay 里被复制的那些**判断**，恰好是全框架最难写对的一批�
 > 因此变成了**候选查询**（选聚合队头）。方法数仍是 7，判据未变。租约互斥没有下沉成方言实现——claim 是三条
 > 方言无关的语句，理由见该 issue。
 
+> **再后续（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）**：`markSent` 由单 id 改为收 **id 列表**，
+> 因为 relay 现在把整批交给传输再一起确认，一轮一次写而不是一行一次写。方法数与判据都没变——
+> 「一批已确认的行怎么落库」仍然只是「怎么读写表」。同一次改动在**契约**侧加了 `OutboxDispatcher.beginDispatch`
+> 与 `InFlightDispatch`：那是 engine 与传输之间的接缝，不属于 store 端口。
+
 **留在后端的另一件事：ShedLock 的 `LockProvider`。** 它是一张 JDBC 锁表，是真正与存储绑定的东西；
 engine 只声明「这次轮询持有租约」（`@SchedulerLock` 在 `OutboxRelayScheduler` 上），
 provider 由后端提供。未来一个 Redis 租约的后端因此不必绕过 engine。

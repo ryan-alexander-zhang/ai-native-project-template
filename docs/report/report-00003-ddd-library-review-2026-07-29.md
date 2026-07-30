@@ -72,8 +72,14 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   **「是否丢过消息」按事件告警**（`dead.lettered` counter，所有 reason 启动即注册好，仪表盘有 0 值曲线可告警），
   而不是看死信表深度——一条被重放的死信会让深度回落、告警随之消失。**刻意不加健康检查**：
   一个连不上 broker 的 relay 不是有病的实例，而本次评审的 C5 正是一个卡在 DEGRADED 的健康检查。
-- 吞吐上限约 100 msg/s：每轮只抽一批、批间固定等 1s、每条 send 同步 `get(timeout)`（放弃 producer 批处理与流水线）、
-  每条成功一次独立 `MARK_SENT`。1 小时故障积压 180 万行要排约 5 小时。
+- ~~吞吐上限约 100 msg/s~~ → **已修** `issue-00111`：一轮 poll 的代价从**往返之和**降到**一次往返**。
+  「交出去」与「等回执」拆成两件事（`OutboxDispatcher.beginDispatch` → `InFlightDispatch`），relay 把整批
+  交给传输再逐个等，确认下来的行**一条语句**记账（`markSent` 收 id 列表）。默认实现仍是同步 `dispatch`，
+  自定义传输零改动；producer 自带的批处理这才第一次有东西可批。
+  **报告要求的「按序等 + 首个失败 fail-fast」被证明既多余又有害**：队头 claim（第 7 项）已使一批 claim 出来的行
+  两两不同 subject，批内根本没有需要保序的两条消息；而 fail-fast 会丢下已交给 broker 的 send 不等，凭空造重复。
+  `sendTimeout` 起算点改为**交出去那一刻**，整批停摆只花一个 timeout，第 7 项的租约算式原样成立。
+  追踪侧顺带补上 `Scope.detach()`（离开当前线程但不结束 span），否则一批重叠的 publish span 要么撒谎要么错乱。
 - ~~**静默丢失**：outbox 行不存目的地，路由在派发时按当前注解决定~~ → **已修** `issue-00109`：
   目的地在**写入事务里**解析并落成 `destination` 列，派发读列不查表。于是主场景从「失败」变成
   「根本不会发生」——注解在版本升级里被删掉，已写入的行照样送到原目的地。新端口 `EventDestinations`
@@ -81,8 +87,11 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   relay 另加一条不变式：带目的地的行不得交给 `reachesExternalTargets()==false` 的 dispatcher，
   归为**瞬态**失败（传输缺失常是滚动发布的时间窗而非判决），耗尽尝试后进死信。
   **死信表同样加这一列**——`replay` 把行拷回 outbox，否则重放会把外发事件复活成本地投递，同一个 bug 换个入口。
-- DLT 固定源分区号（`MessagingKafkaAutoConfiguration:286-290`）：`.DLT` 分区数少于源主题时发布失败 →
-  `DefaultErrorHandler` 重新 seek 重试整轮 → 毒消息永远出不去、分区无限停滞，与 DLT 目的完全相反。
+- ~~DLT 固定源分区号~~ → **已修** `issue-00111`（与上一条同批）：改为不点名分区。
+  **比本报告原先的判断窄一些**：Spring Kafka 自带 `verifyPartition=true` 会先问 broker 该分区在不在，
+  常见情况救得回来——但救不了元数据拿不到的情况，而那恰恰就是 DLT 主题压根不存在的时候；
+  且这个保险每条死信要付一次**阻塞式**元数据查询。不点名分区把这次查询也省了，
+  而同聚合死信共位照旧（recoverer 抄源记录的 key，共位一直是 key 的功劳）。
 
 **Process Manager**
 - ~~`withRetry` 在加入外层事务时失效~~ / ~~并发首次 start 漏 `DuplicateKeyException` 映射~~ →
@@ -166,7 +175,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
    死信只留给"传输整个不在了"这种真配置错。第 7 项让所有实例并发轮询，也把"滚动发布期间按谁的表判"
    从概率事件变成常态，这一项因此更紧要)
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）（`issue-00110`，**已完成**；无新配置项）
-10. 流水线化 Kafka 腿（按 subject 有序发出、按序等 future、首个失败 fail-fast；语义不变，吞吐 10–50 倍）
+10. ~~流水线化 Kafka 腿~~ **（已完成，`issue-00111`）**——落地时否掉了「按序等 + fail-fast」这个前提已变的要求；顺带修掉 DLT 固定分区号
 11. BOM 去 parent，只管理 `com.aipersimmon.ddd:*` 与刻意再导出的坐标
 12. 测试门禁反转：两个 engine 补内存 store 单测 + JaCoCo；加 reactor 级 ArchUnit 用字节码强制契约模块无框架依赖
 13. core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20

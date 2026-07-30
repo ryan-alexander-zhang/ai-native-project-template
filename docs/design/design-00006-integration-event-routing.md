@@ -86,6 +86,9 @@ flowchart LR
 
 - **单张 outbox 表**：原子性/顺序不变（前提是聚合与 outbox 同库同事务，见 §八与 [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]）。
 - 分区 key 仍 = 聚合 `subject`（per-aggregate 保序，decision-00014 不变）。
+- **一批 send 是重叠的**（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）：router 的 Kafka 腿把整批
+  交给 producer 再逐个等 ack。这不会乱序，因为一批 claim 出来的行两两不同 `subject`（队头 claim 的性质），
+  而某聚合的下一条要等这一条记账之后才可领——同一聚合的两条事件**永不同时在飞**。
 
 > **修正（[[issue-00109-a-vanished-route-turned-an-externalized-event-local]]）：reach 在写入时决定，
 > 不在派发时。** 上图里 router "按 reach 分流" 的实现原本是派发时查 `ExternalizedRoutes`，于是路由成了
@@ -106,7 +109,10 @@ flowchart LR
 
 ### 4.4 多 topic
 
-EXTERNAL 事件按 `@Externalized` 的 target 映射到**每类/每上下文命名 topic**；外部方按需订阅；DLT 为 `<topic>.DLT`。
+EXTERNAL 事件按 `@Externalized` 的 target 映射到**每类/每上下文命名 topic**；外部方按需订阅；DLT 为 `<topic>.DLT`，
+**不点名分区**——DLT 常按涓流建、分区数少于源主题，点名一个那里不存在的分区会让发布失败 → recoverer 失败 →
+错误处理器 seek 回去重试，毒消息永远出不去、分区无限停滞（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）。
+同聚合的死信仍落同一分区：recoverer 会把源记录的 key 抄过去，共位一直是 key 的功劳。
 替代今天的单 topic 火龙。
 
 ## 五、兼容与 monolith-first 默认

@@ -202,13 +202,25 @@ com.aipersimmon.ddd.core
 > 同样带这一列(否则重放会把外发事件复活成本地投递)。查询端口 `EventDestinations` 在 outbox core,
 > `ExternalizedRoutes` 实现之;relay 另守一条:带目的地的行不得交给到不了外部的 dispatcher。
 
+> **第五次演进(已交付,[[issue-00111-the-relay-waited-for-each-send-in-turn]])**:一轮 poll 的代价从
+> **往返之和**降到**一次往返**。原来每条消息 `send.get(timeout)`——写一条等一条 ack,单实例上限约 100 msg/s,
+> 且 producer 缓冲区里永远只有一条记录,自带的批处理形同虚设。现在"交出去"与"等回执"是两件事
+> (`OutboxDispatcher.beginDispatch` 返回 `InFlightDispatch`),relay 把**整批**交给传输再逐个等,
+> 确认下来的行**一条语句**记账(`OutboxStore.markSent` 收 id 列表)。默认实现仍是同步 `dispatch`,
+> 自定义传输零改动。**关键前提是第三次演进**:队头 claim 使得一批 claim 出来的行两两不同 subject,
+> 于是批内根本没有需要保序的两条消息——报告原本要求的"按序等 + 首个失败 fail-fast"因此是多余的,
+> 而且有害(会丢下已交给 broker 的 send 不等,凭空造重复)。`sendTimeout` 的起算点改为**交出去那一刻**,
+> 整批停摆只花一个 timeout,第三次演进立下的租约算式原样成立。追踪侧因此给
+> `StoreAndForwardTracer.Scope` 加了 `detach()`(离开当前线程但不结束 span),否则要么交出去就结束 span
+> (失败的投递在链路里显示成功),要么 N 个 scope 同时开着按 FIFO 关闭(OTel 上下文错乱)。
+
 > **后续演进(已交付)**:抽出与存储无关的 **`aipersimmon-ddd-outbox`(core)**——投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、两个默认 dispatcher(logging / in-process)及其选择用的 `AipersimmonDddOutboxAutoConfiguration`,全无持久化。`-outbox-jdbc` 与新增的 **`-outbox-mybatis-plus`** 都依赖该 core,各自只提供 writer + relay(`-outbox-mybatis-plus` 用 MyBatis-Plus `BaseMapper`,`@TableName` 而非 JPA `@Entity`,且只经 `MapperFactoryBean` 注册自己的 mapper,不触发/劫持消费者 `@MapperScan`,同表结构可与 jdbc 互换)。**消费者需自选恰好一个 outbox 存储 starter**。broker starter(§5.14)改为依赖 core,故可与任一存储后端组合。
 
 - **事务性 outbox**:集成事件与聚合变更**同事务**写入 `aipersimmon_outbox` 表;relay 轮询未发送行,发到 broker,置 `sent`。**at-least-once**(dispatch 后置 sent 前崩溃会重投 → 消费方需幂等)。
 - 组件:
   - 表 `aipersimmon_outbox`:`id`/`event_id`(唯一)/`type`/`version`/`payload`(JSON)/`occurred_at`/`trace_id`/`sent`/`sent_at`/`attempts`/`created_at`。建表由消费者(Flyway/Liquibase)负责。全库各存储组件的 DDL 以**分方言 Flyway migration** 为**单一来源**(`aipersimmon/db/migration/{component}/{vendor}`,h2/postgresql/mysql),既是可执行迁移也是参考 DDL。outbox 的 migration 放在 `aipersimmon-ddd-outbox` core,`-outbox-jdbc` 与 `-outbox-mybatis-plus` 共享同一份(两者表结构一致)。可选模块 **`aipersimmon-ddd-flyway`**(与 schema 无关的共享 starter)在启动时扫描 classpath,为发现的每个组件用**独立历史表**(`flyway_schema_history_aipersimmon_{component}`)自动应用(见其 README),或复制进消费者自己的 Flyway/Liquibase;各模块测试直接复用对应 H2 migration(不再单独维护 `schema.sql`)。
   - `OutboxWriter implements IntegrationEvents`:盖章 `EventEnvelope`(eventId=UUID、type=类全名、version=1、occurredAt=now)→ Jackson 序列化 payload → **当前事务** `JdbcTemplate` 插入一行。
-  - `OutboxRelay`:`@Scheduled` 轮询 → **claim** 可投递的行(每行打租约,每个聚合只取队头)→ 交给 **broker 发布 port `OutboxDispatcher`** → 逐行置 `sent`(同时清租约);失败留待下轮 + `attempts++`。所有实例都轮询,互斥靠行租约。
+  - `OutboxRelay`:`@Scheduled` 轮询 → **claim** 可投递的行(每行打租约,每个聚合只取队头)→ **整批**交给 **broker 发布 port `OutboxDispatcher`**(`beginDispatch`)再逐个等回执 → 确认下来的一批**一条语句**置 `sent`(同时清租约);失败留待下轮 + `attempts++`,且只算那一行。所有实例都轮询,互斥靠行租约。
   - `OutboxDispatcher` port,三个实现选一(决定方式二/三):
     - **默认 `LoggingOutboxDispatcher`**(`@ConditionalOnMissingBean`,开箱即用,只记日志)。
     - **`InProcessOutboxDispatcher`(方式二)**:属性 `aipersimmon.ddd.outbox.dispatch=in-process` 启用;按 `type` 反序列化 payload 后 `ApplicationEventPublisher.publishEvent`,投递给进程内 `@EventListener`——outbox 变成"进程内异步"传输(生产者只在其事务里写 outbox,relay 异步投递本地消费者;配 `Inbox` 幂等)。
