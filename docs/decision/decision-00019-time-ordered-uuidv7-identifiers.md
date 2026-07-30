@@ -8,6 +8,14 @@ parent:
 
 # 框架生成的 per-row 标识符改用时间有序 UUIDv7
 
+> **补充（[[issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock]]）：排序跟随墙钟，包括倒退。**
+> JUG 的生成器只在同一毫秒内递增计数器，时间戳一变（**包括变小**）就重抽熵；而墙钟会被 NTP 校正拨回去。
+> 所以时钟倒退时 id 会倒序。**没有钳位**，理由是本决定选 UUIDv7 的目的从头到尾是**写放大与索引局部性**，
+> 不是排序保证：已核实框架里没有任何地方按 id 排序（outbox 按 `created_at` + 自增标识列，PM 按 `seq`，
+> deadline 只把 id 当决定性平局打破），唯一性也来自熵而非时钟。
+> 需要单调**作为保证**的应用需要的是序列，不是时钟——这句已写进 `Uuidv7IdGenerator` 的 javadoc。
+
+
 固化"框架为每行/每条消息铸造的标识符（command messageId、integration `event_id`、process 实例/迁移/effect/deadline id、
 operation-log `recordId` 等）应采用**时间有序 UUIDv7**，经统一的 `IdGenerator` SPI 生成、默认由成熟库实现"这一决策。
 与多租户（[[decision-00018-multi-tenancy-boundaries]]）**正交**：那里管的是低基数的 `tenant_id`（要窄+不可变、明确不用 UUIDv7），

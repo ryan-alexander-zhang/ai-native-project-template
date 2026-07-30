@@ -235,14 +235,18 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   测试通过注入的代理直调同一方法时若撞上，ShedLock 拿不到锁便静默返回——断言于是作用在一次没发生的 purge 上。
   见 `issue-00100`。同类风险：任何 `@Scheduled + @SchedulerLock` 的方法被测试直调都有这个陷阱。
 
-- **新发现的间歇失败（未修，不属于上述任何条目）**：`Uuidv7IdGeneratorTest
-  .isStrictlyMonotonicWithinAndAcrossMilliseconds` 在第 7 项的全量 verify 中失败一次，
-  同一断言隔离重跑 5 次全过。失败对是 `019fae21-69e5-…` 紧跟在 `019fae21-69e6-…` 之后——
-  即嵌入时间戳**回退了 1 毫秒**，不是同毫秒内的次序问题。该用例断言 10 万次连续铸造严格递增，
-  而 JUG `timeBasedEpochGenerator()` 在突发下会把内部时间戳推到墙钟之前，随后重读墙钟即可回退。
-  影响面：UUIDv7 的卖点正是"可按 id 排序 = 按时间排序"，一次回退会让两行的相对顺序与写入顺序相反。
-  需要判断的是改用带单调计数器的构造方式、还是把断言降级为"非严格递增"并说明代价；
-  两者都要动 `decision-00019` / `design-00010` 的措辞。
+- ~~新发现的间歇失败：`Uuidv7IdGeneratorTest.isStrictlyMonotonicWithinAndAcrossMilliseconds`~~
+  → **已查明并修** `issue-00116`。**本报告当时的猜测（"JUG 在突发下把内部时间戳推到墙钟之前"）不成立**：
+  回读 JUG 5.1.0 源码，`construct` 只在 `rawTimestamp == _lastTimestamp` 时递增计数器，
+  其余一律重抽熵——而 `else` 分支对时间戳**变小**同样成立，`UUIDClock` 就是 `System.currentTimeMillis()`。
+  已在 scratchpad 把时钟往回拨 1ms **确定性复现**，形状与线上失败完全一致。
+  **不是并发问题**（内部有 `ReentrantLock`），**不是 JUG 的 bug**，**是测试过度声称**——
+  任何基于墙钟的生成器都无法承诺全局单调。
+  影响面也比本报告当时估计的小：**框架里没有任何地方按 id 排序**（outbox 按 `created_at` + 自增标识列，
+  process-manager 按 `seq`，deadline 查询只把 id 当决定性平局打破），
+  且唯一性来自熵、不依赖时钟。所以**没有钳位**，改为：生成器接受时钟（包私有构造），
+  测试拆成三条各自为真的断言并**把时钟倒退这条断言下来**而不是回避它。
+  `decision-00019` 的措辞未受影响——它选 UUIDv7 的理由从头到尾是写放大/索引局部性，不是排序保证。
 
 ## 关联
 
