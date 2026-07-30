@@ -8,9 +8,15 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 /**
  * Build-time check that module names keep telling the truth about what a module is.
@@ -80,12 +86,6 @@ public final class ModuleNamingChecks {
           "aipersimmon-ddd-archunit",
           "aipersimmon-ddd-test-support");
 
-  private static final Pattern ARTIFACT_ID = Pattern.compile("<artifactId>([^<]+)</artifactId>");
-  private static final Pattern DEPENDENCY =
-      Pattern.compile("<dependency>(.*?)</dependency>", Pattern.DOTALL);
-  private static final Pattern GROUP_ID = Pattern.compile("<groupId>([^<]+)</groupId>");
-  private static final Pattern TEST_SCOPE = Pattern.compile("<scope>test</scope>");
-
   /**
    * Contract modules (no pluggable suffix) that declare a framework dependency outside {@code test}
    * scope, each reported as {@code artifactId -> groupId:artifactId}.
@@ -95,12 +95,12 @@ public final class ModuleNamingChecks {
   public static List<String> contractModulesNamingAFramework(Path reactorRoot) {
     List<String> violations = new ArrayList<>();
     for (Path pom : modulePoms(reactorRoot)) {
-      String text = read(pom);
-      String artifactId = moduleArtifactId(text);
+      Element project = parse(pom);
+      String artifactId = moduleArtifactId(project);
       if (artifactId == null || TOOLING.contains(artifactId) || isPluggable(artifactId)) {
         continue;
       }
-      for (String dependency : frameworkDependencies(text)) {
+      for (String dependency : frameworkDependencies(project)) {
         violations.add(artifactId + " -> " + dependency);
       }
     }
@@ -111,7 +111,7 @@ public final class ModuleNamingChecks {
   public static List<String> modulesWithALegacySpringSuffix(Path reactorRoot) {
     List<String> violations = new ArrayList<>();
     for (Path pom : modulePoms(reactorRoot)) {
-      String artifactId = moduleArtifactId(read(pom));
+      String artifactId = moduleArtifactId(parse(pom));
       if (artifactId != null && artifactId.endsWith("-spring")) {
         violations.add(artifactId);
       }
@@ -151,33 +151,73 @@ public final class ModuleNamingChecks {
   }
 
   /** The {@code <artifactId>} of the module itself: the first one that is not the parent's. */
-  private static String moduleArtifactId(String pom) {
-    String withoutParent = pom.replaceFirst("(?s)<parent>.*?</parent>", "");
-    Matcher matcher = ARTIFACT_ID.matcher(withoutParent);
-    return matcher.find() ? matcher.group(1) : null;
+  /** The module's own artifactId — a direct child of {@code <project>}, not the parent's. */
+  private static String moduleArtifactId(Element project) {
+    return childrenNamed(project, "artifactId").stream()
+        .findFirst()
+        .map(Element::getTextContent)
+        .map(String::trim)
+        .orElse(null);
   }
 
-  private static List<String> frameworkDependencies(String pom) {
-    // Only the module's own <dependencies>; a BOM-style <dependencyManagement> declares nothing.
-    String body = pom.replaceFirst("(?s)<dependencyManagement>.*?</dependencyManagement>", "");
+  /**
+   * Framework dependencies the module actually declares.
+   *
+   * <p>Only {@code <project><dependencies>} counts: a {@code <dependencyManagement>} block declares
+   * nothing (it pins a version for whoever does declare it), and a dependency inside {@code
+   * <profiles>} is not on by default. Reading the parsed document rather than the file's text is
+   * what makes those distinctions available at all — and it is why a dependency someone commented
+   * out no longer reads as a violation, which is the sort of finding that teaches people to
+   * distrust the check.
+   */
+  private static List<String> frameworkDependencies(Element project) {
     List<String> found = new ArrayList<>();
-    Matcher dependency = DEPENDENCY.matcher(body);
-    while (dependency.find()) {
-      String block = dependency.group(1);
-      if (TEST_SCOPE.matcher(block).find()) {
-        continue;
-      }
-      Matcher group = GROUP_ID.matcher(block);
-      if (!group.find()) {
-        continue;
-      }
-      String groupId = group.group(1);
-      if (FRAMEWORK_GROUPS.stream().anyMatch(groupId::startsWith)) {
-        Matcher artifact = ARTIFACT_ID.matcher(block);
-        found.add(groupId + ":" + (artifact.find() ? artifact.group(1) : "?"));
+    for (Element dependencies : childrenNamed(project, "dependencies")) {
+      for (Element dependency : childrenNamed(dependencies, "dependency")) {
+        if (text(dependency, "scope").filter("test"::equals).isPresent()) {
+          continue;
+        }
+        String groupId = text(dependency, "groupId").orElse("");
+        if (FRAMEWORK_GROUPS.stream().anyMatch(groupId::startsWith)) {
+          found.add(groupId + ":" + text(dependency, "artifactId").orElse("?"));
+        }
       }
     }
     return found;
+  }
+
+  private static java.util.Optional<String> text(Element parent, String name) {
+    return childrenNamed(parent, name).stream()
+        .findFirst()
+        .map(Element::getTextContent)
+        .map(String::trim);
+  }
+
+  /** Direct element children with the given tag name. Comments and text nodes are not elements. */
+  private static List<Element> childrenNamed(Element parent, String name) {
+    List<Element> found = new ArrayList<>();
+    NodeList children = parent.getChildNodes();
+    for (int i = 0; i < children.getLength(); i++) {
+      Node child = children.item(i);
+      if (child instanceof Element element && name.equals(element.getTagName())) {
+        found.add(element);
+      }
+    }
+    return found;
+  }
+
+  private static Element parse(Path pom) {
+    try {
+      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      DocumentBuilder builder = factory.newDocumentBuilder();
+      Document document = builder.parse(Files.newInputStream(pom));
+      return document.getDocumentElement();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    } catch (SAXException | ParserConfigurationException e) {
+      throw new IllegalStateException("cannot read " + pom, e);
+    }
   }
 
   private static List<Path> modulePoms(Path reactorRoot) {
@@ -191,14 +231,6 @@ public final class ModuleNamingChecks {
           .filter(Files::isRegularFile)
           .sorted()
           .toList();
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  private static String read(Path pom) {
-    try {
-      return Files.readString(pom);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

@@ -158,11 +158,28 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   `ContractModulesCarryNoFrameworkTest` 按**字节码**跨 reactor 检查 11 个契约模块
   （pom 说声明了什么，字节码说实际够到了什么，落到消费方 classpath 上的是后者）。
   用白名单而非禁用名单，且第二条断言防"空规则恒真"。
-- core 内部违反自己的"一个概念一个名字"：`core.annotation.DomainEvent` vs `core.event.DomainEvent`、
-  `annotation.AggregateRoot` vs `model.AggregateRoot`——同名双词汇表，混用即需全限定名，ArchUnit 追两套。
-- 6 个模块编译依赖 `aipersimmon-ddd-id-spring-boot-starter` 却零 import，只为把 JUG 拖上 classpath；
-  47 个 pom 对 2.8 万行过度碎片化（中位约 300 行，`-inbox` 只有 1 个 42 行接口）。
-- `ModuleNamingChecks` 用正则解析 pom，分不清 `<dependencyManagement>` 与注释掉的 XML；
+- ~~core 内部违反自己的"一个概念一个名字"~~ → **已修** `issue-00114`：判据是**留承重的一边**，
+  两个案例方向相反正说明它是判据而非偏好。建筑块角色留**注解**（它是唯一覆盖全部六个角色的一套；
+  两个接口只是局部影子，且 core 外零使用、仓储基类都绑 `AbstractAggregateRoot`）；
+  领域事件留**接口**（`registerEvent(DomainEvent)` 与 `List<DomainEvent>` 里注解出现不了）。
+  消费方迁移成本为 0——被删的三个类型库外使用次数都是 0。
+- ~~6 个模块编译依赖 `-id-spring-boot-starter` 却零 import~~ → **已修** `issue-00114`：
+  改为 `runtime`（它们编译针对的 `IdGenerator` SPI 在 **core**；需要的是 bean 在运行时存在，
+  否则 id 静默退回 `UUID.randomUUID()`）。已实测 `runtime` 照样传递到消费方 classpath。
+  两个 outbox 后端那条直接删除——engine 已经带着它。
+- **"47 个 pom 过度碎片化 / 收敛到 20"这条被驳回**（`issue-00114` §4）：48 个按角色是
+  13 后端 + 12 装配 + 12 契约 + 4 工具 + 4 打包束 + 3 engine。砍到 20 只有两条路，
+  **两条都被本次评审自己新加的门禁禁止**——合并 jdbc/mybatis 后端会让只用 JDBC 的应用背上 MyBatis-Plus
+  （违反 design-00001 反复写下的"自选恰好一个存储 starter"）；合并契约与装配会让 Spring 进契约模块，
+  而第 12 项新加的 `ContractModulesCarryNoFrameworkTest` 会按**字节码**让构建失败。
+  且计数所描述的问题**4 个打包束早已解决**：消费方按 README 加一个依赖，从不需要认识另外 47 个。
+  模块数是**发布粒度**，不是消费方的认知负担。唯一真候选是 `-inbox`（42 行）并入 `-integration`，
+  收益 48→47、代价是一个已发布坐标消失——**留给用户决定**。
+- ~~`ModuleNamingChecks` 用正则解析 pom~~ → **已修** `issue-00114`：改用 JDK 自带 DOM。
+  核实后两条指控只有一条成立：`<dependencyManagement>` 其实已被 `replaceFirst` 处理，
+  **注释掉的依赖那条是真的**（按文本读，被注释掉的 `<dependency>` 与活的一模一样），
+  新增的这一例在旧实现上按预期失败。理由不只是正确性：一条会报告构建实际没做的事的规则，
+  会教会人不再相信它。
   `aipersimmon-ddd-outbox` 这个"契约模块"已因此偷带 jackson + slf4j 还带着实现类。
 
 ---
@@ -198,7 +215,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 10. ~~流水线化 Kafka 腿~~ **（已完成，`issue-00111`）**——落地时否掉了「按序等 + fail-fast」这个前提已变的要求；顺带修掉 DLT 固定分区号
 11. ~~BOM 去 parent~~ **（已完成，`issue-00112`）**——1626 → 72 条；再导出的判据定为「本库在别的版本上不工作」
 12. ~~测试门禁反转~~ **（已完成，`issue-00113`）**——两个 engine 各带内存 store 与门禁（outbox 39 例 / pm 50 例）+ ArchUnit 字节码规则；`DefaultProcessRuntime` 与 `replay`/`operation` 仍在门外并在 pom 里点名
-13. core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20
+13. ~~core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20~~ **（已完成，`issue-00114`）**——
+    词汇表已删（建筑块留注解、领域事件留接口，判据是"留承重的一边"，消费方迁移成本为 0），
+    id-starter 作用域改 `runtime`，`ModuleNamingChecks` 改 DOM 解析；
+    **"收敛到 20"这条驳回**——两条可行路径都被本次评审自己新加的门禁禁止，理由见 issue §4
 
 ---
 

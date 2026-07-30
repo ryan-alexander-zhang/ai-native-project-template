@@ -8,6 +8,16 @@ parent: plan-00014-adoption-threshold-and-architecture-simplification
 
 # 模块命名规则与「Spring 自由」的可执行边界
 
+> **补充（[[issue-00114-one-name-per-role-and-what-the-module-count-actually-measures]]）：模块数是发布粒度，不是消费方的认知负担。**
+> report-00003 把 47 个 pom 对 2.8 万行称为过度碎片化、建议收敛到约 20。驳回：48 个按角色是
+> 13 后端 + 12 装配 + 12 契约 + 4 工具 + 4 打包束 + 3 engine，砍到 20 只有两条路——
+> 合并 jdbc/mybatis 后端（会让只用 JDBC 的应用背上 MyBatis-Plus，违反"自选恰好一个存储 starter"），
+> 或合并契约与装配（会让 Spring 进契约模块，而 `ContractModulesCarryNoFrameworkTest` 按字节码、
+> `ModuleNamingChecks` 按 pom 都会让构建失败）。两条都与本设计要守的东西直接冲突。
+> 计数所描述的问题由**打包束**解决：消费方加一个依赖，不必认识另外 47 个。
+> `ModuleNamingChecks` 已从正则改为 DOM 解析——注释掉的依赖不再被误报为违规。
+
+
 承接 [[plan-00014-adoption-threshold-and-architecture-simplification]] 的 C5（报告 P1-2）。发布 Maven
 archetype 之前是最后一个免费重命名窗口，所以规则必须现在定下来并**变成断言**，否则半年后必然再次漂移。
 

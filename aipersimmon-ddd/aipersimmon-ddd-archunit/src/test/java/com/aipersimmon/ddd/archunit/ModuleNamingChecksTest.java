@@ -50,6 +50,46 @@ class ModuleNamingChecksTest {
   }
 
   @Test
+  void aDependencySomeoneCommentedOutIsNotADependency(@TempDir Path root) throws IOException {
+    module(
+        root,
+        "aipersimmon-ddd-outbox",
+        "<!-- "
+            + dependency("org.springframework", "spring-context", null).replace("--", "- -")
+            + " -->");
+
+    // The check used to read the POM as text, where a commented-out block looks exactly like a
+    // live one. A rule that reports something the build does not actually do teaches people to
+    // stop believing it, which costs more than the rule was worth.
+    assertEquals(List.of(), ModuleNamingChecks.contractModulesNamingAFramework(root));
+  }
+
+  @Test
+  void aFrameworkVersionPinnedForOtherModulesIsNotADependencyEither(@TempDir Path root)
+      throws IOException {
+    Path dir = Files.createDirectories(root.resolve("aipersimmon-ddd-outbox"));
+    Files.writeString(
+        dir.resolve("pom.xml"),
+        """
+        <project>
+          <artifactId>aipersimmon-ddd-outbox</artifactId>
+          <dependencyManagement>
+            <dependencies>
+              <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-context</artifactId>
+                <version>6.2.15</version>
+              </dependency>
+            </dependencies>
+          </dependencyManagement>
+        </project>
+        """);
+
+    // dependencyManagement pins a version for whoever declares the dependency; it declares none.
+    assertEquals(List.of(), ModuleNamingChecks.contractModulesNamingAFramework(root));
+  }
+
+  @Test
   void aContractModuleNamingSpringIsAViolation(@TempDir Path root) throws IOException {
     module(
         root, "aipersimmon-ddd-outbox", dependency("org.springframework", "spring-context", null));
