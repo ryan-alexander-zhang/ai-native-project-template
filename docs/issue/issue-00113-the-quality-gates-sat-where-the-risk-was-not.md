@@ -69,6 +69,11 @@ mutation 从 78% → 86%，no-coverage 从 9 → 0。
 **仍在门外**：`runtime`（`DefaultProcessRuntime` 611 行）/ `replay` / `operation` / `autoconfigure`。
 `runtime` 需要第四个内存 store（transition）与幂等 claim 状态机，是下一块。
 
+> **后续（`issue-00117`）**：`runtime` 那一块已补完——第四个内存 store 落地，
+> `runtime` 0% → 100% line / 98.2% branch 并入门禁。那里还多学到一件事：
+> **能被回滚抹掉的冲突不是冲突**，所以两个 double 各加了一个"另一个已提交事务写下的"口子。
+> 现在门外只剩 `replay` / `operation` / `autoconfigure`。
+
 ### 契约模块无框架：按字节码查
 
 新增 `ContractModulesCarryNoFrameworkTest`（在 `-archunit` 测试树，不随包发布）：

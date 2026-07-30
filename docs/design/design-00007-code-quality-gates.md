@@ -61,6 +61,14 @@ parent:
 > （Spring 装配唯一有意义的测试是上下文真的起来，而两个后端已各自启动一个），
 > `-process-manager-engine` 跨四个 store 端口的那 1300 行**仍在门外并在 pom 里点名**，不是默默豁免。
 > 另：PIT 阈值在 engine 上是 85 而非 90，理由写在 pom 里——剩下的变异体杀掉只会抬高数字而不保护任何行为。
+>
+> **续（[[issue-00117-the-advance-itself-had-no-tests]]）**：上面那 1300 行里最大的一块——`runtime`
+> （每一次流转都要过的路）——已随第四个内存 store 补完，0% → 100% line / 98.2% branch 并入门禁。
+> 门外现在只剩 `replay` / `operation` / `autoconfigure`，外加**按名字排除的一个类**
+> `SpringTxProcessUnitOfWork`：六行转发给 Spring 的 `TransactionTemplate`，
+> 对着 mock 的事务管理器写的测试断言的是那个 mock 而不是 Spring 真正做的传播；
+> 它的行为在真的地方被覆盖（脚手架对 PostgreSQL/MySQL 的端到端测试）。
+> **这就是本设计"门禁跟着风险走"的完整形态**：排除项要具名、要给理由，而不是把整模块阈值调低到能过。
 
 ## 三、为什么覆盖率与变异只强制 domain 层
 
