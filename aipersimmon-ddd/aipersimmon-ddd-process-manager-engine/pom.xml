@@ -132,6 +132,8 @@
               <includes>
                 <include>com/aipersimmon/ddd/processmanager/engine/retry/**</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/observe/**</include>
+                <include>com/aipersimmon/ddd/processmanager/engine/relay/**</include>
+                <include>com/aipersimmon/ddd/processmanager/engine/deadline/**</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/store/ParkedInputs*</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/store/Payloads*</include>
               </includes>
