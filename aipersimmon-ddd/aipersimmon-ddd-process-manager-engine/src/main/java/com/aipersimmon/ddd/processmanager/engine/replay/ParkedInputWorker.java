@@ -93,7 +93,11 @@ public final class ParkedInputWorker {
   private int drain(ProcessInstanceId instanceId) {
     ProcessInstanceRow row = unitOfWork.execute(() -> instances.find(instanceId).orElse(null));
     if (row == null || !row.lifecycle().isActive()) {
-      return 0; // suspended or ended again between the scan and now; the debt stays recorded
+      // Ended (or archived) between the scan and now: it can no longer be advanced at all, so the
+      // debt stays recorded rather than being handed to a runtime that would only refuse it. A
+      // fresh *suspension* deliberately does not stop here — it is caught one layer down, by the
+      // replay itself, because only the runtime can tell whether the input was applied first.
+      return 0;
     }
     int replayed = 0;
     for (ParkedInput parked :

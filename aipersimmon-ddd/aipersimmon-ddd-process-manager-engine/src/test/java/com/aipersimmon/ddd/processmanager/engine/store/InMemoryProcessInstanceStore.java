@@ -246,6 +246,16 @@ public final class InMemoryProcessInstanceStore implements ProcessInstanceStore,
     return suspensionSources.get(instanceId.value());
   }
 
+  /** Replaces an instance's row wholesale, standing in for another actor changing it. */
+  public void put(ProcessInstanceRow row) {
+    rows.put(row.ref().instanceId().value(), row);
+  }
+
+  /** The same row with a different lifecycle, for a test that needs one changed mid-flight. */
+  public ProcessInstanceRow asLifecycle(ProcessInstanceId instanceId, ProcessLifecycle lifecycle) {
+    return withLifecycle(row(instanceId), lifecycle, Optional.empty(), null);
+  }
+
   public void touch(ProcessInstanceId instanceId, Instant at) {
     touchedAt.put(instanceId.value(), at);
   }

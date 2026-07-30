@@ -121,6 +121,14 @@ public final class InMemoryProcessTransitionStore implements ProcessTransitionSt
       return transitionKind;
     }
 
+    public Optional<String> operator() {
+      return operator;
+    }
+
+    public Optional<String> reason() {
+      return reason;
+    }
+
     public String correlationId() {
       return correlationId;
     }
@@ -392,6 +400,49 @@ public final class InMemoryProcessTransitionStore implements ProcessTransitionSt
         new DecisionCode("carried-on"),
         kind,
         "corr-1");
+  }
+
+  /**
+   * A parked-input row, as the runtime writes one when an input arrives at a suspended instance.
+   * Carries the tenant and correlation the replay has to be performed under, which is the whole
+   * reason the park row exists rather than a counter.
+   */
+  public ProcessTransitionInsert parked(
+      String transitionId,
+      ProcessInstanceId instanceId,
+      String inputMessageId,
+      String tenantId,
+      String correlationId) {
+    return parked(
+        transitionId, instanceId, inputMessageId, tenantId, correlationId, "sample.payload");
+  }
+
+  /**
+   * The same, for a payload whose logical type a test wants to choose (for example a retired one).
+   */
+  public ProcessTransitionInsert parked(
+      String transitionId,
+      ProcessInstanceId instanceId,
+      String inputMessageId,
+      String tenantId,
+      String correlationId,
+      String payloadType) {
+    ProcessStep step = new ProcessStep("awaiting-payment");
+    return new ProcessTransitionInsert(
+        tenantId,
+        transitionId,
+        instanceId,
+        inputMessageId,
+        payloadType,
+        1,
+        inputMessageId.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        Optional.of(ProcessLifecycle.SUSPENDED),
+        ProcessLifecycle.SUSPENDED,
+        Optional.of(step),
+        step,
+        new DecisionCode("parked"),
+        "PARKED",
+        correlationId);
   }
 
   /** All transition ids, in insertion order — for asserting that nothing extra was written. */
