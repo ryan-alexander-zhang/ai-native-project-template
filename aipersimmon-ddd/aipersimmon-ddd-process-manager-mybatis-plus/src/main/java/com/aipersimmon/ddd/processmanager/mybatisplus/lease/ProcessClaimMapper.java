@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.mybatisplus.lease;
 
+import com.aipersimmon.ddd.processmanager.engine.lease.ProcessClaimSql;
 import java.sql.Timestamp;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
@@ -8,26 +9,18 @@ import org.apache.ibatis.annotations.Update;
 
 /**
  * Claim SQL for effects and deadlines, in a {@code SKIP LOCKED} variant (PostgreSQL/MySQL) and a
- * plain-candidate + atomic-conditional-{@code UPDATE} variant (H2). The candidate predicates and
- * per-instance head-of-line ordering are identical to {@code JdbcProcessDialect.CANDIDATE_SQL} /
- * {@code DEADLINE_CANDIDATE_SQL}; only the concurrency mechanism differs.
+ * plain-candidate + atomic-conditional-{@code UPDATE} variant (H2).
+ *
+ * <p>Which rows are claimable, and in what order, comes from {@link ProcessClaimSql} — the same
+ * constants the JDBC backend uses. Only the concurrency mechanism and the {@code LIMIT} differ, and
+ * those are all that should ever be appended here.
  */
 public interface ProcessClaimMapper {
 
-  @Select(
-      "SELECT e.effect_id FROM aipersimmon_process_effect e WHERE ((e.status = 'PENDING' AND"
-          + " e.next_attempt_at <= #{now}) OR (e.status = 'IN_FLIGHT' AND e.lease_until <="
-          + " #{now})) AND NOT EXISTS ( SELECT 1 FROM aipersimmon_process_effect b WHERE"
-          + " b.instance_id = e.instance_id AND b.status <> 'DELIVERED' AND b.seq < e.seq) ORDER BY"
-          + " e.seq LIMIT #{limit} FOR UPDATE SKIP LOCKED")
+  @Select(ProcessClaimSql.EFFECT_CANDIDATE + " LIMIT #{limit} FOR UPDATE SKIP LOCKED")
   List<String> candidateEffectsSkipLocked(@Param("now") Timestamp now, @Param("limit") int limit);
 
-  @Select(
-      "SELECT e.effect_id FROM aipersimmon_process_effect e WHERE ((e.status = 'PENDING' AND"
-          + " e.next_attempt_at <= #{now}) OR (e.status = 'IN_FLIGHT' AND e.lease_until <="
-          + " #{now})) AND NOT EXISTS ( SELECT 1 FROM aipersimmon_process_effect b WHERE"
-          + " b.instance_id = e.instance_id AND b.status <> 'DELIVERED' AND b.seq < e.seq) ORDER BY"
-          + " e.seq LIMIT #{limit}")
+  @Select(ProcessClaimSql.EFFECT_CANDIDATE + " LIMIT #{limit}")
   List<String> candidateEffects(@Param("now") Timestamp now, @Param("limit") int limit);
 
   @Update(
@@ -53,19 +46,10 @@ public interface ProcessClaimMapper {
       @Param("until") Timestamp until,
       @Param("now") Timestamp now);
 
-  @Select(
-      "SELECT d.deadline_id FROM aipersimmon_process_deadline d JOIN aipersimmon_process_instance"
-          + " i ON i.instance_id = d.instance_id WHERE ((d.status = 'PENDING' AND d.next_attempt_at"
-          + " <= #{now}) OR (d.status = 'IN_FLIGHT' AND d.lease_until <= #{now})) AND i.lifecycle"
-          + " IN ('RUNNING', 'COMPENSATING') ORDER BY d.due_at LIMIT #{limit} FOR UPDATE OF d SKIP"
-          + " LOCKED")
+  @Select(ProcessClaimSql.DEADLINE_CANDIDATE + " LIMIT #{limit} FOR UPDATE OF d SKIP LOCKED")
   List<String> candidateDeadlinesSkipLocked(@Param("now") Timestamp now, @Param("limit") int limit);
 
-  @Select(
-      "SELECT d.deadline_id FROM aipersimmon_process_deadline d JOIN aipersimmon_process_instance"
-          + " i ON i.instance_id = d.instance_id WHERE ((d.status = 'PENDING' AND d.next_attempt_at"
-          + " <= #{now}) OR (d.status = 'IN_FLIGHT' AND d.lease_until <= #{now})) AND i.lifecycle"
-          + " IN ('RUNNING', 'COMPENSATING') ORDER BY d.due_at LIMIT #{limit}")
+  @Select(ProcessClaimSql.DEADLINE_CANDIDATE + " LIMIT #{limit}")
   List<String> candidateDeadlines(@Param("now") Timestamp now, @Param("limit") int limit);
 
   @Update(

@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.jdbc.lease;
 
+import com.aipersimmon.ddd.processmanager.engine.lease.ProcessClaimSql;
 import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
 import java.time.Instant;
 import java.util.List;
@@ -27,7 +28,9 @@ public interface JdbcProcessDialect {
    * Claim up to {@code limit} due, unblocked effects, marking each {@code IN_FLIGHT} with the given
    * lease. Must run inside a transaction.
    *
-   * @return the claimed effect ids, in dispatch order (per-instance {@code seq})
+   * @return the claimed effect ids, longest-due first. Per-instance order needs no defending here:
+   *     the head-of-line predicate admits at most one effect per instance, so a batch never holds
+   *     two of the same instance's effects to put in the wrong order.
    */
   List<String> claimDueEffects(
       JdbcTemplate jdbc,
@@ -43,7 +46,7 @@ public interface JdbcProcessDialect {
    * which takes the instance lock, so concurrent fires on one instance serialize there. Must run
    * inside a transaction.
    *
-   * @return the claimed deadline ids, earliest {@code due_at} first
+   * @return the claimed deadline ids, earliest {@code due_at} first, ties broken by id
    */
   List<String> claimDueDeadlines(
       JdbcTemplate jdbc,
@@ -54,35 +57,15 @@ public interface JdbcProcessDialect {
       Instant leaseUntil);
 
   /**
-   * The claimable-and-unblocked candidate query, shared by all dialects. Two positional parameters,
-   * both {@code now}: the {@code PENDING} due bound and the stale-lease bound. Ordered by the
-   * per-instance monotonic {@code seq} so the head comes first, and an effect is blocked by any
-   * earlier-{@code seq}, not-yet-delivered effect on the same instance — a durable key, not the
-   * wall-clock {@code created_at}.
+   * The claimable-and-unblocked candidate query, in JDBC placeholder form. Two positional
+   * parameters, both {@code now}. See {@link ProcessClaimSql#EFFECT_CANDIDATE} for what it says and
+   * why it is spelled the way it is.
    */
-  String CANDIDATE_SQL =
-      """
-            SELECT e.effect_id FROM aipersimmon_process_effect e
-            WHERE ((e.status = 'PENDING' AND e.next_attempt_at <= ?)
-                   OR (e.status = 'IN_FLIGHT' AND e.lease_until <= ?))
-              AND NOT EXISTS (
-                  SELECT 1 FROM aipersimmon_process_effect b
-                  WHERE b.instance_id = e.instance_id
-                    AND b.status <> 'DELIVERED'
-                    AND b.seq < e.seq)
-            ORDER BY e.seq""";
+  String CANDIDATE_SQL = ProcessClaimSql.positional(ProcessClaimSql.EFFECT_CANDIDATE);
 
   /**
-   * The due-deadline candidate query, shared by all dialects. Two positional {@code now} params.
-   * Only deadlines of active instances are claimable — a suspended or ended instance's deadlines
-   * are skipped and become candidates again after it resumes.
+   * The due-deadline candidate query, in JDBC placeholder form. Two positional {@code now} params.
+   * See {@link ProcessClaimSql#DEADLINE_CANDIDATE}.
    */
-  String DEADLINE_CANDIDATE_SQL =
-      """
-            SELECT d.deadline_id FROM aipersimmon_process_deadline d
-            JOIN aipersimmon_process_instance i ON i.instance_id = d.instance_id
-            WHERE ((d.status = 'PENDING' AND d.next_attempt_at <= ?)
-                   OR (d.status = 'IN_FLIGHT' AND d.lease_until <= ?))
-              AND i.lifecycle IN ('RUNNING', 'COMPENSATING')
-            ORDER BY d.due_at""";
+  String DEADLINE_CANDIDATE_SQL = ProcessClaimSql.positional(ProcessClaimSql.DEADLINE_CANDIDATE);
 }
