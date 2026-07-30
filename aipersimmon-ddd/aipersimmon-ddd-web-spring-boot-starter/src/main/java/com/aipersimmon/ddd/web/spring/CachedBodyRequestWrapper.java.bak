@@ -32,10 +32,8 @@ class CachedBodyRequestWrapper extends HttpServletRequestWrapper {
     private final int limit;
 
     BodyTooLargeException(int limit) {
-      super(
-          "Request body exceeds the configured replay-protection buffer limit of "
-              + limit
-              + " bytes");
+      super("Request body exceeds the configured replay-protection buffer limit of " + limit
+          + " bytes");
       this.limit = limit;
     }
 

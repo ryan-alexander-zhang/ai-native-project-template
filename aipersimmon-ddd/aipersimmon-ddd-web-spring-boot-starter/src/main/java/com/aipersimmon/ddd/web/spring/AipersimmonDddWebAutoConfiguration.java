@@ -253,10 +253,17 @@ public class AipersimmonDddWebAutoConfiguration {
             config.getSignatureHeader(),
             config.getTimestampHeader(),
             config.getNonce().isEnabled(),
-            config.getNonce().getHeader());
+            config.getNonce().getHeader(),
+            (int) Math.min(Integer.MAX_VALUE, config.getMaxBodySize().toBytes()));
     FilterRegistrationBean<ReplayProtectionFilter> registration =
         new FilterRegistrationBean<>(filter);
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 30);
+    // Left unset, a FilterRegistrationBean maps to /*. Naming patterns hands the matching to the
+    // container, which matches on the path it dispatches on — so there is no second opinion about
+    // what a path means for this filter to disagree with.
+    if (!config.getUrlPatterns().isEmpty()) {
+      registration.setUrlPatterns(config.getUrlPatterns());
+    }
     return registration;
   }
 

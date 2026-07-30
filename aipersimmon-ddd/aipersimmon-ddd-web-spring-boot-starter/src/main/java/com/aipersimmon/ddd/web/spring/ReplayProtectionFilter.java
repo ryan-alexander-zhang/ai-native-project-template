@@ -32,6 +32,7 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
   private final String timestampHeader;
   private final boolean nonceEnabled;
   private final String nonceHeader;
+  private final int maxBodyBytes;
 
   public ReplayProtectionFilter(
       RequestSignatureVerifier verifier,
@@ -42,7 +43,8 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
       String signatureHeader,
       String timestampHeader,
       boolean nonceEnabled,
-      String nonceHeader) {
+      String nonceHeader,
+      int maxBodyBytes) {
     this.verifier = verifier;
     this.replayGuard = replayGuard;
     this.problemWriter = problemWriter;
@@ -52,6 +54,7 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
     this.timestampHeader = timestampHeader;
     this.nonceEnabled = nonceEnabled;
     this.nonceHeader = nonceHeader;
+    this.maxBodyBytes = maxBodyBytes;
   }
 
   @Override
@@ -59,29 +62,32 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     String signature = request.getHeader(signatureHeader);
-    String timestampRaw = request.getHeader(timestampHeader);
-    if (isBlank(signature) || isBlank(timestampRaw)) {
-      reject(response, "Missing signature or timestamp");
-      return;
-    }
-
-    Instant timestamp = parseEpochSecond(timestampRaw);
-    if (timestamp == null) {
-      reject(response, "Malformed timestamp");
-      return;
-    }
-    if (isStale(timestamp)) {
-      reject(response, "Request timestamp outside tolerance");
-      return;
-    }
-
     String nonce = nonceEnabled ? request.getHeader(nonceHeader) : null;
-    if (nonceEnabled && isBlank(nonce)) {
-      reject(response, "Missing nonce");
+    String headerRejection = checkHeaders(signature, request.getHeader(timestampHeader), nonce);
+    if (headerRejection != null) {
+      reject(response, headerRejection);
+      return;
+    }
+    Instant timestamp = parseEpochSecond(request.getHeader(timestampHeader));
+
+    // Everything above is a header check, and none of it establishes who is calling — a current
+    // timestamp and a non-empty signature header cost an attacker nothing. Buffering the body is
+    // the first expensive thing this filter does, and the signature cannot be checked until it is
+    // done, so the cap is what stands between an anonymous caller and an allocation of their
+    // choosing.
+    CachedBodyRequestWrapper cached;
+    try {
+      cached = new CachedBodyRequestWrapper(request, maxBodyBytes);
+    } catch (CachedBodyRequestWrapper.BodyTooLargeException tooLarge) {
+      problemWriter.write(
+          response,
+          HttpStatus.PAYLOAD_TOO_LARGE,
+          "/problems/request-too-large",
+          "Request body exceeds " + tooLarge.limit() + " bytes",
+          Map.of());
       return;
     }
 
-    CachedBodyRequestWrapper cached = new CachedBodyRequestWrapper(request);
     String authRejection = verifyAuthenticity(signature, timestamp, nonce, cached);
     if (authRejection != null) {
       reject(response, authRejection);
@@ -89,6 +95,27 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(cached, response);
+  }
+
+  /**
+   * The checks that can be made from headers alone. Returns a rejection reason, or {@code null} if
+   * the request is worth reading a body for.
+   */
+  private String checkHeaders(String signature, String timestampRaw, String nonce) {
+    if (isBlank(signature) || isBlank(timestampRaw)) {
+      return "Missing signature or timestamp";
+    }
+    Instant timestamp = parseEpochSecond(timestampRaw);
+    if (timestamp == null) {
+      return "Malformed timestamp";
+    }
+    if (isStale(timestamp)) {
+      return "Request timestamp outside tolerance";
+    }
+    if (nonceEnabled && isBlank(nonce)) {
+      return "Missing nonce";
+    }
+    return null;
   }
 
   /** The epoch-second timestamp, or {@code null} if it is not a parseable number. */

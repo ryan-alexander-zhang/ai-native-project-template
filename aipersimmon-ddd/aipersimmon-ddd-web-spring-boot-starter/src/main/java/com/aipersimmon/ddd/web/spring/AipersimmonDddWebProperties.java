@@ -1,8 +1,10 @@
 package com.aipersimmon.ddd.web.spring;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
 
 /**
  * Configuration for the web layer, under {@code aipersimmon.ddd.web}. The zero-risk concerns
@@ -205,7 +207,45 @@ public class AipersimmonDddWebProperties {
     /** Header carrying the request timestamp (epoch seconds). */
     private String timestampHeader = "X-Timestamp";
 
+    /**
+     * Largest request body this filter will buffer before rejecting with 413.
+     *
+     * <p>A signature is computed over the body, so the body must be held in memory before the
+     * request can be shown to be authentic — an unbounded buffer therefore lets an unauthenticated
+     * caller pick the allocation. Raise it only to the largest signed request the application
+     * actually accepts.
+     */
+    private DataSize maxBodySize = DataSize.ofMegabytes(1);
+
+    /**
+     * Servlet URL patterns the filter is registered for. Empty (the default) means every request,
+     * which is the safe reading of "requests must be signed" but also refuses unsigned traffic the
+     * application still needs to serve — a liveness probe, say.
+     *
+     * <p>These are servlet patterns ({@code /api/*}, {@code *.json}, or an exact path), not Ant
+     * patterns: the container does the matching, on the path it will actually dispatch on. That is
+     * narrower than {@code /api/**} but it removes a whole class of mistake, since a pattern this
+     * code matched itself could disagree with the path the container later resolves.
+     */
+    private List<String> urlPatterns = new ArrayList<>();
+
     private final Nonce nonce = new Nonce();
+
+    public DataSize getMaxBodySize() {
+      return maxBodySize;
+    }
+
+    public void setMaxBodySize(DataSize maxBodySize) {
+      this.maxBodySize = maxBodySize;
+    }
+
+    public List<String> getUrlPatterns() {
+      return urlPatterns;
+    }
+
+    public void setUrlPatterns(List<String> urlPatterns) {
+      this.urlPatterns = urlPatterns;
+    }
 
     public boolean isEnabled() {
       return enabled;

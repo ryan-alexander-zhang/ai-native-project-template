@@ -106,6 +106,8 @@ bodies of identical length and type against the same endpoint are not.
 | `replay.signature-header` / `replay.timestamp-header` | `X-Signature` / `X-Timestamp` | Where they are read from. |
 | `replay.nonce.enabled` | `false` | Also require a single-use nonce — signature plus timestamp alone allow replay inside the tolerance window. |
 | `replay.nonce.header` | `X-Nonce` | Where the nonce is read from. |
+| `replay.max-body-size` | `1MB` | Largest body buffered before answering `413`. A signature covers the body, so the body must be held in memory *before* the request is known to be authentic — raise this only to the largest signed request you actually accept. |
+| `replay.url-patterns` | (empty) | Servlet URL patterns the filter applies to; empty means every request. Set it when unsigned traffic still has to be served — a liveness probe, say. Servlet patterns (`/api/*`, `*.json`, an exact path), not Ant patterns: the container matches, on the path it will really dispatch on. |
 
 ### Rate limiting (off by default)
 
@@ -120,6 +122,22 @@ bodies of identical length and type against the same endpoint are not.
 > Enabling any of the three without a `-web-store-jdbc` / `-web-store-redis` module (or your own store
 > bean) means an in-memory store: state per JVM, so a second instance stops honouring the protection.
 > Startup WARNs, naming what breaks. `allow-in-memory-stores=false` turns that into a failure.
+
+### Web-store cleanup (`-web-store-jdbc` only; on by default)
+
+The three tables each delete expired rows only for the key in front of them, and only when that key
+is presented again — which for an idempotency key or a nonce is nearly never. This sweep is what
+removes the rest. The Redis store expires keys itself and has no equivalent.
+
+| Property | Default | Effect |
+| --- | --- | --- |
+| `store.cleanup.enabled` | `true` | Sweeps expired rows periodically. Off means the three tables grow without bound. |
+| `store.cleanup.poll-delay` | `1h` | Time between sweeps. |
+| `store.cleanup.rate-limit-retention` | `24h` | How long a rate-limit counter is kept after its window began. **Must exceed the longest `rate-limit.window` in use** — the row does not record which policy it counted for. Setting it too short resets a bucket's quota rather than failing a request. |
+
+> On by default, unlike the process manager's retention, and the difference is deliberate: there the
+> rows are business records and how long to keep them is your decision, whereas `expires_at` here is
+> the store's own statement that the row is dead.
 
 ## `aipersimmon.ddd.tenancy` — multi-tenancy
 

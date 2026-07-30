@@ -9,7 +9,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -26,6 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @AutoConfiguration(
     after = JdbcTemplateAutoConfiguration.class,
     beforeName = "com.aipersimmon.ddd.web.spring.AipersimmonDddWebAutoConfiguration")
+@EnableConfigurationProperties(WebStoreCleanupProperties.class)
 public class AipersimmonDddWebStoreJdbcAutoConfiguration {
 
   @Bean
@@ -57,5 +60,32 @@ public class AipersimmonDddWebStoreJdbcAutoConfiguration {
   @ConditionalOnMissingBean(RateLimiter.class)
   public RateLimiter jdbcRateLimiter(JdbcTemplate jdbc, Clock aipersimmonDddWebStoreClock) {
     return new JdbcRateLimiter(jdbc, aipersimmonDddWebStoreClock);
+  }
+
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean(JdbcWebStoreCleanup.class)
+  public JdbcWebStoreCleanup jdbcWebStoreCleanup(
+      JdbcTemplate jdbc, Clock aipersimmonDddWebStoreClock, WebStoreCleanupProperties properties) {
+    return new JdbcWebStoreCleanup(
+        jdbc, aipersimmonDddWebStoreClock, properties.getRateLimitRetention());
+  }
+
+  /**
+   * Registered unless switched off. The three tables only ever delete the key in front of them, so
+   * without this nothing removes a row whose key is never presented again — which is nearly all of
+   * them.
+   */
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean(WebStoreCleanupScheduler.class)
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.web.store.cleanup",
+      name = "enabled",
+      havingValue = "true",
+      matchIfMissing = true)
+  public WebStoreCleanupScheduler webStoreCleanupScheduler(
+      JdbcWebStoreCleanup cleanup, WebStoreCleanupProperties properties) {
+    return new WebStoreCleanupScheduler(cleanup, properties.getPollDelay());
   }
 }

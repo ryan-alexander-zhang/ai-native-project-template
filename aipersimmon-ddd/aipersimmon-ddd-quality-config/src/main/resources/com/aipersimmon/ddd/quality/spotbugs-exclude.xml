@@ -103,6 +103,8 @@
       <Class name="com.aipersimmon.ddd.web.spring.ReplayProtectionFilter"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcIdempotencyStore"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcRateLimiter"/>
+      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcWebStoreCleanup"/>
+      <Class name="com.aipersimmon.ddd.web.store.jdbc.WebStoreCleanupScheduler"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcReplayGuard"/>
       <Class name="com.aipersimmon.ddd.web.store.redis.RedisIdempotencyStore"/>
       <Class name="com.aipersimmon.ddd.web.store.redis.RedisRateLimiter"/>
