@@ -109,14 +109,22 @@
     not. This module holds the framework's most consequential decisions and had no tests at all,
     while the pure value-type modules had a 90% gate — the gates sat where the risk was not.
 
-    What is gated: the retry schedule, the backlog reads, and the persisted conventions. These are
-    pure functions and a few aggregate reads, so they need nothing but a clock and a stub.
+    What is gated: the retry schedule, the backlog reads, the persisted conventions, the effect
+    relay, the deadline worker, and the runtime — the advance itself, its write side, and the
+    operator read side. The four store ports have in-memory implementations under
+    src/test/java/.../engine/store that keep the refusals the engine's guarantees are built on
+    (lease fencing, the revision guard, the (instance, input) dedup key), so these are tests of
+    the engine's decisions rather than of stubs that always say yes.
 
-    What is NOT yet gated, deliberately and not silently: `runtime`, `relay`, `deadline`,
-    `replay`, `operation` and `autoconfigure` — about 1,300 lines whose reasoning runs over four
-    store ports at once (instance, transition, effect, deadline), and testing it means an
-    in-memory implementation of all four that honours their claim semantics, not stubs. That is
-    worth doing and is the remaining half of this work; naming it here is better than a
+    One class inside `runtime` is excluded by name: SpringTxProcessUnitOfWork is six lines
+    delegating to Spring's TransactionTemplate, and a test over a mock PlatformTransactionManager
+    would assert the mock rather than the propagation Spring performs. Its behaviour is covered
+    where it is real — the scaffold's end-to-end tests against PostgreSQL and MySQL.
+
+    What is NOT gated, deliberately and not silently: `replay`, `operation` and `autoconfigure`
+    — the parked-input drain, the operator facade, and the Spring wiring. The first two now have
+    every store double they need and are the next block; `autoconfigure` wants a Spring context
+    test, which is a different kind of test from these. Naming them here is better than a
     whole-module threshold set low enough to pass, which would read as coverage rather than as a
     gap.
   -->
@@ -138,9 +146,15 @@
                 <include>com/aipersimmon/ddd/processmanager/engine/observe/**</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/relay/**</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/deadline/**</include>
+                <include>com/aipersimmon/ddd/processmanager/engine/runtime/**</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/store/ParkedInputs*</include>
                 <include>com/aipersimmon/ddd/processmanager/engine/store/Payloads*</include>
               </includes>
+              <excludes>
+                <exclude>
+                  com/aipersimmon/ddd/processmanager/engine/runtime/SpringTxProcessUnitOfWork*
+                </exclude>
+              </excludes>
               <rules>
                 <rule>
                   <element>BUNDLE</element>

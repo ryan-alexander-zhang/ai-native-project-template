@@ -197,8 +197,17 @@ public final class InMemoryProcessInstanceStore implements ProcessInstanceStore,
   @Override
   public void restore(Object snapshot) {
     Saved saved = (Saved) snapshot;
+    Map<String, ProcessInstanceRow> survivors = new LinkedHashMap<>();
+    committedElsewhere.forEach(
+        id -> {
+          ProcessInstanceRow row = rows.get(id);
+          if (row != null) {
+            survivors.put(id, row);
+          }
+        });
     rows.clear();
     rows.putAll(saved.rows());
+    rows.putAll(survivors);
     touchedAt.clear();
     touchedAt.putAll(saved.touchedAt());
     suspensionSources.clear();
@@ -239,5 +248,43 @@ public final class InMemoryProcessInstanceStore implements ProcessInstanceStore,
 
   public void touch(ProcessInstanceId instanceId, Instant at) {
     touchedAt.put(instanceId.value(), at);
+  }
+
+  private final java.util.Set<String> committedElsewhere = new java.util.HashSet<>();
+
+  /**
+   * Advance an instance's snapshot on behalf of another transaction that has already committed, so
+   * this transaction's rollback leaves the new revision standing.
+   *
+   * <p>Without it a lost revision race cannot be posed: an in-memory rollback would take the
+   * winner's write back out along with the loser's, so the retry would re-read the very revision it
+   * started from and succeed — the optimistic guard would look exercised while never actually being
+   * contended. What survives a rollback is exactly what another transaction committed.
+   *
+   * @return the revision the instance now carries
+   */
+  public ProcessRevision advancedElsewhere(ProcessInstanceId instanceId, Instant now) {
+    ProcessInstanceRow current = row(instanceId);
+    ProcessRevision next = current.revision().next();
+    rows.put(instanceId.value(), withRevision(current, next));
+    touchedAt.put(instanceId.value(), now);
+    committedElsewhere.add(instanceId.value());
+    return next;
+  }
+
+  private static ProcessInstanceRow withRevision(ProcessInstanceRow row, ProcessRevision revision) {
+    return new ProcessInstanceRow(
+        row.tenantId(),
+        row.ref(),
+        row.definitionVersion(),
+        row.stateSchemaVersion(),
+        row.lifecycle(),
+        row.step(),
+        row.outcome(),
+        revision,
+        row.statePayloadType(),
+        row.statePayload(),
+        row.resumeLifecycle(),
+        row.suspensionReason());
   }
 }
