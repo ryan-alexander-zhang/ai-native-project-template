@@ -88,8 +88,11 @@ public class AipersimmonDddCqrsAutoConfiguration {
       ObjectProvider<CommandHandler<?, ?>> handlers,
       ObjectProvider<CommandInterceptor> interceptors,
       IdGenerator idGenerator) {
+    // Suppliers, not resolved lists: reading the providers here would instantiate every handler
+    // while this bean is still being created, and a handler that takes the bus in its constructor
+    // would then be handed a half-built one. The bus reads them once the context is complete.
     return new RegistryCommandBus(
-        handlers.stream().toList(), interceptors.stream().toList(), idGenerator::newId);
+        () -> handlers.stream().toList(), () -> interceptors.stream().toList(), idGenerator::newId);
   }
 
   @Bean
