@@ -134,8 +134,18 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   承载 writer/relay/调度/清理与共享装配，两个后端只剩 `OutboxStore` 适配器 + 死信 + ShedLock provider
   （各约 90 行）。被收拢的正是那三条来自独立 issue 的判断（按聚合顺序、mark-sent 不计重试预算、
   死信搬移失败不计尝试）。**未消除**的一处重复已写在端口 javadoc 上：`findDue` 的顺序谓词仍是两份 SQL。
-- BOM 继承 parent → Maven 解析被 import BOM 的**有效模型**，Spring Boot 3.5.10 等全部 pin 泄漏给消费方
-  并压过对方选的 Boot 版本。BOM 自己特意重声明 springdoc/OTel"以便对齐"，说明作者以为其余不传播——但会传播。
+- ~~BOM 继承 parent~~ → **已修** `issue-00112`：去掉 `<parent>`，被管理坐标 **1626 → 72**（probe 工程实测）。
+  留下的三处第三方再导出有明确判据——**本库自己的代码在别的版本上就是不工作**（OTel core 线不对则 starter
+  启动即 `NoClassDefFoundError`；springdoc/swagger 无人管理且注解 jar 是 `provided` 不传递）——
+  与"Jackson 恰好是 2.19.4"性质不同。代价是四个版本号写两遍，用 `BomExportsOnlyItsOwnModulesTest`
+  三条断言锁住（无 parent、白名单外无第三方坐标、字面量与 parent 属性一致）。
+  消费方零改动：脚手架本就自己 import Boot/MP 的 BOM，那条"aipersimmon BOM 排在 Boot BOM 之前"的注释
+  现在**只**为 OTel 服务，不再顺带决定 1600 个坐标的归属。
+  **本报告这条的受害者判断需要更正**：不是"压过对方选的 Boot 版本"泛指所有消费方——Maven 里继承来的
+  dependencyManagement 优先于 import 的 BOM，所以用 `spring-boot-starter-parent` 的应用从未受影响；
+  真正被压掉的是**靠 import BOM 管版本**的应用（先 import 者赢，而本库要求自己排在 Boot BOM 之前），
+  也就是本库推荐、脚手架采用的那种装配。实测见 issue。
+  顺带修了 README 快速上手：那段示例的 `mybatis-plus-spring-boot3-starter` 没写版本号，靠的正是这次堵掉的泄漏。
 - `process-manager-engine` 4567 行零直接测试，且在所有覆盖率门禁之外（JaCoCo/PIT 只覆盖 6 个纯净层模块）。
   门禁分布与风险分布正好相反。
 - core 内部违反自己的"一个概念一个名字"：`core.annotation.DomainEvent` vs `core.event.DomainEvent`、
@@ -176,7 +186,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
    从概率事件变成常态，这一项因此更紧要)
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）（`issue-00110`，**已完成**；无新配置项）
 10. ~~流水线化 Kafka 腿~~ **（已完成，`issue-00111`）**——落地时否掉了「按序等 + fail-fast」这个前提已变的要求；顺带修掉 DLT 固定分区号
-11. BOM 去 parent，只管理 `com.aipersimmon.ddd:*` 与刻意再导出的坐标
+11. ~~BOM 去 parent~~ **（已完成，`issue-00112`）**——1626 → 72 条；再导出的判据定为「本库在别的版本上不工作」
 12. 测试门禁反转：两个 engine 补内存 store 单测 + JaCoCo；加 reactor 级 ArchUnit 用字节码强制契约模块无框架依赖
 13. core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20
 

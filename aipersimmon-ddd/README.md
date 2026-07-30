@@ -26,10 +26,22 @@ working service is in [../aipersimmon-ddd-scaffold/multi-module](../aipersimmon-
 ```xml
 <dependencyManagement>
   <dependencies>
+    <!-- Import first: this BOM carries the OpenTelemetry core line the optional
+         observability starter needs, which Spring Boot manages to an older one.
+         It manages nothing else of anyone else's — see "What this BOM does not do" below. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-bom</artifactId>
       <version>0.1.0-SNAPSHOT</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+    <!-- MyBatis-Plus is your choice of persistence, not ours: neither Spring Boot nor
+         this BOM versions it. Import its BOM (or pin the version) yourself. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-bom</artifactId>
+      <version>3.5.15</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
@@ -47,6 +59,15 @@ working service is in [../aipersimmon-ddd-scaffold/multi-module](../aipersimmon-
   </dependency>
 </dependencies>
 ```
+
+> **What this BOM does not do: choose your Spring Boot version.** It manages the
+> `com.aipersimmon.ddd` modules and three coordinates this library does not work without (the
+> OpenTelemetry core line, and the two OpenAPI artifacts nothing else manages) — 72 entries in
+> total. It deliberately has no parent POM, because an imported BOM contributes its *effective*
+> model: while it inherited one, importing it brought 1626 managed coordinates along. Since it has
+> to be imported *before* `spring-boot-dependencies` and the first import wins, that silently
+> overruled your own Spring Boot version — in precisely the arrangement above. Bring your own
+> `spring-boot-dependencies`; this BOM will not argue with it.
 
 That is CQRS, in-process events, time-ordered UUIDv7 ids, RFC 9457 error responses, version-checked
 aggregate repositories, a transactional outbox, a consumer inbox, the durable process manager, the
