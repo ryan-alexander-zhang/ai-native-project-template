@@ -8,8 +8,6 @@ import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.TenantId;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.ordering.application.fulfilment.OrderFulfilmentProcess;
 import org.springframework.stereotype.Component;
 
@@ -119,10 +117,14 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
    * A fresh context for a domain fact that arrives without an inbound message, keyed by the order
    * id but stamped with the ambient tenant so the process instance is created — and every
    * tenant-scoped advance thereafter is found — under the tenant whose command raised the fact.
-   * Falls to the {@code __root__} sentinel only when no tenant is bound (single-tenant N=1).
+   *
+   * <p>{@code effective()}, not {@code current().orElse(ROOT)}: what an unbound thread means is a
+   * deployment-wide decision {@code TenantContext} already makes from the tenancy mode. Re-deciding
+   * it here would be worse than one mislabelled row — the tenant stamped now is the one every later
+   * advance looks the instance up under, so a flow started under the sentinel is a flow the real
+   * tenant can never advance again.
    */
   private static CommandContext factContext(String fact, String orderId) {
-    String tenant = TenantContext.current().map(TenantId::value).orElse(Tenants.ROOT.value());
-    return CommandContext.root(tenant, fact + ":" + orderId);
+    return CommandContext.root(TenantContext.effective().value(), fact + ":" + orderId);
   }
 }

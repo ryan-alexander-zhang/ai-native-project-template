@@ -1,7 +1,6 @@
 package com.example.payment.infrastructure;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.payment.application.PaymentOperations;
 import com.example.payment.domain.PaymentDecision;
 import java.util.Optional;
@@ -70,11 +69,15 @@ public class MyBatisPaymentOperations implements PaymentOperations {
   }
 
   /**
-   * The bound tenant, or the {@code __root__} sentinel when nothing is bound — which is what the
-   * command bus itself falls back to, so a bus-dispatched authorization lands under the same tenant
-   * its order did.
+   * The tenant this row belongs to.
+   *
+   * <p>{@code effective()}, not {@code current().orElse(ROOT)}. What to do when nothing is bound is
+   * a deployment-wide decision that {@code TenantContext} already makes from the tenancy mode — the
+   * sentinel at N=1, a refusal when multi-tenancy is on. Deciding it again here means this one
+   * write silently lands in the shared bucket on a thread that lost its binding, while every other
+   * tenant-scoped write in the application refuses.
    */
   private static String tenant() {
-    return TenantContext.current().orElse(Tenants.ROOT).value();
+    return TenantContext.effective().value();
   }
 }
