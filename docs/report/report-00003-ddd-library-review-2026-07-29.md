@@ -146,8 +146,18 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   真正被压掉的是**靠 import BOM 管版本**的应用（先 import 者赢，而本库要求自己排在 Boot BOM 之前），
   也就是本库推荐、脚手架采用的那种装配。实测见 issue。
   顺带修了 README 快速上手：那段示例的 `mybatis-plus-spring-boot3-starter` 没写版本号，靠的正是这次堵掉的泄漏。
-- `process-manager-engine` 4567 行零直接测试，且在所有覆盖率门禁之外（JaCoCo/PIT 只覆盖 6 个纯净层模块）。
-  门禁分布与风险分布正好相反。
+- ~~两个 engine 零直接测试且在所有门禁之外~~ → **部分已修** `issue-00113`：
+  `-outbox-engine` 补内存 store + 39 例 + 门禁（运行期包 90% line / 80% branch + PIT）；
+  `-process-manager-engine` 补 24 例（重试排期 / 积压读 / 持久化约定）+ 同级门禁。
+  **PIT 立刻赚回成本**：第一次跑就找出三条行覆盖率称为"已覆盖"的未测路径，其中一条是第 10 项几天前刚写的。
+  PIT 阈值定 85 而非 90 并在 pom 写明理由——剩下的变异体是日志守卫、延迟算术、换条路径落到同一处的私有 helper，
+  为杀它们写的断言抬高数字而什么也不保护。
+  **仍未覆盖且已在 pom 里点名**：`-process-manager-engine` 的 store 支撑部分约 1300 行
+  （推理同时跨四个 store 端口，需要四个 honor claim 语义的内存实现）——这是本项剩下的一半。
+- ~~库自称契约模块无框架依赖，但无人检查~~ → **已修** `issue-00113`：
+  `ContractModulesCarryNoFrameworkTest` 按**字节码**跨 reactor 检查 11 个契约模块
+  （pom 说声明了什么，字节码说实际够到了什么，落到消费方 classpath 上的是后者）。
+  用白名单而非禁用名单，且第二条断言防"空规则恒真"。
 - core 内部违反自己的"一个概念一个名字"：`core.annotation.DomainEvent` vs `core.event.DomainEvent`、
   `annotation.AggregateRoot` vs `model.AggregateRoot`——同名双词汇表，混用即需全限定名，ArchUnit 追两套。
 - 6 个模块编译依赖 `aipersimmon-ddd-id-spring-boot-starter` 却零 import，只为把 JUG 拖上 classpath；
@@ -187,7 +197,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）（`issue-00110`，**已完成**；无新配置项）
 10. ~~流水线化 Kafka 腿~~ **（已完成，`issue-00111`）**——落地时否掉了「按序等 + fail-fast」这个前提已变的要求；顺带修掉 DLT 固定分区号
 11. ~~BOM 去 parent~~ **（已完成，`issue-00112`）**——1626 → 72 条；再导出的判据定为「本库在别的版本上不工作」
-12. 测试门禁反转：两个 engine 补内存 store 单测 + JaCoCo；加 reactor 级 ArchUnit 用字节码强制契约模块无框架依赖
+12. ~~测试门禁反转~~ **（部分完成，`issue-00113`）**——outbox engine 与 ArchUnit 字节码规则已完成；process-manager engine 的 store 支撑部分（约 1300 行 / 四个端口）仍在门外，已在 pom 里点名而非默默豁免
 13. core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20
 
 ---

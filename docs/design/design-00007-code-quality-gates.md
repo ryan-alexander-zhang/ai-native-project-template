@@ -52,6 +52,16 @@ parent:
 - 不对 starter/adapter/infrastructure/wiring 层强制 90% 覆盖或变异——见 §三理由。
 - 不改任何业务/领域代码行为；本设计只加构建期门禁与一个测试支撑模块。
 
+> **修正（[[issue-00113-the-quality-gates-sat-where-the-risk-was-not]]）：门禁的作用域从"层"改为"风险"。**
+> 本设计把 90/90 定在 domain 层（库这边即 6 个纯净层模块），理由见下一节——那些理由对**消费方项目**依然成立。
+> 但对**库自己**，它产生了一个反常结果：门禁全装在 record 与值类型上，而两个 engine
+> （`-outbox-engine` 1611 行、`-process-manager-engine` 5016 行）——按聚合顺序、重试预算、何时放弃、
+> "记账失败不是投递失败"这些判断的所在地，错了就丢消息或重复消息——**一个测试都没有，也在所有门禁之外**。
+> 现在两个 engine 各自带内存 store 与门禁；`-outbox-engine` 的 `autoconfigure` 包排除在外
+> （Spring 装配唯一有意义的测试是上下文真的起来，而两个后端已各自启动一个），
+> `-process-manager-engine` 跨四个 store 端口的那 1300 行**仍在门外并在 pom 里点名**，不是默默豁免。
+> 另：PIT 阈值在 engine 上是 85 而非 90，理由写在 pom 里——剩下的变异体杀掉只会抬高数字而不保护任何行为。
+
 ## 三、为什么覆盖率与变异只强制 domain 层
 
 **变异测试（PIT）在纯领域逻辑上才划算，在框架层是负收益。**
