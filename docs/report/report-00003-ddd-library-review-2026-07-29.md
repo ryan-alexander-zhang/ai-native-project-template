@@ -103,9 +103,15 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   但 10.6 之前不支持 → 每轮语法错误、effect 永不投递且不 fail-fast。
 
 **持久化（写路径核心是全框架最扎实的部分，以下是其降级路径）**
-- `MybatisPlusAggregateRepository:82` 用 `updateById`，MP 默认 `NOT_NULL` 策略把 null 列从 SET 剔除 →
-  领域方法清空可选字段：版本检查通过、事件发布、库里仍是旧值，重建时僵尸字段复活，全程无错。
-  这是该基类本该中和的头号 MP 陷阱，javadoc 亦无提醒。**（仍然开着）**
+- ~~`MybatisPlusAggregateRepository` 用 `updateById`，MP 默认 `NOT_NULL` 策略把 null 列从 SET 剔除~~
+  → **已修** `issue-00115`：改走 `update(entity, wrapper)`——wrapper 带被清空的列与 id 谓词，
+  实体供其余列**并且**继续做乐观锁拦截器的钩子（已回读拦截器源码确认它对 `update(et, ew)` 与
+  `updateById` 一视同仁），所以 `issue-00107` 那道版本见证断言一个字不用改。
+  强制写哪些列**读 MP 自己的元数据**而不是只处理默认策略——两个边界咬的方向相反：
+  配了 `ALWAYS` 的列再写一遍会生成 `SET c = ?, c = null`（MySQL 接受、**PostgreSQL 拒绝**），
+  配了 `NEVER` 的列强制清空等于按框架臆断销毁数据。
+  **必须打真库验证**：缺陷在生成的 SQL 里，本模块原有的 mock mapper 测试全程一直是绿的；
+  负向对照（换回 `updateById`）按预期失败。脚手架对真实 PG/MySQL 78 组测试全绿。
 - ~~消费方自带 `MybatisPlusInterceptor` 时乐观锁拦截器整体消失~~ → **已修** `issue-00107`：
   按预想的三行办——拦截器会把自增版本写回实体，故 `updateById` 成功后断言 `version == expected + 1`；
   该断言顺带覆盖"行对象漏标 `@Version`"这条同样静默的路径。

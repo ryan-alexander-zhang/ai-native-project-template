@@ -8,6 +8,16 @@ parent: plan-00013-phase-one-correctness-remediation
 
 # 聚合持久化契约：版本化写入、事件发布收口，与 MyBatis-Plus 拦截器组合
 
+> **补充（[[issue-00115-clearing-a-field-never-reached-the-database]]）：保存聚合从来不是部分更新。**
+> `MybatisPlusAggregateRepository` 原先用 `updateById`，而 MyBatis-Plus 默认把 null 字段从 `SET` 剔除——
+> 对部分更新是对的（null = "我没打算说这一列"），对这里是错的（`toRow` 映射整个根，null = "这字段空了"）。
+> 后果是一条被接受的命令静默只执行一半：版本推进、见证断言通过、事件照常发布、库里旧值不动、下次加载僵尸字段复活。
+> 现在走 `update(entity, wrapper)`：wrapper 带被清空的列与 id 谓词，实体供其余列**并且**仍是乐观锁拦截器的钩子
+> （拦截器对 `update(et, ew)` 与 `updateById` 一视同仁，照样 apply version 谓词并回写版本），
+> 所以本设计 §3 的两半保证——谓词与见证——一个字未改。
+> 该强制写哪些列读 MP 自己的元数据：`ALWAYS` 的列重复赋值会被 PostgreSQL 拒绝，`NEVER` 的列强制清空等于销毁数据。
+
+
 聚合是**一个事务一致性单元**。要让这句话成立，写回时必须校验「读取时的快照仍然有效」，并且聚合记录的事实必须
 与状态变更同生共死。本设计定义三层：core 的**版本契约**、后端的**版本化仓储基类**、以及使二者在 MyBatis-Plus
 下真正生效所必需的**拦截器组合模型**。
