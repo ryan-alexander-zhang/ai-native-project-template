@@ -48,7 +48,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | 7 | CQRS：`domainEvents()` 承诺快照实为活视图 | ~~开着~~ **已修** `issue-00121` | 只改成快照会把 CME 换成静默丢事件，故新增 `drainDomainEvents()`（取走并清空一步完成）+ 对同聚合回写的拒绝 |
 | 8 | CQRS：命令失败只 DEBUG | ~~开着~~ **已修** `issue-00121` | 业务拒绝 INFO 无栈、技术故障 WARN 带栈，判据用框架自己的 `DomainException`/`ApplicationException`，按类型匹配 |
 | 9 | Web：5xx 冻结整个 TTL | **其实已修** | `IdempotencyFilter:189` ≥500 → `abandonQuietly`，是 [[issue-00101-idempotency-records-instead-of-claiming]] 顺带做掉的。**报告没划掉，是文档滞后** |
-| 10 | Web：`JdbcRateLimiter` 窗口边界竞态 | **开着** | `:38` `DELETE ... window_start < ?` 会删掉跨窗并发者刚写的行；`:68` `queryForObject` 零行抛 `EmptyResultDataAccessException`。`count == null` 那个守卫拦的是 **NULL 值**，不是**零行** |
+| 10 | Web：`JdbcRateLimiter` 窗口边界竞态 | ~~开着~~ **已修** `issue-00123` | 扫描留两个窗口余量（活着的计数器不再在删除范围内）+ 读取容忍零行并以本次增量作答 |
 | 11 | Web：web-store 无清理 + 无 `expires_at` 索引 | **半修** | 索引 V3 已补（同样是 `issue-00101` 顺带）；**清理仍只在同一个 key 再次到来时触发**（`JdbcIdempotencyStore:54`），一次性 key 的行永不回收 |
 | 12 | Web：兜底 500 不记日志 | ~~开着~~ **已修** `issue-00121` | 先 `log.error(..., ex)` 再作答；响应仍不透露内部 |
 | 13 | Web：`ReplayProtectionFilter` 全量 + 认证前无上限缓冲 | **开着（有限定）** | 注册无 urlPatterns；`CachedBodyRequestWrapper:24` 是裸 `readAllBytes()`。**限定**：它是 opt-in 的（`replay.enabled=true` **且**存在 `RequestSignatureVerifier` bean），只在启用时才咬人——报告没写这个限定 |
@@ -86,7 +86,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | ~~1~~ | ~~MariaDB 方言（#5）~~ **已完成** [[issue-00120-mariadb-was-support-nobody-had-declared]] | — | **动手前查来历，把修法整个换掉了**：不是"支持得不好"，是**从来没有人声明过支持**。版本探测那条因此划掉——三处别名一并删除，落到已有的 fail-fast |
 | ~~2~~ | ~~`domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8）~~ **已完成** [[issue-00121-three-promises-that-did-not-match-their-behaviour]] | — | **"真快照"这个说法本身是错的**：只复制会把 CME 换成静默丢事件，真正的原语是 drain（取走并清空一步完成）。PIT 在测试写好前先把构建打回了 |
 | ~~3~~ | ~~pm 四表保留策略（#3）~~ **已完成** [[issue-00122-the-four-process-tables-grew-forever]] | — | 顺带找出一个真问题：`ORDER BY updated_at` 没有平局打破，配上批量上限会**饿死平局后面的实例**——与报告给 effect claim 提的那条同形 |
-| 4 | `JdbcRateLimiter` 竞态（#10） | 小 | `queryForObject` → `query().stream().findFirst()`，顺带修 DELETE 的窗口谓词 |
+| ~~4~~ | ~~`JdbcRateLimiter` 竞态（#10）~~ **已完成** [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]] | — | **负向对照暴露了我自己的一条测试是空的**：它挂钩在 `query(...)`，而旧代码走 `queryForObject(...)`，于是对着它要排除的那个实现绿着通过 |
 | 5 | CommandBus 循环依赖（#6） | 大 | 要改装配方式（handler 惰性解析）。最大的一项，**且框架文档正推荐着会触发它的写法** |
 | 6 | `ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11） | 中 | 都是 opt-in 才咬人，但缓冲那条是 DoS 面 |
 | 7 | deadline claim 的 PG/MySQL 覆盖（#4） | 中 | 现在只跑 H2，而 H2 根本不走那条 SQL |
@@ -102,4 +102,5 @@ parent: report-00003-ddd-library-review-2026-07-29
   [[issue-00118-the-recovery-paths-had-no-tests]]
 - 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）、
   [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）、
-  [[issue-00122-the-four-process-tables-grew-forever]]（排期第 3 档，**已完成**）
+  [[issue-00122-the-four-process-tables-grew-forever]]（排期第 3 档，**已完成**）、
+  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]（排期第 4 档，**已完成**）

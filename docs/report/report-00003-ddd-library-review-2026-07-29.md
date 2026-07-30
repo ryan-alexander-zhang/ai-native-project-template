@@ -142,8 +142,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 **Web / 可观测性**
 - ~~错误响应被存下并在整个 TTL 内重放（5xx 冻结 24 小时）~~ → **其实已修**，是 `issue-00101` 顺带做掉的
   （`IdempotencyFilter:189` ≥500 → `abandonQuietly`）。本报告一直没划掉，是文档滞后；由 `issue-00119` 核实。
-- **仍开着，已排期** `issue-00119`：`JdbcRateLimiter` 窗口边界竞态抛 `EmptyResultDataAccessException` → 间歇 500。
-  （`count == null` 那个守卫拦的是 **NULL 值**，不是**零行**。）
+- ~~`JdbcRateLimiter` 窗口边界竞态抛 `EmptyResultDataAccessException` → 间歇 500~~
+  → **已修** `issue-00123`。成因是**每次请求顺手扫旧窗口**：同一个桶上相隔一毫秒的两个请求落在不同窗口，
+  后者删掉了前者正在计数的那一行。扫描改为留两个窗口余量，读取改为容忍零行并以本次自己的增量作答
+  （`count == null` 那个守卫拦的是 **NULL 值**，不是**零行**，所以从来没起过作用）。
 - **半修，其余已排期** `issue-00119`：`expires_at` 索引已由 V3 补上（同样是 `issue-00101` 顺带）；
   但两张表**仍无清理路径**——一次性 key 的"改写时顺带清理"永不触发。
 - ~~兜底 500 处理器不记日志 → 生产 NPE 无栈可查~~ → **已修** `issue-00121`：先记 `log.error(..., ex)` 再作答，响应仍不透露内部。
@@ -306,4 +308,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）、
   [[issue-00120-mariadb-was-support-nobody-had-declared]]、
   [[issue-00121-three-promises-that-did-not-match-their-behaviour]]、
-  [[issue-00122-the-four-process-tables-grew-forever]]
+  [[issue-00122-the-four-process-tables-grew-forever]]、
+  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]
