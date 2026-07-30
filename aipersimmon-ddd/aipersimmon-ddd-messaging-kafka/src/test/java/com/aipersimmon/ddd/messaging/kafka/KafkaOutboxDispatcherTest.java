@@ -4,15 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.aipersimmon.ddd.outbox.InFlightDispatch;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.junit.jupiter.api.Test;
@@ -104,6 +109,53 @@ class KafkaOutboxDispatcherTest {
 
     KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template);
     assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(message, "orders"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void handsEveryRecordToTheProducerBeforeWaitingOnAnyAcknowledgement() {
+    KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
+    List<CompletableFuture<Object>> acks =
+        List.of(new CompletableFuture<>(), new CompletableFuture<>(), new CompletableFuture<>());
+    AtomicInteger sends = new AtomicInteger();
+    doAnswer(invocation -> acks.get(sends.getAndIncrement()))
+        .when(template)
+        .send(any(ProducerRecord.class));
+
+    KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template);
+    List<InFlightDispatch> inFlight =
+        List.of(
+            dispatcher.beginDispatch(message, "orders"),
+            dispatcher.beginDispatch(message, "orders"),
+            dispatcher.beginDispatch(message, "orders"));
+
+    // The whole batch is with the producer while none of it has been acknowledged — which is
+    // what makes a poll cost one broker round trip instead of one per message, and what gives
+    // the producer records to batch at all.
+    assertEquals(3, sends.get(), "every record is handed over before anything is waited on");
+    acks.forEach(ack -> ack.complete(null));
+    inFlight.forEach(InFlightDispatch::awaitDelivery);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void aBatchOfStalledSendsCostsOneTimeoutRatherThanOnePerMessage() {
+    KafkaTemplate<String, String> template = mock(KafkaTemplate.class);
+    // Acks that never arrive: the broker has taken every record and gone quiet.
+    doReturn(new CompletableFuture<>()).when(template).send(any(ProducerRecord.class));
+
+    KafkaOutboxDispatcher dispatcher = new KafkaOutboxDispatcher(template, Duration.ofMillis(400));
+    List<InFlightDispatch> inFlight =
+        IntStream.range(0, 5).mapToObj(i -> dispatcher.beginDispatch(message, "orders")).toList();
+
+    // Each wait runs to the deadline fixed when its record was handed over, and those deadlines
+    // are all within a moment of each other — so five stalled sends expire together at ~400ms
+    // rather than serialising into 2s. A per-wait timeout would trip the bound below.
+    assertTimeoutPreemptively(
+        Duration.ofMillis(1200),
+        () ->
+            inFlight.forEach(
+                pending -> assertThrows(IllegalStateException.class, pending::awaitDelivery)));
   }
 
   private static String header(ProducerRecord<String, String> record, String name) {

@@ -58,7 +58,7 @@ public class JdbcOutboxStore implements OutboxStore {
           + "SET lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE event_id IN (";
   private static final String MARK_SENT =
       "UPDATE aipersimmon_outbox SET sent = TRUE, sent_at = ?, "
-          + "lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE event_id = ?";
+          + "lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE event_id IN (";
   private static final String SCHEDULE_RETRY =
       "UPDATE aipersimmon_outbox SET attempts = attempts + 1, next_attempt_at = ?, "
           + "lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE event_id = ?";
@@ -144,8 +144,14 @@ public class JdbcOutboxStore implements OutboxStore {
   }
 
   @Override
-  public void markSent(String eventId, Instant sentAt) {
-    jdbc.update(MARK_SENT, Timestamp.from(sentAt), eventId);
+  public void markSent(List<String> eventIds, Instant sentAt) {
+    if (eventIds.isEmpty()) {
+      return;
+    }
+    List<Object> args = new ArrayList<>();
+    args.add(Timestamp.from(sentAt));
+    args.addAll(eventIds);
+    jdbc.update(MARK_SENT + placeholders(eventIds.size()) + ")", args.toArray());
   }
 
   @Override

@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.FailureClassifier;
+import com.aipersimmon.ddd.outbox.InFlightDispatch;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.RetryBackoff;
@@ -14,13 +15,24 @@ import com.aipersimmon.ddd.outbox.engine.store.PendingMessage;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Claims unsent rows that are due and dispatches them, marking each sent on success. Each row is
- * marked on its own, so one failure does not undo already-dispatched rows — at-least-once delivery.
+ * Claims unsent rows that are due and dispatches them, recording those the transport confirmed —
+ * at-least-once delivery.
+ *
+ * <p>A batch is handed to the transport <em>before</em> any of it is waited on, and the confirmed
+ * rows are then recorded in one write. Waiting on each send in turn made a poll cost the sum of its
+ * round trips — with a broker acknowledging in tens of milliseconds, an instance managed on the
+ * order of a hundred messages a second, so an hour's backlog took the better part of a day to
+ * drain. Overlapping them makes a poll cost roughly one round trip regardless of batch size.
+ * Nothing about the guarantees changes: a row is recorded sent only once its own delivery is
+ * confirmed, and a failure is still that row's alone. Ordering is safe because a claimed batch
+ * holds at most one row per aggregate (see below), so two events that must stay in order are never
+ * in flight together.
  *
  * <p>Rows are claimed, not merely selected. Each claim stamps a lease on the rows it wins, so every
  * instance can poll at the same time and they simply take disjoint work. That is what keeps a lost
@@ -44,12 +56,14 @@ import org.slf4j.LoggerFactory;
  * dead-lettered row leaves the table, its aggregate's later events then proceed — ordering is
  * preserved only up to the point a message is given up on.
  *
- * <p>One poll is bounded twice: it dispatches at most {@code batch-size} rows, and it stops
- * altogether once half the lease has elapsed, releasing whatever it had claimed but not reached.
+ * <p>One poll is bounded twice: it dispatches at most {@code batch-size} rows, and it stops handing
+ * rows over once half the lease has elapsed, releasing whatever it had claimed but not reached.
  * Bounding it here is what lets the lease be short: a poll cannot outlive the lease it holds as
  * long as a single dispatch takes less than half of one, so the length of the lease is free to be
  * chosen for how fast a dead instance's rows should come back rather than for how slow a whole
- * batch of stalled sends might be.
+ * batch of stalled sends might be. That the budget covers only <em>one</em> dispatch and not a
+ * whole batch of them is exactly what overlapping the sends buys: a batch that all stalls costs one
+ * timeout, not one per row.
  *
  * <p>Because only the head of an aggregate is claimable, one claim yields at most one row per
  * aggregate. A poll therefore claims repeatedly — as each row is sent or given up on, its successor
@@ -203,83 +217,159 @@ public class OutboxRelay {
   }
 
   /**
-   * Dispatch every claimed row, stopping if the poll's time budget runs out and handing back what
-   * is left so it does not sit unavailable for the rest of its lease.
+   * Hand every claimed row to the transport, then wait on them all — stopping the hand-over if the
+   * poll's time budget runs out and handing back what is left so it does not sit unavailable for
+   * the rest of its lease.
    *
    * @return {@code true} if claiming again is worthwhile — no row was left immediately re-claimable
    */
   private boolean dispatchAll(List<PendingMessage> claimed, Instant budgetEndsAt) {
     boolean keepClaiming = true;
-    for (int i = 0; i < claimed.size(); i++) {
-      if (clock.instant().isAfter(budgetEndsAt)) {
-        List<String> untouched =
-            claimed.subList(i, claimed.size()).stream().map(p -> p.message().eventId()).toList();
-        log.warn(
-            "outbox poll spent its time budget of {} with {} claimed row(s) not yet dispatched; "
-                + "releasing them for the next poll (or another instance). Lower batch-size, speed "
-                + "up dispatch, or raise the relay lease if this recurs",
-            pollBudget(),
-            untouched.size());
-        observer.released(untouched.size());
-        release(untouched);
-        return false;
+    List<InFlight> inFlight = new ArrayList<>(claimed.size());
+    int handedOver = 0;
+    while (handedOver < claimed.size() && !clock.instant().isAfter(budgetEndsAt)) {
+      PendingMessage pending = claimed.get(handedOver++);
+      OutboxMessage message = pending.message();
+      if (message.destination() != null && !dispatcher.reachesExternalTargets()) {
+        // The row names an external destination, decided when it was written, and the active
+        // dispatcher has admitted it cannot reach one. Delivering it locally would archive it as
+        // sent while it never left the process — the loss that storing the destination exists to
+        // end. Fail instead, so it retries and then becomes a visible dead letter.
+        if (handleFailure(
+                pending,
+                new UnreachableDestinationException(
+                    message.type(), message.version(), message.destination()))
+            == Outcome.HELD) {
+          keepClaiming = false;
+        }
+        continue;
       }
-      if (dispatch(claimed.get(i)) == Outcome.HELD) {
+      inFlight.add(handOver(pending));
+    }
+    if (handedOver < claimed.size()) {
+      List<String> untouched =
+          claimed.subList(handedOver, claimed.size()).stream()
+              .map(p -> p.message().eventId())
+              .toList();
+      log.warn(
+          "outbox poll spent its time budget of {} with {} claimed row(s) not yet dispatched; "
+              + "releasing them for the next poll (or another instance). Lower batch-size, speed "
+              + "up dispatch, or raise the relay lease if this recurs",
+          pollBudget(),
+          untouched.size());
+      observer.released(untouched.size());
+      release(untouched);
+      keepClaiming = false;
+    }
+    // Everything handed over is waited on, budget or not: abandoning a send already with the
+    // transport would either strand the row for its whole lease or duplicate a message that was
+    // in fact delivered. The wait is bounded once for the batch, not once per message, because
+    // the sends overlap — which is why the poll budget still only has to leave room for one.
+    boolean recorded = confirmAll(inFlight);
+    return keepClaiming && recorded;
+  }
+
+  /**
+   * Hand one row to the transport without waiting for it. The restored span is current only across
+   * the hand-over — that is where the producer instrumentation reads it to stamp the message's
+   * trace headers — and is then detached, because the next row is handed over on this same thread
+   * while this one is still in flight. The span itself stays open until delivery is confirmed, so a
+   * failed acknowledgement is recorded on the span that sent it.
+   */
+  private InFlight handOver(PendingMessage pending) {
+    OutboxMessage message = pending.message();
+    long start = System.nanoTime();
+    StoreAndForwardTracer.Scope span =
+        tracer.restore(
+            pending.traceparent(), pending.traceState(), "outbox.publish " + message.eventId());
+    try {
+      InFlightDispatch handle = dispatcher.beginDispatch(message);
+      span.detach();
+      return new InFlight(pending, handle, span, start);
+    } catch (RuntimeException e) {
+      // It failed before the transport even took it. Carry it in the same shape as everything
+      // else so one place decides what a failure means.
+      span.detach();
+      return new InFlight(pending, rethrowing(e), span, start);
+    }
+  }
+
+  /**
+   * Wait on every handed-over row, then record the delivered ones in a single write.
+   *
+   * @return {@code true} if claiming again is worthwhile
+   */
+  private boolean confirmAll(List<InFlight> inFlight) {
+    boolean keepClaiming = true;
+    List<String> delivered = new ArrayList<>(inFlight.size());
+    for (InFlight one : inFlight) {
+      RuntimeException failure = confirm(one);
+      if (failure == null) {
+        delivered.add(one.pending().message().eventId());
+      } else if (handleFailure(one.pending(), failure) == Outcome.HELD) {
         keepClaiming = false;
       }
     }
-    return keepClaiming;
+    boolean recorded = recordDelivered(delivered);
+    return keepClaiming && recorded;
   }
 
-  /** Dispatch one claimed row and record the outcome. */
-  private Outcome dispatch(PendingMessage pending) {
-    OutboxMessage message = pending.message();
-    if (message.destination() != null && !dispatcher.reachesExternalTargets()) {
-      // The row names an external destination, decided when it was written, and the active
-      // dispatcher has admitted it cannot reach one. Delivering it locally would archive it as
-      // sent while it never left the process — the loss that storing the destination exists to
-      // end. Fail instead, so it retries and then becomes a visible dead letter.
-      return handleFailure(
-          pending,
-          new UnreachableDestinationException(
-              message.type(), message.version(), message.destination()));
-    }
-    long dispatchStart = System.nanoTime();
-    try (StoreAndForwardTracer.Scope span =
-        tracer.restore(
-            pending.traceparent(), pending.traceState(), "outbox.publish " + message.eventId())) {
-      // The restored span is current here, so the Kafka producer instrumentation stamps
-      // the message headers with this dispatch span — which links back to the span that
-      // wrote the row — rather than with the (unrelated) scheduler thread's context.
+  /** Waits for one delivery. Returns the failure, or {@code null} if it was delivered. */
+  private RuntimeException confirm(InFlight one) {
+    RuntimeException failure = null;
+    try (StoreAndForwardTracer.Scope span = one.span()) {
       try {
-        dispatcher.dispatch(message);
+        one.handle().awaitDelivery();
       } catch (RuntimeException e) {
         span.recordFailure(e);
-        throw e;
+        failure = e;
       }
-    } catch (RuntimeException e) {
-      observer.dispatched(false, since(dispatchStart));
-      return handleFailure(pending, e);
     }
-    observer.dispatched(true, since(dispatchStart));
-    // The message is delivered (at-least-once satisfied). A failure to record that is
-    // NOT a dispatch failure: never dead-letter or count it against the retry budget —
-    // that would discard or misreport a message the broker already has. Release the row
-    // instead, so the next poll re-dispatches it (an accepted at-least-once duplicate,
-    // which the consumer's inbox dedups) rather than waiting out the lease.
+    observer.dispatched(failure == null, since(one.start()));
+    return failure;
+  }
+
+  /**
+   * Records a confirmed batch as sent, in one write.
+   *
+   * <p>The messages are delivered (at-least-once satisfied). A failure to record that is NOT a
+   * dispatch failure: never dead-letter or count it against the retry budget — that would discard
+   * or misreport messages the broker already has. Release the rows instead, so the next poll
+   * re-dispatches them (accepted at-least-once duplicates, which the consumer's inbox dedups)
+   * rather than waiting out the lease.
+   *
+   * @return {@code true} if the batch was recorded
+   */
+  private boolean recordDelivered(List<String> eventIds) {
+    if (eventIds.isEmpty()) {
+      return true;
+    }
     try {
-      store.markSent(message.eventId(), clock.instant());
-      return Outcome.SENT;
+      store.markSent(eventIds, clock.instant());
+      return true;
     } catch (RuntimeException e) {
       log.warn(
-          "outbox dispatch for eventId={} succeeded but marking it sent failed; "
-              + "it will be re-dispatched (a duplicate) on the next poll",
-          message.eventId(),
+          "outbox dispatch of {} row(s) succeeded but marking them sent failed; "
+              + "they will be re-dispatched (duplicates) on the next poll",
+          eventIds.size(),
           e);
-      observer.markSentFailed();
-      release(List.of(message.eventId()));
-      return Outcome.HELD;
+      observer.markSentFailed(eventIds.size());
+      release(eventIds);
+      return false;
     }
+  }
+
+  /** A row the transport has taken and not yet confirmed. */
+  private record InFlight(
+      PendingMessage pending,
+      InFlightDispatch handle,
+      StoreAndForwardTracer.Scope span,
+      long start) {}
+
+  private static InFlightDispatch rethrowing(RuntimeException error) {
+    return () -> {
+      throw error;
+    };
   }
 
   /** Handles a failed dispatch: dead-letter it, or schedule the next attempt. */

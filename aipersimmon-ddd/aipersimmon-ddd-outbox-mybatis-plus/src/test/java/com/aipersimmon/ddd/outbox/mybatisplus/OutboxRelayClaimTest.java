@@ -115,7 +115,7 @@ class OutboxRelayClaimTest {
         "admitting only the head is what keeps an aggregate ordered without coordinating pollers");
     assertNull(leaseTokenOf("e2"), "a blocked row is not leased either — it was never a candidate");
 
-    store.markSent("e1", now);
+    store.markSent(List.of("e1"), now);
 
     assertEquals(
         List.of("e2"),
@@ -132,7 +132,7 @@ class OutboxRelayClaimTest {
     Instant now = Instant.now();
     store.claimDue(now, 10, 10, lease("node-A", now.plusSeconds(600)));
 
-    store.markSent("sent-1", now);
+    store.markSent(List.of("sent-1"), now);
     store.scheduleRetry("retried-1", now.plusSeconds(5));
     store.backOffWithoutAttempt("backed-off-1", now.plusSeconds(5));
     store.release(List.of("released-1"));

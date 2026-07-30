@@ -1,9 +1,14 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+import com.aipersimmon.ddd.outbox.InFlightDispatch;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.time.Instant;
@@ -27,10 +32,11 @@ class RoutingOutboxDispatcherTest {
   @Test
   void aRowThatNamesADestinationGoesThereAndNotInProcess() {
     OutboxMessage message = message("ordering.events");
+    when(externalLeg.beginDispatch(any(), anyString())).thenReturn(InFlightDispatch.CONFIRMED);
 
     router.dispatch(message);
 
-    verify(externalLeg).dispatch(message, "ordering.events");
+    verify(externalLeg).beginDispatch(message, "ordering.events");
     verifyNoInteractions(localLeg);
   }
 
@@ -50,11 +56,33 @@ class RoutingOutboxDispatcherTest {
     // while it was @Externalized still reaches its topic after the annotation is gone from the
     // code.
     OutboxMessage message = message("legacy.events");
+    when(externalLeg.beginDispatch(any(), anyString())).thenReturn(InFlightDispatch.CONFIRMED);
 
     router.dispatch(message);
 
-    verify(externalLeg).dispatch(message, "legacy.events");
+    verify(externalLeg).beginDispatch(message, "legacy.events");
     verifyNoInteractions(localLeg);
+  }
+
+  @Test
+  void handingOverPassesTheBrokersPendingAcknowledgementStraightBackToTheRelay() {
+    InFlightDispatch pending = () -> {};
+    when(externalLeg.beginDispatch(any(), anyString())).thenReturn(pending);
+
+    assertSame(
+        pending,
+        router.beginDispatch(message("ordering.events")),
+        "the relay waits on the broker's own acknowledgement, not on a stand-in the router made up");
+  }
+
+  @Test
+  void handingOverALocalRowIsAlreadyDoneBecauseRepublishingInProcessIsSynchronous() {
+    OutboxMessage message = message(null);
+
+    assertSame(InFlightDispatch.CONFIRMED, router.beginDispatch(message));
+
+    verify(localLeg).dispatch(message);
+    verifyNoInteractions(externalLeg);
   }
 
   private static OutboxMessage message(String destination) {

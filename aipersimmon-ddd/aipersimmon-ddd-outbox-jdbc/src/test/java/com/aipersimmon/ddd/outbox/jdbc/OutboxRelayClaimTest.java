@@ -202,7 +202,7 @@ class OutboxRelayClaimTest {
         ids(store.claimDue(now, 10, 10, lease("node-B", now.plusSeconds(60)))),
         "while the head is live no other instance may take the aggregate's later events");
 
-    store.markSent("e1", now);
+    store.markSent(List.of("e1"), now);
 
     assertEquals(
         List.of("e2"),
@@ -218,7 +218,7 @@ class OutboxRelayClaimTest {
     Instant now = Instant.now();
     store.claimDue(now, 10, 10, lease("node-A", now.plusSeconds(600)));
 
-    store.markSent("sent-1", now);
+    store.markSent(List.of("sent-1"), now);
     store.scheduleRetry("retried-1", now.plusSeconds(5));
     store.release(List.of("released-1"));
 

@@ -38,10 +38,12 @@ public interface OutboxObserver {
   void deadLettered(DeadLetterStore.Reason reason);
 
   /**
-   * The transport accepted a message but recording that failed, so it will be delivered again. A
-   * duplicate the consumer's inbox absorbs — worth watching, never worth alarming on alone.
+   * The transport accepted {@code rows} messages but recording that failed, so they will be
+   * delivered again. Counted per message rather than per failed write, so the number reads as how
+   * many duplicates follow — which is what it costs. Duplicates the consumer's inbox absorbs: worth
+   * watching, never worth alarming on alone.
    */
-  void markSentFailed();
+  void markSentFailed(int rows);
 
   /**
    * A poll handed {@code rows} back without dispatching them, having spent its time budget. Rare
@@ -64,7 +66,7 @@ public interface OutboxObserver {
         public void deadLettered(DeadLetterStore.Reason reason) {}
 
         @Override
-        public void markSentFailed() {}
+        public void markSentFailed(int rows) {}
 
         @Override
         public void released(int rows) {}

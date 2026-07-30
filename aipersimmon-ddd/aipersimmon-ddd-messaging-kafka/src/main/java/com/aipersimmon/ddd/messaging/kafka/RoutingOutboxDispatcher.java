@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
+import com.aipersimmon.ddd.outbox.InFlightDispatch;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 
@@ -42,10 +43,20 @@ public class RoutingOutboxDispatcher implements OutboxDispatcher {
 
   @Override
   public void dispatch(OutboxMessage message) {
+    beginDispatch(message).awaitDelivery();
+  }
+
+  /**
+   * Hands the message to whichever leg the row's destination names, without waiting for it. The
+   * in-process leg has nothing to overlap — republishing is synchronous and already done when it
+   * returns — so only the Kafka leg returns a real pending acknowledgement.
+   */
+  @Override
+  public InFlightDispatch beginDispatch(OutboxMessage message) {
     if (message.destination() == null) {
       localLeg.dispatch(message);
-    } else {
-      externalLeg.dispatch(message, message.destination());
+      return InFlightDispatch.CONFIRMED;
     }
+    return externalLeg.beginDispatch(message, message.destination());
   }
 }

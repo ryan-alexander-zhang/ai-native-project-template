@@ -84,6 +84,9 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   private static final Logger log =
       LoggerFactory.getLogger(AipersimmonDddMessagingKafkaAutoConfiguration.class);
 
+  /** Let the producer pick the partition from the record key. */
+  private static final int ANY_PARTITION = -1;
+
   /**
    * The externalization routing table, built once at startup by scanning the application's
    * integration events, keeping those annotated {@code @Externalized} and resolving each target's
@@ -276,15 +279,32 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
   @ConditionalOnMissingBean(CommonErrorHandler.class)
   public DefaultErrorHandler kafkaErrorHandler(
       KafkaTemplate<String, String> kafkaTemplate, KafkaMessagingProperties properties) {
-    // Publish to "<topic>.DLT", keyed the same way as the source so an aggregate's
-    // dead letters keep to one partition. The destination is set explicitly (rather
-    // than left to the recoverer's default) so the DLT topic name is the documented
-    // one and does not depend on a library default.
     DeadLetterPublishingRecoverer recoverer =
         new DeadLetterPublishingRecoverer(
-            kafkaTemplate,
-            (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+            kafkaTemplate, (record, exception) -> deadLetterDestination(record));
     return buildErrorHandler(recoverer, properties.getConsumer());
+  }
+
+  /**
+   * Where a dead-lettered record goes: {@code <topic>.DLT}, with the partition left to the
+   * producer. The topic is named explicitly (rather than left to the recoverer's default) so it is
+   * the documented one and does not depend on a library default.
+   *
+   * <p>The partition is deliberately <em>not</em> the source record's. A dead-letter topic is
+   * routinely created with fewer partitions than the topic it shadows — it carries a trickle — and
+   * naming a partition that does not exist there makes the publish fail, which makes the recoverer
+   * fail, which makes the error handler seek back and retry the whole delivery: the poison record
+   * never leaves and its partition stalls forever, the exact opposite of what a DLT is for. Spring
+   * Kafka guards against this by asking the broker whether the partition exists, which rescues the
+   * common case at the cost of a blocking metadata lookup per dead letter — and does not rescue the
+   * case where the lookup itself fails, which is precisely when the DLT is missing. Leaving the
+   * partition unset costs nothing, skips that lookup, and still keeps an aggregate's dead letters
+   * together: the recoverer copies the source key onto the DLT record, and the producer's default
+   * partitioner sends equal keys to the same partition. Co-location was always the key's doing, not
+   * the partition number's.
+   */
+  static TopicPartition deadLetterDestination(ConsumerRecord<?, ?> record) {
+    return new TopicPartition(record.topic() + ".DLT", ANY_PARTITION);
   }
 
   /**

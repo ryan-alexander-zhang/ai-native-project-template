@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.messaging.kafka;
 
+import com.aipersimmon.ddd.outbox.InFlightDispatch;
 import com.aipersimmon.ddd.outbox.OutboxMessage;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -24,20 +25,27 @@ import org.springframework.kafka.core.KafkaTemplate;
  * OutboxDispatcher}: routing (LOCAL vs which EXTERNAL topic) is decided by the {@link
  * RoutingOutboxDispatcher}, which owns that role.
  *
- * <p>The send is awaited: the method returns only once the broker has acknowledged, and throws if
- * it fails — so the outbox relay marks the row sent only on success and otherwise leaves it to be
- * retried on the next poll (at-least-once delivery).
+ * <p>Delivery is confirmed before the relay records the row: {@link #dispatch} returns only once
+ * the broker has acknowledged and throws if it fails, so a row is marked sent only on success and
+ * is otherwise left to be retried on the next poll (at-least-once delivery).
  *
- * <p>The await is <em>bounded</em> by {@code sendTimeout}: the relay is a single-threaded, {@code
- * fixedDelay} scheduled poll that dispatches rows one at a time and blocks on each broker ack, so
- * an unbounded wait would pin that one thread forever on a single stuck send (broker partition
- * unwritable, metadata stall) — stopping <em>all</em> outbox delivery on that instance and, once
- * the wait outlives the relay's lease on the row, letting another instance dispatch that row too. A
- * timed-out send is cancelled and surfaced as a failure, which the {@code FailureClassifier} treats
- * as transient, so the row stays unsent and is retried with backoff on the next poll. Keep {@code
- * sendTimeout} below half of {@code outbox.relay.lease-duration}; a whole batch of stalled sends
- * needs no such arithmetic, because a poll stops at that halfway point and hands back the rows it
- * has not reached.
+ * <p>Handing the record over and waiting for its acknowledgement are separable — {@link
+ * #beginDispatch} does the first and returns the second — because a Kafka send is asynchronous
+ * anyway. The relay hands a whole claimed batch over and only then waits, so the batch costs one
+ * broker round trip instead of one per message and the producer gets records to batch and pipeline
+ * as it was designed to. It also lets the producer's own batching work at all: waiting for each ack
+ * before writing the next record meant every batch held exactly one record.
+ *
+ * <p>The wait is <em>bounded</em> by {@code sendTimeout}, measured from the moment the record was
+ * handed over rather than from when the wait begins — so a batch of stalled sends costs one timeout
+ * in total, not one per record, since they are all in flight together. The bound exists because the
+ * relay is a single-threaded, {@code fixedDelay} scheduled poll: an unbounded wait would pin that
+ * one thread forever on a stuck send (broker partition unwritable, metadata stall), stopping
+ * <em>all</em> outbox delivery on that instance and, once the wait outlives the relay's lease on
+ * the row, letting another instance dispatch that row too. A timed-out send is cancelled and
+ * surfaced as a failure, which the {@code FailureClassifier} treats as transient, so the row stays
+ * unsent and is retried with backoff on the next poll. Keep {@code sendTimeout} below half of
+ * {@code outbox.relay.lease-duration}; {@code batch-size} does not enter into that arithmetic.
  */
 public class KafkaOutboxDispatcher {
 
@@ -57,10 +65,50 @@ public class KafkaOutboxDispatcher {
   }
 
   /**
-   * Publishes the message to {@code topic}. The topic is the event's resolved externalization
-   * target, chosen by the {@link RoutingOutboxDispatcher}.
+   * Publishes the message to {@code topic} and waits for the broker to acknowledge it. The topic is
+   * the event's resolved externalization target, chosen by the {@link RoutingOutboxDispatcher}.
    */
   public void dispatch(OutboxMessage message, String topic) {
+    beginDispatch(message, topic).awaitDelivery();
+  }
+
+  /**
+   * Hands the message to the producer for {@code topic} without waiting, returning the pending
+   * acknowledgement. The deadline is fixed here, at hand-over, so a batch handed over together and
+   * waited on afterwards shares one timeout rather than serialising one each.
+   */
+  public InFlightDispatch beginDispatch(OutboxMessage message, String topic) {
+    Future<?> send = kafkaTemplate.send(record(message, topic));
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(sendTimeoutMillis);
+    return () -> awaitAck(send, deadlineNanos, message.eventId());
+  }
+
+  private void awaitAck(Future<?> send, long deadlineNanos, String eventId) {
+    try {
+      send.get(Math.max(0, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(
+          "interrupted publishing outbox message " + eventId + " to Kafka", e);
+    } catch (ExecutionException e) {
+      throw new IllegalStateException(
+          "failed publishing outbox message " + eventId + " to Kafka", e.getCause());
+    } catch (TimeoutException e) {
+      // Do not pin the single relay thread on one stuck send: give up waiting (cancel
+      // best-effort) and surface it as a transient failure so the relay leaves the row
+      // to be retried with backoff on the next poll.
+      send.cancel(true);
+      throw new IllegalStateException(
+          "timed out after "
+              + sendTimeoutMillis
+              + "ms publishing outbox message "
+              + eventId
+              + " to Kafka",
+          e);
+    }
+  }
+
+  private static ProducerRecord<String, String> record(OutboxMessage message, String topic) {
     String partitionKey =
         message.subject() != null && !message.subject().isBlank()
             ? message.subject()
@@ -85,29 +133,7 @@ public class KafkaOutboxDispatcher {
     addHeader(record, IntegrationEventHeaders.PARTITION_KEY, partitionKey);
     addHeader(
         record, IntegrationEventHeaders.CONTENT_TYPE, IntegrationEventHeaders.CONTENT_TYPE_JSON);
-    Future<?> send = kafkaTemplate.send(record);
-    try {
-      send.get(sendTimeoutMillis, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException(
-          "interrupted publishing outbox message " + message.eventId() + " to Kafka", e);
-    } catch (ExecutionException e) {
-      throw new IllegalStateException(
-          "failed publishing outbox message " + message.eventId() + " to Kafka", e.getCause());
-    } catch (TimeoutException e) {
-      // Do not pin the single relay thread on one stuck send: give up waiting (cancel
-      // best-effort) and surface it as a transient failure so the relay leaves the row
-      // to be retried with backoff on the next poll.
-      send.cancel(true);
-      throw new IllegalStateException(
-          "timed out after "
-              + sendTimeoutMillis
-              + "ms publishing outbox message "
-              + message.eventId()
-              + " to Kafka",
-          e);
-    }
+    return record;
   }
 
   private static void addHeader(ProducerRecord<String, String> record, String name, String value) {

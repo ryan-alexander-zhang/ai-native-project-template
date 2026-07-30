@@ -81,8 +81,8 @@ public final class MicrometerOutboxObserver implements OutboxObserver {
   }
 
   @Override
-  public void markSentFailed() {
-    markSentFailures.increment();
+  public void markSentFailed(int rows) {
+    markSentFailures.increment(rows);
   }
 
   @Override

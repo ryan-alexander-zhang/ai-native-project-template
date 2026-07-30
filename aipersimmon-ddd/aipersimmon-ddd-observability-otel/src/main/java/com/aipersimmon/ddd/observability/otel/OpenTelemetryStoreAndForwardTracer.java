@@ -82,9 +82,19 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
     return open(builder.startSpan());
   }
 
+  /**
+   * Wraps a started span, keeping the two things OTEL separates — the span, and its being the
+   * thread's current context — separately closeable. A relay that hands several dispatches to a
+   * transport before waiting on any of them needs the context current only for the hand-over, while
+   * the spans stay open (and overlapping) until each delivery is confirmed. The detach flag is not
+   * synchronized: a scope belongs to the one worker thread that opened it.
+   */
   private Scope open(Span span) {
     io.opentelemetry.context.Scope otelScope = span.makeCurrent();
     return new Scope() {
+
+      private boolean detached;
+
       @Override
       public void recordFailure(Throwable error) {
         span.setStatus(StatusCode.ERROR, error == null ? "" : String.valueOf(error.getMessage()));
@@ -94,8 +104,16 @@ public final class OpenTelemetryStoreAndForwardTracer implements StoreAndForward
       }
 
       @Override
+      public void detach() {
+        if (!detached) {
+          detached = true;
+          otelScope.close();
+        }
+      }
+
+      @Override
       public void close() {
-        otelScope.close();
+        detach();
         span.end();
       }
     };

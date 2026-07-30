@@ -62,6 +62,20 @@ public interface StoreAndForwardTracer {
      */
     default void recordFailure(Throwable error) {}
 
+    /**
+     * Stop this span being the thread's current context while leaving it open. For a worker that
+     * hands work off asynchronously: the context has to be current only while the transport reads
+     * it — that is how a producer stamps the outgoing message's trace headers — but the span is not
+     * over until delivery is confirmed, which happens after the worker has moved on to hand over
+     * the next item. Without this the worker would either have to keep several scopes current at
+     * once and unwind them out of order, or end each span at hand-over and lose the delivery
+     * outcome.
+     *
+     * <p>Idempotent, and implied by {@link #close()}. Default no-op, for scopes that were never
+     * current in the first place.
+     */
+    default void detach() {}
+
     @Override
     void close();
   }

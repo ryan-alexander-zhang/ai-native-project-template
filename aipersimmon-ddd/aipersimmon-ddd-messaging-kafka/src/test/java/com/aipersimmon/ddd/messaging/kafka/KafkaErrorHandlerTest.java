@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -53,6 +54,23 @@ class KafkaErrorHandlerTest {
 
   private static ConsumerRecord<String, String> record() {
     return new ConsumerRecord<>("orders", 0, 0L, "key", "{}");
+  }
+
+  @Test
+  void aDeadLetterNamesTheDltTopicAndLetsTheProducerPickThePartition() {
+    // A DLT is routinely created with fewer partitions than the topic it shadows. Pinning the
+    // source partition number made the publish fail there, which made the recoverer fail, which
+    // made the handler seek back and retry — the poison record never left and its partition
+    // stalled forever. The key still co-locates an aggregate's dead letters, which is what the
+    // partition number was reached for in the first place.
+    TopicPartition destination =
+        AipersimmonDddMessagingKafkaAutoConfiguration.deadLetterDestination(
+            new ConsumerRecord<>("orders", 7, 0L, "key", "{}"));
+
+    assertEquals("orders.DLT", destination.topic());
+    assertTrue(
+        destination.partition() < 0,
+        "no partition is named, so the DLT's own partition count is what decides");
   }
 
   @Test

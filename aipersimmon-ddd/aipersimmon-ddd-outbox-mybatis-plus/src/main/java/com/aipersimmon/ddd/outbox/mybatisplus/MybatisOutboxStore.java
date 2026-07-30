@@ -105,11 +105,14 @@ public class MybatisOutboxStore implements OutboxStore {
   }
 
   @Override
-  public void markSent(String eventId, Instant sentAt) {
+  public void markSent(List<String> eventIds, Instant sentAt) {
+    if (eventIds.isEmpty()) {
+      return;
+    }
     mapper.update(
         null,
         clearLease(new LambdaUpdateWrapper<OutboxRecord>())
-            .eq(OutboxRecord::getEventId, eventId)
+            .in(OutboxRecord::getEventId, eventIds)
             .set(OutboxRecord::getSent, true)
             .set(OutboxRecord::getSentAt, sentAt));
   }

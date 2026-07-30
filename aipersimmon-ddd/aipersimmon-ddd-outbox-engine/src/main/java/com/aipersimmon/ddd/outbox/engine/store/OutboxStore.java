@@ -77,8 +77,16 @@ public interface OutboxStore {
    */
   void release(List<String> eventIds);
 
-  /** Record that a row was delivered, and drop its lease. */
-  void markSent(String eventId, Instant sentAt);
+  /**
+   * Record that rows were delivered, and drop their leases.
+   *
+   * <p>A whole batch at once, in one statement, because the relay now confirms a batch's deliveries
+   * together: one round trip per poll rather than one per message, which is what stops bookkeeping
+   * from becoming the bottleneck once the sends themselves overlap. All or none, so a failure means
+   * the batch is re-dispatched (duplicates the consumer's inbox absorbs) rather than a partially
+   * recorded batch.
+   */
+  void markSent(List<String> eventIds, Instant sentAt);
 
   /**
    * Count a failed attempt, push the row's next attempt out to {@code nextAttemptAt}, and drop its

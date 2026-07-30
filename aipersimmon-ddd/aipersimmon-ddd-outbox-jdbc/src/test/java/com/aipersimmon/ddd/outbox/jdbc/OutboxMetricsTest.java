@@ -80,6 +80,7 @@ class OutboxMetricsTest {
     final List<Integer> claims = new CopyOnWriteArrayList<>();
     final List<Boolean> dispatches = new CopyOnWriteArrayList<>();
     final List<DeadLetterStore.Reason> deadLetters = new CopyOnWriteArrayList<>();
+    final List<Integer> markSentFailures = new CopyOnWriteArrayList<>();
 
     @Override
     public void claimed(int rows, Duration latency) {
@@ -97,7 +98,9 @@ class OutboxMetricsTest {
     }
 
     @Override
-    public void markSentFailed() {}
+    public void markSentFailed(int rows) {
+      markSentFailures.add(rows);
+    }
 
     @Override
     public void released(int rows) {}
