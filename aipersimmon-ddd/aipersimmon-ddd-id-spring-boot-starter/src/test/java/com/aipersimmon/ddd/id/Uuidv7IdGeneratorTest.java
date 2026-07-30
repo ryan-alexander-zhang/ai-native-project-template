@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.id.IdGenerator;
+import com.fasterxml.uuid.UUIDClock;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -27,19 +29,86 @@ class Uuidv7IdGeneratorTest {
     }
   }
 
+  /** A clock a test moves by hand, so time is an input rather than a race. */
+  private static final class SteppingClock extends UUIDClock {
+    private long millis = 1_760_000_000_000L;
+
+    @Override
+    public long currentTimeMillis() {
+      return millis;
+    }
+
+    void advance(long by) {
+      millis += by;
+    }
+  }
+
   @Test
-  void isStrictlyMonotonicWithinAndAcrossMilliseconds() {
-    // The monotonic variant guarantees each id sorts strictly after the previous one, even for a
-    // burst minted inside the same millisecond — that ordering is the whole point of UUIDv7.
-    String previous = generator.newId();
+  void aBurstInsideOneMillisecondStaysStrictlyOrdered() {
+    // The whole point of choosing v7: a burst minted faster than the clock ticks must not scatter
+    // across the index. Inside one millisecond the generator increments the previous value's
+    // entropy rather than drawing fresh — this exercises that counter well past a byte rollover.
+    IdGenerator fixedClock = new Uuidv7IdGenerator(new SteppingClock());
+
+    String previous = fixedClock.newId();
     for (int i = 0; i < 100_000; i++) {
-      String current = generator.newId();
+      String current = fixedClock.newId();
       String last = previous;
       assertTrue(
           current.compareTo(last) > 0,
-          () -> "expected strictly increasing ids, but " + current + " <= " + last);
+          () ->
+              "expected strictly increasing ids inside one millisecond, but "
+                  + current
+                  + " <= "
+                  + last);
       previous = current;
     }
+  }
+
+  @Test
+  void anIdMintedInALaterMillisecondSortsAfterAnEarlierOne() {
+    SteppingClock clock = new SteppingClock();
+    IdGenerator generator = new Uuidv7IdGenerator(clock);
+
+    String earlier = generator.newId();
+    clock.advance(1);
+    String later = generator.newId();
+
+    assertTrue(later.compareTo(earlier) > 0, later + " should sort after " + earlier);
+  }
+
+  @Test
+  void aClockThatStepsBackwardsMintsIdsThatSortEarlier() {
+    SteppingClock clock = new SteppingClock();
+    IdGenerator generator = new Uuidv7IdGenerator(clock);
+    String beforeTheStep = generator.newId();
+
+    clock.advance(-1);
+    String afterTheStep = generator.newId();
+
+    // Asserted rather than avoided. An NTP correction or a resumed VM moves the wall clock back
+    // and these ids follow it — which used to surface as a rare red build, from a test claiming a
+    // monotonicity no wall-clock generator can promise. It costs a moment of index locality and
+    // nothing else: nothing in this framework orders by an id.
+    assertTrue(
+        afterTheStep.compareTo(beforeTheStep) < 0,
+        "a backwards clock step is expected to produce an earlier-sorting id");
+  }
+
+  @Test
+  void aClockThatStepsBackwardsStillMintsDistinctIds() {
+    SteppingClock clock = new SteppingClock();
+    IdGenerator generator = new Uuidv7IdGenerator(clock);
+    Set<String> ids = new HashSet<>();
+
+    for (int step = 0; step < 100; step++) {
+      ids.add(generator.newId());
+      clock.advance(step % 2 == 0 ? -1 : 1);
+    }
+
+    // The property that actually matters when the clock misbehaves. Uniqueness comes from the
+    // entropy, redrawn on any timestamp change, so it does not depend on time moving forwards.
+    assertEquals(100, ids.size(), "ids must stay unique however the clock moves");
   }
 
   @Test
