@@ -108,8 +108,12 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   而且 **MySQL 的优化器本来就在做这个改写**，所以这一条**只是 PG 的问题**，本报告没有区分。
   （二）「饿死」说轻了：`seq` 每实例递增而排序是全局的，配上 claim 上限，
   长寿实例在**每一次**轮询里都被截掉——不是变慢，是**那个实例永久停摆**。改为按到期时间排序 + `effect_id` 平局打破。
-- **部分陈旧，其余已排期** `issue-00119`：effect claim 现已有 PG + MySQL 并发测试；
-  但 **deadline claim 仍只跑 H2**，而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL。
+- ~~**部分陈旧，其余已排期** `issue-00119`：effect claim 现已有 PG + MySQL 并发测试；
+  但 **deadline claim 仍只跑 H2**，而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL。~~
+  → **已修** `issue-00127`：PG 18 与 MySQL 8 上各 4 条断言。**语句本身是对的**——
+  `FOR UPDATE OF d SKIP LOCKED` 两个库都接受——本报告担心的是对的，只是结论是"未验证"而非"有错"。
+  对照（去掉 `SKIP LOCKED`）在两个库上都把**每一个** deadline 认领两遍（40 → 80），
+  所以这组测试确实抓得住重复触发。
   ~~MariaDB 被识别为 mysql 走 SKIP LOCKED（10.6 之前不支持）→ 每轮语法错误、effect 永不投递且不 fail-fast~~
   → **已修** `issue-00120`。**本报告这条的定性需要更正**：不是"支持 MariaDB 但支持得不对"——全树只有三行别名，没有 MariaDB 迁移、测试、容器或决策记录，**框架从未声明过支持它**
   （Flyway 那处的错误信息就紧挨着别名写着"Supported vendors: h2, postgresql, mysql"，二者互相矛盾）。

@@ -2,7 +2,7 @@
 id: issue-00119-ten-majors-were-never-scheduled
 type: issue
 role: main
-status: open
+status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---
 
@@ -89,9 +89,31 @@ parent: report-00003-ddd-library-review-2026-07-29
 | ~~4~~ | ~~`JdbcRateLimiter` 竞态（#10）~~ **已完成** [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]] | — | **负向对照暴露了我自己的一条测试是空的**：它挂钩在 `query(...)`，而旧代码走 `queryForObject(...)`，于是对着它要排除的那个实现绿着通过 |
 | ~~5~~ | ~~CommandBus 循环依赖（#6）~~ **已完成** [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]] | — | **规则指着一扇门，装配把它钉死了**：禁止 handler 依赖 handler 的那条规则，给出的替代路径正是注入 bus。先复现再修；负向对照差点因 spotless 重排而失效 |
 | ~~6~~ | ~~`ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11）~~ **已完成** [[issue-00126-an-anonymous-caller-chose-the-allocation]] | — | **先跑的那三道检查一个都不认人**——签名头非空、时间戳新鲜，攻击者填这些不花钱，而缓冲必须在验签之前，于是分配大小由匿名调用者决定。路径限定**没有照抄** tenancy 的归一化：改用 servlet urlPatterns，让容器按它自己要分发的路径匹配。清理那条最值得记：**V3 的索引就是为这个作业建的，注释都写了，作业没人写** |
-| 7 | deadline claim 的 PG/MySQL 覆盖（#4） | 中 | 现在只跑 H2，而 H2 根本不走那条 SQL |
+| ~~7~~ | ~~deadline claim 的 PG/MySQL 覆盖（#4）~~ **已完成** [[issue-00127-the-least-portable-statement-had-no-database-to-run-on]] | — | 语句本身是对的，**只是从来没有任何数据库跑过它**；对照（去掉 SKIP LOCKED）在两个库上都把每个 deadline 认领两遍。顺带撞出一个既有顺序依赖：`DeadlineCancelMysqlTest` 只 drop 一张表，一直依赖自己第一个跑 |
 | ~~8~~ | ~~effect claim 索引与全局排序（#1 #2）~~ **已完成** [[issue-00125-the-claim-sorted-one-instance-last-forever]] | — | **先测再改是对的**：报告说成因是索引缺 status，实测那个索引**一点用都没有**；真正的成因是 `<>` 在 PG 上不可 seek，而 **MySQL 的优化器自己就在做这个改写**——#1 只是 PG 的问题。最终**一行迁移都没加**。#2 更严重：不是变慢，是那个实例**永远轮不到** |
 | — | #9 / #14 | — | #9 已修，只需在报告上划掉；#14 已显式接受，白名单与理由都在，不再作为待办 |
+
+## 收尾：八档全部完成
+
+`report-00003` §2 的 10 条 Major 已全部处理，本条 issue 关闭。
+
+**回头看，最值得记的不是这些缺陷本身，而是三件反复出现的事：**
+
+1. **报告给的成因不一定对。** 第 8 档报告说 effect claim 慢是因为索引不含 `status`——
+   实测加上那个索引**计划一个字都没变**。真正的成因是 `<>` 在 PG 上不可 seek，
+   而 MySQL 的优化器本来就在做这个改写，所以那一条**只是 PG 的问题**。
+   **凡是性能判断，先在真库上量一遍再动手。**
+
+2. **对照必须确认它真的破坏了东西。** 连踩两次（`issue-00123` 的钩子挂错重载、
+   `issue-00124` 的替换字符串因 spotless 重排而一字未改），两次都是"对照对着它要排除的那份代码绿着通过"。
+   现在每条 revert 都断言 `assert old in s`，并确认变红。
+
+3. **"没有覆盖"和"有错"是两回事，但要分清得先去跑。** 第 7 档那条最不可移植的 SQL
+   在两个真库上其实完全正确——**它只是从来没被任何数据库执行过**。
+
+**顺带产出的，不在原清单里的四项**：pm 的 deadline claim 平局打破（第 8 档发现 claim 从未遵守
+列表查询的既有约定，而我自己的注释还说它遵守了）、rate_limit 表的 `window_start` 索引
+（报告只提了两张表）、`DeadlineCancelMysqlTest` 的执行顺序依赖、以及两处 claim SQL 拷贝的合并。
 
 ## 关联
 
@@ -104,4 +126,7 @@ parent: report-00003-ddd-library-review-2026-07-29
   [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）、
   [[issue-00122-the-four-process-tables-grew-forever]]（排期第 3 档，**已完成**）、
   [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]（排期第 4 档，**已完成**）、
-  [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]（排期第 5 档，**已完成**）
+  [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]（排期第 5 档，**已完成**）、
+  [[issue-00126-an-anonymous-caller-chose-the-allocation]]（排期第 6 档，**已完成**）、
+  [[issue-00127-the-least-portable-statement-had-no-database-to-run-on]]（排期第 7 档，**已完成**）、
+  [[issue-00125-the-claim-sorted-one-instance-last-forever]]（排期第 8 档，**已完成**）
