@@ -8,7 +8,7 @@ package com.aipersimmon.ddd.core.model;
  * @param <T> the referenced aggregate root type
  * @param <ID> the referenced root's identity type
  */
-public interface Association<T extends AggregateRoot<ID>, ID> {
+public interface Association<T extends AbstractAggregateRoot<ID>, ID> {
 
   /** Identity of the referenced aggregate root. */
   ID id();

@@ -39,14 +39,6 @@
       <artifactId>micrometer-core</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Time-ordered (UUIDv7) IdGenerator. A required dependency, not optional: a silent
-         fall back to UUID.randomUUID() would reintroduce exactly the random-VARCHAR-key write
-         amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-outbox</artifactId>

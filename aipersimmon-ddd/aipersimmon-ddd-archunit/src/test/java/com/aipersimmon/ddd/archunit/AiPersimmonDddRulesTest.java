@@ -16,8 +16,6 @@ class AiPersimmonDddRulesTest {
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.eventtype");
   private static final JavaClasses BAD =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
-  private static final JavaClasses ANNOTATED_EVENT_IN_ADAPTER =
-      new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.annotated");
   private static final JavaClasses APIDOC_BAD =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.apidoc");
   private static final String CONTEXTS_GOOD_BASE =
@@ -49,13 +47,6 @@ class AiPersimmonDddRulesTest {
   void domainEventsShouldStayInDomain_failsForBad() {
     assertThrows(
         AssertionError.class, () -> EventRules.domainEventsShouldStayInDomain().check(BAD));
-  }
-
-  @Test
-  void domainEventsShouldStayInDomain_catchesAnnotatedEventOutsideDomain() {
-    assertThrows(
-        AssertionError.class,
-        () -> EventRules.domainEventsShouldStayInDomain().check(ANNOTATED_EVENT_IN_ADAPTER));
   }
 
   @Test

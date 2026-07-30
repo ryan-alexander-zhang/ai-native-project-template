@@ -22,14 +22,25 @@ import java.util.Objects;
  * guards can both write, and the later write silently discards the earlier one. See {@code
  * design-00011}.
  *
- * <p>Equality is by identity, as {@link Entity} requires: {@link #equals(Object)} and {@link
- * #hashCode()} are {@code final} here so the contract cannot drift per subclass. Neither the
- * version nor the recorded events take part — they are persistence and lifecycle state, not
- * identity.
+ * <p>Equality is by identity, which is what makes this an entity rather than a value: {@link
+ * #equals(Object)} and {@link #hashCode()} are {@code final} here so the contract cannot drift per
+ * subclass. Neither the version nor the recorded events take part — they are persistence and
+ * lifecycle state, not identity.
+ *
+ * <p>This class <em>is</em> the aggregate-root contract; there is no separate marker interface to
+ * implement as well. The role is declared with {@link
+ * com.aipersimmon.ddd.core.annotation.AggregateRoot @AggregateRoot}, which is the one vocabulary
+ * that covers every building-block role, and extending this supplies the behaviour.
  *
  * @param <ID> the identity type of the root
  */
-public abstract class AbstractAggregateRoot<ID> implements AggregateRoot<ID> {
+public abstract class AbstractAggregateRoot<ID> {
+
+  /**
+   * The aggregate's identity. Declared here rather than inherited from a marker interface, so that
+   * a root has one supertype and one place to look.
+   */
+  public abstract ID id();
 
   private final transient List<DomainEvent> domainEvents = new ArrayList<>();
 

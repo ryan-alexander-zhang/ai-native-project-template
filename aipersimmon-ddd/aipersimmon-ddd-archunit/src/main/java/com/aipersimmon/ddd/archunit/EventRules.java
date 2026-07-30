@@ -41,18 +41,17 @@ public final class EventRules {
   private EventRules() {}
 
   /**
-   * Domain events belong to the domain layer, not to the interface or integration layers. Matches a
-   * type declared as a domain event <em>either</em> way the core offers — implementing the {@link
-   * DomainEvent} marker interface or carrying the {@link
-   * com.aipersimmon.ddd.core.annotation.DomainEvent @DomainEvent} annotation — since both express
-   * the same role and the annotation path must be guarded too.
+   * Domain events belong to the domain layer, not to the interface or integration layers. A domain
+   * event is a type that implements {@link DomainEvent} — the one way the core offers to declare
+   * one. It used to be two: an {@code @DomainEvent} annotation named the same role, so this rule
+   * had to match either, and had to write one of the two names fully qualified to do it. The
+   * annotation is gone; only the interface can appear in {@code registerEvent}'s signature, which
+   * is what a domain event is for.
    */
   public static ArchRule domainEventsShouldStayInDomain() {
     return classes()
         .that()
         .implement(DomainEvent.class)
-        .or()
-        .areAnnotatedWith(com.aipersimmon.ddd.core.annotation.DomainEvent.class)
         .should()
         .resideInAPackage("..domain..")
         .as("domain events should reside in the domain layer")

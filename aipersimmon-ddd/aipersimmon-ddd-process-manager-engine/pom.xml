@@ -33,13 +33,17 @@
   <description>Storage-agnostic engine of the durable Process Manager: runtime, relay, deadline worker, and shared Spring wiring over store ports.</description>
 
   <dependencies>
-    <!-- Time-ordered (UUIDv7) IdGenerator. A required dependency, not optional: a silent
-         fall back to UUID.randomUUID() would reintroduce exactly the random-VARCHAR-key write
-         amplification this SPI exists to remove, with no startup signal (see issue-00053). -->
+    <!-- The UUIDv7 IdGenerator implementation, at runtime scope: this module compiles against the
+         IdGenerator SPI in aipersimmon-ddd-core and never names anything in this starter, but the
+         bean has to exist or the framework mints ids with UUID.randomUUID() and reintroduces the
+         random-key write amplification the SPI was added to remove — with no startup signal (see
+         issue-00053). Runtime scope says exactly that and still reaches the application's
+         classpath transitively; compile scope claimed a code dependency that was never there. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
