@@ -11,10 +11,17 @@ import static org.mockito.Mockito.when;
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -59,8 +66,25 @@ class MybatisPlusAggregateRepositoryTest {
     }
   }
 
+  /**
+   * A row the mapper is mocked for, so MyBatis never parses it. The base class reads MyBatis-Plus's
+   * table metadata to key its update and to find the columns the entity update would drop, so the
+   * metadata is registered by hand below — the alternative being to weaken the production path into
+   * accepting an unregistered entity, which no real application has.
+   */
+  @TableName("thing")
   private static final class ThingRow implements VersionedRow {
-    private Long version;
+    @TableId private String id;
+
+    @Version private Long version;
+
+    public String getId() {
+      return id;
+    }
+
+    public void setId(String id) {
+      this.id = id;
+    }
 
     @Override
     public Long getVersion() {
@@ -96,7 +120,9 @@ class MybatisPlusAggregateRepositoryTest {
 
     @Override
     protected ThingRow toRow(Thing thing) {
-      return new ThingRow();
+      ThingRow row = new ThingRow();
+      row.setId(thing.id());
+      return row;
     }
 
     @Override
@@ -111,6 +137,12 @@ class MybatisPlusAggregateRepositoryTest {
   private final CapturingDomainEvents events = new CapturingDomainEvents();
   private Things things;
   private Long versionSeenByUpdate;
+
+  @BeforeAll
+  static void registerTheRowWithMybatisPlus() {
+    TableInfoHelper.initTableInfo(
+        new MapperBuilderAssistant(new MybatisConfiguration(), ""), ThingRow.class);
+  }
 
   @BeforeEach
   void setUp() {
@@ -127,14 +159,18 @@ class MybatisPlusAggregateRepositoryTest {
   }
 
   /**
-   * Stub updateById the way the optimistic-locker interceptor actually behaves: it rewrites the
+   * Stub the update the way the optimistic-locker interceptor actually behaves: it rewrites the
    * statement AND writes the incremented version back onto the entity. That write-back is the
    * witness saveAggregate checks, so a mock that skipped it would be modelling a database with no
    * optimistic locking at all — which is what {@link
    * #anUpdateWhoseVersionWasNotCheckedIsRefusedRatherThanTrusted} models on purpose.
+   *
+   * <p>The interceptor treats {@code update(entity, wrapper)} exactly as it treats {@code
+   * updateById}: it keys on the entity parameter, so it appends the version predicate to the
+   * wrapper and writes the incremented version back just the same.
    */
   private void updateSucceedsWithOptimisticLocking() {
-    when(mapper.updateById(any(ThingRow.class)))
+    when(mapper.update(any(ThingRow.class), any()))
         .thenAnswer(
             invocation -> {
               ThingRow row = invocation.getArgument(0);
@@ -160,7 +196,7 @@ class MybatisPlusAggregateRepositoryTest {
     things.save(thing);
 
     assertThat(versionPassedTo(captor -> verify(mapper).insert(captor.capture()))).isEqualTo(1L);
-    verify(mapper, never()).updateById(any(ThingRow.class));
+    verify(mapper, never()).update(any(ThingRow.class), any());
     verify(mapper, never()).selectById(any());
     assertThat(thing.version()).as("in-memory version matches the stored row").isEqualTo(1L);
   }
@@ -181,7 +217,7 @@ class MybatisPlusAggregateRepositoryTest {
 
   @Test
   void anUpdateThatMatchesNoRowIsRefused() {
-    when(mapper.updateById(any(ThingRow.class))).thenReturn(0);
+    when(mapper.update(any(ThingRow.class), any())).thenReturn(0);
     Thing thing = Thing.loadedAt("t-1", 4L);
     thing.rename();
 
@@ -231,7 +267,7 @@ class MybatisPlusAggregateRepositoryTest {
     // "WHERE version = ?" was applied, so this write would have silently discarded a concurrent
     // change — and the affected-rows check cannot notice, because it passes for exactly that
     // reason.
-    when(mapper.updateById(any(ThingRow.class))).thenReturn(1);
+    when(mapper.update(any(ThingRow.class), any())).thenReturn(1);
     Thing thing = Thing.loadedAt("t-1", 4L);
     thing.rename();
 

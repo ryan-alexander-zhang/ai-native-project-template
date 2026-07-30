@@ -2,7 +2,10 @@ package com.aipersimmon.ddd.persistence.mybatisplus;
 
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfo;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import java.util.Objects;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -87,7 +90,7 @@ public abstract class MybatisPlusAggregateRepository<
       mapper.insert(row);
     } else {
       row.setVersion(expected);
-      if (mapper.updateById(row) == 0) {
+      if (update(row) == 0) {
         throw new OptimisticLockingFailureException(
             "aggregate "
                 + aggregate.getClass().getSimpleName()
@@ -102,6 +105,53 @@ public abstract class MybatisPlusAggregateRepository<
     saveChildren(aggregate);
     aggregate.versionAdvanced();
     domainEvents.publishAndClear(aggregate);
+  }
+
+  /**
+   * Write the root row, including the columns the aggregate has emptied.
+   *
+   * <p>{@code updateById} alone would not: MyBatis-Plus leaves a null field out of the {@code SET}
+   * clause, which is right for a partial update and wrong for this one. {@link #toRow} maps the
+   * whole root, so a null here means the aggregate cleared that field — and dropping the assignment
+   * leaves the old value in the database while everything reports success. The version really did
+   * move, so the optimistic-lock check passes; the events really do publish, so downstream is told
+   * the change happened; and the old value comes back on the next load, undoing part of a command
+   * that was accepted. This is the trap this base class exists to neutralise, and the store the
+   * framework wrote for its own outbox already sidesteps it the same way.
+   *
+   * <p>So the update goes through a wrapper carrying the emptied columns explicitly, keyed by id.
+   * The entity is still passed: it supplies every other column, and — the part that matters — the
+   * optimistic-lock interceptor keys on it, appending the {@code version} predicate to this wrapper
+   * and writing the incremented version back for {@link #requireVersionWasChecked} to inspect. Both
+   * halves of the guarantee are therefore unchanged.
+   */
+  private int update(D row) {
+    TableInfo tableInfo = TableInfoHelper.getTableInfo(row.getClass());
+    UpdateWrapper<D> wrapper = new UpdateWrapper<>();
+    wrapper.eq(idColumnOf(tableInfo, row), idValueOf(tableInfo, row));
+    ClearedColumns.forceOnto(wrapper, row);
+    return mapper.update(row, wrapper);
+  }
+
+  private String idColumnOf(TableInfo tableInfo, D row) {
+    if (tableInfo == null || tableInfo.getKeyColumn() == null) {
+      throw new IllegalStateException(
+          row.getClass().getName()
+              + " has no MyBatis-Plus primary key, so its update has nothing to key on. Annotate"
+              + " the identity field with @TableId.");
+    }
+    return tableInfo.getKeyColumn();
+  }
+
+  private Object idValueOf(TableInfo tableInfo, D row) {
+    Object id = tableInfo.getPropertyValue(row, tableInfo.getKeyProperty());
+    if (id == null) {
+      throw new IllegalStateException(
+          row.getClass().getName()
+              + " came back from toRow with no primary key value, so an update would match every"
+              + " row of the table. Map the aggregate's identity onto the row.");
+    }
+    return id;
   }
 
   /**
