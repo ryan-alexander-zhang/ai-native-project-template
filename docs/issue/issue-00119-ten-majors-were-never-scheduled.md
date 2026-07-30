@@ -43,7 +43,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | 2 | pm：全局 `ORDER BY` 饿死长寿实例 | **开着** | 同上 `:73` `ORDER BY e.seq` 是**全局**排序；`seq` 每实例递增，故长寿实例的 seq 永远排在新实例之后 |
 | 3 | pm：四张表零保留策略 | **开着** | 全树 `DELETE FROM aipersimmon_process_*` **零条** |
 | 4 | pm：SKIP LOCKED claim 零真库覆盖 | **半陈旧** | effect claim 现有 `EffectRelayPostgresConcurrencyTest` / `EffectRelayMysqlConcurrencyTest`；**deadline claim 仍只跑 H2**——而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL |
-| 5 | pm：MariaDB 误判走 SKIP LOCKED | **开着，原样未动** | `ProcessDialectFactory:50` `product.contains("maria") → "mysql" → SkipLockedProcessDialect`；MariaDB 10.6 之前不支持 |
+| 5 | pm：MariaDB 误判走 SKIP LOCKED | ~~开着~~ **已修** `issue-00120` | 查来历后发现**没有人声明过支持它**：全树只有三行别名，无迁移、无测试、无容器、无决策。三处一并删除并落到 fail-fast |
 | 6 | CQRS：handler 构造注入 CommandBus 触发循环依赖 | **开着** | `AipersimmonDddCqrsAutoConfiguration:92` 在 `commandBus` 工厂**体内** `handlers.stream().toList()` |
 | 7 | CQRS：`domainEvents()` 承诺快照实为活视图 | **开着** | `AbstractAggregateRoot:68` 返回 `unmodifiableList(domainEvents)`——**不可变视图 ≠ 快照**，而 javadoc 写着 "snapshot" |
 | 8 | CQRS：命令失败只 DEBUG | **开着** | `LoggingCommandInterceptor:41` `log.debug("Command {} failed: {}")` |
@@ -81,7 +81,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 
 | 序 | 条目 | 规模 | 为什么排这里 |
 |---|---|---|---|
-| 1 | MariaDB 方言（#5） | 十几行 | 把 `maria` 从 mysql 分支剥出去：走 AtomicUpdate，或按版本探测后**拒绝启动**。当前是静默的每轮失败 |
+| ~~1~~ | ~~MariaDB 方言（#5）~~ **已完成** [[issue-00120-mariadb-was-support-nobody-had-declared]] | — | **动手前查来历，把修法整个换掉了**：不是"支持得不好"，是**从来没有人声明过支持**。版本探测那条因此划掉——三处别名一并删除，落到已有的 fail-fast |
 | 2 | `domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8） | 合计 < 1 天 | 三条都是"承诺与行为对齐"，正是 §0 第二个主题的残余 |
 | 3 | pm 四表保留策略（#3） | 中 | 照 outbox cleanup 的形状抄一份，含三方言迁移 |
 | 4 | `JdbcRateLimiter` 竞态（#10） | 小 | `queryForObject` → `query().stream().findFirst()`，顺带修 DELETE 的窗口谓词 |
@@ -98,3 +98,4 @@ parent: report-00003-ddd-library-review-2026-07-29
 - 证明"是注意力不是优先级"的对照：[[issue-00115-clearing-a-field-never-reached-the-database]]
 - §2 中已完成的最后一块（覆盖率）：[[issue-00117-the-advance-itself-had-no-tests]]、
   [[issue-00118-the-recovery-paths-had-no-tests]]
+- 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）

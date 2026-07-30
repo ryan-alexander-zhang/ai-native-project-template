@@ -102,8 +102,10 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   四张表**全无保留/清理策略**——成本无界增长。
 - **部分陈旧，其余已排期** `issue-00119`：effect claim 现已有 PG + MySQL 并发测试；
   但 **deadline claim 仍只跑 H2**，而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL。
-  MariaDB 被识别为 mysql 走 SKIP LOCKED（10.6 之前不支持）→ 每轮语法错误、effect 永不投递且不 fail-fast，
-  **原样未动**。
+  ~~MariaDB 被识别为 mysql 走 SKIP LOCKED（10.6 之前不支持）→ 每轮语法错误、effect 永不投递且不 fail-fast~~
+  → **已修** `issue-00120`。**本报告这条的定性需要更正**：不是"支持 MariaDB 但支持得不对"——全树只有三行别名，没有 MariaDB 迁移、测试、容器或决策记录，**框架从未声明过支持它**
+  （Flyway 那处的错误信息就紧挨着别名写着"Supported vendors: h2, postgresql, mysql"，二者互相矛盾）。
+  三处别名一并删除并落到 fail-fast。
 
 **持久化（写路径核心是全框架最扎实的部分，以下是其降级路径）**
 - ~~`MybatisPlusAggregateRepository` 用 `updateById`，MP 默认 `NOT_NULL` 策略把 null 列从 SET 剔除~~
@@ -298,4 +300,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00108-a-killed-relay-instance-stops-all-delivery]]、
   [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]、
   [[issue-00110-the-outbox-had-no-metrics-at-all]]、
-  [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）
+  [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）、
+  [[issue-00120-mariadb-was-support-nobody-had-declared]]
