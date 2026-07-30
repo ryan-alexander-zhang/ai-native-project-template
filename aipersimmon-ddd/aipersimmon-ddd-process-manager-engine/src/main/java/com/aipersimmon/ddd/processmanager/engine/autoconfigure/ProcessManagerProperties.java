@@ -40,6 +40,7 @@ public class ProcessManagerProperties {
   private final Worker effectRelay = new Worker();
   private final Worker deadlineWorker = new Worker();
   private final ParkedInputWorker parkedInputWorker = new ParkedInputWorker();
+  private final Cleanup cleanup = new Cleanup();
   private final Observability observability = new Observability();
   private final Instance instance = new Instance();
   private final Payload payload = new Payload();
@@ -140,6 +141,72 @@ public class ProcessManagerProperties {
    * retried on a schedule. Exposing lease/attempt/backoff knobs here would describe a mechanism
    * that does not exist.
    */
+  /**
+   * Retention for the four tables. Off by default, like the outbox purge and for the same reason:
+   * deleting a business record and choosing how long to keep it are deployment decisions. Leaving
+   * it off is a valid choice; never having read the question is not.
+   */
+  public static class Cleanup {
+    private boolean enabled = false;
+
+    /** How long a finished instance is kept after its last transition. Thirty days. */
+    private long retentionSeconds = 2_592_000L;
+
+    /** How often to look for instances to remove. */
+    private Duration pollDelay = Duration.ofHours(1);
+
+    /**
+     * How many instances one run removes. It bounds how long the delete holds locks on tables the
+     * relay and deadline worker are also reading; a run that fills its batch says so in the log,
+     * because a purge that is only keeping up looks exactly like one that has finished.
+     */
+    private int batchSize = 200;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public long getRetentionSeconds() {
+      return retentionSeconds;
+    }
+
+    public void setRetentionSeconds(long retentionSeconds) {
+      this.retentionSeconds = retentionSeconds;
+    }
+
+    public Duration getPollDelay() {
+      return pollDelay;
+    }
+
+    public void setPollDelay(Duration pollDelay) {
+      this.pollDelay = pollDelay;
+    }
+
+    public int getBatchSize() {
+      return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+      this.batchSize = batchSize;
+    }
+
+    void validate() {
+      if (retentionSeconds < 1) {
+        throw new IllegalStateException("cleanup.retention-seconds must be >= 1");
+      }
+      if (pollDelay == null || pollDelay.isNegative() || pollDelay.isZero()) {
+        throw new IllegalStateException("cleanup.poll-delay must be positive");
+      }
+      if (batchSize < 1) {
+        throw new IllegalStateException("cleanup.batch-size must be >= 1");
+      }
+    }
+  }
+
   public static class ParkedInputWorker {
     private boolean enabled = true;
 
@@ -328,6 +395,7 @@ public class ProcessManagerProperties {
     effectRelay.validate("effect-relay");
     deadlineWorker.validate("deadline-worker");
     parkedInputWorker.validate();
+    cleanup.validate();
     observability.validate();
     instance.validate();
     payload.validate();
@@ -395,6 +463,10 @@ public class ProcessManagerProperties {
 
   public Worker getDeadlineWorker() {
     return deadlineWorker;
+  }
+
+  public Cleanup getCleanup() {
+    return cleanup;
   }
 
   public ParkedInputWorker getParkedInputWorker() {

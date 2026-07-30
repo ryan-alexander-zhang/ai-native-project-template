@@ -13,6 +13,7 @@ import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
+import com.aipersimmon.ddd.processmanager.engine.cleanup.ProcessCleanup;
 import com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker;
 import com.aipersimmon.ddd.processmanager.engine.lease.ProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog;
@@ -35,6 +36,7 @@ import com.aipersimmon.ddd.processmanager.engine.runtime.SpringTxProcessUnitOfWo
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.ProcessRetentionStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import java.time.Clock;
@@ -361,12 +363,35 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         storeTracer.getIfAvailable(() -> NoOpStoreAndForwardTracer.INSTANCE));
   }
 
+  /**
+   * Retention, only when a backend supplied a {@link ProcessRetentionStore} and the application
+   * asked for it. Off by default: deleting a business record and choosing how long to keep it are
+   * the consumer's decisions, not a default the library helps itself to.
+   */
+  @Bean
+  @ConditionalOnBean(ProcessRetentionStore.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.process-manager.cleanup",
+      name = "enabled",
+      havingValue = "true")
+  public ProcessCleanup processCleanup(
+      ProcessRetentionStore retention,
+      ProcessUnitOfWork unitOfWork,
+      Clock processManagerClock,
+      ProcessManagerProperties properties) {
+    ProcessManagerProperties.Cleanup cfg = properties.getCleanup();
+    return new ProcessCleanup(
+        retention, unitOfWork, processManagerClock, cfg.getRetentionSeconds(), cfg.getBatchSize());
+  }
+
   @Bean
   @ConditionalOnMissingBean
   public ProcessWorkerScheduler processWorkerScheduler(
       ObjectProvider<ProcessEffectRelay> relay,
       ObjectProvider<ProcessDeadlineWorker> worker,
       ObjectProvider<ParkedInputWorker> parkedInputWorker,
+      ObjectProvider<ProcessCleanup> cleanup,
       ProcessManagerProperties properties) {
     return new ProcessWorkerScheduler(
         relay.getIfAvailable(),
@@ -375,6 +400,8 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
         properties.getDeadlineWorker().getPollDelay(),
         parkedInputWorker.getIfAvailable(),
         properties.getParkedInputWorker().getPollDelay(),
+        cleanup.getIfAvailable(),
+        properties.getCleanup().getPollDelay(),
         properties.getShutdownTimeout());
   }
 

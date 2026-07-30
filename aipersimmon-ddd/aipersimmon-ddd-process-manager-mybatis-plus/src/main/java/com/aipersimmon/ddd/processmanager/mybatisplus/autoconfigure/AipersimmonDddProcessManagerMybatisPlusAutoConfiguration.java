@@ -10,10 +10,12 @@ import com.aipersimmon.ddd.processmanager.mybatisplus.lease.ProcessClaimMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessRetentionStore;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessTransitionStore;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessDeadlineMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessEffectMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessInstanceMapper;
+import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessRetentionMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessTransitionMapper;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import java.util.Locale;
@@ -56,6 +58,13 @@ public class AipersimmonDddProcessManagerMybatisPlusAutoConfiguration {
   public MapperFactoryBean<ProcessInstanceMapper> aipersimmonProcessInstanceMapper(
       SqlSessionFactory sqlSessionFactory) {
     return mapper(ProcessInstanceMapper.class, sqlSessionFactory);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public MapperFactoryBean<ProcessRetentionMapper> aipersimmonProcessRetentionMapper(
+      SqlSessionFactory sqlSessionFactory) {
+    return mapper(ProcessRetentionMapper.class, sqlSessionFactory);
   }
 
   @Bean
@@ -113,6 +122,12 @@ public class AipersimmonDddProcessManagerMybatisPlusAutoConfiguration {
   @ConditionalOnMissingBean
   public MybatisProcessInstanceStore mybatisProcessInstanceStore(ProcessInstanceMapper mapper) {
     return new MybatisProcessInstanceStore(mapper);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public MybatisProcessRetentionStore mybatisProcessRetentionStore(ProcessRetentionMapper mapper) {
+    return new MybatisProcessRetentionStore(mapper);
   }
 
   @Bean

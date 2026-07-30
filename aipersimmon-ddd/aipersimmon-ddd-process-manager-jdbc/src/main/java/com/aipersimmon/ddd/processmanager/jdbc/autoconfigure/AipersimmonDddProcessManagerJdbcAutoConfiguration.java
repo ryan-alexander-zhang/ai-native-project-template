@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessDialect;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessRetentionStore;
 import com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore;
 import javax.sql.DataSource;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -74,6 +75,13 @@ public class AipersimmonDddProcessManagerJdbcAutoConfiguration {
   @ConditionalOnMissingBean
   public JdbcProcessInstanceStore jdbcProcessInstanceStore(JdbcTemplate jdbcTemplate) {
     return new JdbcProcessInstanceStore(jdbcTemplate);
+  }
+
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean
+  public JdbcProcessRetentionStore jdbcProcessRetentionStore(JdbcTemplate jdbcTemplate) {
+    return new JdbcProcessRetentionStore(jdbcTemplate);
   }
 
   @Bean

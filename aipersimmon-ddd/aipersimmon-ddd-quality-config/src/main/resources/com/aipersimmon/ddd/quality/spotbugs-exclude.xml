@@ -77,11 +77,14 @@
       <Class name="com.aipersimmon.ddd.outbox.mybatisplus.MybatisOutboxStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessManagerStartupValidator"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.deadline.ProcessDeadlineWorker"/>
+      <Class name="com.aipersimmon.ddd.processmanager.engine.cleanup.ProcessCleanup"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.operation.ProcessOperations"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.replay.ParkedInputWorker"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery"/>
+      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessRetentionStore"/>
+      <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessRetentionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.JdbcProcessSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy"/>
