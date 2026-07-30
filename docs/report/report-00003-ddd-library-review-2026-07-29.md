@@ -100,8 +100,14 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - **部分已修**：~~四张表全无保留/清理策略~~ → **已修** `issue-00122`（按实例整体删除，
   未投递效果与 DEAD 工作一律留下，默认关闭，V5 三方言索引）。**顺带证实了报告的饿死判断**——
   保留查询第一版同样漏了平局打破，配上批量上限会让平局后面的实例永远轮不到。
-  **仍开着，已排期** `issue-00119`：Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢
-  （索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq` 系统性饿死长寿实例。
+  ~~**仍开着，已排期** `issue-00119`：Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢
+  （索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq` 系统性饿死长寿实例。~~
+  → **已修** `issue-00125`，但**两条的判断都要更正**：
+  （一）成因不是索引缺 status。实测加上 `(instance_id, status, seq)` **计划完全没变、索引没被用**；
+  真正的成因是 `<>` 在 PostgreSQL 上不可 seek，写成两个区间即解决，**一行迁移都不需要**。
+  而且 **MySQL 的优化器本来就在做这个改写**，所以这一条**只是 PG 的问题**，本报告没有区分。
+  （二）「饿死」说轻了：`seq` 每实例递增而排序是全局的，配上 claim 上限，
+  长寿实例在**每一次**轮询里都被截掉——不是变慢，是**那个实例永久停摆**。改为按到期时间排序 + `effect_id` 平局打破。
 - **部分陈旧，其余已排期** `issue-00119`：effect claim 现已有 PG + MySQL 并发测试；
   但 **deadline claim 仍只跑 H2**，而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL。
   ~~MariaDB 被识别为 mysql 走 SKIP LOCKED（10.6 之前不支持）→ 每轮语法错误、effect 永不投递且不 fail-fast~~

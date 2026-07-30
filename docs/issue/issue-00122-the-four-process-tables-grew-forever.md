@@ -58,7 +58,11 @@ parked-input worker 靠重放的幂等性。两个实例同时 purge 会选到�
 而配上批量上限，不稳定的顺序可能每次都取到同一个子集，
 **让平局后面的某个实例永远轮不到**——正是报告给 effect claim 提的那个饿死问题的同一形状。
 
-补上 `instance_id` 作为决定性平局打破，与 deadline claim 的 `(due_at, deadline_id)` 同一个约定。
+补上 `instance_id` 作为决定性平局打破，与 deadline **列表查询**的 `(due_at, deadline_id)` 同一个约定。
+
+> 更正（[[issue-00125-the-claim-sorted-one-instance-last-forever]]）：此处原文写的是「与 deadline **claim** 同一个约定」，
+> 而 deadline claim 当时**并没有**平局打破——这个约定只存在于 `JdbcProcessDeadlineStore` 的列表查询上。
+> claim 的那一半由 `issue-00125` 补上。
 
 ## V5 索引，三方言
 
