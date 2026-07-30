@@ -11,6 +11,7 @@ import com.aipersimmon.ddd.testsupport.SharedContainers;
 import com.aipersimmon.ddd.testsupport.TestDataSources;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -42,7 +43,17 @@ class DeadlineCancelMysqlTest {
   void setUp() throws Exception {
     var ds = TestDataSources.from(MYSQL);
     jdbc = new JdbcTemplate(ds);
-    jdbc.execute("DROP TABLE IF EXISTS aipersimmon_process_deadline");
+    // All four, not just the deadline table. V1 creates every table with IF NOT EXISTS and V2 then
+    // drops a column from three of them, so leaving any table behind makes this setup depend on
+    // which test class ran before it: the leftovers are already past V2, and V2 fails on them.
+    for (String table :
+        List.of(
+            "aipersimmon_process_effect",
+            "aipersimmon_process_transition",
+            "aipersimmon_process_deadline",
+            "aipersimmon_process_instance")) {
+      jdbc.execute("DROP TABLE IF EXISTS " + table);
+    }
     new ResourceDatabasePopulator(
             new ClassPathResource(
                 "aipersimmon/db/migration/process-manager/mysql/V1__aipersimmon_process_manager.sql"),
@@ -51,7 +62,9 @@ class DeadlineCancelMysqlTest {
             new ClassPathResource(
                 "aipersimmon/db/migration/process-manager/mysql/V3__add_tenant_id.sql"),
             new ClassPathResource(
-                "aipersimmon/db/migration/process-manager/mysql/V4__parked_input_replay_marker.sql"))
+                "aipersimmon/db/migration/process-manager/mysql/V4__parked_input_replay_marker.sql"),
+            new ClassPathResource(
+                "aipersimmon/db/migration/process-manager/mysql/V5__retention_index.sql"))
         .execute(ds);
     deadlines = new JdbcProcessDeadlineStore(jdbc);
   }
