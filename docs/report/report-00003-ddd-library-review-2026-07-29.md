@@ -97,10 +97,13 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - ~~`withRetry` 在加入外层事务时失效~~ / ~~并发首次 start 漏 `DuplicateKeyException` 映射~~ →
   **已修** `issue-00105`：joined 事务下只尝试一次并让冲突上抛（重试的前提是"失败只作废这一次尝试"，
   加入别人的事务时该前提不成立），两个 instance store 都补上唯一键映射。
-- Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢（索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq`
-  系统性饿死长寿实例；四张表**全无保留/清理策略**——成本无界增长。
-- SKIP LOCKED 的 deadline claim SQL 在两个真实数据库上零测试覆盖；MariaDB 被识别为 mysql 走 SKIP LOCKED，
-  但 10.6 之前不支持 → 每轮语法错误、effect 永不投递且不 fail-fast。
+- **仍开着，已排期** `issue-00119`：Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢
+  （索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq` 系统性饿死长寿实例；
+  四张表**全无保留/清理策略**——成本无界增长。
+- **部分陈旧，其余已排期** `issue-00119`：effect claim 现已有 PG + MySQL 并发测试；
+  但 **deadline claim 仍只跑 H2**，而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL。
+  MariaDB 被识别为 mysql 走 SKIP LOCKED（10.6 之前不支持）→ 每轮语法错误、effect 永不投递且不 fail-fast，
+  **原样未动**。
 
 **持久化（写路径核心是全框架最扎实的部分，以下是其降级路径）**
 - ~~`MybatisPlusAggregateRepository` 用 `updateById`，MP 默认 `NOT_NULL` 策略把 null 列从 SET 剔除~~
@@ -121,19 +124,27 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   变成"启动即失败并报出迁移路径"，缺省值的安全性因此翻转。
 
 **CQRS / 核心**
-- handler 构造注入 `CommandBus` 会启动循环依赖（`AipersimmonDddCqrsAutoConfiguration:67-73` 在工厂方法内
-  `handlers.stream().toList()` 提前实例化全部 handler），而这正是框架文档推荐的子命令派发写法。
-- `domainEvents()` javadoc 承诺快照，实际返回活视图 → 同步监听器回写同一聚合时 `ConcurrentModificationException`。
+- **仍开着，已排期** `issue-00119`：handler 构造注入 `CommandBus` 会启动循环依赖
+  （`AipersimmonDddCqrsAutoConfiguration:92` 在工厂方法内 `handlers.stream().toList()` 提前实例化全部 handler），
+  而这正是框架文档推荐的子命令派发写法。
+- **仍开着，已排期** `issue-00119`：`domainEvents()` javadoc 承诺快照，实际返回活视图
+  （`AbstractAggregateRoot:68` 的 `unmodifiableList` 是**视图**）→ 同步监听器回写同一聚合时 `ConcurrentModificationException`。
+  **这正是 §0 第二个系统性主题的残余**。
 - ~~无 `PlatformTransactionManager` 时 `UnitOfWork` 与事务拦截器静默 back-off~~ → **已修** `issue-00107`：
   默认拒绝启动 + FailureAnalyzer 报告，`aipersimmon.ddd.cqrs.transaction.required=false` 是显式逃生舱（每次启动 WARN）。
-- 命令失败只 DEBUG 记录，默认 INFO 生产配置下失败命令一行日志都没有。
+- **仍开着，已排期** `issue-00119`：命令失败只 DEBUG 记录（`LoggingCommandInterceptor:41`），默认 INFO 生产配置下失败命令一行日志都没有。
 
 **Web / 可观测性**
-- 错误响应被存下并在整个 TTL 内重放（5xx 冻结 24 小时，客户端重试永远拿到失败）。
-- `JdbcRateLimiter` 窗口边界竞态抛 `EmptyResultDataAccessException` → 间歇 500。
-- web-store JDBC 两张表无清理路径且无 `expires_at` 索引 → 无界增长（一次性 key 的"改写时顺带清理"永不触发）。
-- 兜底 500 处理器不记日志（`AipersimmonDddWebExceptionHandler:198-202`）→ 生产 NPE 无栈可查。
-- `ReplayProtectionFilter` 默认作用于全部请求且认证前无上限缓冲请求体（探针被 401 打死 + 内存 DoS 面）。
+- ~~错误响应被存下并在整个 TTL 内重放（5xx 冻结 24 小时）~~ → **其实已修**，是 `issue-00101` 顺带做掉的
+  （`IdempotencyFilter:189` ≥500 → `abandonQuietly`）。本报告一直没划掉，是文档滞后；由 `issue-00119` 核实。
+- **仍开着，已排期** `issue-00119`：`JdbcRateLimiter` 窗口边界竞态抛 `EmptyResultDataAccessException` → 间歇 500。
+  （`count == null` 那个守卫拦的是 **NULL 值**，不是**零行**。）
+- **半修，其余已排期** `issue-00119`：`expires_at` 索引已由 V3 补上（同样是 `issue-00101` 顺带）；
+  但两张表**仍无清理路径**——一次性 key 的"改写时顺带清理"永不触发。
+- **仍开着，已排期** `issue-00119`：兜底 500 处理器不记日志（`AipersimmonDddWebExceptionHandler:167`）→ 生产 NPE 无栈可查。
+- **仍开着，已排期** `issue-00119`：`ReplayProtectionFilter` 默认作用于全部请求且认证前无上限缓冲请求体
+  （`CachedBodyRequestWrapper:24` 是裸 `readAllBytes()`）。**本报告漏了一个限定**：它是 opt-in 的
+  （`replay.enabled=true` 且存在 `RequestSignatureVerifier` bean），只在启用时才咬人。
 
 **架构层**
 - ~~outbox 家族没有 engine 层~~ → **已修** `decision-00020`：新增 `aipersimmon-ddd-outbox-engine`
@@ -255,6 +266,22 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   测试拆成三条各自为真的断言并**把时钟倒退这条断言下来**而不是回避它。
   `decision-00019` 的措辞未受影响——它选 UUIDv7 的理由从头到尾是写放大/索引局部性，不是排序保证。
 
+## 5. §3 的覆盖缺口（本报告自身的缺陷）
+
+**§3 不是 §2 的全集，而本报告从未交代被它漏掉的发现去哪了。** 分组标题「发布阻断」+「紧接其后」
+暗示其余更靠后，但暗示不是决定——尤其当被暗示掉的东西里包含"每轮轮询语法错误且不 fail-fast"这种。
+
+后续所有工作的单位都是 §3 的编号，所以 §2 里那 10 条**从来没有人给它们排过期**，
+也不是被评估后搁置的。收尾时的小结进一步写成"§2 遗留项也已清空"，让它们在协作里彻底不可见。
+
+**已由 [[issue-00119-ten-majors-were-never-scheduled]] 逐条回读代码核实并排期**：
+11 条真开着、1 条已修但本报告没划、2 条半修/陈旧。其中至少三条与已做的项同级
+（MariaDB 方言、pm 零保留、`domainEvents()` 活视图）。
+差别的成因不是优先级判断，而是注意力——第 6 项抽出 outbox-engine 之后，
+第 7～10 项全落在 outbox 上，process-manager 的等价问题没人再提。
+
+**教训：一份既列发现又列顺序的评审，必须交代顺序没覆盖的发现去哪了。**
+
 ## 关联
 
 - 父：[[report-00001-ddd-framework-review]]（第一次库评审）
@@ -270,4 +297,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00107-silent-degradations-become-loud-failures]]、
   [[issue-00108-a-killed-relay-instance-stops-all-delivery]]、
   [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]、
-  [[issue-00110-the-outbox-had-no-metrics-at-all]]
+  [[issue-00110-the-outbox-had-no-metrics-at-all]]、
+  [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）
