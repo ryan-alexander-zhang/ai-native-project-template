@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.outbox.OutboxMessage;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelayScheduler;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -54,8 +55,20 @@ class OutboxRelayScheduleTest {
   @Autowired CapturingDispatcher dispatcher;
   @Autowired JdbcTemplate jdbc;
 
+  /** Whether the event reached the dispatcher, waiting up to five seconds for it. */
+  private boolean delivered(String eventId) throws InterruptedException {
+    long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+    while (System.nanoTime() < deadline) {
+      if (dispatcher.messages.stream().anyMatch(m -> eventId.equals(m.eventId()))) {
+        return true;
+      }
+      Thread.sleep(25);
+    }
+    return false;
+  }
+
   @Test
-  void theScheduledPollDeliversWithoutTakingAnyLock() {
+  void theScheduledPollDeliversWithoutTakingAnyLock() throws InterruptedException {
     jdbc.update(
         "INSERT INTO aipersimmon_outbox (event_id, source, type, version, payload, occurred_at, "
             + "subject, correlation_id, sent, attempts, created_at) "
@@ -66,8 +79,14 @@ class OutboxRelayScheduleTest {
 
     scheduler.poll();
 
+    // Awaited, not read once. The shipped schedule is live in this context — that is the thing
+    // under test — so the ambient poll races the explicit one for the row's lease: it can claim
+    // and still be dispatching while this thread's poll finds nothing left to claim. Reading the
+    // dispatcher immediately then observes a delivery that is about to happen. Either poll
+    // delivering satisfies the claim being made here, so wait for the outcome rather than assume
+    // which of them got there first.
     assertTrue(
-        dispatcher.messages.stream().anyMatch(m -> "scheduled-1".equals(m.eventId())),
+        delivered("scheduled-1"),
         "the shipped schedule must drain the outbox with no configuration at all");
     assertEquals(
         Integer.valueOf(0),
