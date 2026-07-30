@@ -197,7 +197,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）（`issue-00110`，**已完成**；无新配置项）
 10. ~~流水线化 Kafka 腿~~ **（已完成，`issue-00111`）**——落地时否掉了「按序等 + fail-fast」这个前提已变的要求；顺带修掉 DLT 固定分区号
 11. ~~BOM 去 parent~~ **（已完成，`issue-00112`）**——1626 → 72 条；再导出的判据定为「本库在别的版本上不工作」
-12. ~~测试门禁反转~~ **（部分完成，`issue-00113`）**——outbox engine 与 ArchUnit 字节码规则已完成；process-manager engine 的 store 支撑部分（约 1300 行 / 四个端口）仍在门外，已在 pom 里点名而非默默豁免
+12. ~~测试门禁反转~~ **（已完成，`issue-00113`）**——两个 engine 各带内存 store 与门禁（outbox 39 例 / pm 50 例）+ ArchUnit 字节码规则；`DefaultProcessRuntime` 与 `replay`/`operation` 仍在门外并在 pom 里点名
 13. core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20
 
 ---

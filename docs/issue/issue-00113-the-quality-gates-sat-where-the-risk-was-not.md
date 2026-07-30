@@ -2,7 +2,7 @@
 id: issue-00113-the-quality-gates-sat-where-the-risk-was-not
 type: issue
 role: main
-status: partially-resolved
+status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---
 
@@ -50,16 +50,24 @@ mutation 从 78% → 86%，no-coverage 从 9 → 0。
 `if (deleted > 0)` 这种日志守卫、喂给指标钩子的延迟算术、以及"变异后换条路径失败但落在同一个地方"的
 私有 helper 返回值。为杀它们写的断言会把数字抬上去而**什么也不保护**。数字说实话，比数字好看重要。
 
-### `-process-manager-engine`：24 个测试 + 门禁，但只覆盖一半
+### `-process-manager-engine`：50 个测试 + 门禁
 
-已测并已上门禁：重试排期（`ExponentialBackoffPolicy`）、积压读（`ProcessBacklog`）、
-持久化约定（`ParkedInputs` / `Payloads`）。这些是纯函数与几个聚合读，只需要一个时钟和桩。
+第一轮（纯函数与聚合读，只需一个时钟和桩）：重试排期（`ExponentialBackoffPolicy`）、
+积压读（`ProcessBacklog`）、持久化约定（`ParkedInputs` / `Payloads`）。
 
-**明确留在门外**（写在 pom 里，不是省略）：`runtime` / `relay` / `deadline` / `replay` /
-`operation` / `autoconfigure`，约 1300 行，其推理**同时跨四个 store 端口**
-（instance / transition / effect / deadline）。要测它，需要四个都遵守各自 claim 语义的内存实现，
-不是桩——那是这项工作剩下的一半，**值得做**。
-在 pom 里点名，好过给整个模块设一个低到能过的阈值：后者读起来像"有覆盖"，实际是"有缺口"。
+**第二轮补上了 store 支撑的那一半**：三个内存 store（instance / effect / deadline）+
+`ProcessEffectRelay`（86% line）与 `ProcessDeadlineWorker`（97% line）上门禁。
+与 outbox 那份同判据：**每一条完成态写入都被租约令牌栅住**、匹配不上就返回 0，
+与 SQL 的 `WHERE lease_token = ?` 一致；**`attempts` 由失败增加、绝不由 claim 增加**，
+所以慢 worker 的重领不会烧掉它从未用过的预算。
+
+覆盖的行为：操作员 cancel 对**已在飞**的效果同样生效（不只是"取消还没被领走的"）；
+被重排的定时器不会连同它取代的那一代一起触发；claim 与 fire 之间被取消的定时器成为可审计的 no-op；
+派发期间绑定的是行上那个租户（relay 线程本身什么都没绑）；
+效果/定时器在**已终态**实例上耗尽重试时不去挂起它。
+
+**仍在门外**：`runtime`（`DefaultProcessRuntime` 611 行）/ `replay` / `operation` / `autoconfigure`。
+`runtime` 需要第四个内存 store（transition）与幂等 claim 状态机，是下一块。
 
 ### 契约模块无框架：按字节码查
 
@@ -81,12 +89,21 @@ pom 说的是"声明了什么"，字节码说的是"实际够到了什么"，而
 **负向对照**：把 `org.slf4j` 从白名单移除，规则立刻点名三处 `LoggingOutboxDispatcher` 的引用——
 证明它确实在看字节码，而不是在空集上恒真。
 
-## 剩余工作（不是遗漏，是显式的下一步）
+## 最有价值的发现：内存 UoW **必须**会回滚
 
-`-process-manager-engine` 的 store 支撑部分（约 1300 行）仍无测试基架。
-要做的是四个内存 store（各自遵守 claim / lease / 代际 语义），
-然后是 `DefaultProcessRuntime` 的精确一次推进、effect relay 的队头与租约、deadline 的代际栅栏、
-parked-input 的持久化重放。这是本项真正剩下的一半。
+第一版 `DirectUnitOfWork` 是直通的，结果两个 deadline 测试失败——**看起来像 engine 的 bug，实际不是**。
+
+`ProcessDeadlineWorker` 在跑 advance **之前**就 `markFired` 并清空租约（这是刻意的：
+否则 advance 若使流程终结，终态决策会取消所有活着的定时器，把一个**确实触发过**的定时器改写成 CANCELLED）。
+而它的重试路径要求行回到 `IN_FLIGHT` 且租约仍在自己手里——真实 SQL 写的是
+`WHERE lease_token = ? AND status = 'IN_FLIGHT'`（已回读 `JdbcProcessDeadlineStore` 核实）。
+**两者能对上，只因为抛异常把那次 markFired 回滚掉了。**
+
+所以内存 store 加了 `Snapshottable`，UoW 换成 `RollingBackUnitOfWork`（内层 execute 加入外层事务，
+对应 `REQUIRED`）。直通的替身会让这条路径**看起来是坏的**；而反过来——一个悄悄丢弃写入的替身——
+会让**真正的原子性 bug 看起来是好的**。后者更危险。
+
+现有一条测试专门钉住这件事，因为它在任何**单个**文件里都看不出来。
 
 ## 关联
 
