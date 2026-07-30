@@ -44,7 +44,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | 3 | pm：四张表零保留策略 | ~~开着~~ **已修** `issue-00122` | 按实例整体删除（删转移留实例会造出 runtime 拒绝回答的状态）；未投递的效果与 DEAD 工作都留下；默认关闭；V5 三方言索引 |
 | 4 | pm：SKIP LOCKED claim 零真库覆盖 | **半陈旧** | effect claim 现有 `EffectRelayPostgresConcurrencyTest` / `EffectRelayMysqlConcurrencyTest`；**deadline claim 仍只跑 H2**——而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL |
 | 5 | pm：MariaDB 误判走 SKIP LOCKED | ~~开着~~ **已修** `issue-00120` | 查来历后发现**没有人声明过支持它**：全树只有三行别名，无迁移、无测试、无容器、无决策。三处一并删除并落到 fail-fast |
-| 6 | CQRS：handler 构造注入 CommandBus 触发循环依赖 | **开着** | `AipersimmonDddCqrsAutoConfiguration:92` 在 `commandBus` 工厂**体内** `handlers.stream().toList()` |
+| 6 | CQRS：handler 构造注入 CommandBus 触发循环依赖 | ~~开着~~ **已修** `issue-00124` | handler/拦截器改首次派发时解析；**fail-fast 未交出**——bus 实现 `SmartInitializingSingleton`，所有单例造完后强制建一次索引，重复 handler 仍是启动失败 |
 | 7 | CQRS：`domainEvents()` 承诺快照实为活视图 | ~~开着~~ **已修** `issue-00121` | 只改成快照会把 CME 换成静默丢事件，故新增 `drainDomainEvents()`（取走并清空一步完成）+ 对同聚合回写的拒绝 |
 | 8 | CQRS：命令失败只 DEBUG | ~~开着~~ **已修** `issue-00121` | 业务拒绝 INFO 无栈、技术故障 WARN 带栈，判据用框架自己的 `DomainException`/`ApplicationException`，按类型匹配 |
 | 9 | Web：5xx 冻结整个 TTL | **其实已修** | `IdempotencyFilter:189` ≥500 → `abandonQuietly`，是 [[issue-00101-idempotency-records-instead-of-claiming]] 顺带做掉的。**报告没划掉，是文档滞后** |
@@ -87,7 +87,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | ~~2~~ | ~~`domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8）~~ **已完成** [[issue-00121-three-promises-that-did-not-match-their-behaviour]] | — | **"真快照"这个说法本身是错的**：只复制会把 CME 换成静默丢事件，真正的原语是 drain（取走并清空一步完成）。PIT 在测试写好前先把构建打回了 |
 | ~~3~~ | ~~pm 四表保留策略（#3）~~ **已完成** [[issue-00122-the-four-process-tables-grew-forever]] | — | 顺带找出一个真问题：`ORDER BY updated_at` 没有平局打破，配上批量上限会**饿死平局后面的实例**——与报告给 effect claim 提的那条同形 |
 | ~~4~~ | ~~`JdbcRateLimiter` 竞态（#10）~~ **已完成** [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]] | — | **负向对照暴露了我自己的一条测试是空的**：它挂钩在 `query(...)`，而旧代码走 `queryForObject(...)`，于是对着它要排除的那个实现绿着通过 |
-| 5 | CommandBus 循环依赖（#6） | 大 | 要改装配方式（handler 惰性解析）。最大的一项，**且框架文档正推荐着会触发它的写法** |
+| ~~5~~ | ~~CommandBus 循环依赖（#6）~~ **已完成** [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]] | — | **规则指着一扇门，装配把它钉死了**：禁止 handler 依赖 handler 的那条规则，给出的替代路径正是注入 bus。先复现再修；负向对照差点因 spotless 重排而失效 |
 | 6 | `ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11） | 中 | 都是 opt-in 才咬人，但缓冲那条是 DoS 面 |
 | 7 | deadline claim 的 PG/MySQL 覆盖（#4） | 中 | 现在只跑 H2，而 H2 根本不走那条 SQL |
 | 8 | effect claim 索引与全局排序（#1 #2） | 大 | 需要重新设计 claim 谓词与索引，且要有真库的量化证据才好判断收益 |
@@ -103,4 +103,5 @@ parent: report-00003-ddd-library-review-2026-07-29
 - 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）、
   [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）、
   [[issue-00122-the-four-process-tables-grew-forever]]（排期第 3 档，**已完成**）、
-  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]（排期第 4 档，**已完成**）
+  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]（排期第 4 档，**已完成**）、
+  [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]（排期第 5 档，**已完成**）

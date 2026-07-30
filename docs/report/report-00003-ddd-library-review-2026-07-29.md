@@ -128,9 +128,12 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   变成"启动即失败并报出迁移路径"，缺省值的安全性因此翻转。
 
 **CQRS / 核心**
-- **仍开着，已排期** `issue-00119`：handler 构造注入 `CommandBus` 会启动循环依赖
-  （`AipersimmonDddCqrsAutoConfiguration:92` 在工厂方法内 `handlers.stream().toList()` 提前实例化全部 handler），
-  而这正是框架文档推荐的子命令派发写法。
+- ~~handler 构造注入 `CommandBus` 会启动循环依赖~~ → **已修** `issue-00124`。
+  **本报告"框架文档推荐"这句需要更精确**：推荐它的不是文档，是**架构规则**——
+  `commandHandlersShouldNotDependOnOtherCommandHandlers` 禁止 handler 依赖 handler 并把 bus 指为替代路径，
+  而 `sendAs` 规则的反面样例本身就是构造注入 bus 写的。**规则指着一扇门，装配把它钉死了。**
+  改为首次派发时解析，并用 `SmartInitializingSingleton` 在单例全部造完后强制建索引，
+  所以重复 handler 仍是启动失败——fail-fast 没有被交换掉。
 - ~~`domainEvents()` javadoc 承诺快照，实际返回活视图~~ → **已修** `issue-00121`：
   **只改成快照是错的、而且更糟**——`publishAndClear` 随后的 clear 会把监听器途中记下的事件一并丢掉，
   等于把一次响亮的崩溃换成一条静默消失的领域事件。故新增 `drainDomainEvents()`（取走并清空一步完成），
@@ -309,4 +312,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00120-mariadb-was-support-nobody-had-declared]]、
   [[issue-00121-three-promises-that-did-not-match-their-behaviour]]、
   [[issue-00122-the-four-process-tables-grew-forever]]、
-  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]
+  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]、
+  [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]
