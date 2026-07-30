@@ -4,13 +4,6 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>com.aipersimmon.ddd</groupId>
-    <artifactId>aipersimmon-ddd-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../pom.xml</relativePath>
-  </parent>
-
   <!--
     Bill of Materials for the AiPersimmon DDD building blocks.
     Consumers import this BOM (dependencyManagement with scope=import) to align the
@@ -18,26 +11,52 @@
     Entries may be declared here ahead of the corresponding module being built:
     dependencyManagement is lazy, so a not-yet-built entry stays inert until a
     consumer actually depends on it.
+
+    THIS FILE HAS NO PARENT, ON PURPOSE — and that is the whole reason it looks
+    repetitive. An imported BOM contributes its EFFECTIVE model, parent inheritance
+    included, so inheriting aipersimmon-ddd-parent published every pin the library
+    happens to build against: importing this BOM alone brought 1600-odd managed
+    coordinates with it (Spring Boot 3.5.10, Spring 6.2.15, Jackson, JUnit,
+    Testcontainers, MyBatis-Plus, ShedLock). Worse than merely noisy: a BOM imported
+    in a consumer's own dependencyManagement OUTRANKS what spring-boot-starter-parent
+    supplies, so an application on any other Spring Boot line was silently pulled onto
+    ours by depending on this library at all. A BOM must publish what its owner
+    promises to keep aligned, and this library promises nothing about Spring Boot's
+    version.
+
+    Consequences of having no parent, both deliberate:
+      * The three third-party versions below are literals, since there is nothing to
+        inherit them from. They are duplicated from aipersimmon-ddd-parent's
+        properties, and BomExportsOnlyItsOwnModulesTest fails the build if the two
+        drift apart.
+      * This module's own version is declared here rather than inherited, and the
+        aipersimmon entries still say ${project.version} — so the module list stays
+        free of repeated version literals.
   -->
+  <groupId>com.aipersimmon.ddd</groupId>
   <artifactId>aipersimmon-ddd-bom</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>aipersimmon-ddd-bom</name>
   <description>BOM aligning versions of the AiPersimmon DDD building-block modules.</description>
 
   <dependencyManagement>
     <dependencies>
-      <!-- Core OpenTelemetry line the optional observability-otel starter's instrumentation
-           (opentelemetry-instrumentation.version, in the parent) is built against. Exported here so
-           a consumer that imports this BOM *before* spring-boot-dependencies gets the aligned core
-           artifacts (api/context/sdk/exporters); Spring Boot otherwise manages opentelemetry-api to
-           an older line and the starter fails at boot with NoClassDefFoundError
-           io.opentelemetry.common.ComponentLoader. Import order in the consumer decides the winner,
-           so this BOM must precede the Spring Boot BOM there. Inert for consumers that don't use the
-           OTEL starter (dependencyManagement adds no dependency). -->
+      <!-- The one third-party BOM this one re-exports, and the exception that shows the rule.
+           It is here because the optional observability-otel starter's instrumentation is built
+           against this core OpenTelemetry line, and Spring Boot manages opentelemetry-api to an
+           older one: without this, the starter fails at boot with NoClassDefFoundError
+           io.opentelemetry.common.ComponentLoader. That is a promise this library can actually
+           keep — its own starter does not work on another line — which is what separates it from
+           the Spring Boot / Jackson / JUnit pins that used to arrive here through the parent.
+           Import order in the consumer decides the winner, so this BOM must precede the Spring
+           Boot BOM there. Inert for consumers that do not use the OTEL starter
+           (dependencyManagement adds no dependency).
+           Version literal: keep in step with opentelemetry.version in aipersimmon-ddd-parent. -->
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>${opentelemetry.version}</version>
+        <version>1.63.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -247,20 +266,23 @@
         <artifactId>aipersimmon-ddd-archunit</artifactId>
         <version>${project.version}</version>
       </dependency>
-      <!-- OpenAPI/Swagger versions re-exported (values from aipersimmon-ddd-parent). The full
-           springdoc runtime reaches the app transitively through the openapi starter; the
-           annotation jar is what a consumer's adapter tier compiles against at `provided` scope.
-           Re-exported here so a consumer importing this BOM aligns on the same versions without
-           inheriting the parent. -->
+      <!-- OpenAPI/Swagger, re-exported for the same reason as the OpenTelemetry line: the
+           annotation jar is what a consumer's adapter tier compiles against at `provided` scope,
+           and `provided` is not transitive — so without a managed version here the consumer would
+           have to pin it by hand and could drift from the springdoc runtime the openapi starter
+           brings in transitively. Neither is managed by spring-boot-dependencies, so nothing else
+           would align them.
+           Version literals: keep in step with springdoc.version / swagger.version in
+           aipersimmon-ddd-parent. -->
       <dependency>
         <groupId>org.springdoc</groupId>
         <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-        <version>${springdoc.version}</version>
+        <version>2.8.9</version>
       </dependency>
       <dependency>
         <groupId>io.swagger.core.v3</groupId>
         <artifactId>swagger-annotations-jakarta</artifactId>
-        <version>${swagger.version}</version>
+        <version>2.2.30</version>
       </dependency>
       <!-- Note: aipersimmon-ddd-quality-config (the shared PMD/SpotBugs rulesets) is
            deliberately NOT listed here — it is a plugin-classpath artifact, never a normal
