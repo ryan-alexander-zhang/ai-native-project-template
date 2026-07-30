@@ -129,12 +129,13 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - **仍开着，已排期** `issue-00119`：handler 构造注入 `CommandBus` 会启动循环依赖
   （`AipersimmonDddCqrsAutoConfiguration:92` 在工厂方法内 `handlers.stream().toList()` 提前实例化全部 handler），
   而这正是框架文档推荐的子命令派发写法。
-- **仍开着，已排期** `issue-00119`：`domainEvents()` javadoc 承诺快照，实际返回活视图
-  （`AbstractAggregateRoot:68` 的 `unmodifiableList` 是**视图**）→ 同步监听器回写同一聚合时 `ConcurrentModificationException`。
-  **这正是 §0 第二个系统性主题的残余**。
+- ~~`domainEvents()` javadoc 承诺快照，实际返回活视图~~ → **已修** `issue-00121`：
+  **只改成快照是错的、而且更糟**——`publishAndClear` 随后的 clear 会把监听器途中记下的事件一并丢掉，
+  等于把一次响亮的崩溃换成一条静默消失的领域事件。故新增 `drainDomainEvents()`（取走并清空一步完成），
+  并对"在已持久化的同一聚合上回写事件"抛异常。**这是 §0 第二个系统性主题的最后一批残余**。
 - ~~无 `PlatformTransactionManager` 时 `UnitOfWork` 与事务拦截器静默 back-off~~ → **已修** `issue-00107`：
   默认拒绝启动 + FailureAnalyzer 报告，`aipersimmon.ddd.cqrs.transaction.required=false` 是显式逃生舱（每次启动 WARN）。
-- **仍开着，已排期** `issue-00119`：命令失败只 DEBUG 记录（`LoggingCommandInterceptor:41`），默认 INFO 生产配置下失败命令一行日志都没有。
+- ~~命令失败只 DEBUG 记录，默认 INFO 生产配置下失败命令一行日志都没有~~ → **已修** `issue-00121`：业务规则拒绝 INFO（无栈），技术故障 WARN（带栈），判据是框架自己的 `DomainException`/`ApplicationException` 分界。
 
 **Web / 可观测性**
 - ~~错误响应被存下并在整个 TTL 内重放（5xx 冻结 24 小时）~~ → **其实已修**，是 `issue-00101` 顺带做掉的
@@ -143,7 +144,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   （`count == null` 那个守卫拦的是 **NULL 值**，不是**零行**。）
 - **半修，其余已排期** `issue-00119`：`expires_at` 索引已由 V3 补上（同样是 `issue-00101` 顺带）；
   但两张表**仍无清理路径**——一次性 key 的"改写时顺带清理"永不触发。
-- **仍开着，已排期** `issue-00119`：兜底 500 处理器不记日志（`AipersimmonDddWebExceptionHandler:167`）→ 生产 NPE 无栈可查。
+- ~~兜底 500 处理器不记日志 → 生产 NPE 无栈可查~~ → **已修** `issue-00121`：先记 `log.error(..., ex)` 再作答，响应仍不透露内部。
 - **仍开着，已排期** `issue-00119`：`ReplayProtectionFilter` 默认作用于全部请求且认证前无上限缓冲请求体
   （`CachedBodyRequestWrapper:24` 是裸 `readAllBytes()`）。**本报告漏了一个限定**：它是 opt-in 的
   （`replay.enabled=true` 且存在 `RequestSignatureVerifier` bean），只在启用时才咬人。
@@ -301,4 +302,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]、
   [[issue-00110-the-outbox-had-no-metrics-at-all]]、
   [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）、
-  [[issue-00120-mariadb-was-support-nobody-had-declared]]
+  [[issue-00120-mariadb-was-support-nobody-had-declared]]、
+  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]

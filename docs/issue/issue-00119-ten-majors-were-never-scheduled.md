@@ -45,12 +45,12 @@ parent: report-00003-ddd-library-review-2026-07-29
 | 4 | pm：SKIP LOCKED claim 零真库覆盖 | **半陈旧** | effect claim 现有 `EffectRelayPostgresConcurrencyTest` / `EffectRelayMysqlConcurrencyTest`；**deadline claim 仍只跑 H2**——而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL |
 | 5 | pm：MariaDB 误判走 SKIP LOCKED | ~~开着~~ **已修** `issue-00120` | 查来历后发现**没有人声明过支持它**：全树只有三行别名，无迁移、无测试、无容器、无决策。三处一并删除并落到 fail-fast |
 | 6 | CQRS：handler 构造注入 CommandBus 触发循环依赖 | **开着** | `AipersimmonDddCqrsAutoConfiguration:92` 在 `commandBus` 工厂**体内** `handlers.stream().toList()` |
-| 7 | CQRS：`domainEvents()` 承诺快照实为活视图 | **开着** | `AbstractAggregateRoot:68` 返回 `unmodifiableList(domainEvents)`——**不可变视图 ≠ 快照**，而 javadoc 写着 "snapshot" |
-| 8 | CQRS：命令失败只 DEBUG | **开着** | `LoggingCommandInterceptor:41` `log.debug("Command {} failed: {}")` |
+| 7 | CQRS：`domainEvents()` 承诺快照实为活视图 | ~~开着~~ **已修** `issue-00121` | 只改成快照会把 CME 换成静默丢事件，故新增 `drainDomainEvents()`（取走并清空一步完成）+ 对同聚合回写的拒绝 |
+| 8 | CQRS：命令失败只 DEBUG | ~~开着~~ **已修** `issue-00121` | 业务拒绝 INFO 无栈、技术故障 WARN 带栈，判据用框架自己的 `DomainException`/`ApplicationException`，按类型匹配 |
 | 9 | Web：5xx 冻结整个 TTL | **其实已修** | `IdempotencyFilter:189` ≥500 → `abandonQuietly`，是 [[issue-00101-idempotency-records-instead-of-claiming]] 顺带做掉的。**报告没划掉，是文档滞后** |
 | 10 | Web：`JdbcRateLimiter` 窗口边界竞态 | **开着** | `:38` `DELETE ... window_start < ?` 会删掉跨窗并发者刚写的行；`:68` `queryForObject` 零行抛 `EmptyResultDataAccessException`。`count == null` 那个守卫拦的是 **NULL 值**，不是**零行** |
 | 11 | Web：web-store 无清理 + 无 `expires_at` 索引 | **半修** | 索引 V3 已补（同样是 `issue-00101` 顺带）；**清理仍只在同一个 key 再次到来时触发**（`JdbcIdempotencyStore:54`），一次性 key 的行永不回收 |
-| 12 | Web：兜底 500 不记日志 | **开着** | `AipersimmonDddWebExceptionHandler:167` 只造 ProblemDetail |
+| 12 | Web：兜底 500 不记日志 | ~~开着~~ **已修** `issue-00121` | 先 `log.error(..., ex)` 再作答；响应仍不透露内部 |
 | 13 | Web：`ReplayProtectionFilter` 全量 + 认证前无上限缓冲 | **开着（有限定）** | 注册无 urlPatterns；`CachedBodyRequestWrapper:24` 是裸 `readAllBytes()`。**限定**：它是 opt-in 的（`replay.enabled=true` **且**存在 `RequestSignatureVerifier` bean），只在启用时才咬人——报告没写这个限定 |
 | 14 | 架构：`-outbox` 契约模块带实现类 | **未改，但已被显式接受** | 白名单收了 slf4j + jackson-core；`DefaultFailureClassifier` / `LoggingOutboxDispatcher` / `RetryBackoff` / `DeadLetters` 仍在契约模块里 |
 
@@ -68,6 +68,7 @@ parent: report-00003-ddd-library-review-2026-07-29
   pm 的同一个问题**一次都没被提起**。
 - **`domainEvents()`（#7）** ——这**就是** §0 点名的第二个系统性主题"文档承诺 A、代码行为 B"。
   那个主题号称已收口，而这条一直在名单上没动。
+  （**已修，`issue-00121`**，连同 #8 #12 一起——三条是同一个毛病。）
 
 **真正的原因大概率是惯性而非优先级**：第 6 项抽出 `outbox-engine` 之后，第 7、8、9、10 全落在 outbox 上，
 注意力就留在那一带了；pm 的等价问题（保留、claim 性能、方言）没人再提。
@@ -82,7 +83,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | 序 | 条目 | 规模 | 为什么排这里 |
 |---|---|---|---|
 | ~~1~~ | ~~MariaDB 方言（#5）~~ **已完成** [[issue-00120-mariadb-was-support-nobody-had-declared]] | — | **动手前查来历，把修法整个换掉了**：不是"支持得不好"，是**从来没有人声明过支持**。版本探测那条因此划掉——三处别名一并删除，落到已有的 fail-fast |
-| 2 | `domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8） | 合计 < 1 天 | 三条都是"承诺与行为对齐"，正是 §0 第二个主题的残余 |
+| ~~2~~ | ~~`domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8）~~ **已完成** [[issue-00121-three-promises-that-did-not-match-their-behaviour]] | — | **"真快照"这个说法本身是错的**：只复制会把 CME 换成静默丢事件，真正的原语是 drain（取走并清空一步完成）。PIT 在测试写好前先把构建打回了 |
 | 3 | pm 四表保留策略（#3） | 中 | 照 outbox cleanup 的形状抄一份，含三方言迁移 |
 | 4 | `JdbcRateLimiter` 竞态（#10） | 小 | `queryForObject` → `query().stream().findFirst()`，顺带修 DELETE 的窗口谓词 |
 | 5 | CommandBus 循环依赖（#6） | 大 | 要改装配方式（handler 惰性解析）。最大的一项，**且框架文档正推荐着会触发它的写法** |
@@ -98,4 +99,5 @@ parent: report-00003-ddd-library-review-2026-07-29
 - 证明"是注意力不是优先级"的对照：[[issue-00115-clearing-a-field-never-reached-the-database]]
 - §2 中已完成的最后一块（覆盖率）：[[issue-00117-the-advance-itself-had-no-tests]]、
   [[issue-00118-the-recovery-paths-had-no-tests]]
-- 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）
+- 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）、
+  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）
