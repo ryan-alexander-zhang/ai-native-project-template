@@ -121,4 +121,95 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <!--
+    The engine is where the outbox's judgements live and where a mistake is a lost or duplicated
+    message, so this is where the coverage gate belongs. It used to have neither tests nor a gate
+    while the pure value-type modules had both — the gates sat where the risk was not.
+
+    The runtime packages are gated; `autoconfigure` is excluded, because it is Spring wiring whose
+    only meaningful test is a context that actually starts, and both storage backends already boot
+    one. Covering it here would need a Spring context in a module deliberately built without one,
+    to re-prove what the backends prove against a real database.
+
+    Storage-free and Docker-free, so the gate stays CI-portable. prepare-agent and report come
+    from the parent's pluginManagement; check and mutationCoverage are declared here.
+  -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>jacoco-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <excludes>
+                <exclude>com/aipersimmon/ddd/outbox/engine/autoconfigure/**</exclude>
+              </excludes>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.90</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!--
+        Mutation testing, scoped to the runtime packages. The thresholds are 85 rather than the
+        90 the pure-tier modules use, and the difference is the point rather than an exemption:
+        every mutant still alive here is one whose death would mean asserting something no
+        behaviour depends on — a log statement's `if (deleted > 0)` guard, latency arithmetic fed
+        to a metrics hook, a private helper's return value where the mutated version fails the
+        dispatch by a different route and lands in the same place. Writing those assertions would
+        raise the number and defend nothing, so the number says what is true instead. Ratchet it
+        up when real coverage rises, not to make it look tidier.
+
+        It is worth having at all because it has already earned its keep: the first run found
+        three genuinely untested paths, including a hand-over that throws before the transport
+        takes the message, which line coverage called covered.
+      -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <configuration>
+          <mutationThreshold>85</mutationThreshold>
+          <testStrengthThreshold>85</testStrengthThreshold>
+          <coverageThreshold>85</coverageThreshold>
+          <targetClasses>
+            <param>com.aipersimmon.ddd.outbox.engine.relay.*</param>
+            <param>com.aipersimmon.ddd.outbox.engine.write.*</param>
+            <param>com.aipersimmon.ddd.outbox.engine.cleanup.*</param>
+            <param>com.aipersimmon.ddd.outbox.engine.observe.*</param>
+          </targetClasses>
+        </configuration>
+        <executions>
+          <execution>
+            <id>pit-mutation-coverage</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>mutationCoverage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
