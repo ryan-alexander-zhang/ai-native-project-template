@@ -88,7 +88,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 | ~~3~~ | ~~pm 四表保留策略（#3）~~ **已完成** [[issue-00122-the-four-process-tables-grew-forever]] | — | 顺带找出一个真问题：`ORDER BY updated_at` 没有平局打破，配上批量上限会**饿死平局后面的实例**——与报告给 effect claim 提的那条同形 |
 | ~~4~~ | ~~`JdbcRateLimiter` 竞态（#10）~~ **已完成** [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]] | — | **负向对照暴露了我自己的一条测试是空的**：它挂钩在 `query(...)`，而旧代码走 `queryForObject(...)`，于是对着它要排除的那个实现绿着通过 |
 | ~~5~~ | ~~CommandBus 循环依赖（#6）~~ **已完成** [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]] | — | **规则指着一扇门，装配把它钉死了**：禁止 handler 依赖 handler 的那条规则，给出的替代路径正是注入 bus。先复现再修；负向对照差点因 spotless 重排而失效 |
-| 6 | `ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11） | 中 | 都是 opt-in 才咬人，但缓冲那条是 DoS 面 |
+| ~~6~~ | ~~`ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11）~~ **已完成** [[issue-00126-an-anonymous-caller-chose-the-allocation]] | — | **先跑的那三道检查一个都不认人**——签名头非空、时间戳新鲜，攻击者填这些不花钱，而缓冲必须在验签之前，于是分配大小由匿名调用者决定。路径限定**没有照抄** tenancy 的归一化：改用 servlet urlPatterns，让容器按它自己要分发的路径匹配。清理那条最值得记：**V3 的索引就是为这个作业建的，注释都写了，作业没人写** |
 | 7 | deadline claim 的 PG/MySQL 覆盖（#4） | 中 | 现在只跑 H2，而 H2 根本不走那条 SQL |
 | ~~8~~ | ~~effect claim 索引与全局排序（#1 #2）~~ **已完成** [[issue-00125-the-claim-sorted-one-instance-last-forever]] | — | **先测再改是对的**：报告说成因是索引缺 status，实测那个索引**一点用都没有**；真正的成因是 `<>` 在 PG 上不可 seek，而 **MySQL 的优化器自己就在做这个改写**——#1 只是 PG 的问题。最终**一行迁移都没加**。#2 更严重：不是变慢，是那个实例**永远轮不到** |
 | — | #9 / #14 | — | #9 已修，只需在报告上划掉；#14 已显式接受，白名单与理由都在，不再作为待办 |

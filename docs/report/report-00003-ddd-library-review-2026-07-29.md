@@ -155,12 +155,22 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   → **已修** `issue-00123`。成因是**每次请求顺手扫旧窗口**：同一个桶上相隔一毫秒的两个请求落在不同窗口，
   后者删掉了前者正在计数的那一行。扫描改为留两个窗口余量，读取改为容忍零行并以本次自己的增量作答
   （`count == null` 那个守卫拦的是 **NULL 值**，不是**零行**，所以从来没起过作用）。
-- **半修，其余已排期** `issue-00119`：`expires_at` 索引已由 V3 补上（同样是 `issue-00101` 顺带）；
-  但两张表**仍无清理路径**——一次性 key 的"改写时顺带清理"永不触发。
+- ~~**半修，其余已排期** `issue-00119`：`expires_at` 索引已由 V3 补上（同样是 `issue-00101` 顺带）；
+  但两张表**仍无清理路径**——一次性 key 的"改写时顺带清理"永不触发。~~
+  → **已修** `issue-00126`。补一句本报告没说的：V3 那两个索引的注释**写明了**是给一个保留作业用的，
+  也就是说**索引是为它建的，作业没人写**。清理默认**开**（与 pm 保留相反，因为 `expires_at` 是 store
+  自己写的"这行已死"，不是保留策略），另有 V4 给第三张表 `aipersimmon_web_rate_limit` 补
+  `window_start` 索引——它没有 `expires_at`，本报告只提了两张表。
 - ~~兜底 500 处理器不记日志 → 生产 NPE 无栈可查~~ → **已修** `issue-00121`：先记 `log.error(..., ex)` 再作答，响应仍不透露内部。
-- **仍开着，已排期** `issue-00119`：`ReplayProtectionFilter` 默认作用于全部请求且认证前无上限缓冲请求体
+- ~~**仍开着，已排期** `issue-00119`：`ReplayProtectionFilter` 默认作用于全部请求且认证前无上限缓冲请求体
   （`CachedBodyRequestWrapper:24` 是裸 `readAllBytes()`）。**本报告漏了一个限定**：它是 opt-in 的
-  （`replay.enabled=true` 且存在 `RequestSignatureVerifier` bean），只在启用时才咬人。
+  （`replay.enabled=true` 且存在 `RequestSignatureVerifier` bean），只在启用时才咬人。~~
+  → **已修** `issue-00126`。"认证前"这个说法可以更准确：过滤器**确实**先查头再缓冲，
+  但**先跑的三道检查（签名头非空、时间戳新鲜、nonce 非空）没有一道能证明来者是谁**，
+  而验签又必须在 body 到手之后——顺序换不了，所以上限才是唯一的挡板。上限**边读边判**（读完再看
+  `length` 时那次分配已经发生），超限答 413。路径限定用 servlet `urlPatterns` 交给容器匹配，
+  **刻意不照抄** `TenantResolutionFilter` 的 `dispatchPath` 归一化——自己匹配就会有一个可能与容器
+  分道扬镳的第二意见，而契约模块 `aipersimmon-ddd-web` 也不许碰 servlet API。
 
 **架构层**
 - ~~outbox 家族没有 engine 层~~ → **已修** `decision-00020`：新增 `aipersimmon-ddd-outbox-engine`
