@@ -41,7 +41,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 |---|---|---|---|
 | 1 | pm：effect claim 随实例历史线性变慢 | **开着** | `JdbcProcessDialect:63` 的 `NOT EXISTS` 过滤 `b.status`，而索引是 `(instance_id, seq)` **不含 status** |
 | 2 | pm：全局 `ORDER BY` 饿死长寿实例 | **开着** | 同上 `:73` `ORDER BY e.seq` 是**全局**排序；`seq` 每实例递增，故长寿实例的 seq 永远排在新实例之后 |
-| 3 | pm：四张表零保留策略 | **开着** | 全树 `DELETE FROM aipersimmon_process_*` **零条** |
+| 3 | pm：四张表零保留策略 | ~~开着~~ **已修** `issue-00122` | 按实例整体删除（删转移留实例会造出 runtime 拒绝回答的状态）；未投递的效果与 DEAD 工作都留下；默认关闭；V5 三方言索引 |
 | 4 | pm：SKIP LOCKED claim 零真库覆盖 | **半陈旧** | effect claim 现有 `EffectRelayPostgresConcurrencyTest` / `EffectRelayMysqlConcurrencyTest`；**deadline claim 仍只跑 H2**——而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL |
 | 5 | pm：MariaDB 误判走 SKIP LOCKED | ~~开着~~ **已修** `issue-00120` | 查来历后发现**没有人声明过支持它**：全树只有三行别名，无迁移、无测试、无容器、无决策。三处一并删除并落到 fail-fast |
 | 6 | CQRS：handler 构造注入 CommandBus 触发循环依赖 | **开着** | `AipersimmonDddCqrsAutoConfiguration:92` 在 `commandBus` 工厂**体内** `handlers.stream().toList()` |
@@ -66,6 +66,7 @@ parent: report-00003-ddd-library-review-2026-07-29
   这与第 7 项修的"崩溃即 60 分钟停摆"是同一类：**投递整体停摆**。而且这条更糟——它不会自愈，也没有信号。
 - **pm 零保留（#3）** ——成本无界增长。outbox 的 cleanup 是第 6 项顺手带的，
   pm 的同一个问题**一次都没被提起**。
+  （**已修，`issue-00122`**。）
 - **`domainEvents()`（#7）** ——这**就是** §0 点名的第二个系统性主题"文档承诺 A、代码行为 B"。
   那个主题号称已收口，而这条一直在名单上没动。
   （**已修，`issue-00121`**，连同 #8 #12 一起——三条是同一个毛病。）
@@ -84,7 +85,7 @@ parent: report-00003-ddd-library-review-2026-07-29
 |---|---|---|---|
 | ~~1~~ | ~~MariaDB 方言（#5）~~ **已完成** [[issue-00120-mariadb-was-support-nobody-had-declared]] | — | **动手前查来历，把修法整个换掉了**：不是"支持得不好"，是**从来没有人声明过支持**。版本探测那条因此划掉——三处别名一并删除，落到已有的 fail-fast |
 | ~~2~~ | ~~`domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8）~~ **已完成** [[issue-00121-three-promises-that-did-not-match-their-behaviour]] | — | **"真快照"这个说法本身是错的**：只复制会把 CME 换成静默丢事件，真正的原语是 drain（取走并清空一步完成）。PIT 在测试写好前先把构建打回了 |
-| 3 | pm 四表保留策略（#3） | 中 | 照 outbox cleanup 的形状抄一份，含三方言迁移 |
+| ~~3~~ | ~~pm 四表保留策略（#3）~~ **已完成** [[issue-00122-the-four-process-tables-grew-forever]] | — | 顺带找出一个真问题：`ORDER BY updated_at` 没有平局打破，配上批量上限会**饿死平局后面的实例**——与报告给 effect claim 提的那条同形 |
 | 4 | `JdbcRateLimiter` 竞态（#10） | 小 | `queryForObject` → `query().stream().findFirst()`，顺带修 DELETE 的窗口谓词 |
 | 5 | CommandBus 循环依赖（#6） | 大 | 要改装配方式（handler 惰性解析）。最大的一项，**且框架文档正推荐着会触发它的写法** |
 | 6 | `ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11） | 中 | 都是 opt-in 才咬人，但缓冲那条是 DoS 面 |
@@ -100,4 +101,5 @@ parent: report-00003-ddd-library-review-2026-07-29
 - §2 中已完成的最后一块（覆盖率）：[[issue-00117-the-advance-itself-had-no-tests]]、
   [[issue-00118-the-recovery-paths-had-no-tests]]
 - 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）、
-  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）
+  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）、
+  [[issue-00122-the-four-process-tables-grew-forever]]（排期第 3 档，**已完成**）

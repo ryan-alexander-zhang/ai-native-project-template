@@ -97,9 +97,11 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 - ~~`withRetry` 在加入外层事务时失效~~ / ~~并发首次 start 漏 `DuplicateKeyException` 映射~~ →
   **已修** `issue-00105`：joined 事务下只尝试一次并让冲突上抛（重试的前提是"失败只作废这一次尝试"，
   加入别人的事务时该前提不成立），两个 instance store 都补上唯一键映射。
-- **仍开着，已排期** `issue-00119`：Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢
-  （索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq` 系统性饿死长寿实例；
-  四张表**全无保留/清理策略**——成本无界增长。
+- **部分已修**：~~四张表全无保留/清理策略~~ → **已修** `issue-00122`（按实例整体删除，
+  未投递效果与 DEAD 工作一律留下，默认关闭，V5 三方言索引）。**顺带证实了报告的饿死判断**——
+  保留查询第一版同样漏了平局打破，配上批量上限会让平局后面的实例永远轮不到。
+  **仍开着，已排期** `issue-00119`：Effect claim 队头 `NOT EXISTS` 随实例历史线性变慢
+  （索引 `(instance_id, seq)` 不含 status）；全局 `ORDER BY e.seq` 系统性饿死长寿实例。
 - **部分陈旧，其余已排期** `issue-00119`：effect claim 现已有 PG + MySQL 并发测试；
   但 **deadline claim 仍只跑 H2**，而 H2 走 `AtomicUpdateProcessDialect`，根本不是这条 SQL。
   ~~MariaDB 被识别为 mysql 走 SKIP LOCKED（10.6 之前不支持）→ 每轮语法错误、effect 永不投递且不 fail-fast~~
@@ -303,4 +305,5 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   [[issue-00110-the-outbox-had-no-metrics-at-all]]、
   [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）、
   [[issue-00120-mariadb-was-support-nobody-had-declared]]、
-  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]
+  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]、
+  [[issue-00122-the-four-process-tables-grew-forever]]

@@ -302,8 +302,20 @@ gets the bounded backoff and then the DLT.
 | `parked-input-worker.enabled` | `true` | Replays inputs that arrived while an instance was suspended, once it is active again. Turning it off leaves those inputs owed indefinitely — only appropriate while draining a node. |
 | `parked-input-worker.poll-delay` | `1s` | How often to look for instances that still owe a replay. |
 | `parked-input-worker.batch-size` | `50` | Instances per poll; every owed input of a picked instance is replayed. |
+| `cleanup.enabled` | `false` | Deletes finished instances whose retention has elapsed. Off by default: removing a business record, and choosing how long to keep it, are deployment decisions. Left off, the four tables grow for the lifetime of the deployment. |
+| `cleanup.retention-seconds` | `2592000` (30d) | How long a finished instance is kept after its last transition. |
+| `cleanup.poll-delay` | `1h` | How often to look for instances to remove. |
+| `cleanup.batch-size` | `200` | Instances per run. It bounds how long the delete holds locks on tables the relay and deadline worker are also reading; a run that fills its batch logs that more remain. |
 | `observability.stuck-threshold` | `15m` | How long before an instance counts as stuck in the metrics. |
 | `observability.oldest-pending-warn` | `60s` | Backlog age that WARNs — the signal that the relay is falling behind. |
+
+Cleanup removes an instance **whole** — snapshot, transitions, effects and deadlines together —
+and only once every effect and deadline it holds has settled. Two states look finished and are not:
+a terminal decision's staged effects still deliver after it ends, and a DEAD effect or deadline is
+the record of a side effect that never landed which an operator can still redrive. Either keeps the
+instance, so an application that never redrives its dead work will accumulate exactly those
+instances; the dead-work gauges are what surfaces them. It takes no cross-instance lock — two
+purges select overlapping ids and the second deletes nothing.
 
 The parked-input worker deliberately has no lease, attempt or backoff knobs: a replay is idempotent
 (deduped by the replay transition's unique input id), and an input the definition cannot digest
