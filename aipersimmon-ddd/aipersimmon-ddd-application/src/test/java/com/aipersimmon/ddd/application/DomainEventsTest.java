@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.event.DomainEvent;
@@ -58,5 +59,61 @@ class DomainEventsTest {
 
     assertEquals(List.of(first, second), sink.published);
     assertTrue(aggregate.domainEvents().isEmpty(), "events are drained after publishing");
+  }
+
+  /** A sink whose listener reacts by touching an aggregate, the way a synchronous handler does. */
+  private static final class Reacting implements DomainEvents {
+    final List<DomainEvent> published = new ArrayList<>();
+    Runnable onEach = () -> {};
+
+    @Override
+    public void publish(DomainEvent event) {
+      published.add(event);
+      onEach.run();
+    }
+  }
+
+  @Test
+  void aListenerThatTouchesAnotherAggregateDoesNotBreakPublication() {
+    Reacting sink = new Reacting();
+    Aggregate aggregate = new Aggregate();
+    Aggregate other = new Aggregate();
+    aggregate.raise(new SampleEvent("a"));
+    aggregate.raise(new SampleEvent("b"));
+    sink.onEach = () -> other.raise(new SampleEvent("elsewhere"));
+
+    sink.publishAndClear(aggregate);
+
+    // Iterating a live view used to throw ConcurrentModificationException here as soon as anything
+    // recorded an event mid-publication. Reacting to an event by changing something else is the
+    // ordinary case, not an abuse, so it has to work.
+    assertEquals(2, sink.published.size());
+    assertEquals(2, other.domainEvents().size());
+  }
+
+  @Test
+  void aListenerThatRecordsOnTheSameAggregateIsRefusedRatherThanSilentlyDropped() {
+    Reacting sink = new Reacting();
+    Aggregate aggregate = new Aggregate();
+    aggregate.raise(new SampleEvent("a"));
+    sink.onEach = () -> aggregate.raise(new SampleEvent("too late"));
+
+    IllegalStateException refused =
+        assertThrows(IllegalStateException.class, () -> sink.publishAndClear(aggregate));
+
+    // The root was already persisted when this ran, so the state that event announces was never
+    // written. Publishing it would describe something that did not happen; clearing it away — which
+    // is what a snapshot plus a blanket clear would have done — is how a domain event goes missing.
+    assertTrue(refused.getMessage().contains("already persisted"), refused.getMessage());
+    assertEquals(1, sink.published.size(), "the events that were real still went out");
+  }
+
+  @Test
+  void publishAndClearOnAnAggregateWithNoEventsDoesNothing() {
+    Reacting sink = new Reacting();
+
+    sink.publishAndClear(new Aggregate());
+
+    assertTrue(sink.published.isEmpty());
   }
 }

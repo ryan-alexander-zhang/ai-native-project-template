@@ -6,6 +6,8 @@ import com.aipersimmon.ddd.web.error.ApiException;
 import com.aipersimmon.ddd.web.error.FieldError;
 import java.util.List;
 import java.util.NoSuchElementException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -52,6 +54,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  */
 @RestControllerAdvice
 public class AipersimmonDddWebExceptionHandler {
+
+  private static final Logger log =
+      LoggerFactory.getLogger(AipersimmonDddWebExceptionHandler.class);
 
   private final ProblemDetailFactory factory;
 
@@ -165,7 +170,14 @@ public class AipersimmonDddWebExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ProblemDetail handleUnexpected(Exception ex) {
-    // Deliberately does not echo the message: avoid leaking internals on 500.
+    // Log before answering, and log the whole thing. Every other handler here maps an exception the
+    // framework understands onto a status the client can act on; this one is the opposite — it
+    // caught something nobody anticipated, which is exactly the case where the stack is the only
+    // record of what happened. Without this line a production NPE left a 500 in the access log and
+    // nothing at all to debug from.
+    log.error("Unhandled exception while serving a request; answering 500", ex);
+    // The response still says nothing: what an operator needs and what a client may be told are
+    // different questions, and the message can carry internals.
     return factory.simple(HttpStatus.INTERNAL_SERVER_ERROR, null, List.of());
   }
 }

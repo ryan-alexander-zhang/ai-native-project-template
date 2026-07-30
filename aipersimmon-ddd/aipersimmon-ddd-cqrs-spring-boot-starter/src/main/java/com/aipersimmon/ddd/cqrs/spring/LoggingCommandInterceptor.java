@@ -1,5 +1,7 @@
 package com.aipersimmon.ddd.cqrs.spring;
 
+import com.aipersimmon.ddd.application.ApplicationException;
+import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
@@ -38,7 +40,7 @@ public class LoggingCommandInterceptor implements CommandInterceptor {
       log.debug("Handled command {}", name);
       return result;
     } catch (RuntimeException e) {
-      log.debug("Command {} failed: {}", name, e.toString());
+      logFailure(name, context, e);
       throw e;
     } finally {
       if (previous == null) {
@@ -47,6 +49,47 @@ public class LoggingCommandInterceptor implements CommandInterceptor {
         MDC.put(CORRELATION_ID_MDC_KEY, previous);
       }
     }
+  }
+
+  /**
+   * Report a failed command at a level that matches what kind of failure it was.
+   *
+   * <p>Both of these used to be {@code DEBUG}, which meant that under the default INFO threshold a
+   * command that failed produced no log line at all — the one outcome an operator most wants to
+   * see. Raising everything to WARN is the other wrong answer: a rejected order is an expected
+   * outcome of a working system, and a busy reject path would drown the faults worth reading.
+   *
+   * <p>So the level follows the distinction the framework already draws, in the words its own base
+   * types use — {@link DomainException} and {@link ApplicationException} exist "so callers can
+   * distinguish business-rule failures from technical faults":
+   *
+   * <ul>
+   *   <li>a business-rule failure is INFO, with its message and no stack — the stack of a rule that
+   *       did its job is noise, and the message plus the correlation id on the MDC is what makes it
+   *       traceable;
+   *   <li>anything else is WARN <em>with</em> the exception, because somebody has to see the stack
+   *       and this is the only place that sees every command whatever dispatched it — a relay, a
+   *       deadline worker and an HTTP request do not share an outer handler.
+   * </ul>
+   *
+   * <p>Matched by type, never by class name: a name-based match is how an unrelated exception that
+   * happens to share a simple name gets classified as something it is not.
+   */
+  private static void logFailure(String name, CommandContext context, RuntimeException e) {
+    if (e instanceof DomainException || e instanceof ApplicationException) {
+      log.info(
+          "Command {} was rejected: {} [correlationId={}]",
+          name,
+          e.getMessage(),
+          context.correlationId());
+      return;
+    }
+    log.warn(
+        "Command {} failed [correlationId={}, causationId={}]",
+        name,
+        context.correlationId(),
+        context.causationId(),
+        e);
   }
 
   @Override

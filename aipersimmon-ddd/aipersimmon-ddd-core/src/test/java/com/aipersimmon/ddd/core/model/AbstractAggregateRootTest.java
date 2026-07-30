@@ -82,6 +82,54 @@ class AbstractAggregateRootTest {
   }
 
   @Test
+  void domainEvents_isASnapshotAndNotAViewOfTheLiveList() {
+    Order order = new Order("o-1");
+    order.raise(new SampleEvent("a"));
+    List<DomainEvent> taken = order.domainEvents();
+
+    order.raise(new SampleEvent("b"));
+
+    // The assertion the sibling test above never made: it checked only that the returned list
+    // refuses writes, which an unmodifiable VIEW of the live list does too. That is what this
+    // method used to return, and iterating it while a listener recorded another event on the same
+    // aggregate threw ConcurrentModificationException from inside the publisher.
+    assertEquals(1, taken.size(), "the list handed out earlier must not have grown");
+    assertEquals(2, order.domainEvents().size());
+  }
+
+  @Test
+  void drainDomainEvents_returnsTheEventsAndLeavesTheAggregateEmpty() {
+    Order order = new Order("o-1");
+    SampleEvent first = new SampleEvent("a");
+    SampleEvent second = new SampleEvent("b");
+    order.raise(first);
+    order.raise(second);
+
+    List<DomainEvent> drained = order.drainDomainEvents();
+
+    assertEquals(List.of(first, second), drained, "in the order they were recorded");
+    assertTrue(order.domainEvents().isEmpty());
+  }
+
+  @Test
+  void drainDomainEvents_keepsWhatWasRecordedAfterIt() {
+    Order order = new Order("o-1");
+    order.raise(new SampleEvent("a"));
+    order.drainDomainEvents();
+
+    order.raise(new SampleEvent("b"));
+
+    // Draining and then clearing would be two steps, and an event recorded between them would be
+    // discarded. Taking and emptying in one step is what makes the later event survivable.
+    assertEquals(1, order.domainEvents().size());
+  }
+
+  @Test
+  void drainDomainEvents_onAnAggregateWithNoEventsIsEmptyRatherThanAnError() {
+    assertTrue(new Order("o-1").drainDomainEvents().isEmpty());
+  }
+
+  @Test
   void clearDomainEvents_removesEveryRecordedEvent() {
     Order order = new Order("o-1");
     order.raise(new SampleEvent("a"));

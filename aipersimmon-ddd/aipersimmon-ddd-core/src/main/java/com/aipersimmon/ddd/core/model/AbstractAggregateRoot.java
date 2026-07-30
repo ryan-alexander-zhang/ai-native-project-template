@@ -4,15 +4,13 @@ import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.rule.Invariant;
 import com.aipersimmon.ddd.core.rule.InvariantViolationException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Base class for aggregate roots that record domain events while executing behaviour. During a use
  * case the root registers events via {@link #registerEvent(DomainEvent)}; after the aggregate is
- * persisted the application drains {@link #domainEvents()}, publishes them, and then calls {@link
- * #clearDomainEvents()}.
+ * persisted the application takes them with {@link #drainDomainEvents()} and publishes them.
  *
  * <p>Framework-free: it records events in memory and takes no stance on how they are published.
  * Subclasses supply the aggregate's identity via {@link #id()}.
@@ -63,12 +61,43 @@ public abstract class AbstractAggregateRoot<ID> {
     }
   }
 
-  /** An unmodifiable snapshot of the events recorded since load or creation. */
+  /**
+   * An unmodifiable snapshot of the events recorded since load or creation.
+   *
+   * <p>A snapshot, and not a view of the live list, which is what this used to return while
+   * promising otherwise. The difference shows up in one situation and it is not a rare one: a
+   * synchronous listener, invoked while these events are being published, records another event on
+   * the same aggregate — and iteration over a view then dies with {@link
+   * java.util.ConcurrentModificationException} from inside the publisher, far from the listener
+   * that caused it.
+   */
   public List<DomainEvent> domainEvents() {
-    return Collections.unmodifiableList(domainEvents);
+    return List.copyOf(domainEvents);
   }
 
-  /** Clear the recorded events; call after they have been published. */
+  /**
+   * Take the recorded events and clear them, in one step.
+   *
+   * <p>This exists because copying and clearing as two steps is not safe in the situation above.
+   * Publishing a snapshot and then clearing everything would discard an event a listener recorded
+   * during publication — trading a loud {@code ConcurrentModificationException} for a silently
+   * dropped domain event, which is a worse answer to the same problem. Draining first means
+   * anything recorded afterwards is still on the aggregate, where it can be seen.
+   *
+   * @return the events that were recorded, in order
+   */
+  public List<DomainEvent> drainDomainEvents() {
+    List<DomainEvent> drained = List.copyOf(domainEvents);
+    domainEvents.clear();
+    return drained;
+  }
+
+  /**
+   * Clear the recorded events without publishing them.
+   *
+   * <p>Prefer {@link #drainDomainEvents()} when the events are about to be published; this is for
+   * discarding them deliberately, such as rebuilding an aggregate in a test fixture.
+   */
   public void clearDomainEvents() {
     domainEvents.clear();
   }
