@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.processmanager.mybatisplus.autoconfigure;
 
 import com.aipersimmon.ddd.processmanager.engine.autoconfigure.AipersimmonDddProcessManagerAutoConfiguration;
 import com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessManagerProperties;
+import com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessVendors;
 import com.aipersimmon.ddd.processmanager.engine.lease.ProcessClaimStrategy;
 import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
 import com.aipersimmon.ddd.processmanager.mybatisplus.lease.MybatisProcessClaimStrategy;
@@ -15,8 +16,6 @@ import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessEffectMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessInstanceMapper;
 import com.aipersimmon.ddd.processmanager.mybatisplus.store.ProcessTransitionMapper;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Locale;
 import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -172,25 +171,8 @@ public class AipersimmonDddProcessManagerMybatisPlusAutoConfiguration {
   }
 
   private static String probe(DataSource dataSource) {
-    String product;
-    try (Connection connection = dataSource.getConnection()) {
-      product = connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT);
-    } catch (SQLException e) {
-      throw new IllegalStateException(
-          "cannot probe the database product for dialect auto-selection", e);
-    }
-    if (product.contains("postgresql")) {
-      return "postgresql";
-    }
-    if (product.contains("mysql") || product.contains("maria")) {
-      return "mysql";
-    }
-    if (product.contains("h2")) {
-      return "h2";
-    }
-    throw new IllegalStateException(
-        "cannot auto-select a process-manager dialect for database '"
-            + product
-            + "'; set aipersimmon.ddd.process-manager.dialect explicitly");
+    // Shared with the JDBC backend so the two can never answer differently — and deliberately
+    // does not recognise MariaDB; see ProcessVendors for why.
+    return ProcessVendors.probe(dataSource, "aipersimmon.ddd.process-manager.dialect");
   }
 }

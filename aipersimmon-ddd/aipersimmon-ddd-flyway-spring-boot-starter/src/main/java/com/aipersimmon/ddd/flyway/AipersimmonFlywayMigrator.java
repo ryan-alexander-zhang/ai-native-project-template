@@ -152,8 +152,12 @@ public final class AipersimmonFlywayMigrator {
 
   /**
    * Map the DataSource's database product to the Flyway vendor token used in the migration paths.
+   *
+   * <p>Package-private so the mapping itself can be asserted rather than only its effects — the
+   * thing worth pinning here is which products are <em>refused</em>, and that is invisible from the
+   * outside until someone runs on one.
    */
-  private String resolveVendor(DataSource dataSource) {
+  static String resolveVendor(DataSource dataSource) {
     String product;
     try (Connection connection = dataSource.getConnection()) {
       product = JdbcUtils.commonDatabaseName(connection.getMetaData().getDatabaseProductName());
@@ -168,7 +172,12 @@ public final class AipersimmonFlywayMigrator {
     if (name.contains("postgresql")) {
       return "postgresql";
     }
-    if (name.contains("mysql") || name.contains("mariadb")) {
+    // Deliberately not MariaDB, even though these MySQL migrations would very likely apply to it:
+    // the alias used to live here too, and it contradicted the message three lines below, which
+    // has always named h2/postgresql/mysql as the supported vendors. Creating the schema on a
+    // database the process-manager dialect then refuses to start on is worse than refusing here —
+    // it half-succeeds. Support is decided once, for all three probes, or not at all.
+    if (name.contains("mysql")) {
       return "mysql";
     }
     throw new IllegalStateException(
