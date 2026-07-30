@@ -26,6 +26,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Exercises the JDBC-backed stores against H2 with a controllable clock: the same semantics the
@@ -39,6 +40,7 @@ class JdbcWebStoreTest {
   @Autowired ReplayGuard replayGuard;
   @Autowired RateLimiter rateLimiter;
   @Autowired MutableClock clock;
+  @Autowired JdbcTemplate jdbc;
 
   private static final Duration LEASE = Duration.ofMinutes(1);
   private static final Duration RETENTION = Duration.ofHours(1);
@@ -189,6 +191,79 @@ class JdbcWebStoreTest {
 
     clock.advance(Duration.ofMinutes(1));
     assertTrue(rateLimiter.tryAcquire("ip-1", policy).allowed(), "new window resets the count");
+  }
+
+  @Test
+  void crossingAWindowBoundaryDoesNotDeleteTheWindowSomebodyElseIsStillCounting() {
+    RateLimitPolicy policy = new RateLimitPolicy("test", 10, Duration.ofMinutes(1));
+    rateLimiter.tryAcquire("ip-boundary", policy);
+
+    clock.advance(Duration.ofMinutes(1));
+    rateLimiter.tryAcquire("ip-boundary", policy);
+
+    // Two requests a moment apart on one bucket land in different windows all the time. The later
+    // one used to delete every window before its own — including the one the earlier request was
+    // still in the middle of, whose own read then found nothing and raised
+    // EmptyResultDataAccessException out of queryForObject: an intermittent 500 for a caller that
+    // was never over its limit.
+    assertEquals(
+        2,
+        windowsHeldFor("ip-boundary"),
+        "the previous window's counter must survive the crossing into the next one");
+  }
+
+  @Test
+  void anExpiredWindowIsStillSweptOnceNobodyCanBeCountingInIt() {
+    RateLimitPolicy policy = new RateLimitPolicy("test", 10, Duration.ofMinutes(1));
+    rateLimiter.tryAcquire("ip-sweep", policy);
+
+    clock.advance(Duration.ofMinutes(3));
+    rateLimiter.tryAcquire("ip-sweep", policy);
+
+    // The slack that fixes the race must not turn into "never cleans up": a bucket that keeps being
+    // used still drops its old windows, just later than it used to.
+    assertEquals(1, windowsHeldFor("ip-sweep"));
+  }
+
+  @Test
+  void aCounterSweptBetweenTheIncrementAndTheReadAllowsTheRequestRatherThanFailingIt() {
+    RateLimitPolicy policy = new RateLimitPolicy("test", 10, Duration.ofMinutes(1));
+    // A JdbcTemplate that removes the row just before the limiter reads it back, standing in for a
+    // retention job or an operator clearing the table under a live request.
+    // Both read overloads are hooked deliberately: the defect being pinned is that the OLD code
+    // read through queryForObject, so a hook on query() alone would leave this test green against
+    // the very implementation it exists to rule out.
+    JdbcTemplate vanishing =
+        new JdbcTemplate(jdbc.getDataSource()) {
+          @Override
+          public <T> java.util.List<T> query(
+              String sql, org.springframework.jdbc.core.RowMapper<T> mapper, Object... args) {
+            jdbc.update("DELETE FROM aipersimmon_web_rate_limit");
+            return super.query(sql, mapper, args);
+          }
+
+          @Override
+          public <T> T queryForObject(String sql, Class<T> required, Object... args) {
+            jdbc.update("DELETE FROM aipersimmon_web_rate_limit");
+            return super.queryForObject(sql, required, args);
+          }
+        };
+
+    RateLimiter.Decision decision =
+        new JdbcRateLimiter(vanishing, clock).tryAcquire("ip-vanishing", policy);
+
+    // queryForObject would have thrown EmptyResultDataAccessException here. A rate limiter that has
+    // lost its own counter should let the request through, not answer 500 to a caller who was
+    // within their quota.
+    assertTrue(decision.allowed());
+    assertEquals(9, decision.remaining(), "counted as this call's own single increment");
+  }
+
+  private int windowsHeldFor(String bucket) {
+    return jdbc.queryForObject(
+        "SELECT COUNT(*) FROM aipersimmon_web_rate_limit WHERE bucket_key = ?",
+        Integer.class,
+        bucket);
   }
 
   static final class MutableClock extends Clock {

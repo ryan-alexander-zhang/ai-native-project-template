@@ -34,11 +34,18 @@ public class JdbcRateLimiter implements RateLimiter {
     Timestamp windowStart = new Timestamp(alignedStart);
     String tenant = tenant();
 
+    // Sweep this bucket's expired windows, but only ones old enough that nobody can still be
+    // counting in them. It used to delete everything before the caller's own window, which turned
+    // the ordinary boundary crossing into a fault: two requests on one bucket a millisecond apart
+    // land in different windows, the later one deletes the earlier one's row, and the earlier one's
+    // read below then finds nothing. One window of slack is enough to make that impossible — two is
+    // what is used, because the cost of slack is one inert row and the cost of being wrong is a
+    // 500. A caller more than two windows behind is counting in a window that expired long ago.
     jdbc.update(
         "DELETE FROM aipersimmon_web_rate_limit WHERE tenant_id = ? AND bucket_key = ? AND window_start < ?",
         tenant,
         key,
-        windowStart);
+        new Timestamp(alignedStart - 2 * windowMillis));
 
     int updated =
         jdbc.update(
@@ -64,15 +71,23 @@ public class JdbcRateLimiter implements RateLimiter {
       }
     }
 
-    Long count =
-        jdbc.queryForObject(
-            "SELECT count FROM aipersimmon_web_rate_limit "
-                + "WHERE tenant_id = ? AND bucket_key = ? AND window_start = ?",
-            Long.class,
-            tenant,
-            key,
-            windowStart);
-    long used = count == null ? 1 : count;
+    // No row here means the counter this call just incremented has been swept — a retention job, or
+    // an operator. queryForObject would raise EmptyResultDataAccessException and turn that into a
+    // 500 on a request that was never over its limit; the old `count == null` guard did not help,
+    // because it catches a null VALUE and this is an absent ROW. Answer with this call's own
+    // increment: a rate limiter that loses its counter should let the request through, not fail it.
+    long used =
+        jdbc
+            .query(
+                "SELECT count FROM aipersimmon_web_rate_limit "
+                    + "WHERE tenant_id = ? AND bucket_key = ? AND window_start = ?",
+                (rs, n) -> rs.getLong("count"),
+                tenant,
+                key,
+                windowStart)
+            .stream()
+            .findFirst()
+            .orElse(1L);
 
     Instant resetAt = Instant.ofEpochMilli(alignedStart + windowMillis);
     boolean allowed = used <= policy.limit();
