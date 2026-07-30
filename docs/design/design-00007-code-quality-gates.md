@@ -64,7 +64,7 @@ parent:
 >
 > **续（[[issue-00117-the-advance-itself-had-no-tests]]）**：上面那 1300 行里最大的一块——`runtime`
 > （每一次流转都要过的路）——已随第四个内存 store 补完，0% → 100% line / 98.2% branch 并入门禁。
-> 门外现在只剩 `replay` / `operation` / `autoconfigure`，外加**按名字排除的一个类**
+> 门外现在只剩 `autoconfigure`（`replay` 与 `operation` 由 [[issue-00118-the-recovery-paths-had-no-tests]] 补完），外加**按名字排除的一个类**
 > `SpringTxProcessUnitOfWork`：六行转发给 Spring 的 `TransactionTemplate`，
 > 对着 mock 的事务管理器写的测试断言的是那个 mock 而不是 Spring 真正做的传播；
 > 它的行为在真的地方被覆盖（脚手架对 PostgreSQL/MySQL 的端到端测试）。

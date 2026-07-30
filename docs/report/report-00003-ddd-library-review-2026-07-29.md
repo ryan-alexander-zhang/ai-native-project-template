@@ -162,8 +162,11 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
   第四个内存 store 保留去重键与每实例序号两处拒绝；并且——**能被回滚抹掉的冲突不是冲突**，
   所以两个 double 各加一个"另一个已提交事务写下的"口子，否则赢家的行随输家一起消失，
   重试读回自己的出发点顺利成功，乐观锁看起来跑过而从未被顶撞。负向对照：两处拒绝一关，四条测试立刻红。
-  **仍在门外并在 pom 点名**：`replay` / `operation` / `autoconfigure`，以及按名字排除的
-  `SpringTxProcessUnitOfWork`（六行转发给 Spring 的 `TransactionTemplate`，对着 mock 写的测试断言的是 mock）。
+  **`replay` / `operation` 由 `issue-00118` 收尾**，双双 0% → 100% line：那正是第 4 项为修
+  critical #4/#5 写下的代码，此前从未被任何测试执行过。三条负向对照共让 7 条测试变红。
+  **门外只剩 `autoconfigure`**（Spring 装配，两个后端已各自对着真库起过上下文），
+  以及按名字排除的 `SpringTxProcessUnitOfWork`（六行转发给 Spring 的 `TransactionTemplate`，
+  对着 mock 写的测试断言的是 mock）。
 - ~~库自称契约模块无框架依赖，但无人检查~~ → **已修** `issue-00113`：
   `ContractModulesCarryNoFrameworkTest` 按**字节码**跨 reactor 检查 11 个契约模块
   （pom 说声明了什么，字节码说实际够到了什么，落到消费方 classpath 上的是后者）。
@@ -224,7 +227,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 9. 加 metrics SPI（挨着现有 tracer SPI，接缝已在）（`issue-00110`，**已完成**；无新配置项）
 10. ~~流水线化 Kafka 腿~~ **（已完成，`issue-00111`）**——落地时否掉了「按序等 + fail-fast」这个前提已变的要求；顺带修掉 DLT 固定分区号
 11. ~~BOM 去 parent~~ **（已完成，`issue-00112`）**——1626 → 72 条；再导出的判据定为「本库在别的版本上不工作」
-12. ~~测试门禁反转~~ **（已完成，`issue-00113` + `issue-00117`）**——两个 engine 各带内存 store 与门禁（outbox 39 例 / pm 91 例）+ ArchUnit 字节码规则；`DefaultProcessRuntime` 已补齐（0% → 100% line），`replay`/`operation`/`autoconfigure` 仍在门外并在 pom 里点名
+12. ~~测试门禁反转~~ **（已完成，`issue-00113` + `issue-00117` + `issue-00118`）**——两个 engine 各带内存 store 与门禁（outbox 39 例 / pm 129 例）+ ArchUnit 字节码规则；`runtime`/`replay`/`operation` 均 0% → 100% line，门外只剩 `autoconfigure` 并在 pom 里写明理由
 13. ~~core 二选一删掉一套建筑块词汇表；47 模块收敛到约 20~~ **（已完成，`issue-00114`）**——
     词汇表已删（建筑块留注解、领域事件留接口，判据是"留承重的一边"，消费方迁移成本为 0），
     id-starter 作用域改 `runtime`，`ModuleNamingChecks` 改 DOM 解析；

@@ -73,6 +73,9 @@ mutation 从 78% → 86%，no-coverage 从 9 → 0。
 > `runtime` 0% → 100% line / 98.2% branch 并入门禁。那里还多学到一件事：
 > **能被回滚抹掉的冲突不是冲突**，所以两个 double 各加了一个"另一个已提交事务写下的"口子。
 > 现在门外只剩 `replay` / `operation` / `autoconfigure`。
+>
+> **再后续（`issue-00118`）**：`replay` 与 `operation` 也补完了（各 100% line）——
+> 那两个正是第 4 项为修 critical #4/#5 写下的代码。门外只剩 `autoconfigure`。
 
 ### 契约模块无框架：按字节码查
 
