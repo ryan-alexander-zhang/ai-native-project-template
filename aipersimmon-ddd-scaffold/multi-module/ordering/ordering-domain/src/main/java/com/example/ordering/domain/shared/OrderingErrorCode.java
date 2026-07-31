@@ -52,7 +52,14 @@ public enum OrderingErrorCode implements ErrorCode {
   REVIEW_DECISION_ORDER_MISMATCH(
       "ordering.review-decision-order-mismatch", ErrorCategory.DOMAIN_RULE),
   /** A shipped order cannot be cancelled; it must enter the return flow instead. */
-  RETURN_REQUIRED("ordering.return-required", ErrorCategory.CONFLICT);
+  RETURN_REQUIRED("ordering.return-required", ErrorCategory.CONFLICT),
+  /**
+   * The order is already cancelled, whatever the new reason. Its own code because every
+   * reason-specific refusal misstates this situation: a retrying customer would be told the order
+   * "entered fulfilment", a redelivered compensation that its failure "is not applicable" — both
+   * false, and both harder to act on than the actual fact (issue-00130).
+   */
+  ALREADY_CANCELLED("ordering.already-cancelled", ErrorCategory.CONFLICT);
 
   private final String code;
   private final ErrorCategory category;

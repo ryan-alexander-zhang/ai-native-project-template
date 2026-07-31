@@ -160,6 +160,36 @@ class OrderCancellationPolicyTest {
     assertEquals(OrderingErrorCode.REVIEW_DECISION_ORDER_MISMATCH, codeOf(ex));
   }
 
+  /**
+   * A cancelled order refuses every further cancellation with the one code that states the actual
+   * fact — not with a reason-specific refusal that misdescribes it (issue-00130). Before this
+   * branch existed, a customer retry was told "the order has entered fulfilment" and a redelivered
+   * compensation was told the failure "only cancels an order that was cleared for fulfilment" —
+   * both false for an order that is simply already cancelled.
+   */
+  @Test
+  void aCancelledOrderRefusesFurtherCancellationAsAlreadyCancelled() {
+    OrderId id = new OrderId("order-1");
+    Order order = Order.place(id, CUSTOMER, oneLine(), ReviewRequirement.notRequired());
+    order.cancel(new CancellationReason.CustomerRequested(CUSTOMER));
+    assertEquals(OrderStatus.CANCELLED, order.status());
+
+    DomainException customerAgain =
+        assertThrows(
+            DomainException.class,
+            () -> order.cancel(new CancellationReason.CustomerRequested(CUSTOMER)));
+    assertEquals(OrderingErrorCode.ALREADY_CANCELLED, codeOf(customerAgain));
+
+    DomainException compensationAgain =
+        assertThrows(
+            DomainException.class,
+            () ->
+                order.cancel(
+                    new CancellationReason.InventoryUnavailable(
+                        new ReservationFailureRef("fail-1", id, "out_of_stock", "SKU-1"))));
+    assertEquals(OrderingErrorCode.ALREADY_CANCELLED, codeOf(compensationAgain));
+  }
+
   @Test
   void paymentDeclineForAnotherOrderIsRejected() {
     OrderId id = new OrderId("order-1");

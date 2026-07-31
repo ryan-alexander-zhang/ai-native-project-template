@@ -1,5 +1,6 @@
 package com.example.ordering.domain.order;
 
+import static com.example.ordering.domain.shared.OrderingErrorCode.ALREADY_CANCELLED;
 import static com.example.ordering.domain.shared.OrderingErrorCode.COMPENSATION_EVIDENCE_ORDER_MISMATCH;
 import static com.example.ordering.domain.shared.OrderingErrorCode.CUSTOMER_CANCELLATION_WINDOW_CLOSED;
 import static com.example.ordering.domain.shared.OrderingErrorCode.INVENTORY_FAILURE_NOT_APPLICABLE;
@@ -38,6 +39,13 @@ public final class OrderLifecyclePolicy {
     if (status == OrderStatus.SHIPPED) {
       throw new DomainException(
           RETURN_REQUIRED, "a shipped order must enter the return flow, not be cancelled");
+    }
+    // Already cancelled is likewise reason-independent, and it must be said as itself: the
+    // reason-specific refusals below would misdescribe it — a retrying customer told "the order
+    // has entered fulfilment", a redelivered compensation told its failure "is not applicable" —
+    // and a caller acting on those false facts acts wrongly (issue-00130).
+    if (status == OrderStatus.CANCELLED) {
+      throw new DomainException(ALREADY_CANCELLED, "the order is already cancelled");
     }
 
     switch (reason) {
