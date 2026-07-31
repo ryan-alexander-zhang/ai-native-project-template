@@ -58,7 +58,7 @@ import java.util.List;
  *     publishing a fact is not the same as every consumer using it. A consumer that wanted to could
  *     decline to hold stock for a request that has already expired.
  */
-@EventType(name = "com.example.ordering.OrderReadyForFulfilment", version = 2)
+@EventType(name = "com.example.ordering.OrderReadyForFulfilment", version = 2, source = "/ordering")
 @Externalized("ordering.events")
 public record OrderReadyForFulfilment(String orderId, List<Line> lines, Instant reservationDeadline)
     implements IntegrationEvent {

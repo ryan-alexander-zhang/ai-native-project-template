@@ -93,7 +93,11 @@ springdoc:
 
 aipersimmon:
   ddd:
-    # CloudEvents `source` stamped on every published integration event (decision-00014).
+    # CloudEvents `source` FALLBACK (decision-00014): every published contract
+    # in this application declares its own on @EventType (source = "/ordering" | "/inventory" |
+    # "/payment"), because a process hosting three bounded contexts has no single true answer to
+    # "who produced this?" — a shared value made inventory's events claim ordering as their
+    # producer, and consumers dedup on the (source, id) pair (issue-00135).
     integration:
       source: ${spring.application.name}
     # The shared Flyway starter applies each component's schema on its own history table

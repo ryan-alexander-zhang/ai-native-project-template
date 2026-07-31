@@ -136,7 +136,9 @@ public class OutboxWriter implements DurableIntegrationEvents {
     EventEnvelope<IntegrationEvent> envelope =
         new EventEnvelope<>(
             eventId,
-            source,
+            // The contract's own source wins over the deployment-wide default: a process hosting
+            // several contexts has no single true producer, and consumers dedup on (source, id).
+            IntegrationEvent.sourceOf(event.getClass()).orElse(source),
             IntegrationEvent.eventTypeOf(event.getClass()),
             IntegrationEvent.eventVersionOf(event.getClass()),
             clock.instant(),

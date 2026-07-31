@@ -89,6 +89,18 @@ public interface IntegrationEvent {
     return Optional.of(annotation.value());
   }
 
+  /**
+   * The producing context declared by {@code type}'s {@link EventType#source()}, or {@link
+   * Optional#empty()} when the contract leaves it to the deployment-wide default. Read statically
+   * like {@link #eventTypeOf}, so every envelope-minting site resolves the same answer.
+   *
+   * @throws IllegalStateException if {@code type} has no {@link EventType} annotation
+   */
+  static Optional<String> sourceOf(Class<?> type) {
+    String source = requireEventType(type).source();
+    return source.isBlank() ? Optional.empty() : Optional.of(source);
+  }
+
   private static EventType requireEventType(Class<?> type) {
     EventType annotation = type.getAnnotation(EventType.class);
     if (annotation == null) {

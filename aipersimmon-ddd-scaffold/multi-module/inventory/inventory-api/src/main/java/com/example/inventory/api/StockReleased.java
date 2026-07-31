@@ -11,7 +11,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * names the order and its {@code reservationId} does the process manager hold the stock-release
  * evidence the ordering domain demands.
  */
-@EventType(name = "com.example.inventory.StockReleased", version = 1)
+@EventType(name = "com.example.inventory.StockReleased", version = 1, source = "/inventory")
 @Externalized("inventory.events")
 public record StockReleased(String orderId, String reservationId) implements IntegrationEvent {
 

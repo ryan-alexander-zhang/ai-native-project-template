@@ -59,4 +59,19 @@ public @interface EventType {
    * change to the business fact the event asserts is a new {@link #name()} instead.
    */
   int version();
+
+  /**
+   * The producing context's identity (CloudEvents {@code source}), e.g. {@code "/inventory"} —
+   * declared on the contract because the contract is what a context owns. A deployment hosting
+   * several bounded contexts has no single true answer to "who produced this?", so a
+   * deployment-wide source makes every context's events claim the same producer; declaring it here
+   * keeps provenance with the published language it belongs to.
+   *
+   * <p>Optional: an event that leaves it empty is stamped with the deployment-wide default ({@code
+   * aipersimmon.ddd.integration.source}), which stays the right answer for a process that hosts
+   * exactly one context. Consumers dedup on the pair {@code (source, id)}, so changing an event's
+   * source is a contract change: in-flight events under the old source will not be recognised as
+   * duplicates of redeliveries under the new one.
+   */
+  String source() default "";
 }

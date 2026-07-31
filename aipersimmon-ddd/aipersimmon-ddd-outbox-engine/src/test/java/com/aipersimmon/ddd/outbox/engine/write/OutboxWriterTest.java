@@ -113,6 +113,28 @@ class OutboxWriterTest {
     assertEquals("{\"orderId\":\"o-1\"}", row.payload());
   }
 
+  @EventType(name = "com.example.inventory.StockReserved", version = 1, source = "/inventory")
+  private record SourcedEvent(String orderId) implements IntegrationEvent {
+    @Override
+    public String subject() {
+      return orderId;
+    }
+  }
+
+  /**
+   * {@code source} names the context that produced the event, and a context is not a deployment:
+   * three contexts in one process share one deployment-wide default, which made every one of their
+   * events claim the same producer. An event type that declares its source on the contract wins
+   * over the default — the published language owns its own provenance.
+   */
+  @Test
+  void aSourceDeclaredOnTheContractOverridesTheDeploymentDefault() {
+    writerRoutedTo(EventDestinations.ALL_IN_PROCESS)
+        .publish(new SourcedEvent("o-1"), CommandContext.root("acme", "cmd-1"));
+
+    assertEquals("/inventory", store.written("minted-id").orElseThrow().source());
+  }
+
   @Test
   void theWritingThreadsTraceContextIsCarriedOnTheRow() {
     writerRoutedTo(EventDestinations.ALL_IN_PROCESS)

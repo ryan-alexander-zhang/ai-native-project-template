@@ -10,7 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * {@code reservationId} handle the reacting process manager must keep in order to release the very
  * same reservation later (idempotently) should the flow have to compensate.
  */
-@EventType(name = "com.example.inventory.StockReserved", version = 1)
+@EventType(name = "com.example.inventory.StockReserved", version = 1, source = "/inventory")
 @Externalized("inventory.events")
 public record StockReserved(String orderId, String reservationId) implements IntegrationEvent {
 

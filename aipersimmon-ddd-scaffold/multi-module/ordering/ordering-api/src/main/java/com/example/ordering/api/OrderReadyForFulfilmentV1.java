@@ -34,7 +34,7 @@ import java.util.List;
  * where this type belongs, not that anything sends it, and keeping the declaration means the topic
  * list and the catalog are built from one consistent rule instead of one with an exception in it.
  */
-@EventType(name = "com.example.ordering.OrderReadyForFulfilment", version = 1)
+@EventType(name = "com.example.ordering.OrderReadyForFulfilment", version = 1, source = "/ordering")
 @Externalized("ordering.events")
 public record OrderReadyForFulfilmentV1(String orderId, List<Line> lines)
     implements IntegrationEvent {

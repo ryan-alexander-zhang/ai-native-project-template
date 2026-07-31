@@ -21,7 +21,10 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * code on the event is how a bounded context with no HTTP surface still surfaces a stable error
  * identity.
  */
-@EventType(name = "com.example.inventory.StockReservationFailed", version = 1)
+@EventType(
+    name = "com.example.inventory.StockReservationFailed",
+    version = 1,
+    source = "/inventory")
 @Externalized("inventory.events")
 public record StockReservationFailed(String orderId, String code, String reason)
     implements IntegrationEvent {

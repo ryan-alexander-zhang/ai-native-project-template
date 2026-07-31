@@ -32,6 +32,9 @@ class IntegrationEventTest {
   @Externalized("ordering.events")
   record ExternalizedEvent(String id) implements IntegrationEvent {}
 
+  @EventType(name = "com.example.inventory.StockReserved", version = 1, source = "/inventory")
+  record SourcedEvent(String id) implements IntegrationEvent {}
+
   @EventType(name = "com.example.ordering.OrderCancelled", version = 1)
   @Externalized("  ")
   record BlankTargetEvent(String id) implements IntegrationEvent {}
@@ -41,6 +44,18 @@ class IntegrationEventTest {
     assertEquals(
         "com.example.ordering.OrderPlaced", IntegrationEvent.eventTypeOf(AnnotatedEvent.class));
     assertEquals(2, IntegrationEvent.eventVersionOf(AnnotatedEvent.class));
+  }
+
+  /**
+   * {@code source} identifies the producing context, which the contract may declare for itself — a
+   * deployment hosting several contexts has no single true answer. Undeclared means "use the
+   * deployment default", decided by the envelope-minting assembly, not here.
+   */
+  @Test
+  void sourceIsReadFromTheContractWhenDeclared() {
+    assertEquals(
+        java.util.Optional.of("/inventory"), IntegrationEvent.sourceOf(SourcedEvent.class));
+    assertEquals(java.util.Optional.empty(), IntegrationEvent.sourceOf(AnnotatedEvent.class));
   }
 
   @Test

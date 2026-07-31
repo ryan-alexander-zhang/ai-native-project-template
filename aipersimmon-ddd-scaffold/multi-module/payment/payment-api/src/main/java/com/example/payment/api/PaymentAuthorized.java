@@ -9,7 +9,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * cross-context contract for a successful payment. The ordering process manager reacts by
  * confirming the order.
  */
-@EventType(name = "com.example.payment.PaymentAuthorized", version = 1)
+@EventType(name = "com.example.payment.PaymentAuthorized", version = 1, source = "/payment")
 @Externalized("payment.events")
 public record PaymentAuthorized(String orderId) implements IntegrationEvent {
 

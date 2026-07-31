@@ -10,7 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * {@code code} and a human-readable {@code reason}, so the ordering process manager can compensate
  * (release stock, then cancel) and translate the decline into its own cancellation reason.
  */
-@EventType(name = "com.example.payment.PaymentDeclined", version = 1)
+@EventType(name = "com.example.payment.PaymentDeclined", version = 1, source = "/payment")
 @Externalized("payment.events")
 public record PaymentDeclined(String orderId, String code, String reason)
     implements IntegrationEvent {

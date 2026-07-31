@@ -2,7 +2,7 @@
 id: issue-00135-three-contexts-publish-under-one-name
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 三个上下文的事件在 wire 上都宣称产自 ordering
@@ -41,4 +41,15 @@ inbox 去重键的迁移含义——二者必居其一，现状是两头都不�
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，取"source 归契约所有"方案：`@EventType` 新增可选 `source` 属性（空则回退
+部署级 `integration.source`——单上下文进程的正确答案），`IntegrationEvent.sourceOf` 静态读取
+（与 `eventTypeOf` 同款单一事实源），两个铸信封点（`OutboxWriter` 与 `SpringIntegrationEvents`）
+一致地让契约声明覆盖部署默认。javadoc 写明了 inbox 影响：消费者按 `(source, id)` 去重，改
+source 是契约变更。
+
+- 框架红在先（`sourceOf` 不存在编译失败）；`IntegrationEventTest.sourceIsReadFromTheContractWhenDeclared`
+  与 `OutboxWriterTest.aSourceDeclaredOnTheContractOverridesTheDeploymentDefault` 为回归守卫。
+- scaffold：9 个契约各自声明 `/ordering`、`/inventory`、`/payment`；
+  `PublishedLanguageSourceTest` 逐契约 pin（丢声明 = 换 dedup 身份，不只是标签错）；
+  `application.yml` 注释改为"仅 FALLBACK"。全量 `start -am` 验收套件绿（Kafka 端到端流程
+  在新 source 下照常去重）。

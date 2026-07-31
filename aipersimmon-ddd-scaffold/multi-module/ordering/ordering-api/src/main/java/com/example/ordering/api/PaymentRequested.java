@@ -22,7 +22,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * order was cancelled two minutes later as a payment timeout. The published language is where a
  * range like this becomes one agreement instead of two guesses.
  */
-@EventType(name = "com.example.ordering.PaymentRequested", version = 1)
+@EventType(name = "com.example.ordering.PaymentRequested", version = 1, source = "/ordering")
 @Externalized("ordering.events")
 public record PaymentRequested(
     String orderId, String paymentOperationId, long amountMinor, String currency)

@@ -10,7 +10,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * the {@code reservationId} inventory handed back on reservation) when a payment decline forces it
  * to undo the held stock before the order can be cancelled.
  */
-@EventType(name = "com.example.ordering.StockReleaseRequested", version = 1)
+@EventType(name = "com.example.ordering.StockReleaseRequested", version = 1, source = "/ordering")
 @Externalized("ordering.events")
 public record StockReleaseRequested(String orderId, String reservationId)
     implements IntegrationEvent {

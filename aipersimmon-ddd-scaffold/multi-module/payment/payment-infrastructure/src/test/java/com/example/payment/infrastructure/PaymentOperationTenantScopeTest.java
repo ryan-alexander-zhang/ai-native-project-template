@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.tenancy.MissingTenantException;
 import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantEnforcement;
 import com.aipersimmon.ddd.tenancy.TenantId;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.payment.domain.PaymentDecision;
@@ -28,18 +29,20 @@ import org.junit.jupiter.api.Test;
  */
 class PaymentOperationTenantScopeTest {
 
+  private static final TenantEnforcement ENFORCEMENT = new TenantEnforcement();
+
   private final RecordingMapper mapper = new RecordingMapper();
   private final MyBatisPaymentOperations operations = new MyBatisPaymentOperations(mapper);
 
   @AfterEach
   void resetTenancyMode() {
-    TenantContext.setRequired(false);
+    ENFORCEMENT.disable();
     TenantContext.clear();
   }
 
   @Test
   void theBoundTenantIsStampedOnTheRow() {
-    TenantContext.setRequired(true);
+    ENFORCEMENT.enable();
     TenantContext.set(new TenantId("acme"));
 
     operations.record("op-1", new PaymentDecision.Authorized());
@@ -53,7 +56,7 @@ class PaymentOperationTenantScopeTest {
    */
   @Test
   void anUnboundThreadIsRefusedRatherThanWritingToTheSharedBucket() {
-    TenantContext.setRequired(true);
+    ENFORCEMENT.enable();
 
     assertThrows(
         MissingTenantException.class,
@@ -65,7 +68,7 @@ class PaymentOperationTenantScopeTest {
   /** Reads are scoped the same way, or a lookup answers from the wrong bucket. */
   @Test
   void readsAreRefusedOnAnUnboundThreadToo() {
-    TenantContext.setRequired(true);
+    ENFORCEMENT.enable();
 
     assertThrows(MissingTenantException.class, () -> operations.find("op-3"));
   }

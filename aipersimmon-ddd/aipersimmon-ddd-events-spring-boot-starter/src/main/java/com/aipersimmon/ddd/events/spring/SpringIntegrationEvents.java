@@ -76,7 +76,9 @@ public class SpringIntegrationEvents implements IntegrationEvents {
     EventEnvelope<IntegrationEvent> envelope =
         new EventEnvelope<>(
             eventId,
-            source,
+            // The contract's own source wins over the deployment-wide default, mirroring the
+            // durable writer: the same event must claim the same producer on either publisher.
+            IntegrationEvent.sourceOf(event.getClass()).orElse(source),
             IntegrationEvent.eventTypeOf(event.getClass()),
             IntegrationEvent.eventVersionOf(event.getClass()),
             clock.instant(),
