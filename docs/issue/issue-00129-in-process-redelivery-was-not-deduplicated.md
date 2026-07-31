@@ -2,7 +2,7 @@
 id: issue-00129-in-process-redelivery-was-not-deduplicated
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 同一个 handler，走 Kafka 有人替它去重，走本地 relay 没有
