@@ -11,8 +11,15 @@ import java.util.List;
 public record StockQuery(List<String> skus) {
 
   public StockQuery {
-    // Defensive copy so this published-language carrier stays immutable and cannot be
-    // mutated through the caller's list reference after construction.
-    skus = skus == null ? null : List.copyOf(skus);
+    // Refused at parse time (issue-00143): a null list or a blank SKU is a malformed request,
+    // not a question inventory can answer. An empty list stays legal — degenerate, but with a
+    // well-defined (empty) answer. The copy also keeps this carrier immutable.
+    if (skus == null) {
+      throw new IllegalArgumentException("skus required");
+    }
+    skus = List.copyOf(skus);
+    for (String sku : skus) {
+      Contract.required(sku, "sku");
+    }
   }
 }

@@ -64,9 +64,17 @@ public record OrderReadyForFulfilment(String orderId, List<Line> lines, Instant 
     implements IntegrationEvent {
 
   public OrderReadyForFulfilment {
-    // Defensive copy so this published event stays immutable and cannot be mutated
+    // The contract boundary (issue-00143): a payload without an order or without lines cannot be
+    // fulfilled, so it is refused here — at parse time, where the consuming bridge classifies it
+    // as poison — not deep in a handler. reservationDeadline stays nullable: the V1 upcast has
+    // none to give, and consumers must cope without one.
+    Contract.required(orderId, "orderId");
+    if (lines == null || lines.isEmpty()) {
+      throw new IllegalArgumentException("lines required and must not be empty");
+    }
+    // Also a defensive copy, so the published event stays immutable and cannot be mutated
     // through the caller's list reference after construction.
-    lines = lines == null ? null : List.copyOf(lines);
+    lines = List.copyOf(lines);
   }
 
   @Override
@@ -74,5 +82,12 @@ public record OrderReadyForFulfilment(String orderId, List<Line> lines, Instant 
     return orderId();
   }
 
-  public record Line(String sku, int quantity) {}
+  public record Line(String sku, int quantity) {
+    public Line {
+      Contract.required(sku, "sku");
+      if (quantity < 1) {
+        throw new IllegalArgumentException("quantity must be at least 1, got " + quantity);
+      }
+    }
+  }
 }

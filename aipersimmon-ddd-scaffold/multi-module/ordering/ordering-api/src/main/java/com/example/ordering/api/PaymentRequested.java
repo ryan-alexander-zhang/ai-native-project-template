@@ -28,6 +28,18 @@ public record PaymentRequested(
     String orderId, String paymentOperationId, long amountMinor, String currency)
     implements IntegrationEvent {
 
+  public PaymentRequested {
+    // The range the javadoc above agrees on, as code (issue-00143): zero is a legal amount,
+    // negative is not an amount at all. The ids and currency are what payment dedupes and
+    // authorizes by — a payload without them cannot be acted on and is refused at parse time.
+    Contract.required(orderId, "orderId");
+    Contract.required(paymentOperationId, "paymentOperationId");
+    Contract.required(currency, "currency");
+    if (amountMinor < 0) {
+      throw new IllegalArgumentException("amountMinor must be >= 0, got " + amountMinor);
+    }
+  }
+
   @Override
   public String subject() {
     return orderId();

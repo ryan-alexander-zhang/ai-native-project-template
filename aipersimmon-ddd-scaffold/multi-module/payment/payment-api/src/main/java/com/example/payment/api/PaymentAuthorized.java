@@ -13,6 +13,12 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 @Externalized("payment.events")
 public record PaymentAuthorized(String orderId) implements IntegrationEvent {
 
+  public PaymentAuthorized {
+    // The order id is the whole message: an authorization that names no order confirms nothing
+    // (issue-00143).
+    Contract.required(orderId, "orderId");
+  }
+
   @Override
   public String subject() {
     return orderId();

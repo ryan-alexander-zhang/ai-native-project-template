@@ -40,7 +40,13 @@ public record OrderReadyForFulfilmentV1(String orderId, List<Line> lines)
     implements IntegrationEvent {
 
   public OrderReadyForFulfilmentV1 {
-    lines = lines == null ? null : List.copyOf(lines);
+    // Frozen does not mean lax: v1 messages still arrive from the wire, so a poison v1 payload is
+    // refused at parse time exactly like a v2 one (issue-00143).
+    Contract.required(orderId, "orderId");
+    if (lines == null || lines.isEmpty()) {
+      throw new IllegalArgumentException("lines required and must not be empty");
+    }
+    lines = List.copyOf(lines);
   }
 
   @Override
@@ -54,5 +60,12 @@ public record OrderReadyForFulfilmentV1(String orderId, List<Line> lines)
    * change to v2's line shape would silently rewrite what v1 claims to have meant — and the stored
    * messages this class exists to read would no longer match it.
    */
-  public record Line(String sku, int quantity) {}
+  public record Line(String sku, int quantity) {
+    public Line {
+      Contract.required(sku, "sku");
+      if (quantity < 1) {
+        throw new IllegalArgumentException("quantity must be at least 1, got " + quantity);
+      }
+    }
+  }
 }

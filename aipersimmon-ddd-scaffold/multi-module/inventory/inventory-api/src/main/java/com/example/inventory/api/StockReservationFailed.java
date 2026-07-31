@@ -29,6 +29,14 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 public record StockReservationFailed(String orderId, String code, String reason)
     implements IntegrationEvent {
 
+  public StockReservationFailed {
+    // "code is never null" was already this event's documented guarantee, held on the producing
+    // side by a test; now the type itself holds it, on every path (issue-00143). The
+    // human-readable reason stays optional: the consuming evidence type accepts a null detail.
+    Contract.required(orderId, "orderId");
+    Contract.required(code, "code");
+  }
+
   @Override
   public String subject() {
     return orderId();

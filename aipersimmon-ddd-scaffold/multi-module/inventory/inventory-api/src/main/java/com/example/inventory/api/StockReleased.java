@@ -15,6 +15,13 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 @Externalized("inventory.events")
 public record StockReleased(String orderId, String reservationId) implements IntegrationEvent {
 
+  public StockReleased {
+    // Both ids are the whole message: this event is the stock-release evidence the ordering
+    // domain demands, and evidence that names nothing proves nothing (issue-00143).
+    Contract.required(orderId, "orderId");
+    Contract.required(reservationId, "reservationId");
+  }
+
   @Override
   public String subject() {
     return orderId();

@@ -15,6 +15,14 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 public record PaymentDeclined(String orderId, String code, String reason)
     implements IntegrationEvent {
 
+  public PaymentDeclined {
+    // The code is the machine identity consumers branch on and are entitled to refuse without;
+    // the human-readable reason is detail, and consumers demonstrably accept its absence — so
+    // the code is required and the reason is not (issue-00143, same bargain as issue-00131).
+    Contract.required(orderId, "orderId");
+    Contract.required(code, "code");
+  }
+
   @Override
   public String subject() {
     return orderId();
