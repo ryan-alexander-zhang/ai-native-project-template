@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.outbox.spring;
 
+import com.aipersimmon.ddd.inbox.Inbox;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
@@ -25,6 +26,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Selects the single outbox {@link OutboxDispatcher}, independently of how the outbox is stored.
@@ -133,6 +136,13 @@ public class AipersimmonDddOutboxAutoConfiguration {
    * the relay as having delivered, so a fallback that only logs turns a missing transport into
    * archived, undelivered events — see the guard below for the half of this that in-process cannot
    * fix.
+   *
+   * <p>With an {@link Inbox} bean present, the dispatcher absorbs the relay's redeliveries itself
+   * (the same dedup the Kafka bridge gives brokered delivery); without one it says so loudly,
+   * because "the framework dedups for me" is exactly the assumption a handler author brings over
+   * from the Kafka path. An inbox without a transaction manager is refused at startup: a dedup
+   * record that can outlive its failed delivery converts every crash into a lost event, which is
+   * strictly worse than the duplicate it was meant to prevent.
    */
   @Bean
   @ConditionalOnProperty(
@@ -143,9 +153,31 @@ public class AipersimmonDddOutboxAutoConfiguration {
   public OutboxDispatcher inProcessOutboxDispatcher(
       ApplicationEventPublisher publisher,
       ObjectProvider<ObjectMapper> objectMapper,
-      IntegrationEventCatalog catalog) {
+      IntegrationEventCatalog catalog,
+      ObjectProvider<Inbox> inbox,
+      ObjectProvider<PlatformTransactionManager> transactionManager) {
+    ObjectMapper mapper = objectMapper.getIfAvailable(ObjectMapper::new);
+    Inbox dedup = inbox.getIfAvailable();
+    if (dedup == null) {
+      log.warn(
+          "aipersimmon-ddd outbox in-process dispatch has NO inbox: a relay redelivery reaches "
+              + "@EventListener handlers again, so every handler must tolerate its own earlier "
+              + "success. Add an inbox backend (aipersimmon-ddd-inbox-jdbc or "
+              + "aipersimmon-ddd-inbox-mybatis-plus) to deduplicate redeliveries here, as the "
+              + "Kafka consumer bridge does.");
+      return new InProcessOutboxDispatcher(publisher, mapper, catalog);
+    }
+    PlatformTransactionManager ptm = transactionManager.getIfAvailable();
+    if (ptm == null) {
+      throw new IllegalStateException(
+          "An Inbox bean is present but no PlatformTransactionManager is: the in-process outbox "
+              + "dispatcher must run the inbox check and the handlers in one transaction, or a "
+              + "failed delivery leaves a dedup record behind and its retry is dropped as a "
+              + "duplicate. Provide a transaction manager (spring-boot-starter-jdbc does), or "
+              + "remove the inbox.");
+    }
     return new InProcessOutboxDispatcher(
-        publisher, objectMapper.getIfAvailable(ObjectMapper::new), catalog);
+        publisher, mapper, catalog, dedup, new TransactionTemplate(ptm));
   }
 
   /**

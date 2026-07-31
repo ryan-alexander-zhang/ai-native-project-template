@@ -45,7 +45,21 @@ deduplicated"，把隐含契约变成显式声明。
 
 ## 验证结果
 
-未修复。修复时负向对照：拆掉 inbox 接线重跑复现测试，必须回到红（对照要确认真的执行到）。
+2026-07-31 修复。要点比 issue 预测多一层：**inbox 检查必须与 handler 副作用同事务**（Kafka 桥
+的 `@Transactional` 正是这个作用）——否则"先记 inbox、后处理失败"会让重投被误判为重复，
+把重复问题换成丢事件问题，比不修更糟。因此：
+
+- `InProcessOutboxDispatcher` 新增 `(Inbox, TransactionOperations)` 构造器，两者强制成对；
+  dedup 键与 Kafka 桥同为 `(source, eventId)`，检查在 `TenantContext.runAs` 内、事务回调内。
+- outbox starter：有 `Inbox` bean 自动接线（无 `PlatformTransactionManager` 则启动即拒绝——
+  见上面的"更糟"论证）；无 `Inbox` 保持原行为并 WARN 明示 "NOT deduplicated"。
+- messaging-kafka 的 `RoutingOutboxDispatcher` 本地腿同样接线（LOCAL 事件与 externalized
+  事件各走一腿、永不共键，无双记风险）。
+
+红在先：starter 新测试修复前编译失败（构造器不存在）；实现后
+`aRedeliveredMessageIsNotPublishedAgainWhenAnInboxIsPresent`（同 id 两次 dispatch 只发布一次）
+与 `theInboxCheckAndThePublishShareOneTransaction`（发布发生在 dedup 事务回调内）为回归守卫。
+outbox-starter + messaging-kafka 全模块绿；scaffold `start -am` 验收套件在新库下全绿。
 
 ## 关联
 

@@ -50,6 +50,8 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.RetryListener;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.backoff.BackOff;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -213,6 +215,13 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
    * keeps LOCAL events in process (an {@link InProcessOutboxDispatcher} leg) and sends
    * {@code @Externalized} events to their topic (a {@link KafkaOutboxDispatcher} leg).
    * {@code @ConditionalOnMissingBean} so an application can still supply its own.
+   *
+   * <p>The local leg dedups the relay's redeliveries against the same {@link Inbox} the consumer
+   * bridge uses, so a LOCAL event's handler gets the same at-most-once-in-effect guarantee as an
+   * externalized event's — the two legs never share a key, since one event travels exactly one leg.
+   * A Kafka deployment always has a transaction manager (its inbox and outbox are database-backed),
+   * so unlike the plain outbox starter this wiring does not degrade quietly: with no inbox it
+   * simply stays undeduplicated, matching that starter's warning path.
    */
   @Bean
   @ConditionalOnBean(KafkaTemplate.class)
@@ -222,10 +231,17 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
       KafkaMessagingProperties properties,
       ApplicationEventPublisher publisher,
       ObjectProvider<ObjectMapper> objectMapper,
-      IntegrationEventCatalog catalog) {
+      IntegrationEventCatalog catalog,
+      ObjectProvider<Inbox> inbox,
+      ObjectProvider<PlatformTransactionManager> transactionManager) {
+    ObjectMapper mapper = objectMapper.getIfAvailable(ObjectMapper::new);
+    Inbox dedup = inbox.getIfAvailable();
+    PlatformTransactionManager ptm = transactionManager.getIfAvailable();
     OutboxDispatcher localLeg =
-        new InProcessOutboxDispatcher(
-            publisher, objectMapper.getIfAvailable(ObjectMapper::new), catalog);
+        dedup != null && ptm != null
+            ? new InProcessOutboxDispatcher(
+                publisher, mapper, catalog, dedup, new TransactionTemplate(ptm))
+            : new InProcessOutboxDispatcher(publisher, mapper, catalog);
     KafkaOutboxDispatcher externalLeg =
         new KafkaOutboxDispatcher(
             kafkaTemplate, Duration.ofMillis(properties.getProducer().getSendTimeoutMs()));

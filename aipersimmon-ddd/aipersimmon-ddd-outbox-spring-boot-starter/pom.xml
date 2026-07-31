@@ -46,9 +46,23 @@
       <artifactId>aipersimmon-ddd-tenancy</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Contract only: the in-process dispatcher dedups redeliveries against an Inbox when the
+         application supplies one, using the same (source, id) pair as the Kafka consumer bridge —
+         so a handler sees one guarantee whichever transport delivered. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
+    </dependency>
+    <!-- TransactionOperations: the inbox check and the handlers it guards must commit or roll
+         back together, exactly as the Kafka bridge's @Transactional consuming method does. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
