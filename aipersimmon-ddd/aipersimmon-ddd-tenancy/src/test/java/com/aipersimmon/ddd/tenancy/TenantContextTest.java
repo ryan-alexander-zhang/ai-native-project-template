@@ -21,6 +21,21 @@ class TenantContextTest {
     assertTrue(TenantContext.current().isEmpty());
   }
 
+  /**
+   * The enforcement flag is an isolation guarantee, and {@link TenantEnforcement} is its only
+   * sanctioned mover — registered as a bean whose lifecycle brackets the application context. A
+   * public {@code setRequired} let any code in the process flip fail-closed resolution back to
+   * sentinel fallback at runtime, with a javadoc plea as the only guard; package-private makes the
+   * compiler enforce what the javadoc used to ask for.
+   */
+  @Test
+  void theEnforcementFlagCannotBeMovedFromOutsideThePackage() throws NoSuchMethodException {
+    var setRequired = TenantContext.class.getDeclaredMethod("setRequired", boolean.class);
+    assertFalse(
+        java.lang.reflect.Modifier.isPublic(setRequired.getModifiers()),
+        "setRequired must not be public; TenantEnforcement is the only sanctioned mover");
+  }
+
   @Test
   void effectiveReturnsTheBoundTenant() {
     TenantContext.set(Tenants.of("acme"));

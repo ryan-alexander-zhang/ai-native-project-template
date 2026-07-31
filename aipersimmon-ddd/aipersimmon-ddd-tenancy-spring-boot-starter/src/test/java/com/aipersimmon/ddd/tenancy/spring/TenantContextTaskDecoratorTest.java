@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.tenancy.MissingTenantException;
 import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantEnforcement;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,17 +18,19 @@ import org.junit.jupiter.api.Test;
 
 class TenantContextTaskDecoratorTest {
 
+  private static final TenantEnforcement ENFORCEMENT = new TenantEnforcement();
+
   private final TenantContextTaskDecorator decorator = new TenantContextTaskDecorator();
 
   @AfterEach
   void tearDown() {
     TenantContext.clear();
-    TenantContext.setRequired(false);
+    ENFORCEMENT.disable();
   }
 
   @Test
   void carriesTheSubmittingTenantOntoTheWorkerThread() throws Exception {
-    TenantContext.setRequired(true);
+    ENFORCEMENT.enable();
     TenantContext.set(Tenants.of("acme"));
     AtomicReference<String> seen = new AtomicReference<>();
 
@@ -39,7 +42,7 @@ class TenantContextTaskDecoratorTest {
 
   @Test
   void leavesTheWorkerUnboundWhenNothingWasBoundAtSubmission() throws Exception {
-    TenantContext.setRequired(true);
+    ENFORCEMENT.enable();
     AtomicReference<Throwable> failure = new AtomicReference<>();
 
     Runnable decorated =

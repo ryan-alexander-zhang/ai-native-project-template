@@ -118,11 +118,14 @@ public final class TenantContext {
    * Declares whether a binding is mandatory, switching {@link #effective()} between fail-closed and
    * sentinel behaviour.
    *
-   * <p>Bootstrap only: the tenancy auto-configuration sets this while the application context
-   * starts and unsets it when the context closes. Application code must not call it — flipping it
-   * at runtime changes an isolation guarantee under in-flight requests.
+   * <p>Package-private on purpose: {@link TenantEnforcement} is the only sanctioned mover — the
+   * tenancy auto-configurations register it as a bean whose lifecycle brackets the application
+   * context. This used to be public with a javadoc plea ("bootstrap only"), which left the
+   * deployment's isolation guarantee flippable by any code in the process at runtime; data
+   * isolation is the last property that should rest on discipline, so the compiler now enforces
+   * what the comment used to ask for. Tests switch modes through {@code TenantEnforcement} too.
    */
-  public static void setRequired(boolean value) {
+  static void setRequired(boolean value) {
     required = value;
   }
 }

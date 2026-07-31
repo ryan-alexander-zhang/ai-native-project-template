@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantEnforcement;
 import com.aipersimmon.ddd.tenancy.TenantResolver;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.Optional;
@@ -20,6 +21,8 @@ import org.springframework.core.task.TaskDecorator;
 
 class AipersimmonDddTenancyAutoConfigurationTest {
 
+  private static final TenantEnforcement ENFORCEMENT = new TenantEnforcement();
+
   private final WebApplicationContextRunner runner =
       new WebApplicationContextRunner()
           .withConfiguration(AutoConfigurations.of(AipersimmonDddTenancyAutoConfiguration.class));
@@ -28,7 +31,7 @@ class AipersimmonDddTenancyAutoConfigurationTest {
   void tearDown() {
     // The enforcement bean's destroy method already lowers the flag; make a leak visible instead of
     // letting it bleed into sibling tests.
-    TenantContext.setRequired(false);
+    ENFORCEMENT.disable();
   }
 
   @Test

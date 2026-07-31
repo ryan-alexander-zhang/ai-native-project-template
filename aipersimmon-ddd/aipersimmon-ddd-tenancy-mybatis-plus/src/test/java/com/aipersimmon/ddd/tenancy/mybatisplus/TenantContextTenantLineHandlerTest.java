@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.aipersimmon.ddd.tenancy.MissingTenantException;
 import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.TenantEnforcement;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.List;
 import net.sf.jsqlparser.expression.StringValue;
@@ -13,13 +14,15 @@ import org.junit.jupiter.api.Test;
 
 class TenantContextTenantLineHandlerTest {
 
+  private static final TenantEnforcement ENFORCEMENT = new TenantEnforcement();
+
   private final TenantContextTenantLineHandler handler =
       new TenantContextTenantLineHandler("tenant_id", List.of("orders", "ORDER_LINE"));
 
   @AfterEach
   void tearDown() {
     TenantContext.clear();
-    TenantContext.setRequired(false);
+    ENFORCEMENT.disable();
   }
 
   @Test
@@ -31,7 +34,7 @@ class TenantContextTenantLineHandlerTest {
 
   @Test
   void tenantIdIsTheRootSentinelWhenNoneBoundAndTenancyIsOff() {
-    TenantContext.setRequired(false);
+    ENFORCEMENT.disable();
     assertThat(((StringValue) handler.getTenantId()).getValue()).isEqualTo(Tenants.ROOT.value());
   }
 
@@ -40,7 +43,7 @@ class TenantContextTenantLineHandlerTest {
     // Narrowing the predicate to the sentinel here is what makes a tenant's rows silently
     // "disappear" from a query (and land in the shared bucket on a write), so the handler must
     // refuse instead of supplying a value nobody chose.
-    TenantContext.setRequired(true);
+    ENFORCEMENT.enable();
     assertThatThrownBy(handler::getTenantId).isInstanceOf(MissingTenantException.class);
   }
 
