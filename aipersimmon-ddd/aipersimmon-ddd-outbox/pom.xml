@@ -45,7 +45,7 @@
     </dependency>
     <!-- jackson-core only (not databind): DefaultFailureClassifier classifies a
          JsonProcessingException as a permanent failure. No Spring here, by design — this is a
-         contract module a domain layer may depend on (design-00012). -->
+         contract module a domain layer may depend on. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>

@@ -16,7 +16,7 @@
     Duplicate idempotency keys converge dialect-natively — PostgreSQL via INSERT ... ON CONFLICT
     DO NOTHING (never aborts the caller's transaction), H2/MySQL via a plain insert whose duplicate
     is caught (a statement error does not abort the transaction on those engines). Carries no DDL:
-    the shared migrations live in aipersimmon-ddd-operation-log-engine. See design-00008 §7.
+    the shared migrations live in aipersimmon-ddd-operation-log-engine.
   -->
   <artifactId>aipersimmon-ddd-operation-log-jdbc</artifactId>
   <name>aipersimmon-ddd-operation-log-jdbc</name>

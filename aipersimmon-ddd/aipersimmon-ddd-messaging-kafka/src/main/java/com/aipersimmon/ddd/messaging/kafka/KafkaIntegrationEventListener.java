@@ -194,7 +194,7 @@ public class KafkaIntegrationEventListener {
     }
     // A retired revision with no listener of its own may still be handled after upcasting: what
     // the listener will actually see is the chain's terminal class, so that is the version to ask
-    // about (issue-00142). Without this, collapsing the per-revision listeners into one — the
+    // about. Without this, collapsing the per-revision listeners into one — the
     // whole point of upcasters — would make every old-revision record silently skippable.
     if (!upcasters.isEmpty()
         && localHandlers.handles(type, upcasters.terminalVersionOf(eventClass.get()))) {
@@ -217,7 +217,7 @@ public class KafkaIntegrationEventListener {
             .lookup(type, version)
             .orElseThrow(() -> new UnknownIntegrationEventException(type, version));
     try {
-      // Normalise a retired revision at the boundary (issue-00142): after the upcast walk the
+      // Normalise a retired revision at the boundary: after the upcast walk the
       // payload is the newest revision an upcaster leads to, so the envelope's version must
       // describe the payload actually carried — the wire's original version stays visible on the
       // Kafka record, but an envelope whose version contradicts its payload class would be a lie

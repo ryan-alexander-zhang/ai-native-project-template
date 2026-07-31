@@ -1,4 +1,4 @@
--- Multi-tenancy (decision-00018 / design-00009): add the tenant discriminator to all four
+-- Multi-tenancy: add the tenant discriminator to all four
 -- process tables. The single global relay/claim/deadline pollers still scan every tenant, but
 -- each row now carries its owning tenant so the durable store-and-forward hop can reconstruct
 -- the command context under the right tenant and enforce isolation. tenant_id is NOT NULL with

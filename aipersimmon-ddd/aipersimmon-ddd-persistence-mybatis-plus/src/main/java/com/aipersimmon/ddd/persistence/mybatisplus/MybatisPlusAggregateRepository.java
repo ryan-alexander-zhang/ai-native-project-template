@@ -44,11 +44,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *
  * <p>Requires the optimistic-locker interceptor to be installed, which {@code
  * AipersimmonDddPersistenceMybatisPlusAutoConfiguration} contributes. Without it the {@code WHERE
- * version = ?} predicate is never added and the update degrades to last-writer-wins — see {@code
- * design-00011} §3. {@link #saveAggregate} no longer takes that on trust: it checks the
- * interceptor's own witness (the version it writes back onto the row) and fails loudly, because the
- * affected-rows check cannot detect a missing predicate — it passes precisely because the predicate
- * is gone.
+ * version = ?} predicate is never added and the update degrades to last-writer-wins. {@link
+ * #saveAggregate} no longer takes that on trust: it checks the interceptor's own witness (the
+ * version it writes back onto the row) and fails loudly, because the affected-rows check cannot
+ * detect a missing predicate — it passes precisely because the predicate is gone.
  *
  * <p>It also requires an active transaction, for the same reason it publishes events: the root row,
  * the child rows and the events are one atomic outcome or they are a corrupted aggregate.

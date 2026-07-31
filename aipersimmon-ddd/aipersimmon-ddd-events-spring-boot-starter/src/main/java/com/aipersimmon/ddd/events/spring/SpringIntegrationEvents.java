@@ -31,9 +31,9 @@ public class SpringIntegrationEvents implements IntegrationEvents {
 
   /**
    * @param idGenerator supplies each brand-new event's id. Required: there is no defaulting
-   *     overload, so a caller cannot accidentally fall back to a non-time-ordered id (see {@code
-   *     issue-00053}). Auto-configuration passes the {@link
-   *     com.aipersimmon.ddd.core.id.IdGenerator} bean; tests pass a deterministic supplier.
+   *     overload, so a caller cannot accidentally fall back to a non-time-ordered id.
+   *     Auto-configuration passes the {@link com.aipersimmon.ddd.core.id.IdGenerator} bean; tests
+   *     pass a deterministic supplier.
    */
   public SpringIntegrationEvents(
       ApplicationEventPublisher publisher,

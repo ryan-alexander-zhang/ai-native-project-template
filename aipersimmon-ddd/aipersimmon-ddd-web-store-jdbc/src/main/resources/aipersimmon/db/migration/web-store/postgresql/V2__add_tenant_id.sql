@@ -1,4 +1,4 @@
--- Multi-tenancy (decision-00018 / design-00009): the idempotency key, nonce, and rate-limit
+-- Multi-tenancy: the idempotency key, nonce, and rate-limit
 -- bucket key are all CLIENT-provided (tenant-relative), so tenant_id joins each primary key rather
 -- than being a mere data column — two tenants may legitimately send the same Idempotency-Key or
 -- reuse a bucket identifier, and without tenant in the key one tenant could read back another's

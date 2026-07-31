@@ -25,7 +25,7 @@ public class AipersimmonDddWebProperties {
    * Whether an enabled concern may fall back to its in-memory implementation. {@code true} keeps
    * development frictionless — idempotency works without running Redis. Set it to {@code false} in
    * the production profile and startup fails instead of silently substituting a store that does not
-   * survive a second instance (issue-00058).
+   * survive a second instance.
    *
    * <p>It is only about the <em>fallback</em>: with a {@code -web-store-*} module on the classpath,
    * or the application's own store bean, this changes nothing.

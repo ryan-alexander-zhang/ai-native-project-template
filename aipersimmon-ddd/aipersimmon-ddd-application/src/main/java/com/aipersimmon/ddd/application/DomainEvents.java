@@ -21,8 +21,7 @@ import java.util.Collection;
  * until something drains them, and nothing detects a missed drain — no exception, no log, no outbox
  * row. Leaving the call to the handler makes losing a domain fact a matter of remembering one line,
  * and the loss shows up far downstream (a process manager that never advances, a projection that
- * never updates). Keeping the single call site in the repository removes that possibility; see
- * {@code issue-00052}.
+ * never updates). Keeping the single call site in the repository removes that possibility.
  */
 public interface DomainEvents {
 

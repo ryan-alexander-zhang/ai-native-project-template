@@ -18,7 +18,7 @@
 
     Only events annotated @Externalized cross the broker; everything else stays in process. If a
     storage bundle is absent the durable-transport guard fails startup rather than letting
-    @Externalized events be published in process and silently never leave the JVM (issue-00044).
+    @Externalized events be published in process and silently never leave the JVM.
   -->
   <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
   <name>aipersimmon-ddd-starter-messaging-kafka</name>

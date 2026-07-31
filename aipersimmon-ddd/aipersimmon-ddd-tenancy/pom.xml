@@ -21,7 +21,7 @@
     resolution filter and the CommandContext binding live in the optional
     aipersimmon-ddd-tenancy-spring-boot-starter module. Tenant isolation itself is woven into
     the existing cqrs / integration / outbox / process-manager / web-store
-    components (see design-00009 / decision-00018).
+    components.
   -->
   <artifactId>aipersimmon-ddd-tenancy</artifactId>
   <name>aipersimmon-ddd-tenancy</name>

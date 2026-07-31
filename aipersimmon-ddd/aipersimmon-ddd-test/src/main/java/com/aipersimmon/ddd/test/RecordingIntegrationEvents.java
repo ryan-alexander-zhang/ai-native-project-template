@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * An {@link IntegrationEvents} that records full {@link EventEnvelope}s instead of transporting
- * them — the official test double (issue-00140). A minimal hand-rolled fake collects bare payloads
- * and thereby asserts nothing about the wire: this one builds each envelope exactly the way {@code
+ * them — the official test double. A minimal hand-rolled fake collects bare payloads and thereby
+ * asserts nothing about the wire: this one builds each envelope exactly the way {@code
  * SpringIntegrationEvents} and the outbox writer do, reusing the framework's own {@code @EventType}
  * readers, so a test sees — and an event class missing its {@code @EventType} annotation fails —
  * precisely as in production:

@@ -14,7 +14,7 @@
   <!--
     Aggregate persistence for MyBatis-Plus: a template-method repository base that makes the
     version-checked write and the domain-event drain the default path rather than something each
-    consumer repository re-implements (design-00011 §2), plus the OptimisticLockerInnerInterceptor
+    consumer repository re-implements, plus the OptimisticLockerInnerInterceptor
     contribution that supplies the WHERE version = ? predicate.
 
     Deliberately provides NO generic repository port: the domain defines its own (Orders, Stocks),

@@ -9,8 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 /**
  * Binds the named tenant to the test thread's {@link com.aipersimmon.ddd.tenancy.TenantContext}
  * before each test and clears it after — the {@code @AfterEach} cleanup every team otherwise writes
- * by hand, and forgets, until one test's tenant leaks into the next through the ThreadLocal
- * (issue-00140).
+ * by hand, and forgets, until one test's tenant leaks into the next through the ThreadLocal.
  *
  * <p>On the test class it applies to every test; on a method it overrides the class's value. The
  * value passes through {@code Tenants.fromValue} — the explicit trust-boundary reader — so a test

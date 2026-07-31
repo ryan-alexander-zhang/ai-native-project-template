@@ -1,4 +1,4 @@
--- Add the tenant discriminator to the outbox tables (multi-tenancy, decision-00018 / design-00009).
+-- Add the tenant discriminator to the outbox tables (multi-tenancy).
 -- A data column only: event_id stays the natural dedup key (tenant is NOT part of the unique key).
 -- Non-null with the __root__ sentinel so single-tenant rows — and any rows written before tenancy —
 -- resolve to N=1 rather than NULL (a NULL tenant would silently void tenant-composite unique keys).

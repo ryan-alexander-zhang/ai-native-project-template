@@ -12,7 +12,7 @@
   </parent>
 
   <!--
-    The framework's ports, as test doubles the framework itself maintains (issue-00140).
+    The framework's ports, as test doubles the framework itself maintains.
 
     A port without an official fake is a port every consuming team re-invents — and a fake
     CommandBus is easy to get subtly wrong: forget to mint message ids and causation assertions

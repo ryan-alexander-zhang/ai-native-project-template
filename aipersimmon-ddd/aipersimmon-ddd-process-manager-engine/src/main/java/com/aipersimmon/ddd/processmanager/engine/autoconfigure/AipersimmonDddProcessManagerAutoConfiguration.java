@@ -432,7 +432,7 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
 
   // The id supplier for every minting point (instance / transition / effect / deadline id). These
   // are the high-cardinality VARCHAR primary keys where time ordering wins the most, so the
-  // IdGenerator bean is required rather than defaulted (see issue-00053).
+  // IdGenerator bean is required rather than defaulted.
   private static Supplier<String> ids(IdGenerator idGenerator) {
     return idGenerator::newId;
   }

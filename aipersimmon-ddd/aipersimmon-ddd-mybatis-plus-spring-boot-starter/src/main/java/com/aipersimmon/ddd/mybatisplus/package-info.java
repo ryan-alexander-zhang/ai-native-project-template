@@ -6,7 +6,6 @@
  *
  * <p>It exists because MyBatis-Plus honours exactly one such bean, so components that each
  * registered their own would not compose — the loser of {@code @ConditionalOnMissingBean} would
- * back off with no error, silently dropping tenant isolation or the optimistic-lock predicate. See
- * {@code design-00011} §3.
+ * back off with no error, silently dropping tenant isolation or the optimistic-lock predicate.
  */
 package com.aipersimmon.ddd.mybatisplus;

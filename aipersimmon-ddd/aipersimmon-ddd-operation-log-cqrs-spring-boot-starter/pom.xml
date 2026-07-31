@@ -16,7 +16,7 @@
     interceptor inside the transaction, a failed interceptor outside it), the restricted template
     engine, the annotation compiler (@OperationLog -> synthesized definition), the definition
     registry, actor/tenant resolver contracts, and the auto-configuration. Depends on the engine for
-    the OperationLogs pipeline and shared properties; carries no storage. See design-00008 §6.
+    the OperationLogs pipeline and shared properties; carries no storage.
   -->
   <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
   <name>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</name>

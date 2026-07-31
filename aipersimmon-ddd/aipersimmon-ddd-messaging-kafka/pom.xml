@@ -51,7 +51,7 @@
     </dependency>
     <!-- The Spring assembly half of the outbox: OutboxProperties, the shared
          auto-configuration this module orders against, and the in-process dispatcher.
-         The contracts come from -outbox, which is Spring-free (design-00012). -->
+         The contracts come from -outbox, which is Spring-free. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-outbox-spring-boot-starter</artifactId>

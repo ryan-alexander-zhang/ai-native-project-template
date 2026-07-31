@@ -28,7 +28,7 @@
 
   <dependencies>
     <!-- The shared MyBatis-Plus seam that owns the single MybatisPlusInterceptor and composes this
-         module's TenantLineInnerInterceptor contribution into it (design-00011 §3). -->
+         module's TenantLineInnerInterceptor contribution into it. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>

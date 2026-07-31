@@ -17,11 +17,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * sits past {@code expires_at} forever. The two indexes this job scans were added by migration V3
  * for a retention job, with a comment saying so; the job is what was missing.
  *
- * <p>Unlike the process manager's retention (issue-00122), this defaults to <em>on</em>, and the
- * difference is not a change of heart. There the rows are business records and how long to keep
- * them is the deployer's decision. Here {@code expires_at} is the store's own statement that the
- * row is dead — the code deletes such rows already, whenever it happens to pass one. Finishing that
- * job on a schedule is not a policy.
+ * <p>Unlike the process manager's retention, this defaults to <em>on</em>, and the difference is
+ * not a change of heart. There the rows are business records and how long to keep them is the
+ * deployer's decision. Here {@code expires_at} is the store's own statement that the row is dead —
+ * the code deletes such rows already, whenever it happens to pass one. Finishing that job on a
+ * schedule is not a policy.
  *
  * <p>No batch limit, because there is no way to write one that holds across all three dialects:
  * {@code DELETE ... LIMIT} is MySQL-only, and the process manager's select-then-delete-by-id shape
@@ -73,9 +73,9 @@ public class JdbcWebStoreCleanup {
    *
    * <p>Setting it too short is survivable rather than dangerous: deleting a live counter resets
    * that bucket's quota, and a caller whose counter has gone missing is answered with this call's
-   * own increment rather than an error (issue-00123). Hot buckets barely depend on this anyway —
-   * {@link JdbcRateLimiter} sweeps its own bucket on every call — so what is left here is the cold
-   * ones, the keys never seen again.
+   * own increment rather than an error. Hot buckets barely depend on this anyway — {@link
+   * JdbcRateLimiter} sweeps its own bucket on every call — so what is left here is the cold ones,
+   * the keys never seen again.
    */
   private int purgeRateLimitWindows(Instant now) {
     return jdbc.update(

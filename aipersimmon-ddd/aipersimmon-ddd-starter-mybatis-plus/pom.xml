@@ -34,15 +34,14 @@
       <artifactId>aipersimmon-ddd-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- MybatisPlusAggregateRepository: version-checked aggregate writes with event draining
-         (design-00011). -->
+    <!-- MybatisPlusAggregateRepository: version-checked aggregate writes with event draining. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The single MybatisPlusInterceptor every InnerInterceptor contribution composes into.
-         MyBatis-Plus honours exactly one, so it must be owned in one place (design-00011 §3). -->
+         MyBatis-Plus honours exactly one, so it must be owned in one place. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>

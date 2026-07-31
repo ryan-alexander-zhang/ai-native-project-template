@@ -21,7 +21,7 @@ import org.xml.sax.SAXException;
 /**
  * Build-time check that module names keep telling the truth about what a module is.
  *
- * <p>Two rules, both from {@code design-00012}:
+ * <p>Two rules:
  *
  * <ol>
  *   <li><strong>The invariant.</strong> A module whose artifactId carries no technology suffix is a
@@ -59,7 +59,7 @@ public final class ModuleNamingChecks {
    * aggregate other modules into the two or three dependencies an application declares, so they are
    * assembly, not contract — a domain layer never names one. The {@code -starter-} infix keeps a
    * bundle distinguishable from a single-concern {@code <domain>-spring-boot-starter}, and keeps
-   * the two from colliding over a name (design-00012 §3.4).
+   * the two from colliding over a name.
    */
   private static final String BUNDLE_PREFIX = "aipersimmon-ddd-starter";
 
@@ -126,7 +126,7 @@ public final class ModuleNamingChecks {
     if (framework.isEmpty() && legacy.isEmpty()) {
       return;
     }
-    StringBuilder message = new StringBuilder("module naming rules violated (design-00012)");
+    StringBuilder message = new StringBuilder("module naming rules violated");
     if (!framework.isEmpty()) {
       message
           .append("\n\nContract modules must not declare a framework dependency — either drop it, ")

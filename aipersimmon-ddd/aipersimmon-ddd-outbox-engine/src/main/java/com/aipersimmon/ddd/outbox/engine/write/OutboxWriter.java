@@ -70,9 +70,8 @@ public class OutboxWriter implements DurableIntegrationEvents {
    *     ALL_IN_PROCESS} explicitly, because there it is the truth rather than a fallback.
    * @param idGenerator supplies each brand-new event's id. Required for the same reason: no
    *     defaulting overload, so a caller cannot accidentally fall back to a random UUID and lose
-   *     index locality on the {@code event_id} unique index (see {@code issue-00053}).
-   *     Auto-configuration passes the {@link com.aipersimmon.ddd.core.id.IdGenerator} bean; tests
-   *     pass a deterministic supplier.
+   *     index locality on the {@code event_id} unique index. Auto-configuration passes the {@link
+   *     com.aipersimmon.ddd.core.id.IdGenerator} bean; tests pass a deterministic supplier.
    */
   public OutboxWriter(
       OutboxStore store,

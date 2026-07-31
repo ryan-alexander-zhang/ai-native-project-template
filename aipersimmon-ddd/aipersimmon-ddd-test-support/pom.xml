@@ -54,7 +54,7 @@
     </dependency>
     <!-- Kafka container for consumers verifying the reliable transport end to end
          (outbox -> broker -> inbox). The library's own Kafka tests use an embedded broker, so this
-         one is here for consumers rather than for us (issue-00067) — same as the Redis container,
+         one is here for consumers rather than for us — same as the Redis container,
          which only -web-store-redis needs. -->
     <dependency>
       <groupId>org.testcontainers</groupId>

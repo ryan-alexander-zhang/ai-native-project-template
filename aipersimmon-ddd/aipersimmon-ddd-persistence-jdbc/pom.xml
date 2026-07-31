@@ -13,7 +13,7 @@
 
   <!--
     Aggregate persistence for plain JDBC: a template-method repository base that centralises the
-    affected-rows check and the domain-event drain (design-00011 §2). Unlike MyBatis-Plus there is no
+    affected-rows check and the domain-event drain. Unlike MyBatis-Plus there is no
     declarative @Version, so the subclass writes the UPDATE itself — the base hands it the expected
     version as a parameter so omitting the WHERE version = ? predicate is hard to do by accident.
 

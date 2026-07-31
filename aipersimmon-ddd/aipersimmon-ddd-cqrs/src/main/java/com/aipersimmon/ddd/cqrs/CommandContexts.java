@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  * within the command's transaction, but the subscriber's method signature is fixed by the event —
  * there is no place to hand it the context. Before this scope existed such a subscriber could only
  * mint a fresh root context, so the correlation chain the bus works to maintain broke at every
- * domain-event hop (issue-00137).
+ * domain-event hop.
  *
  * <p>Read {@link #current()} only from code that is (transitively) synchronous under a dispatch,
  * and treat an empty result as "not under a dispatch" — a subscriber with a legitimate standalone

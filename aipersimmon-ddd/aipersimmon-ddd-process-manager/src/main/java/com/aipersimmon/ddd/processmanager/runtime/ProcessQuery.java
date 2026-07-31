@@ -21,7 +21,7 @@ public interface ProcessQuery {
    * tenant — or empty when no instance exists for that key. This is every consumer's first need (an
    * inbound result fact carries the business key, not the instance id), which is why it is part of
    * the port rather than a provider detail: a consumer holding only the port can decide whether a
-   * flow exists before advancing it (issue-00136).
+   * flow exists before advancing it.
    */
   Optional<ProcessRef> findRef(ProcessType processType, ProcessBusinessKey businessKey);
 }

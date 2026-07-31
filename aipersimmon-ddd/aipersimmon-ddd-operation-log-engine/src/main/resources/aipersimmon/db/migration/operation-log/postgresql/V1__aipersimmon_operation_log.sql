@@ -1,4 +1,4 @@
--- PostgreSQL schema for the Operation Log component (design-00008 §7.2).
+-- PostgreSQL schema for the Operation Log component.
 -- Append-only business-readable log; timestamps are timestamptz (UTC instants).
 
 CREATE TABLE IF NOT EXISTS aipersimmon_operation_log (

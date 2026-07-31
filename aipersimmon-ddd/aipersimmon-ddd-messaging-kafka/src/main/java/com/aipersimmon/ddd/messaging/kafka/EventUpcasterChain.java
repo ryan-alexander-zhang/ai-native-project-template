@@ -11,8 +11,7 @@ import org.springframework.core.ResolvableType;
 /**
  * The consumer bridge's index of {@link EventUpcaster}s, keyed by the retired revision's class.
  * Applying it walks a deserialized payload hop by hop to the newest revision an upcaster leads to,
- * so listeners face one type per logical event instead of one method per historical version
- * (issue-00142).
+ * so listeners face one type per logical event instead of one method per historical version.
  *
  * <p>Every registration is verified at construction, from the two type parameters' own
  * {@code @EventType} contracts: both must resolve to concrete annotated classes, carry the same

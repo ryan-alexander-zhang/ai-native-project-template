@@ -7,9 +7,8 @@ import java.util.function.Supplier;
 /**
  * A {@link UnitOfWork} with no transaction: the work runs immediately on the calling thread, its
  * result and exceptions pass straight through. For unit tests of code that demands a unit of work
- * without wanting a transaction manager (issue-00140). The number of boundaries opened is counted,
- * so a test can assert "this ran inside exactly one unit of work" — often the whole point of the
- * code under test.
+ * without wanting a transaction manager. The number of boundaries opened is counted, so a test can
+ * assert "this ran inside exactly one unit of work" — often the whole point of the code under test.
  */
 public final class ImmediateUnitOfWork implements UnitOfWork {
 

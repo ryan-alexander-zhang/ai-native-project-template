@@ -305,8 +305,7 @@ public class AipersimmonDddWebAutoConfiguration {
    * request, a caller exceeding its rate. An in-memory store keeps its state per JVM, so on a
    * second instance each of those stops working — the key, nonce or counter simply is not there.
    * The implementations say so in their Javadoc, but nobody reads a Javadoc while assembling a
-   * deployment, and a concern was <em>deliberately switched on</em> by whoever is now unprotected
-   * (issue-00058).
+   * deployment, and a concern was <em>deliberately switched on</em> by whoever is now unprotected.
    *
    * <p>Runs after all singletons are instantiated, so it can report the whole picture at once
    * rather than as three unrelated log lines, and so it sees the store that actually won — an

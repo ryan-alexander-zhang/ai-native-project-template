@@ -5,6 +5,6 @@
  * {@code AipersimmonDddIdAutoConfiguration} binds it as the default {@code IdGenerator} whenever
  * this module is on the classpath. Every framework minting point then resolves its id supplier to
  * it. A build that omits this module keeps {@code UUID.randomUUID()} at each minting point, so the
- * pure tier stays free of the JUG dependency (see {@code decision-00019} / {@code design-00010}).
+ * pure tier stays free of the JUG dependency.
  */
 package com.aipersimmon.ddd.id;

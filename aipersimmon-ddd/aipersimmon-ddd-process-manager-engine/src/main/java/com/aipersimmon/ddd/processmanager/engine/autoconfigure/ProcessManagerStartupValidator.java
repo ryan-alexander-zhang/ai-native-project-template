@@ -28,7 +28,7 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
  *       state codec — so a Definition/codec is never removed while instances still run under it;
  *   <li>every payload class a definition {@linkplain ProcessDefinition#declaredPayloads() declares}
  *       has a registered payload codec — so a forgotten registration fails here, not as a {@code
- *       ProcessSerializationException} inside the first advance that encodes it (issue-00136);
+ *       ProcessSerializationException} inside the first advance that encodes it;
  *   <li>every registered integration-event payload codec's logical type/version matches the event's
  *       {@link EventType}, so a producer's wire type and the codec agree;
  *   <li>the enabled effect kinds each have a dispatcher — the relay never has staged effects it

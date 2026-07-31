@@ -13,8 +13,8 @@ import java.util.function.Function;
 
 /**
  * A {@link CommandBus} that records every dispatch instead of handling it — the official test
- * double, so a consuming team does not re-invent one and get the identity semantics subtly wrong
- * (issue-00140). It keeps the real bus's rules:
+ * double, so a consuming team does not re-invent one and get the identity semantics subtly wrong.
+ * It keeps the real bus's rules:
  *
  * <ul>
  *   <li>{@link #send(Command)} mints a root {@link CommandContext} under the ambient {@link

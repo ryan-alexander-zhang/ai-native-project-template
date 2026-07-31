@@ -20,7 +20,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  */
 // beforeName, not before: this module must not compile against -web-spring-boot-starter. See the
 // same declaration on the JDBC store — without it, this configuration and the web starter's
-// in-memory fallback race to declare the same beans (issue-00062).
+// in-memory fallback race to declare the same beans.
 @AutoConfiguration(
     after = RedisAutoConfiguration.class,
     beforeName = "com.aipersimmon.ddd.web.spring.AipersimmonDddWebAutoConfiguration")

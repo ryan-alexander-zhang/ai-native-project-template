@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
  * module is on the classpath, so every framework minting point resolves its id supplier to UUIDv7.
  * {@code @ConditionalOnMissingBean} lets an application supply its own {@link IdGenerator} to
  * override it; a build that omits this module has no {@link IdGenerator} bean, and each consuming
- * auto-configuration falls back to {@code UUID.randomUUID()} (see {@code decision-00019}).
+ * auto-configuration falls back to {@code UUID.randomUUID()}.
  */
 @AutoConfiguration
 public class AipersimmonDddIdAutoConfiguration {

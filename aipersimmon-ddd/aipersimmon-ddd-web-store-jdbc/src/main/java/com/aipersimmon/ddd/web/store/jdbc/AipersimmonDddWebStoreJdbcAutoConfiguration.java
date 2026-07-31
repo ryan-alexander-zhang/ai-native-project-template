@@ -23,8 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 // beforeName, not before: this module must not compile against -web-spring-boot-starter. Without
 // the edge, both this configuration and the web starter's in-memory fallback declare the same three
 // beans under @ConditionalOnMissingBean, and whichever Spring happens to evaluate first wins — so
-// adding this module would only sometimes replace the per-JVM stores (issue-00062, the same shape
-// as issue-00044 on the outbox side).
+// adding this module would only sometimes replace the per-JVM stores — the same silent-race shape
+// the outbox transport selection once had.
 @AutoConfiguration(
     after = JdbcTemplateAutoConfiguration.class,
     beforeName = "com.aipersimmon.ddd.web.spring.AipersimmonDddWebAutoConfiguration")

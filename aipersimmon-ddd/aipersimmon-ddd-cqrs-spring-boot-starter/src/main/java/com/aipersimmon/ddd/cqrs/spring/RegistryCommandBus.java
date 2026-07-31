@@ -65,8 +65,7 @@ public class RegistryCommandBus implements CommandBus, SmartInitializingSingleto
    * startup), never while this object is being constructed.
    *
    * @param idGenerator supplies each command's message id. Required: there is no defaulting
-   *     overload, so a caller cannot accidentally fall back to a non-time-ordered id (see {@code
-   *     issue-00053}).
+   *     overload, so a caller cannot accidentally fall back to a non-time-ordered id.
    */
   public RegistryCommandBus(
       Supplier<List<CommandHandler<?, ?>>> handlers,
@@ -164,7 +163,7 @@ public class RegistryCommandBus implements CommandBus, SmartInitializingSingleto
     }
     // Bound around the whole chain, not just the handler: the repository publishes domain events
     // inside the transaction interceptor, and a synchronous subscriber there is exactly the reader
-    // CommandContexts exists for (issue-00137). The scope restores, so a nested send inside a
+    // CommandContexts exists for. The scope restores, so a nested send inside a
     // handler hands the outer dispatch its context back.
     CommandInterceptor.Invocation<R> outermost = invocation;
     return CommandContexts.runAs(context, outermost::proceed);

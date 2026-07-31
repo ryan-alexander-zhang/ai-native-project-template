@@ -17,8 +17,7 @@
 
     Why this exists as its own module: MyBatis-Plus honours exactly ONE MybatisPlusInterceptor bean,
     so two auto-configurations that each register their own do not compose — under
-    @ConditionalOnMissingBean the second silently backs off and its concern disappears with no error
-    (design-00011 §3). The composing bean therefore cannot live in -tenancy-mybatis-plus nor in
+    @ConditionalOnMissingBean the second silently backs off and its concern disappears with no error. The composing bean therefore cannot live in -tenancy-mybatis-plus nor in
     -persistence-mybatis-plus, because either may be present without the other. It lives here, and
     both of those contribute plain InnerInterceptor beans instead.
   -->

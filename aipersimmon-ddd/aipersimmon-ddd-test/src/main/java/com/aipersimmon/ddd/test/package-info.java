@@ -7,7 +7,6 @@
  * claim about the real implementation's semantics, and the subtle ones — {@code send} mints ids
  * while {@code sendAs} must not, an envelope's source falls back from the contract to the
  * deployment, inbox identity is the {@code (source, messageKey)} pair — are exactly the ones a
- * quick anonymous class gets wrong, making causation and dedup assertions pass vacuously
- * (issue-00140).
+ * quick anonymous class gets wrong, making causation and dedup assertions pass vacuously.
  */
 package com.aipersimmon.ddd.test;

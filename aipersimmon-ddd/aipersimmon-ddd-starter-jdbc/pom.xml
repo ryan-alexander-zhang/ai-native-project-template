@@ -36,8 +36,7 @@
       <artifactId>aipersimmon-ddd-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- JdbcAggregateRepository: version-checked aggregate writes with event draining
-         (design-00011). -->
+    <!-- JdbcAggregateRepository: version-checked aggregate writes with event draining. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-persistence-jdbc</artifactId>

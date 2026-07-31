@@ -20,7 +20,7 @@
     aipersimmon-ddd-starter-jdbc for that, and either of those already includes this one.
 
     A bundle only aggregates; every component inside stays independently usable and every bean stays
-    @ConditionalOnMissingBean, so picking modules by hand remains fully supported (design-00012 §3.4).
+    @ConditionalOnMissingBean, so picking modules by hand remains fully supported.
   -->
   <artifactId>aipersimmon-ddd-starter</artifactId>
   <name>aipersimmon-ddd-starter</name>
@@ -41,7 +41,7 @@
       <version>${project.version}</version>
     </dependency>
     <!-- Time-ordered UUIDv7 for every framework-minted id. Not optional: without it the ids
-         are random v4 and index locality is lost (issue-00053). -->
+         are random v4 and index locality is lost. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-id-spring-boot-starter</artifactId>

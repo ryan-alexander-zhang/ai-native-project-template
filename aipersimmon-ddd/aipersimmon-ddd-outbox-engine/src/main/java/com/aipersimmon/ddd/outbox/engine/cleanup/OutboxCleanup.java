@@ -16,8 +16,7 @@ import org.springframework.scheduling.annotation.Scheduled;
  *
  * <p>Guarded by ShedLock like the relay, so one instance runs the purge at a time. Note that
  * {@code @Scheduled} fires this once immediately at startup and holds that lock, so a caller
- * invoking {@link #purge()} directly through the Spring proxy can be silently skipped — see {@code
- * issue-00100}.
+ * invoking {@link #purge()} directly through the Spring proxy can be silently skipped.
  */
 public class OutboxCleanup {
 

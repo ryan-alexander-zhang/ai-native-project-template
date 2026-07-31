@@ -17,7 +17,7 @@
     ports, the FailureClassifier SPI, and the @OperationLog metadata annotation.
 
     Hard rule: ZERO Spring / JDBC / CQRS dependencies. The only compile dependency is
-    aipersimmon-ddd-core (tactical DDD annotations); JUnit is test scope. See design-00008.
+    aipersimmon-ddd-core (tactical DDD annotations); JUnit is test scope.
   -->
   <artifactId>aipersimmon-ddd-operation-log</artifactId>
   <name>aipersimmon-ddd-operation-log</name>

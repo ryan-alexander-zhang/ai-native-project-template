@@ -17,9 +17,9 @@ import org.springframework.core.ResolvableType;
  * Runs every {@link CommandPrecheck} registered for a command's type, ordered between validation
  * ({@link ValidationCommandInterceptor#ORDER}) and the transaction ({@link
  * TransactionCommandInterceptor#ORDER}): the command has already passed Bean Validation, and no
- * transaction — no database connection — has been opened yet. That slot is the point (issue-00141):
- * a precheck is allowed to be a slow cross-context read precisely because nothing scarce is being
- * held while it runs.
+ * transaction — no database connection — has been opened yet. That slot is the point: a precheck is
+ * allowed to be a slow cross-context read precisely because nothing scarce is being held while it
+ * runs.
  *
  * <p>Prechecks are matched by their generic type parameter, the same way the bus matches handlers —
  * and resolved lazily for the same reason ({@code BeanCurrentlyInCreationException}, see {@link

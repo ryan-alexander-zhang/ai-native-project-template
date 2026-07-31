@@ -15,7 +15,7 @@
     The storage-agnostic, Spring-aware engine of the Operation Log component: the default
     OperationLogs pipeline (normalize / validate / redact / freeze), the default FailureClassifier,
     the auto-configuration, and the shared three-dialect DDL. Direct-API consumers (no CQRS) depend
-    on this module plus one storage backend. See design-00008 / plan-00010.
+    on this module plus one storage backend.
   -->
   <artifactId>aipersimmon-ddd-operation-log-engine</artifactId>
   <name>aipersimmon-ddd-operation-log-engine</name>
@@ -25,8 +25,7 @@
     <!-- The UUIDv7 IdGenerator implementation, at runtime scope: this module compiles against the
          IdGenerator SPI in aipersimmon-ddd-core and never names anything in this starter, but the
          bean has to exist or the framework mints ids with UUID.randomUUID() and reintroduces the
-         random-key write amplification the SPI was added to remove — with no startup signal (see
-         issue-00053). Runtime scope says exactly that and still reaches the application's
+         random-key write amplification the SPI was added to remove — with no startup signal. Runtime scope says exactly that and still reaches the application's
          classpath transitively; compile scope claimed a code dependency that was never there. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

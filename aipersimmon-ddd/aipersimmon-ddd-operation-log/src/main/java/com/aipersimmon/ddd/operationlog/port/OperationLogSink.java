@@ -6,7 +6,7 @@ import com.aipersimmon.ddd.operationlog.model.OperationLogEntry;
  * The outbound write port for a frozen entry, implemented by a storage backend. It is transaction
  * unaware — it simply joins the current transaction; independent-transaction semantics are owned by
  * the interceptor layer. Duplicate-key conflicts converge to {@link AppendResult.Duplicate} using a
- * dialect-native, non-aborting insert on the success path (see design-00008 §7.3).
+ * dialect-native, non-aborting insert on the success path.
  */
 public interface OperationLogSink {
 

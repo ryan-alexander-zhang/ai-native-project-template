@@ -90,7 +90,7 @@ public class JacksonProcessCodecConfiguration {
    * cause is gone. Because the target is sealed, the compiler knows the complete variant set, and
    * this check makes the registry refuse to build until the mix-in covers it — the same "wrong
    * claim inexpressible" stance the rest of the framework takes, one step earlier than the
-   * hand-written codec's encode-time refusal this route replaces (issue-00136).
+   * hand-written codec's encode-time refusal this route replaces.
    *
    * <p>A non-sealed target cannot be enumerated, so it is trusted as declared.
    */

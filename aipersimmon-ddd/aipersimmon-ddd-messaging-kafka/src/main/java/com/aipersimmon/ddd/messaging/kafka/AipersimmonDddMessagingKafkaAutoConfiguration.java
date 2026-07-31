@@ -274,7 +274,7 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
         properties.getConsumer().isSkipLocallyUnhandled()
             ? LocallyHandledEventTypes.scan(beanFactory)
             : LocallyHandledEventTypes.handlingEverything();
-    // Consumer-side revision normalisation (issue-00142): every EventUpcaster bean is indexed and
+    // Consumer-side revision normalisation: every EventUpcaster bean is indexed and
     // verified here, at startup, so a mis-declared one fails the deployment by name rather than
     // the first old-revision record.
     return new KafkaIntegrationEventListener(
@@ -374,7 +374,7 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
     // Because a systemic failure is never recovered, it never reaches the dead-letter recoverer
     // and so never produces the ERROR that path logs. Without this the only output is Spring
     // Kafka's "Record in retry and not yet recovered" INFO, which names neither the record nor
-    // the cause — a stalled partition and an idle one look identical (issue-00057).
+    // the cause — a stalled partition and an idle one look identical.
     handler.setRetryListeners(new SystemicStallReporter());
     return handler;
   }

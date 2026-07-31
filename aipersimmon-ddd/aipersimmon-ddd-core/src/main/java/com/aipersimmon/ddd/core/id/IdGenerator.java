@@ -23,7 +23,7 @@ package com.aipersimmon.ddd.core.id;
  * application mints that key itself rather than taking a client-supplied natural key. Aggregate
  * tables are usually the highest-volume tables in the schema, so a time-ordered key pays off most
  * there — {@code UUID.randomUUID()} on an aggregate primary key is exactly the scattered-write
- * pattern this SPI exists to remove (see {@code issue-00054}).
+ * pattern this SPI exists to remove.
  *
  * <p>This does <em>not</em> cover values that are deliberately not high-cardinality time-ordered
  * keys: a {@code tenant_id} discriminator, client-supplied web idempotency/nonce keys, an edge

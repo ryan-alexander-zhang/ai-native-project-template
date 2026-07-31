@@ -6,9 +6,9 @@ package com.aipersimmon.ddd.processmanager.engine.lease;
  * <p>The engine is storage-agnostic, but it already owns the relational schema — the migrations for
  * all three dialects ship from this module — and these two queries are part of that same contract:
  * which row a worker may take, and in what order. They lived as hand-maintained copies in the JDBC
- * and MyBatis backends until issue-00125, where both spellings turned out to be load-bearing rather
- * than cosmetic, and a copy could have been "tidied" back into its slower or unfair form without
- * anything objecting. One copy cannot drift from itself.
+ * and MyBatis backends until both spellings turned out to be load-bearing rather than cosmetic, and
+ * a copy could have been "tidied" back into its slower or unfair form without anything objecting.
+ * One copy cannot drift from itself.
  *
  * <p>Written with MyBatis's {@code #{name}} placeholders so the mapper annotations can use these
  * constants directly (an annotation argument must be a compile-time constant); the JDBC backend

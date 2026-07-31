@@ -21,7 +21,7 @@
 
     A build that omits it stays entirely JUG-free: each consuming
     auto-configuration falls back to UUID.randomUUID(), behaving exactly as
-    before (see decision-00019 / design-00010). The UUIDv7 library (JUG) is the
+    before. The UUIDv7 library (JUG) is the
     only third-party dependency and is confined to this module, so core stays
     zero-dependency.
   -->

@@ -17,8 +17,7 @@ import java.util.Objects;
  *
  * <p>It also carries the {@linkplain #version() optimistic-lock version} that makes the aggregate a
  * real transactional consistency unit: without it, two commands that each pass the root's own state
- * guards can both write, and the later write silently discards the earlier one. See {@code
- * design-00011}.
+ * guards can both write, and the later write silently discards the earlier one.
  *
  * <p>Equality is by identity, which is what makes this an entity rather than a value: {@link
  * #equals(Object)} and {@link #hashCode()} are {@code final} here so the contract cannot drift per

@@ -2,7 +2,7 @@ package com.aipersimmon.ddd.integration;
 
 /**
  * A consumer-side translation of one retired revision of a published event into its successor, so
- * handlers only ever face the newest revision they know (issue-00142).
+ * handlers only ever face the newest revision they know.
  *
  * <p>The {@link IntegrationEventCatalog} identifies an inbound message by its exact {@code (name,
  * version)} and deliberately never falls back — an unregistered version is dead-lettered, not

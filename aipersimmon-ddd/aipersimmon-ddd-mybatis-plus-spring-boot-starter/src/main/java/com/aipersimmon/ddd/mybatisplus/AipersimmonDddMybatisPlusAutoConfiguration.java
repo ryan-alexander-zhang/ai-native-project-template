@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Bean;
  * concern vanishes with no error and no log. That failure mode is severe because the concerns are
  * security- and correctness-critical — losing the tenant-line interceptor stops isolating tenants,
  * and losing the optimistic locker stops {@code @Version} from adding its {@code WHERE version = ?}
- * predicate, so every update reports success and lost updates return. See {@code design-00011} §3.
+ * predicate, so every update reports success and lost updates return.
  *
  * <p>Contributors therefore publish plain {@code InnerInterceptor} beans and let this class
  * assemble them. The framework's own contributions declare their position with {@code @Order},
