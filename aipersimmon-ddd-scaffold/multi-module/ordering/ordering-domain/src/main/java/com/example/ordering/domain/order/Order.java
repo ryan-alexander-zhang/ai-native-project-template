@@ -165,9 +165,11 @@ public class Order extends AbstractAggregateRoot<OrderId> {
    * Manual review approved the order: it becomes eligible for fulfilment. The state guard is the
    * transition table's — it refuses a non-awaiting order with {@code ORDER_NOT_AWAITING_REVIEW},
    * declared on the edge itself, so this method no longer restates the same rule by hand just to
-   * attach the code (issue-00138).
+   * attach the code (issue-00138). Taking {@link ReviewDecisionRef.Approval} rather than the
+   * interface is the point of the sealed split: a rejection cannot be handed to the approving
+   * method at all (issue-00134).
    */
-  public void approveReview(ReviewDecisionRef decision) {
+  public void approveReview(ReviewDecisionRef.Approval decision) {
     if (decision == null || !decision.belongsTo(id)) {
       throw new DomainException(
           OrderingErrorCode.REVIEW_DECISION_ORDER_MISMATCH,

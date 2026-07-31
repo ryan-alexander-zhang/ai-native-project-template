@@ -125,7 +125,8 @@ class OrderCancellationPolicyTest {
     OrderId id = new OrderId("order-1");
     Order order = awaitingReview(id);
 
-    order.cancel(new CancellationReason.ReviewRejected(new ReviewDecisionRef("rev-1", id, false)));
+    order.cancel(
+        new CancellationReason.ReviewRejected(new ReviewDecisionRef.Rejection("rev-1", id)));
 
     assertEquals(OrderStatus.CANCELLED, order.status());
   }
@@ -141,7 +142,7 @@ class OrderCancellationPolicyTest {
             () ->
                 order.cancel(
                     new CancellationReason.ReviewRejected(
-                        new ReviewDecisionRef("rev-1", id, false))));
+                        new ReviewDecisionRef.Rejection("rev-1", id))));
     assertEquals(OrderingErrorCode.ORDER_NOT_AWAITING_REVIEW, codeOf(ex));
   }
 
@@ -156,7 +157,7 @@ class OrderCancellationPolicyTest {
             () ->
                 order.cancel(
                     new CancellationReason.ReviewRejected(
-                        new ReviewDecisionRef("rev-1", new OrderId("other"), false))));
+                        new ReviewDecisionRef.Rejection("rev-1", new OrderId("other")))));
     assertEquals(OrderingErrorCode.REVIEW_DECISION_ORDER_MISMATCH, codeOf(ex));
   }
 

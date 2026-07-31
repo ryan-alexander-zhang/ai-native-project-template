@@ -10,8 +10,9 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
  *
  * <p>Every part this needs already existed and none of it could be reached — {@code
  * CancellationReason.ReviewRejected}, {@code CancellationCategory.REVIEW_REJECTED}, the policy's
- * {@code ensureReviewCancellationAllowed}, and {@code ReviewDecisionRef}'s {@code approved} flag,
- * which no caller had ever set to {@code false}. The sealed {@code CancellationReason} forced the
+ * {@code ensureReviewCancellationAllowed}, and the rejecting form of the review evidence (then a
+ * {@code boolean approved} flag no caller had ever set to {@code false}; now the {@code
+ * ReviewDecisionRef.Rejection} type, issue-00134). The sealed {@code CancellationReason} forced the
  * domain to handle the branch; nothing forced the application to offer it. No result.
  */
 @OperationLog(

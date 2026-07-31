@@ -24,13 +24,17 @@ class OrderEvidenceRefTest {
 
   @Test
   void reviewDecisionRefValidatesAndEquals() {
-    assertThrows(DomainException.class, () -> new ReviewDecisionRef(" ", ORDER, true));
-    assertThrows(DomainException.class, () -> new ReviewDecisionRef("d-1", null, true));
+    assertThrows(DomainException.class, () -> new ReviewDecisionRef.Approval(" ", ORDER));
+    assertThrows(DomainException.class, () -> new ReviewDecisionRef.Approval("d-1", null));
+    assertThrows(DomainException.class, () -> new ReviewDecisionRef.Rejection(" ", ORDER));
+    assertThrows(DomainException.class, () -> new ReviewDecisionRef.Rejection("d-1", null));
 
-    ReviewDecisionRef ref = new ReviewDecisionRef("d-1", ORDER, true);
-    assertEquals(new ReviewDecisionRef("d-1", ORDER, true), ref);
-    assertNotEquals(new ReviewDecisionRef("d-2", ORDER, true), ref);
-    assertTrue(ref.approved());
+    ReviewDecisionRef ref = new ReviewDecisionRef.Approval("d-1", ORDER);
+    assertEquals(new ReviewDecisionRef.Approval("d-1", ORDER), ref);
+    assertNotEquals(new ReviewDecisionRef.Approval("d-2", ORDER), ref);
+    // The decision's direction is the type, so two directions never compare equal — this is the
+    // property the old boolean could not give: nothing had to read it for it to matter.
+    assertNotEquals(new ReviewDecisionRef.Rejection("d-1", ORDER), ref);
   }
 
   @Test

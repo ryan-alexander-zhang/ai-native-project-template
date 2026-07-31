@@ -227,7 +227,7 @@ class ComplexOrderStateChangeDemoTest {
           Order.place(id, CUSTOMER, lines, ReviewRequirement.required(Set.of("high_value")));
       assertEquals(OrderStatus.AWAITING_REVIEW, order.status());
 
-      order.approveReview(new ReviewDecisionRef("review-1", id, true));
+      order.approveReview(new ReviewDecisionRef.Approval("review-1", id));
 
       assertEquals(OrderStatus.READY_FOR_FULFILMENT, order.status());
       assertInstanceOf(

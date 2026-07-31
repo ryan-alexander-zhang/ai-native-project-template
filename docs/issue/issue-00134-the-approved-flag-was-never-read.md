@@ -2,7 +2,7 @@
 id: issue-00134-the-approved-flag-was-never-read
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 审核证据带着 approved 标志，领域层却从来没读过它
@@ -51,4 +51,14 @@ public sealed interface ReviewDecisionRef extends OrderEvidenceRef {
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，取推荐方案（类型拆分）。`ReviewDecisionRef` 改为 sealed interface +
+`Approval`/`Rejection` 两个 record（共用 `requireWellFormed` 守卫）；
+`Order.approveReview(ReviewDecisionRef.Approval)`、
+`CancellationReason.ReviewRejected(ReviewDecisionRef.Rejection)` ——错误方向的证据在类型上
+不可表达，issue 里的两条失败测试（`approved=false` 照样批准、`approved=true` 照样取消）
+在新世界里**无法写出**，复现即编译失败。这正是与 `CancellationReason` 同一手法的完成。
+
+`OrderEvidenceRefTest.reviewDecisionRefValidatesAndEquals` 补断言：两个方向永不相等——旧
+boolean 给不出的性质（没人读它它也不 matter）。codec 不涉及该类型（`ReviewRejected` 只走
+同步路径），改动收敛于领域 + 两个 handler + 领域测试。ordering-domain（92）+
+ordering-application（7）绿。

@@ -49,7 +49,7 @@ public class ApproveReviewHandler implements CommandHandler<ApproveReview, Void>
                     new EntityNotFoundException(
                         OrderingErrorCode.ORDER_NOT_FOUND, "unknown order: " + command.orderId()));
 
-    order.approveReview(new ReviewDecisionRef(idGenerator.newId(), id, true));
+    order.approveReview(new ReviewDecisionRef.Approval(idGenerator.newId(), id));
     fulfilmentTrigger.begin(order, context);
     return null;
   }

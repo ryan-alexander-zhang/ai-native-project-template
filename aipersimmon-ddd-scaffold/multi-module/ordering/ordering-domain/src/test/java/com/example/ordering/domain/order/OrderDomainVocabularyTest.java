@@ -42,7 +42,7 @@ class OrderDomainVocabularyTest {
     assertSame(
         CancellationCategory.REVIEW_REJECTED,
         CancellationCategory.from(
-            new CancellationReason.ReviewRejected(new ReviewDecisionRef("rev", ORDER, false))));
+            new CancellationReason.ReviewRejected(new ReviewDecisionRef.Rejection("rev", ORDER))));
   }
 
   @Test

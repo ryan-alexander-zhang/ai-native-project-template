@@ -52,7 +52,7 @@ public class RejectReviewHandler implements CommandHandler<RejectReview, Void> {
 
     order.cancel(
         new CancellationReason.ReviewRejected(
-            new ReviewDecisionRef(idGenerator.newId(), id, false)));
+            new ReviewDecisionRef.Rejection(idGenerator.newId(), id)));
 
     // Saved first, then released: an order that refuses to cancel must not hand back credit it is
     // still holding (CustomerCredit.releaseFor says so, and the ordering is the reason it does).

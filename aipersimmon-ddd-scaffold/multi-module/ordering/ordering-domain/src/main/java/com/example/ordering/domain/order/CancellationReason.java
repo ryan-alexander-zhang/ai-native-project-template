@@ -52,8 +52,12 @@ public sealed interface CancellationReason {
     }
   }
 
-  /** Manual review rejected the order; the review decision is required. */
-  record ReviewRejected(ReviewDecisionRef reviewDecision) implements CancellationReason {
+  /**
+   * Manual review rejected the order; the rejecting decision is required. Typed {@link
+   * ReviewDecisionRef.Rejection}: an approval cannot be presented as grounds for cancelling
+   * (issue-00134).
+   */
+  record ReviewRejected(ReviewDecisionRef.Rejection reviewDecision) implements CancellationReason {
     public ReviewRejected {
       if (reviewDecision == null) {
         throw new DomainException("review cancellation requires a review decision");

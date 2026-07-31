@@ -157,7 +157,8 @@ class OrderPlacementTest {
     DomainException wrongOrder =
         assertThrows(
             DomainException.class,
-            () -> order.approveReview(new ReviewDecisionRef("rev-1", new OrderId("other"), true)));
+            () ->
+                order.approveReview(new ReviewDecisionRef.Approval("rev-1", new OrderId("other"))));
     assertEquals(OrderingErrorCode.REVIEW_DECISION_ORDER_MISMATCH, codeOf(wrongOrder));
   }
 
@@ -168,7 +169,7 @@ class OrderPlacementTest {
     DomainException ex =
         assertThrows(
             DomainException.class,
-            () -> order.approveReview(new ReviewDecisionRef("rev-1", ID, true)));
+            () -> order.approveReview(new ReviewDecisionRef.Approval("rev-1", ID)));
     assertEquals(OrderingErrorCode.ORDER_NOT_AWAITING_REVIEW, codeOf(ex));
   }
 
