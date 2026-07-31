@@ -47,9 +47,11 @@ class ContractValidationTest {
   }
 
   @Test
-  void stockQueryRefusesNullOrBlankSkus() {
+  void stockQueryRefusesNullLinesBlankSkusAndNonPositiveQuantities() {
     assertThrows(IllegalArgumentException.class, () -> new StockQuery(null));
-    assertThrows(IllegalArgumentException.class, () -> new StockQuery(List.of(" ")));
+    assertThrows(IllegalArgumentException.class, () -> new StockQuery.Line(" ", 1));
+    // The quantity is the point of the line (issue-00150): zero of something is not a question.
+    assertThrows(IllegalArgumentException.class, () -> new StockQuery.Line("SKU-1", 0));
   }
 
   @Test

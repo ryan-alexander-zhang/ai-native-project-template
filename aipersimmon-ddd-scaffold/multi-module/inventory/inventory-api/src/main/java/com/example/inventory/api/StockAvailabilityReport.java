@@ -4,9 +4,9 @@ import java.util.List;
 
 /**
  * Response DTO of {@link StockAvailabilityApi}: for each requested SKU, whether inventory can
- * currently offer it. A published-language type — it exposes a boolean verdict per SKU, not
- * inventory's internal stock levels or aggregates, so the exact quantity on hand stays an inventory
- * secret.
+ * currently offer the <em>quantity asked for</em> (lines repeating a SKU are summed first). A
+ * published-language type — it exposes a boolean verdict per SKU, not inventory's internal stock
+ * levels or aggregates, so the exact quantity on hand stays an inventory secret.
  */
 public record StockAvailabilityReport(List<Item> items) {
 
@@ -19,7 +19,10 @@ public record StockAvailabilityReport(List<Item> items) {
     items = List.copyOf(items);
   }
 
-  /** The verdict for one SKU: {@code available} is true when inventory can offer it now. */
+  /**
+   * The verdict for one SKU: {@code available} is true when inventory can offer the requested
+   * quantity now.
+   */
   public record Item(String sku, boolean available) {
     public Item {
       Contract.required(sku, "sku");

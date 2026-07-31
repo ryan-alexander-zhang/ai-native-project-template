@@ -460,6 +460,30 @@ class OrderFulfilmentDefinitionTest {
     assertEquals(Step.CANCELLED.name(), decision.step().value());
   }
 
+  /**
+   * The one terminal decision that left its timer armed (issue-00150): a cancelled order whose
+   * reservation then fails is finished — and the STOCK deadline set when the reservation was
+   * requested must be disarmed on the way out, like every other exit from a deadline-guarded step.
+   * The generation guard would absorb the stray firing, but that is the safety net, not the walk.
+   */
+  @Test
+  void aFailedReservationForACancelledOrderDisarmsTheStockDeadline() {
+    OrderFulfilmentState state = awaitingStock().withStep(Step.AWAITING_STOCK_ORDER_CANCELLED);
+
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            state,
+            new OrderFulfilmentInput.StockReservationFailed(ORDER, "NO_STOCK", "sold out"),
+            context(
+                "msg-late-failure", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK_ORDER_CANCELLED));
+
+    assertEquals(ProcessLifecycle.COMPLETED, decision.lifecycle());
+    assertEquals(
+        OrderFulfilmentDefinition.STOCK_DEADLINE,
+        onlyEffectOfType(decision, CancelDeadline.class).name(),
+        "a completed flow leaves no timer ticking behind it");
+  }
+
   @Test
   void theThreeEvidenceIdsAcrossAFlowAreAllDistinct() {
     String failureId =

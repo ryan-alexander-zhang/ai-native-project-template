@@ -15,6 +15,18 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * <p>Nothing waits on an answer: the flow has already moved on, and voiding is idempotent under
  * at-least-once delivery — a redelivery finds the operation already voided. That is why, unlike
  * {@code PaymentRequested}, this contract has no outcome-event counterpart.
+ *
+ * <h2>A request, not a fact</h2>
+ *
+ * <p>Most of this topic's traffic announces things that already happened; this event <em>asks
+ * another context to act</em>. It rides the same machinery on purpose — the outbox, the topic, the
+ * ordering guarantee — but the consumption rule differs, and that is what this marking exists for:
+ * a fact consumed twice is merely recorded twice, a request consumed twice does the work twice.
+ * <strong>Any consumer acting on this event must deduplicate by {@code
+ * paymentOperationId}</strong>, as the payment context does: the void claims or updates the
+ * operation row keyed by it, and every shape of redelivery matches zero rows the second time.
+ * Transport dedupe (the inbox) is a window, not a guarantee — see the retention reasoning in the
+ * consuming application's configuration.
  */
 @EventType(name = "com.example.ordering.PaymentVoidRequested", version = 1, source = "/ordering")
 @Externalized("ordering.events")

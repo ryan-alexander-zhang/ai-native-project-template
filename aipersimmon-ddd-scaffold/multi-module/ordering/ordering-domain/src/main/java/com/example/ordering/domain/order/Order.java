@@ -86,6 +86,17 @@ public class Order extends AbstractAggregateRoot<OrderId> {
    * order needing review starts {@link OrderStatus#AWAITING_REVIEW}; otherwise it is {@link
    * OrderStatus#READY_FOR_FULFILMENT}. {@code OrderPlacedEvent} means only "the order was created"
    * — it is {@link OrderReadyForFulfilmentEvent} that signals eligibility for fulfilment.
+   *
+   * <p><strong>This takes the review verdict, not the review policy — a stated trade-off
+   * (issue-00150).</strong> Passing {@link ManualReviewPolicy} instead and letting the aggregate
+   * ask it would make "every placement is reviewed" unforgeable here; taking the verdict leaves
+   * that force in the application layer's hands, and a caller passing {@code
+   * ReviewRequirement.notRequired()} bypasses review. Chosen anyway, for two reasons: the double
+   * dispatch does not actually close the hole (a caller who would forge a verdict can as easily
+   * pass an always-approving policy), and the verdict-as-value keeps this factory deterministic and
+   * policy-free — the policy is consulted once, in {@code PlaceOrderHandler}, where its
+   * configuration lives, and tests place orders in any review state without staging policy
+   * internals.
    */
   public static Order place(
       OrderId id, CustomerId customerId, List<LineData> lineData, ReviewRequirement review) {

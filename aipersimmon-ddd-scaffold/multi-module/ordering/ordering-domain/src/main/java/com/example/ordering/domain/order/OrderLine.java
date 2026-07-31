@@ -1,18 +1,23 @@
 package com.example.ordering.domain.order;
 
-import com.aipersimmon.ddd.core.annotation.Entity;
+import com.aipersimmon.ddd.core.annotation.ValueObject;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.OrderingErrorCode;
 import com.example.ordering.domain.shared.Sku;
 
 /**
- * A line of an {@link Order}. Package-private on purpose: it is an internal entity of the
- * aggregate, so nothing outside this package can construct or reference it — the only way in is
- * through {@link Order}.
+ * A line of an {@link Order}. Package-private on purpose: it is internal to the aggregate, so
+ * nothing outside this package can construct or reference it — the only way in is through {@link
+ * Order}.
+ *
+ * <p>A value object, not an entity (issue-00150): it carries no identity of its own, no lifecycle,
+ * every component is final, and persistence rewrites the whole line set rather than tracking
+ * individual lines — it was wearing {@code @Entity} while having none of an entity's properties.
+ * The record makes the value semantics structural: equality by components, no mutation possible.
  */
-@Entity
-class OrderLine {
+@ValueObject
+record OrderLine(Sku sku, int quantity, Money unitPrice) {
 
   /**
    * The most of one SKU a single line may carry.
@@ -24,11 +29,7 @@ class OrderLine {
    */
   static final int MAX_QUANTITY = 10_000;
 
-  private final Sku sku;
-  private final int quantity;
-  private final Money unitPrice;
-
-  OrderLine(Sku sku, int quantity, Money unitPrice) {
+  OrderLine {
     // No blank check here: Sku enforces that in its own constructor, once, for everybody
     // (issue-00085). This used to repeat it, and two copies of a rule are two rules waiting to
     // disagree.
@@ -49,21 +50,6 @@ class OrderLine {
       // subtotal(), far from the constructor that accepted it.
       throw new DomainException("unitPrice required");
     }
-    this.sku = sku;
-    this.quantity = quantity;
-    this.unitPrice = unitPrice;
-  }
-
-  Sku sku() {
-    return sku;
-  }
-
-  int quantity() {
-    return quantity;
-  }
-
-  Money unitPrice() {
-    return unitPrice;
   }
 
   Money subtotal() {

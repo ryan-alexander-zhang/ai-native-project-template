@@ -61,6 +61,14 @@
          revision the producer currently publishes. -->
     <!-- The framework port fakes (RecordingCommandBus / RecordingIntegrationEvents), maintained
          by the framework so their identity semantics match the real implementations. -->
+    <!-- Test only: StockAvailabilityServiceTest assembles the real query handler over the real
+         RegistryQueryBus, so the verdict arithmetic is tested through the same dispatch the
+         application uses. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-test</artifactId>

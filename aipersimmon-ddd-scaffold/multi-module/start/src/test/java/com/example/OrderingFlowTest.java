@@ -144,13 +144,25 @@ class OrderingFlowTest {
   }
 
   @Test
-  void whenStockIsInsufficientTheProcessManagerCancelsWithInsufficientStockCode() {
-    // SKU-1 is carried and in stock, so it passes the synchronous availability gate;
-    // the exact-quantity check is the reservation's job. SKU-1 has 10 units, so asking
-    // for 999 is reserved asynchronously, fails, and the process compensates by cancelling.
+  void whenStockVanishesAfterTheGateTheProcessManagerCancelsWithInsufficientStockCode() {
+    // The synchronous gate checks quantities now (issue-00150), so an order it can see is hopeless
+    // is refused before anything is created — the shape this test used to rely on (999 against a
+    // stock of 10 slipping through a SKU-only gate) no longer exists. What the gate still cannot
+    // see is the future: it is advisory and holds nothing, so stock that disappears between its
+    // answer and the reservation is the reservation's problem. This manufactures exactly that
+    // window: the raw write lands milliseconds after placement, the asynchronous reservation only
+    // starts at the outbox relay's next poll.
+    jdbc.update(
+        "INSERT INTO inventory.stocks (sku, available, tenant_id) VALUES ('SKU-VANISH', 6, ?)"
+            + " ON CONFLICT (tenant_id, sku) DO UPDATE SET available = 6",
+        BoundTenant.TENANT);
+
     String orderId =
         commandBus.send(
-            new PlaceOrder("CUST-1", List.of(new PlaceOrder.Line("SKU-1", 999, 1, "USD"))));
+            new PlaceOrder("CUST-1", List.of(new PlaceOrder.Line("SKU-VANISH", 6, 1, "USD"))));
+    jdbc.update(
+        "UPDATE inventory.stocks SET available = 0 WHERE tenant_id = ? AND sku = 'SKU-VANISH'",
+        BoundTenant.TENANT);
 
     await().atMost(SETTLE).untilAsserted(() -> assertEquals("CANCELLED", status(orderId)));
     await()

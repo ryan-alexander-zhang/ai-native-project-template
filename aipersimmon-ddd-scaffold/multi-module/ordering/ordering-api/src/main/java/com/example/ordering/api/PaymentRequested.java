@@ -21,6 +21,18 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * zero-amount order was accepted, its authorization was rejected as a constraint violation, and the
  * order was cancelled two minutes later as a payment timeout. The published language is where a
  * range like this becomes one agreement instead of two guesses.
+ *
+ * <h2>A request, not a fact</h2>
+ *
+ * <p>Most of this topic's traffic announces things that already happened; this event <em>asks
+ * another context to act</em>. It rides the same machinery on purpose — the outbox, the topic, the
+ * ordering guarantee — but the consumption rule differs, and that is what this marking exists for:
+ * a fact consumed twice is merely recorded twice, a request consumed twice does the work twice.
+ * <strong>Any consumer acting on this event must deduplicate by {@code
+ * paymentOperationId}</strong>, as the payment context does: its operations row is the business
+ * idempotency log, and a redelivery finds the recorded decision and republishes it instead of
+ * authorizing again. Transport dedupe (the inbox) is a window, not a guarantee — see the retention
+ * reasoning in the consuming application's configuration.
  */
 @EventType(name = "com.example.ordering.PaymentRequested", version = 1, source = "/ordering")
 @Externalized("ordering.events")

@@ -19,10 +19,15 @@ import java.util.List;
 public interface StockAvailabilityGateway {
 
   /**
-   * @param skus the SKUs to check (typically the distinct SKUs of an order's lines)
-   * @return the verdict: whether every SKU is offerable, and if not, which are not
+   * @param lines the order's lines as (sku, quantity) pairs — the quantity is what makes the answer
+   *     useful (issue-00150): "is any on hand?" let a 999-unit order through a stock of 5, placed
+   *     only to walk the whole compensation circle
+   * @return the verdict: whether every line's quantity is offerable, and if not, which SKUs are not
    */
-  Availability check(List<String> skus);
+  Availability check(List<Line> lines);
+
+  /** One ordered SKU and how many of it, in ordering's own words. */
+  record Line(String sku, int quantity) {}
 
   /** Ordering's own view of the answer: are all SKUs offerable, and if not, which are not. */
   record Availability(boolean allAvailable, List<String> unavailableSkus) {

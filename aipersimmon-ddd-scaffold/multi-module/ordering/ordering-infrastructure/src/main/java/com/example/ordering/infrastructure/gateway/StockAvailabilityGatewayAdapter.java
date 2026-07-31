@@ -32,8 +32,13 @@ public class StockAvailabilityGatewayAdapter implements StockAvailabilityGateway
   }
 
   @Override
-  public Availability check(List<String> skus) {
-    StockAvailabilityReport report = stockAvailabilityApi.check(new StockQuery(skus));
+  public Availability check(List<Line> lines) {
+    StockAvailabilityReport report =
+        stockAvailabilityApi.check(
+            new StockQuery(
+                lines.stream()
+                    .map(line -> new StockQuery.Line(line.sku(), line.quantity()))
+                    .toList()));
     List<String> unavailable =
         report.items().stream()
             .filter(item -> !item.available())

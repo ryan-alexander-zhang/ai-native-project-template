@@ -6,7 +6,9 @@ import com.example.inventory.api.StockAvailabilityReport;
 import com.example.inventory.api.StockQuery;
 import com.example.inventory.application.stock.CheckStockAvailability;
 import com.example.inventory.application.stock.StockLevel;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
@@ -33,10 +35,21 @@ public class StockAvailabilityService implements StockAvailabilityApi {
 
   @Override
   public StockAvailabilityReport check(StockQuery query) {
-    List<StockLevel> levels = queryBus.ask(new CheckStockAvailability(query.skus()));
+    // Lines repeating a SKU are summed before the level is consulted (the contract says so): the
+    // caller's total demand is what has to fit, and two lines of 3 against a stock of 5 must not
+    // each pass alone.
+    Map<String, Integer> requested = new LinkedHashMap<>();
+    for (StockQuery.Line line : query.lines()) {
+      requested.merge(line.sku(), line.quantity(), Integer::sum);
+    }
+    List<StockLevel> levels =
+        queryBus.ask(new CheckStockAvailability(List.copyOf(requested.keySet())));
     List<StockAvailabilityReport.Item> items =
         levels.stream()
-            .map(level -> new StockAvailabilityReport.Item(level.sku(), level.available() > 0))
+            .map(
+                level ->
+                    new StockAvailabilityReport.Item(
+                        level.sku(), level.available() >= requested.get(level.sku())))
             .toList();
     return new StockAvailabilityReport(items);
   }

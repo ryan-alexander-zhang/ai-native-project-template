@@ -15,7 +15,13 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
  */
 public enum InventoryErrorCode implements ErrorCode {
 
-  /** A reservation asked for more than is available (or for a non-positive quantity). */
+  /**
+   * A reservation asked for more than is available. Exactly that, and not "or a non-positive
+   * quantity", which this doc used to claim while the code never did: a non-positive quantity is a
+   * malformed request the bus's validation refuses long before the domain — {@code Stock.reserve}'s
+   * own guard for it is a codeless backstop for callers that bypass the bus, and a codeless
+   * DomainException deliberately surfaces as {@code inventory.unspecified} (issue-00131).
+   */
   INSUFFICIENT_STOCK("inventory.insufficient-stock", ErrorCategory.DOMAIN_RULE),
 
   /** No stock record exists for the requested SKU. */

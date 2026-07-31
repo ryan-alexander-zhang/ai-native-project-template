@@ -118,7 +118,7 @@ class AvailabilityPrecheckTransactionBoundaryTest {
     }
 
     @Override
-    public Availability check(List<String> skus) {
+    public Availability check(List<Line> lines) {
       calls.incrementAndGet();
       sawTransaction = unitOfWork.inTransaction;
       return new Availability(unavailable.isEmpty(), unavailable);

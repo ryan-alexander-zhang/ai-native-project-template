@@ -37,8 +37,11 @@ public class StockAvailabilityPrecheck implements CommandPrecheck<PlaceOrder> {
 
   @Override
   public void check(PlaceOrder command, CommandContext context) {
-    List<String> skus = command.lines().stream().map(PlaceOrder.Line::sku).distinct().toList();
-    Availability availability = stockAvailability.check(skus);
+    List<StockAvailabilityGateway.Line> lines =
+        command.lines().stream()
+            .map(line -> new StockAvailabilityGateway.Line(line.sku(), line.quantity()))
+            .toList();
+    Availability availability = stockAvailability.check(lines);
     if (!availability.allAvailable()) {
       throw new DomainException(
           OrderingErrorCode.STOCK_UNAVAILABLE,

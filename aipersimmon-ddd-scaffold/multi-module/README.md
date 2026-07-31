@@ -67,6 +67,21 @@ purpose: a missing one fails at startup rather than silently pointing somewhere 
 `ProductionProfileBootTest` starts the application under that profile with nothing but those
 variables, so the file cannot rot.
 
+### Before production: the declared debts
+
+Two decisions in this scaffold are demo conveniences that a real deployment **must** revisit, and
+both say so where they live (issue-00150 keeps them on this list so they cannot be forgotten):
+
+- **`/ops/**` is unauthenticated and tenant-exempt.** The dead-letter console
+  (`DeadLetterOpsController`) is mounted bare because the scaffold ships no security context, and
+  `application.yml` exempts `/ops/**` from tenant resolution because an operator acts across
+  tenants. A deployment puts it behind an operator role — the exemption is then an authorization
+  statement instead of an open door.
+- **The in-memory idempotency/nonce/rate-limit fallback stays refused.** The base configuration
+  already forbids it (`aipersimmon.ddd.web.allow-in-memory-stores: false` in `application.yml` —
+  the JDBC store module supplies the real stores, so the flag only bites if someone removes that
+  dependency); keep the refusal when copying the configuration.
+
 Place an order, then read it back. The app listens on **8090**, and every request carries a
 tenant: multi-tenancy is on with `missing-policy=REJECT`, so a header-less call is a 400 before it
 reaches the controller. Use `demo` — `db/dev/afterMigrate__seed.sql` (dev profile only) seeds

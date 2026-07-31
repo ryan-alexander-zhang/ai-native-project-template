@@ -330,15 +330,22 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           new CancelDeadline(STOCK_DEADLINE),
           releaseDeadline(state, context));
     }
-    if (in instanceof OrderFulfilmentInput.StockReservationFailed
-        || in instanceof OrderFulfilmentInput.StockReservationTimedOut) {
+    if (in instanceof OrderFulfilmentInput.StockReservationFailed) {
       // Nothing was ever reserved and the order is already cancelled, so there is no compensation
-      // to run and no command to send. The flow is simply finished.
-      boolean timedOut = in instanceof OrderFulfilmentInput.StockReservationTimedOut;
+      // to run and no command to send. The flow is finished — and the STOCK timer it set when the
+      // reservation was requested is disarmed on the way out, like every other exit from a
+      // deadline-guarded step (issue-00150; this was the one terminal decision that left its timer
+      // armed).
       return completed(
           state.withStep(Step.CANCELLED),
-          timedOut ? "cancelled-order-stock-timed-out" : "cancelled-order-stock-failed",
-          "ORDER_CANCELLED");
+          "cancelled-order-stock-failed",
+          "ORDER_CANCELLED",
+          new CancelDeadline(STOCK_DEADLINE));
+    }
+    if (in instanceof OrderFulfilmentInput.StockReservationTimedOut) {
+      // As above, but no deadline is cancelled here — this decision *is* the deadline.
+      return completed(
+          state.withStep(Step.CANCELLED), "cancelled-order-stock-timed-out", "ORDER_CANCELLED");
     }
     return ignore(state, in, context);
   }

@@ -17,6 +17,12 @@ import org.springframework.stereotype.Component;
  * {@link FindCustomerOrders}, where a page of orders is one join with the totals summed in SQL.
  * Rehydrating fifty aggregates to render a list rebuilds fifty sets of lines and invariants that a
  * read is never going to use.
+ *
+ * <p>This is the single-entity exception the framework's {@code Query} contract names (read models
+ * by default; a read whose shape follows the aggregate may load it, provided it mutates nothing) —
+ * taken here deliberately, because {@code cancellableByCustomer} is a domain specification and
+ * loading the aggregate keeps its one definition instead of re-deriving it from a status column in
+ * a second place (issue-00150).
  */
 @Component
 public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderSnapshot>> {
