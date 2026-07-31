@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import com.aipersimmon.ddd.cqrs.CommandPrecheck;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
+import com.aipersimmon.ddd.cqrs.QueryInterceptor;
 import com.aipersimmon.ddd.cqrs.UnitOfWork;
 import jakarta.validation.Validator;
 import org.springframework.beans.factory.ObjectProvider;
@@ -76,6 +77,23 @@ public class AipersimmonDddCqrsAutoConfiguration {
     return new ConcurrencyTranslationCommandInterceptor();
   }
 
+  /**
+   * Present only when the deployment opts in: rerunning a command is safe exactly when its handler
+   * has no non-transactional side effects, which is the application's property to assert, not the
+   * framework's to assume.
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.cqrs.retry-on-conflict",
+      name = "enabled",
+      havingValue = "true")
+  public RetryOnConflictCommandInterceptor retryOnConflictCommandInterceptor(
+      AipersimmonDddCqrsProperties properties) {
+    AipersimmonDddCqrsProperties.RetryOnConflict retry = properties.getRetryOnConflict();
+    return new RetryOnConflictCommandInterceptor(retry.getMaxAttempts(), retry.getInitialBackoff());
+  }
+
   @Bean
   @ConditionalOnMissingBean
   public PrecheckCommandInterceptor precheckCommandInterceptor(
@@ -107,11 +125,14 @@ public class AipersimmonDddCqrsAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean
-  public QueryBus queryBus(ObjectProvider<QueryHandler<?, ?>> handlers) {
-    // A supplier for the same reason as the command bus above: resolving the provider here would
+  public QueryBus queryBus(
+      ObjectProvider<QueryHandler<?, ?>> handlers, ObjectProvider<QueryInterceptor> interceptors) {
+    // Suppliers for the same reason as the command bus above: resolving the providers here would
     // instantiate every handler while this bean is still being created, and a composite handler
-    // that takes the bus in its constructor would be handed a half-built one.
-    return new RegistryQueryBus(() -> handlers.stream().toList());
+    // that takes the bus in its constructor would be handed a half-built one. No built-in
+    // interceptors are registered — the chain is the application's seam.
+    return new RegistryQueryBus(
+        () -> handlers.stream().toList(), () -> interceptors.stream().toList());
   }
 
   /**

@@ -1,7 +1,12 @@
 /**
  * The tactical building blocks that carry weight in the type system: {@link
- * com.aipersimmon.ddd.core.model.Identifier}, {@link com.aipersimmon.ddd.core.model.Association},
- * and {@link com.aipersimmon.ddd.core.model.AbstractAggregateRoot}.
+ * com.aipersimmon.ddd.core.model.Identifier} and {@link
+ * com.aipersimmon.ddd.core.model.AbstractAggregateRoot}, bound together — an aggregate's identity
+ * type must be an {@code Identifier}, so "ids are dedicated value objects" is enforced by the
+ * compiler rather than remembered. (An {@code Association} abstraction for by-identity references
+ * between aggregates used to live here too; nothing in the library or its scaffold ever needed more
+ * than holding the target's {@code Identifier} directly, so it was a name without a job and was
+ * removed.)
  *
  * <p>Every role a building block can play is <em>named</em> once, in {@link
  * com.aipersimmon.ddd.core.annotation}. What lives here is only the part a name cannot do: hold

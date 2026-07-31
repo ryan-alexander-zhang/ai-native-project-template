@@ -122,7 +122,9 @@ class ClearingAFieldReachesTheDatabaseTest {
   private record NicknameCleared(String id) implements DomainEvent {}
 
   /** An aggregate whose nickname is optional — the domain's way of saying "it can be cleared". */
-  static final class Thing extends AbstractAggregateRoot<String> {
+  record ThingId(String value) implements com.aipersimmon.ddd.core.model.Identifier {}
+
+  static final class Thing extends AbstractAggregateRoot<ThingId> {
     private final String id;
     private String nickname;
 
@@ -147,8 +149,8 @@ class ClearingAFieldReachesTheDatabaseTest {
     }
 
     @Override
-    public String id() {
-      return id;
+    public ThingId id() {
+      return new ThingId(id);
     }
   }
 
@@ -259,6 +261,6 @@ class ClearingAFieldReachesTheDatabaseTest {
     inTransaction(() -> things.save(Thing.loaded("t-1", "Alice", 1)));
 
     assertThat(columnOf("nickname")).isEqualTo("Alice");
-    assertThat(loaded.id()).isEqualTo("t-1");
+    assertThat(loaded.id().value()).isEqualTo("t-1");
   }
 }

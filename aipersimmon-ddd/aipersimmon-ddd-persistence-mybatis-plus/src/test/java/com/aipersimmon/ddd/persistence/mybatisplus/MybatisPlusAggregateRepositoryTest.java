@@ -39,7 +39,9 @@ class MybatisPlusAggregateRepositoryTest {
   private record Renamed(String id) implements DomainEvent {}
 
   /** A minimal aggregate that can record an event on demand. */
-  private static final class Thing extends AbstractAggregateRoot<String> {
+  private record ThingId(String value) implements com.aipersimmon.ddd.core.model.Identifier {}
+
+  private static final class Thing extends AbstractAggregateRoot<ThingId> {
     private final String id;
 
     private Thing(String id) {
@@ -61,8 +63,8 @@ class MybatisPlusAggregateRepositoryTest {
     }
 
     @Override
-    public String id() {
-      return id;
+    public ThingId id() {
+      return new ThingId(id);
     }
   }
 
@@ -121,7 +123,7 @@ class MybatisPlusAggregateRepositoryTest {
     @Override
     protected ThingRow toRow(Thing thing) {
       ThingRow row = new ThingRow();
-      row.setId(thing.id());
+      row.setId(thing.id().value());
       return row;
     }
 

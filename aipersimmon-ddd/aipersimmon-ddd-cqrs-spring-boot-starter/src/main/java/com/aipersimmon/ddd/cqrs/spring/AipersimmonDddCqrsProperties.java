@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.cqrs.spring;
 
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Configuration for the CQRS starter, under {@code aipersimmon.ddd.cqrs}. */
@@ -7,6 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AipersimmonDddCqrsProperties {
 
   private final Transaction transaction = new Transaction();
+
+  private final RetryOnConflict retryOnConflict = new RetryOnConflict();
 
   /** How the command bus behaves with respect to transactions. */
   public static class Transaction {
@@ -36,7 +39,53 @@ public class AipersimmonDddCqrsProperties {
     }
   }
 
+  /**
+   * Bounded automatic retry of commands that lost an optimistic-lock race — see {@link
+   * RetryOnConflictCommandInterceptor} for the full argument, including why it is opt-in (the
+   * deployment, not the framework, can assert that its handlers have no non-transactional side
+   * effects to repeat).
+   */
+  public static class RetryOnConflict {
+
+    /** Off by default: enabling it asserts the handlers are safe to rerun. */
+    private boolean enabled = false;
+
+    /** Total attempts, the first included; 3 means "retry twice, then let the conflict stand". */
+    private int maxAttempts = 3;
+
+    /** Backoff before the first retry; doubles per further retry. */
+    private Duration initialBackoff = Duration.ofMillis(50);
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public int getMaxAttempts() {
+      return maxAttempts;
+    }
+
+    public void setMaxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
+    }
+
+    public Duration getInitialBackoff() {
+      return initialBackoff;
+    }
+
+    public void setInitialBackoff(Duration initialBackoff) {
+      this.initialBackoff = initialBackoff;
+    }
+  }
+
   public Transaction getTransaction() {
     return transaction;
+  }
+
+  public RetryOnConflict getRetryOnConflict() {
+    return retryOnConflict;
   }
 }

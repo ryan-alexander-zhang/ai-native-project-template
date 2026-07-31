@@ -10,16 +10,16 @@ import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
  * aggregateRootsShouldExtendAbstractAggregateRoot}.
  */
 @AggregateRoot
-public class GoodStockItem extends AbstractAggregateRoot<String> {
+public class GoodStockItem extends AbstractAggregateRoot<GoodSku> {
 
-  private final String sku;
+  private final GoodSku sku;
 
-  public GoodStockItem(String sku) {
+  public GoodStockItem(GoodSku sku) {
     this.sku = sku;
   }
 
   @Override
-  public String id() {
+  public GoodSku id() {
     return sku;
   }
 }

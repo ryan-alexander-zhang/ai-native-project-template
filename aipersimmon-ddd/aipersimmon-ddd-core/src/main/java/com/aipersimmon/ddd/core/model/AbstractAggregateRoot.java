@@ -29,9 +29,12 @@ import java.util.Objects;
  * com.aipersimmon.ddd.core.annotation.AggregateRoot @AggregateRoot}, which is the one vocabulary
  * that covers every building-block role, and extending this supplies the behaviour.
  *
- * @param <ID> the identity type of the root
+ * @param <ID> the identity type of the root — a dedicated {@link Identifier} value object, never a
+ *     raw {@code String} or {@code UUID}. The bound is what makes {@code Identifier}'s promise
+ *     ("keeps the identities of different aggregates from being mixed up") true by construction
+ *     rather than by convention: an aggregate simply cannot be declared over a bare primitive.
  */
-public abstract class AbstractAggregateRoot<ID> {
+public abstract class AbstractAggregateRoot<ID extends Identifier> {
 
   /**
    * The aggregate's identity. Declared here rather than inherited from a marker interface, so that
@@ -128,6 +131,11 @@ public abstract class AbstractAggregateRoot<ID> {
    * Record that this aggregate's row now holds the next version; call after a version-checked write
    * succeeded, so saving the same instance again in one transaction checks against the new value
    * rather than the stale one.
+   *
+   * <p><strong>For persistence adapters only.</strong> It is public because the repository bases
+   * live in other packages, but a domain or application class calling it would advance the witness
+   * without a write and disarm the optimistic lock — the architecture rule {@code
+   * versionWitnessIsAdvancedOnlyByPersistenceAdapters} refuses the call at build time.
    */
   public final void versionAdvanced() {
     version++;
@@ -138,6 +146,10 @@ public abstract class AbstractAggregateRoot<ID> {
    * #id()}. The class must match exactly rather than by {@code instanceof}: letting a subclass
    * equal its parent would break symmetry, and two different aggregate types are different entities
    * even where their identity values coincide.
+   *
+   * <p>An aggregate whose identity is still {@code null} — created but not yet assigned an id — is
+   * equal only to itself. {@code Objects.equals(null, null)} is true, so without this fallback two
+   * distinct things-in-progress compared equal and a {@code Set} would silently collapse them.
    */
   @Override
   public final boolean equals(Object other) {
@@ -145,6 +157,9 @@ public abstract class AbstractAggregateRoot<ID> {
       return true;
     }
     if (other == null || getClass() != other.getClass()) {
+      return false;
+    }
+    if (id() == null) {
       return false;
     }
     return Objects.equals(id(), ((AbstractAggregateRoot<?>) other).id());

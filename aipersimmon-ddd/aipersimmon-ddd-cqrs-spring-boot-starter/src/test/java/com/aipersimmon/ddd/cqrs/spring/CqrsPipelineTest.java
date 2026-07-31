@@ -115,16 +115,18 @@ class CqrsPipelineTest {
 
   record ThingCreated(String id) implements DomainEvent {}
 
-  static final class Thing extends AbstractAggregateRoot<String> {
-    private final String id;
+  record ThingId(String value) implements com.aipersimmon.ddd.core.model.Identifier {}
+
+  static final class Thing extends AbstractAggregateRoot<ThingId> {
+    private final ThingId id;
 
     Thing(String id) {
-      this.id = id;
+      this.id = new ThingId(id);
       registerEvent(new ThingCreated(id));
     }
 
     @Override
-    public String id() {
+    public ThingId id() {
       return id;
     }
   }

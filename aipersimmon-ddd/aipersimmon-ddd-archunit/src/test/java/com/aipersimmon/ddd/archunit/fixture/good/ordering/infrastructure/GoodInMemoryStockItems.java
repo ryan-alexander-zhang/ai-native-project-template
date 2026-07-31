@@ -25,6 +25,6 @@ public class GoodInMemoryStockItems implements GoodStockItems {
 
   @Override
   public void save(GoodStockItem item) {
-    bySku.put(item.id(), item);
+    bySku.put(item.id().value(), item);
   }
 }

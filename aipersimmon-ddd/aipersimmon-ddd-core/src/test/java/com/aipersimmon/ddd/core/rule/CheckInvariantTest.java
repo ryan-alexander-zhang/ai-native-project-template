@@ -40,15 +40,17 @@ class CheckInvariantTest {
     }
   }
 
-  private static final class SampleAggregate extends AbstractAggregateRoot<String> {
-    private final String id;
+  private record SampleId(String value) implements com.aipersimmon.ddd.core.model.Identifier {}
+
+  private static final class SampleAggregate extends AbstractAggregateRoot<SampleId> {
+    private final SampleId id;
 
     SampleAggregate(String id) {
-      this.id = id;
+      this.id = new SampleId(id);
     }
 
     @Override
-    public String id() {
+    public SampleId id() {
       return id;
     }
 

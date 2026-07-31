@@ -3,6 +3,8 @@ package com.aipersimmon.ddd.cqrs.spring;
 import com.aipersimmon.ddd.cqrs.Query;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
+import com.aipersimmon.ddd.cqrs.QueryInterceptor;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +15,10 @@ import org.springframework.core.ResolvableType;
 /**
  * A {@link QueryBus} that routes each query to the single {@link QueryHandler} registered for its
  * type, indexed by the query type resolved from the handler's generic signature. There is no
- * interceptor chain or transaction here: a query neither changes state nor records events.
+ * transaction here — a query neither changes state nor records events — but there is an optional
+ * {@link QueryInterceptor} chain, so cross-cutting read concerns (logging, authorization,
+ * slow-query observability) have the same kind of seam the command side has. With no interceptors
+ * registered the bus behaves exactly as before.
  *
  * <p><strong>Handlers are resolved on first use, not while this bus is being built</strong> — the
  * same arrangement as {@link RegistryCommandBus}, for the same reason: a composite handler that
@@ -25,20 +30,34 @@ import org.springframework.core.ResolvableType;
 public class RegistryQueryBus implements QueryBus, SmartInitializingSingleton {
 
   private final Supplier<List<QueryHandler<?, ?>>> handlerSource;
+  private final Supplier<List<QueryInterceptor>> interceptorSource;
 
   private volatile Map<Class<?>, QueryHandler<?, ?>> registry;
+  private volatile List<QueryInterceptor> chain;
 
-  /** Eagerly-supplied handlers, for a test or a hand-built bus. */
+  /** Eagerly-supplied handlers and no interceptors, for a test or a hand-built bus. */
   public RegistryQueryBus(List<QueryHandler<?, ?>> handlers) {
-    this(() -> handlers);
+    this(() -> handlers, List::of);
+  }
+
+  /** Eagerly-supplied handlers and interceptors, for a test or a hand-built bus. */
+  public RegistryQueryBus(List<QueryHandler<?, ?>> handlers, List<QueryInterceptor> interceptors) {
+    this(() -> handlers, () -> interceptors);
+  }
+
+  /** Interceptor-less composing constructor, kept for existing callers. */
+  public RegistryQueryBus(Supplier<List<QueryHandler<?, ?>>> handlers) {
+    this(handlers, List::of);
   }
 
   /**
-   * The composing constructor: the source is read on first dispatch (or at the end of context
+   * The composing constructor: both sources are read on first dispatch (or at the end of context
    * startup), never while this object is being constructed.
    */
-  public RegistryQueryBus(Supplier<List<QueryHandler<?, ?>>> handlers) {
+  public RegistryQueryBus(
+      Supplier<List<QueryHandler<?, ?>>> handlers, Supplier<List<QueryInterceptor>> interceptors) {
     this.handlerSource = handlers;
+    this.interceptorSource = interceptors;
   }
 
   /**
@@ -48,6 +67,7 @@ public class RegistryQueryBus implements QueryBus, SmartInitializingSingleton {
   @Override
   public void afterSingletonsInstantiated() {
     registry();
+    chain();
   }
 
   private Map<Class<?>, QueryHandler<?, ?>> registry() {
@@ -91,7 +111,33 @@ public class RegistryQueryBus implements QueryBus, SmartInitializingSingleton {
       throw new IllegalStateException(
           "No query handler registered for " + query.getClass().getName());
     }
-    return handler.handle(query);
+    QueryInterceptor.Invocation<R> invocation = () -> handler.handle(query);
+    // Fold the sorted chain from the handler outwards, so the lowest order() ends up outermost —
+    // the same shape the command bus gives its interceptors.
+    List<QueryInterceptor> interceptors = chain();
+    for (int i = interceptors.size() - 1; i >= 0; i--) {
+      QueryInterceptor interceptor = interceptors.get(i);
+      QueryInterceptor.Invocation<R> next = invocation;
+      invocation = () -> interceptor.intercept(query, next);
+    }
+    return invocation.proceed();
+  }
+
+  private List<QueryInterceptor> chain() {
+    List<QueryInterceptor> current = chain;
+    if (current == null) {
+      synchronized (this) {
+        current = chain;
+        if (current == null) {
+          current =
+              interceptorSource.get().stream()
+                  .sorted(Comparator.comparingInt(QueryInterceptor::order))
+                  .toList();
+          chain = current;
+        }
+      }
+    }
+    return current;
   }
 
   private static Class<?> queryTypeOf(QueryHandler<?, ?> handler) {

@@ -15,12 +15,17 @@ class AbstractAggregateRootTest {
 
   private record SampleEvent(String what) implements DomainEvent {}
 
+  /**
+   * One identity type shared by both fixture roots, so cross-type equality is really cross-type.
+   */
+  private record Ref(String value) implements Identifier {}
+
   /** A minimal aggregate root that exposes the protected event-recording hook for testing. */
-  private static final class Order extends AbstractAggregateRoot<String> {
-    private final String id;
+  private static final class Order extends AbstractAggregateRoot<Ref> {
+    private final Ref id;
 
     Order(String id) {
-      this.id = id;
+      this.id = id == null ? null : new Ref(id);
     }
 
     /** Stands in for a repository rehydrating a persisted root at a known version. */
@@ -31,7 +36,7 @@ class AbstractAggregateRootTest {
     }
 
     @Override
-    public String id() {
+    public Ref id() {
       return id;
     }
 
@@ -41,15 +46,15 @@ class AbstractAggregateRootTest {
   }
 
   /** A second root type sharing Order's identity type, to pin down cross-type inequality. */
-  private static final class Shipment extends AbstractAggregateRoot<String> {
-    private final String id;
+  private static final class Shipment extends AbstractAggregateRoot<Ref> {
+    private final Ref id;
 
     Shipment(String id) {
-      this.id = id;
+      this.id = new Ref(id);
     }
 
     @Override
-    public String id() {
+    public Ref id() {
       return id;
     }
   }
@@ -213,6 +218,24 @@ class AbstractAggregateRootTest {
   void differentAggregateTypesSharingAnIdentity_areNotEqual() {
     assertNotEquals(new Order("o-1"), new Shipment("o-1"));
     assertNotEquals(new Shipment("o-1"), new Order("o-1"));
+  }
+
+  /**
+   * Two freshly created aggregates that have not been assigned an identity yet are two different
+   * things-in-progress, not one: {@code Objects.equals(null, null)} is true, so without an explicit
+   * fallback they compared equal — and a {@code Set} used to collect new aggregates before their
+   * ids are minted would silently collapse them.
+   */
+  @Test
+  void twoNewAggregatesWithoutAnIdentityYet_areNotEqual() {
+    assertNotEquals(new Order(null), new Order(null));
+  }
+
+  @Test
+  void anUnidentifiedAggregateStillEqualsItself() {
+    Order order = new Order(null);
+
+    assertEquals(order, order);
   }
 
   @Test

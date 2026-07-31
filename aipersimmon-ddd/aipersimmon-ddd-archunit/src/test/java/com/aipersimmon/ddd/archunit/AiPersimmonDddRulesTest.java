@@ -120,6 +120,19 @@ class AiPersimmonDddRulesTest {
   }
 
   @Test
+  void versionWitnessIsAdvancedOnlyByPersistenceAdapters_passesForGood() {
+    assertDoesNotThrow(
+        () -> BuildingBlockRules.versionWitnessIsAdvancedOnlyByPersistenceAdapters().check(GOOD));
+  }
+
+  @Test
+  void versionWitnessIsAdvancedOnlyByPersistenceAdapters_failsForBad() {
+    assertThrows(
+        AssertionError.class,
+        () -> BuildingBlockRules.versionWitnessIsAdvancedOnlyByPersistenceAdapters().check(BAD));
+  }
+
+  @Test
   void commandComponentsShouldDeclareValidationConstraints_passesForGood() {
     assertDoesNotThrow(
         () ->

@@ -73,6 +73,7 @@ public final class AiPersimmonDddRules {
         .and(BuildingBlockRules.domainServicesShouldResideInDomain())
         .and(BuildingBlockRules.aggregateRootsShouldExtendAbstractAggregateRoot())
         .and(BuildingBlockRules.valueObjectsShouldBeImmutable())
+        .and(BuildingBlockRules.versionWitnessIsAdvancedOnlyByPersistenceAdapters())
         .and(InvariantAndErrorRules.illegalStateTransitionsShouldOnlyComeFromTransitions())
         .and(InvariantAndErrorRules.errorCodesShouldBeEnums())
         .and(RepositoryRules.portsShouldBeInterfacesInDomain())

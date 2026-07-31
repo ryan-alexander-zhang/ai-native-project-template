@@ -23,7 +23,9 @@ class JdbcAggregateRepositoryTest {
 
   private record Renamed(String id) implements DomainEvent {}
 
-  private static final class Thing extends AbstractAggregateRoot<String> {
+  private record ThingId(String value) implements com.aipersimmon.ddd.core.model.Identifier {}
+
+  private static final class Thing extends AbstractAggregateRoot<ThingId> {
     private final String id;
 
     private Thing(String id) {
@@ -45,8 +47,8 @@ class JdbcAggregateRepositoryTest {
     }
 
     @Override
-    public String id() {
-      return id;
+    public ThingId id() {
+      return new ThingId(id);
     }
   }
 

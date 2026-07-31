@@ -7,7 +7,11 @@ import com.aipersimmon.ddd.core.annotation.Entity;
 import com.aipersimmon.ddd.core.annotation.Service;
 import com.aipersimmon.ddd.core.annotation.ValueObject;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
  * Tactical building-block rules: where the domain model's building blocks live and the shape they
@@ -103,5 +107,51 @@ public final class BuildingBlockRules {
             "a value object is defined by its attributes and compared by their equality, so it "
                 + "must not change after construction")
         .allowEmptyShould(true);
+  }
+
+  /**
+   * Only persistence adapters advance the optimistic-lock witness: no class in the domain or
+   * application layer calls {@link AbstractAggregateRoot#versionAdvanced()}.
+   *
+   * <p>The method is public out of necessity — the repository bases live in other packages — but
+   * its one legitimate caller is the adapter that just performed a version-checked write. A domain
+   * or application class calling it advances the witness without a write, which quietly disarms the
+   * optimistic lock: the next save checks against a version the row never reached. Part of {@link
+   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project with no aggregates.
+   */
+  public static ArchRule versionWitnessIsAdvancedOnlyByPersistenceAdapters() {
+    return classes()
+        .that()
+        .resideInAPackage("..domain..")
+        .or()
+        .resideInAPackage("..application..")
+        .should(notCallVersionAdvanced())
+        .as("domain and application classes should not call versionAdvanced()")
+        .because(
+            "advancing the optimistic-lock witness is the persistence adapter's acknowledgement "
+                + "of a version-checked write; calling it anywhere else disarms the lock — the "
+                + "next save checks against a version the row never reached")
+        .allowEmptyShould(true);
+  }
+
+  private static ArchCondition<JavaClass> notCallVersionAdvanced() {
+    return new ArchCondition<>("not call AbstractAggregateRoot.versionAdvanced()") {
+      @Override
+      public void check(JavaClass origin, ConditionEvents events) {
+        origin
+            .getMethodCallsFromSelf()
+            .forEach(
+                call -> {
+                  boolean advancesWitness =
+                      call.getTarget().getName().equals("versionAdvanced")
+                          && call.getTarget()
+                              .getOwner()
+                              .isAssignableTo(AbstractAggregateRoot.class);
+                  if (advancesWitness) {
+                    events.add(SimpleConditionEvent.violated(call, call.getDescription()));
+                  }
+                });
+      }
+    };
   }
 }

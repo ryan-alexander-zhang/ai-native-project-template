@@ -24,10 +24,12 @@ class DomainEventsTest {
     }
   }
 
-  private static final class Aggregate extends AbstractAggregateRoot<String> {
+  private record AggregateId(String value) implements com.aipersimmon.ddd.core.model.Identifier {}
+
+  private static final class Aggregate extends AbstractAggregateRoot<AggregateId> {
     @Override
-    public String id() {
-      return "a-1";
+    public AggregateId id() {
+      return new AggregateId("a-1");
     }
 
     void raise(DomainEvent event) {
