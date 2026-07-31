@@ -31,12 +31,23 @@ import java.util.List;
 @AggregateRoot
 public class Order extends AbstractAggregateRoot<OrderId> {
 
+  // Each edge also names its refusal (issue-00138): the whole mechanical lifecycle contract —
+  // what is legal, and what a refusal is called at the edge — reads off this one table.
   private static final Transitions<OrderStatus> RULES =
       Transitions.<OrderStatus>of()
-          .allow(OrderStatus.AWAITING_REVIEW, OrderStatus.READY_FOR_FULFILMENT)
-          .allow(OrderStatus.READY_FOR_FULFILMENT, OrderStatus.FULFILMENT_IN_PROGRESS)
-          .allow(OrderStatus.FULFILMENT_IN_PROGRESS, OrderStatus.CONFIRMED)
-          .allow(OrderStatus.CONFIRMED, OrderStatus.SHIPPED);
+          .allow(
+              OrderStatus.AWAITING_REVIEW,
+              OrderStatus.READY_FOR_FULFILMENT,
+              OrderingErrorCode.ORDER_NOT_AWAITING_REVIEW)
+          .allow(
+              OrderStatus.READY_FOR_FULFILMENT,
+              OrderStatus.FULFILMENT_IN_PROGRESS,
+              OrderingErrorCode.ORDER_NOT_READY_FOR_FULFILMENT)
+          .allow(
+              OrderStatus.FULFILMENT_IN_PROGRESS,
+              OrderStatus.CONFIRMED,
+              OrderingErrorCode.ORDER_NOT_UNDER_FULFILMENT)
+          .allow(OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderingErrorCode.ORDER_NOT_CONFIRMED);
 
   private static final OrderLifecyclePolicy LIFECYCLE = new OrderLifecyclePolicy();
 
@@ -150,17 +161,17 @@ public class Order extends AbstractAggregateRoot<OrderId> {
     return out;
   }
 
-  /** Manual review approved the order: it becomes eligible for fulfilment. */
+  /**
+   * Manual review approved the order: it becomes eligible for fulfilment. The state guard is the
+   * transition table's — it refuses a non-awaiting order with {@code ORDER_NOT_AWAITING_REVIEW},
+   * declared on the edge itself, so this method no longer restates the same rule by hand just to
+   * attach the code (issue-00138).
+   */
   public void approveReview(ReviewDecisionRef decision) {
     if (decision == null || !decision.belongsTo(id)) {
       throw new DomainException(
           OrderingErrorCode.REVIEW_DECISION_ORDER_MISMATCH,
           "the review decision does not belong to this order");
-    }
-    if (status != OrderStatus.AWAITING_REVIEW) {
-      throw new DomainException(
-          OrderingErrorCode.ORDER_NOT_AWAITING_REVIEW,
-          "only an order awaiting review can be approved");
     }
     RULES.check(status, OrderStatus.READY_FOR_FULFILMENT);
     this.status = OrderStatus.READY_FOR_FULFILMENT;

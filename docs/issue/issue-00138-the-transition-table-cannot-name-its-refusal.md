@@ -2,7 +2,7 @@
 id: issue-00138-the-transition-table-cannot-name-its-refusal
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 转换表拒绝时报不出错误码，逼得聚合把同一条守卫写两遍
@@ -49,4 +49,16 @@ freeze 语义（`build()` 返回不可变实例），或 javadoc 明确"必须�
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复。设计定案：码属于**目的地**（"不在可确认的状态"说的是要去哪，不是现在在哪），
+`allow(from, to, code)` 声明边并命名拒绝；同一目的地的多条边必须同码，冲突在**声明期**抛
+`IllegalArgumentException`（类初始化时、作者眼前），而不是运行期看哪条非法尝试先跑到。
+freeze 采用 javadoc 声明方案（表必须在类初始化期建完，此后视为冻结）。
+
+- 框架红：`TransitionsTest` 新增 4 条（目的地码、未声明目的地无码、无码表仍无码、声明期
+  冲突检测），修复前编译失败（API 不存在）。
+- 脚手架：`Order` 四条机械转换各配 `OrderingErrorCode`（`ORDER_NOT_AWAITING_REVIEW` 复用，
+  新增 `ORDER_NOT_READY_FOR_FULFILMENT`/`ORDER_NOT_UNDER_FULFILMENT`/`ORDER_NOT_CONFIRMED`），
+  `approveReview` 的手写守卫删除——`OrderPlacementTest.approveReviewRejectedWhenNotAwaitingReview`
+  按码断言原样通过，证明错误契约无缝接管。
+- `OrderLifecycleTransitionsTest.illegalForwardTransitionsAreRejectedWithTheirDeclaredCodes`
+  钉住三个新码。aipersimmon-ddd-core（41）+ ordering-domain（92）+ ordering-application（7）全绿。

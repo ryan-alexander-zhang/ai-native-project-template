@@ -48,6 +48,15 @@ public enum OrderingErrorCode implements ErrorCode {
       "ordering.compensation-evidence-order-mismatch", ErrorCategory.DOMAIN_RULE),
   /** A review-related action was attempted on an order that is not awaiting review. */
   ORDER_NOT_AWAITING_REVIEW("ordering.order-not-awaiting-review", ErrorCategory.CONFLICT),
+
+  // --- Mechanical forward transitions, named per destination in Order's transition table
+  // (issue-00138). One code per destination: the refusal is about where the caller tried to go.
+  /** Fulfilment was begun on an order that is not ready for fulfilment. */
+  ORDER_NOT_READY_FOR_FULFILMENT("ordering.order-not-ready-for-fulfilment", ErrorCategory.CONFLICT),
+  /** A confirmation was attempted on an order that is not under fulfilment. */
+  ORDER_NOT_UNDER_FULFILMENT("ordering.order-not-under-fulfilment", ErrorCategory.CONFLICT),
+  /** A shipment was attempted on an order that is not confirmed. */
+  ORDER_NOT_CONFIRMED("ordering.order-not-confirmed", ErrorCategory.CONFLICT),
   /** The supplied review decision belongs to a different order. */
   REVIEW_DECISION_ORDER_MISMATCH(
       "ordering.review-decision-order-mismatch", ErrorCategory.DOMAIN_RULE),

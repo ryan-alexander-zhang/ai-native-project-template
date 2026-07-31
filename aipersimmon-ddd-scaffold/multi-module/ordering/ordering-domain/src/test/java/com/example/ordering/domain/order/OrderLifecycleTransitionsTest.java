@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.state.IllegalStateTransitionException;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.shared.Money;
+import com.example.ordering.domain.shared.OrderingErrorCode;
 import com.example.ordering.domain.shared.Sku;
 import java.util.List;
 import java.util.Set;
@@ -64,8 +65,14 @@ class OrderLifecycleTransitionsTest {
     assertInstanceOf(OrderShippedEvent.class, lastEvent(order));
   }
 
+  /**
+   * Every refused mechanical move carries a stable code, declared once in the transition table
+   * (issue-00138). Before the table could name refusals, these three reached the edge as codeless
+   * exceptions while every cancel/review refusal had its own {@code OrderingErrorCode} — the same
+   * aggregate, two error contracts.
+   */
   @Test
-  void illegalForwardTransitionsAreRejected() {
+  void illegalForwardTransitionsAreRejectedWithTheirDeclaredCodes() {
     // beginFulfilment requires READY_FOR_FULFILMENT; an awaiting-review order is not there yet.
     Order awaiting =
         Order.place(
@@ -73,14 +80,20 @@ class OrderLifecycleTransitionsTest {
             CUSTOMER,
             List.of(new LineData(new Sku("SKU-1"), 1, Money.of(1_000, "USD"))),
             ReviewRequirement.required(Set.of("high_value")));
-    assertThrows(IllegalStateTransitionException.class, awaiting::beginFulfilment);
+    IllegalStateTransitionException begin =
+        assertThrows(IllegalStateTransitionException.class, awaiting::beginFulfilment);
+    assertEquals(OrderingErrorCode.ORDER_NOT_READY_FOR_FULFILMENT, begin.errorCode().orElseThrow());
 
     // confirm requires FULFILMENT_IN_PROGRESS; a merely-ready order is not there.
-    assertThrows(IllegalStateTransitionException.class, readyOrder()::confirm);
+    IllegalStateTransitionException confirm =
+        assertThrows(IllegalStateTransitionException.class, readyOrder()::confirm);
+    assertEquals(OrderingErrorCode.ORDER_NOT_UNDER_FULFILMENT, confirm.errorCode().orElseThrow());
 
     // ship requires CONFIRMED; an in-fulfilment order is not there.
     Order inFulfilment = readyOrder();
     inFulfilment.beginFulfilment();
-    assertThrows(IllegalStateTransitionException.class, inFulfilment::ship);
+    IllegalStateTransitionException ship =
+        assertThrows(IllegalStateTransitionException.class, inFulfilment::ship);
+    assertEquals(OrderingErrorCode.ORDER_NOT_CONFIRMED, ship.errorCode().orElseThrow());
   }
 }
