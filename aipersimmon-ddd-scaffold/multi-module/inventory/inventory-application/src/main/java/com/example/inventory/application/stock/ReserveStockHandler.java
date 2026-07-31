@@ -17,6 +17,7 @@ import com.example.inventory.domain.stock.Stock;
 import com.example.inventory.domain.stock.Stocks;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
@@ -91,6 +92,23 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
 
   @Override
   public Void handle(ReserveStock command, CommandContext context) {
+    // Decide once, announce every time (issue-00147) — the same contract payment keeps for its
+    // paymentOperationId, for the same reason: repeating this action does not do compensable work
+    // twice, it leaks a resource. A duplicate outside the inbox's retention window reaches this
+    // handler, and without this lookup it would deduct the stock again and write a second
+    // Reservation that nothing will ever release (the flow has moved on; the second StockReserved
+    // is ignored). So a redelivery finds the reservation already held for the order — released or
+    // not — and re-announces it verbatim; the announcement repeats because the previous one may
+    // never have arrived. Two deliveries racing past this lookup are settled by the schema's
+    // unique (tenant_id, order_id) key: the losing transaction rolls back and its retry lands
+    // here, finding the winner's row.
+    Optional<Reservation> existing = reservations.findByOrderId(command.orderId());
+    if (existing.isPresent()) {
+      integrationEvents.publish(
+          new StockReserved(command.orderId(), existing.get().id().value()), context);
+      return null;
+    }
+
     Map<Sku, Stock> reserved = new LinkedHashMap<>();
     Map<Sku, Integer> held = new LinkedHashMap<>();
     try {

@@ -78,21 +78,33 @@ public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservat
 
   @Override
   public Optional<Reservation> findById(ReservationId id) {
-    ReservationDo header = reservations.selectById(id.value());
+    return reconstitute(reservations.selectById(id.value()));
+  }
+
+  @Override
+  public Optional<Reservation> findByOrderId(String orderId) {
+    // At most one row can match: (tenant_id, order_id) is a unique key, and the tenant interceptor
+    // scopes the query to the current tenant.
+    return reconstitute(
+        reservations.selectOne(
+            new LambdaQueryWrapper<ReservationDo>().eq(ReservationDo::getOrderId, orderId)));
+  }
+
+  private Optional<Reservation> reconstitute(ReservationDo header) {
     if (header == null) {
       return Optional.empty();
     }
     List<ReservationLineDo> rows =
         lines.selectList(
             new LambdaQueryWrapper<ReservationLineDo>()
-                .eq(ReservationLineDo::getReservationId, id.value()));
+                .eq(ReservationLineDo::getReservationId, header.getId()));
     Map<Sku, Integer> held = new LinkedHashMap<>();
     for (ReservationLineDo row : rows) {
       held.put(new Sku(row.getSku()), row.getQuantity());
     }
     return Optional.of(
         Reservation.reconstitute(
-            id,
+            new ReservationId(header.getId()),
             header.getOrderId(),
             held,
             Boolean.TRUE.equals(header.getReleased()),

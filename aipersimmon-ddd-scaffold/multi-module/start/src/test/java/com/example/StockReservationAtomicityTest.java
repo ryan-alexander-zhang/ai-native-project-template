@@ -1,6 +1,7 @@
 package com.example;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -139,6 +141,65 @@ class StockReservationAtomicityTest {
   }
 
   /**
+   * A redelivered reservation request holds nothing twice and re-announces the same reservation
+   * (issue-00147).
+   *
+   * <p>Sent twice straight on the bus, which is what a duplicate outside the inbox's retention
+   * window looks like: the transport-level dedupe has forgotten the first delivery, so the handler
+   * is the only thing left standing. Without a business-level answer the second delivery deducted
+   * the stock again and wrote a second {@code Reservation} — and since the fulfilment flow had
+   * already moved on, its {@code StockReserved} was ignored and <em>nothing would ever release
+   * it</em>: leaked stock, no alarm. The contract is payment's "decide once, announce every time",
+   * for the same reason payment has it — the action leaks a resource if repeated, so transport
+   * dedupe alone is not enough.
+   */
+  @Test
+  void aRedeliveredReservationHoldsNothingTwiceAndReAnnouncesTheSameReservation() {
+    stock("SKU-DUP", 10);
+
+    reserve("order-dup", new ReserveStock.Line("SKU-DUP", 2));
+    reserve("order-dup", new ReserveStock.Line("SKU-DUP", 2));
+
+    assertEquals(8, availableOf("SKU-DUP"), "the second delivery must not deduct again");
+    assertEquals(1, reservationsFor("order-dup"), "one order, one reservation");
+    List<String> announced = reservedEventIdsFor("order-dup");
+    assertEquals(
+        2,
+        announced.size(),
+        "every delivery still answers — at-least-once means the first announcement may never have"
+            + " arrived");
+    assertEquals(
+        1,
+        announced.stream().distinct().count(),
+        "and both announcements must name the same reservation, or the process manager could"
+            + " release one while the other stays held");
+  }
+
+  /**
+   * The last line of the same defence: "one order, one reservation" is written into the schema, so
+   * two concurrent deliveries racing past the handler's lookup cannot both commit — one insert
+   * loses, rolls back, and the redelivery finds the winner's row.
+   */
+  @Test
+  void theDatabaseRefusesASecondReservationRowForTheSameOrder() {
+    jdbc.update(
+        "INSERT INTO inventory.reservations (id, order_id, released, version, tenant_id)"
+            + " VALUES ('res-unique-1', 'order-unique', false, 0, ?)",
+        TENANT.value());
+
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () ->
+            jdbc.update(
+                "INSERT INTO inventory.reservations"
+                    + " (id, order_id, released, version, tenant_id)"
+                    + " VALUES ('res-unique-2', 'order-unique', false, 0, ?)",
+                TENANT.value()),
+        "the unique key on (tenant_id, order_id) is the guard the application code cannot"
+            + " provide: it is what settles two deliveries racing inside the lookup window");
+  }
+
+  /**
    * A status-only save leaves the child rows alone (issue-00090).
    *
    * <p>Asserted with PostgreSQL's {@code xmin} — the id of the transaction that last wrote each
@@ -217,6 +278,28 @@ class StockReservationAtomicityTest {
         Integer.class,
         TENANT.value(),
         orderId);
+  }
+
+  /**
+   * The reservation id each StockReserved announcement for this order carries, read out of the
+   * outbox rows (the relay is off in this context, so every announcement is still there).
+   */
+  private List<String> reservedEventIdsFor(String orderId) {
+    return jdbc
+        .queryForList(
+            "SELECT payload FROM aipersimmon_outbox"
+                + " WHERE type LIKE '%StockReserved%' AND payload LIKE ?",
+            String.class, "%" + orderId + "%")
+        .stream()
+        .map(
+            payload -> {
+              java.util.regex.Matcher id =
+                  java.util.regex.Pattern.compile("\"reservationId\"\s*:\s*\"([^\"]+)\"")
+                      .matcher(payload);
+              assertTrue(id.find(), "every StockReserved payload carries a reservationId");
+              return id.group(1);
+            })
+        .toList();
   }
 
   /** The relay is off in this context, so the event is still sitting in the outbox to be found. */

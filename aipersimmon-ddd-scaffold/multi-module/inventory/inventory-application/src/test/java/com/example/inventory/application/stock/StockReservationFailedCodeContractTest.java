@@ -64,6 +64,11 @@ class StockReservationFailedCodeContractTest {
     }
 
     @Override
+    public Optional<Reservation> findByOrderId(String orderId) {
+      return Optional.empty();
+    }
+
+    @Override
     public void save(Reservation reservation) {}
   }
 }
