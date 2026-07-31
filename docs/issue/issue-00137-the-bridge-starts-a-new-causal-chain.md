@@ -2,7 +2,7 @@
 id: issue-00137-the-bridge-starts-a-new-causal-chain
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 域事件跳点上因果链断了，脚手架只好自己起一条新的
@@ -42,7 +42,29 @@ start/terminal 输入与 `PlaceOrder`/`ConfirmOrder` 的 correlationId 互不相
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，按改法原样落地（scope 放 bus 而非 interceptor：绑定必须覆盖整条链，
+包括事务 interceptor 内仓储 save 时的同步域事件发布）。
+
+- **框架**：新增 `com.aipersimmon.ddd.cqrs.CommandContexts`（core cqrs 模块，零 Spring 依赖）——
+  `current()` + `runAs(context, work)`。刻意**只有 scope 式入口、没有 set/clear 对**：
+  写者永远在调用栈上方（bus），恢复式 scope 是嵌套 dispatch（handler 内再 send）唯一
+  活得下来的形态；与 `TenantContext` 的差异（后者是请求身份、需要边界 set）在 javadoc 在案。
+  `RegistryCommandBus.dispatch` 用它包住整条 interceptor 链，三条路径（send/send(cause)/sendAs）
+  一视同仁。
+- **scaffold**：`RuntimeOrderFulfilmentProcess.factContext` 降级为 fallback——有环境上下文时
+  `current().map(cause -> cause.deriveChild("fact:orderId"))`：**确定性 messageId 原样保留**
+  （幂等不丢，减刑因素兑现），correlation/causation/tenant 全部接上链；无绑定时才铸 root
+  （租户仍走 `TenantContext.effective()`，原论证不动）。
+- **测试先行**：`CommandContextsTest`（scope 语义 5 条：嵌套恢复、抛异常不泄漏）+
+  `DispatchScopedCommandContextTest`（bus 侧 4 条：栈上订阅者可读、嵌套 send 恢复父上下文、
+  sendAs 原样绑定、失败 dispatch 不泄漏）编译红先行；scaffold 复现测试
+  `OrderingFlowTest.theFulfilmentProcessJoinsThePlacingCommandsCausalChain` 按"复现"一节
+  原样写——`sendAs` 钉住 PlaceOrder 的 correlation，查 `aipersimmon_process_transition`
+  的 start 行断言相等。修复前实测红：`expected: <place-…> but was: <ready-for-fulfilment:…>`。
+- 修复后 scaffold main 代码里 `CommandContext.root(` 仅剩 factContext 的 fallback 一处。
+
+验证：库全 reactor `clean install` BUILD SUCCESS；scaffold `clean test -pl start -am`
+验收套件 BUILD SUCCESS。
 
 ## 关联
 

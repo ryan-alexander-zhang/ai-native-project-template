@@ -8,13 +8,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.ordering.application.order.FindOrder;
 import com.example.ordering.application.order.PlaceOrder;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +60,8 @@ class OrderingFlowTest {
 
   @Autowired QueryBus queryBus;
 
+  @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
   @Autowired StockReservationFailedRecorder failures;
 
   @BeforeEach
@@ -91,6 +96,33 @@ class OrderingFlowTest {
             new PlaceOrder("CUST-1", List.of(new PlaceOrder.Line("SKU-1", 1, 0, "USD"))));
 
     await().atMost(SETTLE).untilAsserted(() -> assertEquals("CONFIRMED", status(orderId)));
+  }
+
+  @Test
+  void theFulfilmentProcessJoinsThePlacingCommandsCausalChain() {
+    // One business flow, one correlation (issue-00137): the process instance the PlaceOrder
+    // triggers must carry the PlaceOrder's correlationId, not a fresh chain minted at the
+    // domain-event hop. Dispatching via sendAs pins the command's identity so the assertion
+    // has something known to compare against.
+    CommandContext placing =
+        CommandContext.root(Tenants.of(BoundTenant.TENANT), "place-" + UUID.randomUUID());
+
+    String orderId =
+        commandBus.sendAs(
+            new PlaceOrder("CUST-1", List.of(new PlaceOrder.Line("SKU-1", 1, 100, "USD"))),
+            placing);
+
+    await().atMost(SETTLE).untilAsserted(() -> assertEquals("CONFIRMED", status(orderId)));
+    String startCorrelation =
+        jdbc.queryForObject(
+            "SELECT correlation_id FROM aipersimmon_process_transition WHERE input_message_id = ?",
+            String.class,
+            "ready-for-fulfilment:" + orderId);
+    assertEquals(
+        placing.correlationId(),
+        startCorrelation,
+        "the process's start transition must sit on the placing command's causal chain,"
+            + " not on a chain of its own");
   }
 
   @Test

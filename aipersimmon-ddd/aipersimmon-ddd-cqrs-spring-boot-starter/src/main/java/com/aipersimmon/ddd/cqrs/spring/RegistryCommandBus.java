@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.cqrs.spring;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.cqrs.CommandContexts;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import com.aipersimmon.ddd.tenancy.TenantContext;
@@ -161,7 +162,12 @@ public class RegistryCommandBus implements CommandBus, SmartInitializingSingleto
       CommandInterceptor.Invocation<R> next = invocation;
       invocation = () -> interceptor.intercept(command, context, next);
     }
-    return invocation.proceed();
+    // Bound around the whole chain, not just the handler: the repository publishes domain events
+    // inside the transaction interceptor, and a synchronous subscriber there is exactly the reader
+    // CommandContexts exists for (issue-00137). The scope restores, so a nested send inside a
+    // handler hands the outer dispatch its context back.
+    CommandInterceptor.Invocation<R> outermost = invocation;
+    return CommandContexts.runAs(context, outermost::proceed);
   }
 
   private static Class<?> commandTypeOf(CommandHandler<?, ?> handler) {

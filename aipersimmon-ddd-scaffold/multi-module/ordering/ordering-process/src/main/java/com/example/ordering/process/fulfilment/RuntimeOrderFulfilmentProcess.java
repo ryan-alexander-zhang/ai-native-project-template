@@ -1,6 +1,7 @@
 package com.example.ordering.process.fulfilment;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.cqrs.CommandContexts;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
@@ -19,10 +20,10 @@ import org.springframework.stereotype.Component;
  * in-memory saga.
  *
  * <p>The domain facts (ready-for-fulfilment, confirmed, cancelled) arrive without an inbound
- * message, so they mint a fresh context keyed by the order id but stamped with the ambient tenant
- * ({@link TenantContext}, bound by the command that raised the fact) — so the instance is created,
- * and every later advance found, under the right tenant. The cross-context result facts instead
- * carry the triggering event's context, keeping the causal chain intact.
+ * message, so their context is built here: a deterministic messageId keyed by the order id (free
+ * idempotency for the runtime), chained as a child of the command the bus is currently dispatching
+ * ({@link CommandContexts}) so the whole flow shares one correlation. The cross-context result
+ * facts instead carry the triggering event's context as an explicit parameter.
  */
 @Component
 public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
@@ -116,17 +117,28 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
   }
 
   /**
-   * A fresh context for a domain fact that arrives without an inbound message, keyed by the order
-   * id but stamped with the ambient tenant so the process instance is created — and every
-   * tenant-scoped advance thereafter is found — under the tenant whose command raised the fact.
+   * The context for a domain fact that arrives without an inbound message. The messageId is
+   * deterministic ({@code fact:orderId}) either way — that is what makes the runtime's
+   * input-idempotency free: a redelivered fact advances nothing twice.
    *
-   * <p>{@code effective()}, not {@code current().orElse(ROOT)}: what an unbound thread means is a
-   * deployment-wide decision {@code TenantContext} already makes from the tenancy mode. Re-deciding
-   * it here would be worse than one mislabelled row — the tenant stamped now is the one every later
-   * advance looks the instance up under, so a flow started under the sentinel is a flow the real
-   * tenant can never advance again.
+   * <p>The chain, though, is not fabricated when the real one is on the stack: these facts are
+   * published synchronously inside the command that raised them, and the bus binds that command's
+   * context to {@link CommandContexts} for the duration of the dispatch (issue-00137). Deriving a
+   * child of it keeps the whole flow — place, ready, start, every staged effect — on one
+   * correlation. Minting a root here is only the fallback for a genuinely standalone entry (a test
+   * driving this class directly), where there is no chain to continue.
+   *
+   * <p>The fallback's tenant is {@code effective()}, not {@code current().orElse(ROOT)}: what an
+   * unbound thread means is a deployment-wide decision {@code TenantContext} already makes from the
+   * tenancy mode. Re-deciding it here would be worse than one mislabelled row — the tenant stamped
+   * now is the one every later advance looks the instance up under, so a flow started under the
+   * sentinel is a flow the real tenant can never advance again. (On the derive path the child keeps
+   * the dispatching command's tenant, which the bus took from the same authority.)
    */
   private static CommandContext factContext(String fact, String orderId) {
-    return CommandContext.root(TenantContext.effective(), fact + ":" + orderId);
+    String messageId = fact + ":" + orderId;
+    return CommandContexts.current()
+        .map(cause -> cause.deriveChild(messageId))
+        .orElseGet(() -> CommandContext.root(TenantContext.effective(), messageId));
   }
 }
