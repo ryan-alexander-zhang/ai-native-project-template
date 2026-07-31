@@ -108,9 +108,13 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
       // transaction commits carrying only the failure event. That is the whole point of deciding
       // before writing — see the class javadoc.
       //
-      // The failing code (if any) rides the event: a BC with no HTTP edge still
-      // surfaces a stable machine identity for the reacting process manager to branch on.
-      String code = failure.errorCode().map(ErrorCode::code).orElse(null);
+      // The failing code rides the event: a BC with no HTTP edge still surfaces a stable machine
+      // identity for the reacting process manager to branch on. Never null — the contract promises
+      // a code and the consuming side enforces the promise (ordering's ReservationFailureRef
+      // refuses a null one), so a codeless DomainException falls back to UNSPECIFIED instead of
+      // poisoning the consumer's transaction (issue-00131).
+      String code =
+          failure.errorCode().map(ErrorCode::code).orElse(InventoryErrorCode.UNSPECIFIED.code());
       integrationEvents.publish(
           new StockReservationFailed(command.orderId(), code, failure.getMessage()), context);
       return null;

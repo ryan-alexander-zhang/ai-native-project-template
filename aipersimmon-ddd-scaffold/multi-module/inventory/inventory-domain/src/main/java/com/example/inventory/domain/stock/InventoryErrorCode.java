@@ -22,7 +22,16 @@ public enum InventoryErrorCode implements ErrorCode {
   STOCK_NOT_FOUND("inventory.stock-not-found", ErrorCategory.NOT_FOUND),
 
   /** No reservation exists for the id a release referred to. */
-  RESERVATION_NOT_FOUND("inventory.reservation-not-found", ErrorCategory.NOT_FOUND);
+  RESERVATION_NOT_FOUND("inventory.reservation-not-found", ErrorCategory.NOT_FOUND),
+
+  /**
+   * A domain refusal that carried no code of its own. This is the floor under the published
+   * contract: {@code StockReservationFailed.code} promises a stable machine identity and the
+   * consuming side enforces that promise ({@code ReservationFailureRef} refuses a null code), so a
+   * codeless {@code DomainException} must leave this context wearing <em>something</em> stable
+   * rather than poisoning the consumer's transaction (issue-00131).
+   */
+  UNSPECIFIED("inventory.unspecified", ErrorCategory.DOMAIN_RULE);
 
   private final String code;
   private final ErrorCategory category;

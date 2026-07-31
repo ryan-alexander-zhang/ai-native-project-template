@@ -2,7 +2,7 @@
 id: issue-00131-one-side-allowed-null-the-other-side-threw
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 失败码一侧允许为空，另一侧对空抛异常——两边各自"正确"，合起来是毒丸
@@ -45,7 +45,16 @@ status: open
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，取生产侧兜底方案。先写测试确认红：
+`StockReservationFailedCodeContractTest.aCodelessDomainFailureStillPublishesAStableCode`
+以 quantity=0 直调 handler（绕过总线校验，正是无码 `DomainException` 的现实来源），修复前
+事件 `code` 为 null。
+
+改动：`InventoryErrorCode` 新增 `UNSPECIFIED("inventory.unspecified")` 作为契约地板；
+`ReserveStockHandler` 的 `orElse(null)` 改为 `orElse(UNSPECIFIED.code())`；
+`StockReservationFailed` javadoc 将"code 永不为 null"写成契约保证。inventory 三模块全绿，
+新测试即回归守卫。codec 的 `"null"` 字面量次生问题仍归
+[[issue-00136-the-second-process-pays-the-boilerplate-again]]。
 
 ## 关联
 
