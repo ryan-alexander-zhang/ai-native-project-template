@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * The three statements the payment operation log needs. A plain MyBatis mapper rather than a
@@ -50,6 +51,21 @@ public interface PaymentOperationMapper {
       @Param("outcome") String outcome,
       @Param("declineCode") String declineCode,
       @Param("declineReason") String declineReason);
+
+  /**
+   * Turn an AUTHORIZED outcome into VOIDED (issue-00144). The {@code outcome = 'AUTHORIZED'}
+   * predicate is the idempotency: a redelivered void, or a void of a declined/already-voided
+   * operation, matches zero rows and changes nothing. The one sanctioned UPDATE against this table
+   * — releasing a hold undoes the irreversible act's reservation, it does not re-decide it.
+   */
+  @Update(
+      """
+      UPDATE payment.payment_operations
+         SET outcome = 'VOIDED'
+       WHERE tenant_id = #{tenantId} AND operation_id = #{operationId}
+         AND outcome = 'AUTHORIZED'
+      """)
+  int markVoided(@Param("tenantId") String tenantId, @Param("operationId") String operationId);
 
   /**
    * Drop operations recorded before {@code cutoff}, across all tenants. Tenant-less on purpose,

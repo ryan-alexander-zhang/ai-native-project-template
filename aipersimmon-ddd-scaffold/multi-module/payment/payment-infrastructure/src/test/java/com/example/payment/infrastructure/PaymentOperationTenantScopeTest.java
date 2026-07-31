@@ -104,6 +104,11 @@ class PaymentOperationTenantScopeTest {
     }
 
     @Override
+    public int markVoided(String tenantId, String operationId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public int purgeRecordedBefore(java.time.Instant cutoff) {
       throw new UnsupportedOperationException();
     }

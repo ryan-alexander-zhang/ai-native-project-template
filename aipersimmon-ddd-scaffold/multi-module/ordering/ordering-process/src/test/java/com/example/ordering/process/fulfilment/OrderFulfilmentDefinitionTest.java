@@ -26,6 +26,7 @@ import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
+import com.example.ordering.application.order.RequestPaymentVoid;
 import com.example.ordering.application.order.RequestStockRelease;
 import com.example.ordering.domain.order.CancellationReason;
 import com.example.ordering.process.fulfilment.OrderFulfilmentState.Step;
@@ -162,14 +163,91 @@ class OrderFulfilmentDefinitionTest {
 
     assertEquals(ProcessLifecycle.COMPENSATING, decision.lifecycle());
     assertEquals(Step.AWAITING_STOCK_RELEASE.name(), decision.step().value());
-    RequestStockRelease release =
-        assertInstanceOf(RequestStockRelease.class, dispatchedCommand(decision));
+    // "Exactly as a decline does" plus the one thing a decline does not need: the decline path
+    // dispatches only the release, while the timeout also voids the still-open operation
+    // (issue-00144) — asserted in its own test above.
+    RequestStockRelease release = dispatchedCommandOfType(decision, RequestStockRelease.class);
     assertEquals("res-1", release.reservationId(), "the same handle inventory issued");
     // What distinguishes it afterwards is the recorded code and the evidence, not the path.
     assertEquals("PAYMENT_TIMEOUT", decision.state().paymentDeclineCode());
     assertEquals("msg-timeout", decision.state().paymentDeclineEvidenceId());
     // Nothing to cancel: this decision is the deadline firing.
     assertNoEffectOfType(decision, CancelDeadline.class);
+  }
+
+  // ---------- the orphaned authorization hold (issue-00144) ----------
+
+  @Test
+  void abandoningThePaymentWaitOnTimeoutVoidsTheOutstandingOperation() {
+    // Payment was silent, but silence is not a refusal: the authorization may still complete
+    // after this flow has moved on, leaving a hold on a customer's card for an order that will
+    // be cancelled. The flow voids the operation in the same decision that abandons the wait —
+    // eagerly, rather than reacting to a late PaymentAuthorized, because the flow may reach its
+    // terminal state before that late answer arrives and a terminal instance reacts to nothing.
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentTimedOut(ORDER),
+            context("msg-timeout", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+
+    RequestPaymentVoid voided = dispatchedCommandOfType(decision, RequestPaymentVoid.class);
+    assertEquals(ORDER, voided.orderId());
+    assertEquals(
+        "op-1",
+        voided.paymentOperationId(),
+        "the void must name the very operation the flow asked payment to authorize");
+  }
+
+  @Test
+  void abandoningThePaymentWaitOnCancellationVoidsTheOutstandingOperation() {
+    // The race the issue names: the customer's cancellation lands while payment is outstanding.
+    // The payment context may already have authorized — or may be about to. Either way the flow
+    // no longer wants the money, so it says so, and payment's operation row resolves the race
+    // atomically on its side.
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.OrderCancelled(ORDER),
+            context("msg-cancelled", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+
+    assertEquals(Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED.name(), decision.step().value());
+    RequestPaymentVoid voided = dispatchedCommandOfType(decision, RequestPaymentVoid.class);
+    assertEquals("op-1", voided.paymentOperationId());
+  }
+
+  @Test
+  void aGenuineDeclineVoidsNothing() {
+    // A decline is payment's own recorded decision: the operation can never later authorize
+    // (redeliveries replay the recorded outcome), so there is no hold to void.
+    ProcessDecision<OrderFulfilmentState> decision =
+        definition.react(
+            awaitingPayment(),
+            new OrderFulfilmentInput.PaymentDeclined(ORDER, "DECLINED", "over ceiling"),
+            context("msg-declined", ProcessLifecycle.RUNNING, Step.AWAITING_PAYMENT));
+
+    assertTrue(
+        decision.effects().stream()
+            .noneMatch(
+                effect ->
+                    effect instanceof DispatchCommand dispatch
+                        && dispatch.command() instanceof RequestPaymentVoid),
+        "voiding a declined operation would be asking payment to undo a refusal");
+  }
+
+  @Test
+  void theOperationIdSurvivesInTheStateFromRequestToVoid() {
+    // The void happens hops after the request, under a different causing envelope, so the id must
+    // ride the state — deriving it again from the current cause would void a different operation.
+    ProcessDecision<OrderFulfilmentState> reserved =
+        definition.react(
+            awaitingStock(),
+            new OrderFulfilmentInput.StockReserved(ORDER, "res-1"),
+            context("msg-reserved", ProcessLifecycle.RUNNING, Step.AWAITING_STOCK));
+
+    assertEquals(
+        "msg-reserved",
+        reserved.state().paymentOperationId(),
+        "the state must remember the operation id the RequestPayment was minted with");
   }
 
   @Test
@@ -545,16 +623,16 @@ class OrderFulfilmentDefinitionTest {
   }
 
   private static OrderFulfilmentState awaitingStock() {
-    return new OrderFulfilmentState(ORDER, Step.AWAITING_STOCK, null, null, null);
+    return new OrderFulfilmentState(ORDER, Step.AWAITING_STOCK, null, null, null, null);
   }
 
   private static OrderFulfilmentState awaitingPayment() {
-    return new OrderFulfilmentState(ORDER, Step.AWAITING_PAYMENT, "res-1", null, null);
+    return new OrderFulfilmentState(ORDER, Step.AWAITING_PAYMENT, "res-1", "op-1", null, null);
   }
 
   private static OrderFulfilmentState awaitingStockRelease(String declineEvidenceId) {
     return new OrderFulfilmentState(
-        ORDER, Step.AWAITING_STOCK_RELEASE, "res-1", "DECLINED", declineEvidenceId);
+        ORDER, Step.AWAITING_STOCK_RELEASE, "res-1", "op-1", "DECLINED", declineEvidenceId);
   }
 
   private static ProcessContext context(

@@ -138,6 +138,17 @@ class AuthorizePaymentIdempotencyTest {
       records++;
     }
 
+    @Override
+    public void markVoided(String operationId) {
+      // The port's guard: only an Authorized outcome becomes Voided; every other shape no-ops.
+      byOperationId.computeIfPresent(
+          operationId,
+          (id, decision) ->
+              decision instanceof PaymentDecision.Authorized
+                  ? new PaymentDecision.Voided()
+                  : decision);
+    }
+
     void hideFromFind(String operationId) {
       hidden.add(operationId);
       records = 0;

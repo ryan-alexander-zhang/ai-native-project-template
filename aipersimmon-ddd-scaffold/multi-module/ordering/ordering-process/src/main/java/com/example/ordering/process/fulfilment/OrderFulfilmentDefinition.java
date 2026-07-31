@@ -18,6 +18,7 @@ import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
+import com.example.ordering.application.order.RequestPaymentVoid;
 import com.example.ordering.application.order.RequestStockRelease;
 import com.example.ordering.domain.order.CancellationReason;
 import com.example.ordering.domain.order.OrderId;
@@ -45,7 +46,8 @@ import org.springframework.stereotype.Component;
  *       PaymentAuthorized ─▶ ConfirmOrder, cancel deadline ─▶ AWAITING_ORDER_CONFIRMATION
  *         OrderConfirmed ─▶ COMPLETED (ORDER_CONFIRMED)
  *       PaymentDeclined  ─▶ COMPENSATING, RequestStockRelease, cancel deadline ─▶ AWAITING_STOCK_RELEASE
- *       PaymentTimedOut  ─▶ COMPENSATING, RequestStockRelease ─▶ AWAITING_STOCK_RELEASE
+ *       PaymentTimedOut  ─▶ COMPENSATING, RequestStockRelease + RequestPaymentVoid ─▶ AWAITING_STOCK_RELEASE
+ *       OrderCancelled   ─▶ COMPENSATING, RequestStockRelease + RequestPaymentVoid ─▶ AWAITING_STOCK_RELEASE_ORDER_CANCELLED
  *         StockReleased  ─▶ CancelOrder(PaymentDeclinedAfterStockReleased) ─▶ AWAITING_ORDER_CANCELLATION
  *           OrderCancelled ─▶ COMPLETED (ORDER_CANCELLED)
  *     StockReservationFailed ─▶ COMPENSATING, CancelOrder(InventoryUnavailable) ─▶ AWAITING_ORDER_CANCELLATION
@@ -67,7 +69,11 @@ import org.springframework.stereotype.Component;
  *       down the same path a reservation failure takes. Only the recorded code differs.
  *   <li>{@code AWAITING_PAYMENT} — stock is held, so a timeout releases it and then cancels, down
  *       the same path a decline takes. The customer's position is identical however the payment
- *       failed to happen.
+ *       failed to happen. One addition a decline does not need: abandoning this wait — on timeout
+ *       or on a racing cancellation — also dispatches {@code RequestPaymentVoid} (issue-00144),
+ *       because payment may still authorize after the flow moves on, and a flow that has reached
+ *       its terminal step reacts to nothing; the hold would be orphaned for good. The void is eager
+ *       so the abandonment is mutual, and payment settles the race atomically on its operation row.
  *   <li>{@code AWAITING_STOCK_RELEASE} — a timeout <em>cannot</em> end the wait, and this is the
  *       interesting one. Cancelling from here needs a {@link
  *       CancellationReason.PaymentDeclinedAfterStockReleased}, which cannot be constructed without
@@ -180,7 +186,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   public ProcessDecision<OrderFulfilmentState> start(ProcessInput input, ProcessContext context) {
     if (input instanceof OrderFulfilmentInput.ReadyForFulfilment ready) {
       OrderFulfilmentState state =
-          new OrderFulfilmentState(ready.orderId(), Step.AWAITING_STOCK, null, null, null);
+          new OrderFulfilmentState(ready.orderId(), Step.AWAITING_STOCK, null, null, null, null);
       // Starting the flow and arming its first timer are one decision, for the same reason asking
       // for payment and arming that timer are: a wait must not be able to begin without a way out.
       return running(
@@ -234,7 +240,9 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // supplied by the runtime — reading a clock here would make the decision untestable and
       // non-repeatable on redelivery.
       return running(
-          state.reserved(reserved.reservationId(), Step.AWAITING_PAYMENT),
+          state
+              .reserved(reserved.reservationId(), Step.AWAITING_PAYMENT)
+              .paymentRequested(paymentOperationId),
           "stock-reserved",
           // The reservation exists, so now — and only now — the order really is under fulfilment.
           // Ordering's own state used to be advanced at placement, before anyone had reserved
@@ -363,10 +371,18 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // The residual window: the customer's cancellation committed while this flow was moving from
       // AWAITING_STOCK to here, so BeginFulfilment found a cancelled order and did nothing. Stock
       // is held, and the order is terminal — release it and finish, without a second CancelOrder.
+      //
+      // Payment is also outstanding, and it may already have authorized (issue-00144). The void is
+      // dispatched now, in the decision that abandons the wait, not in reaction to a late
+      // PaymentAuthorized: this flow may reach its terminal step before that late answer arrives,
+      // and a terminal instance reacts to nothing — the hold would be orphaned for good. Payment
+      // settles the race atomically on its operation row: authorized becomes voided, in-flight
+      // finds the void first and is refused, declined needs nothing.
       return compensating(
           state.withStep(Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED),
           "order-cancelled-while-awaiting-payment",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          new DispatchCommand(new RequestPaymentVoid(state.orderId(), state.paymentOperationId())),
           new CancelDeadline(PAYMENT_DEADLINE),
           releaseDeadline(state, context));
     }
@@ -376,11 +392,17 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // The recorded code is what tells them apart afterwards, and the evidence id is the timer's
       // own delivery, so the eventual cancellation names the firing rather than a decline that
       // never happened. No deadline is cancelled here: this decision *is* the deadline.
+      //
+      // Plus one thing a decline does not need: the void (issue-00144). A decline is payment's own
+      // recorded decision and can never later authorize; a timeout is only silence, and the
+      // authorization may still complete after this flow has moved on. Voiding the operation now
+      // makes the abandonment mutual instead of unilateral.
       return compensating(
           state.declined(
               PAYMENT_TIMEOUT_CODE, context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
           "payment-timed-out",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
+          new DispatchCommand(new RequestPaymentVoid(state.orderId(), state.paymentOperationId())),
           releaseDeadline(state, context));
     }
     return ignore(state, in, context);
@@ -516,6 +538,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
         OrderFulfilmentInput.OrderCancelled.class,
         BeginFulfilment.class,
         RequestPayment.class,
+        RequestPaymentVoid.class,
         ConfirmOrder.class,
         RequestStockRelease.class,
         CancelOrder.class);

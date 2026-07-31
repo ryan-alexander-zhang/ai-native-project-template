@@ -7,6 +7,7 @@ import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
 import com.example.ordering.application.order.ConfirmOrder;
 import com.example.ordering.application.order.RequestPayment;
+import com.example.ordering.application.order.RequestPaymentVoid;
 import com.example.ordering.application.order.RequestStockRelease;
 import com.example.ordering.domain.order.CancellationReason;
 import com.example.ordering.process.fulfilment.OrderFulfilmentInput.OrderCancelled;
@@ -84,6 +85,7 @@ public class OrderFulfilmentCodecs {
         .payload("ordering.fulfilment.order-cancelled", 1, OrderCancelled.class)
         // command effects — what the flow dispatches
         .payload("ordering.fulfilment.request-payment", 1, RequestPayment.class)
+        .payload("ordering.fulfilment.request-payment-void", 1, RequestPaymentVoid.class)
         .payload("ordering.fulfilment.begin-fulfilment", 1, BeginFulfilment.class)
         .payload("ordering.fulfilment.confirm-order", 1, ConfirmOrder.class)
         .payload("ordering.fulfilment.request-stock-release", 1, RequestStockRelease.class)

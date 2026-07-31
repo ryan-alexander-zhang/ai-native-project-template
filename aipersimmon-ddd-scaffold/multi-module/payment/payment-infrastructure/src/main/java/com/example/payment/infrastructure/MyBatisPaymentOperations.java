@@ -33,6 +33,7 @@ public class MyBatisPaymentOperations implements PaymentOperations {
 
   private static final String AUTHORIZED = "AUTHORIZED";
   private static final String DECLINED = "DECLINED";
+  private static final String VOIDED = "VOIDED";
 
   private final PaymentOperationMapper operations;
 
@@ -47,9 +48,11 @@ public class MyBatisPaymentOperations implements PaymentOperations {
       return Optional.empty();
     }
     return Optional.of(
-        AUTHORIZED.equals(row.getOutcome())
-            ? new PaymentDecision.Authorized()
-            : new PaymentDecision.Declined(row.getDeclineCode(), row.getDeclineReason()));
+        switch (row.getOutcome()) {
+          case AUTHORIZED -> new PaymentDecision.Authorized();
+          case VOIDED -> new PaymentDecision.Voided();
+          default -> new PaymentDecision.Declined(row.getDeclineCode(), row.getDeclineReason());
+        });
   }
 
   @Override
@@ -60,12 +63,22 @@ public class MyBatisPaymentOperations implements PaymentOperations {
       declineCode = declined.code();
       declineReason = declined.reason();
     }
-    operations.record(
-        tenant(),
-        operationId,
-        decision.isAuthorized() ? AUTHORIZED : DECLINED,
-        declineCode,
-        declineReason);
+    operations.record(tenant(), operationId, outcomeOf(decision), declineCode, declineReason);
+  }
+
+  @Override
+  public void markVoided(String operationId) {
+    // The WHERE outcome = 'AUTHORIZED' guard makes this the no-op the port promises for every
+    // other shape; zero rows updated is the expected answer for a redelivered void.
+    operations.markVoided(tenant(), operationId);
+  }
+
+  private static String outcomeOf(PaymentDecision decision) {
+    return switch (decision) {
+      case PaymentDecision.Authorized ignored -> AUTHORIZED;
+      case PaymentDecision.Declined ignored -> DECLINED;
+      case PaymentDecision.Voided ignored -> VOIDED;
+    };
   }
 
   /**

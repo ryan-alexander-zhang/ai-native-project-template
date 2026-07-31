@@ -52,6 +52,11 @@ class PaymentOperationCleanupTest {
     }
 
     @Override
+    public int markVoided(String tenantId, String operationId) {
+      throw new UnsupportedOperationException("not part of cleanup");
+    }
+
+    @Override
     public int purgeRecordedBefore(Instant cutoff) {
       this.cutoff = cutoff;
       return 0;

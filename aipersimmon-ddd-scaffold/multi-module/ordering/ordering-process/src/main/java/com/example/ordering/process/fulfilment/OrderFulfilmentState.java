@@ -9,6 +9,9 @@ import com.aipersimmon.ddd.processmanager.model.ProcessStep;
  *
  * <ul>
  *   <li>the {@code reservationId} inventory issued — so the stock can be released on compensation;
+ *   <li>the {@code paymentOperationId} the payment request was minted with — so abandoning the
+ *       payment wait can void the very operation it opened (issue-00144): by then the causing
+ *       envelope is a timer or a cancellation, and the id is not derivable from it;
  *   <li>the {@code paymentDeclineCode} — so the eventual cancellation can name why;
  *   <li>the {@code paymentDeclineEvidenceId} — the <em>envelope id</em> of the causing {@code
  *       PaymentDeclined} fact, kept so the later {@code PaymentDeclineRef} can be identified by the
@@ -22,6 +25,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessStep;
  * @param orderId the order this flow coordinates (its business key)
  * @param step the business step the flow is waiting at
  * @param reservationId the inventory reservation handle, once stock is reserved
+ * @param paymentOperationId the operation the payment request opened, once payment is requested
  * @param paymentDeclineCode the payment decline code, once payment is declined
  * @param paymentDeclineEvidenceId the causing decline event's envelope id, once payment is declined
  */
@@ -29,6 +33,7 @@ public record OrderFulfilmentState(
     String orderId,
     Step step,
     String reservationId,
+    String paymentOperationId,
     String paymentDeclineCode,
     String paymentDeclineEvidenceId)
     implements HasStep {
@@ -76,15 +81,35 @@ public record OrderFulfilmentState(
 
   public OrderFulfilmentState withStep(Step next) {
     return new OrderFulfilmentState(
-        orderId, next, reservationId, paymentDeclineCode, paymentDeclineEvidenceId);
+        orderId,
+        next,
+        reservationId,
+        paymentOperationId,
+        paymentDeclineCode,
+        paymentDeclineEvidenceId);
   }
 
   public OrderFulfilmentState reserved(String reservationId, Step next) {
     return new OrderFulfilmentState(
-        orderId, next, reservationId, paymentDeclineCode, paymentDeclineEvidenceId);
+        orderId,
+        next,
+        reservationId,
+        paymentOperationId,
+        paymentDeclineCode,
+        paymentDeclineEvidenceId);
+  }
+
+  /**
+   * Records the operation id the flow's {@code RequestPayment} was minted with, so the decision
+   * that later abandons the wait can void the same operation (issue-00144).
+   */
+  public OrderFulfilmentState paymentRequested(String operationId) {
+    return new OrderFulfilmentState(
+        orderId, step, reservationId, operationId, paymentDeclineCode, paymentDeclineEvidenceId);
   }
 
   public OrderFulfilmentState declined(String declineCode, String declineEvidenceId, Step next) {
-    return new OrderFulfilmentState(orderId, next, reservationId, declineCode, declineEvidenceId);
+    return new OrderFulfilmentState(
+        orderId, next, reservationId, paymentOperationId, declineCode, declineEvidenceId);
   }
 }

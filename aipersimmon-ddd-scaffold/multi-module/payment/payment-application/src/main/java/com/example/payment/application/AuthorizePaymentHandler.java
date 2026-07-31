@@ -83,7 +83,21 @@ public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment,
       case PaymentDecision.Declined declined ->
           integrationEvents.publish(
               new PaymentDeclined(command.orderId(), declined.code(), declined.reason()), context);
+      // The refusal-in-advance (issue-00144): ordering abandoned this operation before the
+      // authorization arrived, and the void it sent won the operation row. Announcing a decline
+      // keeps the outcome contract intact — every AuthorizePayment gets an answer — and the
+      // announcement is harmless by construction: the flow that abandoned the wait ignores it.
+      case PaymentDecision.Voided ignored ->
+          integrationEvents.publish(
+              new PaymentDeclined(
+                  command.orderId(),
+                  VOIDED_CODE,
+                  "the operation was voided before it was authorized"),
+              context);
     }
     return null;
   }
+
+  /** Announced when an authorization loses its race against ordering's void. */
+  static final String VOIDED_CODE = "payment.voided";
 }

@@ -50,4 +50,16 @@ public interface PaymentOperations {
    * transaction back so the redelivery can republish the winner's decision.
    */
   void record(String operationId, PaymentDecision decision);
+
+  /**
+   * Turn an {@code Authorized} outcome into {@code Voided}, in the caller's transaction — the one
+   * sanctioned rewrite of a recorded decision (issue-00144): releasing a hold is undoing the
+   * irreversible act's reservation, not re-deciding it. A no-op unless the current outcome is
+   * {@code Authorized}, so a redelivered void, a void racing a decline, or a void of an operation
+   * something else already voided all fall through harmlessly.
+   *
+   * <p>Voiding an operation nothing has recorded yet is {@code record(id, Voided)} — the ordinary
+   * claim, resolved by the same primary key when it races the authorization's own insert.
+   */
+  void markVoided(String operationId);
 }

@@ -69,6 +69,7 @@ class PaymentTimeoutFlowTest {
   @Autowired Stocks stocks;
   @Autowired DefaultProcessQuery process;
   @Autowired TimeoutRecorder recorder;
+  @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   /**
    * The payment context's inbound adapter, replaced by one that does nothing. A bean override
@@ -118,6 +119,24 @@ class PaymentTimeoutFlowTest {
               assertEquals("ORDER_CANCELLED", view.outcome().orElseThrow().value());
               assertEquals("CANCELLED", view.step().value());
             });
+
+    // The other half of abandoning the wait (issue-00144): payment never answered, but its
+    // authorization may still be in flight somewhere — so the same decision that gave up also
+    // voided the operation. With payment's inbound adapter silenced, nothing was ever recorded
+    // for this operation, so the void's record lands as the refusal-in-advance: a VOIDED row.
+    // An AuthorizePayment arriving after this — however late — finds it and cannot authorize.
+    await()
+        .atMost(SETTLE)
+        .untilAsserted(
+            () ->
+                assertEquals(
+                    1,
+                    jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM payment.payment_operations WHERE outcome = 'VOIDED'",
+                        Integer.class),
+                    "abandoning the payment wait must void the operation it opened — the whole"
+                        + " round trip: process effect, ordering command, integration event over"
+                        + " Kafka, payment's operation row"));
   }
 
   private int available(String sku) {

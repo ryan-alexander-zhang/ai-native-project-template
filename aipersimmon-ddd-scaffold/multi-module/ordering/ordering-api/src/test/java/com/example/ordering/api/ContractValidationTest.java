@@ -108,6 +108,14 @@ class ContractValidationTest {
     assertThrows(IllegalArgumentException.class, () -> new StockReleaseRequested("o-1", " "));
   }
 
+  // ---- PaymentVoidRequested ----
+
+  @Test
+  void paymentVoidRequestedRefusesBlankIdentifiers() {
+    assertThrows(IllegalArgumentException.class, () -> new PaymentVoidRequested(null, "op-1"));
+    assertThrows(IllegalArgumentException.class, () -> new PaymentVoidRequested("o-1", " "));
+  }
+
   // ---- The linchpin: how a refusal reaches the consumer's error handler ----
 
   @Test
