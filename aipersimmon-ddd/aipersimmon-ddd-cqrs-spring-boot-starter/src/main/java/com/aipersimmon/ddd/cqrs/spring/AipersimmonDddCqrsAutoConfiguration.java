@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
+import com.aipersimmon.ddd.cqrs.CommandPrecheck;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
 import com.aipersimmon.ddd.cqrs.UnitOfWork;
@@ -73,6 +74,15 @@ public class AipersimmonDddCqrsAutoConfiguration {
   @ConditionalOnMissingBean
   public ConcurrencyTranslationCommandInterceptor concurrencyTranslationCommandInterceptor() {
     return new ConcurrencyTranslationCommandInterceptor();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public PrecheckCommandInterceptor precheckCommandInterceptor(
+      ObjectProvider<CommandPrecheck<?>> prechecks) {
+    // A supplier for the same reason as the buses below: a precheck may take the bus in its
+    // constructor, and resolving the provider here would instantiate it against a half-built one.
+    return new PrecheckCommandInterceptor(() -> prechecks.stream().toList());
   }
 
   @Bean
