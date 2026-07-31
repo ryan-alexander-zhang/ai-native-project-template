@@ -2,7 +2,7 @@
 id: issue-00139-the-query-bus-kept-the-mine-the-command-bus-defused
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 命令总线专门拆掉的那颗雷，查询总线原样留着
@@ -39,4 +39,13 @@ status: open
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，与改法预测一致（`Supplier` + double-checked registry +
+`SmartInitializingSingleton` 原样搬运；eager-list 构造器保留为委托重载，零 API 破坏；
+auto-configuration 的 `queryBus` bean 改传 `() -> handlers.stream().toList()`）。
+
+红在先：新回归测试 `HandlerInjectingTheQueryBusStartsUpTest`（镜像命令侧同名测试）修复前
+全部报 `BeanCurrentlyInCreationException`（surefire 报告核实：`queryBus` 工厂方法在创建期
+索取尚在创建中的 `outerHandler`）。修复后三条全绿：组合式 handler 注入 bus 可启动、
+无 handler 查询仍在分发期拒绝、同一查询类型双 handler 仍在启动期（`afterSingletonsInstantiated`）
+失败。库内 `RegistryQueryBus` 无其他直接引用（全仓 grep 核实）。模块 23 测试全绿；
+库全 reactor `clean install` BUILD SUCCESS。

@@ -98,7 +98,10 @@ public class AipersimmonDddCqrsAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean
   public QueryBus queryBus(ObjectProvider<QueryHandler<?, ?>> handlers) {
-    return new RegistryQueryBus(handlers.stream().toList());
+    // A supplier for the same reason as the command bus above: resolving the provider here would
+    // instantiate every handler while this bean is still being created, and a composite handler
+    // that takes the bus in its constructor would be handed a half-built one.
+    return new RegistryQueryBus(() -> handlers.stream().toList());
   }
 
   /**
