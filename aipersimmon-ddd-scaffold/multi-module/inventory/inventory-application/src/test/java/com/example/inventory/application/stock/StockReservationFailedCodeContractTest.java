@@ -3,10 +3,9 @@ package com.example.inventory.application.stock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
-import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import com.aipersimmon.ddd.test.RecordingIntegrationEvents;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
@@ -14,7 +13,6 @@ import com.example.inventory.domain.stock.Reservations;
 import com.example.inventory.domain.stock.Sku;
 import com.example.inventory.domain.stock.Stock;
 import com.example.inventory.domain.stock.Stocks;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -44,7 +42,7 @@ class StockReservationFailedCodeContractTest {
         new ReserveStock("order-1", List.of(new ReserveStock.Line("SKU-1", 0))),
         CommandContext.root(Tenants.of("demo"), "msg-1"));
 
-    StockReservationFailed failed = (StockReservationFailed) events.published.get(0);
+    StockReservationFailed failed = (StockReservationFailed) events.events().get(0);
     assertNotNull(failed.code(), "the contract promises a machine-readable code, never null");
     assertEquals("inventory.unspecified", failed.code());
   }
@@ -67,14 +65,5 @@ class StockReservationFailedCodeContractTest {
 
     @Override
     public void save(Reservation reservation) {}
-  }
-
-  private static final class RecordingIntegrationEvents implements IntegrationEvents {
-    private final List<IntegrationEvent> published = new ArrayList<>();
-
-    @Override
-    public void publish(IntegrationEvent event, CommandContext context) {
-      published.add(event);
-    }
   }
 }

@@ -287,6 +287,13 @@
       <!-- Note: aipersimmon-ddd-quality-config (the shared PMD/SpotBugs rulesets) is
            deliberately NOT listed here — it is a plugin-classpath artifact, never a normal
            dependency, so a BOM entry would wrongly imply it is consumable. -->
+      <!-- In-memory fakes for the framework's ports plus the @WithTenant JUnit extension;
+           consumers add it at test scope. -->
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-test</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <!-- Reusable Testcontainers support (singleton containers + Spring Boot
            @ServiceConnection configs); consumers add it at test scope. -->
       <dependency>

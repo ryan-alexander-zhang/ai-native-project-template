@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
-import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import com.aipersimmon.ddd.test.RecordingIntegrationEvents;
 import com.example.payment.api.PaymentAuthorized;
 import com.example.payment.api.PaymentDeclined;
 import com.example.payment.domain.CeilingAuthorizationPolicy;
@@ -60,11 +60,11 @@ class AuthorizePaymentIdempotencyTest {
         "the irreversible act happens once — that is what the operation log is for");
     assertEquals(
         2,
-        events.published.size(),
+        events.events().size(),
         "but the outcome is announced on every delivery: the first announcement may never have"
             + " arrived, and a silent redelivery would strand the flow waiting on it");
-    assertInstanceOf(PaymentAuthorized.class, events.published.get(0));
-    assertInstanceOf(PaymentAuthorized.class, events.published.get(1));
+    assertInstanceOf(PaymentAuthorized.class, events.events().get(0));
+    assertInstanceOf(PaymentAuthorized.class, events.events().get(1));
   }
 
   @Test
@@ -75,11 +75,11 @@ class AuthorizePaymentIdempotencyTest {
     handler.handle(authorize, CommandContext.root(Tenants.ROOT, "cmd-2"));
 
     assertEquals(1, operations.records);
-    assertEquals(2, events.published.size());
+    assertEquals(2, events.events().size());
     // The recorded decision is replayed rather than recomputed, so a rule or ceiling that changed
     // between deliveries cannot give one operation two different outcomes.
-    PaymentDeclined first = assertInstanceOf(PaymentDeclined.class, events.published.get(0));
-    PaymentDeclined replayed = assertInstanceOf(PaymentDeclined.class, events.published.get(1));
+    PaymentDeclined first = assertInstanceOf(PaymentDeclined.class, events.events().get(0));
+    PaymentDeclined replayed = assertInstanceOf(PaymentDeclined.class, events.events().get(1));
     assertEquals(CeilingAuthorizationPolicy.DECLINE_CODE, first.code());
     assertEquals(first.code(), replayed.code(), "the same decision, not a fresh one");
     assertEquals(first.reason(), replayed.reason());
@@ -95,7 +95,7 @@ class AuthorizePaymentIdempotencyTest {
         CommandContext.root(Tenants.ROOT, "cmd-4"));
 
     assertEquals(2, operations.records, "different operation ids are different authorizations");
-    assertEquals(2, events.published.size());
+    assertEquals(2, events.events().size());
   }
 
   /**
@@ -114,7 +114,7 @@ class AuthorizePaymentIdempotencyTest {
             handler.handle(
                 new AuthorizePayment("order-5", "op-race", UNDER_CEILING, "USD"),
                 CommandContext.root(Tenants.ROOT, "cmd-5")));
-    assertEquals(0, events.published.size(), "the loser announces nothing");
+    assertEquals(0, events.events().size(), "the loser announces nothing");
   }
 
   /** Stands in for the table: {@code record} rejects a duplicate the way the primary key does. */
@@ -141,15 +141,6 @@ class AuthorizePaymentIdempotencyTest {
     void hideFromFind(String operationId) {
       hidden.add(operationId);
       records = 0;
-    }
-  }
-
-  private static final class RecordingIntegrationEvents implements IntegrationEvents {
-    private final List<IntegrationEvent> published = new ArrayList<>();
-
-    @Override
-    public void publish(IntegrationEvent event, CommandContext context) {
-      published.add(event);
     }
   }
 }

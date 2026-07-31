@@ -73,6 +73,13 @@
       <artifactId>spring-boot-starter-validation</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The framework port fakes (RecordingCommandBus / RecordingIntegrationEvents), maintained
+         by the framework so their identity semantics match the real implementations. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

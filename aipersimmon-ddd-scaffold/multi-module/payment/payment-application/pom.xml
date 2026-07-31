@@ -70,6 +70,13 @@
       <scope>test</scope>
     </dependency>
     <!-- Unit test for authorization idempotency: exercises the handler with a local operation-log fake. -->
+    <!-- The framework port fakes (RecordingCommandBus / RecordingIntegrationEvents), maintained
+         by the framework so their identity semantics match the real implementations. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

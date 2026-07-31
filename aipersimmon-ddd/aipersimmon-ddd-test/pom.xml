@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The framework's ports, as test doubles the framework itself maintains (issue-00140).
+
+    A port without an official fake is a port every consuming team re-invents — and a fake
+    CommandBus is easy to get subtly wrong: forget to mint message ids and causation assertions
+    pass vacuously; derive on sendAs and redelivery dedup can never be tested. These fakes keep
+    the semantics of the real implementations (same mint/derive/verbatim rules as
+    RegistryCommandBus, same envelope construction as SpringIntegrationEvents) so a unit test
+    exercises the contract the deployment will actually run — with no Spring context and no
+    Docker.
+
+    Deliberately separate from aipersimmon-ddd-test-support: that module is container
+    infrastructure (Testcontainers singletons + @ServiceConnection), pulled only by tests that
+    need a real database or broker. This one is plain objects. Consumers add either — or both —
+    at test scope.
+  -->
+  <artifactId>aipersimmon-ddd-test</artifactId>
+  <name>aipersimmon-ddd-test</name>
+  <description>In-memory fakes for the framework's ports (CommandBus, IntegrationEvents, UnitOfWork, Inbox) and the @WithTenant JUnit 5 extension.</description>
+
+  <dependencies>
+    <!-- The ports being faked. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-cqrs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-application</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-integration</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- TenantContext binding for the fakes' ambient-tenant semantics and @WithTenant. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Compile scope on purpose: the @WithTenant extension implements JUnit callbacks, and this
+         whole artifact only ever appears on a consumer's TEST classpath anyway. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -3,17 +3,14 @@ package com.example.inventory.adapter.messaging;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.aipersimmon.ddd.cqrs.Command;
-import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
-import com.aipersimmon.ddd.tenancy.Tenants;
+import com.aipersimmon.ddd.test.RecordingCommandBus;
 import com.example.inventory.application.stock.ReserveStock;
 import com.example.ordering.api.OrderReadyForFulfilment;
 import com.example.ordering.api.OrderReadyForFulfilmentV1;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -28,8 +25,9 @@ import org.junit.jupiter.api.Test;
  * or drifted. This test is the only thing standing between "we support both revisions" and "we
  * believe we support both revisions".
  *
- * <p>No Spring context: the listener is constructed directly over a recording bus, because what is
- * under test is the translation, not the wiring.
+ * <p>No Spring context: the listener is constructed directly over the framework's {@link
+ * RecordingCommandBus} (issue-00140), because what is under test is the translation, not the
+ * wiring.
  */
 class OrderReadyForFulfilmentVersionsTest {
 
@@ -60,10 +58,11 @@ class OrderReadyForFulfilmentVersionsTest {
                     new OrderReadyForFulfilmentV1.Line("SKU-2", 1))),
             1));
 
-    assertEquals(2, bus.sent.size(), "each revision should have produced exactly one command");
     assertEquals(
-        bus.sent.get(0),
-        bus.sent.get(1),
+        2, bus.commands().size(), "each revision should have produced exactly one command");
+    assertEquals(
+        bus.commands().get(0),
+        bus.commands().get(1),
         "a v1 and a v2 message describing the same order must reach the application layer as the"
             + " same command — if these differ, a rollout would reserve stock differently depending"
             + " on which revision happened to arrive");
@@ -77,7 +76,7 @@ class OrderReadyForFulfilmentVersionsTest {
                 ORDER, List.of(new OrderReadyForFulfilmentV1.Line("SKU-1", 3))),
             1));
 
-    ReserveStock reservation = (ReserveStock) bus.sent.getFirst();
+    ReserveStock reservation = bus.commandsOf(ReserveStock.class).getFirst();
     assertEquals(ORDER, reservation.orderId());
     assertEquals(List.of(new ReserveStock.Line("SKU-1", 3)), reservation.lines());
   }
@@ -99,8 +98,8 @@ class OrderReadyForFulfilmentVersionsTest {
 
     // Why the ACL receives the envelope and not just the payload: the reservation stays attached to
     // the chain that caused it, and a retired revision must not quietly lose that.
-    assertEquals(2, bus.contexts.size());
-    for (CommandContext context : bus.contexts) {
+    assertEquals(2, bus.contexts().size());
+    for (CommandContext context : bus.contexts()) {
       assertNotNull(context, "an inbound translation must carry the causal context across");
     }
   }
@@ -117,24 +116,5 @@ class OrderReadyForFulfilmentVersionsTest {
         "corr-1",
         "cause-1",
         payload);
-  }
-
-  /** Records what reached the application layer, which is the only thing these tests assert on. */
-  private static final class RecordingCommandBus implements CommandBus {
-
-    private final List<Command<?>> sent = new ArrayList<>();
-    private final List<CommandContext> contexts = new ArrayList<>();
-
-    @Override
-    public <R> R send(Command<R> command) {
-      return send(command, CommandContext.root(Tenants.of("demo"), "test"));
-    }
-
-    @Override
-    public <R> R send(Command<R> command, CommandContext context) {
-      sent.add(command);
-      contexts.add(context);
-      return null;
-    }
   }
 }

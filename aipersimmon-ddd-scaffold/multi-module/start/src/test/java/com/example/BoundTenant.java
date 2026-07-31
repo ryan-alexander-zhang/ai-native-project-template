@@ -21,6 +21,12 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * tenants (two tenants not seeing each other, a tenant reaching the audit row) should call {@code
  * TenantContext.runAs} explicitly instead, so the tenant it operates as is visible at the
  * assertion.
+ *
+ * <p>For plain binding the framework now ships {@code com.aipersimmon.ddd.test.WithTenant}
+ * (issue-00140) — a unit test that just needs a tenant uses that annotation and writes no
+ * extension. This class remains because these acceptance tests need one more thing welded to the
+ * same lifecycle: Awaitility must poll on the calling thread, or the binding would not reach the
+ * tenant-scoped reads inside the poll.
  */
 final class BoundTenant implements BeforeEachCallback, AfterEachCallback {
 

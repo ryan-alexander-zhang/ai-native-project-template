@@ -127,6 +127,10 @@
          framework's cross-cutting web contracts (RFC 9457 problem responses, pagination, headers). -->
     <module>aipersimmon-ddd-openapi-spring-boot-starter</module>
     <module>aipersimmon-ddd-archunit</module>
+    <!-- In-memory fakes for the framework's ports (CommandBus, IntegrationEvents, UnitOfWork,
+         Inbox) plus the @WithTenant JUnit extension; consumers add it at test scope. No
+         containers here — that is test-support's job. -->
+    <module>aipersimmon-ddd-test</module>
     <!-- Reusable Testcontainers support (singleton containers + Spring Boot
          @ServiceConnection configs); consumers add it at test scope. -->
     <module>aipersimmon-ddd-test-support</module>

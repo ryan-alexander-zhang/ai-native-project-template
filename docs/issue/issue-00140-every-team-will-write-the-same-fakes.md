@@ -2,7 +2,7 @@
 id: issue-00140-every-team-will-write-the-same-fakes
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 框架定义了六个端口，每个消费团队都得自己手搓同一批 fake
@@ -46,4 +46,30 @@ scaffold 全面换用，作为用法示范。
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复。新模块 **`aipersimmon-ddd-test`**（与装容器的 test-support 刻意分开：一个是
+纯对象，一个是 Testcontainers 基建；消费方按需各自 test scope 引入），五件套 + 自测 18 条：
+
+- **`RecordingCommandBus`**：保真三条身份规则——`send` 铸 root（环境租户 + 新 correlation）、
+  `send(cause)` deriveChild、`sendAs` **原样不铸**（重投去重可测的前提）；`Dispatch(command,
+  context, kind)` 记录 + `commandsOf`/`contexts` 读取 + `returning` 打桩。
+- **`RecordingIntegrationEvents`**：录完整 `EventEnvelope` 而非裸载荷，信封构造与
+  `SpringIntegrationEvents`/outbox writer 同一套规则，经框架自己的 `@EventType` 静态读取器——
+  缺注解在测试里就按生产方式炸（`IllegalStateException`）；contract source 覆盖部署默认、
+  `publishAs` 原样保 id；固定 Clock 使断言确定。
+- **`ImmediateUnitOfWork`**（直通 + 边界计数）、**`InMemoryInbox`**（守住 `(source, messageKey)`
+  **对**为身份的契约微妙处；javadoc 言明无事务性——需要回滚语义的是集成测试）。
+- **`@WithTenant`** + extension：类/方法级绑定（方法覆盖类）、afterEach **无条件**清理（测试
+  中途改绑也不泄漏，有顺序化测试钉住）；值经 `Tenants.fromValue` 信任边界读取。
+
+scaffold 全面换用作为示范（issue 的验收标尺）：inventory-adapter 的手写 `RecordingCommandBus`、
+payment-application 与 inventory-application 的两份手写 `RecordingIntegrationEvents` 全部删除，
+三个 pom 各加一行 test 依赖，行数净减且断言面变宽（如 `commandsOf(ReserveStock.class)` 取代
+强转）。库自身 dogfood：`RecordingCommandBusTest` 就用 `@WithTenant("acme")`。
+
+**在案边界**：(a) scaffold 的 `RecordingHandler`/`RecordingQueries`/`FakePaymentOperations`
+是应用自己端口的 fake，不属框架交付物，保留；(b) start 的 `BoundTenant` 保留——它在同一
+生命周期上还焊了 Awaitility 同线程轮询（scaffold 私有关注点），javadoc 已标注纯绑定场景
+应改用 `@WithTenant`。
+
+验证：`aipersimmon-ddd-test` 模块 18 测全绿并过全部质量门禁；库全 reactor `clean install`
+BUILD SUCCESS；scaffold `clean test -pl start -am` 验收套件 BUILD SUCCESS。
