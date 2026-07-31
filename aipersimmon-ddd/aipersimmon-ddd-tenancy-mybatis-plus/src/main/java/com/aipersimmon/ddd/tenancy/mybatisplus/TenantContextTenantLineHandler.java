@@ -19,14 +19,30 @@ import net.sf.jsqlparser.expression.StringValue;
 public final class TenantContextTenantLineHandler implements TenantLineHandler {
 
   private final String tenantColumn;
-  private final Set<String> tenantTables;
+
+  /** Entries without a schema qualifier: match the table name whatever schema it resolves to. */
+  private final Set<String> bareTables;
+
+  /**
+   * Entries with a schema qualifier ({@code ordering.orders}): match only that schema's table, so
+   * two contexts with a same-named table can scope one without scoping the other. They claim only
+   * schema-qualified references — an unqualified reference cannot prove which schema it resolves
+   * to, and guessing would scope a table nobody opted in.
+   */
+  private final Set<String> qualifiedTables;
 
   public TenantContextTenantLineHandler(String tenantColumn, Collection<String> tenantTables) {
     this.tenantColumn = tenantColumn;
-    this.tenantTables =
+    Set<String> cleaned =
         tenantTables.stream()
-            .map(TenantContextTenantLineHandler::normalize)
+            .map(TenantContextTenantLineHandler::clean)
             .collect(Collectors.toUnmodifiableSet());
+    this.bareTables =
+        cleaned.stream()
+            .filter(name -> !name.contains("."))
+            .collect(Collectors.toUnmodifiableSet());
+    this.qualifiedTables =
+        cleaned.stream().filter(name -> name.contains(".")).collect(Collectors.toUnmodifiableSet());
   }
 
   @Override
@@ -45,16 +61,23 @@ public final class TenantContextTenantLineHandler implements TenantLineHandler {
    */
   @Override
   public boolean ignoreTable(String tableName) {
-    return !tenantTables.contains(normalize(tableName));
+    String cleaned = clean(tableName);
+    if (qualifiedTables.contains(cleaned)) {
+      return false;
+    }
+    int dot = cleaned.lastIndexOf('.');
+    String bare = dot >= 0 ? cleaned.substring(dot + 1) : cleaned;
+    return !bareTables.contains(bare);
   }
 
-  /** Strip any schema qualifier and identifier quoting, and lower-case, for a stable comparison. */
-  private static String normalize(String tableName) {
-    String name = tableName.replace("`", "").replace("\"", "").replace("[", "").replace("]", "");
-    int dot = name.lastIndexOf('.');
-    if (dot >= 0) {
-      name = name.substring(dot + 1);
-    }
-    return name.trim().toLowerCase(Locale.ROOT);
+  /** Strip identifier quoting and lower-case, keeping any schema qualifier for exact matching. */
+  private static String clean(String tableName) {
+    return tableName
+        .replace("`", "")
+        .replace("\"", "")
+        .replace("[", "")
+        .replace("]", "")
+        .trim()
+        .toLowerCase(Locale.ROOT);
   }
 }

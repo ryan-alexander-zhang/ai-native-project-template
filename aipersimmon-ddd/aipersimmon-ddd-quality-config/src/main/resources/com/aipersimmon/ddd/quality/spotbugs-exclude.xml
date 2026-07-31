@@ -92,6 +92,7 @@
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore"/>
+      <Class name="com.aipersimmon.ddd.tenancy.mybatisplus.TenantTableRegistrationGuard"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessDeadlineStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessEffectStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessInstanceStore"/>

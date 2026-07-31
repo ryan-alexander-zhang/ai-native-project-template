@@ -2,7 +2,7 @@
 id: issue-00132-a-table-nobody-registered-is-visible-to-everyone
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 忘记登记的租户表，对所有租户可见——而且没人会发现
@@ -46,7 +46,23 @@ status: open
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复。设计比 issue 原方案多一个关键概念：守卫要求的不是"每张表都走拦截器"，而是
+**"每张表的租户策略都是一个在案的决定"**——带 `tenant_id` 的基表必须出现在 `tenant-tables`
+（拦截器管）或新增的 `exempt-tables`（仓储自管，如 dedupe 日志从无租户绑定的路径也要写入）
+二者之一，否则启动失败。豁免的第三类是结构性的：`aipersimmon_*` 框架表（relay 无租户扫描、
+租户是数据列）与视图（拦截器改写的是基表语句）按构造排除，不占用配置。
+
+- 库侧：`TenantTableRegistrationGuard`（查 `information_schema.columns ⋈ tables`，
+  `BASE TABLE` 限定，系统 schema 排除）+ `guard-tables` 属性（默认开）+
+  `SmartInitializingSingleton` 装配（迁移之后执行）；`TenantContextTenantLineHandler` 支持
+  schema 限定条目（`ordering.orders` 只圈定该 schema；裸条目保持历史语义）。测试红在先
+  （类不存在），`TenantTableRegistrationGuardTest` 三条 + handler 限定条目一条为回归守卫。
+- **真实负向对照**：装库后未改 scaffold 配置直接跑 `ApplicationSmokeTest`，守卫当场拒绝启动，
+  报文精确命名 `payment.payment_operations`——正是本仓库里那张已知的手管租户表。加
+  `exempt-tables: [payment_operations]`（含理由注释）后 ApplicationSmokeTest +
+  TwoTenantAcceptanceTest 绿，全量 start 套件绿。
+
+`normalize` 剥 schema 的附带问题一并解决（见上 handler 限定条目）。
 
 ## 关联
 

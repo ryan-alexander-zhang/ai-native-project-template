@@ -4,8 +4,12 @@ import com.aipersimmon.ddd.mybatisplus.AipersimmonDddMybatisPlusAutoConfiguratio
 import com.aipersimmon.ddd.tenancy.TenantEnforcement;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
+import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -64,5 +68,29 @@ public class AipersimmonDddTenancyMybatisPlusAutoConfiguration {
     return new TenantLineInnerInterceptor(
         new TenantContextTenantLineHandler(
             properties.getTenantColumn(), properties.getTenantTables()));
+  }
+
+  /**
+   * Runs the {@link TenantTableRegistrationGuard} once every singleton is up — after migrations, so
+   * the schema it inspects is the one the application will run against. A {@code
+   * SmartInitializingSingleton} rather than eager bean init, because the guard needs the fully
+   * migrated database, not the bean graph.
+   */
+  @Bean
+  @ConditionalOnBean(DataSource.class)
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.tenancy.mybatis-plus",
+      name = "guard-tables",
+      havingValue = "true",
+      matchIfMissing = true)
+  SmartInitializingSingleton aipersimmonTenantTableRegistrationGuard(
+      ObjectProvider<DataSource> dataSource, TenancyMybatisPlusProperties properties) {
+    return () ->
+        new TenantTableRegistrationGuard(
+                dataSource.getObject(),
+                properties.getTenantColumn(),
+                properties.getTenantTables(),
+                properties.getExemptTables())
+            .verify();
   }
 }

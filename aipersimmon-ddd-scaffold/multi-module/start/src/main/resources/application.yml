@@ -226,6 +226,14 @@ aipersimmon:
           - stocks
           - reservations
           - reservation_lines
+        # Tables that carry tenant_id but are deliberately NOT interceptor-scoped. The startup
+        # guard requires every tenant-carrying table to appear in exactly one of these two lists,
+        # because a table in neither gets NO tenant predicate at all — every tenant would see
+        # every tenant's rows, silently (issue-00132). payment_operations is written from paths
+        # with and without a bound tenant, so MyBatisPaymentOperations stamps and filters the
+        # column itself (see its tenant() method and PaymentOperationTenantScopeTest).
+        exempt-tables:
+          - payment_operations
 
 # OpenTelemetry. What is exported and how it is instrumented is a decision and lives here; WHERE it
 # is exported to is an address and lives in the profile files.

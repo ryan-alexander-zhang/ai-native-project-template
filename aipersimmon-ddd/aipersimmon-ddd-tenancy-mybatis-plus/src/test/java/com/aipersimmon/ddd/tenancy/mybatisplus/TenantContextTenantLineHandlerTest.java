@@ -65,6 +65,24 @@ class TenantContextTenantLineHandlerTest {
     assertThat(handler.ignoreTable("order_line")).isFalse();
   }
 
+  /**
+   * A schema-qualified entry scopes exactly one schema's table. A bare entry keeps its historical
+   * meaning — it matches the table name in any schema — which is also why two contexts with a
+   * same-named table need the qualified form to scope only one of them.
+   */
+  @Test
+  void aSchemaQualifiedEntryScopesOnlyThatSchema() {
+    TenantContextTenantLineHandler qualified =
+        new TenantContextTenantLineHandler("tenant_id", List.of("ordering.orders"));
+
+    assertThat(qualified.ignoreTable("ordering.orders")).isFalse();
+    assertThat(qualified.ignoreTable("\"ordering\".\"Orders\"")).isFalse();
+    assertThat(qualified.ignoreTable("inventory.orders")).isTrue();
+    // An unqualified reference cannot prove which schema it resolves to, so a qualified entry
+    // does not claim it.
+    assertThat(qualified.ignoreTable("orders")).isTrue();
+  }
+
   @Test
   void anEmptyAllowListIgnoresEverything() {
     TenantContextTenantLineHandler empty =

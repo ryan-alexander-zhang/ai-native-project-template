@@ -40,11 +40,43 @@ public class TenancyMybatisPlusProperties {
     this.tenantColumn = tenantColumn;
   }
 
+  /**
+   * Tables that carry the {@link #tenantColumn} but are deliberately NOT interceptor-scoped,
+   * because their repository stamps and filters the column itself (a dedup log written from paths
+   * with and without a bound tenant, say). Listing a table here is a statement of intent the {@link
+   * TenantTableRegistrationGuard} accepts; leaving a tenant-carrying table in neither list fails
+   * startup, because an unregistered table gets no tenant predicate at all.
+   */
+  private List<String> exemptTables = new ArrayList<>();
+
+  /**
+   * Whether to verify at startup that every base table carrying the {@link #tenantColumn} appears
+   * in {@link #tenantTables} or {@link #exemptTables}. On by default: the allow-list fails open, so
+   * its completeness is exactly the kind of property a machine should check.
+   */
+  private boolean guardTables = true;
+
   public List<String> getTenantTables() {
     return tenantTables;
   }
 
   public void setTenantTables(List<String> tenantTables) {
     this.tenantTables = tenantTables;
+  }
+
+  public List<String> getExemptTables() {
+    return exemptTables;
+  }
+
+  public void setExemptTables(List<String> exemptTables) {
+    this.exemptTables = exemptTables;
+  }
+
+  public boolean isGuardTables() {
+    return guardTables;
+  }
+
+  public void setGuardTables(boolean guardTables) {
+    this.guardTables = guardTables;
   }
 }
