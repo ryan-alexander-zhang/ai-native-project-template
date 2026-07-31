@@ -291,10 +291,11 @@ class OrderListPagingTest {
             TENANT,
             "any-order-id");
     assertTrue(
-        linesPlan.contains("order_lines_by_order"),
+        linesPlan.contains("order_lines_one_line_per_sku"),
         () ->
             "the join/child-read side needs its own index — PostgreSQL does not index the child"
-                + " side of a foreign key:\n"
+                + " side of a foreign key. Since V1_7 that index is the one-line-per-SKU unique"
+                + " key, whose (tenant_id, order_id) prefix took over from order_lines_by_order:\n"
                 + linesPlan);
   }
 

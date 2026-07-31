@@ -35,10 +35,17 @@ import org.springframework.context.annotation.Configuration;
     havingValue = "true")
 public class PaymentOperationCleanupConfig {
 
+  /**
+   * Takes the application's {@link Clock} bean rather than constructing {@code Clock.systemUTC()}
+   * here (issue-00146): the cutoff this computes closes the same window {@code recorded_at} opens,
+   * so both must read the same clock — the injected one every other time-dependent bean uses, and
+   * the one a test can freeze.
+   */
   @Bean
   PaymentOperationCleanup paymentOperationCleanup(
       PaymentOperationMapper operations,
+      Clock clock,
       @Value("${payment.operations.cleanup.retention-seconds}") long retentionSeconds) {
-    return new PaymentOperationCleanup(operations, Clock.systemUTC(), retentionSeconds);
+    return new PaymentOperationCleanup(operations, clock, retentionSeconds);
   }
 }

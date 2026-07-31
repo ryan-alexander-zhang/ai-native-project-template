@@ -47,7 +47,8 @@ class PaymentOperationCleanupTest {
         String operationId,
         String outcome,
         String declineCode,
-        String declineReason) {
+        String declineReason,
+        Instant recordedAt) {
       throw new UnsupportedOperationException("not part of cleanup");
     }
 

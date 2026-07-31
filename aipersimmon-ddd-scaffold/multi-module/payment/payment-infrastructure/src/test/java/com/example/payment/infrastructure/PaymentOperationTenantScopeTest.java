@@ -32,7 +32,9 @@ class PaymentOperationTenantScopeTest {
   private static final TenantEnforcement ENFORCEMENT = new TenantEnforcement();
 
   private final RecordingMapper mapper = new RecordingMapper();
-  private final MyBatisPaymentOperations operations = new MyBatisPaymentOperations(mapper);
+  private final MyBatisPaymentOperations operations =
+      new MyBatisPaymentOperations(
+          mapper, java.time.Clock.fixed(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC));
 
   @AfterEach
   void resetTenancyMode() {
@@ -99,7 +101,8 @@ class PaymentOperationTenantScopeTest {
         String operationId,
         String outcome,
         String declineCode,
-        String declineReason) {
+        String declineReason,
+        java.time.Instant recordedAt) {
       recorded.add(tenantId + "/" + operationId);
     }
 

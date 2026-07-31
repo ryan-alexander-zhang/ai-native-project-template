@@ -43,14 +43,15 @@ public interface PaymentOperationMapper {
       INSERT INTO payment.payment_operations
              (tenant_id, operation_id, outcome, decline_code, decline_reason, recorded_at)
       VALUES (#{tenantId}, #{operationId}, #{outcome}, #{declineCode}, #{declineReason},
-              CURRENT_TIMESTAMP)
+              #{recordedAt})
       """)
   void record(
       @Param("tenantId") String tenantId,
       @Param("operationId") String operationId,
       @Param("outcome") String outcome,
       @Param("declineCode") String declineCode,
-      @Param("declineReason") String declineReason);
+      @Param("declineReason") String declineReason,
+      @Param("recordedAt") Instant recordedAt);
 
   /**
    * Turn an AUTHORIZED outcome into VOIDED (issue-00144). The {@code outcome = 'AUTHORIZED'}

@@ -3,6 +3,7 @@ package com.example.payment.infrastructure;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.example.payment.application.PaymentOperations;
 import com.example.payment.domain.PaymentDecision;
+import java.time.Clock;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -37,8 +38,16 @@ public class MyBatisPaymentOperations implements PaymentOperations {
 
   private final PaymentOperationMapper operations;
 
-  public MyBatisPaymentOperations(PaymentOperationMapper operations) {
+  /**
+   * The application's Clock bean, not the database's CURRENT_TIMESTAMP (issue-00146). recorded_at
+   * bounds the dedupe window and the cleanup expires by it with this same clock — one time source
+   * for writing the window and for closing it, and a test can freeze it.
+   */
+  private final Clock clock;
+
+  public MyBatisPaymentOperations(PaymentOperationMapper operations, Clock clock) {
     this.operations = operations;
+    this.clock = clock;
   }
 
   @Override
@@ -63,7 +72,8 @@ public class MyBatisPaymentOperations implements PaymentOperations {
       declineCode = declined.code();
       declineReason = declined.reason();
     }
-    operations.record(tenant(), operationId, outcomeOf(decision), declineCode, declineReason);
+    operations.record(
+        tenant(), operationId, outcomeOf(decision), declineCode, declineReason, clock.instant());
   }
 
   @Override

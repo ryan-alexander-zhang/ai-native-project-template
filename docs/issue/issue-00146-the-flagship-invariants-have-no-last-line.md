@@ -2,7 +2,7 @@
 id: issue-00146-the-flagship-invariants-have-no-last-line
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 项目自己论证过"约束要放绕不过的层"，旗舰不变量却没有最后一道防线
@@ -43,4 +43,41 @@ status: open
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，六项全做。新测试 `SchemaBackstopTest`（start，加入既有 @SpringBootTest
+属性组不增上下文，全部用 raw JdbcTemplate 写入——它就是约束要防的那条旁路）落地当刻
+**8 条全红**（5 失败 + 3 错误，逐条对应缺失的约束/列/索引），三个迁移 + 代码改动后 8/8 绿。
+
+1. **CHECK 约束**（inventory V2_6 + ordering V1_7）：`stocks.available >= 0`（防超卖规则
+   本体）、`reservation_lines.quantity > 0`、`order_lines.quantity > 0`、
+   `order_lines.unit_minor >= 0`——与 issue-00145 补的构造器守卫互为镜像：构造器管应用路径，
+   CHECK 管绕过应用的路径。
+2. **`UNIQUE (tenant_id, order_id, sku)`**（V1_7）：`OrderHasDistinctSkus` 内存执行、
+   reconstitute 不复跑（立场保留），DB 键是它在绕不过的层的镜像。**一个全量验收才暴露的
+   交互**：该唯一索引前缀 `(tenant_id, order_id)` 完全覆盖 V1_4 子侧索引
+   `order_lines_by_order` 的职责，planner 当即改选它，`OrderListPagingTest` 钉旧索引名的
+   计划断言变红——正确修法与 V2_5 同构：**替换而非并存**（两个索引干一件事 = 写放大 +
+   planner 掷硬币），V1_7 顺带 DROP 旧索引，计划断言改钉唯一索引。
+3. **清理索引——先测量后下结论（memory 教训执行）**：一次性 PG 18.1 容器造 200 万行
+   （保留 100 万），`EXPLAIN (ANALYZE, BUFFERS)`：无索引时每小时 purge 全表顺扫
+   **8,345 buffers / ~86ms**，且**空转轮（零行可删）同样 86ms**——成本跟着保留历史涨；
+   加 `recorded_at` 索引后典型轮 **18 buffers / 0.36ms**、空转轮 **3 buffers / 0.009ms**
+   ——成本只跟到期工作量走。主张成立，V3_2 建 `payment_operations_by_recorded_at`，
+   测试钉索引存在（量得的性质靠它存续）。
+4. **时钟统一**：`recorded_at` 改 **TIMESTAMPTZ**（V3_2，`USING ... AT TIME ZONE 'UTC'`——
+   旧值由 UTC 会话的 CURRENT_TIMESTAMP 写下，USING 是陈述不是假设）；写入从 DB 的
+   `CURRENT_TIMESTAMP` 改为 mapper 参数 + `MyBatisPaymentOperations` 注入 **Clock**；
+   `PaymentOperationCleanupConfig` 从 `Clock.systemUTC()` 硬造改为注入应用 Clock bean——
+   开窗与关窗同一只钟，且测试可冻结。列型由测试断言 `information_schema` =
+   'timestamp with time zone'。
+5. **`orders.created_at`**（V1_7，TIMESTAMPTZ NOT NULL；DEFAULT 只为回填、随手 DROP）：
+   落在**适配层**而非领域——`OrderDo.createdAt` + `FieldStrategy.NEVER`（创建时刻是事实
+   不是状态，任何后续 save 不碰它）+ `MyBatisOrders` 注入 Clock 在 toRow 盖章。**没有改
+   `Order.place` 签名**（在案）：issue 的诉求是审计/BI/对账可读的行级时间，适配层列完整
+   满足且领域与全部既有测试零波及。测试：真下单后断言列非空且≈当前时刻。
+6. **同 BC FK 取舍：加**（V1_7）：`orders (tenant_id, customer_id) REFERENCES customers`
+   ——同上下文同 schema 同事务，V1_4 的论证在边界内无反例；子侧索引 V1_4 的
+   `orders_by_customer_newest_first` 已覆盖。迁移注释同时写明**跨 BC 依旧不加 FK**（那条
+   线就是上下文边界）。全部 raw 造单的测试只 seed customers、订单走应用，无一受累。
+
+验证：`SchemaBackstopTest` 红→绿 8/8；scaffold 全量验收 `clean test -pl start -am`
+BUILD SUCCESS。

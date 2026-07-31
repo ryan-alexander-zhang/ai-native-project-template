@@ -11,6 +11,7 @@ import com.example.ordering.domain.order.OrderStatus;
 import com.example.ordering.domain.order.Orders;
 import com.example.ordering.domain.shared.Money;
 import com.example.ordering.domain.shared.Sku;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,10 +31,15 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
   private final OrderMapper orders;
   private final OrderLineMapper lines;
 
-  public MyBatisOrders(OrderMapper orders, OrderLineMapper lines, DomainEvents domainEvents) {
+  /** The application's single time source; stamps {@code created_at} on the first save. */
+  private final Clock clock;
+
+  public MyBatisOrders(
+      OrderMapper orders, OrderLineMapper lines, DomainEvents domainEvents, Clock clock) {
     super(orders, domainEvents);
     this.orders = orders;
     this.lines = lines;
+    this.clock = clock;
   }
 
   @Override
@@ -51,6 +57,9 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
     // definition and the currency rule (Money.plus refuses to mix) travels with it (issue-00083).
     header.setTotalMinor(order.total().amountMinor());
     header.setCurrency(order.total().currency());
+    // Stamped on every toRow but written only by the INSERT: the column's FieldStrategy.NEVER
+    // keeps updates from touching it, so the first save's instant is the one that persists.
+    header.setCreatedAt(clock.instant());
     return header;
   }
 
