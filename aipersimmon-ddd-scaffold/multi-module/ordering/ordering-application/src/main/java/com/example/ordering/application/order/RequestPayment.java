@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Ordering-internal command the process manager sends to ask the payment context to authorize
@@ -25,4 +26,5 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
         "Requested payment for order ${input.orderId} (operation ${input.paymentOperationId})",
     failure =
         "Payment request for order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
-public record RequestPayment(String orderId, String paymentOperationId) implements Command<Void> {}
+public record RequestPayment(@NotBlank String orderId, @NotBlank String paymentOperationId)
+    implements Command<Void> {}

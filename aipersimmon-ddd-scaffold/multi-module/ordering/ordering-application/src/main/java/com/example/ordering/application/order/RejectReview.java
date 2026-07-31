@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to reject the manual review of an order held in {@code AWAITING_REVIEW}, cancelling it.
@@ -22,4 +23,4 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
     success = "Rejected review for order ${input.orderId}",
     failure =
         "Rejecting review for order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
-public record RejectReview(String orderId) implements Command<Void> {}
+public record RejectReview(@NotBlank String orderId) implements Command<Void> {}

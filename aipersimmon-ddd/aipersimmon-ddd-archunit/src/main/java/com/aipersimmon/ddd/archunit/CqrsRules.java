@@ -2,10 +2,12 @@ package com.aipersimmon.ddd.archunit;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -102,6 +104,84 @@ public final class CqrsRules {
                 + "which is an application-layer responsibility, not domain, infrastructure, or "
                 + "interface work")
         .allowEmptyShould(true);
+  }
+
+  /**
+   * Every reference-typed component of a {@link Command} implementation declares a Bean Validation
+   * annotation — a constraint, or {@code @Valid} for a cascaded type.
+   *
+   * <p>The command bus promises a validation gate for <em>every</em> entry into the application —
+   * event listeners and process-manager relays included, not just HTTP — but the gate only checks
+   * what a command declares. Experience shows the declarations cluster on the commands a web
+   * adapter binds and quietly stop at the internal ones, precisely the commands whose callers no
+   * framework validates first; "which commands are validated" then becomes a question answered by
+   * opening files one at a time. This rule turns the convention into a mechanism: a bare component
+   * fails the build with its field name, not a code review with luck.
+   *
+   * <p>What the rule asks for is a <em>declaration</em>, not {@code @NotNull} everywhere. A
+   * deliberately optional component states so with a null-tolerant constraint (every standard
+   * constraint except the {@code @NotNull} family accepts null — {@code @Size}, {@code @Positive},
+   * {@code @Pattern} all do), so optionality is written down instead of left indistinguishable from
+   * an omission. Primitive components need nothing: they cannot be null, and any range they must
+   * sit in is a real constraint the author adds because it is true, not to satisfy a rule.
+   *
+   * <p>Opt-in rather than part of {@link AiPersimmonDddRules#all()} because it presumes the project
+   * validates commands with Bean Validation at all — true wherever the CQRS starter's validation
+   * interceptor is on the bus, but not something the framework-agnostic bundle may assume. Matches
+   * nothing (and so passes) in a project that has no commands.
+   */
+  public static ArchRule commandComponentsShouldDeclareValidationConstraints() {
+    return classes()
+        .that()
+        .implement(Command.class)
+        .should(declareAValidationAnnotationOnEveryReferenceTypedComponent())
+        .as(
+            "every reference-typed component of a command should declare a Bean Validation "
+                + "annotation (a constraint, or @Valid for a cascaded type)")
+        .because(
+            "the bus validates every entry into the application, but only what a command "
+                + "declares; an undeclared component makes 'is this required?' a question only "
+                + "the handler's source can answer, and internal commands — the ones no web "
+                + "framework validates first — are exactly where declarations go missing")
+        .allowEmptyShould(true);
+  }
+
+  private static ArchCondition<JavaClass>
+      declareAValidationAnnotationOnEveryReferenceTypedComponent() {
+    return new ArchCondition<>(
+        "declare a Bean Validation annotation on every reference-typed component") {
+      @Override
+      public void check(JavaClass command, ConditionEvents events) {
+        command.getFields().stream()
+            .filter(field -> !field.getModifiers().contains(JavaModifier.STATIC))
+            .filter(field -> !field.getModifiers().contains(JavaModifier.SYNTHETIC))
+            .filter(field -> !field.getRawType().isPrimitive())
+            .filter(
+                field ->
+                    field.getAnnotations().stream()
+                        .noneMatch(annotation -> declaresValidation(annotation.getRawType())))
+            .forEach(
+                field ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            field,
+                            field.getDescription()
+                                + " declares no Bean Validation annotation — required gets a "
+                                + "@NotNull-family constraint, deliberately optional gets a "
+                                + "null-tolerant one, a cascaded type gets @Valid")));
+      }
+    };
+  }
+
+  /**
+   * A Bean Validation declaration: {@code @Valid}, or any annotation carrying {@code @Constraint}
+   * (directly for the standard ones, possibly meta for composed custom constraints). Matched by
+   * name so this jar never depends on jakarta.validation.
+   */
+  private static boolean declaresValidation(JavaClass annotationType) {
+    return annotationType.getName().equals("jakarta.validation.Valid")
+        || annotationType.isAnnotatedWith("jakarta.validation.Constraint")
+        || annotationType.isMetaAnnotatedWith("jakarta.validation.Constraint");
   }
 
   private static ArchCondition<JavaClass> notCallCommandBusSendAs() {

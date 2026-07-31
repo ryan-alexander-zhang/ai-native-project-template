@@ -31,8 +31,8 @@ import org.springframework.kafka.core.KafkaTemplate;
  * refuses the payload at parse time as a {@code ValueInstantiationException} — a {@code
  * JsonProcessingException}, which is on the error handler's not-retryable list. This test pins the
  * end-to-end composition: the DLT record's recorded exception is the parse-time refusal, not a
- * handler NPE — and by the classifier the library pins in {@code KafkaErrorHandlerTest}, that
- * class of failure spends one delivery, not a retry budget.
+ * handler NPE — and by the classifier the library pins in {@code KafkaErrorHandlerTest}, that class
+ * of failure spends one delivery, not a retry budget.
  */
 @SpringBootTest(
     properties = {

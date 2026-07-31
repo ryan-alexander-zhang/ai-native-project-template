@@ -133,5 +133,13 @@
       <artifactId>swagger-annotations-jakarta</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test only: fixtures carrying Bean Validation constraints, so
+         commandComponentsShouldDeclareValidationConstraints has a compliant command to accept.
+         The rule itself matches the annotations by name, so this is never a compile dependency. -->
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

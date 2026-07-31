@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Ordering-internal command the process manager sends when it abandons its wait for a payment
@@ -23,5 +24,5 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
     failure =
         "Payment-void request for order ${input.orderId} failed: ${failure.code}"
             + " (${failure.safeSummary})")
-public record RequestPaymentVoid(String orderId, String paymentOperationId)
+public record RequestPaymentVoid(@NotBlank String orderId, @NotBlank String paymentOperationId)
     implements Command<Void> {}

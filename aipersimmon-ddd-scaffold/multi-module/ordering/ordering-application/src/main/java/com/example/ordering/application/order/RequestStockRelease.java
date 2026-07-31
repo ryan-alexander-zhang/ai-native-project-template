@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Ordering-internal command the process manager sends to ask the inventory context to release a
@@ -17,4 +18,5 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
         "Requested stock release for order ${input.orderId} (reservation ${input.reservationId})",
     failure =
         "Stock-release request for order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
-public record RequestStockRelease(String orderId, String reservationId) implements Command<Void> {}
+public record RequestStockRelease(@NotBlank String orderId, @NotBlank String reservationId)
+    implements Command<Void> {}

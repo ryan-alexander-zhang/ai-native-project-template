@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to move a ready order into fulfilment, dispatched by the process manager once inventory
@@ -20,4 +21,4 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
     targetId = "${input.orderId}",
     success = "Fulfilment began for order ${input.orderId}",
     failure = "Beginning fulfilment for order ${input.orderId} failed: ${failure.code}")
-public record BeginFulfilment(String orderId) implements Command<Void> {}
+public record BeginFulfilment(@NotBlank String orderId) implements Command<Void> {}

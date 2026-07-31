@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 
 import com.aipersimmon.ddd.archunit.AiPersimmonDddRules;
 import com.aipersimmon.ddd.archunit.BoundedContextRules;
+import com.aipersimmon.ddd.archunit.CqrsRules;
 import com.aipersimmon.ddd.archunit.EventRules;
 import com.aipersimmon.ddd.archunit.LayeringRules;
 import com.aipersimmon.ddd.archunit.RepositoryRules;
@@ -69,6 +70,18 @@ class ArchitectureTest {
   @ArchTest
   static final ArchRule adaptersDoNotDependOnDomain =
       LayeringRules.adapterShouldNotDependOnDomain();
+
+  /**
+   * Every reference-typed component of every command declares its Bean Validation contract
+   * (issue-00148). The bus's validation gate guards each entry into the application — including the
+   * internal commands only a relay or an event listener ever sends — but it checks only what a
+   * command declares, and the declarations were found clustered on the two HTTP-bound commands
+   * while eight internal ones said nothing. Opt-in because it presumes Bean Validation, which this
+   * application's bus uses.
+   */
+  @ArchTest
+  static final ArchRule commandsDeclareTheirValidationContract =
+      CqrsRules.commandComponentsShouldDeclareValidationConstraints();
 
   /**
    * A SKU inside a domain is a {@code Sku}, never a {@code String} (issue-00085). Both contexts

@@ -18,6 +18,11 @@ class AiPersimmonDddRulesTest {
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
   private static final JavaClasses APIDOC_BAD =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.apidoc");
+  private static final JavaClasses VALIDATION_GOOD =
+      new ClassFileImporter()
+          .importPackages("com.aipersimmon.ddd.archunit.fixture.validation.good");
+  private static final JavaClasses VALIDATION_BAD =
+      new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.validation.bad");
   private static final String CONTEXTS_GOOD_BASE =
       "com.aipersimmon.ddd.archunit.fixture.contexts.good";
   private static final String CONTEXTS_BAD_BASE =
@@ -112,6 +117,21 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () -> CqrsRules.commandHandlersAndApplicationShouldNotCallSendAs().check(BAD));
+  }
+
+  @Test
+  void commandComponentsShouldDeclareValidationConstraints_passesForGood() {
+    assertDoesNotThrow(
+        () ->
+            CqrsRules.commandComponentsShouldDeclareValidationConstraints().check(VALIDATION_GOOD));
+  }
+
+  @Test
+  void commandComponentsShouldDeclareValidationConstraints_failsForBad() {
+    assertThrows(
+        AssertionError.class,
+        () ->
+            CqrsRules.commandComponentsShouldDeclareValidationConstraints().check(VALIDATION_BAD));
   }
 
   @Test

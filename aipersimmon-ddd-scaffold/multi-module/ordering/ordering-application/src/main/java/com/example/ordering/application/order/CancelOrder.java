@@ -3,6 +3,8 @@ package com.example.ordering.application.order;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 import com.example.ordering.domain.order.CancellationReason;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * Command to cancel an order (the fulfilment process manager's compensation). It carries the
@@ -16,4 +18,5 @@ import com.example.ordering.domain.order.CancellationReason;
     targetId = "${input.orderId}",
     success = "Cancelled order ${input.orderId} (reason ${input.reason})",
     failure = "Cancelling order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
-public record CancelOrder(String orderId, CancellationReason reason) implements Command<Void> {}
+public record CancelOrder(@NotBlank String orderId, @NotNull CancellationReason reason)
+    implements Command<Void> {}

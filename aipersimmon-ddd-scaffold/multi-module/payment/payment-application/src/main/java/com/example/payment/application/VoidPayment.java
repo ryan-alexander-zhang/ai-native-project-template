@@ -2,6 +2,7 @@ package com.example.payment.application;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to void a payment operation — the payment context's side of ordering's payment
@@ -18,4 +19,5 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
     failure =
         "Voiding payment operation ${input.paymentOperationId} failed: ${failure.code}"
             + " (${failure.safeSummary})")
-public record VoidPayment(String orderId, String paymentOperationId) implements Command<Void> {}
+public record VoidPayment(@NotBlank String orderId, @NotBlank String paymentOperationId)
+    implements Command<Void> {}

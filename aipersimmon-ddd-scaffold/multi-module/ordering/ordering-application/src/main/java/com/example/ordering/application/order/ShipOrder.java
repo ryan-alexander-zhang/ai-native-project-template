@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to dispatch a confirmed order. An operator action, like {@link ApproveReview}: the
@@ -23,4 +24,4 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
     targetId = "${input.orderId}",
     success = "Shipped order ${input.orderId}",
     failure = "Shipping order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
-public record ShipOrder(String orderId) implements Command<Void> {}
+public record ShipOrder(@NotBlank String orderId) implements Command<Void> {}

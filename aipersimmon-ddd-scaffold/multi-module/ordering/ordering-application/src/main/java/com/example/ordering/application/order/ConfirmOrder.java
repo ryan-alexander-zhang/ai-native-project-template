@@ -2,6 +2,7 @@ package com.example.ordering.application.order;
 
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to confirm an order (sent by the fulfilment process manager on reservation). No result.
@@ -12,4 +13,4 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
     targetId = "${input.orderId}",
     success = "Confirmed order ${input.orderId}",
     failure = "Confirming order ${input.orderId} failed: ${failure.code} (${failure.safeSummary})")
-public record ConfirmOrder(String orderId) implements Command<Void> {}
+public record ConfirmOrder(@NotBlank String orderId) implements Command<Void> {}
