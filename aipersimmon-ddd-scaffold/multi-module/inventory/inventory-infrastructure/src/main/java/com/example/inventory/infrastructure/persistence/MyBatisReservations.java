@@ -3,6 +3,7 @@ package com.example.inventory.infrastructure.persistence;
 import com.aipersimmon.ddd.application.DomainEvents;
 import com.aipersimmon.ddd.persistence.mybatisplus.MybatisPlusAggregateRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.inventory.domain.stock.OrderRef;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
 import com.example.inventory.domain.stock.Reservations;
@@ -43,7 +44,7 @@ public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservat
   protected ReservationDo toRow(Reservation reservation) {
     ReservationDo header = new ReservationDo();
     header.setId(reservation.id().value());
-    header.setOrderId(reservation.orderId());
+    header.setOrderId(reservation.orderId().value());
     header.setReleased(reservation.isReleased());
     return header;
   }
@@ -82,12 +83,13 @@ public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservat
   }
 
   @Override
-  public Optional<Reservation> findByOrderId(String orderId) {
+  public Optional<Reservation> findByOrderId(OrderRef orderId) {
     // At most one row can match: (tenant_id, order_id) is a unique key, and the tenant interceptor
     // scopes the query to the current tenant.
     return reconstitute(
         reservations.selectOne(
-            new LambdaQueryWrapper<ReservationDo>().eq(ReservationDo::getOrderId, orderId)));
+            new LambdaQueryWrapper<ReservationDo>()
+                .eq(ReservationDo::getOrderId, orderId.value())));
   }
 
   private Optional<Reservation> reconstitute(ReservationDo header) {
@@ -105,7 +107,7 @@ public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservat
     return Optional.of(
         Reservation.reconstitute(
             new ReservationId(header.getId()),
-            header.getOrderId(),
+            new OrderRef(header.getOrderId()),
             held,
             Boolean.TRUE.equals(header.getReleased()),
             header.getVersion()));

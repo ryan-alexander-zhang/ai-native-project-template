@@ -65,7 +65,7 @@ public class ReleaseStockHandler implements CommandHandler<ReleaseStock, Void> {
       reservations.save(reservation);
     }
     integrationEvents.publish(
-        new StockReleased(reservation.orderId(), command.reservationId()), context);
+        new StockReleased(reservation.orderId().value(), command.reservationId()), context);
     return null;
   }
 }

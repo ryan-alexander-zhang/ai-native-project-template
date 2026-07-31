@@ -13,6 +13,11 @@ public class Stock extends AbstractAggregateRoot<Sku> {
   private int available;
 
   public Stock(Sku sku, int available) {
+    if (sku == null) {
+      // The SKU is this aggregate's identity: a null one would flow into equals/hashCode and the
+      // repository's key instead of failing here, at the door.
+      throw new DomainException("a stock row needs its SKU");
+    }
     if (available < 0) {
       throw new DomainException("available must be >= 0");
     }

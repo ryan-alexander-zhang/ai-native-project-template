@@ -33,10 +33,10 @@ package com.example.payment.domain;
 public interface AuthorizationPolicy {
 
   /**
-   * @param amountMinor the amount in the currency's minor unit; may be {@code 0}, which a real
-   *     provider would never be asked to charge but which this domain accepts and must not treat as
-   *     a failure
-   * @param currency ISO-4217 code
+   * @param amount the amount to authorise. May be zero, which a real provider would never be asked
+   *     to charge but which this domain accepts and must not treat as a failure. Arrives as
+   *     payment's own {@link Amount} — already a non-negative amount in a real ISO-4217 currency —
+   *     so no implementation re-answers "is this a currency?" for itself.
    */
-  PaymentDecision decide(long amountMinor, String currency);
+  PaymentDecision decide(Amount amount);
 }

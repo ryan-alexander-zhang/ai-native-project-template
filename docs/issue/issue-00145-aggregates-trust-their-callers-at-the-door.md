@@ -2,7 +2,7 @@
 id: issue-00145-aggregates-trust-their-callers-at-the-door
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 几个聚合在门口信任了调用方：构造/重建守卫批量补齐
@@ -47,4 +47,35 @@ status: open
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，八项全做，每项构造期断言测试先红（1/2/4/5/6 行为红——"nothing was
+thrown"；3/7/8 引入新类型/签名 = 编译红）：
+
+1. **Reservation 持有数量**：构造器逐项校验 `> 0`（含 null value）。**没有做 HeldLine 重构**
+   （在案）：缺陷本体是守卫缺失，`held()` 的 `List<Map.Entry>` 是风格问题，不值得为它
+   连带改写 handler 与两个仓储。顺带补了 **null id 守卫**（原清单第 5 项的 Reservation 半边）。
+2. **OrderLine.unitPrice** 补非空守卫（此前 NPE 延迟到 `subtotal()`）。
+3. **单一货币不变量**：新 `OrderHasSingleCurrency`（镜像 `OrderHasDistinctSkus`）+
+   `OrderingErrorCode.MIXED_CURRENCY("ordering.mixed-currency")`，`Order.place` 在
+   `total()` 之前 `checkInvariant`——规则从算术副作用（`Money.requireSameCurrency` 的无码
+   "currency mismatch"）升格为有名字有码的聚合不变量。
+4. **Customer**：私有主构造器成为创建与 rehydrate 共用的门（id/creditLimit/usedCredit 非空
+   + 双 Money 同货币）；公共构造器在解引用 `creditLimit.currency()` **之前**先拒绝 null
+   （首轮实现在这里被测试抓出 NPE 而非 DomainException）；`reserveCredit(null)` 拒绝。
+   **`used <= limit` 刻意不守卫并写进 javadoc**：调低额度合法地把存量债务滞留在新额度之上
+   ——这样的行能 release 不能 reserve，正是对的行为，拒绝加载等于拒绝合法历史。
+5. **身份非空**：`Stock` 拒绝 null sku（身份进 equals/hashCode 前拦下）；Reservation 见第 1 项。
+6. **Money.currency 过 ISO 4217**（`Currency.getInstance`，拒绝 "usd"/"XYZ"/"US"）。**校验
+   不归一化**（在案）：大小写不同的调用方是个该浮出的 bug，静默吸收更糟。仓内字面量已核实
+   全为合法 ISO（USD×63、EUR×2）。
+7. **`OrderRef`**（inventory 本地 VO，null/blank 拒绝）：Reservation 构造器/`orderId()`/
+   `reconstitute`、`Reservations.findByOrderId`（00147 刚加的那个，一并升格）、两个 handler、
+   `MyBatisReservations` 全链换型。javadoc 写明双向立场：不 import ordering 的 OrderId
+   （DDL 无跨界外键 + ArchitectureTest 拦），也不再退回裸 String。
+8. **payment `Amount` VO**（minor >= 0——零合法、issue-00075 的立场保留；currency 过 ISO）：
+   `AuthorizationPolicy.decide(Amount)`、`CeilingAuthorizationPolicy`、
+   `AuthorizePaymentHandler` 换签名；javadoc 点明"published contract 应扁平"只约束 api
+   事件、不约束领域端口自身。
+
+测试：`ReservationTest`/`StockTest`/`InventoryValueObjectsTest`/`OrderLineAndInvariantTest`/
+`CustomerTest`/`MoneyTest`/`AmountTest`/`AuthorizationPolicyTest` 增改。验证：六个受牵连
+模块全绿 + scaffold 全量验收 `clean test -pl start -am` BUILD SUCCESS。

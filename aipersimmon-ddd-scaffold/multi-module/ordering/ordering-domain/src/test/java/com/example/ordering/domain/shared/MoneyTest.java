@@ -34,6 +34,19 @@ class MoneyTest {
     assertThrows(DomainException.class, () -> Money.of(1, " "));
   }
 
+  /**
+   * "usd" and "USD" would be two different currencies to requireSameCurrency, and "XYZ" is not a
+   * currency at all — an arbitrary non-blank string is not a currency identity (issue-00145 item
+   * 6). Validated against ISO 4217 rather than normalised: a caller whose code differs by case has
+   * a bug better surfaced than silently absorbed.
+   */
+  @Test
+  void rejectsANonIso4217CurrencyCode() {
+    assertThrows(DomainException.class, () -> Money.of(1, "usd"));
+    assertThrows(DomainException.class, () -> Money.of(1, "XYZ"));
+    assertThrows(DomainException.class, () -> Money.of(1, "US"));
+  }
+
   @Test
   void plusAddsAmountsOfTheSameCurrency() {
     assertEquals(Money.of(300, "USD"), Money.of(100, "USD").plus(Money.of(200, "USD")));

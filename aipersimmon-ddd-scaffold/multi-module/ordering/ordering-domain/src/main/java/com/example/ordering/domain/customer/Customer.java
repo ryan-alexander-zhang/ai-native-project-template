@@ -2,6 +2,7 @@ package com.example.ordering.domain.customer;
 
 import com.aipersimmon.ddd.core.annotation.AggregateRoot;
 import com.aipersimmon.ddd.core.annotation.Identity;
+import com.aipersimmon.ddd.core.exception.DomainException;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.example.ordering.domain.shared.Money;
 
@@ -42,10 +43,46 @@ public class Customer extends AbstractAggregateRoot<CustomerId> {
   private Money usedCredit;
 
   public Customer(CustomerId id, String name, Money creditLimit) {
-    this(id, name, creditLimit, Money.of(0, creditLimit.currency()));
+    // The delegation derives the zero balance from the limit's currency, so the limit must be
+    // refused here — before it is dereferenced — for the refusal to be the domain's own.
+    this(id, name, requiredLimit(creditLimit), Money.of(0, creditLimit.currency()));
   }
 
+  private static Money requiredLimit(Money creditLimit) {
+    if (creditLimit == null) {
+      throw new DomainException("a customer needs a credit limit");
+    }
+    return creditLimit;
+  }
+
+  /**
+   * The one gate both creation and rehydration pass through. A customer with no id or no limit is
+   * corrupt however it arrives, and a used balance in another currency would make every {@code
+   * reserveCredit} comparison meaningless — a bad row rehydrated without complaint here explodes
+   * later, in {@code reserveCredit}, far from the row that caused it.
+   *
+   * <p>Deliberately <em>not</em> guarded: {@code used <= limit}. A lowered credit limit legally
+   * strands existing debt above the new limit; such a customer can release and cannot reserve,
+   * which is exactly right, so rejecting the row would refuse to load legitimate history.
+   */
   private Customer(CustomerId id, String name, Money creditLimit, Money usedCredit) {
+    if (id == null) {
+      throw new DomainException("a customer needs its identity");
+    }
+    if (creditLimit == null) {
+      throw new DomainException("a customer needs a credit limit");
+    }
+    if (usedCredit == null) {
+      throw new DomainException("a customer needs its used balance, even when it is zero");
+    }
+    if (!usedCredit.currency().equals(creditLimit.currency())) {
+      throw new DomainException(
+          "used credit is in "
+              + usedCredit.currency()
+              + " but the limit is in "
+              + creditLimit.currency()
+              + " — the two must share a currency for the limit to mean anything");
+    }
     this.id = id;
     this.name = name;
     this.creditLimit = creditLimit;
@@ -78,6 +115,9 @@ public class Customer extends AbstractAggregateRoot<CustomerId> {
    * whatever the error code is called (issue-00071).
    */
   public void reserveCredit(Money amount) {
+    if (amount == null) {
+      throw new DomainException("an amount is required to reserve credit");
+    }
     Money wouldBeUsed = usedCredit.plus(amount);
     if (!wouldBeUsed.lessThanOrEqual(creditLimit)) {
       throw new CreditExceededException(

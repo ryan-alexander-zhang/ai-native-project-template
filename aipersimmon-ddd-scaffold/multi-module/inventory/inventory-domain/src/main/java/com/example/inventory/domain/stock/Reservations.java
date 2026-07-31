@@ -17,5 +17,5 @@ public interface Reservations {
    * reservation request find the work already done and re-announce it instead of holding stock a
    * second time.
    */
-  Optional<Reservation> findByOrderId(String orderId);
+  Optional<Reservation> findByOrderId(OrderRef orderId);
 }

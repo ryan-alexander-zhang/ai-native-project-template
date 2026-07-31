@@ -111,6 +111,7 @@ public class Order extends AbstractAggregateRoot<OrderId> {
     Order order = new Order(id, customerId, lines, initial);
     order.lineSetChanged = true;
     order.checkInvariant(new OrderHasDistinctSkus(lines));
+    order.checkInvariant(new OrderHasSingleCurrency(lines));
     order.registerEvent(new OrderPlacedEvent(id, order.total()));
     if (initial == OrderStatus.READY_FOR_FULFILMENT) {
       order.registerEvent(new OrderReadyForFulfilmentEvent(id));

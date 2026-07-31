@@ -10,6 +10,13 @@ import org.junit.jupiter.api.Test;
 class InventoryValueObjectsTest {
 
   @Test
+  void orderRefHoldsItsValueAndRejectsNullOrBlank() {
+    assertEquals("order-1", new OrderRef("order-1").value());
+    assertThrows(DomainException.class, () -> new OrderRef(null));
+    assertThrows(DomainException.class, () -> new OrderRef(" "));
+  }
+
+  @Test
   void skuHoldsItsValue() {
     assertEquals("sku-1", new Sku("sku-1").value());
   }

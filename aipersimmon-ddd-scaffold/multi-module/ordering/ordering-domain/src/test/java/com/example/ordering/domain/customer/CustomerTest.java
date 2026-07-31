@@ -19,6 +19,29 @@ class CustomerTest {
     return new Customer(ID, "Ada", Money.of(limitMinor, "USD"));
   }
 
+  /**
+   * Construction and rehydration guards (issue-00145 item 4): a customer with no id, no limit, or a
+   * used balance in another currency is corrupt however it arrives, and a bad row rehydrated
+   * without complaint explodes later in reserveCredit — far from the row that caused it.
+   */
+  @Test
+  void rejectsANullIdAndANullCreditLimit() {
+    assertThrows(DomainException.class, () -> new Customer(null, "Ada", Money.of(1_000, "USD")));
+    assertThrows(DomainException.class, () -> new Customer(ID, "Ada", null));
+  }
+
+  @Test
+  void rejectsARehydratedBalanceInAnotherCurrency() {
+    assertThrows(
+        DomainException.class,
+        () -> Customer.reconstitute(ID, "Ada", Money.of(1_000, "USD"), Money.of(1, "EUR"), 1L));
+  }
+
+  @Test
+  void refusesToReserveNull() {
+    assertThrows(DomainException.class, () -> customerWithLimit(1_000).reserveCredit(null));
+  }
+
   @Test
   void exposesIdAndName() {
     Customer customer = customerWithLimit(10_000);

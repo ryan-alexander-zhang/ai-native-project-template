@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.payment.api.PaymentAuthorized;
 import com.example.payment.api.PaymentDeclined;
+import com.example.payment.domain.Amount;
 import com.example.payment.domain.AuthorizationPolicy;
 import com.example.payment.domain.PaymentDecision;
 import java.util.Optional;
@@ -69,7 +70,8 @@ public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment,
     // decision is reused verbatim — re-running the policy could reach a different answer if a
     // rule or a rate changed in between, and an operation must not have two outcomes.
     PaymentDecision decision =
-        recorded.orElseGet(() -> authorization.decide(command.amountMinor(), command.currency()));
+        recorded.orElseGet(
+            () -> authorization.decide(new Amount(command.amountMinor(), command.currency())));
     if (recorded.isEmpty()) {
       operations.record(command.paymentOperationId(), decision);
     }

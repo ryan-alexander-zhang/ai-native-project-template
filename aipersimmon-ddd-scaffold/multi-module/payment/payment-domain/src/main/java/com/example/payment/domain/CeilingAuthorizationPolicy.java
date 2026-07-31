@@ -44,15 +44,19 @@ public final class CeilingAuthorizationPolicy implements AuthorizationPolicy {
   }
 
   @Override
-  public PaymentDecision decide(long amountMinor, String currency) {
-    if (amountMinor == 0L) {
+  public PaymentDecision decide(Amount amount) {
+    if (amount.amountMinor() == 0L) {
       return new PaymentDecision.Authorized();
     }
-    if (amountMinor <= ceilingMinor) {
+    if (amount.amountMinor() <= ceilingMinor) {
       return new PaymentDecision.Authorized();
     }
     return new PaymentDecision.Declined(
         DECLINE_CODE,
-        "amount " + amountMinor + " " + currency + " exceeds the authorisation ceiling");
+        "amount "
+            + amount.amountMinor()
+            + " "
+            + amount.currency()
+            + " exceeds the authorisation ceiling");
   }
 }

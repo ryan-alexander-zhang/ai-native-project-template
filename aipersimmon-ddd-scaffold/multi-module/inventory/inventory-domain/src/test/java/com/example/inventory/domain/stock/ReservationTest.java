@@ -14,29 +14,41 @@ class ReservationTest {
 
   private static final ReservationId ID = new ReservationId("r-1");
   private static final Sku SKU = new Sku("sku-1");
+  private static final OrderRef ORDER = new OrderRef("order-1");
 
   private static Reservation reservation() {
-    return new Reservation(ID, "order-1", Map.of(SKU, 2));
+    return new Reservation(ID, ORDER, Map.of(SKU, 2));
   }
 
   @Test
-  void rejectsBlankOrderId() {
-    assertThrows(DomainException.class, () -> new Reservation(ID, " ", Map.of(SKU, 2)));
-  }
-
-  @Test
-  void rejectsNullOrderId() {
+  void rejectsNullOrderRef() {
     assertThrows(DomainException.class, () -> new Reservation(ID, null, Map.of(SKU, 2)));
   }
 
   @Test
+  void rejectsANullId() {
+    assertThrows(DomainException.class, () -> new Reservation(null, ORDER, Map.of(SKU, 2)));
+  }
+
+  /**
+   * A held quantity of zero or less is not a smaller hold, it is corrupt state: it would be
+   * persisted without complaint and only explode two transactions later, when the release hands
+   * "-5" to Stock.release in a different aggregate (issue-00145 item 1).
+   */
+  @Test
+  void rejectsANonPositiveHeldQuantity() {
+    assertThrows(DomainException.class, () -> new Reservation(ID, ORDER, Map.of(SKU, 0)));
+    assertThrows(DomainException.class, () -> new Reservation(ID, ORDER, Map.of(SKU, -5)));
+  }
+
+  @Test
   void rejectsEmptyHeldLines() {
-    assertThrows(DomainException.class, () -> new Reservation(ID, "order-1", Map.of()));
+    assertThrows(DomainException.class, () -> new Reservation(ID, ORDER, Map.of()));
   }
 
   @Test
   void rejectsNullHeldLines() {
-    assertThrows(DomainException.class, () -> new Reservation(ID, "order-1", null));
+    assertThrows(DomainException.class, () -> new Reservation(ID, ORDER, null));
   }
 
   @Test
@@ -44,7 +56,7 @@ class ReservationTest {
     Reservation reservation = reservation();
 
     assertSame(ID, reservation.id());
-    assertEquals("order-1", reservation.orderId());
+    assertEquals(ORDER, reservation.orderId());
     assertEquals(1, reservation.held().size());
     assertEquals(SKU, reservation.held().get(0).getKey());
     assertEquals(2, reservation.held().get(0).getValue());
@@ -68,7 +80,11 @@ class ReservationTest {
   void reconstituteRestoresTheReleasedFlagAndVersionWithoutReplayingBehaviour() {
     Reservation released =
         Reservation.reconstitute(
-            new ReservationId("res-1"), "order-1", Map.of(new Sku("sku-1"), 2), true, 5L);
+            new ReservationId("res-1"),
+            new OrderRef("order-1"),
+            Map.of(new Sku("sku-1"), 2),
+            true,
+            5L);
 
     assertTrue(released.isReleased(), "a released reservation loads back as released");
     assertFalse(released.markReleased(), "so releasing again is still a no-op");
@@ -81,7 +97,11 @@ class ReservationTest {
   void reconstituteAnUnreleasedReservation() {
     Reservation open =
         Reservation.reconstitute(
-            new ReservationId("res-2"), "order-2", Map.of(new Sku("sku-1"), 1), false, 1L);
+            new ReservationId("res-2"),
+            new OrderRef("order-2"),
+            Map.of(new Sku("sku-1"), 1),
+            false,
+            1L);
 
     assertFalse(open.isReleased());
     assertTrue(open.markReleased(), "an unreleased reservation can still be released");

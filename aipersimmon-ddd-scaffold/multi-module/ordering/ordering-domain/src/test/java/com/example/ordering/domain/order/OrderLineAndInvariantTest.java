@@ -41,6 +41,42 @@ class OrderLineAndInvariantTest {
   }
 
   @Test
+  void orderLineRejectsANullUnitPrice() {
+    // sku and quantity are guarded; a null unitPrice used to walk in and NPE later in subtotal(),
+    // far from the constructor that accepted it (issue-00145 item 2).
+    assertThrows(DomainException.class, () -> new OrderLine(new Sku("SKU-1"), 1, null));
+  }
+
+  @Test
+  void singleCurrencyInvariantHoldsWhenEveryLineAgrees() {
+    OrderHasSingleCurrency invariant =
+        new OrderHasSingleCurrency(List.of(line("SKU-1", 1), line("SKU-2", 1)));
+
+    assertFalse(invariant.isBroken());
+  }
+
+  /**
+   * The rule existed only as an arithmetic side effect: total() reducing mixed-currency lines
+   * tripped Money.requireSameCurrency with a codeless "currency mismatch". A rule the aggregate
+   * enforces deserves a name and a code of its own (issue-00145 item 3).
+   */
+  @Test
+  void singleCurrencyInvariantIsBrokenByAMixedCurrencyOrder() {
+    OrderHasSingleCurrency invariant =
+        new OrderHasSingleCurrency(
+            List.of(line("SKU-1", 1), new OrderLine(new Sku("SKU-2"), 1, Money.of(500, "EUR"))));
+
+    assertTrue(invariant.isBroken());
+    assertSame(OrderingErrorCode.MIXED_CURRENCY, invariant.errorCode());
+    assertEquals("an order's lines must share a single currency", invariant.message());
+  }
+
+  @Test
+  void singleCurrencyInvariantTreatsNullLinesAsNotBroken() {
+    assertFalse(new OrderHasSingleCurrency(null).isBroken());
+  }
+
+  @Test
   void distinctSkusInvariantHoldsForDistinctLines() {
     OrderHasDistinctSkus invariant =
         new OrderHasDistinctSkus(List.of(line("SKU-1", 1), line("SKU-2", 1)));

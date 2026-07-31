@@ -18,7 +18,7 @@ import java.util.Map;
 public class Reservation extends AbstractAggregateRoot<ReservationId> {
 
   private final ReservationId id;
-  private final String orderId;
+  private final OrderRef orderId;
   private final Map<Sku, Integer> heldBySku;
   private boolean released;
 
@@ -36,12 +36,24 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
    */
   private boolean heldSetChanged;
 
-  public Reservation(ReservationId id, String orderId, Map<Sku, Integer> heldBySku) {
-    if (orderId == null || orderId.isBlank()) {
+  public Reservation(ReservationId id, OrderRef orderId, Map<Sku, Integer> heldBySku) {
+    if (id == null) {
+      throw new DomainException("a reservation needs its identity");
+    }
+    if (orderId == null) {
       throw new DomainException("a reservation must reference an order");
     }
     if (heldBySku == null || heldBySku.isEmpty()) {
       throw new DomainException("a reservation must hold at least one line");
+    }
+    for (Map.Entry<Sku, Integer> held : heldBySku.entrySet()) {
+      // A non-positive hold is not a smaller hold, it is corrupt state: persisted without
+      // complaint, it explodes two transactions later when the release hands the quantity to
+      // Stock.release in a different aggregate — far from whatever produced it.
+      if (held.getValue() == null || held.getValue() <= 0) {
+        throw new DomainException(
+            "a held quantity must be > 0, was " + held.getValue() + " for " + held.getKey());
+      }
     }
     this.id = id;
     this.orderId = orderId;
@@ -60,7 +72,7 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
    */
   public static Reservation reconstitute(
       ReservationId id,
-      String orderId,
+      OrderRef orderId,
       Map<Sku, Integer> heldBySku,
       boolean released,
       long version) {
@@ -73,7 +85,7 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
     return reservation;
   }
 
-  public String orderId() {
+  public OrderRef orderId() {
     return orderId;
   }
 

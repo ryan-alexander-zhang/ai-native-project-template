@@ -14,7 +14,7 @@ class AuthorizationPolicyTest {
 
   @Test
   void authorizesAmountBelowTheCeiling() {
-    PaymentDecision decision = policy.decide(10_000L, "USD");
+    PaymentDecision decision = policy.decide(new Amount(10_000L, "USD"));
 
     assertTrue(decision.isAuthorized());
     assertInstanceOf(PaymentDecision.Authorized.class, decision);
@@ -23,7 +23,7 @@ class AuthorizationPolicyTest {
   @Test
   void authorizesAmountExactlyAtTheCeiling() {
     PaymentDecision decision =
-        policy.decide(CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR, "USD");
+        policy.decide(new Amount(CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR, "USD"));
 
     assertTrue(decision.isAuthorized(), "the ceiling itself is authorised (<=)");
   }
@@ -32,7 +32,7 @@ class AuthorizationPolicyTest {
   void authorizesAZeroAmountOutright() {
     // A gift or fully discounted order reaches payment with nothing to charge. It is authorised
     // by its own branch, not by happening to sit under the ceiling — see issue-00075.
-    PaymentDecision decision = policy.decide(0L, "USD");
+    PaymentDecision decision = policy.decide(new Amount(0L, "USD"));
 
     assertTrue(
         decision.isAuthorized(), "there is nothing to charge, so there is nothing to refuse");
@@ -43,7 +43,7 @@ class AuthorizationPolicyTest {
   void declinesAmountJustAboveTheCeiling_withCodeAndReason() {
     long amount = CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR + 1;
 
-    PaymentDecision decision = policy.decide(amount, "EUR");
+    PaymentDecision decision = policy.decide(new Amount(amount, "EUR"));
 
     assertFalse(decision.isAuthorized());
     PaymentDecision.Declined declined = assertInstanceOf(PaymentDecision.Declined.class, decision);
@@ -61,10 +61,13 @@ class AuthorizationPolicyTest {
   void honoursACeilingOtherThanTheDefault() {
     AuthorizationPolicy strict = new CeilingAuthorizationPolicy(100L);
 
-    assertTrue(strict.decide(100L, "USD").isAuthorized(), "at the configured ceiling");
-    assertFalse(strict.decide(101L, "USD").isAuthorized(), "one above the configured ceiling");
+    assertTrue(strict.decide(new Amount(100L, "USD")).isAuthorized(), "at the configured ceiling");
     assertFalse(
-        strict.decide(CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR, "USD").isAuthorized(),
+        strict.decide(new Amount(101L, "USD")).isAuthorized(), "one above the configured ceiling");
+    assertFalse(
+        strict
+            .decide(new Amount(CeilingAuthorizationPolicy.DEFAULT_CEILING_MINOR, "USD"))
+            .isAuthorized(),
         "the default ceiling must no longer apply once one is configured");
   }
 

@@ -44,6 +44,11 @@ class OrderLine {
           OrderingErrorCode.QUANTITY_OUT_OF_RANGE,
           "quantity must be <= " + MAX_QUANTITY + ", was " + quantity);
     }
+    if (unitPrice == null) {
+      // The one unguarded component: a null price used to walk in here and NPE later in
+      // subtotal(), far from the constructor that accepted it.
+      throw new DomainException("unitPrice required");
+    }
     this.sku = sku;
     this.quantity = quantity;
     this.unitPrice = unitPrice;

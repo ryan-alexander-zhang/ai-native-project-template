@@ -15,6 +15,15 @@ public record Money(long amountMinor, String currency) {
     if (currency == null || currency.isBlank()) {
       throw new DomainException("currency required");
     }
+    // An arbitrary non-blank string is not a currency identity: "usd" and "USD" would be two
+    // currencies to requireSameCurrency, and "XYZ" none at all. Validated against ISO 4217 rather
+    // than normalised — a caller whose code differs by case has a bug better surfaced than
+    // silently absorbed (java.util.Currency accepts exactly the uppercase ISO spellings).
+    try {
+      java.util.Currency.getInstance(currency);
+    } catch (IllegalArgumentException unknown) {
+      throw new DomainException("not an ISO 4217 currency code: " + currency);
+    }
   }
 
   public static Money of(long amountMinor, String currency) {

@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import com.aipersimmon.ddd.test.RecordingIntegrationEvents;
 import com.example.inventory.api.StockReservationFailed;
+import com.example.inventory.domain.stock.OrderRef;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
 import com.example.inventory.domain.stock.Reservations;
@@ -64,7 +65,7 @@ class StockReservationFailedCodeContractTest {
     }
 
     @Override
-    public Optional<Reservation> findByOrderId(String orderId) {
+    public Optional<Reservation> findByOrderId(OrderRef orderId) {
       return Optional.empty();
     }
 

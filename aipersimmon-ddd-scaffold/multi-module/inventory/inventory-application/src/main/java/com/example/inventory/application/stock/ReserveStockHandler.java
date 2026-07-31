@@ -9,6 +9,7 @@ import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.api.StockReserved;
 import com.example.inventory.domain.stock.InventoryErrorCode;
+import com.example.inventory.domain.stock.OrderRef;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
 import com.example.inventory.domain.stock.Reservations;
@@ -102,7 +103,8 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
     // never have arrived. Two deliveries racing past this lookup are settled by the schema's
     // unique (tenant_id, order_id) key: the losing transaction rolls back and its retry lands
     // here, finding the winner's row.
-    Optional<Reservation> existing = reservations.findByOrderId(command.orderId());
+    OrderRef order = new OrderRef(command.orderId());
+    Optional<Reservation> existing = reservations.findByOrderId(order);
     if (existing.isPresent()) {
       integrationEvents.publish(
           new StockReserved(command.orderId(), existing.get().id().value()), context);
@@ -147,7 +149,7 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
     }
     // Time-ordered (UUIDv7) primary key from IdGenerator, not UUID.randomUUID() (issue-00054).
     ReservationId reservationId = new ReservationId(idGenerator.newId());
-    reservations.save(new Reservation(reservationId, command.orderId(), held));
+    reservations.save(new Reservation(reservationId, order, held));
     integrationEvents.publish(new StockReserved(command.orderId(), reservationId.value()), context);
     return null;
   }

@@ -10,6 +10,13 @@ import org.junit.jupiter.api.Test;
 
 class StockTest {
 
+  @Test
+  void rejectsANullSku() {
+    // The SKU is the aggregate's identity: a null one would flow into equals/hashCode and the
+    // repository's key instead of failing here at the door (issue-00145 item 5).
+    assertThrows(DomainException.class, () -> new Stock(null, 5));
+  }
+
   private static final Sku SKU = new Sku("sku-1");
 
   @Test
