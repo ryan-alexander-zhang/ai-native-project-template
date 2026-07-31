@@ -675,6 +675,51 @@ class DefaultProcessRuntimeTest {
   }
 
   @Test
+  void anAdvanceCanAddressItsInstanceByBusinessKey() {
+    instances.given(INSTANCE, ProcessLifecycle.RUNNING);
+    definition.onReact =
+        (state, input, context) -> running(SHIPPING, new DispatchCommand(new ReserveStock("s")));
+
+    // The id an inbound result fact actually carries — no ProcessRef, no query round-trip in the
+    // consumer (issue-00136).
+    ProcessAdvanceResult result =
+        runtime().handle(ORDERING, ORDER_1, new Say("paid"), cause("m-1"));
+
+    assertEquals(REF, result.processRef(), "the key resolved to the seeded instance");
+    assertEquals(SHIPPING, instances.row(INSTANCE).step());
+    assertEquals("ADVANCE", onlyTransition().transitionKind());
+  }
+
+  @Test
+  void anAdvanceByBusinessKeyForAKeyWithNoInstanceFails() {
+    DefaultProcessRuntime runtime = runtime();
+
+    ProcessNotFoundException refused =
+        assertThrows(
+            ProcessNotFoundException.class,
+            () -> runtime.handle(ORDERING, ORDER_1, new Say("paid"), cause("m-1")));
+    assertTrue(refused.getMessage().contains(ORDER_1.value()), refused.getMessage());
+  }
+
+  @Test
+  void anAdvanceByBusinessKeyCannotReachAnotherTenantsInstance() {
+    instances.given(INSTANCE, ProcessLifecycle.RUNNING);
+    DefaultProcessRuntime runtime = runtime();
+
+    // Business keys are tenant-relative: the resolution runs under the advancing context's tenant,
+    // so another tenant reusing the same key must not advance — or even observe — this instance.
+    assertThrows(
+        ProcessNotFoundException.class,
+        () ->
+            runtime.handle(
+                ORDERING,
+                ORDER_1,
+                new Say("paid"),
+                CommandContext.root(Tenants.of("globex"), "m-1")));
+    assertEquals(0, definition.reactCalls);
+  }
+
+  @Test
   void aRefThatNamesADifferentProcessThanTheStoredInstanceIsRefused() {
     instances.given(INSTANCE, ProcessLifecycle.RUNNING);
     ProcessRef wrong = new ProcessRef(INSTANCE, new ProcessType("Shipping"), ORDER_1);

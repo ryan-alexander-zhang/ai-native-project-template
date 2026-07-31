@@ -265,6 +265,23 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
         () -> withRetry(() -> unitOfWork.execute(() -> doHandle(processRef, input, cause))));
   }
 
+  @Override
+  public ProcessAdvanceResult handle(
+      ProcessType processType,
+      ProcessBusinessKey businessKey,
+      ProcessInput input,
+      CommandContext cause) {
+    // A plain read, not FOR UPDATE: the by-ref handle below re-loads under its own lock, so
+    // locking here would only widen the window without buying anything. Scoped to the advancing
+    // tenant for the same reason doStart's lookup is — business keys are tenant-relative.
+    ProcessRef ref =
+        instances
+            .readByBusinessKey(cause.tenantId().value(), processType, businessKey)
+            .map(ProcessInstanceRow::ref)
+            .orElseThrow(() -> new ProcessNotFoundException(processType, businessKey));
+    return handle(ref, input, cause);
+  }
+
   /**
    * Opens a {@code process.advance} span around one advance so the decision is visible in traces —
    * both under a command and, once a relay or deadline worker drives it, under the restored

@@ -32,6 +32,16 @@ import java.util.Set;
  * and is performed by the runtime. Effects are defensively copied and their order is preserved, so
  * replaying the same input yields the same effects.
  *
+ * <p>When the state implements {@link HasStep}, one more invariant holds: the decision's {@code
+ * step} must equal the state's own {@link HasStep#processStep()}. The two are persisted separately
+ * (the step as a column, the state as an encoded blob), and nothing downstream can reconcile them
+ * once they disagree.
+ *
+ * <p>Definitions normally build decisions through the static factories — {@link #running}, {@link
+ * #compensating}, {@link #completed}, {@link #ignored} — which fill the lifecycle, read the step
+ * from the state, and wrap the code, so a flow's decision reads as one line naming only what
+ * varies. The canonical constructor stays public for states that do not implement {@link HasStep}.
+ *
  * @param <S> the business state type
  */
 public record ProcessDecision<S>(
@@ -74,8 +84,84 @@ public record ProcessDecision<S>(
     if (effects == null) {
       throw new IllegalArgumentException("effects required (use an empty list)");
     }
+    if (state instanceof HasStep knows && !knows.processStep().equals(step)) {
+      throw new IllegalArgumentException(
+          "the decision's step ("
+              + step.value()
+              + ") disagrees with the state's own ("
+              + knows.processStep().value()
+              + "); the two are persisted separately and nothing can reconcile them later");
+    }
     effects = List.copyOf(effects);
     requireUnambiguousDeadlines(effects);
+  }
+
+  /** A non-terminal forward decision: lifecycle RUNNING, step read from the state. */
+  public static <S extends HasStep> ProcessDecision<S> running(
+      S state, String decisionCode, ProcessEffect... effects) {
+    return of(state, ProcessLifecycle.RUNNING, Optional.empty(), decisionCode, effects);
+  }
+
+  /** A non-terminal compensation decision: lifecycle COMPENSATING, step read from the state. */
+  public static <S extends HasStep> ProcessDecision<S> compensating(
+      S state, String decisionCode, ProcessEffect... effects) {
+    return of(state, ProcessLifecycle.COMPENSATING, Optional.empty(), decisionCode, effects);
+  }
+
+  /** A terminal decision: lifecycle COMPLETED, carrying its outcome, step read from the state. */
+  public static <S extends HasStep> ProcessDecision<S> completed(
+      S state, String decisionCode, String outcome, ProcessEffect... effects) {
+    return of(
+        state,
+        ProcessLifecycle.COMPLETED,
+        Optional.of(new ProcessOutcome(outcome)),
+        decisionCode,
+        effects);
+  }
+
+  /**
+   * The no-op arm every step-gated definition needs: keep the current lifecycle and step and emit
+   * no effects, so a duplicate or out-of-order input is absorbed idempotently instead of driving a
+   * wrong transition — or, worse, throwing, which the at-least-once runtime treats as a poison
+   * message and retries. The lifecycle and step come from the {@linkplain ProcessContext context}
+   * (both present on any {@code react}), and the decision code is derived — {@code
+   * ignored:<step>:<InputType>} — so the audit trail names what was absorbed without the definition
+   * composing strings.
+   */
+  public static <S> ProcessDecision<S> ignored(
+      ProcessContext context, S state, ProcessInput input) {
+    ProcessLifecycle lifecycle =
+        context
+            .currentLifecycle()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "ignored() needs the current lifecycle; it applies to react, never start"));
+    ProcessStep step =
+        context
+            .currentStep()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "ignored() needs the current step; it applies to react, never start"));
+    String code = "ignored:" + step.value() + ":" + input.getClass().getSimpleName();
+    return new ProcessDecision<>(
+        state, lifecycle, step, Optional.empty(), new DecisionCode(code), List.of());
+  }
+
+  private static <S extends HasStep> ProcessDecision<S> of(
+      S state,
+      ProcessLifecycle lifecycle,
+      Optional<ProcessOutcome> outcome,
+      String decisionCode,
+      ProcessEffect... effects) {
+    return new ProcessDecision<>(
+        state,
+        lifecycle,
+        state.processStep(),
+        outcome,
+        new DecisionCode(decisionCode),
+        List.of(effects));
   }
 
   private static void requireUnambiguousDeadlines(List<ProcessEffect> effects) {

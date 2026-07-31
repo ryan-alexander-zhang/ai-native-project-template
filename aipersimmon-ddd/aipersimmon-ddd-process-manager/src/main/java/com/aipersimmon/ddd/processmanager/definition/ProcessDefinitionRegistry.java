@@ -5,6 +5,7 @@ import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -64,6 +65,11 @@ public final class ProcessDefinitionRegistry {
       }
       activeByType.put(type, activeDefinition);
     }
+  }
+
+  /** All registered definitions, for startup consistency checks. */
+  public List<ProcessDefinition<?>> all() {
+    return byType.values().stream().flatMap(versions -> versions.values().stream()).toList();
   }
 
   /**

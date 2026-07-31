@@ -2,7 +2,7 @@
 id: issue-00136-the-second-process-pays-the-boilerplate-again
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 第二条流程会把这些样板全付一遍：process-manager 消费方工效学欠费
@@ -64,7 +64,53 @@ startup validator 对账 catalog；纯增益 fail-fast。
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，四项全落地。API 级缺口的红以"修复前编译失败"成立（issue-00129 同款论证）；
+行为级检查各有失败测试。
+
+1. **端口补齐 + by-key 重载**：`findRef(ProcessType, ProcessBusinessKey)` 升入 `ProcessQuery`
+   端口（`DefaultProcessQuery` 只余 `@Override`）；`ProcessRuntime` 增
+   `handle(type, businessKey, input, cause)`，engine 实现按 `cause.tenantId()` 域内解析
+   （非锁定读，by-ref `handle` 自己再加锁）、缺实例抛 `ProcessNotFoundException`（新增
+   by-key 构造器）。新测试：by-key 推进命中同实例、未知键点名拒绝、**他租户同键不可达**。
+   scaffold `RuntimeOrderFulfilmentProcess` 两个协作者全部换成端口——engine 类 import 清零，
+   手写 `handle` helper 连同它的 `IllegalStateException` 一起删除；`orderCancelled` 的
+   "无实例是业务常态"路径保留 `findRef` 先查。
+
+2. **`ProcessDecision` 工厂四件套 + `HasStep`**：`running/compensating/completed(outcome)/
+   ignored(context, state, input)` 静态工厂；可选接口 `HasStep.processStep()`（不叫 `step()`——
+   消费方 state record 的组件访问器多半已占用该签名）。step 双写的**检查**放在紧凑构造器：
+   state 实现 `HasStep` 而显式 step 与之不符即拒绝——不只是"可以省略"，是"想写错也写不进"。
+   `ignored` 从 context 取 lifecycle+step、自动生成 `ignored:<step>:<InputType>` 码。
+   scaffold definition 的四个私有工厂 + `decision` helper（65 行）删除，全部决策点 step
+   参数消失；`ignore` 只剩 ReadyForFulfilment 的流程私有拒绝。
+
+3. **mixin 注册入口，手写 codec 删除**：catalog 增 `mixIn(target, mixInSource)`（同目标二次
+   注册即拒）；Jackson 层把 mixin 施加在 **mapper 副本**上（应用共享 mapper 永不被改，
+   有测试钉住）。**比 issue 预测多一层**：Jackson 对未映射子类型的默认行为是回退类简单名——
+   encode 在 advance 事务里"成功"，decode 在 relay 里变毒丸（试过
+   `REQUIRE_TYPE_ID_FOR_SUBTYPES`，对 `Id.NAME` 序列化不生效）；故框架在注册表构建期强制
+   **sealed 目标的 mixin 必须覆盖全部 permitted subclasses**，缺一即启动失败点名——比旧手写
+   codec 的 encode 期 default 分支更早更全。scaffold：`CancellationReasonMixIn`（四变体全映射，
+   判别符即线上契约）+ `CancelOrder` 回归 catalog 一行；手写 codec 连同两个真 bug
+   （split 后未校验字段数的 AIOOBE、null 写成 `"null"` 字面量）与 US 分隔符格式整体删除。
+   `OrderFulfilmentCodecsTest` 重写为经真实 Jackson 层构建的 codec 钉 JSON 线格式（判别符
+   非类名、含 0x1F 的自由文本往返、未派发变体也忠实往返、畸形载荷点名拒绝）。同
+   `(type, version)` 换线格式是刻意决定：pre-production，无存量行。
+
+4. **`declaredPayloads()` 启动对账**：`ProcessDefinition` 默认空集=不校验（纯增益 opt-in）；
+   validator 汇总**全部**缺失后一次性报（不让部署一次重启发现一个）。scaffold definition
+   声明全部 16 个载荷类。新 `ProcessManagerStartupValidatorTest` 三条。
+
+验收标尺（issue 原文）：scaffold codecs 文件 245→113 行，definition 净减 ~60 行样板，
+第二条流程不再需要手写 codec/决策工厂/engine import。库全 reactor `clean install`
+BUILD SUCCESS（jdbc/mybatis-plus 后端未破坏，两个 worker 测试假件补齐重载）；scaffold
+`clean test -pl start -am` 全绿（验收套件含全流程、双租户、Kafka、死信重放）。
+
+## 残余取舍（在案）
+
+- 旧 codec 的 "本流程不派发此 reason 即拒绝 encode" 是把流程规则放进序列化层；新世界里
+  codec 忠实编码整个类型，"可派发哪些 reason"回到 definition 的构造点强制。语义边界更对，
+  但少了一道运行期护栏——由 sealed-coverage 启动检查与 definition 单测补位。
 
 ## 关联
 

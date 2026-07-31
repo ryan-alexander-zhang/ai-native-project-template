@@ -124,6 +124,15 @@ class ParkedInputWorkerTest {
     }
 
     @Override
+    public ProcessAdvanceResult handle(
+        ProcessType processType,
+        ProcessBusinessKey businessKey,
+        ProcessInput input,
+        CommandContext cause) {
+      throw new UnsupportedOperationException("a replay addresses its instance by ref");
+    }
+
+    @Override
     public ProcessAdvanceResult handle(ProcessRef ref, ProcessInput input, CommandContext cause) {
       causes.add(cause);
       inputs.add(input);

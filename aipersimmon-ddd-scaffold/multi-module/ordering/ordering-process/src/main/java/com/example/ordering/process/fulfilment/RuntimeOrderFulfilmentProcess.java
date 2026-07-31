@@ -2,10 +2,9 @@ package com.example.ordering.process.fulfilment;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
-import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery;
 import com.aipersimmon.ddd.processmanager.model.ProcessBusinessKey;
-import com.aipersimmon.ddd.processmanager.model.ProcessRef;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
+import com.aipersimmon.ddd.processmanager.runtime.ProcessQuery;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.example.ordering.application.fulfilment.OrderFulfilmentProcess;
@@ -13,10 +12,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Drives the order-fulfilment {@link OrderFulfilmentProcess} through the durable {@link
- * ProcessRuntime}: {@code readyForFulfilment} starts the instance; each subsequent fact resolves
- * the instance's {@link ProcessRef} from its order id (the business key) and hands the input to
- * {@code handle}. The runtime stages the ordering commands as effects and a relay delivers them —
- * so the coordination is durable and at-least-once, not a synchronous in-memory saga.
+ * ProcessRuntime}: {@code readyForFulfilment} starts the instance; each subsequent fact hands its
+ * input to {@code handle} addressed by the order id (the business key) — the runtime resolves the
+ * instance under the advancing tenant. The runtime stages the ordering commands as effects and a
+ * relay delivers them — so the coordination is durable and at-least-once, not a synchronous
+ * in-memory saga.
  *
  * <p>The domain facts (ready-for-fulfilment, confirmed, cancelled) arrive without an inbound
  * message, so they mint a fresh context keyed by the order id but stamped with the ambient tenant
@@ -30,9 +30,15 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
   private static final ProcessType TYPE = OrderFulfilmentDefinition.PROCESS_TYPE;
 
   private final ProcessRuntime runtime;
-  private final DefaultProcessQuery query;
+  private final ProcessQuery query;
 
-  public RuntimeOrderFulfilmentProcess(ProcessRuntime runtime, DefaultProcessQuery query) {
+  /**
+   * Both collaborators are the framework <em>ports</em>: swapping the process-manager provider (the
+   * javadoc on these ports names Temporal/Seata) replaces the beans behind them, and this class
+   * does not change. It used to import the engine's {@code DefaultProcessQuery} for the
+   * by-business-key lookup, which broke exactly that promise (issue-00136).
+   */
+  public RuntimeOrderFulfilmentProcess(ProcessRuntime runtime, ProcessQuery query) {
     this.runtime = runtime;
     this.query = query;
   }
@@ -101,16 +107,12 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
 
   /**
    * For a fact that can only exist because a flow produced it. A missing instance is then a wiring
-   * defect, not a business case, and failing loudly is the point.
+   * defect, not a business case, and the runtime's by-business-key {@code handle} fails loudly on
+   * it ({@code ProcessNotFoundException}) — which is the point. Contrast {@link #orderCancelled},
+   * where "no instance" is an ordinary business outcome and so checks {@code findRef} first.
    */
   private void handle(String orderId, ProcessInput input, CommandContext cause) {
-    ProcessRef ref =
-        query
-            .findRef(TYPE, new ProcessBusinessKey(orderId))
-            .orElseThrow(
-                () ->
-                    new IllegalStateException("no order-fulfilment instance for order " + orderId));
-    runtime.handle(ref, input, cause);
+    runtime.handle(TYPE, new ProcessBusinessKey(orderId), input, cause);
   }
 
   /**

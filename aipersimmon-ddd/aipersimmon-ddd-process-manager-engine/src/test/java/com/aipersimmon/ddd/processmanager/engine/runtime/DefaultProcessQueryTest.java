@@ -124,6 +124,17 @@ class DefaultProcessQueryTest {
   }
 
   @Test
+  void findRefIsReachableThroughThePortNotJustThisClass() {
+    instances.given(INSTANCE, ProcessLifecycle.RUNNING);
+    // The consumer-facing type: a component holding only the port can resolve by business key, so
+    // it never has to import this engine class — the dependency inversion issue-00136 restores.
+    com.aipersimmon.ddd.processmanager.runtime.ProcessQuery port = query;
+
+    TenantContext.set(new TenantId("acme"));
+    assertEquals(Optional.of(REF), port.findRef(ORDERING, ORDER_1));
+  }
+
+  @Test
   void instancesArePagedByTheCriteria() {
     instances.given(INSTANCE, ProcessLifecycle.RUNNING);
     instances.given(new ProcessInstanceId("instance-2"), ProcessLifecycle.RUNNING);

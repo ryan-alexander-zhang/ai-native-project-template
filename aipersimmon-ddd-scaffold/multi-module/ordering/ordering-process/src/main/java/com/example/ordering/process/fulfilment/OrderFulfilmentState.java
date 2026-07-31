@@ -1,5 +1,8 @@
 package com.example.ordering.process.fulfilment;
 
+import com.aipersimmon.ddd.processmanager.definition.HasStep;
+import com.aipersimmon.ddd.processmanager.model.ProcessStep;
+
 /**
  * The business state of one order-fulfilment flow, carried across inputs by the durable runtime. It
  * holds the facts the flow must remember across hops:
@@ -27,7 +30,18 @@ public record OrderFulfilmentState(
     Step step,
     String reservationId,
     String paymentDeclineCode,
-    String paymentDeclineEvidenceId) {
+    String paymentDeclineEvidenceId)
+    implements HasStep {
+
+  /**
+   * {@link HasStep}: the decision factories read the step from here, so each decision names its
+   * step once — in the state — instead of twice, and the constructor guard keeps the persisted step
+   * column from ever drifting away from this state's own.
+   */
+  @Override
+  public ProcessStep processStep() {
+    return new ProcessStep(step.name());
+  }
 
   /** Which response the flow is currently waiting for. */
   public enum Step {

@@ -51,11 +51,7 @@ public final class DefaultProcessQuery implements ProcessQuery {
     this.clock = clock;
   }
 
-  /**
-   * Resolve a running instance's full {@link ProcessRef} from its business key, so a consumer that
-   * only holds the business key (an inbound result event's correlation) can address the instance
-   * for {@code handle}. Returns empty if no instance exists for that key.
-   */
+  @Override
   public Optional<ProcessRef> findRef(ProcessType processType, ProcessBusinessKey businessKey) {
     // Scope to the ambient tenant (root sentinel when tenancy is off): with a tenant-relative
     // business key, an unscoped read could resolve another tenant's instance.

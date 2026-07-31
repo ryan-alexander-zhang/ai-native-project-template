@@ -1,19 +1,18 @@
 package com.example.ordering.process.fulfilment;
 
+import static com.aipersimmon.ddd.processmanager.definition.ProcessDecision.compensating;
+import static com.aipersimmon.ddd.processmanager.definition.ProcessDecision.completed;
+import static com.aipersimmon.ddd.processmanager.definition.ProcessDecision.running;
+
 import com.aipersimmon.ddd.processmanager.definition.ProcessContext;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDecision;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
-import com.aipersimmon.ddd.processmanager.effect.ProcessEffect;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
 import com.aipersimmon.ddd.processmanager.model.DeadlineName;
-import com.aipersimmon.ddd.processmanager.model.DecisionCode;
-import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
-import com.aipersimmon.ddd.processmanager.model.ProcessOutcome;
-import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.example.ordering.application.order.BeginFulfilment;
 import com.example.ordering.application.order.CancelOrder;
@@ -27,8 +26,7 @@ import com.example.ordering.domain.order.ReservationFailureRef;
 import com.example.ordering.domain.order.StockReleaseRef;
 import com.example.ordering.process.fulfilment.OrderFulfilmentState.Step;
 import java.time.Duration;
-import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -187,7 +185,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // for payment and arming that timer are: a wait must not be able to begin without a way out.
       return running(
           state,
-          Step.AWAITING_STOCK,
           "ready-for-fulfilment",
           new ScheduleDeadline(
               STOCK_DEADLINE,
@@ -238,7 +235,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // non-repeatable on redelivery.
       return running(
           state.reserved(reserved.reservationId(), Step.AWAITING_PAYMENT),
-          Step.AWAITING_PAYMENT,
           "stock-reserved",
           // The reservation exists, so now — and only now — the order really is under fulfilment.
           // Ordering's own state used to be advanced at placement, before anyone had reserved
@@ -262,7 +258,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // order whose inventory never answers must not wait forever either.
       return compensating(
           state.withStep(Step.AWAITING_STOCK_ORDER_CANCELLED),
-          Step.AWAITING_STOCK_ORDER_CANCELLED,
           "order-cancelled-while-awaiting-stock");
     }
     if (in instanceof OrderFulfilmentInput.StockReservationTimedOut) {
@@ -303,15 +298,10 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     return cancelTimer
         ? compensating(
             state.withStep(Step.AWAITING_ORDER_CANCELLATION),
-            Step.AWAITING_ORDER_CANCELLATION,
             decisionCode,
             cancel,
             new CancelDeadline(STOCK_DEADLINE))
-        : compensating(
-            state.withStep(Step.AWAITING_ORDER_CANCELLATION),
-            Step.AWAITING_ORDER_CANCELLATION,
-            decisionCode,
-            cancel);
+        : compensating(state.withStep(Step.AWAITING_ORDER_CANCELLATION), decisionCode, cancel);
   }
 
   /**
@@ -327,7 +317,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // cancel, and it stands.
       return compensating(
           state.reserved(reserved.reservationId(), Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED),
-          Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
           "stock-reserved-for-cancelled-order",
           new DispatchCommand(new RequestStockRelease(state.orderId(), reserved.reservationId())),
           new CancelDeadline(STOCK_DEADLINE),
@@ -340,7 +329,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       boolean timedOut = in instanceof OrderFulfilmentInput.StockReservationTimedOut;
       return completed(
           state.withStep(Step.CANCELLED),
-          Step.CANCELLED,
           timedOut ? "cancelled-order-stock-timed-out" : "cancelled-order-stock-failed",
           "ORDER_CANCELLED");
     }
@@ -359,7 +347,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     if (in instanceof OrderFulfilmentInput.PaymentAuthorized) {
       return running(
           state.withStep(Step.AWAITING_ORDER_CONFIRMATION),
-          Step.AWAITING_ORDER_CONFIRMATION,
           "payment-authorized",
           new DispatchCommand(new ConfirmOrder(state.orderId())),
           new CancelDeadline(PAYMENT_DEADLINE));
@@ -367,7 +354,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     if (in instanceof OrderFulfilmentInput.PaymentDeclined declined) {
       return compensating(
           state.declined(declined.code(), context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
-          Step.AWAITING_STOCK_RELEASE,
           "payment-declined",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
           new CancelDeadline(PAYMENT_DEADLINE),
@@ -379,7 +365,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // is held, and the order is terminal — release it and finish, without a second CancelOrder.
       return compensating(
           state.withStep(Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED),
-          Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
           "order-cancelled-while-awaiting-payment",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
           new CancelDeadline(PAYMENT_DEADLINE),
@@ -394,7 +379,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       return compensating(
           state.declined(
               PAYMENT_TIMEOUT_CODE, context.cause().messageId(), Step.AWAITING_STOCK_RELEASE),
-          Step.AWAITING_STOCK_RELEASE,
           "payment-timed-out",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
           releaseDeadline(state, context));
@@ -424,7 +408,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
               new StockReleaseRef(context.cause().messageId(), id));
       return compensating(
           state.withStep(Step.AWAITING_ORDER_CANCELLATION),
-          Step.AWAITING_ORDER_CANCELLATION,
           "stock-released",
           new DispatchCommand(new CancelOrder(state.orderId(), reason)),
           new CancelDeadline(STOCK_RELEASE_DEADLINE));
@@ -443,7 +426,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // instance.max-lifetime and handles MaxLifetimeExceeded in react (see below).
       return compensating(
           state,
-          Step.AWAITING_STOCK_RELEASE,
           "stock-release-timed-out",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
           releaseDeadline(state, context));
@@ -461,7 +443,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
     if (in instanceof OrderFulfilmentInput.StockReleased) {
       return completed(
           state.withStep(Step.CANCELLED),
-          Step.CANCELLED,
           "stock-released-for-cancelled-order",
           "ORDER_CANCELLED",
           new CancelDeadline(STOCK_RELEASE_DEADLINE));
@@ -471,7 +452,6 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // the flow asks again rather than declaring stock returned that is still held.
       return compensating(
           state,
-          Step.AWAITING_STOCK_RELEASE_ORDER_CANCELLED,
           "cancelled-order-stock-release-timed-out",
           new DispatchCommand(new RequestStockRelease(state.orderId(), state.reservationId())),
           releaseDeadline(state, context));
@@ -483,8 +463,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   private ProcessDecision<OrderFulfilmentState> onAwaitingOrderConfirmation(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
     if (in instanceof OrderFulfilmentInput.OrderConfirmed) {
-      return completed(
-          state.withStep(Step.CONFIRMED), Step.CONFIRMED, "order-confirmed", "ORDER_CONFIRMED");
+      return completed(state.withStep(Step.CONFIRMED), "order-confirmed", "ORDER_CONFIRMED");
     }
     return ignore(state, in, context);
   }
@@ -493,42 +472,18 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
   private ProcessDecision<OrderFulfilmentState> onAwaitingOrderCancellation(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
     if (in instanceof OrderFulfilmentInput.OrderCancelled) {
-      return completed(
-          state.withStep(Step.CANCELLED), Step.CANCELLED, "order-cancelled", "ORDER_CANCELLED");
+      return completed(state.withStep(Step.CANCELLED), "order-cancelled", "ORDER_CANCELLED");
     }
     return ignore(state, in, context);
   }
 
-  private static ProcessDecision<OrderFulfilmentState> running(
-      OrderFulfilmentState state, Step step, String code, ProcessEffect... effects) {
-    return decision(state, ProcessLifecycle.RUNNING, step, Optional.empty(), code, effects);
-  }
-
-  private static ProcessDecision<OrderFulfilmentState> compensating(
-      OrderFulfilmentState state, Step step, String code, ProcessEffect... effects) {
-    return decision(state, ProcessLifecycle.COMPENSATING, step, Optional.empty(), code, effects);
-  }
-
-  private static ProcessDecision<OrderFulfilmentState> completed(
-      OrderFulfilmentState state,
-      Step step,
-      String code,
-      String outcome,
-      ProcessEffect... effects) {
-    return decision(
-        state,
-        ProcessLifecycle.COMPLETED,
-        step,
-        Optional.of(new ProcessOutcome(outcome)),
-        code,
-        effects);
-  }
-
   /**
-   * The no-op arm of the transition table: keep the current lifecycle and step and emit no effects,
-   * so a duplicate or out-of-order fact is absorbed idempotently instead of driving a wrong
-   * transition or throwing. {@link OrderFulfilmentInput.ReadyForFulfilment} is the one input that
-   * is rejected here: it is start-only and never reaches {@code react} in normal operation.
+   * The no-op arm of the transition table, via {@link ProcessDecision#ignored}: keep the current
+   * lifecycle and step and emit no effects, so a duplicate or out-of-order fact is absorbed
+   * idempotently instead of driving a wrong transition or throwing. {@link
+   * OrderFulfilmentInput.ReadyForFulfilment} is the one input still rejected here — a flow-specific
+   * rule the framework cannot know: it is start-only and never reaches {@code react} in normal
+   * operation, so its arrival only ever signals a wiring defect.
    */
   private static ProcessDecision<OrderFulfilmentState> ignore(
       OrderFulfilmentState state, OrderFulfilmentInput in, ProcessContext context) {
@@ -537,30 +492,32 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           "ReadyForFulfilment is a start-only input and must not reach react for order "
               + state.orderId());
     }
-    ProcessLifecycle current =
-        context
-            .currentLifecycle()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "react requires a current lifecycle for order " + state.orderId()));
-    String code = "ignored:" + state.step() + ":" + in.getClass().getSimpleName();
-    return decision(state, current, state.step(), Optional.empty(), code);
+    return ProcessDecision.ignored(context, state, in);
   }
 
-  private static ProcessDecision<OrderFulfilmentState> decision(
-      OrderFulfilmentState state,
-      ProcessLifecycle lifecycle,
-      Step step,
-      Optional<ProcessOutcome> outcome,
-      String code,
-      ProcessEffect... effects) {
-    return new ProcessDecision<>(
-        state,
-        lifecycle,
-        new ProcessStep(step.name()),
-        outcome,
-        new DecisionCode(code),
-        List.of(effects));
+  /**
+   * Everything this flow can receive as an input or stage as an effect — reconciled against the
+   * codec registry at startup, so a forgotten {@code .payload(...)} line in {@link
+   * OrderFulfilmentCodecs} fails the deployment, not the first advance that encodes it.
+   */
+  @Override
+  public Set<Class<?>> declaredPayloads() {
+    return Set.of(
+        OrderFulfilmentInput.ReadyForFulfilment.class,
+        OrderFulfilmentInput.StockReserved.class,
+        OrderFulfilmentInput.StockReservationFailed.class,
+        OrderFulfilmentInput.StockReservationTimedOut.class,
+        OrderFulfilmentInput.PaymentAuthorized.class,
+        OrderFulfilmentInput.PaymentDeclined.class,
+        OrderFulfilmentInput.PaymentTimedOut.class,
+        OrderFulfilmentInput.StockReleased.class,
+        OrderFulfilmentInput.StockReleaseTimedOut.class,
+        OrderFulfilmentInput.OrderConfirmed.class,
+        OrderFulfilmentInput.OrderCancelled.class,
+        BeginFulfilment.class,
+        RequestPayment.class,
+        ConfirmOrder.class,
+        RequestStockRelease.class,
+        CancelOrder.class);
   }
 }

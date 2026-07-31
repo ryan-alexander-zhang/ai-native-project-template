@@ -6,11 +6,15 @@ import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
+import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.engine.store.VersionRef;
+import com.aipersimmon.ddd.processmanager.exception.ProcessSerializationException;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 
@@ -22,6 +26,9 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
  *   <li>every {@code (processType, definitionVersion)} and {@code (processType,
  *       stateSchemaVersion)} referenced by a live instance still has a registered Definition and
  *       state codec — so a Definition/codec is never removed while instances still run under it;
+ *   <li>every payload class a definition {@linkplain ProcessDefinition#declaredPayloads() declares}
+ *       has a registered payload codec — so a forgotten registration fails here, not as a {@code
+ *       ProcessSerializationException} inside the first advance that encodes it (issue-00136);
  *   <li>every registered integration-event payload codec's logical type/version matches the event's
  *       {@link EventType}, so a producer's wire type and the codec agree;
  *   <li>the enabled effect kinds each have a dispatcher — the relay never has staged effects it
@@ -59,8 +66,39 @@ public final class ProcessManagerStartupValidator implements InitializingBean {
   @Override
   public void afterPropertiesSet() {
     validateVersionsInUse();
+    validateDeclaredPayloads();
     validateIntegrationEventCodecs();
     validateDispatchers();
+  }
+
+  /**
+   * Reconcile each definition's declared payload classes against the codec registry, and report
+   * every missing one at once — a deployment fixing its registrations should not discover them one
+   * restart at a time.
+   */
+  private void validateDeclaredPayloads() {
+    List<String> missing = new ArrayList<>();
+    for (ProcessDefinition<?> definition : definitions.all()) {
+      for (Class<?> payload : definition.declaredPayloads()) {
+        try {
+          payloadCodecs.forJavaType(payload);
+        } catch (ProcessSerializationException absent) {
+          missing.add(
+              payload.getName()
+                  + " (declared by "
+                  + definition.processType().value()
+                  + " "
+                  + definition.definitionVersion().value()
+                  + ")");
+        }
+      }
+    }
+    if (!missing.isEmpty()) {
+      throw new IllegalStateException(
+          "process definitions declare payloads that have no registered codec — a first encode "
+              + "would fail inside a live transaction instead of here: "
+              + String.join(", ", missing));
+    }
   }
 
   private void validateVersionsInUse() {

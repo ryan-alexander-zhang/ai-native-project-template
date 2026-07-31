@@ -2,27 +2,38 @@ package com.example.ordering.process.fulfilment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
+import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
+import com.aipersimmon.ddd.processmanager.engine.autoconfigure.codec.JacksonProcessCodecConfiguration;
 import com.aipersimmon.ddd.processmanager.exception.ProcessSerializationException;
 import com.example.ordering.application.order.CancelOrder;
+import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.order.CancellationReason;
 import com.example.ordering.domain.order.OrderId;
 import com.example.ordering.domain.order.PaymentDeclineRef;
 import com.example.ordering.domain.order.ReservationFailureRef;
+import com.example.ordering.domain.order.ReviewDecisionRef;
 import com.example.ordering.domain.order.StockReleaseRef;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * The hand-written {@code CancelOrder} codec's wire format, pinned by round trip (issue-00087).
+ * The {@code CancelOrder} payload's persisted format, pinned by round trip — through the very
+ * codecs the framework's Jackson layer generates from {@link OrderFulfilmentCodecs}' catalog, mixin
+ * included, so what is tested is what the deployment runs.
  *
- * <p>The case that matters is a {@code detail} containing the separator itself. That field is free
- * text — inventory's failure message, passed through verbatim — so nothing prevents it, and the old
- * unbounded {@code split} then read every following field one position out. The damage surfaced at
- * decode time, in a relay, long after the event that produced the string; the outcome was either an
- * index out of bounds or a cancellation reason quietly assembled from the wrong values.
+ * <p>This file used to specify a hand-written unit-separator format and its two parsing traps
+ * (issue-00087). The mix-in route (issue-00136) deleted that codec: free text in {@code detail} is
+ * now just a JSON string — no separator can shift fields — and "which variant is this" is a
+ * declared discriminator instead of a positional convention. What still deserves pinning is the
+ * discriminator itself (wire contract: renaming a class must not change it) and the malformed-row
+ * refusal.
  *
  * <p>Kept apart from {@code OrderFulfilmentDefinitionTest}, which tests the pure transition table
  * and says so — this is about a persisted format, a different subject with a different reason to
@@ -30,15 +41,14 @@ import org.junit.jupiter.api.Test;
  */
 class OrderFulfilmentCodecsTest {
 
-  /**
-   * The codec's separator, written as an escape here for the same reason it is written as one
-   * there: a raw 0x1F in a test source is invisible, and a test whose input cannot be read is not
-   * much of a specification.
-   */
-  private static final String SEPARATOR = "\u001F";
-
-  private final ProcessPayloadCodec<CancelOrder> codec =
-      new OrderFulfilmentCodecs().cancelOrderCodec();
+  private final ObjectMapper applicationMapper = new ObjectMapper();
+  private final ProcessPayloadCodecRegistry registry =
+      new JacksonProcessCodecConfiguration()
+          .processPayloadCodecRegistry(
+              noExplicitCodecs(),
+              new OrderFulfilmentCodecs().orderFulfilmentSerialization(),
+              applicationMapper);
+  private final ProcessPayloadCodec<CancelOrder> codec = registry.forJavaType(CancelOrder.class);
 
   @Test
   void anInventoryUnavailableCancellationRoundTrips() {
@@ -48,13 +58,13 @@ class OrderFulfilmentCodecsTest {
   }
 
   @Test
-  void aDetailContainingTheSeparatorRoundTripsInsteadOfShiftingTheFields() {
-    CancelOrder command = cancelledBecauseStockWasShort("asked 999" + SEPARATOR + "available 10");
+  void freeTextInTheDetailCannotShiftAnything() {
+    // The old positional format's failure mode (issue-00087): a 0x1F inside inventory's verbatim
+    // message produced one extra field. JSON has no positional fields to shift; kept as the
+    // regression witness for the same input.
+    CancelOrder command = cancelledBecauseStockWasShort("asked 999\u001Favailable 10");
 
-    assertEquals(
-        command,
-        codec.decode(codec.encode(command)),
-        "detail is the last field of its variant, so the remainder belongs to it");
+    assertEquals(command, codec.decode(codec.encode(command)));
   }
 
   @Test
@@ -71,18 +81,56 @@ class OrderFulfilmentCodecsTest {
   }
 
   @Test
-  void aPayloadWithTooFewFieldsIsRejectedAsMalformed() {
+  void theVariantsThisFlowNeverDispatchesRoundTripToo() {
+    // The codec encodes the type, not the flow's habits: which reasons may be dispatched is the
+    // definition's business, enforced where reasons are constructed. The framework's sealed-
+    // coverage check made these two mappings mandatory; this pins that they actually work.
+    CancelOrder byCustomer =
+        new CancelOrder(
+            "order-3", new CancellationReason.CustomerRequested(new CustomerId("cust-7")));
+    CancelOrder byReview =
+        new CancelOrder(
+            "order-4",
+            new CancellationReason.ReviewRejected(
+                new ReviewDecisionRef.Rejection("review-9", new OrderId("order-4"))));
+
+    assertEquals(byCustomer, codec.decode(codec.encode(byCustomer)));
+    assertEquals(byReview, codec.decode(codec.encode(byReview)));
+  }
+
+  @Test
+  void theWireCarriesTheDeclaredDiscriminatorNotTheClassName() {
+    String json =
+        new String(
+            codec.encode(cancelledBecauseStockWasShort("out of stock")).data(),
+            StandardCharsets.UTF_8);
+
+    // The discriminator is wire contract, exactly like the catalog's logical type: a persisted
+    // effect must survive the variant class being renamed or moved.
+    assertTrue(json.contains("\"INVENTORY_UNAVAILABLE\""), json);
+    assertTrue(!json.contains("InventoryUnavailable"), json);
+  }
+
+  @Test
+  void aMalformedPayloadIsRejectedAsUnserializable() {
     assertThrows(
         ProcessSerializationException.class,
-        () -> decode("order-1"),
-        "a truncated payload must name itself as malformed, not fail on an array index");
+        () ->
+            codec.decode(
+                new EncodedPayload(
+                    codec.payloadType(), "not json".getBytes(StandardCharsets.UTF_8))));
   }
 
   @Test
   void anUnknownReasonKindIsRejected() {
     assertThrows(
         ProcessSerializationException.class,
-        () -> decode("order-1" + SEPARATOR + "SOMETHING_ELSE" + SEPARATOR + "x"));
+        () ->
+            codec.decode(
+                new EncodedPayload(
+                    codec.payloadType(),
+                    "{\"orderId\":\"order-1\",\"reason\":{\"kind\":\"SOMETHING_ELSE\"}}"
+                        .getBytes(StandardCharsets.UTF_8))));
   }
 
   private static CancelOrder cancelledBecauseStockWasShort(String detail) {
@@ -93,8 +141,17 @@ class OrderFulfilmentCodecsTest {
                 "failure-1", new OrderId("order-1"), "inventory.insufficient-stock", detail)));
   }
 
-  private CancelOrder decode(String wire) {
-    return codec.decode(
-        new EncodedPayload(codec.payloadType(), wire.getBytes(StandardCharsets.UTF_8)));
+  private static ObjectProvider<ProcessPayloadCodec<?>> noExplicitCodecs() {
+    return new ObjectProvider<>() {
+      @Override
+      public ProcessPayloadCodec<?> getObject() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public Stream<ProcessPayloadCodec<?>> orderedStream() {
+        return Stream.empty();
+      }
+    };
   }
 }

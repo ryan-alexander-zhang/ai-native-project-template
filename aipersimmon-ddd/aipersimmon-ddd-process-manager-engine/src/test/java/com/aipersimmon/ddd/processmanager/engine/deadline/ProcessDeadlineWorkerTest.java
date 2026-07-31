@@ -104,6 +104,15 @@ class ProcessDeadlineWorkerTest {
 
     @Override
     public ProcessAdvanceResult handle(
+        ProcessType processType,
+        ProcessBusinessKey businessKey,
+        ProcessInput input,
+        CommandContext cause) {
+      throw new UnsupportedOperationException("a timer addresses its instance by ref");
+    }
+
+    @Override
+    public ProcessAdvanceResult handle(
         ProcessRef processRef, ProcessInput input, CommandContext cause) {
       advances.add(cause.messageId());
       tenantsSeen.add(TenantContext.current().map(tenant -> tenant.value()).orElse("<unbound>"));

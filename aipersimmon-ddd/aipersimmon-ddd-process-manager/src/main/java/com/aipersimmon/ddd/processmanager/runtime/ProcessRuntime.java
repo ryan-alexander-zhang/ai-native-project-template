@@ -47,4 +47,25 @@ public interface ProcessRuntime {
    * @return the advance result
    */
   ProcessAdvanceResult handle(ProcessRef processRef, ProcessInput input, CommandContext cause);
+
+  /**
+   * Advance an existing instance addressed by its business key — the id an inbound result fact
+   * actually carries. Resolves the instance under {@code cause}'s tenant and delegates to {@link
+   * #handle(ProcessRef, ProcessInput, CommandContext)}; a missing instance is a {@link
+   * com.aipersimmon.ddd.processmanager.exception.ProcessNotFoundException}, because a fact that can
+   * only exist because a flow produced it arriving for no flow is a wiring defect, not a business
+   * case. A consumer for whom "no instance" <em>is</em> a business case (a cancellation racing the
+   * flow's start) checks {@link ProcessQuery#findRef} first and advances by ref.
+   *
+   * @param processType the logical process type
+   * @param businessKey the business correlation key the inbound fact carries
+   * @param input the input to react to
+   * @param cause the context of the message that carried the input
+   * @return the advance result
+   */
+  ProcessAdvanceResult handle(
+      ProcessType processType,
+      ProcessBusinessKey businessKey,
+      ProcessInput input,
+      CommandContext cause);
 }

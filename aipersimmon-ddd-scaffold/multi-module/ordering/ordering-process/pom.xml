@@ -48,10 +48,11 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-process-manager</artifactId>
     </dependency>
-    <!-- The engine: ProcessRuntime is driven and DefaultProcessQuery resolves the instance ref,
-         both against store PORTS rather than any one backend. ProcessSerializationCatalog also
-         lives here — the Jackson convenience layer's registration list, so most payloads need one
-         declaration instead of a hand-written codec.
+    <!-- The engine, for ONE class: ProcessSerializationCatalog — the Jackson convenience layer's
+         registration list, so every payload needs one declaration (plus a mix-in line for the
+         sealed CancellationReason) instead of a hand-written codec. The runtime collaborators
+         themselves (ProcessRuntime, ProcessQuery) are injected as the PORTS from the contracts
+         module above, so this module no longer references any engine runtime class.
 
          Note what is deliberately absent: no aipersimmon-ddd-process-manager-mybatis-plus. The
          store implementation is a deployment choice and is declared in `start`. If it were
@@ -71,10 +72,23 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
     </dependency>
+    <!-- The CancellationReason mix-in's @JsonTypeInfo/@JsonSubTypes. Annotations only: the
+         engine's Jackson databind dependency is optional (a deployment may bring its own codec
+         route), so the one Jackson artifact this module's main code needs is declared here. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
     <!-- Unit tests for the pure ProcessDefinition transition table; no runtime, no Spring context. -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- The codec test builds the real Jackson-generated codecs from this module's catalog. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.processmanager.definition;
 import com.aipersimmon.ddd.processmanager.model.DefinitionVersion;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
+import java.util.Set;
 
 /**
  * A consumer's process, expressed as a pure, deterministic decision object: given the current
@@ -63,6 +64,20 @@ public interface ProcessDefinition<S> {
    */
   default StateSchemaVersion stateSchemaVersion() {
     return StateSchemaVersion.INITIAL;
+  }
+
+  /**
+   * Every payload class this definition can receive as an input or stage as an effect — so a
+   * forgotten codec registration fails the <em>startup</em>, not the first advance that happens to
+   * encode it inside somebody's transaction. The startup validator reconciles each declared class
+   * against the payload codec registry and refuses to start naming whatever is missing.
+   *
+   * <p>Defaults to an empty set, which means "not validated": declaring is opt-in, because only the
+   * definition's author knows the full set. A flow that declares gets fail-fast; one that does not
+   * keeps today's behaviour.
+   */
+  default Set<Class<?>> declaredPayloads() {
+    return Set.of();
   }
 
   /**
