@@ -3,6 +3,7 @@ package com.aipersimmon.ddd.messaging.kafka;
 import com.aipersimmon.ddd.application.DurableIntegrationEvents;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.inbox.Inbox;
+import com.aipersimmon.ddd.integration.EventUpcaster;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.integration.IntegrationEventCatalog;
 import com.aipersimmon.ddd.integration.MalformedIntegrationEventException;
@@ -17,6 +18,7 @@ import com.aipersimmon.ddd.outbox.spring.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -263,7 +265,8 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
       ObjectProvider<Inbox> inbox,
       IntegrationEventCatalog catalog,
       ConfigurableListableBeanFactory beanFactory,
-      KafkaMessagingProperties properties) {
+      KafkaMessagingProperties properties,
+      ObjectProvider<EventUpcaster<?, ?>> upcasters) {
     // Which event types have a local @EventListener; records of any other type are dropped
     // before the inbox (nothing would handle them). Opt out to handle-everything when the
     // application consumes via a mechanism the scan cannot see.
@@ -271,12 +274,17 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
         properties.getConsumer().isSkipLocallyUnhandled()
             ? LocallyHandledEventTypes.scan(beanFactory)
             : LocallyHandledEventTypes.handlingEverything();
+    // Consumer-side revision normalisation (issue-00142): every EventUpcaster bean is indexed and
+    // verified here, at startup, so a mis-declared one fails the deployment by name rather than
+    // the first old-revision record.
     return new KafkaIntegrationEventListener(
         publisher,
         objectMapper.getIfAvailable(ObjectMapper::new),
         inbox.getIfAvailable(),
         catalog,
-        localHandlers);
+        localHandlers,
+        EventUpcasterChain.of(upcasters.stream().toList()),
+        Clock.systemUTC());
   }
 
   /**

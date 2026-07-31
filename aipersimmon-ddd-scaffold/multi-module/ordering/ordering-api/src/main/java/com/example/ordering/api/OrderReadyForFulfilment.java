@@ -46,9 +46,9 @@ import java.util.List;
  * the cheap case, and it is cheap precisely because a consumer can supply a stand-in for what is
  * missing. A <em>breaking</em> change — renaming a field, changing {@code quantity}'s unit,
  * splitting {@code lines} — cannot be absorbed that way and needs the same two-revision overlap
- * plus a real translation in the consumer's anticorruption layer. The overlap mechanism is
- * identical; only the upcast gets harder. See {@code OrderReadyForFulfilmentListener} in {@code
- * inventory-adapter} for where that translation belongs.
+ * plus a real translation in the consumer's upcaster. The overlap mechanism is identical; only the
+ * upcast gets harder. See {@code OrderReadyForFulfilmentV1Upcaster} in {@code inventory-adapter}
+ * for where that translation belongs.
  *
  * @param reservationDeadline when ordering will stop waiting for an answer and compensate — the
  *     instant its own STOCK deadline fires. Ordering is the only context that knows this (it owns

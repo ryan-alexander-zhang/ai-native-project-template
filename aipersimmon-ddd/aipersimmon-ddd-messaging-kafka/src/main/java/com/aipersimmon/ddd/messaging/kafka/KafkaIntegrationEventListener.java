@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Optional;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 import org.springframework.context.ApplicationEventPublisher;
@@ -53,6 +54,7 @@ public class KafkaIntegrationEventListener {
   private final Inbox inbox;
   private final IntegrationEventCatalog catalog;
   private final LocallyHandledEventTypes localHandlers;
+  private final EventUpcasterChain upcasters;
   private final Clock clock;
 
   /**
@@ -95,11 +97,23 @@ public class KafkaIntegrationEventListener {
       IntegrationEventCatalog catalog,
       LocallyHandledEventTypes localHandlers,
       Clock clock) {
+    this(publisher, objectMapper, inbox, catalog, localHandlers, EventUpcasterChain.none(), clock);
+  }
+
+  KafkaIntegrationEventListener(
+      ApplicationEventPublisher publisher,
+      ObjectMapper objectMapper,
+      Inbox inbox,
+      IntegrationEventCatalog catalog,
+      LocallyHandledEventTypes localHandlers,
+      EventUpcasterChain upcasters,
+      Clock clock) {
     this.publisher = publisher;
     this.objectMapper = objectMapper;
     this.inbox = inbox;
     this.catalog = catalog;
     this.localHandlers = localHandlers;
+    this.upcasters = upcasters;
     this.clock = clock;
   }
 
@@ -171,10 +185,22 @@ public class KafkaIntegrationEventListener {
     // Only skip a KNOWN type that no local handler wants. An unknown (type, version) is poison
     // and must still be dead-lettered (strict inbound validation), so leave it
     // to the normal path rather than silently dropping it here.
-    if (catalog.lookup(type, version).isEmpty()) {
+    Optional<Class<? extends IntegrationEvent>> eventClass = catalog.lookup(type, version);
+    if (eventClass.isEmpty()) {
       return false;
     }
-    return !localHandlers.handles(type, version);
+    if (localHandlers.handles(type, version)) {
+      return false;
+    }
+    // A retired revision with no listener of its own may still be handled after upcasting: what
+    // the listener will actually see is the chain's terminal class, so that is the version to ask
+    // about (issue-00142). Without this, collapsing the per-revision listeners into one — the
+    // whole point of upcasters — would make every old-revision record silently skippable.
+    if (!upcasters.isEmpty()
+        && localHandlers.handles(type, upcasters.terminalVersionOf(eventClass.get()))) {
+      return false;
+    }
+    return true;
   }
 
   private EventEnvelope<IntegrationEvent> reconstruct(
@@ -191,7 +217,17 @@ public class KafkaIntegrationEventListener {
             .lookup(type, version)
             .orElseThrow(() -> new UnknownIntegrationEventException(type, version));
     try {
-      IntegrationEvent payload = objectMapper.readValue(record.value(), eventType);
+      // Normalise a retired revision at the boundary (issue-00142): after the upcast walk the
+      // payload is the newest revision an upcaster leads to, so the envelope's version must
+      // describe the payload actually carried — the wire's original version stays visible on the
+      // Kafka record, but an envelope whose version contradicts its payload class would be a lie
+      // to every listener that reads it.
+      IntegrationEvent payload =
+          upcasters.upcast(objectMapper.readValue(record.value(), eventType));
+      int deliveredVersion =
+          payload.getClass() == eventType
+              ? version
+              : IntegrationEvent.eventVersionOf(payload.getClass());
       String subject = header(record, IntegrationEventHeaders.SUBJECT);
       String tenantId = tenantId(record);
       String correlationId =
@@ -201,7 +237,7 @@ public class KafkaIntegrationEventListener {
           eventId,
           source,
           type,
-          version,
+          deliveredVersion,
           occurredAt,
           subject,
           tenantId,
