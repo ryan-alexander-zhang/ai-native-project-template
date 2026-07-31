@@ -123,7 +123,7 @@ class JdbcProcessOperationsTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
   }
 
   private String lifecycle() {
@@ -155,7 +155,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmPoisonDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
     ProcessDeadlineWorker worker =
         new ProcessDeadlineWorker(
             new JdbcProcessClaimStrategy(jdbc, dialect, new WorkerId("dw")),
@@ -202,7 +202,7 @@ class JdbcProcessOperationsTest {
         runtime.handle(
             started.processRef(),
             new TestFulfilment.Advance(),
-            CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+            CommandContext.root(Tenants.ROOT, "msg-adv"));
     assertFalse(parked.duplicate());
     assertEquals(
         1L,
@@ -215,7 +215,7 @@ class JdbcProcessOperationsTest {
         runtime.handle(
             started.processRef(),
             new TestFulfilment.Advance(),
-            CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+            CommandContext.root(Tenants.ROOT, "msg-adv"));
     assertTrue(again.duplicate());
     assertEquals(
         1L,
@@ -232,7 +232,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+        CommandContext.root(Tenants.ROOT, "msg-adv"));
 
     operations.redriveEffect(deadEffectId, "operator-1", "transient outage cleared");
 
@@ -309,11 +309,11 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+        CommandContext.root(Tenants.ROOT, "msg-adv"));
     runtime.handle(
         started.processRef(),
         new TestFulfilment.FanOut(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-fan"));
+        CommandContext.root(Tenants.ROOT, "msg-fan"));
     assertEquals(
         2L,
         jdbc.queryForObject(
@@ -336,7 +336,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+        CommandContext.root(Tenants.ROOT, "msg-adv"));
     operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
     parkedInputWorker.pollOnce();
     assertEquals("S2|1", state(), "Advance ran once, incrementing the counter once");
@@ -362,7 +362,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Boom(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-boom"));
+        CommandContext.root(Tenants.ROOT, "msg-boom"));
     operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
 
     assertEquals(0, parkedInputWorker.pollOnce(), "nothing was replayed");
@@ -385,7 +385,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+        CommandContext.root(Tenants.ROOT, "msg-adv"));
 
     assertEquals(0, parkedInputWorker.pollOnce(), "a suspended instance would only re-park it");
     assertEquals("S1", step());
@@ -401,7 +401,7 @@ class JdbcProcessOperationsTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+        CommandContext.root(Tenants.ROOT, "msg-adv"));
 
     operations.redriveEffect(deadEffectId, "operator-1", "outage cleared");
     parkedInputWorker.pollOnce();
@@ -425,7 +425,7 @@ class JdbcProcessOperationsTest {
         runtime.handle(
             started.processRef(),
             new TestFulfilment.ArmDeadline(),
-            CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+            CommandContext.root(Tenants.ROOT, "msg-arm"));
 
     operations.cancelProcess(
         started.processRef(), armed.revision().value(), "operator-1", "customer request");

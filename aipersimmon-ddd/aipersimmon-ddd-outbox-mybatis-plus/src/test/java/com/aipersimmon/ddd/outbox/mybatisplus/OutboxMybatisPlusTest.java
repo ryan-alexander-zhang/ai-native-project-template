@@ -73,7 +73,7 @@ class OutboxMybatisPlusTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
+                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT, "cmd-1")));
 
     assertEquals(
         Integer.valueOf(1),

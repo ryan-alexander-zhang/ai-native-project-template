@@ -23,7 +23,7 @@ class TenantContextCommandInterceptorTest {
 
   @Test
   void bindsTheCommandsTenantForTheDurationOfHandling() {
-    CommandContext ctx = CommandContext.root("acme", "cmd-1");
+    CommandContext ctx = CommandContext.root(Tenants.of("acme"), "cmd-1");
 
     String seenDuringHandling =
         interceptor.intercept(new Ping(), ctx, () -> TenantContext.effective().value());
@@ -36,7 +36,8 @@ class TenantContextCommandInterceptorTest {
   void restoresThePreviousAmbientTenantAfterHandling() {
     TenantContext.set(Tenants.of("outer"));
 
-    interceptor.intercept(new Ping(), CommandContext.root("inner", "cmd-2"), () -> null);
+    interceptor.intercept(
+        new Ping(), CommandContext.root(Tenants.of("inner"), "cmd-2"), () -> null);
 
     assertEquals("outer", TenantContext.effective().value());
   }

@@ -12,6 +12,7 @@ import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.EventDestinations;
 import com.aipersimmon.ddd.outbox.engine.store.InMemoryOutboxStore;
 import com.aipersimmon.ddd.outbox.engine.store.OutboxInsert;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -89,7 +90,8 @@ class OutboxWriterTest {
             IllegalStateException.class,
             () ->
                 writerRoutedTo(EventDestinations.ALL_IN_PROCESS)
-                    .publish(new SampleEvent("o-1"), CommandContext.root("acme", "cmd-1")));
+                    .publish(
+                        new SampleEvent("o-1"), CommandContext.root(Tenants.of("acme"), "cmd-1")));
 
     // Untransacted, the row commits on its own; then the caller's work rolls back and the relay
     // faithfully publishes an event announcing a change that never happened, with no error
@@ -100,7 +102,7 @@ class OutboxWriterTest {
 
   @Test
   void aBrandNewEventGetsAFreshIdAndIsCausedByTheCommandThatPublishedIt() {
-    CommandContext command = CommandContext.root("acme", "cmd-1");
+    CommandContext command = CommandContext.root(Tenants.of("acme"), "cmd-1");
 
     writerRoutedTo(EventDestinations.ALL_IN_PROCESS).publish(new SampleEvent("o-1"), command);
 
@@ -130,7 +132,7 @@ class OutboxWriterTest {
   @Test
   void aSourceDeclaredOnTheContractOverridesTheDeploymentDefault() {
     writerRoutedTo(EventDestinations.ALL_IN_PROCESS)
-        .publish(new SourcedEvent("o-1"), CommandContext.root("acme", "cmd-1"));
+        .publish(new SourcedEvent("o-1"), CommandContext.root(Tenants.of("acme"), "cmd-1"));
 
     assertEquals("/inventory", store.written("minted-id").orElseThrow().source());
   }
@@ -138,7 +140,7 @@ class OutboxWriterTest {
   @Test
   void theWritingThreadsTraceContextIsCarriedOnTheRow() {
     writerRoutedTo(EventDestinations.ALL_IN_PROCESS)
-        .publish(new SampleEvent("o-1"), CommandContext.root("acme", "cmd-1"));
+        .publish(new SampleEvent("o-1"), CommandContext.root(Tenants.of("acme"), "cmd-1"));
 
     OutboxInsert row = store.written("minted-id").orElseThrow();
     // The relay restores this when it dispatches, on a different thread and long after: the one
@@ -150,7 +152,7 @@ class OutboxWriterTest {
   @Test
   void whereTheEventIsGoingIsResolvedNowAndStoredOnTheRow() {
     writerRoutedTo((type, version) -> Optional.of("ordering.events"))
-        .publish(new SampleEvent("o-1"), CommandContext.root("acme", "cmd-1"));
+        .publish(new SampleEvent("o-1"), CommandContext.root(Tenants.of("acme"), "cmd-1"));
 
     assertEquals(
         "ordering.events",
@@ -162,7 +164,7 @@ class OutboxWriterTest {
   @Test
   void anEventWithNoExternalTargetIsMarkedInProcessRatherThanUnrouted() {
     writerRoutedTo(EventDestinations.ALL_IN_PROCESS)
-        .publish(new SampleEvent("o-1"), CommandContext.root("acme", "cmd-1"));
+        .publish(new SampleEvent("o-1"), CommandContext.root(Tenants.of("acme"), "cmd-1"));
 
     assertNull(store.written("minted-id").orElseThrow().destination());
   }
@@ -171,7 +173,8 @@ class OutboxWriterTest {
   void aReplayedStagedEffectKeepsTheIdentityAlreadyPersistedUpstream() {
     // What the durable relay hands the writer: the effect's own persisted id as the message id,
     // and the transition that staged it as the cause.
-    CommandContext staged = new CommandContext("acme", "effect-id-7", "corr-1", "the-cause");
+    CommandContext staged =
+        new CommandContext(Tenants.of("acme"), "effect-id-7", "corr-1", "the-cause");
 
     writerRoutedTo(EventDestinations.ALL_IN_PROCESS).publishAs(new SampleEvent("o-1"), staged);
 
@@ -184,7 +187,8 @@ class OutboxWriterTest {
   void aRedeliveredStagedEffectCollapsesOntoTheOneRowItAlreadyWrote() {
     // What the durable relay hands the writer: the effect's own persisted id as the message id,
     // and the transition that staged it as the cause.
-    CommandContext staged = new CommandContext("acme", "effect-id-7", "corr-1", "the-cause");
+    CommandContext staged =
+        new CommandContext(Tenants.of("acme"), "effect-id-7", "corr-1", "the-cause");
     OutboxWriter writer = writerRoutedTo(EventDestinations.ALL_IN_PROCESS);
     writer.publishAs(new SampleEvent("o-1"), staged);
 
@@ -200,13 +204,15 @@ class OutboxWriterTest {
   @Test
   void aDuplicateBrandNewEventIsAnErrorRatherThanSwallowed() {
     OutboxWriter writer = writerRoutedTo(EventDestinations.ALL_IN_PROCESS);
-    writer.publish(new SampleEvent("o-1"), CommandContext.root("acme", "cmd-1"));
+    writer.publish(new SampleEvent("o-1"), CommandContext.root(Tenants.of("acme"), "cmd-1"));
 
     // Only a replayed effect is idempotent. A fresh publish colliding on a minted id means the
     // id generator is broken, which is not something to absorb quietly.
     assertThrows(
         org.springframework.dao.DuplicateKeyException.class,
-        () -> writer.publish(new SampleEvent("o-2"), CommandContext.root("acme", "cmd-1")));
+        () ->
+            writer.publish(
+                new SampleEvent("o-2"), CommandContext.root(Tenants.of("acme"), "cmd-1")));
   }
 
   @Test
@@ -224,6 +230,6 @@ class OutboxWriterTest {
         IllegalStateException.class,
         () ->
             writerRoutedTo(EventDestinations.ALL_IN_PROCESS)
-                .publish(cyclic, CommandContext.root("acme", "cmd-1")));
+                .publish(cyclic, CommandContext.root(Tenants.of("acme"), "cmd-1")));
   }
 }

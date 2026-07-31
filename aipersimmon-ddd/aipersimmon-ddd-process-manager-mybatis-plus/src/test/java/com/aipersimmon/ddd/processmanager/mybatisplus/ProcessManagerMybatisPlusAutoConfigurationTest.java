@@ -87,7 +87,7 @@ class ProcessManagerMybatisPlusAutoConfigurationTest {
             MybatisTestProcess.TYPE,
             new ProcessBusinessKey("order-1"),
             new MybatisTestProcess.Begin("order-1"),
-            CommandContext.root(Tenants.ROOT.value(), "msg-1"));
+            CommandContext.root(Tenants.ROOT, "msg-1"));
 
     ProcessView view = query.find(started.processRef()).orElseThrow();
     assertEquals("GO", view.step().value());

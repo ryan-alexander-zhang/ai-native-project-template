@@ -571,6 +571,6 @@ class OrderFulfilmentDefinitionTest {
         java.util.Optional.of(lifecycle),
         java.util.Optional.of(new ProcessStep(step.name())),
         Instant.EPOCH,
-        CommandContext.root(Tenants.ROOT.value(), causeMessageId));
+        CommandContext.root(Tenants.ROOT, causeMessageId));
   }
 }

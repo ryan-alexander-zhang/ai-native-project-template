@@ -72,7 +72,7 @@ final class ProcessOutcomeWriter {
     EncodedPayload encodedInput = serdes.encodePayload(input);
     transitions.append(
         new ProcessTransitionInsert(
-            cause.tenantId(),
+            cause.tenantId().value(),
             transitionId,
             ref.instanceId(),
             cause.messageId(),
@@ -174,7 +174,7 @@ final class ProcessOutcomeWriter {
     Captured captured = storeTracer.captureCurrent();
     deadlines.schedule(
         new ProcessDeadlineInsert(
-            cause.tenantId(),
+            cause.tenantId().value(),
             idGenerator.get(),
             ref.instanceId(),
             schedule.name(),
@@ -204,7 +204,7 @@ final class ProcessOutcomeWriter {
     Captured captured = storeTracer.captureCurrent();
     effects.insert(
         new ProcessEffectInsert(
-            cause.tenantId(),
+            cause.tenantId().value(),
             effectId,
             ref.instanceId(),
             transitionId,

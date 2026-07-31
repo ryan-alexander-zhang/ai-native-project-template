@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectInsert;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectView;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -71,7 +72,10 @@ public final class MybatisProcessEffectStore implements ProcessEffectStore {
             new PayloadType(r.getPayloadType(), r.getPayloadVersion()),
             Payloads.fromText(r.getPayload()),
             new CommandContext(
-                r.getTenantId(), r.getMessageId(), r.getCorrelationId(), r.getCausationId()),
+                Tenants.fromValue(r.getTenantId()),
+                r.getMessageId(),
+                r.getCorrelationId(),
+                r.getCausationId()),
             r.getAttempts(),
             r.getTraceparent(),
             r.getTraceState()));

@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 class OperationLogInterceptorsTest {
 
-  private static final CommandContext CTX = CommandContext.root(Tenants.ROOT.value(), "m1");
+  private static final CommandContext CTX = CommandContext.root(Tenants.ROOT, "m1");
 
   private static OperationLogDefinitionRegistry registryWithUpdateRemark() {
     return OperationLogDefinitionRegistry.build(

@@ -305,7 +305,7 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
     // two tenants reuse a business key, so an unscoped lookup could load — and FOR UPDATE lock —
     // another tenant's instance.
     Optional<ProcessInstanceRow> existing =
-        instances.findByBusinessKey(cause.tenantId(), processType, businessKey);
+        instances.findByBusinessKey(cause.tenantId().value(), processType, businessKey);
     if (existing.isPresent()) {
       return resolveExistingStart(existing.get(), processType, businessKey, cause);
     }
@@ -331,7 +331,7 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
         serdes.encodeState(processType, definition.stateSchemaVersion(), decision.state());
     instances.insert(
         new ProcessInstanceRow(
-            cause.tenantId(),
+            cause.tenantId().value(),
             ref,
             definition.definitionVersion(),
             definition.stateSchemaVersion(),
@@ -465,7 +465,7 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
       EncodedPayload parkedInput = serdes.encodePayload(input);
       transitions.append(
           new ProcessTransitionInsert(
-              cause.tenantId(),
+              cause.tenantId().value(),
               parkedId,
               ref.instanceId(),
               cause.messageId(),

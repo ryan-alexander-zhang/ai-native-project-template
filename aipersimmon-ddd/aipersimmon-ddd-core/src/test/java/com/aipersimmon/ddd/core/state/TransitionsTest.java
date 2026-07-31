@@ -60,7 +60,7 @@ class TransitionsTest {
     assertFalse(table.permits(Status.PENDING, Status.CANCELLED));
   }
 
-  // --- refusal codes (issue-00138): the table names the refusal, once, where the transition is
+  // --- refusal codes: the table names the refusal, once, where the transition is
   // declared — so a refused mechanical move reaches the edge with a stable identity instead of a
   // bare message, and the aggregate never writes the same guard twice to get one.
 

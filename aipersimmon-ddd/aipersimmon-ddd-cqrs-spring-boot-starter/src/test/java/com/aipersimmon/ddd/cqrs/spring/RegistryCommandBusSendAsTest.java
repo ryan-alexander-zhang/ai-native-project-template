@@ -43,7 +43,8 @@ class RegistryCommandBusSendAsTest {
             List.of(handler), List.of(), () -> "MINTED-" + idCalls.incrementAndGet());
 
     // effectId is the durable identity the relay reconstructs into a full context.
-    CommandContext effectCtx = new CommandContext("__root__", "effect-42", "corr-7", "input-msg-3");
+    CommandContext effectCtx =
+        new CommandContext(Tenants.ROOT, "effect-42", "corr-7", "input-msg-3");
     String result = bus.sendAs(new Reserve("sku-1"), effectCtx);
 
     assertEquals("ok:sku-1", result);
@@ -66,7 +67,7 @@ class RegistryCommandBusSendAsTest {
             () -> {
               throw new AssertionError("sendAs must not mint an id");
             });
-    CommandContext effectCtx = CommandContext.root(Tenants.ROOT.value(), "effect-99");
+    CommandContext effectCtx = CommandContext.root(Tenants.ROOT, "effect-99");
 
     bus.sendAs(new Reserve("s"), effectCtx);
     bus.sendAs(new Reserve("s"), effectCtx); // relay redelivers the same persisted effect

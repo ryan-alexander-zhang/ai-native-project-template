@@ -108,7 +108,7 @@ class JdbcProcessDeadlineWorkerTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
   }
 
   private String instanceLifecycle() {
@@ -121,7 +121,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
 
     int fired = worker(zeroBackoff(3)).pollOnce();
 
@@ -141,7 +141,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
     String deadlineId =
         jdbc.queryForObject("SELECT deadline_id FROM aipersimmon_process_deadline", String.class);
     // Claim it, then let a cancel land — the shape of a fire whose transaction rolled back as the
@@ -172,11 +172,11 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "arm-1"));
+        CommandContext.root(Tenants.ROOT, "arm-1"));
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "arm-2"));
+        CommandContext.root(Tenants.ROOT, "arm-2"));
     assertEquals(
         2L,
         jdbc.queryForObject(
@@ -206,7 +206,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmPoisonDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
     ProcessDeadlineWorker worker = worker(zeroBackoff(2));
 
     worker.pollOnce(); // attempt 1 -> handle throws -> retry
@@ -228,7 +228,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
 
     assertEquals(1, worker(zeroBackoff(3)).pollOnce());
 
@@ -247,7 +247,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
 
     // A worker claimed the deadline (IN_FLIGHT) and its lease has since expired (crash/slow
     // worker).
@@ -264,7 +264,7 @@ class JdbcProcessDeadlineWorkerTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.CancelReview(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-cancel"));
+        CommandContext.root(Tenants.ROOT, "msg-cancel"));
 
     int fired = worker(zeroBackoff(3)).pollOnce();
 

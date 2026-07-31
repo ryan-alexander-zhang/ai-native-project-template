@@ -98,7 +98,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
     write(
         event,
         idGenerator.get(),
-        context.tenantId(),
+        context.tenantId().value(),
         context.correlationId(),
         context.messageId(),
         false);
@@ -114,7 +114,7 @@ public class OutboxWriter implements DurableIntegrationEvents {
     write(
         event,
         context.messageId(),
-        context.tenantId(),
+        context.tenantId().value(),
         context.correlationId(),
         context.causationId(),
         true);

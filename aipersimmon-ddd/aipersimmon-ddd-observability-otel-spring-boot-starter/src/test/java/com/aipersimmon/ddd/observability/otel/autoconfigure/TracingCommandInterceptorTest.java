@@ -45,7 +45,7 @@ class TracingCommandInterceptorTest {
 
   @Test
   void wrapsSuccessfulCommandInASpanWithAttributes() {
-    CommandContext context = CommandContext.root(Tenants.ROOT.value(), "msg-1");
+    CommandContext context = CommandContext.root(Tenants.ROOT, "msg-1");
 
     String result = interceptor.intercept(new PlaceOrder(), context, () -> "done");
 
@@ -68,7 +68,7 @@ class TracingCommandInterceptorTest {
 
   @Test
   void stampsTheCommandTenantOnTheSpan() {
-    CommandContext context = CommandContext.root("acme", "msg-3");
+    CommandContext context = CommandContext.root(Tenants.of("acme"), "msg-3");
 
     interceptor.intercept(new PlaceOrder(), context, () -> "done");
 
@@ -80,7 +80,7 @@ class TracingCommandInterceptorTest {
 
   @Test
   void marksSpanFailedWhenHandlerThrows() {
-    CommandContext context = CommandContext.root(Tenants.ROOT.value(), "msg-2");
+    CommandContext context = CommandContext.root(Tenants.ROOT, "msg-2");
     RuntimeException boom = new IllegalStateException("boom");
 
     RuntimeException thrown =

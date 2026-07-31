@@ -137,7 +137,7 @@ class ConnectedTraceEndToEndTest {
       commandTransaction.executeWithoutResult(
           status ->
               writer.publish(
-                  new OrderPlaced("order-1"), CommandContext.root(Tenants.ROOT.value(), "msg-1")));
+                  new OrderPlaced("order-1"), CommandContext.root(Tenants.ROOT, "msg-1")));
     }
 
     // Later, on the scheduler thread with no ambient context, the relay dispatches the row.

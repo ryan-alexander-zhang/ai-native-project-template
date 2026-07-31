@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.application;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
+import com.aipersimmon.ddd.tenancy.Tenants;
 
 /**
  * How an inbound integration event becomes the cause of the command it triggers.
@@ -32,7 +33,13 @@ public final class InboundEvents {
    * inherits its correlation and tenant.
    */
   public static CommandContext commandContext(EventEnvelope<?> envelope) {
+    // Tenants.fromValue, not Tenants.of: the envelope's tenant is a persisted wire value that may
+    // legitimately be a framework sentinel, and re-adopting it here IS the trust-boundary act —
+    // the consuming bridge already vetted the envelope before handing it over.
     return new CommandContext(
-        envelope.tenantId(), envelope.eventId(), envelope.correlationId(), envelope.causationId());
+        Tenants.fromValue(envelope.tenantId()),
+        envelope.eventId(),
+        envelope.correlationId(),
+        envelope.causationId());
   }
 }

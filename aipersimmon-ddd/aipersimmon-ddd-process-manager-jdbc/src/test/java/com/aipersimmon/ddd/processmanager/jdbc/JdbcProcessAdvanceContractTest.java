@@ -101,7 +101,7 @@ class JdbcProcessAdvanceContractTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), messageId));
+        CommandContext.root(Tenants.ROOT, messageId));
   }
 
   @Test
@@ -111,7 +111,7 @@ class JdbcProcessAdvanceContractTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm"));
+        CommandContext.root(Tenants.ROOT, "msg-arm"));
     assertEquals(
         "PENDING",
         jdbc.queryForObject("SELECT status FROM aipersimmon_process_deadline", String.class));
@@ -119,7 +119,7 @@ class JdbcProcessAdvanceContractTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Finish(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-finish"));
+        CommandContext.root(Tenants.ROOT, "msg-finish"));
 
     // Left PENDING, this row could never be claimed again, since the claim query only offers timers
     // of active instances — yet it would still count as due work in the backlog SLI, so the health
@@ -148,7 +148,7 @@ class JdbcProcessAdvanceContractTest {
                 runtime.handle(
                     started.processRef(),
                     new TestFulfilment.FinishAndArmDeadline(),
-                    CommandContext.root(Tenants.ROOT.value(), "msg-finish")));
+                    CommandContext.root(Tenants.ROOT, "msg-finish")));
 
     assertTrue(
         rejected.getMessage().contains("REVIEW"),
@@ -169,7 +169,7 @@ class JdbcProcessAdvanceContractTest {
         runtime.handle(
             started.processRef(),
             new TestFulfilment.Advance(),
-            CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+            CommandContext.root(Tenants.ROOT, "msg-adv"));
 
     assertEquals(ProcessLifecycle.RUNNING, advanced.lifecycle());
     assertEquals(
@@ -200,7 +200,7 @@ class JdbcProcessAdvanceContractTest {
                     runtime.handle(
                         started.processRef(),
                         new TestFulfilment.Advance(),
-                        CommandContext.root(Tenants.ROOT.value(), "msg-adv"))));
+                        CommandContext.root(Tenants.ROOT, "msg-adv"))));
 
     assertEquals(
         1,

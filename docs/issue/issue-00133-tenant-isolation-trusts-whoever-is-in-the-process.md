@@ -2,7 +2,7 @@
 id: issue-00133-tenant-isolation-trusts-whoever-is-in-the-process
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 租户隔离信任进程内的所有代码——而框架其余部分谁都不信
@@ -49,7 +49,26 @@ status: open
 
 ## 验证结果
 
-未修复。
+2026-07-31 修复，三个软点取前两项（可组合项中最强的两个）：
+
+1. **`setRequired` 收窄为包私有**（commit caa86da）：`TenantEnforcement`——生命周期与应用上下文
+   绑定的那个 bean——成为唯一 sanctioned mover；库内与 scaffold 的测试全部改经它切换模式。
+   `TenantContextTest.theEnforcementFlagCannotBeMovedFromOutsideThePackage` 以反射钉住可见性
+   （修复前红：方法是 public）。
+2. **`CommandContext.tenantId` 类型化为 `TenantId`**：伪造租户从"传任何能过 isBlank 的字符串"
+   变成"必须显式调用 `Tenants.of`（拒绝 `__` 前缀，哨兵不可随手命名）或 `Tenants.fromValue`
+   （声明'我在信任边界'的动作）"。旧测试 `rejectsBlankTenantId` 在新世界不可表达——空白租户
+   无法成为 `TenantId`，与 issue-00134 同款论证。转换纪律：来自 `TenantContext` 的直接传递
+   （bus、interceptor 不再 `.value()` 往返）；进 String 槽位（outbox 行、信封、span 属性）在
+   槽位处 `.value()`；从持久化/wire 字符串重建（`InboundEvents`、effect/deadline/parked 行
+   重建）一律 `Tenants.fromValue`。`aipersimmon-ddd-application` 显式声明 tenancy 依赖。
+
+**第三项（`sendAs` 能力令牌）经权衡不取**，作为在案取舍而非遗漏：(a) 类型化后经 `sendAs`
+伪造租户已必须先执行上述显式信任动作，收益大头已拿到；(b) `CqrsRules` 的 ArchUnit 规则
+仍守住 `sendAs` 调用方集合。若未来出现进程内不可信插件代码的场景再升级。
+
+验证：库全 reactor `mvn -o clean test` BUILD SUCCESS；scaffold `mvn -o clean test -pl start
+-am` BUILD SUCCESS（含双租户验收与全部流程测试）。改动波及库 14 个模块 + scaffold 6 处。
 
 ## 关联
 

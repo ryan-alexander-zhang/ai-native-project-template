@@ -52,7 +52,7 @@ class OutboxIdGeneratorWiringTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
+                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT, "cmd-1")));
 
     assertEquals(
         "outbox-id-sentinel",

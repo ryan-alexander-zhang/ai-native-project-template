@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,8 @@ class EffectDispatcherRegistryTest {
     return new DecodedProcessEffect(id, new ProcessInstanceId("instance-1"), kind, "payload");
   }
 
-  private static final CommandContext CONTEXT = CommandContext.root("acme", "message-1");
+  private static final CommandContext CONTEXT =
+      CommandContext.root(Tenants.of("acme"), "message-1");
 
   @Test
   void anEffectGoesToTheHandlerForItsKind() {

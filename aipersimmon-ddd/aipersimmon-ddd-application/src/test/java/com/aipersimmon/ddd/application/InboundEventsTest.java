@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +36,8 @@ class InboundEventsTest {
   void theEnvelopeSTenantIdCorrelationAndCausationAreCarriedOver() {
     CommandContext cause = InboundEvents.commandContext(envelope());
 
-    assertEquals("acme", cause.tenantId(), "the event's tenant owns the work it triggers");
+    assertEquals(
+        Tenants.of("acme"), cause.tenantId(), "the event's tenant owns the work it triggers");
     assertEquals("evt-9", cause.messageId(), "the event's id becomes the cause's message id");
     assertEquals("corr-3", cause.correlationId());
     assertEquals("upstream-cause", cause.causationId());
@@ -47,6 +49,6 @@ class InboundEventsTest {
 
     assertEquals("corr-3", command.correlationId(), "one correlation spans the whole flow");
     assertEquals("evt-9", command.causationId(), "the event is what directly caused this command");
-    assertEquals("acme", command.tenantId());
+    assertEquals(Tenants.of("acme"), command.tenantId());
   }
 }

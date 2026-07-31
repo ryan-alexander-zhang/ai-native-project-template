@@ -58,6 +58,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessStep;
 import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.model.StateSchemaVersion;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -419,7 +420,7 @@ class DefaultProcessRuntimeTest {
   }
 
   private static CommandContext cause(String messageId) {
-    return CommandContext.root("acme", messageId);
+    return CommandContext.root(Tenants.of("acme"), messageId);
   }
 
   private InMemoryProcessTransitionStore.Row onlyTransition() {
@@ -511,7 +512,8 @@ class DefaultProcessRuntimeTest {
     runtime.start(ORDERING, ORDER_1, new Say("place"), cause("m-1"));
 
     ProcessAdvanceResult other =
-        runtime.start(ORDERING, ORDER_1, new Say("place"), CommandContext.root("globex", "m-2"));
+        runtime.start(
+            ORDERING, ORDER_1, new Say("place"), CommandContext.root(Tenants.of("globex"), "m-2"));
 
     // The key is (tenant, type, businessKey). An unscoped lookup would not merely refuse this
     // start — it would load, and lock, another tenant's instance.

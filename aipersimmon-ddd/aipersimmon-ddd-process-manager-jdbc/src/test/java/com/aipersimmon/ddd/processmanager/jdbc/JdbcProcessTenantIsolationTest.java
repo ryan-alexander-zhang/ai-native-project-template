@@ -96,7 +96,7 @@ class JdbcProcessTenantIsolationTest {
             TestFulfilment.TYPE,
             SHARED,
             new TestFulfilment.Started("order-1"),
-            CommandContext.root(tenant, messageId))
+            CommandContext.root(Tenants.of(tenant), messageId))
         .processRef();
   }
 
@@ -140,6 +140,6 @@ class JdbcProcessTenantIsolationTest {
                 TestFulfilment.TYPE,
                 SHARED,
                 new TestFulfilment.Started("order-1"),
-                CommandContext.root("acme", "m-acme-2")));
+                CommandContext.root(Tenants.of("acme"), "m-acme-2")));
   }
 }

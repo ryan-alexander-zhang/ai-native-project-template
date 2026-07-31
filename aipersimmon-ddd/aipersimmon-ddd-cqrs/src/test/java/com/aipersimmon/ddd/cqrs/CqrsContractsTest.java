@@ -28,9 +28,7 @@ class CqrsContractsTest {
     CommandBus bus = new TestBus((c, ctx) -> "x", List.of());
     assertThrows(
         UnsupportedOperationException.class,
-        () ->
-            bus.sendAs(
-                new CreateThing("w"), CommandContext.root(Tenants.ROOT.value(), "effect-1")));
+        () -> bus.sendAs(new CreateThing("w"), CommandContext.root(Tenants.ROOT, "effect-1")));
   }
 
   @Test
@@ -73,7 +71,7 @@ class CqrsContractsTest {
             List.of());
 
     // e.g. an inbound integration event mapped to a cause context.
-    CommandContext cause = CommandContext.root(Tenants.ROOT.value(), "evt-1");
+    CommandContext cause = CommandContext.root(Tenants.ROOT, "evt-1");
     bus.send(new CreateThing("y"), cause);
 
     CommandContext ctx = seen.get(0);
@@ -151,7 +149,7 @@ class CqrsContractsTest {
 
     @Override
     public <R> R send(Command<R> command) {
-      return dispatch(command, CommandContext.root(Tenants.ROOT.value(), nextId()));
+      return dispatch(command, CommandContext.root(Tenants.ROOT, nextId()));
     }
 
     @Override

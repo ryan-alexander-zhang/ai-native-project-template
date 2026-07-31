@@ -80,7 +80,7 @@ class OutboxJdbcTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
+                new SampleEvent("O-1"), CommandContext.root(Tenants.ROOT, "cmd-1")));
 
     assertEquals(
         Integer.valueOf(1),
@@ -109,7 +109,7 @@ class OutboxJdbcTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new NamespacedEvent("O-9"), CommandContext.root(Tenants.ROOT.value(), "cmd-9")));
+                new NamespacedEvent("O-9"), CommandContext.root(Tenants.ROOT, "cmd-9")));
 
     relay.relay();
 
@@ -139,7 +139,7 @@ class OutboxJdbcTest {
     // delivered-mark cannot leave two rows with two different event ids, which would defeat the
     // downstream inbox's dedupe. Before the fix, the effect path used publish() and each
     // redelivery minted a new random event id.
-    CommandContext effectContext = new CommandContext("__root__", "txn-1#0", "corr-1", "cause-1");
+    CommandContext effectContext = new CommandContext(Tenants.ROOT, "txn-1#0", "corr-1", "cause-1");
 
     publishInTransaction(() -> integrationEvents.publishAs(new SampleEvent("O-7"), effectContext));
     publishInTransaction(

@@ -125,7 +125,7 @@ class JdbcProcessStateUpcastTest {
         now);
     ProcessRef ref = new ProcessRef(new ProcessInstanceId("inst-1"), TYPE, ORDER);
 
-    runtime.handle(ref, new Advance(), CommandContext.root(Tenants.ROOT.value(), "msg-adv"));
+    runtime.handle(ref, new Advance(), CommandContext.root(Tenants.ROOT, "msg-adv"));
 
     assertEquals(
         1,

@@ -118,7 +118,7 @@ class JdbcProcessEffectRelayTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
   }
 
   private String status(String effectId) {
@@ -152,7 +152,7 @@ class JdbcProcessEffectRelayTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.FanOut(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-fan"));
+        CommandContext.root(Tenants.ROOT, "msg-fan"));
 
     int firstRound = relay.pollOnce();
     assertEquals(1, firstRound, "only the head of the two fan-out effects is delivered");
@@ -172,7 +172,7 @@ class JdbcProcessEffectRelayTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-advance"));
+        CommandContext.root(Tenants.ROOT, "msg-advance"));
     ProcessEffectRelay relay = relay(zeroBackoff(3));
 
     assertEquals(1, relay.pollOnce(), "only the head effect is delivered; the later one waits");

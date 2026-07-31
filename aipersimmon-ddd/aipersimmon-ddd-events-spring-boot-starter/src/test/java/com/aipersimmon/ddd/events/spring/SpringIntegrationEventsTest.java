@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.EventType;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +29,7 @@ class SpringIntegrationEventsTest {
         new SpringIntegrationEvents(publisher, Clock.systemUTC(), "/inventory", () -> "EVT-1");
 
     SampleIntegrationEvent event = new SampleIntegrationEvent("1");
-    CommandContext context = new CommandContext("__root__", "cmd-1", "corr-1", "cause-0");
+    CommandContext context = new CommandContext(Tenants.ROOT, "cmd-1", "corr-1", "cause-0");
     events.publish(event, context);
 
     assertEquals(1, captured.size());
@@ -55,7 +56,7 @@ class SpringIntegrationEventsTest {
 
     events.publish(
         new SampleIntegrationEvent("1"),
-        new CommandContext("__root__", "cmd-1", "corr-1", "cause-0"));
+        new CommandContext(Tenants.ROOT, "cmd-1", "corr-1", "cause-0"));
 
     PayloadApplicationEvent<?> published = (PayloadApplicationEvent<?>) captured.get(0);
     EventEnvelope<?> envelope = (EventEnvelope<?>) published.getPayload();

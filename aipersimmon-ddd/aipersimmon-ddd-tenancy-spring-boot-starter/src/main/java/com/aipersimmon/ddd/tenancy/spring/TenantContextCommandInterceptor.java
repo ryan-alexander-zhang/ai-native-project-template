@@ -4,7 +4,6 @@ import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.Tenants;
 
 /**
  * Binds the ambient {@link TenantContext} from the command's {@link CommandContext#tenantId()} for
@@ -28,6 +27,8 @@ public class TenantContextCommandInterceptor implements CommandInterceptor {
 
   @Override
   public <R> R intercept(Command<R> command, CommandContext context, Invocation<R> invocation) {
-    return TenantContext.runAs(Tenants.fromValue(context.tenantId()), invocation::proceed);
+    // The context carries a real TenantId, so binding needs no re-parse: whoever minted the
+    // context already performed the trust-boundary act.
+    return TenantContext.runAs(context.tenantId(), invocation::proceed);
   }
 }

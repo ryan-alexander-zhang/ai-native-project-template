@@ -97,7 +97,7 @@ class OutboxTracingTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1")));
+                new SampleEvent("o1"), CommandContext.root(Tenants.ROOT, "m1")));
 
     String traceparent =
         jdbc.queryForObject("SELECT traceparent FROM aipersimmon_outbox", String.class);
@@ -112,7 +112,7 @@ class OutboxTracingTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new SampleEvent("o1"), CommandContext.root(Tenants.ROOT.value(), "m1")));
+                new SampleEvent("o1"), CommandContext.root(Tenants.ROOT, "m1")));
 
     relay.relay();
 

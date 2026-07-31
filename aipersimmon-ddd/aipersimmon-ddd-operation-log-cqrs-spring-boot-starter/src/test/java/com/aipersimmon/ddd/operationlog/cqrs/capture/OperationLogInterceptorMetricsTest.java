@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 /** Verifies the capture interceptors emit render latency and the failure-record-loss signal. */
 class OperationLogInterceptorMetricsTest {
 
-  private static final CommandContext CTX = CommandContext.root(Tenants.ROOT.value(), "m1");
+  private static final CommandContext CTX = CommandContext.root(Tenants.ROOT, "m1");
   private static final String CODE = "order.remark.update";
 
   private static final FailureClassifier CLASSIFIER =

@@ -132,7 +132,7 @@ class EffectRelayPostgresConcurrencyTest {
           MybatisTestProcess.TYPE,
           new ProcessBusinessKey("order-" + i),
           new MybatisTestProcess.Begin("order-" + i),
-          CommandContext.root(Tenants.ROOT.value(), "msg-" + i));
+          CommandContext.root(Tenants.ROOT, "msg-" + i));
     }
 
     AtomicInteger delivered = new AtomicInteger();

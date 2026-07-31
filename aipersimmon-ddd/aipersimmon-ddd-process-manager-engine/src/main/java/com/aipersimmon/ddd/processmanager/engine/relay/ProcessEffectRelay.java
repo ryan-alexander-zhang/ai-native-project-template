@@ -15,7 +15,6 @@ import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.tenancy.TenantContext;
-import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -179,8 +178,7 @@ public final class ProcessEffectRelay {
     // Rebind the effect's tenant for the duration of the dispatch. The row carries the owning
     // tenant precisely because this hop crosses threads: the handler (or the event's producer) may
     // read the ambient tenant to scope its own tables, and on a relay thread nothing bound it.
-    return TenantContext.runAs(
-        Tenants.fromValue(effect.context().tenantId()), () -> dispatch(effect, leaseToken));
+    return TenantContext.runAs(effect.context().tenantId(), () -> dispatch(effect, leaseToken));
   }
 
   private boolean dispatch(ClaimedEffect effect, String leaseToken) {

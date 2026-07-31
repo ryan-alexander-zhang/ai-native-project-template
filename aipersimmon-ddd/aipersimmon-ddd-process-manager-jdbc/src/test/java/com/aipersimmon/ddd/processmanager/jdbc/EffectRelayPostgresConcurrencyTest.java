@@ -111,7 +111,7 @@ class EffectRelayPostgresConcurrencyTest {
           TestFulfilment.TYPE,
           new ProcessBusinessKey("order-" + i),
           new TestFulfilment.Started("order-" + i),
-          CommandContext.root(Tenants.ROOT.value(), "msg-" + i));
+          CommandContext.root(Tenants.ROOT, "msg-" + i));
     }
     assertEquals(
         (long) total,

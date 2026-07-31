@@ -87,7 +87,7 @@ class ProcessManagerJdbcJacksonCodecTest {
             StarterTestProcess.TYPE,
             new ProcessBusinessKey("order-json"),
             new StarterTestProcess.Begin("order-json"),
-            CommandContext.root(Tenants.ROOT.value(), "msg-1"));
+            CommandContext.root(Tenants.ROOT, "msg-1"));
 
     ProcessView view = query.find(started.processRef()).orElseThrow();
     assertEquals(

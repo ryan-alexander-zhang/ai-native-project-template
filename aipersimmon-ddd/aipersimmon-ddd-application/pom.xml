@@ -43,6 +43,13 @@
       <artifactId>aipersimmon-ddd-cqrs</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- InboundEvents re-adopts the envelope's persisted tenant via Tenants.fromValue — the
+         explicit trust-boundary act the typed CommandContext.tenantId exists to force. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

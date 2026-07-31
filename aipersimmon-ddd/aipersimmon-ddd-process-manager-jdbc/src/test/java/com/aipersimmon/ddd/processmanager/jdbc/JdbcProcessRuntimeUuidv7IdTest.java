@@ -76,7 +76,7 @@ class JdbcProcessRuntimeUuidv7IdTest {
             TestFulfilment.TYPE,
             new ProcessBusinessKey("order-1"),
             new TestFulfilment.Started("order-1"),
-            CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+            CommandContext.root(Tenants.ROOT, "msg-start"));
 
     assertEquals(
         7,

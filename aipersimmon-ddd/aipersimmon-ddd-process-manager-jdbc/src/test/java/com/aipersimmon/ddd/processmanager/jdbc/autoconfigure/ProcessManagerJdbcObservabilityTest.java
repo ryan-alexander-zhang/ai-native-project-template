@@ -112,7 +112,7 @@ class ProcessManagerJdbcObservabilityTest {
             StarterTestProcess.TYPE,
             new ProcessBusinessKey("order-obs"),
             new StarterTestProcess.Begin("order-obs"),
-            CommandContext.root(Tenants.ROOT.value(), "msg-1"));
+            CommandContext.root(Tenants.ROOT, "msg-1"));
     assertEquals(1, relay.pollOnce(), "the staged effect is delivered");
 
     assertTrue(

@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.EventEnvelope;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.inventory.application.stock.ReserveStock;
 import com.example.ordering.api.OrderReadyForFulfilment;
 import com.example.ordering.api.OrderReadyForFulfilmentV1;
@@ -126,7 +127,7 @@ class OrderReadyForFulfilmentVersionsTest {
 
     @Override
     public <R> R send(Command<R> command) {
-      return send(command, CommandContext.root("demo", "test"));
+      return send(command, CommandContext.root(Tenants.of("demo"), "test"));
     }
 
     @Override

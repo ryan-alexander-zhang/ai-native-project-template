@@ -123,9 +123,7 @@ class JdbcProcessMaxLifetimeReservedDeadlineTest {
 
   @Test
   void aDefinitionReschedulingTheReservedNameInStartWinsOverTheDefaultBackstop() {
-    runtime()
-        .start(
-            TYPE, ORDER, new Reschedule(), CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+    runtime().start(TYPE, ORDER, new Reschedule(), CommandContext.root(Tenants.ROOT, "msg-start"));
 
     assertEquals(
         1L,
@@ -142,8 +140,7 @@ class JdbcProcessMaxLifetimeReservedDeadlineTest {
 
   @Test
   void aDefinitionCancellingTheReservedNameInStartWinsOverTheDefaultBackstop() {
-    runtime()
-        .start(TYPE, ORDER, new Cancel(), CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+    runtime().start(TYPE, ORDER, new Cancel(), CommandContext.root(Tenants.ROOT, "msg-start"));
 
     assertEquals(
         0L,

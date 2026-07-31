@@ -103,7 +103,7 @@ class JdbcProcessBacklogTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
   }
 
   private ProcessBacklog backlogAt(Instant at) {
@@ -144,7 +144,7 @@ class JdbcProcessBacklogTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "msg-arm")); // schedules a due REVIEW deadline
+        CommandContext.root(Tenants.ROOT, "msg-arm")); // schedules a due REVIEW deadline
 
     ProcessBacklog backlog = backlogAt(CLOCK.instant().plusSeconds(5));
     assertEquals(Duration.ofSeconds(5), backlog.oldestPendingEffectAge());

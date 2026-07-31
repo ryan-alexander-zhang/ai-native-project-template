@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.cqrs;
 
+import com.aipersimmon.ddd.tenancy.TenantId;
 import com.aipersimmon.ddd.tenancy.Tenants;
 
 /**
@@ -9,8 +10,14 @@ import com.aipersimmon.ddd.tenancy.Tenants;
  * be correlated back to what triggered it — and stay isolated to the right tenant.
  *
  * <ul>
- *   <li>{@code tenantId} — the owning tenant (the data-isolation boundary). Never blank: single
- *       tenant deployments use the sentinel {@link Tenants#ROOT} (N=1 multi-tenancy).
+ *   <li>{@code tenantId} — the owning tenant (the data-isolation boundary), as a {@link TenantId}
+ *       rather than a string. Never null: single-tenant deployments use the sentinel {@link
+ *       Tenants#ROOT} (N=1 multi-tenancy). The type is the guard — a context cannot be built from
+ *       an arbitrary string, only from a value that passed {@link Tenants#of} (which refuses the
+ *       reserved {@code __} prefix, so a caller cannot casually name a framework sentinel) or from
+ *       {@link Tenants#fromValue}, the explicit "I am at a trust boundary, this value was already
+ *       vetted" act. Fabricating a tenant therefore requires performing that act where a reviewer
+ *       can see it, instead of passing any string that survives an isBlank check.
  *   <li>{@code messageId} — this command's own id, unique per dispatch.
  *   <li>{@code correlationId} — stable across the whole flow: every command and event descending
  *       from one root shares it. A root command's correlationId equals its own messageId.
@@ -28,17 +35,17 @@ import com.aipersimmon.ddd.tenancy.Tenants;
  * format, so {@code cqrs} depends only on {@code core} and {@code tenancy}.
  *
  * <p>Framework-free and immutable. Ids are minted by the {@link CommandBus}, not by this type, and
- * the tenant is seeded by the bus from the ambient {@code TenantContext}; use {@link #root(String,
- * String)} and {@link #deriveChild(String)} to build the chain from a bus-supplied id. There is
- * deliberately no tenant-defaulting overload: the owning tenant is always an explicit choice, made
- * at the trusted boundary that mints the context (the bus reads it from the ambient tenant; a
- * genuinely tenant-less system path passes {@link Tenants#ROOT} by name).
+ * the tenant is seeded by the bus from the ambient {@code TenantContext}; use {@link
+ * #root(TenantId, String)} and {@link #deriveChild(String)} to build the chain from a bus-supplied
+ * id. There is deliberately no tenant-defaulting overload: the owning tenant is always an explicit
+ * choice, made at the trusted boundary that mints the context (the bus reads it from the ambient
+ * tenant; a genuinely tenant-less system path passes {@link Tenants#ROOT} by name).
  */
 public record CommandContext(
-    String tenantId, String messageId, String correlationId, String causationId) {
+    TenantId tenantId, String messageId, String correlationId, String causationId) {
 
   public CommandContext {
-    if (tenantId == null || tenantId.isBlank()) {
+    if (tenantId == null) {
       throw new IllegalArgumentException("tenantId required");
     }
     if (messageId == null || messageId.isBlank()) {
@@ -58,7 +65,7 @@ public record CommandContext(
    * @param tenantId the owning tenant
    * @param messageId the bus-minted id for this command
    */
-  public static CommandContext root(String tenantId, String messageId) {
+  public static CommandContext root(TenantId tenantId, String messageId) {
     return new CommandContext(tenantId, messageId, messageId, null);
   }
 

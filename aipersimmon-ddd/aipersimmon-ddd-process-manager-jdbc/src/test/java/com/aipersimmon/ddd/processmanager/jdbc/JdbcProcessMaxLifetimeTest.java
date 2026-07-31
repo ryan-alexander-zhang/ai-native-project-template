@@ -104,7 +104,7 @@ class JdbcProcessMaxLifetimeTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
   }
 
   @Test

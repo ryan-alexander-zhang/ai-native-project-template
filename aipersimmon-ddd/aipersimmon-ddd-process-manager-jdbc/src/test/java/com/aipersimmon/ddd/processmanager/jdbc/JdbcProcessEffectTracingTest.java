@@ -129,7 +129,7 @@ class JdbcProcessEffectTracingTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
 
     String traceparent =
         jdbc.queryForObject("SELECT traceparent FROM aipersimmon_process_effect", String.class);
@@ -142,7 +142,7 @@ class JdbcProcessEffectTracingTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "msg-start"));
+        CommandContext.root(Tenants.ROOT, "msg-start"));
 
     int delivered = relay().pollOnce();
 

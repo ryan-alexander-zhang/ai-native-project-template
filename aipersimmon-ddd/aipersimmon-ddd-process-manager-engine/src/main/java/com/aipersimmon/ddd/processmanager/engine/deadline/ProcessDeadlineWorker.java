@@ -178,7 +178,7 @@ public final class ProcessDeadlineWorker {
                 // the timeout stays on the same causal chain as the flow that armed it.
                 CommandContext context =
                     new CommandContext(
-                        deadline.tenantId(),
+                        Tenants.fromValue(deadline.tenantId()),
                         deadline.deadlineId() + "#" + deadline.generation(),
                         deadline.correlationId(),
                         deadline.causationId());

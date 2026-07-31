@@ -20,7 +20,7 @@ class IntegrationEventsTest {
     IntegrationEvents events = (event, context) -> published.add(event);
 
     SampleEvent event = new SampleEvent("e-1");
-    events.publish(event, CommandContext.root(Tenants.ROOT.value(), "c-1"));
+    events.publish(event, CommandContext.root(Tenants.ROOT, "c-1"));
 
     assertEquals(List.of(event), published);
   }
@@ -33,8 +33,7 @@ class IntegrationEventsTest {
         assertThrows(
             UnsupportedOperationException.class,
             () ->
-                events.publishAs(
-                    new SampleEvent("e-1"), CommandContext.root(Tenants.ROOT.value(), "c-1")));
+                events.publishAs(new SampleEvent("e-1"), CommandContext.root(Tenants.ROOT, "c-1")));
     assertEquals(
         "this IntegrationEvents transport does not support staged (publishAs) publication",
         ex.getMessage());

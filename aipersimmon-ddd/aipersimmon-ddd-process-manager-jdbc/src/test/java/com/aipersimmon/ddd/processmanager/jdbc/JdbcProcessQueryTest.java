@@ -106,7 +106,7 @@ class JdbcProcessQueryTest {
         TestFulfilment.TYPE,
         new ProcessBusinessKey(order),
         new TestFulfilment.Started(order),
-        CommandContext.root(Tenants.ROOT.value(), "start-" + order));
+        CommandContext.root(Tenants.ROOT, "start-" + order));
   }
 
   @Test
@@ -146,7 +146,7 @@ class JdbcProcessQueryTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.Advance(),
-        CommandContext.root(Tenants.ROOT.value(), "adv"));
+        CommandContext.root(Tenants.ROOT, "adv"));
 
     var timeline = query.timeline(started.processRef());
     assertEquals(
@@ -173,7 +173,7 @@ class JdbcProcessQueryTest {
     runtime.handle(
         started.processRef(),
         new TestFulfilment.ArmDeadline(),
-        CommandContext.root(Tenants.ROOT.value(), "arm"));
+        CommandContext.root(Tenants.ROOT, "arm"));
 
     var pending = query.deadlines(DeadlineStatus.PENDING, 10);
     assertEquals(1, pending.size());

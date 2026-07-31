@@ -125,6 +125,6 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
    * tenant can never advance again.
    */
   private static CommandContext factContext(String fact, String orderId) {
-    return CommandContext.root(TenantContext.effective().value(), fact + ":" + orderId);
+    return CommandContext.root(TenantContext.effective(), fact + ":" + orderId);
   }
 }

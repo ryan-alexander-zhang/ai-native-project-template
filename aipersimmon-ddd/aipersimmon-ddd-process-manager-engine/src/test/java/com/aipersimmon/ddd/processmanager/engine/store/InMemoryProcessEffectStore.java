@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -131,7 +132,7 @@ public final class InMemoryProcessEffectStore implements ProcessEffectStore, Sna
                     new PayloadType(row.inserted.payloadType(), row.inserted.payloadVersion()),
                     row.inserted.payload(),
                     new CommandContext(
-                        row.inserted.tenantId(),
+                        Tenants.fromValue(row.inserted.tenantId()),
                         row.inserted.messageId(),
                         row.inserted.correlationId(),
                         row.inserted.causationId()),

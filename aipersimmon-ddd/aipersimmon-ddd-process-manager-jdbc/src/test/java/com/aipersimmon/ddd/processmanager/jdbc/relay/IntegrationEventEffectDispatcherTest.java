@@ -12,6 +12,7 @@ import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 import com.aipersimmon.ddd.processmanager.engine.relay.DecodedProcessEffect;
 import com.aipersimmon.ddd.processmanager.engine.relay.IntegrationEventEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,7 +53,7 @@ class IntegrationEventEffectDispatcherTest {
     SampleEvent event = new SampleEvent("O-1");
     // messageId is the persisted effect id (transitionId#index); publishAs stamps it as the event
     // id.
-    CommandContext effectContext = new CommandContext("__root__", "txn-1#0", "corr-1", "cause-1");
+    CommandContext effectContext = new CommandContext(Tenants.ROOT, "txn-1#0", "corr-1", "cause-1");
 
     dispatcher.dispatch(
         new DecodedProcessEffect(

@@ -51,7 +51,11 @@ public class SpringIntegrationEvents implements IntegrationEvents {
     // A brand-new event caused by the command described by context: mint a fresh event
     // id and record the command (context.messageId()) as the cause.
     publish(
-        event, idGenerator.get(), context.tenantId(), context.correlationId(), context.messageId());
+        event,
+        idGenerator.get(),
+        context.tenantId().value(),
+        context.correlationId(),
+        context.messageId());
   }
 
   @Override
@@ -62,7 +66,7 @@ public class SpringIntegrationEvents implements IntegrationEvents {
     publish(
         event,
         context.messageId(),
-        context.tenantId(),
+        context.tenantId().value(),
         context.correlationId(),
         context.causationId());
   }

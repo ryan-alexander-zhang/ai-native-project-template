@@ -98,7 +98,7 @@ class JdbcProcessRuntimeTracingTest {
         TestFulfilment.TYPE,
         ORDER,
         new TestFulfilment.Started("order-1"),
-        CommandContext.root(Tenants.ROOT.value(), "m1"));
+        CommandContext.root(Tenants.ROOT, "m1"));
 
     assertEquals(1, tracer.spans.size());
     RecordingTracer.RecordedSpan span = tracer.spans.get(0);
@@ -121,9 +121,7 @@ class JdbcProcessRuntimeTracingTest {
         RuntimeException.class,
         () ->
             runtime.handle(
-                ghost,
-                new TestFulfilment.Advance(),
-                CommandContext.root(Tenants.ROOT.value(), "m2")));
+                ghost, new TestFulfilment.Advance(), CommandContext.root(Tenants.ROOT, "m2")));
 
     assertEquals(1, tracer.spans.size());
     RecordingTracer.RecordedSpan span = tracer.spans.get(0);

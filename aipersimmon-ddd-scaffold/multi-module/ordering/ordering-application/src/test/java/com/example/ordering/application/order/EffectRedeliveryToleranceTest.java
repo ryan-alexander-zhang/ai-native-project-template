@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.ordering.domain.customer.Customer;
 import com.example.ordering.domain.customer.CustomerId;
 import com.example.ordering.domain.customer.Customers;
@@ -34,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class EffectRedeliveryToleranceTest {
 
   private static final CustomerId CUSTOMER = new CustomerId("cust-1");
-  private static final CommandContext CONTEXT = CommandContext.root("demo", "msg-1");
+  private static final CommandContext CONTEXT = CommandContext.root(Tenants.of("demo"), "msg-1");
 
   private final InMemoryOrders orders = new InMemoryOrders();
   private final RecordingCustomers customers = new RecordingCustomers();

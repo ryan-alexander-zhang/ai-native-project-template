@@ -121,7 +121,7 @@ class OutboxDestinationTest {
   private void publish(IntegrationEvent event) {
     new TransactionTemplate(transactionManager)
         .executeWithoutResult(
-            status -> events.publish(event, CommandContext.root(Tenants.ROOT.value(), "msg-1")));
+            status -> events.publish(event, CommandContext.root(Tenants.ROOT, "msg-1")));
   }
 
   private String destinationOf(String table, String eventId) {

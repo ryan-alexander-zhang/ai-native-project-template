@@ -28,7 +28,7 @@ class ConcurrencyTranslationCommandInterceptorTest {
             () ->
                 interceptor.intercept(
                     new Ping(),
-                    CommandContext.root(Tenants.ROOT.value(), "m1"),
+                    CommandContext.root(Tenants.ROOT, "m1"),
                     () -> {
                       throw cause;
                     }));
@@ -41,7 +41,7 @@ class ConcurrencyTranslationCommandInterceptorTest {
     assertEquals(
         "ok",
         interceptor.intercept(
-            new StringCommand(), CommandContext.root(Tenants.ROOT.value(), "m2"), () -> "ok"));
+            new StringCommand(), CommandContext.root(Tenants.ROOT, "m2"), () -> "ok"));
   }
 
   private record StringCommand() implements Command<String> {}

@@ -126,8 +126,7 @@ public class RegistryCommandBus implements CommandBus, SmartInitializingSingleto
 
   @Override
   public <R> R send(Command<R> command) {
-    String tenant = TenantContext.effective().value();
-    return dispatch(command, CommandContext.root(tenant, idGenerator.get()));
+    return dispatch(command, CommandContext.root(TenantContext.effective(), idGenerator.get()));
   }
 
   @Override

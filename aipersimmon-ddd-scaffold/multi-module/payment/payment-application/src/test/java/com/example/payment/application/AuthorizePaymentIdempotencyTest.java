@@ -50,9 +50,9 @@ class AuthorizePaymentIdempotencyTest {
   void aRedeliveryAuthorisesOnceAndRepublishesTheRecordedOutcome() {
     AuthorizePayment authorize = new AuthorizePayment("order-1", "op-1", UNDER_CEILING, "USD");
 
-    handler.handle(authorize, CommandContext.root(Tenants.ROOT.value(), "cmd-1"));
+    handler.handle(authorize, CommandContext.root(Tenants.ROOT, "cmd-1"));
     handler.handle(
-        authorize, CommandContext.root(Tenants.ROOT.value(), "cmd-1")); // at-least-once redelivery
+        authorize, CommandContext.root(Tenants.ROOT, "cmd-1")); // at-least-once redelivery
 
     assertEquals(
         1,
@@ -71,8 +71,8 @@ class AuthorizePaymentIdempotencyTest {
   void aRedeliveredDeclineRepublishesTheSameDecline() {
     AuthorizePayment authorize = new AuthorizePayment("order-2", "op-2", OVER_CEILING, "USD");
 
-    handler.handle(authorize, CommandContext.root(Tenants.ROOT.value(), "cmd-2"));
-    handler.handle(authorize, CommandContext.root(Tenants.ROOT.value(), "cmd-2"));
+    handler.handle(authorize, CommandContext.root(Tenants.ROOT, "cmd-2"));
+    handler.handle(authorize, CommandContext.root(Tenants.ROOT, "cmd-2"));
 
     assertEquals(1, operations.records);
     assertEquals(2, events.published.size());
@@ -89,10 +89,10 @@ class AuthorizePaymentIdempotencyTest {
   void distinctOperationsAreEachAuthorised() {
     handler.handle(
         new AuthorizePayment("order-3", "op-3", UNDER_CEILING, "USD"),
-        CommandContext.root(Tenants.ROOT.value(), "cmd-3"));
+        CommandContext.root(Tenants.ROOT, "cmd-3"));
     handler.handle(
         new AuthorizePayment("order-4", "op-4", UNDER_CEILING, "USD"),
-        CommandContext.root(Tenants.ROOT.value(), "cmd-4"));
+        CommandContext.root(Tenants.ROOT, "cmd-4"));
 
     assertEquals(2, operations.records, "different operation ids are different authorizations");
     assertEquals(2, events.published.size());
@@ -113,7 +113,7 @@ class AuthorizePaymentIdempotencyTest {
         () ->
             handler.handle(
                 new AuthorizePayment("order-5", "op-race", UNDER_CEILING, "USD"),
-                CommandContext.root(Tenants.ROOT.value(), "cmd-5")));
+                CommandContext.root(Tenants.ROOT, "cmd-5")));
     assertEquals(0, events.published.size(), "the loser announces nothing");
   }
 

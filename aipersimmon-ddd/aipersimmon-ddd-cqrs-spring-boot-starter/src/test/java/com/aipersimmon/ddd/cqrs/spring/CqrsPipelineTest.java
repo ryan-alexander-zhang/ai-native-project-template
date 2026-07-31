@@ -157,7 +157,7 @@ class CqrsPipelineTest {
   static final class EchoTenantHandler implements CommandHandler<EchoTenant, String> {
     @Override
     public String handle(EchoTenant command, CommandContext context) {
-      return context.tenantId();
+      return context.tenantId().value();
     }
   }
 

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import com.example.inventory.api.StockReservationFailed;
 import com.example.inventory.domain.stock.Reservation;
 import com.example.inventory.domain.stock.ReservationId;
@@ -41,7 +42,7 @@ class StockReservationFailedCodeContractTest {
 
     handler.handle(
         new ReserveStock("order-1", List.of(new ReserveStock.Line("SKU-1", 0))),
-        CommandContext.root("demo", "msg-1"));
+        CommandContext.root(Tenants.of("demo"), "msg-1"));
 
     StockReservationFailed failed = (StockReservationFailed) events.published.get(0);
     assertNotNull(failed.code(), "the contract promises a machine-readable code, never null");

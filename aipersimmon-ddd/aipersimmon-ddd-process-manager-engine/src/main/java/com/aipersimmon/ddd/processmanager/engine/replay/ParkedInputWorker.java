@@ -145,7 +145,11 @@ public final class ParkedInputWorker {
     return runtime.handle(
         ref,
         input,
-        new CommandContext(parked.tenantId(), replayId, correlationId, parked.inputMessageId()));
+        new CommandContext(
+            Tenants.fromValue(parked.tenantId()),
+            replayId,
+            correlationId,
+            parked.inputMessageId()));
   }
 
   private void suspend(

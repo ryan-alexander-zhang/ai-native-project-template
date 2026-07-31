@@ -113,7 +113,7 @@ class EffectRelayMysqlConcurrencyTest {
           StarterTestProcess.TYPE,
           new ProcessBusinessKey("order-" + i),
           new StarterTestProcess.Begin("order-" + i),
-          CommandContext.root(Tenants.ROOT.value(), "msg-" + i));
+          CommandContext.root(Tenants.ROOT, "msg-" + i));
     }
 
     AtomicInteger delivered = new AtomicInteger();

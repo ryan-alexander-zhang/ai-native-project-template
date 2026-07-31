@@ -78,8 +78,7 @@ class InProcessOutboxDispatcherTest {
     publishInTransaction(
         () ->
             integrationEvents.publish(
-                new InProcessSampleEvent("O-1"),
-                CommandContext.root(Tenants.ROOT.value(), "cmd-1")));
+                new InProcessSampleEvent("O-1"), CommandContext.root(Tenants.ROOT, "cmd-1")));
     relay.relay();
 
     assertEquals(1, listener.received.size());

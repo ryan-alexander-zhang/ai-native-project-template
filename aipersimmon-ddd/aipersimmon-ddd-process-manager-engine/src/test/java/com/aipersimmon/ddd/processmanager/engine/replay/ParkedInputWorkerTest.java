@@ -27,6 +27,7 @@ import com.aipersimmon.ddd.processmanager.model.ProcessType;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessAdvanceResult;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import com.aipersimmon.ddd.tenancy.TenantContext;
+import com.aipersimmon.ddd.tenancy.Tenants;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -259,7 +260,7 @@ class ParkedInputWorkerTest {
     assertEquals("m-1", cause.causationId(), "the parked input is what caused this replay");
     assertEquals(
         "corr-9", cause.correlationId(), "and the chain it belongs to is the original one");
-    assertEquals("acme", cause.tenantId());
+    assertEquals(Tenants.of("acme"), cause.tenantId());
   }
 
   @Test
