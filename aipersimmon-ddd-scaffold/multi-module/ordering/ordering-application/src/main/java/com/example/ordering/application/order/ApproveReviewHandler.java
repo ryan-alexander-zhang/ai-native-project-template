@@ -23,6 +23,16 @@ import org.springframework.stereotype.Component;
  * a primary key — it is evidence carried into the aggregate, never indexed — so the time-ordering
  * itself buys nothing here. Minting it the same way as every other identifier is the point: one way
  * to make an id, so nobody has to decide per call site which way applies (decision-00019).
+ *
+ * <p><strong>Trade-off — this evidence is a stand-in.</strong> The point of an evidence-bearing
+ * type is that it references a fact that exists <em>somewhere else</em>: the cancellation refs are
+ * the real lesson, each one carrying the {@code messageId} of a compensation fact another context
+ * actually recorded. This {@code Approval} demonstrates the form but not the substance — the {@code
+ * decisionId} is minted right here and points at no stored review record and no reviewing
+ * principal, because a review subdomain (who may approve what, four-eyes rules, an approvals table)
+ * would dwarf the flow this project exists to show. In a real system the ref would carry the id of
+ * a persisted review decision and the approver's identity from the authenticated principal — mint
+ * an id inline only when, as here, there is deliberately no record behind it yet.
  */
 @Component
 public class ApproveReviewHandler implements CommandHandler<ApproveReview, Void> {

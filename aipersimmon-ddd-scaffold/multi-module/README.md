@@ -284,6 +284,46 @@ containing it is held in `AWAITING_REVIEW` until `POST /orders/{id}/approve-revi
 `ReviewFlowTest`. The watchlist is configuration and the rule behind it is a bean, so both the list
 and the whole policy are replaceable without editing a handler — see "Replaceable policies" below.
 
+## Copying this: what you may leave out
+
+This project runs every building block at once because it is the worked example for all of them.
+That makes it a catalogue, not a serving suggestion — eighteen modules is what *demonstrating
+everything* costs, not what a three-step business flow needs. Copying the whole shape into a
+context that has not earned it is the main way to get this scaffold wrong. When you copy, subtract:
+
+- **`payment` is the floor, and the floor is low.** Its domain layer is four classes and no
+  aggregate: a policy, a sealed decision, two value objects. If your context's rules fit in a
+  policy and a decision, that *is* the domain layer — manufacturing an aggregate to look more
+  DDD adds a lifecycle where there is no lifecycle. Start every new context from the payment
+  shape and let it grow into the ordering shape only when invariants spanning state actually
+  appear.
+- **No second deployable reacting to your events? Drop Kafka.** Without
+  `-starter-messaging-kafka`, integration events are delivered in process, synchronously, in the
+  publisher's transaction — no broker, no inbox, no eventual consistency to explain. The handler
+  code is identical either way, which is precisely why the broker can be added later instead of
+  up front.
+- **No long-lived flow waiting on other contexts? Drop `ordering-process`.** The process manager
+  earns its tables when a flow must survive a restart while waiting for someone else. A request
+  that completes inside one transaction never needs it — and "we might need it later" is
+  satisfied by adding it later.
+- **A context that owns no tables needs almost nothing.** A pure calculation or read-side
+  projection takes the bare starter: buses, in-process events, ids, the web contract — no
+  storage bundle, no Flyway components, none of the four tables. See the library's
+  CHOOSING-MODULES.md for the decision path; the four dependencies this project uses are the
+  *maximum* a service normally reaches, not the entry fee.
+- **Five modules per context is release granularity, not virtue.** The split exists so the
+  ArchUnit rules can price every dependency edge and so `-api` can be versioned to other
+  contexts. A context nothing else consumes can fold `-api` away; a team that trusts its
+  package discipline (and keeps the ArchUnit gate) can start with fewer modules and split when
+  a boundary needs enforcing. The rules care about the *edges*, not the module count.
+- **Three contexts demonstrate three shapes** — a full aggregate context (ordering), a
+  contention-boundary context (inventory), a policy-only context (payment). They are a spectrum
+  to place yourself on, not a minimum headcount for a service.
+
+What you should *not* subtract: the outbox under externalized events (that is the delivery
+guarantee, not ceremony), idempotent consumption wherever a message can arrive twice, and the
+ArchUnit gate — the rules are what keeps the claimed architecture true after month three.
+
 ## Intentional design decisions worth knowing
 
 - **No public `confirm` endpoint.** Confirming is an *internal* step of the fulfilment process

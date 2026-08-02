@@ -2,7 +2,7 @@
 id: issue-00155-the-scaffold-never-says-what-you-may-leave-out
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # scaffold 从不说"哪些可以不要"（P1，教学）
@@ -31,3 +31,12 @@ bus + outbox + inbox + process manager + tenancy + operation log。
 - 五模块层栈什么时候可以合并（引用库文档的 light 路径，若无则说明合并的判据与代价）；
 - 一句点破：模块数是发布粒度不是美德，三个 BC 是为了演示三种形态，不是"每个服务至少
   三个 BC"。
+
+## 解决记录（2026-08-02）
+
+README 新增 "Copying this: what you may leave out" 一节（紧接 "Not demonstrated here, on
+purpose"，同一口吻）。六条减法 + 一条不许减的：payment 是地板（政策+决策就是领域层，为了
+像 DDD 而制造聚合是在无生命周期处添加生命周期）；无第二部署方→去 Kafka（handler 代码两种
+模式完全一致，正是可以后加的原因）；无跨上下文长流程→去 -process；无表→裸 starter；五模块
+是发布粒度，规则关心的是边不是模块数；三个 BC 是三种形态的光谱不是最低配置。不许减：
+外发事件下的 outbox、可重复投递处的幂等消费、ArchUnit 门禁。

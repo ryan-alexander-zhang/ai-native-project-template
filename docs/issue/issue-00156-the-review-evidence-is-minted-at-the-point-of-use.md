@@ -2,7 +2,7 @@
 id: issue-00156-the-review-evidence-is-minted-at-the-point-of-use
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 评审"证据"在使用点自铸，削弱它要教的模式（P1，教学）
@@ -34,3 +34,11 @@ refs 是真凭据（信封 `messageId`），"证据承载类型"的课在那边�
   （envelope messageId）是范例，这里是权宜。
 
 纯注释改动，不改行为。
+
+## 解决记录（2026-08-02）
+
+`ApproveReviewHandler` javadoc 增补 "Trade-off — this evidence is a stand-in" 段：言明证据
+承载类型的价值在于引用**存在于别处**的事实（补偿 refs 携带对端记录的 messageId 才是正课）；
+这里的 `decisionId` 现场铸造、不指向任何评审记录与 principal，原因是评审子域（审批权限、
+四眼原则、审批表）会喧宾夺主；真实系统应携带已持久化评审决定的 id 与认证 principal——
+"仅当像这里一样刻意没有背后记录时才允许现场铸 id"。ordering-application 构建绿。
