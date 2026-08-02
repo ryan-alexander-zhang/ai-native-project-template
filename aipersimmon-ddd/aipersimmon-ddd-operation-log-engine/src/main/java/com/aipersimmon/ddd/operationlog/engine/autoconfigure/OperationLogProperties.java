@@ -4,8 +4,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration under {@code aipersimmon.ddd.operation-log}. {@code source} defaults to the
- * application name when blank (resolved in the auto-configuration); {@code tenant.enabled} turns on
- * multi-tenant enforcement; {@code limits.*} are the pipeline size budgets.
+ * application name when blank (resolved in the auto-configuration); {@code limits.*} are the
+ * pipeline size budgets.
+ *
+ * <p>Deliberately no tenant switch here. The tenant column is always stamped: the default {@code
+ * OperationTenantResolver} reads {@code TenantContext.effective()}, so enforcement follows the
+ * deployment-wide {@code aipersimmon.ddd.tenancy.enabled} — with tenancy on, an unbound tenant
+ * fails the command rather than stamping the sentinel; with tenancy off, rows carry {@code
+ * __root__}. A per-component flag once declared here was read by nothing and promised enforcement
+ * this class never provided; a second switch for the same question would only let the two disagree.
  */
 @ConfigurationProperties(prefix = "aipersimmon.ddd.operation-log")
 public class OperationLogProperties {
@@ -13,7 +20,6 @@ public class OperationLogProperties {
   /** Stable logical producer identity; when blank the auto-config falls back to the app name. */
   private String source = "";
 
-  private final Tenant tenant = new Tenant();
   private final Limits limits = new Limits();
 
   public String getSource() {
@@ -24,26 +30,8 @@ public class OperationLogProperties {
     this.source = source;
   }
 
-  public Tenant getTenant() {
-    return tenant;
-  }
-
   public Limits getLimits() {
     return limits;
-  }
-
-  /** Multi-tenant settings. */
-  public static class Tenant {
-    /** When true, tenant is mandatory on write, unique key, and all reads. */
-    private boolean enabled;
-
-    public boolean isEnabled() {
-      return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-      this.enabled = enabled;
-    }
   }
 
   /** Pipeline size budgets. */

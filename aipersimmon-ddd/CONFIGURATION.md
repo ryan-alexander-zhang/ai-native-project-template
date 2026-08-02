@@ -347,13 +347,18 @@ Records only commands carrying `@OperationLog`, so adding the module logs nothin
 | Property | Default | Effect |
 | --- | --- | --- |
 | `source` | (empty) | Recorded as the origin system. |
-| `tenant.enabled` | `false` | Whether to record the tenant on each row. |
 | `limits.summary-max-chars` | `1024` | Truncation cap for the rendered summary. |
 | `limits.max-changes` / `max-details` | `20` / `20` | Caps on recorded field changes and detail entries. |
 | `limits.max-value-chars` | `512` | Per-value truncation. |
 
 The limits exist so one pathological command cannot write an unbounded audit row. Raise them
 deliberately.
+
+There is deliberately no per-component tenant switch. The tenant column is always stamped from the
+same trusted scope the command runs under, and enforcement follows the deployment-wide
+`aipersimmon.ddd.tenancy.enabled`: with tenancy on, an unbound tenant fails the command instead of
+stamping the sentinel; with tenancy off, audit rows carry `__root__`. Reads are tenant-scoped
+unconditionally — the read criteria require a tenant id.
 
 ## `aipersimmon.ddd.openapi`
 

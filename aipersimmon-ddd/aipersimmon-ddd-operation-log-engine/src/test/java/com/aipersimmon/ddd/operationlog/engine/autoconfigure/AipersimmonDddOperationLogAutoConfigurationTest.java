@@ -1,11 +1,9 @@
 package com.aipersimmon.ddd.operationlog.engine.autoconfigure;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.id.AipersimmonDddIdAutoConfiguration;
@@ -57,7 +55,6 @@ class AipersimmonDddOperationLogAutoConfigurationTest {
         .withUserConfiguration(SinkConfig.class)
         .withPropertyValues(
             "aipersimmon.ddd.operation-log.source=svc",
-            "aipersimmon.ddd.operation-log.tenant.enabled=true",
             "aipersimmon.ddd.operation-log.limits.summary-max-chars=50",
             "aipersimmon.ddd.operation-log.limits.max-changes=3",
             "aipersimmon.ddd.operation-log.limits.max-details=4",
@@ -67,7 +64,6 @@ class AipersimmonDddOperationLogAutoConfigurationTest {
               assertNotNull(context.getBean(OperationLogs.class));
               OperationLogProperties props = context.getBean(OperationLogProperties.class);
               assertEquals("svc", props.getSource());
-              assertTrue(props.getTenant().isEnabled());
               assertEquals(50, props.getLimits().getSummaryMaxChars());
               assertEquals(3, props.getLimits().getMaxChanges());
               assertEquals(4, props.getLimits().getMaxDetails());
@@ -81,7 +77,6 @@ class AipersimmonDddOperationLogAutoConfigurationTest {
         context -> {
           OperationLogProperties props = context.getBean(OperationLogProperties.class);
           assertEquals("", props.getSource());
-          assertFalse(props.getTenant().isEnabled());
           assertEquals(1024, props.getLimits().getSummaryMaxChars());
         });
   }
