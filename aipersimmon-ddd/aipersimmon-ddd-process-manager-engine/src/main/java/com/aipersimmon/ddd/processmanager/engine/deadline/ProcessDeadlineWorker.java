@@ -15,6 +15,7 @@ import com.aipersimmon.ddd.processmanager.engine.store.DeadlineStatus;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessDeadlineStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.SuspensionSource;
 import com.aipersimmon.ddd.processmanager.runtime.ProcessRuntime;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import com.aipersimmon.ddd.tenancy.Tenants;
@@ -222,7 +223,7 @@ public final class ProcessDeadlineWorker {
                     deadline.instanceId(),
                     row.lifecycle(),
                     "deadline " + deadline.deadlineId() + " exhausted retries",
-                    "DEADLINE",
+                    SuspensionSource.DEADLINE.name(),
                     deadline.deadlineId(),
                     clock.instant());
               }

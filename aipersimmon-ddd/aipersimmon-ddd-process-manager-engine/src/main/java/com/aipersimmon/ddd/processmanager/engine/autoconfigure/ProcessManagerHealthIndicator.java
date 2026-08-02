@@ -8,9 +8,13 @@ import org.springframework.boot.actuate.health.Status;
 
 /**
  * Reports Process Manager health from the backlog SLIs: DOWN when the store is unreachable, {@code
- * DEGRADED} when there is a redrive backlog, stuck instances, or the oldest due work has waited
- * past the configured warning threshold, and UP otherwise. DEGRADED is a distinct status so a
- * transient backlog surfaces without failing the aggregate readiness probe.
+ * DEGRADED} when there is a redrive backlog, suspended or stuck instances, or the oldest due work
+ * has waited past the configured warning threshold, and UP otherwise. A suspended instance degrades
+ * health for the same reason a DEAD row does — nothing will happen to it until an operator acts (a
+ * suspension caused by effect or deadline exhaustion also leaves a DEAD row, but a parked-input
+ * suspension leaves only the instance, so the suspension count must weigh in by itself). DEGRADED
+ * is a distinct status so a transient backlog surfaces without failing the aggregate readiness
+ * probe.
  */
 public final class ProcessManagerHealthIndicator implements HealthIndicator {
 
@@ -40,6 +44,7 @@ public final class ProcessManagerHealthIndicator implements HealthIndicator {
     boolean degraded =
         s.deadEffects() > 0
             || s.deadDeadlines() > 0
+            || s.suspendedInstances() > 0
             || s.stuckInstances() > 0
             || s.oldestPendingEffectAge().compareTo(oldestPendingWarn) > 0
             || s.oldestPendingDeadlineAge().compareTo(oldestPendingWarn) > 0;

@@ -13,6 +13,7 @@ import com.aipersimmon.ddd.processmanager.engine.store.ClaimedEffect;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessEffectStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
+import com.aipersimmon.ddd.processmanager.engine.store.SuspensionSource;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.tenancy.TenantContext;
 import java.time.Duration;
@@ -229,7 +230,7 @@ public final class ProcessEffectRelay {
                     effect.instanceId(),
                     row.lifecycle(),
                     "effect " + effect.effectId() + " exhausted retries",
-                    "EFFECT",
+                    SuspensionSource.EFFECT.name(),
                     effect.effectId(),
                     clock.instant());
               }

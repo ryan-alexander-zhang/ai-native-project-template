@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.processmanager.engine.autoconfigure;
 
 import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog;
 import com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog.BacklogSnapshot;
+import com.aipersimmon.ddd.processmanager.engine.store.SuspensionSource;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
@@ -20,8 +21,12 @@ import java.time.Instant;
  */
 public final class ProcessManagerMeterBinder implements MeterBinder {
 
-  /** The suspension sources the runtime sets (relay exhaustion, deadline exhaustion). */
-  private static final String[] SUSPENSION_SOURCES = {"EFFECT", "DEADLINE"};
+  /**
+   * The tag for suspensions whose stored source is outside {@link SuspensionSource} — rows written
+   * by an older or newer version, or by an operator tool. Counting them here keeps the invariant a
+   * dashboard sums over: the per-source gauges always add up to the suspended total.
+   */
+  private static final String OTHER_SOURCES = "OTHER";
 
   /** How long a sampled snapshot is reused; long enough to coalesce one scrape's gauge reads. */
   private static final Duration SAMPLE_TTL = Duration.ofSeconds(1);
@@ -72,18 +77,33 @@ public final class ProcessManagerMeterBinder implements MeterBinder {
         .description("Deadlines in DEAD awaiting operator redrive")
         .register(registry);
     // One consistent tag key per metric name (Prometheus-friendly): sum over `source` for the
-    // total.
-    for (String source : SUSPENSION_SOURCES) {
+    // total. The tag set is derived from the enum every suspending writer names its source
+    // through, so a new way to suspend cannot ship invisible to this SLI — this loop once
+    // hand-listed EFFECT and DEADLINE, and PARKED_INPUT suspensions read zero everywhere.
+    for (SuspensionSource source : SuspensionSource.values()) {
       Gauge.builder(
               ProcessManagerMeters.SUSPENDED_INSTANCES,
               this,
-              b -> b.sample().suspendedBySource().getOrDefault(source, 0L))
+              b -> b.sample().suspendedBySource().getOrDefault(source.name(), 0L))
           .description("Instances currently SUSPENDED, by suspension source")
-          .tag("source", source)
+          .tag("source", source.name())
           .register(registry);
     }
+    Gauge.builder(ProcessManagerMeters.SUSPENDED_INSTANCES, this, b -> otherSuspended(b.sample()))
+        .description("Instances currently SUSPENDED, by suspension source")
+        .tag("source", OTHER_SOURCES)
+        .register(registry);
     Gauge.builder(ProcessManagerMeters.STUCK_INSTANCES, this, b -> b.sample().stuckInstances())
         .description("Active instances idle past the threshold with no pending work")
         .register(registry);
+  }
+
+  /** Suspensions whose stored source is not one this build's runtime writes. Never negative. */
+  private static long otherSuspended(BacklogSnapshot s) {
+    long known = 0;
+    for (SuspensionSource source : SuspensionSource.values()) {
+      known += s.suspendedBySource().getOrDefault(source.name(), 0L);
+    }
+    return Math.max(0, s.suspendedInstances() - known);
   }
 }

@@ -11,6 +11,7 @@ import com.aipersimmon.ddd.processmanager.engine.store.ParkedInputs;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceRow;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessInstanceStore;
 import com.aipersimmon.ddd.processmanager.engine.store.ProcessTransitionStore;
+import com.aipersimmon.ddd.processmanager.engine.store.SuspensionSource;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.processmanager.model.ProcessLifecycle;
 import com.aipersimmon.ddd.processmanager.model.ProcessRef;
@@ -168,7 +169,7 @@ public final class ParkedInputWorker {
                 ref.instanceId(),
                 lifecycle,
                 reason(parked, failure),
-                "PARKED_INPUT",
+                SuspensionSource.PARKED_INPUT.name(),
                 parked.inputMessageId(),
                 clock.instant());
           }
