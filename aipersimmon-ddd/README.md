@@ -181,7 +181,8 @@ public class ConfirmOrderHandler implements CommandHandler<ConfirmOrder, Void> {
 `OrderingErrorCode` is your own `ErrorCode` enum: a stable machine-readable code per failure, which
 is what lets the web layer map it to a problem type without the domain knowing about HTTP.
 
-The bus wraps every dispatch in logging → concurrency translation → validation → transaction, mints
+The bus wraps every dispatch in logging → retry-on-conflict (opt-in) → validation → prechecks →
+concurrency translation → transaction, mints
 the message id, seeds the tenant, and drains domain events inside the transaction. You do not put
 `@Transactional` on the handler.
 

@@ -209,7 +209,7 @@ events and nothing else does not inherit the command bus.
 
 | Module | Holds |
 | --- | --- |
-| `cqrs-spring-boot-starter` | `RegistryCommandBus` / `RegistryQueryBus`, the interceptor chain (logging → concurrency translation → validation → transaction), unit of work, aggregate collector |
+| `cqrs-spring-boot-starter` | `RegistryCommandBus` / `RegistryQueryBus`, the interceptor chain (logging → retry-on-conflict (opt-in) → validation → prechecks → concurrency translation → transaction), unit of work, aggregate collector |
 | `events-spring-boot-starter` | The in-process transport for domain and integration events |
 | `web-spring-boot-starter` | Problem-detail advice, request-id filter, cursor serialization, i18n titles, the in-memory-store guard |
 | `id-spring-boot-starter` | The UUIDv7 `IdGenerator` |

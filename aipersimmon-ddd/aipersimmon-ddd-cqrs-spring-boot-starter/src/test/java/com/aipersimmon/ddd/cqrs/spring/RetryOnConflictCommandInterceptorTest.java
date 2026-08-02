@@ -126,9 +126,18 @@ class RetryOnConflictCommandInterceptorTest {
         () -> new RetryOnConflictCommandInterceptor(3, Duration.ofMillis(-1)));
   }
 
+  /**
+   * Lower order runs further out, and exceptions travel outward: for the retry loop to catch the
+   * translated conflict, translation must sit inside retry, and both outside the transaction. The
+   * previous version of this test asserted the opposite relation between retry and translation —
+   * pinning the exact ordering bug that made the opt-in retry silently inert. The chain-level proof
+   * lives in {@link RetryOnConflictPipelineTest}; this pins the constants it relies on.
+   */
   @Test
-  void sitsBetweenConcurrencyTranslationAndValidation() {
-    assertTrue(interceptor.order() > ConcurrencyTranslationCommandInterceptor.ORDER);
+  void sitsOutsideTranslationWhichSitsOutsideTheTransaction() {
+    assertTrue(interceptor.order() < ConcurrencyTranslationCommandInterceptor.ORDER);
     assertTrue(interceptor.order() < ValidationCommandInterceptor.ORDER);
+    assertTrue(
+        ConcurrencyTranslationCommandInterceptor.ORDER < TransactionCommandInterceptor.ORDER);
   }
 }

@@ -20,11 +20,12 @@ import org.slf4j.LoggerFactory;
  * remedy is to resubmit the identical request — the retry loop still exists, it just runs over HTTP
  * with a human in it.
  *
- * <p>Ordered at {@code 75}: inside {@link ConcurrencyTranslationCommandInterceptor} ({@code 50}),
- * so it sees the translated {@link ConcurrencyConflictException} whatever the persistence
- * technology; outside validation ({@code 100}), prechecks ({@code 150}) and above all the
- * transaction ({@code 200}), so each attempt is a complete fresh dispatch — new transaction, fresh
- * aggregate load, prechecks re-run.
+ * <p>Ordered at {@code 75}: <em>outside</em> {@link ConcurrencyTranslationCommandInterceptor}
+ * ({@code 175}) — exceptions travel outward, so the translation must run closer to the handler for
+ * the retry loop to see the translated {@link ConcurrencyConflictException} whatever the
+ * persistence technology. Also outside validation ({@code 100}), prechecks ({@code 150}) and above
+ * all the transaction ({@code 200}), so each attempt is a complete fresh dispatch — new
+ * transaction, fresh aggregate load, prechecks re-run.
  *
  * <p><strong>Why opt-in.</strong> Rerunning the transaction is safe by construction — everything
  * inside it rolled back — but a handler that performed non-transactional side effects (an HTTP call
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RetryOnConflictCommandInterceptor implements CommandInterceptor {
 
-  /** Inside concurrency translation ({@code 50}), outside validation ({@code 100}). */
+  /** Outside concurrency translation ({@code 175}) so it catches what translation throws. */
   public static final int ORDER = 75;
 
   private static final Logger log =
