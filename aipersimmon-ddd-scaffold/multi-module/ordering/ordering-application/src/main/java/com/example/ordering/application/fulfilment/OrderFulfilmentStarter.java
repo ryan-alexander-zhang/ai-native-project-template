@@ -20,6 +20,16 @@ import org.springframework.stereotype.Component;
  * domain types. Keeping this subscription in the application layer is why {@code ordering-adapter}
  * needs no dependency on {@code ordering-domain}. The events are published in-process,
  * synchronously, within the transaction that recorded them.
+ *
+ * <p><strong>That synchronous, in-transaction delivery is load-bearing, not incidental.</strong>
+ * The process instance is created in the same commit that recorded the order's readiness, so either
+ * both exist afterwards or neither does — the fact and the flow it starts cannot come apart. The
+ * framework's drain-on-save is what guarantees these listeners run inside that transaction.
+ * Swapping this to {@code @Async} or {@code @TransactionalEventListener(AFTER_COMMIT)} would
+ * silently break it: a crash between commit and listener would leave a ready order no process ever
+ * picks up, with no error anywhere. If the start must move out of the transaction, the correct
+ * shape is an integration event through the outbox — which is durable precisely so it may be
+ * asynchronous.
  */
 @Component
 @DomainEventHandler

@@ -4,7 +4,19 @@ import com.aipersimmon.ddd.cqrs.ReadModel;
 import com.example.ordering.domain.order.OrderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** Read-side view of an order returned to callers, decoupled from the aggregate. */
+/**
+ * Read-side view of an order returned to callers, decoupled from the aggregate.
+ *
+ * <p><strong>Trade-off — {@code @Schema} in the application layer.</strong> These are OpenAPI
+ * annotations, transport documentation, and this module otherwise keeps transport out. The clean
+ * alternative is an adapter-layer response DTO that exists only to carry the annotations, plus a
+ * field-for-field mapping this record would have to stay in step with. That pure-forwarding layer
+ * was judged a worse deal than the leak: {@code swagger-annotations-jakarta} is annotations only
+ * (no runtime behaviour, no framework), and the read model already IS the wire shape by design. The
+ * line drawn: annotation metadata may ride on a read model; anything with behaviour — serializers,
+ * validators bound to HTTP semantics, servlet types — still may not. A context whose read models
+ * serve several transports should reintroduce the DTO instead.
+ */
 @ReadModel
 @Schema(description = "Read-side view of an order returned to callers.")
 public record OrderSnapshot(

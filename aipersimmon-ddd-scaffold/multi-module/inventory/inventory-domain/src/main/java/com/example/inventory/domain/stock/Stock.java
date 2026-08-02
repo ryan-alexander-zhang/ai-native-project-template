@@ -53,7 +53,19 @@ public class Stock extends AbstractAggregateRoot<Sku> {
     this.available -= quantity;
   }
 
-  /** Return a previously reserved quantity to the available pool (the compensation for reserve). */
+  /**
+   * Return a previously reserved quantity to the available pool (the compensation for reserve).
+   *
+   * <p><strong>Deliberately unbounded here.</strong> This aggregate cannot check "only what was
+   * reserved comes back": that would need a {@code reserved} counter, which couples every {@code
+   * Stock} write to the reservation concept and — worse — is wrong under partial releases across
+   * many reservations. The invariant's real home is the {@link
+   * com.example.inventory.domain.reservation.Reservation} aggregate (idempotent, keyed by order,
+   * releases exactly what it holds and only once) with {@code ReleaseStockHandler} walking its
+   * lines. The trade-off is honest: an in-context bug that calls {@code release} outside that path
+   * can inflate availability, and this aggregate will not catch it — the guard was placed where the
+   * knowledge lives, not where the mutation happens.
+   */
   public void release(int quantity) {
     if (quantity <= 0) {
       throw new DomainException("quantity must be > 0");
