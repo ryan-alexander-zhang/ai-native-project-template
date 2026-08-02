@@ -40,6 +40,18 @@ public class AipersimmonDddInboxAutoConfiguration {
     return new JdbcInbox(jdbcTemplate, inboxClock, consumer);
   }
 
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.inbox",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public JdbcInboxSchemaValidator inboxSchemaValidator(JdbcTemplate jdbcTemplate) {
+    return new JdbcInboxSchemaValidator(jdbcTemplate);
+  }
+
   /**
    * Enables scheduling and wires the retention cleanup only when opted in, so the common case adds
    * no scheduled beans.

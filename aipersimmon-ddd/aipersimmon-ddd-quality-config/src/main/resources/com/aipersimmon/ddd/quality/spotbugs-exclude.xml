@@ -63,6 +63,7 @@
       <Class name="com.aipersimmon.ddd.flyway.AipersimmonFlywayMigrator"/>
       <Class name="com.aipersimmon.ddd.inbox.jdbc.InboxCleanup"/>
       <Class name="com.aipersimmon.ddd.inbox.jdbc.JdbcInbox"/>
+      <Class name="com.aipersimmon.ddd.inbox.jdbc.JdbcInboxSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaIntegrationEventListener"/>
       <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaOutboxDispatcher"/>
       <Class name="com.aipersimmon.ddd.outbox.spring.InProcessOutboxDispatcher"/>
@@ -72,6 +73,7 @@
       <Class name="com.aipersimmon.ddd.outbox.engine.observe.OutboxBacklog"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetters"/>
+      <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxStore"/>
       <Class name="com.aipersimmon.ddd.outbox.mybatisplus.MybatisDeadLetterStore"/>
       <Class name="com.aipersimmon.ddd.outbox.mybatisplus.MybatisOutboxStore"/>
@@ -86,6 +88,7 @@
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessRetentionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessRetentionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime"/>
+      <Class name="com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.JdbcProcessSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore"/>
@@ -105,6 +108,7 @@
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcIdempotencyStore"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcRateLimiter"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcWebStoreCleanup"/>
+      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcWebStoreSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.WebStoreCleanupScheduler"/>
       <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcReplayGuard"/>
       <Class name="com.aipersimmon.ddd.web.store.redis.RedisIdempotencyStore"/>

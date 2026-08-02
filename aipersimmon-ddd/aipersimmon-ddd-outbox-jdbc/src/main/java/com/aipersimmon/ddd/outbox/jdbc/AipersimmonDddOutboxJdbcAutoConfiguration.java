@@ -11,6 +11,7 @@ import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -41,6 +42,18 @@ public class AipersimmonDddOutboxJdbcAutoConfiguration {
   @ConditionalOnMissingBean(OutboxStore.class)
   public OutboxStore outboxStore(JdbcTemplate jdbcTemplate) {
     return new JdbcOutboxStore(jdbcTemplate);
+  }
+
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.outbox",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public JdbcOutboxSchemaValidator outboxSchemaValidator(JdbcTemplate jdbcTemplate) {
+    return new JdbcOutboxSchemaValidator(jdbcTemplate);
   }
 
   @Bean

@@ -44,6 +44,28 @@ public class AipersimmonDddInboxMybatisPlusAutoConfiguration {
 
   @Bean
   @ConditionalOnBean(SqlSessionFactory.class)
+  @ConditionalOnMissingBean
+  public MapperFactoryBean<InboxSchemaMapper> aipersimmonInboxSchemaMapper(
+      SqlSessionFactory sqlSessionFactory) {
+    MapperFactoryBean<InboxSchemaMapper> factory = new MapperFactoryBean<>(InboxSchemaMapper.class);
+    factory.setSqlSessionFactory(sqlSessionFactory);
+    return factory;
+  }
+
+  @Bean
+  @ConditionalOnBean(InboxSchemaMapper.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.inbox",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public MybatisPlusInboxSchemaValidator inboxSchemaValidator(InboxSchemaMapper mapper) {
+    return new MybatisPlusInboxSchemaValidator(mapper);
+  }
+
+  @Bean
+  @ConditionalOnBean(SqlSessionFactory.class)
   @ConditionalOnMissingBean(Inbox.class)
   public Inbox mybatisPlusInbox(
       InboxMapper inboxMapper,

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 
@@ -43,6 +44,30 @@ public class AipersimmonDddOperationLogMybatisPlusAutoConfiguration {
         new MapperFactoryBean<>(OperationLogMapper.class);
     factory.setSqlSessionFactory(sqlSessionFactory);
     return factory;
+  }
+
+  @Bean
+  @ConditionalOnBean(SqlSessionFactory.class)
+  @ConditionalOnMissingBean
+  public MapperFactoryBean<OperationLogSchemaMapper> operationLogSchemaMapper(
+      SqlSessionFactory sqlSessionFactory) {
+    MapperFactoryBean<OperationLogSchemaMapper> factory =
+        new MapperFactoryBean<>(OperationLogSchemaMapper.class);
+    factory.setSqlSessionFactory(sqlSessionFactory);
+    return factory;
+  }
+
+  @Bean
+  @ConditionalOnBean(OperationLogSchemaMapper.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.operation-log",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public MybatisPlusOperationLogSchemaValidator operationLogSchemaValidator(
+      OperationLogSchemaMapper mapper) {
+    return new MybatisPlusOperationLogSchemaValidator(mapper);
   }
 
   @Bean

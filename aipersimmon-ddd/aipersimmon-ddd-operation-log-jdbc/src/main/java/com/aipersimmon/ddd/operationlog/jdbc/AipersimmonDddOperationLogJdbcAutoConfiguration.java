@@ -8,6 +8,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -36,5 +37,17 @@ public class AipersimmonDddOperationLogJdbcAutoConfiguration {
     ObjectMapper mapper = objectMapper.getIfAvailable(ObjectMapper::new);
     JdbcOperationLogDialect dialect = OperationLogDialectFactory.create(dataSource);
     return new JdbcOperationLogSink(jdbcTemplate, dialect, mapper);
+  }
+
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.operation-log",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public JdbcOperationLogSchemaValidator operationLogSchemaValidator(JdbcTemplate jdbcTemplate) {
+    return new JdbcOperationLogSchemaValidator(jdbcTemplate);
   }
 }

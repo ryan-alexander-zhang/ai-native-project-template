@@ -45,6 +45,10 @@ class OutboxClockCoexistenceTest {
                   // The outbox writer requires an IdGenerator (issue-00053), so the module that
                   // supplies it is part of the minimal assembly.
                   AipersimmonDddIdAutoConfiguration.class))
+          // This runner never applies the outbox schema (no spring.sql.init here), and the clock
+          // wiring under test does not touch a table — so the startup schema probe, which would
+          // correctly fail an empty database, is switched off rather than satisfied.
+          .withPropertyValues("aipersimmon.ddd.outbox.schema-validation=none")
           .withUserConfiguration(ForeignClockConfig.class);
 
   @Test

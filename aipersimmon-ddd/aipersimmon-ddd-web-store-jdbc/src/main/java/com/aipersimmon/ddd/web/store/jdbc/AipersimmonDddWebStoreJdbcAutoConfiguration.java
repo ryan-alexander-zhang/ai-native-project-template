@@ -64,6 +64,18 @@ public class AipersimmonDddWebStoreJdbcAutoConfiguration {
 
   @Bean
   @ConditionalOnBean(JdbcTemplate.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.web.store",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public JdbcWebStoreSchemaValidator jdbcWebStoreSchemaValidator(JdbcTemplate jdbc) {
+    return new JdbcWebStoreSchemaValidator(jdbc);
+  }
+
+  @Bean
+  @ConditionalOnBean(JdbcTemplate.class)
   @ConditionalOnMissingBean(JdbcWebStoreCleanup.class)
   public JdbcWebStoreCleanup jdbcWebStoreCleanup(
       JdbcTemplate jdbc, Clock aipersimmonDddWebStoreClock, WebStoreCleanupProperties properties) {

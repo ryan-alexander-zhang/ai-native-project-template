@@ -14,6 +14,7 @@ import org.mybatis.spring.mapper.MapperFactoryBean;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,6 +59,29 @@ public class AipersimmonDddOutboxMybatisPlusAutoConfiguration {
     MapperFactoryBean<DeadLetterMapper> factory = new MapperFactoryBean<>(DeadLetterMapper.class);
     factory.setSqlSessionFactory(sqlSessionFactory);
     return factory;
+  }
+
+  @Bean
+  @ConditionalOnBean(SqlSessionFactory.class)
+  @ConditionalOnMissingBean
+  public MapperFactoryBean<OutboxSchemaMapper> aipersimmonOutboxSchemaMapper(
+      SqlSessionFactory sqlSessionFactory) {
+    MapperFactoryBean<OutboxSchemaMapper> factory =
+        new MapperFactoryBean<>(OutboxSchemaMapper.class);
+    factory.setSqlSessionFactory(sqlSessionFactory);
+    return factory;
+  }
+
+  @Bean
+  @ConditionalOnBean(OutboxSchemaMapper.class)
+  @ConditionalOnMissingBean
+  @ConditionalOnProperty(
+      prefix = "aipersimmon.ddd.outbox",
+      name = "schema-validation",
+      havingValue = "validate",
+      matchIfMissing = true)
+  public MybatisOutboxSchemaValidator outboxSchemaValidator(OutboxSchemaMapper mapper) {
+    return new MybatisOutboxSchemaValidator(mapper);
   }
 
   @Bean
