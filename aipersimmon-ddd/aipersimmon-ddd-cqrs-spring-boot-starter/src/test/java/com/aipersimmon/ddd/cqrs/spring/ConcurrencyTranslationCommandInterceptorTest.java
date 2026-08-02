@@ -5,10 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
+import com.aipersimmon.ddd.application.DuplicateEntityException;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.tenancy.Tenants;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 class ConcurrencyTranslationCommandInterceptorTest {
@@ -34,6 +36,25 @@ class ConcurrencyTranslationCommandInterceptorTest {
                     }));
 
     assertSame(cause, ex.getCause());
+  }
+
+  @Test
+  void translatesDuplicateKeyToDuplicateEntityNotToConcurrencyConflict() {
+    DuplicateKeyException cause = new DuplicateKeyException("dup");
+
+    DuplicateEntityException ex =
+        assertThrows(
+            DuplicateEntityException.class,
+            () ->
+                interceptor.intercept(
+                    new Ping(),
+                    CommandContext.root(Tenants.ROOT, "m3"),
+                    () -> {
+                      throw cause;
+                    }));
+
+    assertSame(cause, ex.getCause());
+    assertEquals("duplicate key while handling Ping", ex.getMessage());
   }
 
   @Test

@@ -1,8 +1,10 @@
 package com.aipersimmon.ddd.persistence.jdbc;
 
 import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.application.DuplicateEntityException;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import java.util.Objects;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -52,12 +54,13 @@ public abstract class JdbcAggregateRepository<A extends AbstractAggregateRoot<?>
    * <p>Runs in the caller's transaction, so rows and events commit or roll back together.
    *
    * @throws OptimisticLockingFailureException if the aggregate was modified concurrently
+   * @throws DuplicateEntityException if the insert hit a row that already exists
    */
   protected final void saveAggregate(A aggregate) {
     requireActiveTransaction(aggregate);
     long expected = aggregate.version();
     if (expected == 0) {
-      insert(aggregate);
+      insertExactlyOnce(aggregate);
     } else if (update(aggregate, expected) == 0) {
       throw new OptimisticLockingFailureException(
           "aggregate "
@@ -70,6 +73,49 @@ public abstract class JdbcAggregateRepository<A extends AbstractAggregateRoot<?>
     }
     aggregate.versionAdvanced();
     domainEvents.publishAndClear(aggregate);
+  }
+
+  /**
+   * Run the subclass's {@link #insert} and refuse to continue unless it wrote exactly the row.
+   *
+   * <p>Zero rows means the aggregate was not saved, and the method must not fall through to
+   * advancing the version and publishing events for a row the database never gained. The usual way
+   * to report zero is an {@code INSERT ... ON CONFLICT DO NOTHING}, which swallows a duplicate
+   * instead of raising it; a conflict-tolerant insert belongs behind an explicit application-level
+   * check, not silently inside save.
+   *
+   * <p>A duplicate key is rethrown as {@link DuplicateEntityException} naming both plausible
+   * causes, because the stack trace alone cannot distinguish them: a genuine race between two
+   * creates of the same identity, or an update that mistakenly took this branch.
+   */
+  private void insertExactlyOnce(A aggregate) {
+    int inserted;
+    try {
+      inserted = insert(aggregate);
+    } catch (DuplicateKeyException e) {
+      throw new DuplicateEntityException(
+          "aggregate "
+              + aggregate.getClass().getSimpleName()
+              + "["
+              + aggregate.id()
+              + "] already exists. Either two concurrent creates raced on the same identity — a"
+              + " genuine conflict the client should see as 409 — or this aggregate was"
+              + " reconstituted by a factory that forgot to call restoreVersion(...), leaving its"
+              + " version at 0 so save took the insert branch; if this write was meant to be an"
+              + " update, that is the bug to fix.",
+          e);
+    }
+    if (inserted == 0) {
+      throw new IllegalStateException(
+          "insert of aggregate "
+              + aggregate.getClass().getSimpleName()
+              + "["
+              + aggregate.id()
+              + "] reported zero rows (an INSERT ... ON CONFLICT DO NOTHING does this on a"
+              + " duplicate): the aggregate was NOT saved and its events must not be published. A"
+              + " conflict-tolerant insert belongs behind an explicit application-level check, not"
+              + " silently inside save.");
+    }
   }
 
   /**

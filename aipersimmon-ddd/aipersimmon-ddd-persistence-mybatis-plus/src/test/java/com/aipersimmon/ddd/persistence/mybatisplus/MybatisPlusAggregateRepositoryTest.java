@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.application.DuplicateEntityException;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -215,6 +217,42 @@ class MybatisPlusAggregateRepositoryTest {
         .isEqualTo(4L);
     verify(mapper, never()).insert(any(ThingRow.class));
     assertThat(thing.version()).isEqualTo(5L);
+  }
+
+  @Test
+  void anInsertReportingZeroRowsIsRefusedAndPublishesNothing() {
+    when(mapper.insert(any(ThingRow.class))).thenReturn(0);
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("zero rows")
+        .hasMessageContaining("t-1");
+
+    assertThat(events.published).as("an aggregate that was not saved publishes nothing").isEmpty();
+    assertThat(things.childWrites).as("nor are children written").isZero();
+    assertThat(thing.version()).as("and its version does not advance").isZero();
+  }
+
+  @Test
+  void aDuplicateKeyOnInsertNamesBothPlausibleCauses() {
+    DuplicateKeyException cause = new DuplicateKeyException("dup");
+    when(mapper.insert(any(ThingRow.class))).thenThrow(cause);
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(DuplicateEntityException.class)
+        .hasMessageContaining("t-1")
+        .hasMessageContaining("concurrent creates")
+        .hasMessageContaining("restoreVersion")
+        .cause()
+        .isSameAs(cause);
+
+    assertThat(events.published).as("a refused create publishes nothing").isEmpty();
+    assertThat(things.childWrites).isZero();
+    assertThat(thing.version()).isZero();
   }
 
   @Test

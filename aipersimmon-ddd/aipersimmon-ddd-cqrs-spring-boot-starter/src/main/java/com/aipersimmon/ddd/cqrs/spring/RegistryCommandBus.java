@@ -7,6 +7,7 @@ import com.aipersimmon.ddd.cqrs.CommandContexts;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.aipersimmon.ddd.cqrs.CommandInterceptor;
 import com.aipersimmon.ddd.tenancy.TenantContext;
+import java.lang.reflect.Modifier;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -172,11 +173,20 @@ public class RegistryCommandBus implements CommandBus, SmartInitializingSingleto
   private static Class<?> commandTypeOf(CommandHandler<?, ?> handler) {
     Class<?> type =
         ResolvableType.forInstance(handler).as(CommandHandler.class).getGeneric(0).resolve();
-    if (type == null) {
+    // Stricter than null (the same rule the precheck registry applies): an erased type parameter
+    // resolves to its bound — the Command interface or an abstract base — and dispatch looks
+    // handlers up by the command's exact class, so such a registration would not fail, it would
+    // "register" and then every real dispatch would report the misleading "No command handler
+    // registered".
+    if (type == null || type.isInterface() || Modifier.isAbstract(type.getModifiers())) {
       throw new IllegalStateException(
           "Cannot resolve the command type of handler "
               + handler.getClass().getName()
-              + "; declare it with a concrete Command type parameter");
+              + " (got "
+              + (type == null ? "nothing" : type.getName())
+              + "); declare it with a concrete Command type parameter — handlers are matched by"
+              + " the command's exact class, so one registered against an interface or abstract"
+              + " type would never receive a dispatch");
     }
     return type;
   }

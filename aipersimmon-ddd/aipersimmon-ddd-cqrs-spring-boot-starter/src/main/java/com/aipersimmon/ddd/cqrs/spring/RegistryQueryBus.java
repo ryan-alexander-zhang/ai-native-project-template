@@ -4,6 +4,7 @@ import com.aipersimmon.ddd.cqrs.Query;
 import com.aipersimmon.ddd.cqrs.QueryBus;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
 import com.aipersimmon.ddd.cqrs.QueryInterceptor;
+import java.lang.reflect.Modifier;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -143,11 +144,17 @@ public class RegistryQueryBus implements QueryBus, SmartInitializingSingleton {
   private static Class<?> queryTypeOf(QueryHandler<?, ?> handler) {
     Class<?> type =
         ResolvableType.forInstance(handler).as(QueryHandler.class).getGeneric(0).resolve();
-    if (type == null) {
+    // Same strictness as the command side: a type parameter erased to its bound would "register"
+    // under the Query interface and then never match a dispatch by exact class.
+    if (type == null || type.isInterface() || Modifier.isAbstract(type.getModifiers())) {
       throw new IllegalStateException(
           "Cannot resolve the query type of handler "
               + handler.getClass().getName()
-              + "; declare it with a concrete Query type parameter");
+              + " (got "
+              + (type == null ? "nothing" : type.getName())
+              + "); declare it with a concrete Query type parameter — handlers are matched by the"
+              + " query's exact class, so one registered against an interface or abstract type"
+              + " would never receive a dispatch");
     }
     return type;
   }

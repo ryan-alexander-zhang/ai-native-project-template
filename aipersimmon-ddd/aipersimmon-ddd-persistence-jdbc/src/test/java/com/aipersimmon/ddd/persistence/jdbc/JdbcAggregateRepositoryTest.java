@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.application.DuplicateEntityException;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -66,6 +68,8 @@ class JdbcAggregateRepositoryTest {
     private final int updateAffects;
     private final List<String> calls = new ArrayList<>();
     private Long expectedVersionSeen;
+    private int insertAffects = 1;
+    private RuntimeException insertFailure;
 
     Things(DomainEvents domainEvents, int updateAffects) {
       super(domainEvents);
@@ -79,7 +83,10 @@ class JdbcAggregateRepositoryTest {
     @Override
     protected int insert(Thing aggregate) {
       calls.add("insert");
-      return 1;
+      if (insertFailure != null) {
+        throw insertFailure;
+      }
+      return insertAffects;
     }
 
     @Override
@@ -164,6 +171,44 @@ class JdbcAggregateRepositoryTest {
     assertThat(events.published).as("a refused write publishes nothing").isEmpty();
     assertThat(thing.domainEvents()).hasSize(1);
     assertThat(thing.version()).isEqualTo(6L);
+  }
+
+  @Test
+  void anInsertReportingZeroRowsIsRefusedAndPublishesNothing() {
+    CapturingDomainEvents events = new CapturingDomainEvents();
+    Things things = new Things(events, 1);
+    things.insertAffects = 0;
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("zero rows")
+        .hasMessageContaining("t-1");
+
+    assertThat(events.published).as("an aggregate that was not saved publishes nothing").isEmpty();
+    assertThat(thing.version()).as("and its version does not advance").isZero();
+  }
+
+  @Test
+  void aDuplicateKeyOnInsertNamesBothPlausibleCauses() {
+    CapturingDomainEvents events = new CapturingDomainEvents();
+    Things things = new Things(events, 1);
+    DuplicateKeyException cause = new DuplicateKeyException("dup");
+    things.insertFailure = cause;
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> things.save(thing))
+        .isInstanceOf(DuplicateEntityException.class)
+        .hasMessageContaining("t-1")
+        .hasMessageContaining("concurrent creates")
+        .hasMessageContaining("restoreVersion")
+        .cause()
+        .isSameAs(cause);
+
+    assertThat(events.published).as("a refused create publishes nothing").isEmpty();
+    assertThat(thing.version()).isZero();
   }
 
   @Test

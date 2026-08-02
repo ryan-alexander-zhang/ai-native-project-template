@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.aipersimmon.ddd.application.ApplicationException;
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
+import com.aipersimmon.ddd.application.DuplicateEntityException;
 import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.core.error.ErrorCategory;
 import com.aipersimmon.ddd.core.error.ErrorCode;
@@ -126,6 +127,13 @@ class WebLayerTest {
   @Test
   void concurrencyConflictMapsTo409() throws Exception {
     mvc.perform(post("/test/conflict"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409));
+  }
+
+  @Test
+  void duplicateEntityMapsTo409() throws Exception {
+    mvc.perform(post("/test/duplicate"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.status").value(409));
   }
@@ -251,6 +259,11 @@ class WebLayerTest {
     @PostMapping("/test/conflict")
     String conflict() {
       throw new ConcurrencyConflictException("stale write");
+    }
+
+    @PostMapping("/test/duplicate")
+    String duplicate() {
+      throw new DuplicateEntityException("already created");
     }
 
     @PostMapping("/test/validate")

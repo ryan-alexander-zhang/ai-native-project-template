@@ -89,12 +89,17 @@ public final class BuildingBlockRules {
   }
 
   /**
-   * A value object — a type carrying {@link ValueObject @ValueObject} — has only final fields, so
-   * it cannot be mutated after construction. A value object is defined by its attributes and
-   * compared by their equality; letting a field change would give it identity-like behaviour and
-   * break that contract. A {@code record} satisfies this for free; a class must declare its fields
-   * {@code final}. Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a
-   * project that annotates no value objects.
+   * A value object — a type carrying {@link ValueObject @ValueObject} — has only final fields. A
+   * value object is defined by its attributes and compared by their equality; letting a field be
+   * reassigned would give it identity-like behaviour and break that contract. A {@code record}
+   * satisfies this for free; a class must declare its fields {@code final}.
+   *
+   * <p>This checks field <em>reassignment</em> only — it is shallow. A {@code final List} field
+   * whose list is externally mutable passes, because bytecode cannot show whether the constructor
+   * defensively copied. Real immutability is the convention the scaffolds model: records whose
+   * compact constructors take {@code List.copyOf}/{@code Map.copyOf} of every collection argument.
+   * Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that
+   * annotates no value objects.
    */
   public static ArchRule valueObjectsShouldBeImmutable() {
     return classes()

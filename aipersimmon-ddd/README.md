@@ -255,4 +255,9 @@ designed to be replaced are `IdGenerator`, `OutboxDispatcher`, `FailureClassifie
 `IdempotencyStore` / `ReplayGuard` / `RateLimiter`, `TenantResolver`, `ProcessPayloadCodec` /
 `ProcessStateCodec`, `OperationLogSink`, and the observability SPIs.
 
-`aipersimmon-ddd-archunit` ships the layering rules as tests you can run against your own code.
+`aipersimmon-ddd-archunit` ships the layering and building-block rules as tests you run against your
+own code — and adopting it is a prerequisite, not a nicety, for one guarantee in particular: the
+optimistic-lock witness. `versionAdvanced()` is public because the repository bases live in other
+packages, so the only thing keeping business code from disarming the lock by calling it is the
+`versionWitnessIsAdvancedOnlyByPersistenceAdapters` rule inside `AiPersimmonDddRules.all()`. A
+project that skips the ArchUnit tests is running without that fence.

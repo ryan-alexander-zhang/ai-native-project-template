@@ -1,12 +1,14 @@
 package com.aipersimmon.ddd.persistence.mybatisplus;
 
 import com.aipersimmon.ddd.application.DomainEvents;
+import com.aipersimmon.ddd.application.DuplicateEntityException;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfo;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import java.util.Objects;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -79,6 +81,7 @@ public abstract class MybatisPlusAggregateRepository<
    * the events commit or roll back together.
    *
    * @throws OptimisticLockingFailureException if the aggregate was modified concurrently
+   * @throws DuplicateEntityException if the insert hit a row that already exists
    */
   protected final void saveAggregate(A aggregate) {
     requireActiveTransaction(aggregate);
@@ -86,7 +89,7 @@ public abstract class MybatisPlusAggregateRepository<
     long expected = aggregate.version();
     if (expected == 0) {
       row.setVersion(1L);
-      mapper.insert(row);
+      insertExactlyOnce(row, aggregate);
     } else {
       row.setVersion(expected);
       if (update(row) == 0) {
@@ -104,6 +107,49 @@ public abstract class MybatisPlusAggregateRepository<
     saveChildren(aggregate);
     aggregate.versionAdvanced();
     domainEvents.publishAndClear(aggregate);
+  }
+
+  /**
+   * Insert the row and refuse to continue unless the mapper wrote exactly it.
+   *
+   * <p>Zero rows means the aggregate was not saved, and save must not fall through to writing
+   * children, advancing the version and publishing events for a row the database never gained. A
+   * mapper reports zero when its insert statement swallows the conflict — an {@code INSERT ... ON
+   * CONFLICT DO NOTHING} or {@code INSERT IGNORE}; a conflict-tolerant insert belongs behind an
+   * explicit application-level check, not silently inside save.
+   *
+   * <p>A duplicate key is rethrown as {@link DuplicateEntityException} naming both plausible
+   * causes, because the stack trace alone cannot distinguish them: a genuine race between two
+   * creates of the same identity, or an update that mistakenly took this branch.
+   */
+  private void insertExactlyOnce(D row, A aggregate) {
+    int inserted;
+    try {
+      inserted = mapper.insert(row);
+    } catch (DuplicateKeyException e) {
+      throw new DuplicateEntityException(
+          "aggregate "
+              + aggregate.getClass().getSimpleName()
+              + "["
+              + aggregate.id()
+              + "] already exists. Either two concurrent creates raced on the same identity — a"
+              + " genuine conflict the client should see as 409 — or this aggregate was"
+              + " reconstituted by a factory that forgot to call restoreVersion(...), leaving its"
+              + " version at 0 so save took the insert branch; if this write was meant to be an"
+              + " update, that is the bug to fix.",
+          e);
+    }
+    if (inserted == 0) {
+      throw new IllegalStateException(
+          "insert of aggregate "
+              + aggregate.getClass().getSimpleName()
+              + "["
+              + aggregate.id()
+              + "] reported zero rows (an INSERT IGNORE or INSERT ... ON CONFLICT DO NOTHING does"
+              + " this on a duplicate): the aggregate was NOT saved and its events must not be"
+              + " published. A conflict-tolerant insert belongs behind an explicit"
+              + " application-level check, not silently inside save.");
+    }
   }
 
   /**
