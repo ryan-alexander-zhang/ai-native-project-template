@@ -227,6 +227,15 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-cqrs`、`aipersimmon-ddd-messaging-kafka`（或原生 spring-kafka listener
 手动进 inbox）。
 
+**文档**：[[analysis-00029-samples-external-messages-inbound]]（已完成，单模块，**故意不装**
+`-starter-messaging-kafka`）。落地时的主要发现：**"幂等键从哪来"这一问要先问这条消息需不需要键**——绝对状态 +
+每实体单调 revision 的消息，排序守卫已经让重投按内容成为 no-op，**一个去重键都不需要**（测试断言 inbox 零行）；
+只有**相对语义**（降 10%）的消息必须要，而键**只能由上游提供**，payload hash / `(topic,partition,offset)` / 到达
+时现铸都恰好在重放时失效——上游给不了就死信，不猜。排序选**每实体单调计数器**而不是上游时间戳（同毫秒即退化为按
+到达顺序），且 `upstreamRevision` 是**领域状态**、与本行乐观锁 `version` 分开两列。另有两条测试手艺：死信 topic
+名不能用 Spring Kafka 的默认（不是 `.DLT`，实际去了 `<topic>-dlt`）；`untilAsserted` 只重试 `AssertionError`，
+所以"等一行出现"的辅助方法必须返回 null 而不能抛 `EmptyResultDataAccessException`。
+
 ### S6 服务间同步调用（P0，双服务）
 
 **场景描述**：处理一个请求的过程中，必须**当场**拿到另一个服务的数据或结果才能继续。调用方与

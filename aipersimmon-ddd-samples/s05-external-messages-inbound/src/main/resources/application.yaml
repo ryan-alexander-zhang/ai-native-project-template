@@ -1,0 +1,46 @@
+spring:
+  application:
+    # Also the inbox's `consumer` identity: two services sharing one inbox table and one name would
+    # suppress each other's processing of the same ERP message id.
+    name: s05-catalog-service
+  datasource:
+    url: jdbc:postgresql://localhost:18051/catalog
+    username: catalog
+    password: catalog
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18054
+    consumer:
+      auto-offset-reset: earliest
+      # String in, String out. The listener deserializes by hand, because a JSON deserializer configured
+      # here would fail INSIDE the container — where a failure is a poison-record problem rather than a
+      # translation problem, and where this application cannot classify it.
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      # This service publishes nothing of its own — the producer exists solely so the dead-letter
+      # recoverer can republish a rejected record. Without the framework's Kafka starter nothing
+      # configures these, and Kafka has no default serializer, so a KafkaTemplate would fail to build.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 18050
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+catalog:
+  erp-topic: erp.product.changes
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /catalog
+    flyway:
+      # The inbox only. Nothing here publishes, so there is no outbox — and no @Externalized event, so
+      # the durable-transport guard that forces one on S4's consumer never fires here.
+      components: [inbox]
