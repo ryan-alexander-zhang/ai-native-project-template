@@ -105,10 +105,13 @@ sample 内演示，不单独建目录。
 - **操作者身份（actor）如何进入请求处理链**——见 §3.2，这是 S14 的前置；
 - OpenAPI 文档如何与实际行为保持一致。
 
-**预计涉及的组件**：`aipersimmon-ddd-starter-mybatis-plus`、
-`aipersimmon-ddd-web-spring-boot-starter`、`aipersimmon-ddd-cqrs`、`aipersimmon-ddd-web`
-（`ProblemCatalog` / `ProblemRegistry` / `DefaultProblemFamilies`）、
-`aipersimmon-ddd-openapi-spring-boot-starter`。**寄宿 S14**。
+**预计涉及的组件**：`aipersimmon-ddd-starter` + `aipersimmon-ddd-persistence-mybatis-plus` +
+`aipersimmon-ddd-mybatis-plus-spring-boot-starter`（**不是** `-starter-mybatis-plus`：那个 bundle
+会带进四个表结构校验器，`flyway.components` 为空时启动即失败，理由见 analysis-00015 §6.1）、
+`aipersimmon-ddd-cqrs`、`aipersimmon-ddd-web`（`ProblemCatalog` / `ProblemRegistry` /
+`DefaultProblemFamilies`）、`aipersimmon-ddd-openapi-spring-boot-starter`。**寄宿 S14**。
+
+**文档**：[[analysis-00015-samples-http-command-query]]（模板篇，已完成）。
 
 ### S2 HTTP 写接口的幂等提交与重放防护（P0）
 
