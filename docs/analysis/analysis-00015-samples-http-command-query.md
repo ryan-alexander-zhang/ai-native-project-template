@@ -656,9 +656,21 @@ spring:
 
 ## 7. actor 约定（S14 的前置，本篇必须定）
 
-库里**没有 actor 的承载通道**：`CommandContext` 只有 `tenantId` / `messageId` /
-`correlationId` / `causationId`；而 `OperationActorResolver.resolve()` 是无参的，只能从环境
-上下文取。所以"谁做了这件事"必须由应用自己接。
+这里的 actor 指审计意义上的**操作者**——"谁做了这件事"。它是操作日志组件的概念，
+`Actor(type, id, displayName)`，带 `Actor.user(...)` / `Actor.system(...)` /
+`Actor.service(...)` 三个工厂。本篇要定的是它从哪来。
+
+库把这个决定**有意留给使用方**，不是漏了：
+
+- `OperationActorResolver` 的 `Actor resolve()` 是无参的，javadoc 要求它从**可信边界**（安全
+  上下文或显式的调用作用域）取，**绝不能从命令载荷取**。这就是为什么 actor 既不在
+  `CommandContext` 上，也不该作为字段塞进 command——命令载荷是不可信输入，而审计要的是可信身份。
+- 它没有默认实现：开了操作日志却不提供这个 bean，**启动直接失败**，并且有专门的
+  `MissingOperationLogResolverFailureAnalyzer` 输出带代码片段的提示。同一个模块里的
+  `OperationTenantResolver` 反而有默认实现（委托 `TenantContext`）——一个有默认一个没有，说明
+  "actor 必须你自己填"是设计判断。
+
+所以要解决的不是库的缺口，而是**示例得选一个可信来源，并且覆盖没有 HTTP 上下文的入口**。
 
 **本篇为全部 sample 定下的约定**（明确标注这是示例的选择，不是库的机制）：
 

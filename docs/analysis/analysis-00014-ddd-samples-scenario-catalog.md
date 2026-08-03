@@ -658,13 +658,25 @@ S10 要求完整可运行，所以这条必须先跑通一个最小验证：一�
 全局回滚，检查数据与 `undo_log` 是否正确。若不兼容，S10 主线改用 TCC（Try/Confirm/Cancel 与
 聚合方法一一对应，本身也更贴 DDD），AT 作为"为什么不用"的对照写进文档。
 
-### 3.2 操作者身份（actor）没有承载通道（阻塞 S14，影响 S1/S11）
+### 3.2 操作者身份（actor）的来源要由示例自己决定（S14 的前置）
 
-`CommandContext` 只有 `tenantId` / `messageId` / `correlationId` / `causationId`，**没有
-actor**；而 `OperationActorResolver.resolve()` 是无参的，只能从环境上下文取。于是"谁做的这件
-事"在 HTTP 入口之外（定时任务、outbox relay、inbox 消费）没有确定来源。S14 寄宿于 S1，所以
-S1 必须先给出一个 actor 约定（示例自己用 ThreadLocal / MDC / 自定义上下文都可以，但必须显式
-说明它是示例的选择而非库的机制），否则 S14 无法落地。
+这里说的 actor 就是审计意义上的**操作者**——"谁做了这件事"。它是操作日志组件的概念：
+`Actor(type, id, displayName)`，带 `Actor.user(...)` / `Actor.system(...)` /
+`Actor.service(...)` 三个工厂。
+
+**这不是库的缺口，是库有意留给使用方的决定**，先把事实说准：
+
+- `OperationActorResolver` 是操作日志 cqrs starter 里的函数式接口，`Actor resolve()` 无参。
+  javadoc 明确要求它从**可信边界**（安全上下文或显式的调用作用域）取，**绝不能从命令载荷取**
+  ——所以 actor 不在 `CommandContext` 上、也不该塞进 command，是刻意的：命令载荷是不可信输入。
+- 它**没有默认实现**。开了操作日志而不提供这个 bean，启动就失败，而且有专门的
+  `MissingOperationLogResolverFailureAnalyzer` 把报错渲染成带代码片段的可操作提示。对比之下
+  `OperationTenantResolver` 是有默认的（委托 `TenantContext`），可见这个"必须自己填"是设计选择
+  而非遗漏。
+
+于是真正要做的工作是：**示例必须自己选一个可信来源，并且要覆盖没有 HTTP 上下文的入口**（定时
+任务、outbox relay、inbox 消费在那里没有天然的操作者）。S14 寄宿 S1，所以这个约定在 S1 的文档
+里给出（见 analysis-00015 §7），代码随 S14 一起落地。
 
 ### 3.3 从未被任何场景覆盖的库能力（本轮已全部认领）
 
