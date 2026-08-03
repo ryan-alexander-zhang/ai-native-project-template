@@ -1,1 +1,2 @@
 com.aipersimmon.ddd.operationlog.engine.autoconfigure.AipersimmonDddOperationLogAutoConfiguration
+com.aipersimmon.ddd.operationlog.engine.autoconfigure.OperationLogObservabilityConfiguration

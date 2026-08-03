@@ -136,8 +136,8 @@ class OutboxRelayPipelineTest {
     }
 
     @Override
-    public int deleteSentBefore(Instant sentBefore) {
-      return delegate.deleteSentBefore(sentBefore);
+    public int deleteSentBefore(Instant sentBefore, int limit) {
+      return delegate.deleteSentBefore(sentBefore, limit);
     }
 
     @Override

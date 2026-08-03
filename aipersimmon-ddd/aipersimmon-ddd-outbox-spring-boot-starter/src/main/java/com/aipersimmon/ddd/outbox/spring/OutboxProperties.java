@@ -242,12 +242,26 @@ public class OutboxProperties implements InitializingBean {
 
     private long retentionSeconds = 604800;
 
+    /**
+     * Rows deleted per page; the purge loops pages until one comes back short. Bounds how long a
+     * single delete transaction holds locks on a table the relay is also reading.
+     */
+    private int batchSize = 500;
+
     public long getRetentionSeconds() {
       return retentionSeconds;
     }
 
     public void setRetentionSeconds(long retentionSeconds) {
       this.retentionSeconds = retentionSeconds;
+    }
+
+    public int getBatchSize() {
+      return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+      this.batchSize = batchSize;
     }
   }
 }

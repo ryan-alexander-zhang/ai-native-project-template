@@ -45,7 +45,7 @@ class OutboxCleanupTest {
    * outcome either way: it can only delete the same expired row this test expects to be gone.
    */
   private OutboxCleanup cleanup() {
-    return new OutboxCleanup(new JdbcOutboxStore(jdbc), Clock.systemUTC(), 1);
+    return new OutboxCleanup(new JdbcOutboxStore(jdbc), Clock.systemUTC(), 1, 500);
   }
 
   @BeforeEach

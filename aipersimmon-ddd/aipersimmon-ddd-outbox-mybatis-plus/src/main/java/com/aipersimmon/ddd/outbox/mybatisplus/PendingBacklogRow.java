@@ -3,13 +3,14 @@ package com.aipersimmon.ddd.outbox.mybatisplus;
 import java.time.Instant;
 
 /**
- * The two aggregate columns of the backlog query. A plain bean rather than the engine's {@code
+ * The aggregate columns of the backlog query. A plain bean rather than the engine's {@code
  * PendingBacklog} record because MyBatis maps a result set onto setters; the store converts.
  */
 public class PendingBacklogRow {
 
   private long pending;
   private Instant oldest;
+  private long givenUp;
 
   public long getPending() {
     return pending;
@@ -25,5 +26,13 @@ public class PendingBacklogRow {
 
   public void setOldest(Instant oldest) {
     this.oldest = oldest;
+  }
+
+  public long getGivenUp() {
+    return givenUp;
+  }
+
+  public void setGivenUp(long givenUp) {
+    this.givenUp = givenUp;
   }
 }

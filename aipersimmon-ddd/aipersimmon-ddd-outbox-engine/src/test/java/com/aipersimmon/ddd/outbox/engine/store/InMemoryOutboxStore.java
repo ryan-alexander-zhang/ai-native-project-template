@@ -182,12 +182,15 @@ public final class InMemoryOutboxStore implements OutboxStore {
   }
 
   @Override
-  public int deleteSentBefore(Instant sentBefore) {
+  public int deleteSentBefore(Instant sentBefore, int limit) {
     failIfAsked("deleteSentBefore");
+    // Honours the page bound like a real backend, so the caller's loop-until-short-page logic is
+    // actually exercised rather than handed everything in one call.
     List<String> spent =
         rows.values().stream()
             .filter(row -> row.sent && row.sentAt != null && row.sentAt.isBefore(sentBefore))
             .map(row -> row.inserted.eventId())
+            .limit(limit)
             .toList();
     spent.forEach(rows::remove);
     return spent.size();
@@ -197,12 +200,15 @@ public final class InMemoryOutboxStore implements OutboxStore {
   public PendingBacklog pendingBacklog(int maxAttempts) {
     failIfAsked("pendingBacklog");
     List<Row> waiting = rows.values().stream().filter(row -> row.live(maxAttempts)).toList();
+    long givenUp =
+        rows.values().stream().filter(row -> !row.sent && row.attempts >= maxAttempts).count();
     return new PendingBacklog(
         waiting.size(),
         waiting.stream()
             .map(row -> row.inserted.createdAt())
             .min(Comparator.naturalOrder())
-            .orElse(null));
+            .orElse(null),
+        givenUp);
   }
 
   // --- what a test needs to look at ------------------------------------------------------------

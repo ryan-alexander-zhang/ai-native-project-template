@@ -122,7 +122,7 @@ class OutboxDestinationTest {
     publish(new Externalised("o-3"));
     String eventId = onlyEventId("aipersimmon_outbox");
     deadLetterStore.store(
-        message(eventId), 3, DeadLetterStore.Reason.RETRIES_EXHAUSTED, "simulated");
+        message(eventId), 3, DeadLetterStore.Reason.RETRIES_EXHAUSTED, "simulated", null, null);
 
     assertEquals(
         TOPIC,

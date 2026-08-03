@@ -65,13 +65,17 @@ public class JdbcOutboxStore implements OutboxStore {
   private static final String SCHEDULE_BACKOFF =
       "UPDATE aipersimmon_outbox SET next_attempt_at = ?, "
           + "lease_owner = NULL, lease_token = NULL, lease_until = NULL WHERE event_id = ?";
-  private static final String DELETE_SENT =
-      "DELETE FROM aipersimmon_outbox WHERE sent = TRUE AND sent_at < ?";
+  // Page of ids first, then delete by key: DELETE ... LIMIT is not portable (PostgreSQL has
+  // none), and event_id is the single-column primary key, so the two-step page is.
+  private static final String SELECT_SENT_PAGE =
+      "SELECT event_id FROM aipersimmon_outbox WHERE sent = TRUE AND sent_at < ? LIMIT ";
   // One scan answers both gauges. COUNT and MIN over the same predicate the claim uses to decide a
   // row is still live, so "waiting" here means the same thing it means there.
   private static final String PENDING_BACKLOG =
-      "SELECT COUNT(*) AS pending, MIN(created_at) AS oldest FROM aipersimmon_outbox "
-          + "WHERE sent = FALSE AND attempts < ?";
+      "SELECT COUNT(CASE WHEN attempts < ? THEN 1 END) AS pending, "
+          + "MIN(CASE WHEN attempts < ? THEN created_at END) AS oldest, "
+          + "COUNT(CASE WHEN attempts >= ? THEN 1 END) AS given_up "
+          + "FROM aipersimmon_outbox WHERE sent = FALSE";
 
   private final JdbcTemplate jdbc;
 
@@ -165,8 +169,15 @@ public class JdbcOutboxStore implements OutboxStore {
   }
 
   @Override
-  public int deleteSentBefore(Instant sentBefore) {
-    return jdbc.update(DELETE_SENT, Timestamp.from(sentBefore));
+  public int deleteSentBefore(Instant sentBefore, int limit) {
+    List<String> page =
+        jdbc.queryForList(SELECT_SENT_PAGE + limit, String.class, Timestamp.from(sentBefore));
+    if (page.isEmpty()) {
+      return 0;
+    }
+    String placeholders = String.join(",", java.util.Collections.nCopies(page.size(), "?"));
+    return jdbc.update(
+        "DELETE FROM aipersimmon_outbox WHERE event_id IN (" + placeholders + ")", page.toArray());
   }
 
   @Override
@@ -180,8 +191,12 @@ public class JdbcOutboxStore implements OutboxStore {
               }
               Timestamp oldest = rs.getTimestamp("oldest");
               return new PendingBacklog(
-                  rs.getLong("pending"), oldest == null ? null : oldest.toInstant());
+                  rs.getLong("pending"),
+                  oldest == null ? null : oldest.toInstant(),
+                  rs.getLong("given_up"));
             },
+            maxAttempts,
+            maxAttempts,
             maxAttempts);
     return backlog == null ? PendingBacklog.EMPTY : backlog;
   }

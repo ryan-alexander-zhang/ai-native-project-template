@@ -90,7 +90,13 @@ class OutboxRelayTest {
     }
 
     @Override
-    public void store(OutboxMessage message, int attempts, Reason reason, String lastError) {
+    public void store(
+        OutboxMessage message,
+        int attempts,
+        Reason reason,
+        String lastError,
+        String traceparent,
+        String traceState) {
       if (unavailable) {
         throw new IllegalStateException("the dead-letter store is unavailable");
       }

@@ -39,7 +39,7 @@ public final class OutboxBacklog {
   public Snapshot snapshot() {
     Instant now = clock.instant();
     PendingBacklog backlog = store.pendingBacklog(maxAttempts);
-    return new Snapshot(backlog.rows(), age(backlog.oldestCreatedAt(), now));
+    return new Snapshot(backlog.rows(), age(backlog.oldestCreatedAt(), now), backlog.givenUp());
   }
 
   private static Duration age(Instant oldest, Instant now) {
@@ -56,6 +56,9 @@ public final class OutboxBacklog {
    *
    * @param pending unsent messages the relay still intends to deliver
    * @param oldestPendingAge how long the oldest of them has been waiting since it was written
+   * @param givenUp unsent rows at or beyond {@code max-attempts}, which the relay will neither
+   *     claim nor dead-letter. Normally zero — exhaustion dead-letters in the same act; nonzero
+   *     means {@code max-attempts} was lowered across a restart and rows are stranded
    */
-  public record Snapshot(long pending, Duration oldestPendingAge) {}
+  public record Snapshot(long pending, Duration oldestPendingAge, long givenUp) {}
 }

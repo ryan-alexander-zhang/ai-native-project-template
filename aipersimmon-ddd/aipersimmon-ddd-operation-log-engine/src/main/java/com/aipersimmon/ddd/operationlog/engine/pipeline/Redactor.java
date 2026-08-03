@@ -58,6 +58,11 @@ final class Redactor {
     if (s == null || s.length() <= max) {
       return s;
     }
-    return s.substring(0, max);
+    // Never cut through a surrogate pair: half a pair is not valid UTF-8 when encoded, and MySQL's
+    // utf8mb4 rejects the row — on the success path that insert failure rolls back the business
+    // transaction, turning one emoji at the truncation boundary into a failed command. Giving up
+    // one char of budget keeps the value valid everywhere.
+    int cut = Character.isHighSurrogate(s.charAt(max - 1)) ? max - 1 : max;
+    return s.substring(0, cut);
   }
 }

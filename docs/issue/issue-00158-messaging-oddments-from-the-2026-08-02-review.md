@@ -16,19 +16,19 @@ status: open
   单语句 UPDATE 语义，PG/MySQL 迁移从未在本 reactor 里对真库执行。补 Testcontainers
   并发认领测试（参照 pm 的 effect/deadline claim 真库测试形状；deadline 那次的教训：
   "没覆盖"≠"有错"，但要分清得先去跑）。
-- [ ] **purge DELETE 无批量上限**：`JdbcOutboxStore.java:68-69` 与 `InboxCleanup`（inbox
+- [x] **purge DELETE 无批量上限**：`JdbcOutboxStore.java:68-69` 与 `InboxCleanup`（inbox
   全表条件删）都是单语句。首次在积累数月的表上开启=一个巨型事务。LIMIT 循环分批
   （注意 PG 无 `DELETE ... LIMIT`，用 ctid/子查询按 pm retention 的既有形状做）。
-- [ ] **调低 max-attempts 跨重启后的 stranded 行不可见**：`attempts >= maxAttempts` 的行
+- [x] **调低 max-attempts 跨重启后的 stranded 行不可见**：`attempts >= maxAttempts` 的行
   不阻塞不可认领（`JdbcOutboxStore.java:40`，正确），但也不进 backlog gauge（:72-74）、
   不被追溯 dead-letter。加"given-up 在表"gauge 或一次性清扫。
-- [ ] **死信 replay 丢 trace 且尾排**：`JdbcDeadLetterStore.REQUEUE_OUTBOX`（:31-36）不带
+- [x] **死信 replay 丢 trace 且尾排**：`JdbcDeadLetterStore.REQUEUE_OUTBOX`（:31-36）不带
   `traceparent`/`trace_state`，`created_at = now` 使重放事件排在同聚合后续事件之后。
   尾排已文档化为放弃项（可不动）；trace 列补上。
 
 ## kafka
 
-- [ ] **DLT topic 存在性无人检查**：`deadLetterDestination`
+- [x] **DLT topic 存在性无人检查**：`deadLetterDestination`
   （`AipersimmonDddMessagingKafkaAutoConfiguration.java:330-332`）避开了分区陷阱，但
   `<topic>.DLT` 不存在时 recoverer 失败→分区永久 seek-back，且该失败非
   `DataAccessException`，`SystemicStallReporter` 沉默。启动期存在性检查或文档写明预置
@@ -50,12 +50,12 @@ status: open
 
 - [ ] **审计表无保留/清理故事**（outbox、inbox 都有 purge，唯独审计表没有）。补按时间
   的分批清理，默认关（审计数据删除该是显式决定）。
-- [ ] **`failureRecordLost` 开箱只是一条 WARN**：`OperationLogMetrics` 默认 no-op，最该
+- [x] **`failureRecordLost` 开箱只是一条 WARN**：`OperationLogMetrics` 默认 no-op，最该
   告警的"审计缺口"信号没有指标。给 micrometer binder 补计数器（形状照 outbox observer）。
-- [ ] **`Redactor` 截断可切开 surrogate pair**（:57-62 `substring`）：MySQL utf8mb4 拒绝
+- [x] **`Redactor` 截断可切开 surrogate pair**（:57-62 `substring`）：MySQL utf8mb4 拒绝
   半个代理对，而成功路径 insert 失败会回滚业务事务。用 code point 边界截断 + 一条含
   emoji 的测试。
-- [ ] **PG 迁移里过期的 `'GLOBAL'` 哨兵注释**（`postgresql/V1__aipersimmon_operation_log.sql:5`，
+- [x] **PG 迁移里过期的 `'GLOBAL'` 哨兵注释**（`postgresql/V1__aipersimmon_operation_log.sql:5`，
   实际哨兵是 `__root__`）。一行。
 
 **在案不做**：`OperationLogReader` 仍是路线图端口（评审确认现状即立场，消费方自写查询）。

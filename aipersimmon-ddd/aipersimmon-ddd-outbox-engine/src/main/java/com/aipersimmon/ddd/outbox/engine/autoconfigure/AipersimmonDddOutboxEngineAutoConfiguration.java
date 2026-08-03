@@ -163,6 +163,9 @@ public class AipersimmonDddOutboxEngineAutoConfiguration {
   public OutboxCleanup outboxCleanup(
       OutboxStore outboxStore, Clock outboxClock, OutboxProperties properties) {
     return new OutboxCleanup(
-        outboxStore, outboxClock, properties.getCleanup().getRetentionSeconds());
+        outboxStore,
+        outboxClock,
+        properties.getCleanup().getRetentionSeconds(),
+        properties.getCleanup().getBatchSize());
   }
 }

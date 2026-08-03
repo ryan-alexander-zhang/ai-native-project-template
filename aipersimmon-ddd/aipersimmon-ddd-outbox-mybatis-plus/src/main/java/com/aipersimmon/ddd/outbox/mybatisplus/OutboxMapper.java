@@ -52,7 +52,9 @@ public interface OutboxMapper extends BaseMapper<OutboxRecord> {
    * thing in both places. Read on demand by a metrics scrape, never by the relay.
    */
   @Select(
-      "SELECT COUNT(*) AS pending, MIN(created_at) AS oldest FROM aipersimmon_outbox "
-          + "WHERE sent = FALSE AND attempts < #{maxAttempts}")
+      "SELECT COUNT(CASE WHEN attempts < #{maxAttempts} THEN 1 END) AS pending, "
+          + "MIN(CASE WHEN attempts < #{maxAttempts} THEN created_at END) AS oldest, "
+          + "COUNT(CASE WHEN attempts >= #{maxAttempts} THEN 1 END) AS given_up "
+          + "FROM aipersimmon_outbox WHERE sent = FALSE")
   PendingBacklogRow selectPendingBacklog(@Param("maxAttempts") int maxAttempts);
 }

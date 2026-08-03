@@ -67,9 +67,9 @@ public class AipersimmonDddInboxAutoConfiguration {
     public InboxCleanup inboxCleanup(
         JdbcTemplate jdbcTemplate,
         Clock inboxClock,
-        @Value("${aipersimmon.ddd.inbox.cleanup.retention-seconds:2592000}")
-            long retentionSeconds) {
-      return new InboxCleanup(jdbcTemplate, inboxClock, retentionSeconds);
+        @Value("${aipersimmon.ddd.inbox.cleanup.retention-seconds:2592000}") long retentionSeconds,
+        @Value("${aipersimmon.ddd.inbox.cleanup.batch-size:500}") int batchSize) {
+      return new InboxCleanup(jdbcTemplate, inboxClock, retentionSeconds, batchSize);
     }
   }
 }

@@ -6,6 +6,7 @@ final class OutboxMeters {
   private static final String PREFIX = "aipersimmon.outbox.";
 
   static final String PENDING = PREFIX + "pending";
+  static final String GIVEN_UP = PREFIX + "given.up";
   static final String OLDEST_PENDING_AGE = PREFIX + "oldest.pending.age";
   static final String CLAIM_LATENCY = PREFIX + "claim.latency";
   static final String DISPATCH_LATENCY = PREFIX + "dispatch.latency";

@@ -374,11 +374,10 @@ public class OutboxRelay {
 
   /** Handles a failed dispatch: dead-letter it, or schedule the next attempt. */
   private Outcome handleFailure(PendingMessage pending, RuntimeException error) {
-    OutboxMessage message = pending.message();
     int attempts = pending.attempts() + 1;
     if (failureClassifier.classify(error) == FailureClassifier.Failure.PERMANENT) {
       return deadLetter(
-          message,
+          pending,
           attempts,
           DeadLetterStore.Reason.PERMANENT,
           error,
@@ -386,17 +385,17 @@ public class OutboxRelay {
     }
     if (attempts >= maxAttempts) {
       return deadLetter(
-          message,
+          pending,
           attempts,
           DeadLetterStore.Reason.RETRIES_EXHAUSTED,
           error,
           "failed " + maxAttempts + " times; dead-lettered");
     }
     Duration delay = backoff.nextDelay(attempts);
-    store.scheduleRetry(message.eventId(), clock.instant().plus(delay));
+    store.scheduleRetry(pending.message().eventId(), clock.instant().plus(delay));
     log.warn(
         "outbox dispatch failed for eventId={}, retrying in {}ms (attempt {}/{})",
-        message.eventId(),
+        pending.message().eventId(),
         delay.toMillis(),
         attempts,
         maxAttempts,
@@ -415,13 +414,15 @@ public class OutboxRelay {
    *     and this poll may go on — or {@link Outcome#HELD} if the move failed and the row stayed put
    */
   private Outcome deadLetter(
-      OutboxMessage message,
+      PendingMessage pending,
       int attempts,
       DeadLetterStore.Reason reason,
       RuntimeException error,
       String givingUp) {
+    OutboxMessage message = pending.message();
     try {
-      deadLetterStore.store(message, attempts, reason, summarize(error));
+      deadLetterStore.store(
+          message, attempts, reason, summarize(error), pending.traceparent(), pending.traceState());
       log.error("outbox dispatch for eventId={} {}", message.eventId(), givingUp, error);
       observer.deadLettered(reason);
       return Outcome.RETIRED;

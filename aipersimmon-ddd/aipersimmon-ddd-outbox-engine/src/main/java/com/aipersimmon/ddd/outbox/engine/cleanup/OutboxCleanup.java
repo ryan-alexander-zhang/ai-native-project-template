@@ -2,6 +2,7 @@ package com.aipersimmon.ddd.outbox.engine.cleanup;
 
 import com.aipersimmon.ddd.outbox.engine.store.OutboxStore;
 import java.time.Clock;
+import java.time.Instant;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +26,16 @@ public class OutboxCleanup {
   private final OutboxStore store;
   private final Clock clock;
   private final long retentionSeconds;
+  private final int batchSize;
 
-  public OutboxCleanup(OutboxStore store, Clock clock, long retentionSeconds) {
+  public OutboxCleanup(OutboxStore store, Clock clock, long retentionSeconds, int batchSize) {
+    if (batchSize < 1) {
+      throw new IllegalArgumentException("batchSize must be >= 1, was " + batchSize);
+    }
     this.store = store;
     this.clock = clock;
     this.retentionSeconds = retentionSeconds;
+    this.batchSize = batchSize;
   }
 
   @Scheduled(fixedDelayString = "${aipersimmon.ddd.outbox.cleanup.poll-delay-ms:3600000}")
@@ -38,9 +44,18 @@ public class OutboxCleanup {
           "${aipersimmon.ddd.outbox.cleanup.lock-name:${spring.application.name:aipersimmon}-outbox-cleanup}",
       lockAtMostFor = "${aipersimmon.ddd.outbox.cleanup.lock-at-most-for:PT10M}")
   public void purge() {
-    int deleted = store.deleteSentBefore(clock.instant().minusSeconds(retentionSeconds));
-    if (deleted > 0) {
-      log.info("outbox cleanup removed {} sent rows older than {}s", deleted, retentionSeconds);
+    // Bounded pages rather than one statement: the first purge of a long-lived table would
+    // otherwise be a single giant DELETE transaction. Each page is its own small transaction; a
+    // run cut short (shutdown, lock expiry) has still permanently removed every page it finished.
+    Instant cutoff = clock.instant().minusSeconds(retentionSeconds);
+    int total = 0;
+    int deleted;
+    do {
+      deleted = store.deleteSentBefore(cutoff, batchSize);
+      total += deleted;
+    } while (deleted == batchSize);
+    if (total > 0) {
+      log.info("outbox cleanup removed {} sent rows older than {}s", total, retentionSeconds);
     }
   }
 }

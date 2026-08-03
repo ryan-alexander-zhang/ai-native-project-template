@@ -91,6 +91,8 @@ class DeadLetterReadTest {
             null),
         3,
         reason,
-        lastError);
+        lastError,
+        null,
+        null);
   }
 }

@@ -102,6 +102,11 @@ class OutboxEngineHousekeepingTest {
     // either would have the gauge cry wolf forever.
     assertEquals(1, backlog.pending());
     assertEquals(
+        1,
+        backlog.givenUp(),
+        "but a given-up row must not be invisible either: it is unsent, unclaimed and "
+            + "un-dead-lettered — stranded — and this gauge is the only thing that shows it");
+    assertEquals(
         Duration.ofSeconds(60),
         backlog.oldestPendingAge(),
         "and the age is the oldest waiting row's, which is the reading worth alerting on: fifty "
@@ -114,6 +119,7 @@ class OutboxEngineHousekeepingTest {
         new OutboxBacklog(store, Clock.fixed(NOW, ZoneOffset.UTC), MAX_ATTEMPTS).snapshot();
 
     assertEquals(0, backlog.pending());
+    assertEquals(0, backlog.givenUp());
     assertEquals(Duration.ZERO, backlog.oldestPendingAge(), "a gauge needs a value to alert on");
   }
 
@@ -143,7 +149,7 @@ class OutboxEngineHousekeepingTest {
     store.markSent(List.of("old-and-sent"), NOW.minusSeconds(3600));
     store.markSent(List.of("just-sent"), NOW.minusSeconds(10));
 
-    new OutboxCleanup(store, Clock.fixed(NOW, ZoneOffset.UTC), 600).purge();
+    new OutboxCleanup(store, Clock.fixed(NOW, ZoneOffset.UTC), 600, 500).purge();
 
     assertEquals(
         List.of("just-sent", "never-sent"),
@@ -154,8 +160,23 @@ class OutboxEngineHousekeepingTest {
 
   @Test
   void aRetentionSweepThatFindsNothingIsNotAnError() {
-    new OutboxCleanup(store, Clock.fixed(NOW, ZoneOffset.UTC), 600).purge();
+    new OutboxCleanup(store, Clock.fixed(NOW, ZoneOffset.UTC), 600, 500).purge();
 
     assertTrue(store.eventIds().isEmpty());
+  }
+
+  @Test
+  void aBacklogLargerThanOnePageIsDrainedByLoopingPagesNotByOneGiantDelete() {
+    for (int i = 0; i < 3; i++) {
+      insert("expired-" + i, NOW.minusSeconds(7200));
+    }
+    store.markSent(List.of("expired-0", "expired-1", "expired-2"), NOW.minusSeconds(3600));
+
+    // batchSize=1: one run must still remove everything, by paging — the in-memory store honours
+    // the page bound, so a purge that issued a single unbounded delete could not pass this with
+    // the loop removed... and a purge that ran only one page would leave two rows behind.
+    new OutboxCleanup(store, Clock.fixed(NOW, ZoneOffset.UTC), 600, 1).purge();
+
+    assertTrue(store.eventIds().isEmpty(), "all pages drained in one scheduled run");
   }
 }

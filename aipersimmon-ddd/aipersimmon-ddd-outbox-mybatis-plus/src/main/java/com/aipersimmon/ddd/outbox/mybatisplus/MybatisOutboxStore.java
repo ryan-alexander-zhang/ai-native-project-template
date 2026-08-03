@@ -137,11 +137,21 @@ public class MybatisOutboxStore implements OutboxStore {
   }
 
   @Override
-  public int deleteSentBefore(Instant sentBefore) {
+  public int deleteSentBefore(Instant sentBefore, int limit) {
+    // Page of ids first, then delete by key — DELETE ... LIMIT is not portable, the two-step is.
+    List<OutboxRecord> page =
+        mapper.selectList(
+            new LambdaQueryWrapper<OutboxRecord>()
+                .select(OutboxRecord::getEventId)
+                .eq(OutboxRecord::getSent, true)
+                .lt(OutboxRecord::getSentAt, sentBefore)
+                .last("LIMIT " + limit));
+    if (page.isEmpty()) {
+      return 0;
+    }
     return mapper.delete(
         new LambdaQueryWrapper<OutboxRecord>()
-            .eq(OutboxRecord::getSent, true)
-            .lt(OutboxRecord::getSentAt, sentBefore));
+            .in(OutboxRecord::getEventId, page.stream().map(OutboxRecord::getEventId).toList()));
   }
 
   @Override
@@ -149,7 +159,7 @@ public class MybatisOutboxStore implements OutboxStore {
     PendingBacklogRow row = mapper.selectPendingBacklog(maxAttempts);
     return row == null
         ? PendingBacklog.EMPTY
-        : new PendingBacklog(row.getPending(), row.getOldest());
+        : new PendingBacklog(row.getPending(), row.getOldest(), row.getGivenUp());
   }
 
   /**

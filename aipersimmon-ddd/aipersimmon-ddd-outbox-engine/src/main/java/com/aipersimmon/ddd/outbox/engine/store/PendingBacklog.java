@@ -15,9 +15,14 @@ import java.time.Instant;
  * @param oldestCreatedAt when the oldest of those rows was written, or {@code null} when there are
  *     none. The age is computed against the clock by the caller, not stored here, so a snapshot
  *     does not go stale in the reading.
+ * @param givenUp unsent rows at or beyond {@code maxAttempts} — rows the relay will neither claim
+ *     nor dead-letter. Normally zero, because exhausting the last attempt dead-letters the row in
+ *     the same act; it goes nonzero when {@code max-attempts} was <em>lowered</em> across a
+ *     restart, stranding rows whose attempt count the old limit permitted. Without this count those
+ *     rows are invisible: not pending, not dead-lettered, findable only by hand-written SQL.
  */
-public record PendingBacklog(long rows, Instant oldestCreatedAt) {
+public record PendingBacklog(long rows, Instant oldestCreatedAt, long givenUp) {
 
   /** Nothing is waiting. */
-  public static final PendingBacklog EMPTY = new PendingBacklog(0, null);
+  public static final PendingBacklog EMPTY = new PendingBacklog(0, null, 0);
 }

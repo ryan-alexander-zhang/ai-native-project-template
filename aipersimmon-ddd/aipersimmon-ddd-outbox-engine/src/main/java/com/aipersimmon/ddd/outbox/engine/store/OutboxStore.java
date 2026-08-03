@@ -106,11 +106,14 @@ public interface OutboxStore {
   void backOffWithoutAttempt(String eventId, Instant nextAttemptAt);
 
   /**
-   * Delete rows already sent before {@code sentBefore}.
+   * Delete <em>up to</em> {@code limit} rows already sent before {@code sentBefore} — one bounded
+   * page; the caller loops until a page comes back smaller than it asked for. Bounded because the
+   * first purge of a long-lived table would otherwise be one giant DELETE transaction (undo log,
+   * replication lag, lock time on a table the relay is reading).
    *
-   * @return how many rows were removed
+   * @return how many rows were removed, at most {@code limit}
    */
-  int deleteSentBefore(Instant sentBefore);
+  int deleteSentBefore(Instant sentBefore, int limit);
 
   /**
    * How much live work is waiting: unsent rows below {@code maxAttempts}, and when the oldest of

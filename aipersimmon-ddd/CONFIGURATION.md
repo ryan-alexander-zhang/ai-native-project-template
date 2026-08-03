@@ -270,6 +270,7 @@ Present with a storage module; the relay polls as soon as it is.
 | `cleanup.enabled` | `false` | Deletes sent rows past retention. Off by default — an unbounded table is visible, whereas deleting rows someone still wanted is not. |
 | `cleanup.retention-seconds` | `604800` (7 days) | How long a sent row is kept. |
 | `cleanup.poll-delay-ms` | `3600000` (1 hour) | How often cleanup runs. |
+| `cleanup.batch-size` | `500` | Rows deleted per page; the purge loops pages until one comes back short. Bounds how long any one delete transaction holds locks on a table the relay is reading — the first purge of a long-lived table is many small transactions, not one giant one. |
 | `cleanup.lock-name` / `cleanup.lock-at-most-for` | `${spring.application.name}` / `PT10M` | ShedLock settings for cleanup. |
 
 ## `aipersimmon.ddd.inbox` — idempotent consumer
@@ -287,6 +288,7 @@ nothing while every producer mints UUIDs, and breaks the moment one uses per-sou
 
 | `cleanup.retention-seconds` | `2592000` (30 days) | How long a handled key is remembered. Must exceed the longest possible redelivery delay, or a very late redelivery is processed twice. |
 | `cleanup.poll-delay-ms` | `3600000` (1 hour) | How often cleanup runs. |
+| `cleanup.batch-size` | `500` | Rows per time-sliced delete page (the key is composite, so pages advance by timestamp; ties can make a page slightly larger). Same purpose as the outbox's: many small transactions instead of one giant first purge. |
 
 ## `aipersimmon.ddd.messaging.kafka` — broker transport
 
@@ -304,6 +306,14 @@ nothing while every producer mints UUIDs, and breaks the moment one uses per-sou
 Three failure tiers, worth knowing before tuning: **poison** (unknown type, malformed payload) is
 dead-lettered at once; **systemic** is retried forever and never dead-lettered; **everything else**
 gets the bounded backoff and then the DLT.
+
+**Provision `<topic>.DLT` for every topic you consume** (or let the broker auto-create topics in
+environments where that is acceptable). The framework does not create it and deliberately does not
+probe for it at startup — a probe would false-fail every auto-create environment, and could only
+warn in the rest. What a missing DLT does is the thing to know: dead-lettering a poison record
+fails, the error handler seeks back, and the partition retries that record forever. The failure is
+a producer error, not a `DataAccessException`, so the systemic-stall WARN does not fire — watch
+consumer lag on the partition, which is the one signal that always shows it.
 
 ## `aipersimmon.ddd.process-manager` — durable process manager
 

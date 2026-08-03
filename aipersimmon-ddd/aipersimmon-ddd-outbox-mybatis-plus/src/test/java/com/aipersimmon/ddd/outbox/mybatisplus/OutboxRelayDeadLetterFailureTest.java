@@ -67,7 +67,13 @@ class OutboxRelayDeadLetterFailureTest {
   /** Stands in for an unavailable dead-letter table: the move always fails. */
   static class FailingDeadLetterStore implements DeadLetterStore {
     @Override
-    public void store(OutboxMessage message, int attempts, Reason reason, String lastError) {
+    public void store(
+        OutboxMessage message,
+        int attempts,
+        Reason reason,
+        String lastError,
+        String traceparent,
+        String traceState) {
       throw new IllegalStateException("dead-letter table unavailable");
     }
 

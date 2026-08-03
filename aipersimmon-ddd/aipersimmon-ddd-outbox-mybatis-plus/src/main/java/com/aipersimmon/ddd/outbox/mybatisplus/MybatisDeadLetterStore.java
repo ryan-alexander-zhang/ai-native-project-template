@@ -32,7 +32,13 @@ public class MybatisDeadLetterStore implements DeadLetterStore {
   }
 
   @Override
-  public void store(OutboxMessage message, int attempts, Reason reason, String lastError) {
+  public void store(
+      OutboxMessage message,
+      int attempts,
+      Reason reason,
+      String lastError,
+      String traceparent,
+      String traceState) {
     transactionTemplate.executeWithoutResult(
         status -> {
           DeadLetterRecord record = new DeadLetterRecord();
@@ -47,6 +53,8 @@ public class MybatisDeadLetterStore implements DeadLetterStore {
           record.setCausationId(message.causationId());
           record.setTenantId(message.tenantId());
           record.setDestination(message.destination());
+          record.setTraceparent(traceparent);
+          record.setTraceState(traceState);
           record.setAttempts(attempts);
           record.setReason(reason.name());
           record.setLastError(lastError);
@@ -82,6 +90,8 @@ public class MybatisDeadLetterStore implements DeadLetterStore {
               record.setCausationId(dead.getCausationId());
               record.setTenantId(dead.getTenantId());
               record.setDestination(dead.getDestination());
+              record.setTraceparent(dead.getTraceparent());
+              record.setTraceState(dead.getTraceState());
               record.setSent(false);
               record.setAttempts(0);
               record.setNextAttemptAt(null);

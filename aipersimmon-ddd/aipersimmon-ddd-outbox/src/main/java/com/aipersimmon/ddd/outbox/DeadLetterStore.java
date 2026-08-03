@@ -29,8 +29,17 @@ public interface DeadLetterStore {
    * @param attempts how many delivery attempts were made (including the last failure)
    * @param reason why it was given up on
    * @param lastError a short description of the final failure (class and message)
+   * @param traceparent the W3C trace context captured when the row was written, or {@code null};
+   *     carried into the dead-letter row so a replayed message keeps its original trace identity
+   * @param traceState the companion {@code tracestate}, or {@code null}
    */
-  void store(OutboxMessage message, int attempts, Reason reason, String lastError);
+  void store(
+      OutboxMessage message,
+      int attempts,
+      Reason reason,
+      String lastError,
+      String traceparent,
+      String traceState);
 
   /**
    * Moves a dead letter back into the outbox for another delivery attempt, resetting its delivery

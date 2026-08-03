@@ -38,6 +38,13 @@
       <artifactId>aipersimmon-ddd-operation-log</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Optional: the out-of-the-box OperationLogMetrics bridge binds only when a MeterRegistry
+         bean exists; without Micrometer on the classpath the SPI stays a no-op. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- ConcurrencyConflictException / DomainException for the default failure classification. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

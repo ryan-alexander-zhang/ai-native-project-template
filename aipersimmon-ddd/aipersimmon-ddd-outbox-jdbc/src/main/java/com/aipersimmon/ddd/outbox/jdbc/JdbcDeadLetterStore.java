@@ -19,21 +19,21 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
   private static final String INSERT_DEAD_LETTER =
       "INSERT INTO aipersimmon_dead_letter "
           + "(event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id, destination, attempts, reason, last_error, "
-          + "failed_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+          + "tenant_id, correlation_id, causation_id, destination, traceparent, trace_state, "
+          + "attempts, reason, last_error, failed_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
   private static final String DELETE_OUTBOX = "DELETE FROM aipersimmon_outbox WHERE event_id = ?";
 
   private static final String SELECT_DEAD_LETTER =
       "SELECT event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id, destination "
+          + "tenant_id, correlation_id, causation_id, destination, traceparent, trace_state "
           + "FROM aipersimmon_dead_letter WHERE event_id = ?";
   private static final String REQUEUE_OUTBOX =
       "INSERT INTO aipersimmon_outbox "
           + "(event_id, source, type, version, payload, occurred_at, subject, "
-          + "tenant_id, correlation_id, causation_id, destination, sent, attempts, next_attempt_at, "
-          + "created_at) "
-          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 0, NULL, ?)";
+          + "tenant_id, correlation_id, causation_id, destination, traceparent, trace_state, "
+          + "sent, attempts, next_attempt_at, created_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 0, NULL, ?)";
   private static final String DELETE_DEAD_LETTER =
       "DELETE FROM aipersimmon_dead_letter WHERE event_id = ?";
 
@@ -49,7 +49,13 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
   }
 
   @Override
-  public void store(OutboxMessage message, int attempts, Reason reason, String lastError) {
+  public void store(
+      OutboxMessage message,
+      int attempts,
+      Reason reason,
+      String lastError,
+      String traceparent,
+      String traceState) {
     transactionTemplate.executeWithoutResult(
         status -> {
           jdbc.update(
@@ -65,6 +71,8 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
               message.correlationId(),
               message.causationId(),
               message.destination(),
+              traceparent,
+              traceState,
               attempts,
               reason.name(),
               lastError,
@@ -78,28 +86,32 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
     return Boolean.TRUE.equals(
         transactionTemplate.execute(
             status -> {
-              OutboxMessage message =
+              DeadRow dead =
                   jdbc.query(
                       SELECT_DEAD_LETTER,
                       rs ->
                           rs.next()
-                              ? new OutboxMessage(
-                                  rs.getString("event_id"),
-                                  rs.getString("source"),
-                                  rs.getString("type"),
-                                  rs.getInt("version"),
-                                  rs.getString("payload"),
-                                  rs.getTimestamp("occurred_at").toInstant(),
-                                  rs.getString("subject"),
-                                  rs.getString("tenant_id"),
-                                  rs.getString("correlation_id"),
-                                  rs.getString("causation_id"),
-                                  rs.getString("destination"))
+                              ? new DeadRow(
+                                  new OutboxMessage(
+                                      rs.getString("event_id"),
+                                      rs.getString("source"),
+                                      rs.getString("type"),
+                                      rs.getInt("version"),
+                                      rs.getString("payload"),
+                                      rs.getTimestamp("occurred_at").toInstant(),
+                                      rs.getString("subject"),
+                                      rs.getString("tenant_id"),
+                                      rs.getString("correlation_id"),
+                                      rs.getString("causation_id"),
+                                      rs.getString("destination")),
+                                  rs.getString("traceparent"),
+                                  rs.getString("trace_state"))
                               : null,
                       eventId);
-              if (message == null) {
+              if (dead == null) {
                 return false;
               }
+              OutboxMessage message = dead.message();
               jdbc.update(
                   REQUEUE_OUTBOX,
                   message.eventId(),
@@ -113,9 +125,14 @@ public class JdbcDeadLetterStore implements DeadLetterStore {
                   message.correlationId(),
                   message.causationId(),
                   message.destination(),
+                  dead.traceparent(),
+                  dead.traceState(),
                   Timestamp.from(clock.instant()));
               jdbc.update(DELETE_DEAD_LETTER, eventId);
               return true;
             }));
   }
+
+  /** One dead-letter row: the published message plus the trace context it was written under. */
+  private record DeadRow(OutboxMessage message, String traceparent, String traceState) {}
 }

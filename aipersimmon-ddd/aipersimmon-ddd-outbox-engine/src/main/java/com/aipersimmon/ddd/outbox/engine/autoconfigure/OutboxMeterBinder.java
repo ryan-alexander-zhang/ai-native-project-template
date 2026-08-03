@@ -53,6 +53,11 @@ public final class OutboxMeterBinder implements MeterBinder {
     Gauge.builder(OutboxMeters.PENDING, this, b -> b.sample().pending())
         .description("Messages written but not yet delivered, and not yet given up on")
         .register(registry);
+    Gauge.builder(OutboxMeters.GIVEN_UP, this, b -> b.sample().givenUp())
+        .description(
+            "Unsent rows at or beyond max-attempts that the relay will neither claim nor"
+                + " dead-letter — stranded by a lowered max-attempts; alert on nonzero")
+        .register(registry);
     Gauge.builder(
             OutboxMeters.OLDEST_PENDING_AGE,
             this,

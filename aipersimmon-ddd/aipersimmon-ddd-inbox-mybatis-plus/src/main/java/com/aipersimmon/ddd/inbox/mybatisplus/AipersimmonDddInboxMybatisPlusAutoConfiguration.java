@@ -90,9 +90,9 @@ public class AipersimmonDddInboxMybatisPlusAutoConfiguration {
     public InboxCleanup inboxCleanup(
         InboxMapper inboxMapper,
         Clock inboxClock,
-        @Value("${aipersimmon.ddd.inbox.cleanup.retention-seconds:2592000}")
-            long retentionSeconds) {
-      return new InboxCleanup(inboxMapper, inboxClock, retentionSeconds);
+        @Value("${aipersimmon.ddd.inbox.cleanup.retention-seconds:2592000}") long retentionSeconds,
+        @Value("${aipersimmon.ddd.inbox.cleanup.batch-size:500}") int batchSize) {
+      return new InboxCleanup(inboxMapper, inboxClock, retentionSeconds, batchSize);
     }
   }
 }

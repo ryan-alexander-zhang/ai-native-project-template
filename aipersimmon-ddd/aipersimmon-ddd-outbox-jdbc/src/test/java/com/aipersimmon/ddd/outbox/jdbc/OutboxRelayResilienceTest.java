@@ -234,9 +234,23 @@ class OutboxRelayResilienceTest {
   @Test
   void replayMovesADeadLetterBackToTheOutboxAndItThenDelivers() {
     insert("e1", null, 0);
+    // The trace context the event was written under must survive the round trip through the
+    // dead-letter table: the columns existed from V1 but the store dropped them at both hops,
+    // so a replayed message silently started a fresh trace.
+    String traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
+    jdbc.update(
+        "UPDATE aipersimmon_outbox SET traceparent = ?, trace_state = ? WHERE event_id = ?",
+        traceparent,
+        "vendor=aipersimmon",
+        "e1");
     dispatcher.permanentlyFailEventIds.add("e1");
     relay.relay(); // dead-lettered
     assertEquals(1, deadLetterCount());
+    assertEquals(
+        traceparent,
+        jdbc.queryForObject(
+            "SELECT traceparent FROM aipersimmon_dead_letter WHERE event_id = 'e1'", String.class),
+        "the move to the dead-letter table carries the trace context");
 
     // the cause is "fixed": the dispatcher stops failing, an operator replays it
     dispatcher.permanentlyFailEventIds.clear();
@@ -246,6 +260,11 @@ class OutboxRelayResilienceTest {
     assertEquals(1, outboxCount(), "the message is back in the outbox, unsent");
     assertEquals(0, deadLetterCount());
     assertEquals(Integer.valueOf(0), attempts("e1"), "its delivery bookkeeping is reset");
+    assertEquals(
+        traceparent,
+        jdbc.queryForObject(
+            "SELECT traceparent FROM aipersimmon_outbox WHERE event_id = 'e1'", String.class),
+        "and the replay keeps the original trace identity rather than starting a fresh one");
 
     relay.relay();
 

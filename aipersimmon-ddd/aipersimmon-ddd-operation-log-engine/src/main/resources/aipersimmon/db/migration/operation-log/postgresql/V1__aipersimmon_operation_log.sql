@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS aipersimmon_operation_log (
     record_id         VARCHAR(64)  NOT NULL PRIMARY KEY, -- time-ordered id (UUIDv7/ULID)
     source            VARCHAR(128) NOT NULL,
-    tenant_id         VARCHAR(64)  NOT NULL,             -- non-multi-tenant normalized to 'GLOBAL'
+    tenant_id         VARCHAR(64)  NOT NULL,             -- non-multi-tenant normalized to '__root__'
     idempotency_key   CHAR(64)     NOT NULL,             -- SHA-256 hex
     operation_code    VARCHAR(128) NOT NULL,
     actor_type        VARCHAR(32)  NOT NULL,

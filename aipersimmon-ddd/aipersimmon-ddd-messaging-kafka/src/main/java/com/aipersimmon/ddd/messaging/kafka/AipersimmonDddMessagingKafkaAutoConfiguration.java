@@ -326,6 +326,13 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
    * together: the recoverer copies the source key onto the DLT record, and the producer's default
    * partitioner sends equal keys to the same partition. Co-location was always the key's doing, not
    * the partition number's.
+   *
+   * <p>The topic itself is a provisioning requirement: this transport neither creates {@code
+   * <topic>.DLT} nor probes for it (a probe would false-fail every auto-create environment and
+   * could only warn in the rest). If it is missing, the recovery publish fails, the handler seeks
+   * back, and the partition retries the poison record forever — and because that failure is a
+   * producer error rather than a {@code DataAccessException}, the systemic-stall WARN stays silent.
+   * Consumer lag on the partition is the signal that always shows it.
    */
   static TopicPartition deadLetterDestination(ConsumerRecord<?, ?> record) {
     return new TopicPartition(record.topic() + ".DLT", ANY_PARTITION);

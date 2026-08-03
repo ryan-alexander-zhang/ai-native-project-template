@@ -39,6 +39,17 @@ class RedactorTest {
   }
 
   @Test
+  void truncation_never_cuts_through_a_surrogate_pair() {
+    // "abcd😀" is 6 UTF-16 units; the summary budget of 5 lands exactly between the emoji's two
+    // halves. Cutting there produces a lone high surrogate, which MySQL utf8mb4 rejects — and on
+    // the success path that insert failure would roll back the business transaction. One char of
+    // budget is given up instead.
+    assertEquals("abcd", redactor.summary("abcd😀"));
+    // A pair that fits entirely inside the budget is kept whole.
+    assertEquals("abc😀", redactor.summary("abc😀x"));
+  }
+
+  @Test
   void details_are_capped_and_values_redacted() {
     List<OperationDetail> out =
         redactor.details(
