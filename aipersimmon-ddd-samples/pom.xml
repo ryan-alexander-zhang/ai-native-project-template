@@ -36,6 +36,7 @@
     <module>s16-tactical-modelling</module>
     <module>s17-aggregate-persistence-mapping</module>
     <module>s18-testing-strategy</module>
+    <module>s19-validation-layers</module>
   </modules>
 
   <dependencyManagement>

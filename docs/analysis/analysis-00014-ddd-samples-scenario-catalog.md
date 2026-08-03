@@ -514,6 +514,8 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 **预计涉及的组件**：`aipersimmon-ddd-cqrs`（`CommandPrecheck`）、`aipersimmon-ddd-core`
 （`Invariant`、`Specification`）、`aipersimmon-ddd-web`。
 
+**文档**：[[analysis-00022-samples-validation-layers]]（已完成）。
+
 ### S20 读侧查询契约：分页、排序、过滤（P0）
 
 **场景描述**：列表查询是最高频的读需求，库为它准备了三种分页形状，但一个都没有示例。
