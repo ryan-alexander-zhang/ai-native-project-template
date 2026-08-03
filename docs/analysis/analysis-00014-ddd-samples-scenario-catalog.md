@@ -465,8 +465,9 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 - 读路径能不能绕过聚合直接查表（与 S12/S20 的边界）；
 - 领域声明仓储接口、读方法留在实现类，这种分工的理由。
 
-**预计涉及的组件**：`aipersimmon-ddd-persistence-mybatis-plus`、
-`aipersimmon-ddd-persistence-jdbc`（对照）、`aipersimmon-ddd-core`。
+**预计涉及的组件**：`aipersimmon-ddd-persistence-mybatis-plus`、`aipersimmon-ddd-core`。
+
+**文档**：[[analysis-00018-samples-aggregate-persistence-mapping]]（已完成）。
 
 ### S18 分层测试策略（P0）
 

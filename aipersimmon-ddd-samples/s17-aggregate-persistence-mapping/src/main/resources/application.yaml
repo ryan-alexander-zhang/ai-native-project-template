@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: s17-aggregate-persistence-mapping
+  datasource:
+    url: jdbc:postgresql://localhost:18171/s17
+    username: s17
+    password: s17
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
