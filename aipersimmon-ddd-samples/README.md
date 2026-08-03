@@ -29,5 +29,9 @@ variants of the framework modules are not used.
 | S2 Idempotency and replay protection | [s02-http-idempotency](s02-http-idempotency) | `analysis-00017` |
 | S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |
 | S17 Aggregate to tables | [s17-aggregate-persistence-mapping](s17-aggregate-persistence-mapping) | `analysis-00018` |
+| S18 Testing strategy | [s18-testing-strategy](s18-testing-strategy) | `analysis-00019` |
 
 Ports: scenario N owns the block starting at `18000 + 10*N`, so several samples can run at once.
+
+Test style is settled in **S18**: five layers, each assertion at the cheapest one that can answer it.
+New samples follow it rather than inventing their own.

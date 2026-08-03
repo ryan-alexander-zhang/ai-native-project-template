@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: s18-testing-strategy
+  datasource:
+    url: jdbc:postgresql://localhost:18181/s18
+    username: s18
+    password: s18
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18180
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true

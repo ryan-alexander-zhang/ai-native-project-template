@@ -491,6 +491,8 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 **预计涉及的组件**：`aipersimmon-ddd-test`、`aipersimmon-ddd-test-support`、
 `aipersimmon-ddd-archunit`。
 
+**文档**：[[analysis-00019-samples-testing-strategy]]（已完成）。
+
 ### S19 校验的三层分工（P0）
 
 **场景描述**：同一个"不合法"，可能是参数形状不对、可能是跨上下文的前置条件不满足、也可能是
