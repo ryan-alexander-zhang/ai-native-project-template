@@ -36,6 +36,7 @@ variants of the framework modules are not used.
 | S18 Testing strategy | [s18-testing-strategy](s18-testing-strategy) | `analysis-00019` |
 | S19 Three kinds of "not allowed" | [s19-validation-layers](s19-validation-layers) | `analysis-00022` |
 | S20 The read side's contract | [s20-query-contract-paging](s20-query-contract-paging) | `analysis-00023` |
+| S21 Contract evolution and coexisting revisions | [s21-event-contract-evolution](s21-event-contract-evolution) | `analysis-00026` |
 
 Ports: scenario N owns the block starting at `18000 + 10*N`, so several samples can run at once.
 

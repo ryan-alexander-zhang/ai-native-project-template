@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: s21-inventory-service
+  datasource:
+    url: jdbc:postgresql://localhost:18213/inventory
+    username: inventory
+    password: inventory
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18214
+    consumer:
+      auto-offset-reset: earliest
+
+server:
+  port: 18212
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+inventory:
+  # Two topics, because this consumer is mid-move: v2 and v3 are on the current topic, v1 is still on
+  # the one the contract used to live on. The subscription set is the union of what the declared
+  # revisions name, so no extra configuration says "read both" — the annotations do.
+  ordering-events-topic: ordering.events
+  legacy-events-topic: ordering.events.v1
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /inventory
+    flyway:
+      # inbox is what a consumer needs. outbox is the tax the durable-transport guard levies on a
+      # consume-only service (see the pom, and docs/issue/issue-00161); its tables stay empty.
+      components: [inbox, outbox]
+    outbox:
+      relay:
+        enabled: false
+    messaging:
+      kafka:
+        consumer:
+          enabled: true
+          # Left at its default (true) deliberately. It is what makes the "delete only the upcaster"
+          # failure silent, and a sample that turned it off to feel safer would have hidden the one
+          # hazard it exists to show. What it buys in return is real: a service subscribed to a busy
+          # topic does not write an inbox row for every record it has no handler for.
+          skip-locally-unhandled: true

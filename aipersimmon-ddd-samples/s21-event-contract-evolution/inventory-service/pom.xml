@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>s21-event-contract-evolution</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s21-inventory-service</artifactId>
+  <name>s21-inventory-service</name>
+  <description>The consuming side: three revisions in, one revision out.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
+    </dependency>
+    <!--
+      An outbox in a service that publishes nothing, carried under protest — the same tax S4 pays, and
+      for the same reason: the Kafka starter's durable-transport guard reads the @Externalized
+      annotations this service needs in order to SUBSCRIBE as evidence that it PUBLISHES, so without a
+      durable publisher it refuses to start. Filed as docs/issue/issue-00161.
+
+      It costs more here than it did in S4. This service declares three revisions, all @Externalized,
+      so the guard is triggered by three classes that exist purely to be read.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-archunit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>kafka</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- For ContainerTestUtils.waitForAssignment: this service subscribes to two topics, so the
+         count it waits for is 2, and getting it wrong is how a consumer test goes flaky. -->
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

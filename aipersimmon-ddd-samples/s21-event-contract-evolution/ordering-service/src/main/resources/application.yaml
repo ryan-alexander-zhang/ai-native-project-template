@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: s21-ordering-service
+  datasource:
+    url: jdbc:postgresql://localhost:18211/ordering
+    username: ordering
+    password: ordering
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18214
+
+server:
+  port: 18210
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ordering:
+  # One topic for every revision of this contract. A topic per revision is possible (the routing table
+  # is keyed by (name, version), not by name) and is the wrong default: it multiplies the subscriptions
+  # every consumer must hold, and the (name, version) pair already tells a consumer which revision it
+  # is holding. The consumer side of this sample keeps one legacy topic anyway, so the mechanics of a
+  # topic move are visible where they matter — in the subscription set, not here.
+  events-topic: ordering.events
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /ordering
+    flyway:
+      components: [outbox]
+    outbox:
+      relay:
+        enabled: true
+      poll-delay-ms: 500
+    messaging:
+      kafka:
+        producer:
+          send-timeout-ms: 10000

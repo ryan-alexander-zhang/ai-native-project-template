@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>s21-event-contract-evolution</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s21-ordering-service</artifactId>
+  <name>s21-ordering-service</name>
+  <description>The publishing side, two revisions further on than where it started.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
+    </dependency>
+    <!--
+      The durable side. It matters twice over in this sample: the outbox is not only what makes
+      publication atomic with the business write, it is also a queue of rows that were serialized
+      BEFORE this deploy. A revision bump does not re-stamp them, so the backlog keeps shipping the
+      old revision after the code that could produce it is gone. A test asserts exactly that.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-archunit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>kafka</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
