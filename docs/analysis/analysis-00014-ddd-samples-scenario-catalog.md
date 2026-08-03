@@ -259,6 +259,15 @@ sample 内演示，不单独建目录。
 （`CommandPrecheck`）、`aipersimmon-ddd-web`（problem 的客户端解读）、
 `aipersimmon-ddd-starter`（无库服务）；HTTP 客户端为三方选型。
 
+**文档**：[[analysis-00030-samples-synchronous-call-between-services]]（已完成，两个服务模块）。落地时把"何时该同步"
+的判据收敛成一句：**同步调用能拿到"判断"，永远拿不到"预留"**——需要对方持有东西就是 S9/S10，不是一次提问。另外
+三条上面没问到的：被调方**拒绝必须是 200 + `approved:false`**（用 4xx 会让调用方分不清业务拒绝与自己发错了），
+调用方把对方的 **4xx 也翻译成"没有答案"**（4xx 意味着本服务有缺陷，不该说成客户订单被拒），以及 `ErrorCategory`
+**没有"依赖不可用"这一档**（`UNEXPECTED`→500 既错在归属又叫客户端别重试），要用 `ProblemCatalog` 按 code 覆盖成
+503。precheck 在事务之前这条用探针直接测了（precheck 里无事务、handler 里有）。踩坑三件：lambda 写的 precheck
+启动期被拒（带 diamond 的匿名类能过检查但**不运行**，要具名类）、`SpringApplicationBuilder.properties()` 优先级
+低于 `application.yaml`、JDK HttpServer 的默认 executor 是单线程导致"重试没发生"的假象。
+
 ### S7 调用外部三方应用（防腐层 + 出站/回调）（P0）
 
 **场景描述**：与完全不受控的外部系统集成：支付网关、短信服务商、物流平台。通常有"发起调用 →

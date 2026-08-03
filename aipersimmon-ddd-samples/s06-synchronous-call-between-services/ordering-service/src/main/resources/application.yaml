@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: s06-ordering-service
+  datasource:
+    url: jdbc:postgresql://localhost:18061/ordering
+    username: ordering
+    password: ordering
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18060
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ordering:
+  risk-service-url: http://localhost:18062
+  # Both timeouts exist because Spring's default request factory has none. A callee that accepts a
+  # connection and then goes quiet would otherwise hold a request thread indefinitely — which is how one
+  # slow dependency takes down its callers one thread at a time. These are a sample's numbers; a real one
+  # is shorter than this service's own SLA.
+  risk-connect-timeout-ms: 1000
+  risk-read-timeout-ms: 2000
+
+aipersimmon:
+  ddd:
+    # No flyway.components: this service has no framework tables at all. A synchronous call needs no
+    # outbox, no inbox and no dedup log — which is half its appeal and, since nothing durable records that
+    # the call happened, the whole of its cost.
+    web:
+      # The problem-detail title for the one overridden problem type; the rest come from the framework's
+      # own message source.
+      enabled: true

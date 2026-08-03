@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: s06-risk-service
+
+server:
+  port: 18062
+
+risk:
+  # 1,000.00 — above this an order needs a human, which is the kind of rule that lives in configuration
+  # because it changes on a Tuesday for business reasons.
+  max-amount-cents: 100000
+  blocked-customers: customer-blocked
+
+aipersimmon:
+  ddd:
+    cqrs:
+      transaction:
+        # The one property a database-less service must set, and it must be set deliberately.
+        #
+        # With no DataSource there is no PlatformTransactionManager, so the starter's UnitOfWork and its
+        # transaction interceptor are both absent and every command would run untransacted. Rather than
+        # let that guarantee evaporate in silence, the starter REFUSES TO START unless the deployment
+        # says out loud that it meant it — with a FailureAnalyzer that prints the two ways out. Saying so
+        # here logs a WARN on every start, on purpose, so this cannot become the unnoticed state of a
+        # service that later grows a database.
+        #
+        # This service qualifies honestly: it answers a query from a rule and writes nothing anywhere.
+        required: false

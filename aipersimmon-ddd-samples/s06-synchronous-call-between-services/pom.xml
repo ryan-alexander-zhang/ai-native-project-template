@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>aipersimmon-ddd-samples</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s06-synchronous-call-between-services</artifactId>
+  <packaging>pom</packaging>
+  <name>s06-synchronous-call-between-services</name>
+  <description>S6: when a request cannot continue without another service's answer.</description>
+
+  <!--
+    Two services, and again no shared contract module — but the reasoning is not S4's.
+
+    Over a broker the argument is about durability: records outlive the code, so a shared jar forces a
+    coordinated release on a contract that is already in flight. A synchronous HTTP call has no such
+    backlog; both sides are live at the same moment. What a shared jar costs here is narrower and still
+    real: the callee's DTOs become the caller's compile-time dependency, so every field the callee adds
+    for someone else recompiles this caller, and the caller's model quietly inherits the callee's shape.
+
+    So the caller hand-writes the two records it actually sends and reads, in its own client package,
+    and the companion document argues the three options (shared jar, OpenAPI codegen, hand-written)
+    rather than pretending there is only one.
+  -->
+  <modules>
+    <module>risk-service</module>
+    <module>ordering-service</module>
+  </modules>
+</project>
