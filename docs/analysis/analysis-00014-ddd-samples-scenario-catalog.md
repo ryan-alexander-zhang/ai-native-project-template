@@ -535,6 +535,10 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 `ReadModel`）、`aipersimmon-ddd-web-spring-boot-starter`（游标序列化）、
 `aipersimmon-ddd-persistence-mybatis-plus`。
 
+**文档**：[[analysis-00023-samples-query-contract-paging]]（已完成）。落地时修正了上面第三条问法：
+按 `IdGenerator` 的不透明契约，稳定排序依赖的是**排序键全序**，时间有序 id 只提供索引局部性，不是
+可以拿来当业务排序的承诺。
+
 ### S21 事件契约演进与多版本共存（P0，双服务不同版次）
 
 **场景描述**：跨服务事件一旦发出就是公共契约。加字段、删字段、改语义、换 topic，各走哪条路，

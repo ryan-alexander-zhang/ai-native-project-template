@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: s20-query-contract-paging
+  datasource:
+    url: jdbc:postgresql://localhost:18201/s20
+    username: s20
+    password: s20
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18200
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
