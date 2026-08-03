@@ -53,5 +53,5 @@ fails when Docker is absent — check for skips before trusting a green build on
 | Idempotency, rate limiting, replay protection | S2. `POST /orders` here is not retry-safe, deliberately: that is the next sample's subject. |
 | Paging, filtering, cursors | S20. The only read here is by id. |
 | The `ORDER_HAS_NO_LINES` invariant over HTTP | Unreachable from this endpoint, because the request DTO also rejects an empty list. That duplication is correct — the aggregate must not trust its callers — and which layer owns which check is S19. `OrderTest` covers the invariant directly. |
-| The actor convention | Defined in the companion document, but no code needs it until the operation log arrives with S14. |
+| Auditing, and the operator identity it needs | There is no operation log here, so nothing needs to know who performed the request. S14 brings both, together. |
 | Domain event subscribers | `OrderPlaced` and `OrderConfirmed` are published on save and nothing listens yet. S3 picks them up. |

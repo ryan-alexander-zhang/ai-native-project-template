@@ -14,7 +14,7 @@ parent: analysis-00014-ddd-samples-scenario-catalog
 ## 0. 本篇定位
 
 这是 samples 的**模板篇**。除了讲清一条 HTTP 同步请求怎么写，它还要一次性冻结后续所有 sample
-继承的东西：目录与包结构、父 POM、端口分段、错误契约、actor 约定、README 结构、测试风格雏形
+继承的东西：目录与包结构、父 POM、端口分段、错误契约、README 结构、测试风格雏形
 （S18 会把测试正式化）。**后续场景不再重新裁决这些，只引用本篇。**
 
 刻意的取舍：**本篇用一个尽可能笨的聚合**。为什么这样建模、不变量怎么放、值对象怎么设计属于
@@ -654,41 +654,7 @@ spring:
 `retry-on-conflict.initial-backoff`（`50ms`，每次翻倍、无 jitter）。本篇保持重试关闭——什么命令
 能重试是 S8 的题目。
 
-## 7. actor 约定（S14 的前置，本篇必须定）
-
-这里的 actor 指审计意义上的**操作者**——"谁做了这件事"。它是操作日志组件的概念，
-`Actor(type, id, displayName)`，带 `Actor.user(...)` / `Actor.system(...)` /
-`Actor.service(...)` 三个工厂。本篇要定的是它从哪来。
-
-库把这个决定**有意留给使用方**，不是漏了：
-
-- `OperationActorResolver` 的 `Actor resolve()` 是无参的，javadoc 要求它从**可信边界**（安全
-  上下文或显式的调用作用域）取，**绝不能从命令载荷取**。这就是为什么 actor 既不在
-  `CommandContext` 上，也不该作为字段塞进 command——命令载荷是不可信输入，而审计要的是可信身份。
-- 它没有默认实现：开了操作日志却不提供这个 bean，**启动直接失败**，并且有专门的
-  `MissingOperationLogResolverFailureAnalyzer` 输出带代码片段的提示。同一个模块里的
-  `OperationTenantResolver` 反而有默认实现（委托 `TenantContext`）——一个有默认一个没有，说明
-  "actor 必须你自己填"是设计判断。
-
-所以要解决的不是库的缺口，而是**示例得选一个可信来源，并且覆盖没有 HTTP 上下文的入口**。
-
-**本篇为全部 sample 定下的约定**（明确标注这是示例的选择，不是库的机制）：
-
-- 一个 `SampleActorContext`，内部是 `ThreadLocal<Actor>`，由 HTTP 的一个 filter 从认证信息
-  （sample 里就是一个请求头）填入、请求结束清理；
-- 非 HTTP 入口（S11 的定时任务、S4 的 inbox 消费）在入口处显式设置一个系统 actor，例如
-  `system:scheduler` / `system:inbox`，**不允许留空**；
-- sample 的 `OperationActorResolver` 实现只读这个上下文。
-
-它跨不过线程池和 `@Async`——和 `CommandContexts.current()` 一样。要跨就显式传参。这个约定同时
-解释了为什么本篇不把 actor 塞进 command：那会让每个命令都多一个与业务无关的字段，而重投时它还
-得被正确复原。
-
-**代码落地时机**：约定在此定清，但 s01 里**没有**实现它——现阶段没有任何消费者，写出来就是死
-代码。它随 S14（操作日志寄宿进 s01）一起落地，那时 `OperationActorResolver` 就是它的第一个
-消费者。
-
-## 8. 测试（雏形，S18 正式化）
+## 7. 测试（雏形，S18 正式化）
 
 本篇至少要有四个测试，后续 sample 照抄这四层：
 
@@ -724,7 +690,7 @@ class ArchitectureTest {
 `implementationsShouldBeSpringRepositories()` 与
 `commandComponentsShouldDeclareValidationConstraints()`。
 
-## 9. 工程约定（本篇冻结，全部 sample 继承）
+## 8. 工程约定（本篇冻结，全部 sample 继承）
 
 **目录与命名**
 
@@ -763,7 +729,7 @@ aipersimmon-ddd-samples/
 **业务域**：不追求全局统一。订单域被 S1/S2/S3/S8 等复用；需要新域的场景直接用新域，不为统一
 而牵强。
 
-## 10. 库文档与代码不一致之处（写文档时以代码为准）
+## 9. 库文档与代码不一致之处（写文档时以代码为准）
 
 写本篇时撞到四处偏差，记录在此以免后续 sample 被文档带偏：
 
@@ -781,10 +747,11 @@ aipersimmon-ddd-samples/
 
 这些属于库自身的文档债，不在 samples 范围内修；但 samples 的正文不得复述错误说法。
 
-## 11. 本篇不覆盖
+## 10. 本篇不覆盖
 
 - 幂等与重放防护（S2）、分页与游标（S20）、`CommandPrecheck` 的三层校验分工（S19）；
 - 聚合建模的理由与取舍（S16）、映射细节与部分更新（S17）；
 - 领域事件的语义与易失性（S3）、跨服务（S4 起）；
 - 事务边界与并发升级路径（S8）；
-- 认证授权本身——本篇只定 actor 从哪来，不定它怎么被验证。
+- 审计与操作日志，连同它需要的操作者身份（actor）——那是 S14 的题目，本篇一个字都不用定；
+- 认证与授权。

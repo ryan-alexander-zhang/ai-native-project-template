@@ -109,7 +109,6 @@ sample 内演示，不单独建目录。
   示例要如实呈现这一点，而不是自造一层 `{code,message,data}`；
 - **读侧的返回类型与归属**：query handler 返回什么、住在哪一层，`Projection` 与 `ReadModel`
   两个标记分别什么时候用；
-- **操作者身份（actor）如何进入请求处理链**——见 §3.2，这是 S14 的前置；
 - OpenAPI 文档如何与实际行为保持一致。
 
 **预计涉及的组件**：`aipersimmon-ddd-starter` + `aipersimmon-ddd-persistence-mybatis-plus` +
@@ -396,9 +395,11 @@ sample 内演示，不单独建目录。
 **要回答的关键问题**：注解式（命令上声明）与非注解式（类型安全 Definition）各适用什么；成功
 日志与业务同事务、失败日志独立事务的语义；不该记什么（完整 command/entity 快照）；**写日志
 本身失败时业务怎么办**——吞掉继续等于审计有洞，打断业务等于审计可用性 = 业务可用性，这是合规
-决策不是技术偏好；**actor 从哪来**：`OperationActorResolver.resolve()` 无参、靠环境上下文取
-操作者，那么在定时任务、outbox relay、inbox 消费这些没有 HTTP 上下文的入口里它返回什么、谁
-负责设置（见 §3.2）。
+决策不是技术偏好；**操作者身份（actor）从哪来**——这一问由本篇自己解决，不是别的场景的前置：
+`OperationActorResolver` 是必须由使用方提供的 bean（没有默认实现，缺了启动就失败，且有专门的
+FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可信边界取、**绝不能从命令载荷
+取**，所以 HTTP 之外的入口（定时任务、outbox relay、inbox 消费）返回什么、由谁设置，是本篇要
+给出的答案。
 
 **预计涉及的组件**：`aipersimmon-ddd-operation-log`、`aipersimmon-ddd-operation-log-engine`、
 `aipersimmon-ddd-operation-log-cqrs-spring-boot-starter`、
@@ -658,27 +659,7 @@ S10 要求完整可运行，所以这条必须先跑通一个最小验证：一�
 全局回滚，检查数据与 `undo_log` 是否正确。若不兼容，S10 主线改用 TCC（Try/Confirm/Cancel 与
 聚合方法一一对应，本身也更贴 DDD），AT 作为"为什么不用"的对照写进文档。
 
-### 3.2 操作者身份（actor）的来源要由示例自己决定（S14 的前置）
-
-这里说的 actor 就是审计意义上的**操作者**——"谁做了这件事"。它是操作日志组件的概念：
-`Actor(type, id, displayName)`，带 `Actor.user(...)` / `Actor.system(...)` /
-`Actor.service(...)` 三个工厂。
-
-**这不是库的缺口，是库有意留给使用方的决定**，先把事实说准：
-
-- `OperationActorResolver` 是操作日志 cqrs starter 里的函数式接口，`Actor resolve()` 无参。
-  javadoc 明确要求它从**可信边界**（安全上下文或显式的调用作用域）取，**绝不能从命令载荷取**
-  ——所以 actor 不在 `CommandContext` 上、也不该塞进 command，是刻意的：命令载荷是不可信输入。
-- 它**没有默认实现**。开了操作日志而不提供这个 bean，启动就失败，而且有专门的
-  `MissingOperationLogResolverFailureAnalyzer` 把报错渲染成带代码片段的可操作提示。对比之下
-  `OperationTenantResolver` 是有默认的（委托 `TenantContext`），可见这个"必须自己填"是设计选择
-  而非遗漏。
-
-于是真正要做的工作是：**示例必须自己选一个可信来源，并且要覆盖没有 HTTP 上下文的入口**（定时
-任务、outbox relay、inbox 消费在那里没有天然的操作者）。S14 寄宿 S1，所以这个约定在 S1 的文档
-里给出（见 analysis-00015 §7），代码随 S14 一起落地。
-
-### 3.3 从未被任何场景覆盖的库能力（本轮已全部认领）
+### 3.2 从未被任何场景覆盖的库能力（本轮已全部认领）
 
 初版总纲有九个模块无人使用，现已分别落到：`-test` / `-test-support` / `-archunit` → S18；
 `-flyway-spring-boot-starter` → S4 + S22 + S23；`-id-spring-boot-starter` → S16；
@@ -694,7 +675,7 @@ S10 要求完整可运行，所以这条必须先跑通一个最小验证：一�
 
 写作顺序与阅读顺序不同：先立地基与模板，再铺场景。
 
-1. **地基（先做，且必须先冻结）**：S1（模板：目录布局、父 POM、错误契约、actor 约定、
+1. **地基（先做，且必须先冻结）**：S1（模板：目录布局、父 POM、错误契约、
    README 结构、"怎么跑起来"）→ S16 → S17 → S18。S18 必须排在这里而不是最后，因为它确立
    测试风格；晚写就要回头翻修所有 sample。
 2. **一次命令的内部**：S3 → S8 → S19。
@@ -707,7 +688,7 @@ S10 要求完整可运行，所以这条必须先跑通一个最小验证：一�
 
 依赖关系（比初版更正）：**所有场景都依赖 S16/S17**；**S8 是 S4 的前置**（"业务行与 outbox 行
 同一事务"是 S8 的课，S4 消费它）；S2 与 S7 的回调入站共用一套 `web/spi` 机制；S13/S15 依赖
-S4 的 sample 代码存在；S14 依赖 S1 定下 actor 约定（见 §3.2）；S21 依赖 S4；S26 与 S12 成对。
+S4 的 sample 代码存在；S14 自己要选定操作者身份（actor）的可信来源，并覆盖没有 HTTP 请求的入口；S21 依赖 S4；S26 与 S12 成对。
 
 ## 5. 工程约定（随第一篇 S1 一并冻结）
 
