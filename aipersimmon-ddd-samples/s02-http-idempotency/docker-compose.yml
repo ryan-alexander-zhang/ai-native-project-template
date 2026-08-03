@@ -1,0 +1,28 @@
+# Scenario N owns the port block starting at 18000 + 10*N. S2 uses 18020 for the application,
+# 18021 for its database and 18022 for the shared edge store.
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "18021:5432"
+    environment:
+      POSTGRES_DB: s02
+      POSTGRES_USER: s02
+      POSTGRES_PASSWORD: s02
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s02 -d s02"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # Holds the idempotency claims, the spent nonces and the rate-limit counters. Not optional:
+  # allow-in-memory-stores is false, so the application refuses to start without a shared store.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "18022:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

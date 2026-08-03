@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: s02-http-idempotency
+  datasource:
+    url: jdbc:postgresql://localhost:18021/s02
+    username: s02
+    password: s02
+  data:
+    redis:
+      host: localhost
+      port: 18022
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18020
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+samples:
+  s02:
+    # The webhook signing secret. Shared with the caller out of band; in production it comes from a
+    # secret manager, never from a checked-in file.
+    webhook-secret: s02-shared-secret
+
+aipersimmon:
+  ddd:
+    web:
+      # Refuse to start on an in-memory edge store. With Redis present this changes nothing; without
+      # it the application fails instead of quietly protecting only one instance.
+      allow-in-memory-stores: false
+      idempotency:
+        enabled: true
+        # Left off, and the reason is a real constraint rather than a preference: idempotency has no
+        # url-patterns setting, so it covers every request using the configured methods. Turning
+        # require-key on is therefore an application-wide decision, and it would reject the third-party
+        # callback below — no payment provider sends an Idempotency-Key. A service that both serves
+        # clients and receives callbacks cannot simply switch this on; see StricterSettingsTest for
+        # what it does when it can.
+        require-key: false
+        ttl: 24h
+        claim-lease: 1m
+      replay:
+        enabled: true
+        # Only the third-party callback is signed. Servlet patterns, not Ant.
+        url-patterns:
+          - /webhooks/*
+        tolerance: 5m
+        nonce:
+          # Off by default, and with it off the ReplayGuard is never consulted at all — a signature
+          # alone does not stop the same signed bytes being sent twice inside the tolerance window.
+          enabled: true
+      rate-limit:
+        enabled: true
+        limit: 100
+        window: 60s
+        key: ip
+        headers: both

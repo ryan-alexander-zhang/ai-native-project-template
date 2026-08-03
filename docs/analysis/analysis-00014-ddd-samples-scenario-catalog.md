@@ -141,8 +141,11 @@ sample 内演示，不单独建目录。
 
 **预计涉及的组件**：`aipersimmon-ddd-web`（`IdempotencyStore` / `ReplayGuard` /
 `RequestSignatureVerifier` / `RateLimiter` / `IdempotencyPrincipalResolver` SPI）、
-`aipersimmon-ddd-web-store-jdbc`、`aipersimmon-ddd-web-store-redis`、
-`aipersimmon-ddd-web-spring-boot-starter`。
+`aipersimmon-ddd-web-store-redis`（sample 选它：无 DDL、无 Flyway 组件、无清理线程；
+`-web-store-jdbc` 作为有库服务的替代在文档里对比）、`aipersimmon-ddd-web-spring-boot-starter`。
+**注意 `RequestSignatureVerifier` 库里没有任何实现，必须自己写**，否则防重放静默失效。
+
+**文档**：[[analysis-00017-samples-http-idempotency]]（已完成）。
 
 ### S3 领域事件的发布与消费（同进程）（P0）
 

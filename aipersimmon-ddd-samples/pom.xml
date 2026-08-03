@@ -30,6 +30,7 @@
 
   <modules>
     <module>s01-http-command-query</module>
+    <module>s02-http-idempotency</module>
     <module>s16-tactical-modelling</module>
   </modules>
 
