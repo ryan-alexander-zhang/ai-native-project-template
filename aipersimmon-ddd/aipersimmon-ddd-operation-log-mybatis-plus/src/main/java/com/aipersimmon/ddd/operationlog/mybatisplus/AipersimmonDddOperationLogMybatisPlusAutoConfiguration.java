@@ -7,17 +7,21 @@ import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.util.Locale;
 import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.mapper.MapperFactoryBean;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Wires the MyBatis-Plus {@link OperationLogSink} once MyBatis-Plus has produced a {@code
@@ -77,6 +81,31 @@ public class AipersimmonDddOperationLogMybatisPlusAutoConfiguration {
       OperationLogMapper mapper, DataSource dataSource, ObjectProvider<ObjectMapper> objectMapper) {
     ObjectMapper mapperJson = objectMapper.getIfAvailable(ObjectMapper::new);
     return new MybatisPlusOperationLogSink(mapper, isPostgres(dataSource), mapperJson);
+  }
+
+  /**
+   * Enables scheduling and wires the audit retention cleanup only when opted in; deleting audit
+   * records is a statement, never a default.
+   */
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnProperty(
+      name = "aipersimmon.ddd.operation-log.cleanup.enabled",
+      havingValue = "true")
+  @EnableScheduling
+  static class OperationLogCleanupConfiguration {
+
+    @Bean
+    @ConditionalOnBean(OperationLogMapper.class)
+    @ConditionalOnMissingBean
+    public MybatisPlusOperationLogCleanup operationLogCleanup(
+        OperationLogMapper mapper,
+        Clock operationLogClock,
+        @Value("${aipersimmon.ddd.operation-log.cleanup.retention-seconds:31536000}")
+            long retentionSeconds,
+        @Value("${aipersimmon.ddd.operation-log.cleanup.batch-size:500}") int batchSize) {
+      return new MybatisPlusOperationLogCleanup(
+          mapper, operationLogClock, retentionSeconds, batchSize);
+    }
   }
 
   private static boolean isPostgres(DataSource dataSource) {

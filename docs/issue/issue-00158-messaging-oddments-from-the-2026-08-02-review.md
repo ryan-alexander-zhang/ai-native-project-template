@@ -2,7 +2,7 @@
 id: issue-00158-messaging-oddments-from-the-2026-08-02-review
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 2026-08-02 评审的消息机制 P2（伞形清单）
@@ -11,7 +11,7 @@ status: open
 
 ## outbox
 
-- [ ] **claim SQL 只在 H2 上跑过**：`outbox-jdbc` 测试树只跑 H2 迁移；SELECT-then-CAS
+- [x] **claim SQL 只在 H2 上跑过**：`outbox-jdbc` 测试树只跑 H2 迁移；SELECT-then-CAS
   （`JdbcOutboxStore.java:104-136`，mybatis 侧镜像）与队头 `NOT EXISTS` 谓词依赖引擎级
   单语句 UPDATE 语义，PG/MySQL 迁移从未在本 reactor 里对真库执行。补 Testcontainers
   并发认领测试（参照 pm 的 effect/deadline claim 真库测试形状；deadline 那次的教训：
@@ -48,7 +48,7 @@ status: open
 
 ## operation-log
 
-- [ ] **审计表无保留/清理故事**（outbox、inbox 都有 purge，唯独审计表没有）。补按时间
+- [x] **审计表无保留/清理故事**（outbox、inbox 都有 purge，唯独审计表没有）。补按时间
   的分批清理，默认关（审计数据删除该是显式决定）。
 - [x] **`failureRecordLost` 开箱只是一条 WARN**：`OperationLogMetrics` 默认 no-op，最该
   告警的"审计缺口"信号没有指标。给 micrometer binder 补计数器（形状照 outbox observer）。
@@ -59,3 +59,24 @@ status: open
   实际哨兵是 `__root__`）。一行。
 
 **在案不做**：`OperationLogReader` 仍是路线图端口（评审确认现状即立场，消费方自写查询）。
+
+## 解决记录（2026-08-02/03，分四个 commit）
+
+- **pm 租户守卫**（commit `14e34a6`）：by-ref advance 补租户相等断言，外租户 ref 答"not
+  found"不答"forbidden"（不向跨租户调用方确认实例存在）；负向对照实跑红。CONFIGURATION.md
+  补 UTC 运维前提与单实例 effect 吞吐两段。
+- **七项加固**（commit `82b6c4f`）：purge 分页（outbox 按 id 页、inbox 按时间切片——复合主键
+  没有便携的 select-then-delete）；`aipersimmon.outbox.given.up` gauge（调低 max-attempts 搁浅
+  的行唯一的出口）；死信双跳保 trace（列 V1 就有、store 两跳都在丢，`DeadLetterStore.store`
+  签名加 trace 两参）；operation-log Micrometer 桥（`failure.record.lost` 从 WARN 变可告警计数
+  器，装配 `before` 引擎的 noOp 兜底）；Redactor 代理对安全截断；DLT 预置要求文档化（不做启动
+  探测：会误伤 auto-create 环境、其余环境也只能 WARN——写清失败形状：非 DataAccessException
+  所以 stall WARN 沉默，看分区 consumer lag）；PG V1 哨兵注释更正。
+- **审计保留清理**：双后端 `*OperationLogCleanup`，默认关且 javadoc 言明双重理由（删数据是
+  部署决定 + 删审计行该是可被问责的声明，默认窗口一年）；id 分页；batch-size=1 一轮排空的
+  分页测试。
+- **claim SQL 真库覆盖**：`OutboxClaimRealDatabaseTest`（Testcontainers PG 18 + MySQL 8）三场
+  景×双引擎：并发认领分割行集（无一行被赢两次）、队头规则、未过期租约屏蔽第二认领者。
+  **负向对照**：禁用 CAS 复检 → 真库上红。javadoc 点明教训出处：deadline claim 那次"语句
+  正确但没人能知道"。mybatis 后端经 wrapper 生成标准 SQL 且行为等价测试已覆盖 H2，真库
+  差异集中在手写 SQL 的 jdbc 侧——mybatis 真库镜像在案不做。

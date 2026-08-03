@@ -89,6 +89,8 @@
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessRetentionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime"/>
       <Class name="com.aipersimmon.ddd.operationlog.engine.autoconfigure.MicrometerOperationLogMetrics"/>
+      <Class name="com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogCleanup"/>
+      <Class name="com.aipersimmon.ddd.operationlog.mybatisplus.MybatisPlusOperationLogCleanup"/>
       <Class name="com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.JdbcProcessSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy"/>

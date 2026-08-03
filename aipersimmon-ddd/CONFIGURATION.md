@@ -385,8 +385,18 @@ Records only commands carrying `@OperationLog`, so adding the module logs nothin
 | `limits.max-changes` / `max-details` | `20` / `20` | Caps on recorded field changes and detail entries. |
 | `limits.max-value-chars` | `512` | Per-value truncation. |
 
+| `cleanup.enabled` | `false` | Deletes audit records past retention. Off by default twice over: deleting data is a deployment decision everywhere, and removing *audit* rows should be a statement someone can be asked about — retention obligations are often regulatory. |
+| `cleanup.retention-seconds` | `31536000` (365 days) | How long an audit record is kept. Enabling cleanup asserts this window satisfies your obligations. |
+| `cleanup.poll-delay-ms` | `3600000` (1 hour) | How often cleanup runs. |
+| `cleanup.batch-size` | `500` | Records deleted per id page; the purge loops pages until one comes back short, so the first purge of a long-lived table is many small transactions. |
+
 The limits exist so one pathological command cannot write an unbounded audit row. Raise them
 deliberately.
+
+With a `MeterRegistry` present, the audit metrics bind automatically (`aipersimmon.operation.log.*`
+counters and latencies). The one to alert on is `failure.record.lost`: a failure-path audit record
+could not be written and was swallowed so the original business exception could propagate — an
+audit gap.
 
 There is deliberately no per-component tenant switch. The tenant column is always stamped from the
 same trusted scope the command runs under, and enforcement follows the deployment-wide
