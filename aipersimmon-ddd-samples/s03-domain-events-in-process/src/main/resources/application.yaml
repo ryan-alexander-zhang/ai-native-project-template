@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: s03-domain-events-in-process
+  datasource:
+    url: jdbc:postgresql://localhost:18031/s03
+    username: s03
+    password: s03
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18030
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true

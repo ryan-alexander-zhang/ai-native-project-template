@@ -166,8 +166,9 @@ sample 内演示，不单独建目录。
 - 什么样的反应适合领域事件，什么样的其实应该写在同一个命令处理器里。
 
 **预计涉及的组件**：`aipersimmon-ddd-core`（`AbstractAggregateRoot`）、
-`aipersimmon-ddd-events-spring-boot-starter`、`aipersimmon-ddd-persistence-mybatis-plus`、
-`aipersimmon-ddd-outbox`（对照用）。
+`aipersimmon-ddd-events-spring-boot-starter`、`aipersimmon-ddd-persistence-mybatis-plus`。
+
+**文档**：[[analysis-00020-samples-domain-events-in-process]]（已完成）。
 
 ### S4 集成事件跨服务：outbox 发布 + Kafka + inbox 消费（P0，双服务）
 

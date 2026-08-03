@@ -27,6 +27,7 @@ variants of the framework modules are not used.
 | --- | --- | --- |
 | S1 HTTP command and query | [s01-http-command-query](s01-http-command-query) | `analysis-00015` |
 | S2 Idempotency and replay protection | [s02-http-idempotency](s02-http-idempotency) | `analysis-00017` |
+| S3 Domain events, in process | [s03-domain-events-in-process](s03-domain-events-in-process) | `analysis-00020` |
 | S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |
 | S17 Aggregate to tables | [s17-aggregate-persistence-mapping](s17-aggregate-persistence-mapping) | `analysis-00018` |
 | S18 Testing strategy | [s18-testing-strategy](s18-testing-strategy) | `analysis-00019` |

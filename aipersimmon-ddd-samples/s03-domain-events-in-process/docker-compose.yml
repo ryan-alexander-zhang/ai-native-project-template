@@ -1,0 +1,15 @@
+# Scenario N owns the port block starting at 18000 + 10*N. S3 uses 18030 and 18031.
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "18031:5432"
+    environment:
+      POSTGRES_DB: s03
+      POSTGRES_USER: s03
+      POSTGRES_PASSWORD: s03
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s03 -d s03"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
