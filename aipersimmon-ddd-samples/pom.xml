@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Parent and aggregator for the aipersimmon-ddd samples. One reactor on purpose: a sample that
+    builds only when someone remembers to build it rots. `mvn verify` here covers every sample.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.10</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.example.samples</groupId>
+  <artifactId>aipersimmon-ddd-samples</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>aipersimmon-ddd-samples</name>
+  <description>Runnable samples, one per DDD flow scenario.</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <aipersimmon-ddd.version>0.1.0-SNAPSHOT</aipersimmon-ddd.version>
+    <mybatis-plus.version>3.5.15</mybatis-plus.version>
+  </properties>
+
+  <modules>
+    <module>s01-http-command-query</module>
+  </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <!--
+        Import order is load-bearing. This BOM carries the OpenTelemetry core line the optional
+        observability starter needs, which spring-boot-dependencies manages to an older one; the
+        first import of a coordinate wins, and entries declared here outrank the ones inherited
+        from spring-boot-starter-parent. So this must come first, and it must stay a sibling of
+        (never a replacement for) Spring Boot's own dependency management.
+      -->
+      <dependency>
+        <groupId>com.aipersimmon.ddd</groupId>
+        <artifactId>aipersimmon-ddd-bom</artifactId>
+        <version>${aipersimmon-ddd.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- MyBatis-Plus is the consumer's choice of persistence: neither Spring Boot nor the
+           aipersimmon BOM versions it. -->
+      <dependency>
+        <groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-bom</artifactId>
+        <version>${mybatis-plus.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>

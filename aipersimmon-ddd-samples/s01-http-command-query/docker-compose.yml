@@ -1,0 +1,16 @@
+# Ports follow the samples convention: scenario N owns the block starting at 18000 + 10*N.
+# S1 uses 18010 for the application and 18011 for its database.
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "18011:5432"
+    environment:
+      POSTGRES_DB: s01
+      POSTGRES_USER: s01
+      POSTGRES_PASSWORD: s01
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s01 -d s01"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

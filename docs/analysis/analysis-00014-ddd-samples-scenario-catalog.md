@@ -26,6 +26,13 @@ parent:
   samples 是示例代码，按示例本身讲清楚为准。
 - samples **唯一的对标物是 `aipersimmon-ddd` 库本身的真实行为**：库里有什么类型、什么 SPI、
   什么配置项、什么启动校验，示例就按它实际的样子演示。
+- **数据访问一律用 MyBatis-Plus 系组件，不用 JDBC 系**：`-persistence-mybatis-plus`、
+  `-outbox-mybatis-plus`、`-inbox-mybatis-plus`、`-process-manager-mybatis-plus`、
+  `-operation-log-mybatis-plus`、`-tenancy-mybatis-plus`。`-persistence-jdbc` 一类模块不出现在
+  任何 sample 里，也不作对照。**唯一的例外是 web 边界存储**：库只提供
+  `aipersimmon-ddd-web-store-jdbc` 与 `-web-store-redis` 两种实现，**没有 mybatis-plus 变体**，
+  所以 S2/S7/S22 用到幂等/限流/防重放存储时只能在这两者之间选（它们存的是框架自己的边界表，
+  不是业务聚合）。
 
 ### 0.2 已拍板事项
 

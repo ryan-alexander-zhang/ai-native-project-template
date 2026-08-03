@@ -1,0 +1,24 @@
+spring:
+  application:
+    # Several components derive defaults from this, so it is set rather than left blank.
+    name: s01-http-command-query
+  datasource:
+    url: jdbc:postgresql://localhost:18011/s01
+    username: s01
+    password: s01
+  flyway:
+    # This sample owns no framework table, so aipersimmon.ddd.flyway.components stays unset and
+    # Flyway here manages the business schema only.
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18010
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

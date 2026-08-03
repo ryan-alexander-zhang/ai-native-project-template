@@ -525,6 +525,11 @@ problem-type catalogue does not grow one-for-one with the domain's error codes"�
 多个 `ProblemCatalog` bean 会被全部合并；按 `code` 字符串 keying，**没有重复检测**，后来者
 静默覆盖。所以一个上下文一个 catalog bean，别散着放。
 
+一个会让服务起不来的小坑（sample 上撞到过）：承载这个 `@Bean` 的 `@Configuration` 类**不能与
+bean 方法同名**。被扫描到的配置类自己就是一个按类名命名的 bean，同名的 `@Bean` 方法会撞上它，
+启动时报 `BeanDefinitionOverrideException`。sample 里类叫 `OrderingProblemConfig`、方法叫
+`orderingProblemCatalog`。
+
 ### 5.4 必须自备 `messages.properties`
 
 `titleKey` 是 message-source 的键，由 `ProblemTitleResolver` 走应用的 `MessageSource` 解析。
@@ -667,6 +672,10 @@ spring:
 解释了为什么本篇不把 actor 塞进 command：那会让每个命令都多一个与业务无关的字段，而重投时它还
 得被正确复原。
 
+**代码落地时机**：约定在此定清，但 s01 里**没有**实现它——现阶段没有任何消费者，写出来就是死
+代码。它随 S14（操作日志寄宿进 s01）一起落地，那时 `OperationActorResolver` 就是它的第一个
+消费者。
+
 ## 8. 测试（雏形，S18 正式化）
 
 本篇至少要有四个测试，后续 sample 照抄这四层：
@@ -674,9 +683,20 @@ spring:
 | 层 | 例子 | 用什么 |
 | --- | --- | --- |
 | 领域单测 | `Order.confirm()` 在 CONFIRMED 上再调一次会拒绝 | 纯 JUnit，无 Spring |
-| handler 单测 | `ConfirmOrderHandler` 找不到订单抛 `EntityNotFoundException` | `aipersimmon-ddd-test` 的内存替身 |
+| handler 单测 | `ConfirmOrderHandler` 找不到订单抛 `EntityNotFoundException` | 手写的内存端口替身 |
 | 架构规则 | `AiPersimmonDddRules.all()` 跑在 `com.example.samples.s01` 上 | `aipersimmon-ddd-archunit` |
 | HTTP 契约 | 三类失败各自的状态码、`type`、`code`、`errors[]` | `@SpringBootTest` + Testcontainers |
+
+`aipersimmon-ddd-test` 的 `RecordingCommandBus` / `RecordingIntegrationEvents` / `InMemoryInbox`
+在本篇用不上——这里的 handler 依赖的是端口而不是总线或事件发布器。它们要到 handler 开始依赖那些
+东西时才有价值（S3 起），所以 s01 的依赖里没有这个模块，S18 会把"什么时候用哪个替身"讲清。
+
+架构规则的导入必须**排除测试类**（`ImportOption.DoNotIncludeTests`）：测试里那个内存端口替身实现
+了 `Orders`，却住在测试包而不是 `..infrastructure..`，不排除就会打红
+`implementationsShouldResideInInfrastructure`。
+
+Testcontainers 那条用 `@EnabledIf(DockerAvailable)` 守着，**没有 Docker 时是跳过而不是失败**。
+好处是换台机器不假红，代价是绿色构建可能什么都没验证——所以 README 里明写了"先看有没有 skip"。
 
 架构规则一句话就能接上，而且**必须接**——`versionWitnessIsAdvancedOnlyByPersistenceAdapters()`
 是唯一阻止业务代码调 `versionAdvanced()` 把乐观锁解除的东西：
