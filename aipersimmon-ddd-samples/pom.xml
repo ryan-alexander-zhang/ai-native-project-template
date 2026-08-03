@@ -32,6 +32,7 @@
     <module>s01-http-command-query</module>
     <module>s02-http-idempotency</module>
     <module>s03-domain-events-in-process</module>
+    <module>s08-local-transaction-aggregate</module>
     <module>s16-tactical-modelling</module>
     <module>s17-aggregate-persistence-mapping</module>
     <module>s18-testing-strategy</module>

@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: s08-local-transaction-aggregate
+  datasource:
+    url: jdbc:postgresql://localhost:18081/s08
+    username: s08
+    password: s08
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18080
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+aipersimmon:
+  ddd:
+    cqrs:
+      retry-on-conflict:
+        # Off by default in the library, on here so the sample can show both what it fixes and what it
+        # must never be allowed to replay. max-attempts counts the first try, and the backoff doubles
+        # with no jitter.
+        enabled: true
+        max-attempts: 3
+        initial-backoff: 20ms
