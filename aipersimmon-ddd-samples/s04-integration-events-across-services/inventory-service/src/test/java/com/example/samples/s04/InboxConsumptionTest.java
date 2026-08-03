@@ -47,12 +47,13 @@ import org.springframework.kafka.test.utils.ContainerTestUtils;
   PostgresServiceConnection.class,
   KafkaServiceConnection.class,
   TestKafkaTopics.class,
-  ProbeDispatch.class
+  Probes.class
 })
 @EnabledIf("com.aipersimmon.ddd.testsupport.DockerAvailable#dockerAvailable")
 class InboxConsumptionTest {
 
   private static final String KEYBOARD = "sku-keyboard";
+  private static final String ACME = "acme";
   private static final String ORDERING_TYPE = "com.example.samples.ordering.OrderPlaced";
 
   @Autowired private JdbcTemplate jdbc;
@@ -177,7 +178,9 @@ class InboxConsumptionTest {
     header(record, "ce_dataschemaversion", String.valueOf(version));
     header(record, "ce_time", Instant.now().toString());
     header(record, "ce_subject", orderId);
-    header(record, "ce_tenantid", "__root__");
+    // A real tenant, because this service has tenancy enabled (S13): the bridge binds it for the whole
+    // transaction, and a record carrying none is rejected rather than attributed to the sentinel.
+    header(record, "ce_tenantid", ACME);
     header(record, "ce_correlationid", UUID.randomUUID().toString());
     header(record, "content-type", "application/json");
     return record;
@@ -231,14 +234,21 @@ class InboxConsumptionTest {
     return collected;
   }
 
+  /** Raw SQL, so the tenant is a predicate this test writes by hand — the rows are per tenant now. */
   private int reserved() {
     return jdbc.queryForObject(
-        "SELECT reserved FROM s04_stock WHERE sku = ?", Integer.class, KEYBOARD);
+        "SELECT reserved FROM s04_stock WHERE tenant_id = ? AND sku = ?",
+        Integer.class,
+        ACME,
+        KEYBOARD);
   }
 
   private int available() {
     return jdbc.queryForObject(
-        "SELECT available FROM s04_stock WHERE sku = ?", Integer.class, KEYBOARD);
+        "SELECT available FROM s04_stock WHERE tenant_id = ? AND sku = ?",
+        Integer.class,
+        ACME,
+        KEYBOARD);
   }
 
   private long inboxCount() {

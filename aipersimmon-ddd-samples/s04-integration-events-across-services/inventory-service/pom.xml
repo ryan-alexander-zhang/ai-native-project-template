@@ -62,9 +62,31 @@
       <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
     </dependency>
 
+    <!-- S13, hosted here: resolving/binding the tenant, and rewriting SQL so a query cannot leave it. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
+    </dependency>
+    <!-- S15, hosted here: the consuming end of the trace, and the trace_id MDC key. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <!-- Required by the tenancy interceptor and deliberately `provided` upstream: since MyBatis-Plus
+         3.5.9 the SQL-parsing inner interceptors live here. Omit it and startup fails loudly with
+         NoClassDefFoundError: TenantLineHandler. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-jsqlparser</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

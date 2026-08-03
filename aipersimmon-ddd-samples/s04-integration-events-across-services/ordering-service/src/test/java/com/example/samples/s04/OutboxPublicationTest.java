@@ -46,7 +46,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
   PostgresServiceConnection.class,
   KafkaServiceConnection.class,
   TestKafkaTopics.class,
-  FailAfterHandling.class
+  FailAfterHandling.class,
+  Probes.class
 })
 @EnabledIf("com.aipersimmon.ddd.testsupport.DockerAvailable#dockerAvailable")
 class OutboxPublicationTest {
@@ -153,7 +154,10 @@ class OutboxPublicationTest {
     assertThat(header(record, "ce_dataschemaversion")).isEqualTo("1");
     assertThat(header(record, "ce_source")).isEqualTo("/ordering");
     assertThat(header(record, "ce_id")).isNotBlank();
-    assertThat(header(record, "ce_tenantid")).isEqualTo("__root__");
+    // The tenant the request resolved, not the sentinel: this service has tenancy enabled (S13), and
+    // the tenant reaches the wire the same way the correlation id does — through the command context
+    // and the durable row, never through the payload.
+    assertThat(header(record, "ce_tenantid")).isEqualTo("acme");
     assertThat(header(record, "ce_correlationid")).isNotBlank();
     // The ordering key: one aggregate's events stay in one partition, so they stay in order.
     assertThat(header(record, "ce_subject")).isEqualTo(orderId);
@@ -193,18 +197,24 @@ class OutboxPublicationTest {
     assertThat(recordsFor(orderId)).isEmpty();
   }
 
+  /**
+   * Every request names a tenant, because tenancy is enabled in this service (S13) and a request that
+   * resolves none is rejected at the edge with 400. That is the point of the default policy: a request
+   * with no tenant has no safe interpretation, and falling back to the shared sentinel would write one
+   * tenant's order into a bucket that, in a migrated deployment, holds someone's production data.
+   */
   private ResponseEntity<String> place(
       String customerId, String sku, int quantity, boolean draftOnly) {
-    return http.postForEntity(
-        "/orders",
+    return TenantRequests.post(
+        http,
+        "acme",
         Map.of(
             "customerId",
             customerId,
             "lines",
             List.of(Map.of("sku", sku, "quantity", quantity)),
             "draftOnly",
-            draftOnly),
-        String.class);
+            draftOnly));
   }
 
   private String idOf(ResponseEntity<String> response) {

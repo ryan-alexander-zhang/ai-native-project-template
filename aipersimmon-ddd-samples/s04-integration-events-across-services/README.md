@@ -3,13 +3,23 @@
 An order is placed in one service; stock is reserved in another. Between them: a transactional
 outbox, a real Kafka broker, and an inbox that turns at-least-once delivery into at-most-once effect.
 
-Companion document: `docs/analysis/analysis-00025-samples-integration-events-across-services.md`.
+Two cross-cutting scenarios are hosted in this same code rather than in directories of their own:
+**S13 multi-tenancy end to end** and **S15 following one request across the boundary**. Both are about
+metadata that has to survive every hop, so they belong in the sample that has the hops.
+
+Companion documents:
+
+| | |
+| --- | --- |
+| S4 — outbox, Kafka, inbox | `docs/analysis/analysis-00025-samples-integration-events-across-services.md` |
+| S13 — multi-tenancy end to end | `docs/analysis/analysis-00027-samples-multi-tenancy-end-to-end.md` |
+| S15 — one request across the boundary | `docs/analysis/analysis-00028-samples-one-trace-across-the-boundary.md` |
 
 ## Run it
 
 ```bash
-mvn -pl s04-integration-events-across-services/ordering-service   -am verify   # 9 tests
-mvn -pl s04-integration-events-across-services/inventory-service  -am verify   # 9 tests
+mvn -pl s04-integration-events-across-services/ordering-service   -am verify   # 20 tests
+mvn -pl s04-integration-events-across-services/inventory-service  -am verify   # 18 tests
 ```
 
 Real PostgreSQL and real Kafka via Testcontainers; they **skip** rather than fail without Docker.
@@ -111,12 +121,78 @@ The inventory service carries an outbox it never writes to, because the Kafka st
 durable-transport guard reads its subscription-declaring `@Externalized` as publication intent. Filed
 as `docs/issue/issue-00161`; the pom says so at the dependency.
 
+## S13 — the tenant, and the code that never mentions it
+
+Tenancy is on in both services. No controller, command, handler, aggregate, repository or row class
+mentions a tenant: the edge filter and the message consumer bind it, and the SQL is rewritten to carry
+it. A tenant that travels as a method parameter is a tenant some method will eventually forget to pass.
+
+| Claim | Test |
+| --- | --- |
+| Stamped on every row — root, child, outbox — with nothing in the code naming it | `theTenantIsStampedOnEveryRowWithoutAnyCodeMentioningIt` |
+| **A foreign tenant's order id reads as 404, not 403** | `aforeignTenantsOrderIdReadsAsNotFound` |
+| A request that resolves no tenant is rejected at the edge | `arequestThatResolvesNoTenantIsRejectedAtTheEdge` |
+| The relay is *not* tenant-scoped and drains every tenant in one poll | `therelayIsNotTenantScopedAndDrainsEveryTenant` |
+| A tenant-less thread fails closed instead of reading the sentinel bucket | `aTenantLessThreadFailsClosedRatherThanReadingTheSentinelBucket`, `theSamePortOnATenantLessThreadFailsClosed` |
+| **`__root__` is a bucket, not a wildcard** | `theRootSentinelIsABucketNotAWildcard` |
+| An unregistered tenant-carrying table is refused at startup | `anUnregisteredTenantCarryingTableIsRefusedByTheStartupGuard` |
+| The tenant on the record decides which bucket moves | `thetenantOnTheRecordDecidesWhichBucketMoves` |
+| A consumer has no request, so the tenant arrives on the message | `thecommandInheritedTheTenantFromTheEnvelopeAndNotFromAnyRequest` |
+| A record carrying no tenant is dead-lettered, not attributed | `arecordCarryingNoTenantIsRejectedRatherThanAttributed` |
+| One URL, one method, no tenant parameter — two answers | `thehttpReadIsScopedToTheCallersTenantWithoutAskingForIt` |
+| The inbox dedup key deliberately excludes the tenant | `thededupKeyDeliberatelyExcludesTheTenant` |
+
+Two things measured rather than assumed. **The allow-list fails open**: an unregistered table gets no
+predicate on any statement, which is why the library checks the list against the live schema at
+startup. And **isolation belongs in the key, not only in the predicate** — dropping `s04_stock` from
+`tenant-tables` (with the guard off, so it could boot) does not leak here, it *stalls*: `selectById`
+falls back to `WHERE sku = ?`, matches two rows, and `TooManyResultsException` is retried forever. Loud
+— and loud only because the key is `(tenant_id, sku)`. With a single-column key the same mistake reads
+somebody else's row and reserves from it.
+
+## S15 — what actually connects the seven hops
+
+Two answers, and they are not the same answer.
+
+| | across HTTP | across the outbox | across the broker |
+| --- | --- | --- | --- |
+| trace | one trace (parent/child) | **a new trace, linked back** | one trace (the consumer resumes the record's) |
+| correlationId | same value | same value | same value |
+
+The catalogue called this "one complete trace". It is not one trace, and it should not be: the outbox is
+a deliberate break in time, so the dispatch span **links** to the creating span instead of continuing
+it — a child would make the trace's duration "how long the row waited". The library's own
+`ConnectedTraceEndToEndTest` asserts exactly that. The identifier that *is* byte-identical end to end is
+the correlation id, and it needs no backend at all.
+
+| Claim | Test |
+| --- | --- |
+| The durable row carries the trace context of the request that wrote it | `theDurableRowCarriesTheTraceContextOfTheRequestThatWroteIt` |
+| **The wire leaves under its own trace, linked back** | `theWireLeavesUnderItsOwnTraceLinkedBackRatherThanContinuingTheRequests` |
+| The correlation id is identical on command, row and wire; causation advances | `theCorrelationIdIsTheOneIdentifierThatIsIdenticalEndToEnd` |
+| Four MDC ids from four different modules | `theLogLineCarriesFourIdsFromFourDifferentModules` |
+| The consumer joins the trace the record arrived on, with no code reading the header | `theWorkThisServiceDoesJoinsTheTraceTheRecordArrivedOn` |
+| The correlation id crosses the broker unchanged; causation advances again | `thecorrelationIdCrossesTheBrokerUnchangedAndTheCausationChainAdvances` |
+| **A consumer's log line carries one of the four ids, not three** | `aconsumersLogLineCarriesOneOfTheFourIdsAndNotThreeOfThem` |
+
+Two gaps worth knowing before an operator hits them. The caller-facing `X-Request-Id` and the messaging
+`correlationId` are **different ids with no bridge in the data** — a root command's correlation id is
+its own message id. And on the consuming side three of the four MDC keys are absent, because they are
+written by servlet filters and a consumer has no request: the tenant *is* bound and the trace *is*
+joined, so it is a logging gap, not a propagation failure.
+
+The `traceparent`/`trace_state` columns exist on the outbox row without the observability starter and
+stay NULL: capture goes through an SPI whose default captures nothing. Being on the schema is not being
+filled in.
+
 ## Not demonstrated here yet
 
 | | |
 | --- | --- |
-| Multi-tenancy end to end (S13) | Hosted here by the catalogue; not written yet. |
-| One trace across the boundary (S15) | Same. |
 | Both services booted against one broker | The two sides are tested against the wire contract independently; an end-to-end harness is the next increment. |
+| A real tracing backend | Exporters are `none` — a sample has no collector. What the two hops need is a column and a header, and neither needs a backend to assert. |
+| Tenant migration and merge | A data operation, and one that must go through the cross-tenant path §4.1 of the S13 document warns about. |
+| Database-per-tenant / schema-per-tenant | Only the pool-with-a-discriminator shape is shown. |
+| Metrics, alerting, dead-letter replay | S22. |
 | Offset reset vs inbox retention | Documented in the companion; not yet a test — it needs a clock the inbox's retention respects. |
 | Swapping Kafka for another broker | The seam is named in the companion (`OutboxDispatcher`); RabbitMQ/RocketMQ is not built. |

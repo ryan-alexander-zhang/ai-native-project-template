@@ -46,10 +46,45 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
     </dependency>
+    <!--
+      S13, hosted here. Two artifacts, because tenancy is two separable jobs: resolving the tenant at
+      the edge and binding it (the starter), and rewriting SQL so a query cannot leave its tenant (the
+      MyBatis-Plus one). Both are inert until aipersimmon.ddd.tenancy.enabled=true.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy-mybatis-plus</artifactId>
+    </dependency>
+    <!--
+      S15, hosted here. This is the artifact that fills the outbox row's traceparent/trace_state
+      columns: they exist without it and stay null, because capture goes through an SPI whose default
+      implementation captures nothing. Installing it also brings OpenTelemetry's own Spring Boot
+      starter (HTTP/JDBC/Kafka auto-instrumentation and the OpenTelemetry bean).
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-observability-otel-spring-boot-starter</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <!--
+      The one dependency the tenancy module cannot bring for you. Since MyBatis-Plus 3.5.9 the
+      SQL-parsing inner interceptors live in this separate artifact, and aipersimmon-ddd-tenancy-
+      mybatis-plus declares it `provided` on purpose — it must not force jsqlparser onto a consumer
+      that never parses SQL. Omit it with tenancy enabled and startup fails with
+      NoClassDefFoundError: TenantLineHandler, which is loud, and is the last word on the subject
+      before anything runs. (Not mentioned in CHOOSING-MODULES.md; the crash is the documentation.)
+    -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-jsqlparser</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

@@ -47,3 +47,36 @@ aipersimmon:
       kafka:
         producer:
           send-timeout-ms: 10000
+    # S13. Inert until this flag is on, so bundling the two tenancy artifacts costs nothing at N=1.
+    tenancy:
+      enabled: true
+      # Affirming that the X-Tenant-Id header may be believed. The library refuses to start on the
+      # default (false) with no TenantResolver bean of its own, and it is right to: the header is
+      # client-supplied and nothing ties it to an authenticated principal, so trusting it means any
+      # caller who can reach this service reads and writes any tenant's data by editing one header.
+      # It holds only while a gateway/mesh/BFF authenticates the caller and REWRITES the header,
+      # discarding whatever arrived — and only while this service cannot be reached around it. A real
+      # deployment that cannot promise that resolves the tenant from the principal instead, by
+      # defining a TenantResolver bean, and leaves this false.
+      trust-header: true
+      mybatis-plus:
+        # The allow-list, and the deliberate act. It fails OPEN — an unlisted table gets no tenant
+        # predicate at all, on reads as well as writes — which is why the library also runs a startup
+        # guard that refuses to boot when a table carrying tenant_id appears in neither list. The
+        # framework's own aipersimmon_* tables are exempt by construction: a relay polls them with no
+        # request tenant, and each row carries its tenant as stamped data rather than as a predicate.
+        tenant-tables: [s04_order, s04_order_line]
+
+# S15. The SDK is on because the aipersimmon observability starter is a dependency; the exporters are
+# off because a sample has no collector to reach, and an OTLP exporter retrying against nothing is
+# noise in every test log. Spans are still created and sampled, which is all the store-and-forward
+# capture needs — a deployment sets `traces.exporter: otlp` and an endpoint instead.
+otel:
+  service:
+    name: s04-ordering-service
+  traces:
+    exporter: none
+  metrics:
+    exporter: none
+  logs:
+    exporter: none

@@ -45,3 +45,25 @@ aipersimmon:
           # Off by default in the library, because producing and consuming are separate decisions.
           # This service is a consumer, so it says so.
           enabled: true
+    # S13. The consuming side has two trusted boundaries, not one: the HTTP edge (the read endpoint)
+    # and the message consumer. The bridge binds the tenant from ce_tenantid before it touches the
+    # database — which is why a record that carries no tenant is rejected rather than attributed.
+    tenancy:
+      enabled: true
+      trust-header: true
+      mybatis-plus:
+        # Only the domain table. aipersimmon_inbox carries tenant_id too, and is exempt by
+        # construction: its rows are written from a bound thread but its cleanup job polls with no
+        # tenant at all, so a predicate on it would make cleanup throw.
+        tenant-tables: [s04_stock]
+
+# S15, consuming end. Exporters off for the same reason as the publisher: a sample has no collector.
+otel:
+  service:
+    name: s04-inventory-service
+  traces:
+    exporter: none
+  metrics:
+    exporter: none
+  logs:
+    exporter: none

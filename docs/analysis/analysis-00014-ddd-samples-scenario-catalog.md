@@ -66,7 +66,7 @@ sample 内演示，不单独建目录。
 | S12 | CQRS 读模型：事件驱动的投影 | P1 | 订单列表 | `cqrs-read-model` |
 | S13 | 多租户端到端传播 | X（寄宿 S4） | — | — |
 | S14 | 操作日志：注解式与非注解式 | X（寄宿 S1） | — | — |
-| S15 | 可观测性：跨边界一条完整 trace | X（寄宿 S4） | — | — |
+| S15 | 可观测性：跨边界追一次请求（**不是一条 trace**，见 00028） | X（寄宿 S4） | — | — |
 | S16 | 战术建模：实体、值对象、聚合与规则原语 | P0 | 订单 | `tactical-modelling` |
 | S17 | 聚合与数据表的映射 | P0 | 订单 | `aggregate-persistence-mapping` |
 | S18 | 分层测试策略 | P0 | 复用 S16/S17 的域 | `testing-strategy` |
@@ -198,10 +198,14 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-starter-messaging-kafka`、`aipersimmon-ddd-flyway-spring-boot-starter`。
 **寄宿 S13、S15**。
 
-**文档**：[[analysis-00025-samples-integration-events-across-services]]（已完成，**S13/S15 尚未寄宿进去**，
-是下一个增量）。落地时发现两件事：消费侧的去重**由库的消费桥负责**（`KafkaIntegrationEventListener:152`），
-handler 再查一遍会让每条消息静默跳过；以及只消费的服务会被发布侧的启动检查误报，见
+**文档**：[[analysis-00025-samples-integration-events-across-services]]（已完成）。落地时发现两件事：消费侧的
+去重**由库的消费桥负责**（`KafkaIntegrationEventListener:152`），handler 再查一遍会让每条消息静默跳过；以及只
+消费的服务会被发布侧的启动检查误报，见
 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]。
+
+**S13 与 S15 已寄宿完成**（同一份代码，各有自己的文档）：
+[[analysis-00027-samples-multi-tenancy-end-to-end]]、
+[[analysis-00028-samples-one-trace-across-the-boundary]]。
 
 ### S5 消费外部系统的消息（非本体系事件格式）（P0）
 
@@ -401,6 +405,14 @@ handler 再查一遍会让每条消息静默跳过；以及只消费的服务会
 **预计涉及的组件**：`aipersimmon-ddd-tenancy`、`aipersimmon-ddd-tenancy-mybatis-plus`、
 `aipersimmon-ddd-tenancy-spring-boot-starter`、`aipersimmon-ddd-mybatis-plus-spring-boot-starter`。
 
+**文档**：[[analysis-00027-samples-multi-tenancy-end-to-end]]（已完成，寄宿 S4 的两个服务）。落地时补了三条上面
+没问到的：**allow-list fail open**，所以库有启动期自检（漏登记一张带 `tenant_id` 的表就一个谓词都不加）；
+**隔离要落在唯一键里，不只落在谓词里**——把表从 `tenant-tables` 里删掉后不是静默泄漏而是
+`TooManyResultsException` 无限重试导致分区停滞，而这份"响"只因为主键是 `(tenant_id, sku)` 复合的；以及 inbox
+的**去重键不含租户**（`MybatisPlusInbox:48-52` 写明），所以生产者的 id 必须在 source 内唯一而不是在
+`(source, tenant)` 内唯一。另有一条装配实账：`mybatis-plus-jsqlparser` 是 `provided`，使用方要自己加，漏了在
+启动期 `NoClassDefFoundError: TenantLineHandler`。
+
 ### S14 操作日志（X，寄宿 S1）
 
 **场景描述**：管理后台要求"谁、何时、对什么、做了什么、结果如何"的业务级审计记录，且业务拒绝、
@@ -431,6 +443,13 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 
 **预计涉及的组件**：`aipersimmon-ddd-observability`、`aipersimmon-ddd-observability-otel`、
 `aipersimmon-ddd-observability-otel-spring-boot-starter`。
+
+**文档**：[[analysis-00028-samples-one-trace-across-the-boundary]]（已完成，寄宿 S4 的两个服务）。落地时修正了上面
+的标题前提：**它不是"一条完整 trace"，也不该是**——outbox 那跳库开的是一个 link 回去的**新 trace**（库自己的
+`ConnectedTraceEndToEndTest` 断言 `assertNotEquals` 两个 trace id），所以下游报出的 trace id 不是那次 HTTP
+请求的；端到端逐字节相同的是 **correlationId**，且不需要任何后端。另外两条：调用方手里的 `X-Request-Id` 与消息层
+的 `correlationId` 是**两个 id、数据上没有桥**；消费侧四个 MDC 键里**有三个不存在**（都由 servlet 过滤器写），
+而租户确实绑上、trace 确实续上——是日志缺口不是传播故障。
 
 ### S16 战术建模：实体、值对象、聚合与规则原语（P0）
 
