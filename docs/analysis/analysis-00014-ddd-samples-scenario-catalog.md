@@ -439,8 +439,10 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 - 领域模块如何做到不依赖 Spring（只依赖契约模块）。
 
 **预计涉及的组件**：`aipersimmon-ddd-core`（`Invariant`、`Specification`、`Transitions`、
-`core/annotation/*`、`IdGenerator`）、`aipersimmon-ddd-id-spring-boot-starter`、
-`aipersimmon-ddd-archunit`。
+`core/annotation/*`、`IdGenerator`）、`aipersimmon-ddd-archunit`。`-id-spring-boot-starter` 归 S1：
+本篇是纯领域模块，不引 Spring。
+
+**文档**：[[analysis-00016-samples-tactical-modelling]]（已完成）。
 
 ### S17 聚合与数据表的映射（P0）
 

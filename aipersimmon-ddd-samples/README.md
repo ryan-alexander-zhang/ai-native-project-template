@@ -26,5 +26,6 @@ variants of the framework modules are not used.
 | Scenario | Directory | Document |
 | --- | --- | --- |
 | S1 HTTP command and query | [s01-http-command-query](s01-http-command-query) | `analysis-00015` |
+| S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |
 
 Ports: scenario N owns the block starting at `18000 + 10*N`, so several samples can run at once.
