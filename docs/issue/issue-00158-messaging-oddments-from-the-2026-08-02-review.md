@@ -36,13 +36,13 @@ status: open
 
 ## process-manager
 
-- [ ] **by-ref advance 不校验租户相等**：`DefaultProcessRuntime.java:445-450` 验 type +
+- [x] **by-ref advance 不校验租户相等**：`DefaultProcessRuntime.java:445-450` 验 type +
   business key，不比 `cause.tenantId()` 与行租户——持有外租户 `ProcessRef` 的 confused
   deputy 能推进别人的实例并写出混租转移行。一行相等断言 + 测试。
-- [ ] **时间戳列依赖 JVM 统一时区**：租约/deadline 用 `Timestamp.from(Instant)` 走应用
+- [x] **时间戳列依赖 JVM 统一时区**：租约/deadline 用 `Timestamp.from(Instant)` 走应用
   时钟（outbox 同型），混时区节点会把租约到期平移数小时。语义安全（租约围栏 + inbox
   吸收重复），但没有任何文档说"所有节点跑 UTC"。CONFIGURATION.md 补运维前提。
-- [ ] **单实例 effect 吞吐是每轮一条**：队头认领 + 默认 500ms poll，一次转移暂存 N 个
+- [x] **单实例 effect 吞吐是每轮一条**：队头认领 + 默认 500ms poll，一次转移暂存 N 个
   effect 要 N × pollDelay 才排空（`SkipLockedProcessDialect.java:43-55` 每批 N+1 次往返）。
   是调优特性不是缺陷，文档化到 pm 的 tuning 段落。
 

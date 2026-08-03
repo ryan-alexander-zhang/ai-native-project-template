@@ -139,6 +139,12 @@ removes the rest. The Redis store expires keys itself and has no equivalent.
 > rows are business records and how long to keep them is your decision, whereas `expires_at` here is
 > the store's own statement that the row is dead.
 
+### Web-store schema validation (`-web-store-jdbc` only; on by default)
+
+| Property | Default | Effect |
+| --- | --- | --- |
+| `store.schema-validation` | `validate` | Whether to check at startup that the three web-store tables exist **and carry the columns of the latest migration**. `validate` fails fast instead of failing every covered request at the edge. `none` disables. |
+
 ## `aipersimmon.ddd.tenancy` — multi-tenancy
 
 Entirely inert until enabled, so bundling it costs nothing at N=1.
@@ -253,6 +259,7 @@ Present with a storage module; the relay polls as soon as it is.
 | --- | --- | --- |
 | `dispatch` | `in-process` | Which built-in dispatcher delivers a relayed event when no messaging starter and no custom `OutboxDispatcher` bean supplies one. `in-process` republishes it through Spring's event publisher — the correct delivery for a LOCAL event. `logging` only logs it, so it delivers *nothing*; it is for watching the relay work, never for a deployment. An unrecognised value fails startup: a broker is chosen by adding its starter, not here. |
 | `allow-unreachable-external-events` | `false` | Lets the application start when it declares `@Externalized` events but the active dispatcher cannot reach an external target — accepting that those events get marked sent without leaving the process. Off, because that loss is invisible: the relay treats a dispatch that returns as delivered, so there is no exception, no dead letter and no consumer lag to alert on. Switch it on for a deliberately broker-less local run. |
+| `schema-validation` | `validate` | Whether to check at startup that the outbox tables (and `shedlock`) exist **and carry the columns of the latest migration**. `validate` fails fast instead of rolling back the first command that publishes an `@Externalized` event — the outbox insert runs inside the business transaction. `none` disables. |
 | `relay.enabled` | `true` | Whether the relay is *scheduled*. `false` removes only the schedule, not the relay: nothing polls on its own, and a caller can drive `OutboxRelay.relay()` directly. Use it when one dedicated instance relays while the rest only write, or in an integration test that asserts on what a single poll did. |
 | `poll-delay-ms` | `1000` | How often the relay looks for unsent rows, *after* the first poll. `@Scheduled(fixedDelay)` runs first and waits afterwards, so raising this does not prevent a poll at startup — that is what `relay.enabled=false` is for. Lower means lower latency and more empty queries. |
 | `batch-size` | `100` | Rows one poll may dispatch. The batch is handed to the transport before any of it is waited on, so a larger batch costs a poll roughly the same wall-clock time — it is one round trip either way. Every instance polls, so this bounds one poll's work, not the deployment's throughput. |
@@ -270,6 +277,7 @@ Present with a storage module; the relay polls as soon as it is.
 | Property | Default | Effect |
 | --- | --- | --- |
 | `consumer` | `${spring.application.name}`, else `aipersimmon` | This application's identity in the dedup key. Several services sharing one inbox table must differ here, or they suppress each other's processing of the same message. |
+| `schema-validation` | `validate` | Whether to check at startup that `aipersimmon_inbox` exists **and carries the columns of the latest migration**. `validate` fails fast instead of at the first consumed message, on a listener thread. `none` disables. |
 
 The dedup key is `(consumer, source, message_key)` — the producer's `ce_source` and the message's
 `ce_id`. `ce_id` is unique only *within* its source, which is all CloudEvents requires, so the pair is
@@ -327,6 +335,21 @@ gets the bounded backoff and then the DLT.
 | `observability.stuck-threshold` | `15m` | How long before an instance counts as stuck in the metrics. |
 | `observability.oldest-pending-warn` | `60s` | Backlog age that WARNs — the signal that the relay is falling behind. |
 
+Two operational characteristics worth knowing before tuning the relay:
+
+- **Run every node in the same timezone (UTC), and say so in your runbook.** Lease expiries and
+  deadline due-times are written from the application clock via `Timestamp.from(Instant)`; the
+  instants are correct, but a fleet whose nodes disagree on the JVM default timezone can shift how
+  a database column reads them by hours. The design is lease-fenced, so skew manufactures only
+  duplicates the inbox absorbs and early/late timer fires — degraded, not corrupt. UTC everywhere
+  removes the class of surprise.
+- **A single instance drains roughly one effect per poll.** The claim takes only the head of each
+  instance's queue (that is what preserves per-instance order), so a transition that stages N
+  effects on one instance delivers them in about N × `effect-relay.poll-delay`, not in one batch.
+  Throughput across *many* instances scales with `batch-size`; depth within *one* instance scales
+  with `poll-delay`. A flow that stages long effect chains on a single instance and cares about
+  latency wants a shorter poll delay, not a bigger batch.
+
 Cleanup removes an instance **whole** — snapshot, transitions, effects and deadlines together —
 and only once every effect and deadline it holds has settled. Two states look finished and are not:
 a terminal decision's staged effects still deliver after it ends, and a DEAD effect or deadline is
@@ -347,6 +370,7 @@ Records only commands carrying `@OperationLog`, so adding the module logs nothin
 | Property | Default | Effect |
 | --- | --- | --- |
 | `source` | (empty) | Recorded as the origin system. |
+| `schema-validation` | `validate` | Whether to check at startup that `aipersimmon_operation_log` exists **and carries the columns of the latest migration**. `validate` fails fast instead of rolling back the first `@OperationLog` command at the audit append. `none` disables. |
 | `limits.summary-max-chars` | `1024` | Truncation cap for the rendered summary. |
 | `limits.max-changes` / `max-details` | `20` / `20` | Caps on recorded field changes and detail entries. |
 | `limits.max-value-chars` | `512` | Per-value truncation. |

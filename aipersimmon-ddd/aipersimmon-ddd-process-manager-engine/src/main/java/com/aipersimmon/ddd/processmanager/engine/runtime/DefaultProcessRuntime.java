@@ -448,6 +448,13 @@ public final class DefaultProcessRuntime implements ProcessRuntime {
             .findForUpdate(ref.instanceId())
             .orElseThrow(() -> new ProcessNotFoundException(ref));
     row.requireRefMatches(ref);
+    if (!row.tenantId().equals(cause.tenantId().value())) {
+      // A ref names an instance but does not prove tenancy: a confused deputy holding another
+      // tenant's ref would otherwise advance that instance and write its transition rows under the
+      // caller's tenant. Answering "not found" — the same answer the (tenant, type, key) lookup
+      // gives — means a foreign ref does not even confirm the instance exists.
+      throw new ProcessNotFoundException(ref);
+    }
 
     Optional<String> duplicate =
         transitions.findTransitionIdByInput(ref.instanceId(), cause.messageId());

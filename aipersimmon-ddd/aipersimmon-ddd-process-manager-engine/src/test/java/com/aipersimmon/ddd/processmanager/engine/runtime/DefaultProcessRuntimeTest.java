@@ -731,6 +731,22 @@ class DefaultProcessRuntimeTest {
   }
 
   @Test
+  void aForeignTenantsRefReadsAsNotFoundInsteadOfAdvancingTheirInstance() {
+    instances.given(INSTANCE, ProcessLifecycle.RUNNING); // stored under "acme"
+    DefaultProcessRuntime runtime = runtime();
+
+    // A ref names an instance but does not prove tenancy. The (tenant, type, key) entry point is
+    // scoped by construction; the by-ref one must check, or a confused deputy holding another
+    // tenant's ref would advance that instance and write transition rows under its own tenant.
+    // "Not found" — not "forbidden" — so a foreign ref does not even confirm the instance exists.
+    assertThrows(
+        ProcessNotFoundException.class,
+        () ->
+            runtime.handle(REF, new Say("paid"), CommandContext.root(Tenants.of("globex"), "m-1")));
+    assertEquals(0, definition.reactCalls);
+  }
+
+  @Test
   void anIllegalLifecycleMoveIsRefusedEvenThoughTheDecisionItselfIsWellFormed() {
     instances.given(INSTANCE, ProcessLifecycle.COMPENSATING);
     definition.onReact = (state, input, context) -> running(SHIPPING);
