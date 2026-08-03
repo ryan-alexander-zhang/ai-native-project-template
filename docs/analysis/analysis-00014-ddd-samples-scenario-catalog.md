@@ -264,9 +264,12 @@ sample 内演示，不单独建目录。
 三条上面没问到的：被调方**拒绝必须是 200 + `approved:false`**（用 4xx 会让调用方分不清业务拒绝与自己发错了），
 调用方把对方的 **4xx 也翻译成"没有答案"**（4xx 意味着本服务有缺陷，不该说成客户订单被拒），以及 `ErrorCategory`
 **没有"依赖不可用"这一档**（`UNEXPECTED`→500 既错在归属又叫客户端别重试），要用 `ProblemCatalog` 按 code 覆盖成
-503。precheck 在事务之前这条用探针直接测了（precheck 里无事务、handler 里有）。踩坑三件：lambda 写的 precheck
-启动期被拒（带 diamond 的匿名类能过检查但**不运行**，要具名类）、`SpringApplicationBuilder.properties()` 优先级
-低于 `application.yaml`、JDK HttpServer 的默认 executor 是单线程导致"重试没发生"的假象。
+503。precheck 在事务之前这条用探针直接测了（precheck 里无事务、handler 里有）。踩坑三件（都是 sample 的，不是库的）：lambda 写的 precheck
+启动期被拒（库的守卫，`PrecheckCommandInterceptor:93-109`；**带 diamond 的匿名类是好的**——查过了）、
+`SpringApplicationBuilder.properties()` 优先级低于 `application.yaml`、JDK HttpServer 默认 executor 是单线程
+——**这一条是一个 bug 两个症状**：既让"重试没发生"成为假象，又让上一个测试的 sleep 拖到下一个测试超时、风控
+precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最初错误归因成"precheck 必须具名类"，是编的；隔离之后
+更正。
 
 ### S7 调用外部三方应用（防腐层 + 出站/回调）（P0）
 

@@ -154,15 +154,26 @@ catch 块——**不能是吞掉异常的副产品**。
 `TransactionlessDeclarationTest` 两半都测了：不声明则起不来，声明后能起且上下文里确实没有 `PlatformTransactionManager`。
 "我们给无状态服务选对了 bundle"恰好是那种最容易悄悄搞错的判断。
 
-## 9. 这次踩到的三件事
+## 9. 这次踩到的三件事（都是 sample 的，不是库的）
 
-1. **lambda 写的 precheck 在启动期被拒**——prechecks 按类型参数索引，lambda 会擦除它（`Cannot resolve the
-   command type of precheck`）。换成带 diamond 的匿名类能过检查，但**它也没运行**；只有写出类型的具名类才可靠地
-   带着泛型父类型。与 S21 的 upcaster 注册同一种严格、同一个理由。
+第一件是库的守卫在正确地拦住该被拦的代码；后两件是我写测试写错了。
+
+1. **lambda 写的 precheck 在启动期被拒**——prechecks 按类型参数索引，lambda 会擦除它
+   （`PrecheckCommandInterceptor:93-109`，消息 `Cannot resolve the command type of precheck ...`）。与 S21 的
+   upcaster 注册同一种严格、同一个理由：索引到接口上的 bean 会**静默永不运行**。
+   带 diamond 的**匿名类是好的**——这一条是查过的，不是猜的：
+   `ResolvableType.forInstance(...).as(CommandPrecheck.class).getGeneric(0)` 对具名类、`<>` 匿名类、写全类型参数的
+   匿名类都解析出 `PlaceOrder`，只有 lambda 解析成 `Command`。
 2. **`SpringApplicationBuilder.properties(...)` 输给 `application.yaml`**——它贡献的是 *default* properties，优先级
    在配置文件之下。于是启动测试的第一版"证明"了不声明也能起来，实际上是 yaml 里的值赢了。命令行参数才压得住文件。
-3. **stub 的默认 executor 是单线程**：一个刻意慢的响应把重试挡在 handler 之外，请求计数器于是声称"没有重试"，而
-   重试确实发生了。**stub 的并发度必须匹配客户端可能在途的请求数。**
+3. **stub 的默认 executor 是单线程——一个 bug 两个症状，而第二个症状指向了一个无辜的嫌疑人。**
+   默认 executor 下，一个被延迟的响应会挡住后面每个请求进入 handler。于是：慢测试的重试根本没进到计数器
+   （"客户端没重试"——它重试了）；**并且**那 2 秒 sleep 在下一个测试运行时还占着 executor，下一个测试的请求跟着
+   超时 → 风控 precheck 抛异常 → 而**抛异常的 precheck 会短路它后面的 precheck** → 事务状态探针没跑到，报了 null。
+
+   这第二个症状最初被我写成"precheck 必须是具名类"——那是**编的**：两个改动一起进去、测试变绿，功劳被记在了错的
+   那一个头上。**规则：两个改动一起让测试变绿时，写下结论之前先隔离。** 另外两句照样成立：stub 的并发度必须匹配
+   客户端可能在途的请求数；共享 stub 会像数据库一样在测试之间携带状态。
 
 ## 10. 常见错法
 

@@ -37,32 +37,28 @@ class TransactionProbes {
   }
 
   /**
-   * A named class, not a lambda and not an anonymous one.
+   * An anonymous class, and <strong>not a lambda</strong>.
    *
-   * <p>Prechecks are indexed by their type parameter, so a lambda is refused at startup ("Cannot resolve
-   * the command type of precheck ...") — the same strictness the upcaster registry applies in S21, and for
-   * the same reason: a bean indexed under the interface would silently never run. An anonymous class with
-   * a diamond gets past that check and then <em>did not run</em> here either, which is the more
-   * interesting half: the resolution reads the instance's generic supertype, and the surest way to give it
-   * one is to write the type out.
+   * <p>Prechecks are indexed by their type parameter, and a lambda erases it: the registry refuses one at
+   * startup with "Cannot resolve the command type of precheck ... declare it with a concrete Command type
+   * parameter" ({@code PrecheckCommandInterceptor:93-109}). Same strictness as S21's upcaster registry,
+   * same reason — a bean indexed under the interface would silently never run.
+   *
+   * <p>An anonymous class with a diamond is fine, and that was worth checking rather than assuming:
+   * {@code ResolvableType.forInstance(...).as(CommandPrecheck.class).getGeneric(0)} resolves to
+   * {@code PlaceOrder} for a named class, an anonymous class with {@code <>}, and an anonymous class with
+   * the argument spelled out — and only to {@code Command} for a lambda. An earlier version of this file
+   * claimed a named class was needed; it was not, and the failure that prompted the claim had another
+   * cause entirely (see {@code RiskStubServer}'s executor).
    */
-  static final class TransactionStateProbe implements CommandPrecheck<PlaceOrder> {
-
-    private final Recorder recorder;
-
-    TransactionStateProbe(Recorder recorder) {
-      this.recorder = recorder;
-    }
-
-    @Override
-    public void check(PlaceOrder command, CommandContext context) {
-      recorder.duringPrecheck.set(TransactionSynchronizationManager.isActualTransactionActive());
-    }
-  }
-
   @Bean
-  TransactionStateProbe recordTransactionStateDuringPrecheck(Recorder recorder) {
-    return new TransactionStateProbe(recorder);
+  CommandPrecheck<PlaceOrder> recordTransactionStateDuringPrecheck(Recorder recorder) {
+    return new CommandPrecheck<>() {
+      @Override
+      public void check(PlaceOrder command, CommandContext context) {
+        recorder.duringPrecheck.set(TransactionSynchronizationManager.isActualTransactionActive());
+      }
+    };
   }
 
   /** Order 400: innermost, so inside the transaction interceptor at 200. */

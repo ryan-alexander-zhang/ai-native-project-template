@@ -84,10 +84,19 @@ final class RiskStubServer {
               out.write(body);
             }
           });
-      // A real pool, not the default single-threaded executor. With the default, a request that is being
-      // delayed blocks the next one from entering the handler at all — so "the client retried" was
-      // invisible to the counter and the retry looked like it had not happened. The stub's concurrency has
-      // to at least match what the client can have in flight.
+      // A real pool, not the default single-threaded executor — and this one line was the root cause of
+      // two apparently unrelated test failures, which is why it is worth a paragraph.
+      //
+      // With the default executor a delayed response blocks every following request from entering the
+      // handler. So the deliberately-slow test's retry never reached the counter ("the client did not
+      // retry" — it had), and its 2-second sleep was still holding the executor when the NEXT test ran,
+      // whose request then timed out too: the risk precheck threw, and because a refusing precheck
+      // short-circuits the ones after it, the transaction-state probe never ran and reported null.
+      //
+      // One bug, two symptoms, and the second symptom pointed at a completely innocent suspect (the way
+      // the probe precheck was declared). The lesson worth keeping: a stub's concurrency has to match
+      // what the client can have in flight, and a shared stub carries state between tests as surely as
+      // a database does.
       server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
       server.start();
       return stub;

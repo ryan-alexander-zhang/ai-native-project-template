@@ -131,16 +131,31 @@ service" is exactly the kind of claim that turns out to have been silently wrong
 
 ## Three things this cost
 
+All three are this sample's, not the library's. The first is a library guard doing its job on code that
+deserved it; the other two are test-writing mistakes.
+
 1. **A precheck registered as a lambda is refused at startup** — prechecks are indexed by their type
-   parameter and a lambda erases it. An anonymous class with a diamond got past the check and then did
-   not run either; a named class is what reliably carries the generic supertype. Same strictness, and
-   same reason, as S21's upcaster registry.
+   parameter and a lambda erases it (`PrecheckCommandInterceptor:93-109`). Same strictness, and same
+   reason, as S21's upcaster registry: a bean indexed under the interface would silently never run. An
+   anonymous class with a diamond is fine — checked, not assumed:
+   `ResolvableType.forInstance(...).as(CommandPrecheck.class).getGeneric(0)` resolves to `PlaceOrder` for
+   a named class, an anonymous one with `<>`, and an anonymous one with the argument written out, and only
+   to `Command` for a lambda.
 2. **`SpringApplicationBuilder.properties(...)` loses to `application.yaml`** — it contributes *default*
    properties. The first version of the startup test therefore "proved" the app boots happily without the
    declaration, when the yaml's own value had simply won. Command-line arguments outrank the file.
-3. **The stub's default executor is single-threaded**, so a deliberately slow response blocked the retry
-   from even entering the handler — and the request counter said the retry had not happened when it had.
-   A stub's concurrency has to match what the client can have in flight.
+3. **The stub's default executor is single-threaded — one bug with two symptoms, and the second one framed
+   an innocent suspect.** A delayed response blocks every following request from entering the handler. So
+   the slow test's retry never reached the request counter ("the client did not retry" — it had), *and*
+   that test's 2-second sleep was still holding the executor when the next test ran, whose request then
+   timed out too: the risk precheck threw, a refusing precheck short-circuits the ones after it, and the
+   transaction-state probe never ran and reported `null`.
+
+   That second symptom was first written up here as "a precheck must be a named class", which was
+   invention: two changes had gone in together and the tests went green, and the wrong one got the credit.
+   **When two changes land together, isolate before writing down which one worked.** A stub's concurrency
+   has to match what the client can have in flight, and a shared stub carries state between tests as
+   surely as a database does.
 
 ## Not demonstrated here
 
