@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>s04-integration-events-across-services</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s04-inventory-service</artifactId>
+  <name>s04-inventory-service</name>
+  <description>The consuming side: at-least-once delivery, at-most-once effect.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
+    </dependency>
+    <!-- The dedup table and its store. This is what turns at-least-once delivery into
+         at-most-once effect; without it a redelivery reserves the stock twice. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
+    </dependency>
+    <!--
+      An outbox in a service that publishes nothing — carried under protest, and the reason is worth
+      knowing before you copy this.
+
+      A consuming service must declare its copy of the contract @Externalized, because that is what
+      the consumer bridge derives its topic set from (OnExternalizedEventsCondition: "with zero
+      externalized events there is no topic to subscribe to"). But the Kafka starter's
+      durable-transport guard fails startup whenever @Externalized events exist and the active
+      IntegrationEvents publisher is not durable — and without an outbox the active publisher is the
+      in-process one. The guard is right about the danger it names (an @Externalized event published
+      in process leaves the JVM silently never), and it has no exemption for the consume-only shape,
+      so the only way to start is to add a durable publisher this service never uses.
+
+      Cost: the outbox tables and shedlock exist here and stay empty. Filed as an issue against the
+      library rather than papered over.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-archunit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>kafka</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      For ContainerTestUtils.waitForAssignment. A consumer test that produces before the group has
+      been assigned its partition is a coin toss: the same test passed and failed on consecutive
+      runs, and every "assert nothing was consumed" in it passed for the wrong reason.
+    -->
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

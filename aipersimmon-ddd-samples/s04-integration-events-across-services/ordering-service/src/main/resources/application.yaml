@@ -1,0 +1,49 @@
+spring:
+  application:
+    # Also the outbox relay's ShedLock lock name and the Kafka consumer group default. Naming a
+    # service is not cosmetic here.
+    name: s04-ordering-service
+  datasource:
+    url: jdbc:postgresql://localhost:18041/ordering
+    username: ordering
+    password: ordering
+  flyway:
+    # This service's own schema. The framework's is a separate runner with its own history table.
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18044
+
+server:
+  port: 18040
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ordering:
+  events-topic: ordering.events
+
+aipersimmon:
+  ddd:
+    integration:
+      # The fallback provenance stamped on any event whose @EventType leaves `source` empty. Both of
+      # this service's events name their own, so this is belt and braces — but a deployment hosting
+      # several contexts cannot rely on a single default, which is why the annotation wins.
+      source: /ordering
+    flyway:
+      # The switch the catalogue asked to see explicitly. Omit `outbox` and the migrations sit unused
+      # on the classpath; the outbox's own schema validator then refuses to start, naming this
+      # property — which is the good failure, because the alternative is a command rolling back at
+      # runtime on its first publication.
+      components: [outbox]
+    outbox:
+      relay:
+        # On in a real deployment. The tests turn it off so a single poll can be driven and asserted
+        # on; the library documents exactly this use.
+        enabled: true
+      poll-delay-ms: 500
+    messaging:
+      kafka:
+        producer:
+          send-timeout-ms: 10000

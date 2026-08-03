@@ -1,0 +1,47 @@
+spring:
+  application:
+    # Also the inbox's `consumer` identity and the Kafka consumer group. Two services sharing one
+    # inbox table and one name would suppress each other's processing of the same message.
+    name: s04-inventory-service
+  datasource:
+    url: jdbc:postgresql://localhost:18043/inventory
+    username: inventory
+    password: inventory
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18044
+    consumer:
+      auto-offset-reset: earliest
+
+server:
+  port: 18042
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+inventory:
+  ordering-events-topic: ordering.events
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /inventory
+    flyway:
+      # The inbox is what this service needs. The outbox is here only because the durable-transport
+      # guard forces a consume-only service to carry a durable publisher (see the pom); its tables
+      # stay empty, and its schema validator would refuse to start if they were missing.
+      components: [inbox, outbox]
+    outbox:
+      relay:
+        # Nothing is ever written to it, so nothing needs draining. Off, so a service that publishes
+        # nothing does not poll an empty table every second forever.
+        enabled: false
+    messaging:
+      kafka:
+        consumer:
+          # Off by default in the library, because producing and consuming are separate decisions.
+          # This service is a consumer, so it says so.
+          enabled: true

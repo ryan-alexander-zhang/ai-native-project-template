@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>aipersimmon-ddd-samples</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s04-integration-events-across-services</artifactId>
+  <packaging>pom</packaging>
+  <name>s04-integration-events-across-services</name>
+  <description>S4: one fact, two deployables — outbox, Kafka, inbox.</description>
+
+  <!--
+    Two services, two modules, and deliberately NO third module holding the event class.
+
+    They are separate deployables, so a shared contract jar would give them a compile-time coupling
+    that the deployment boundary is supposed to remove: bump the jar and both sides must be released
+    together, which is the thing a broker was introduced to avoid. The library is built for the other
+    way round — an event resolves by its logical (name, version) pair from @EventType, never by Java
+    class — so each side declares its own class for the same contract, and the consumer's copy carries
+    only the fields it actually reads.
+  -->
+  <modules>
+    <module>ordering-service</module>
+    <module>inventory-service</module>
+  </modules>
+</project>

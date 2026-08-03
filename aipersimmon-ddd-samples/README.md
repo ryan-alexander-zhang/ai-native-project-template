@@ -28,6 +28,7 @@ variants of the framework modules are not used.
 | S1 HTTP command and query | [s01-http-command-query](s01-http-command-query) | `analysis-00015` |
 | S2 Idempotency and replay protection | [s02-http-idempotency](s02-http-idempotency) | `analysis-00017` |
 | S3 Domain events, in process | [s03-domain-events-in-process](s03-domain-events-in-process) | `analysis-00020` |
+| S4 Integration events across services | [s04-integration-events-across-services](s04-integration-events-across-services) | `analysis-00025` |
 | S8 Transactions and the optimistic lock | [s08-local-transaction-aggregate](s08-local-transaction-aggregate) | `analysis-00021` |
 | S11 Entries that are not HTTP | [s11-scheduled-and-batch-entries](s11-scheduled-and-batch-entries) | `analysis-00024` |
 | S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |

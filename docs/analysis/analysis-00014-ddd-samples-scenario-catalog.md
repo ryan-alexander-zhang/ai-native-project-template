@@ -198,6 +198,11 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-starter-messaging-kafka`、`aipersimmon-ddd-flyway-spring-boot-starter`。
 **寄宿 S13、S15**。
 
+**文档**：[[analysis-00025-samples-integration-events-across-services]]（已完成，**S13/S15 尚未寄宿进去**，
+是下一个增量）。落地时发现两件事：消费侧的去重**由库的消费桥负责**（`KafkaIntegrationEventListener:152`），
+handler 再查一遍会让每条消息静默跳过；以及只消费的服务会被发布侧的启动检查误报，见
+[[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]。
+
 ### S5 消费外部系统的消息（非本体系事件格式）（P0）
 
 **场景描述**：消息来自**不使用本库的外部系统**，格式、语义、投递保证都不受我们控制。与 S4 的
