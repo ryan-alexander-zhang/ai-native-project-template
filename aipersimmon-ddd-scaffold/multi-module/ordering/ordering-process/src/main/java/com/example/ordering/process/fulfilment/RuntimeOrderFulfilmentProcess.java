@@ -37,7 +37,7 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
    * Both collaborators are the framework <em>ports</em>: swapping the process-manager provider (the
    * javadoc on these ports names Temporal/Seata) replaces the beans behind them, and this class
    * does not change. It used to import the engine's {@code DefaultProcessQuery} for the
-   * by-business-key lookup, which broke exactly that promise (issue-00136).
+   * by-business-key lookup, which broke exactly that promise.
    */
   public RuntimeOrderFulfilmentProcess(ProcessRuntime runtime, ProcessQuery query) {
     this.runtime = runtime;
@@ -123,10 +123,10 @@ public class RuntimeOrderFulfilmentProcess implements OrderFulfilmentProcess {
    *
    * <p>The chain, though, is not fabricated when the real one is on the stack: these facts are
    * published synchronously inside the command that raised them, and the bus binds that command's
-   * context to {@link CommandContexts} for the duration of the dispatch (issue-00137). Deriving a
-   * child of it keeps the whole flow — place, ready, start, every staged effect — on one
-   * correlation. Minting a root here is only the fallback for a genuinely standalone entry (a test
-   * driving this class directly), where there is no chain to continue.
+   * context to {@link CommandContexts} for the duration of the dispatch. Deriving a child of it
+   * keeps the whole flow — place, ready, start, every staged effect — on one correlation. Minting a
+   * root here is only the fallback for a genuinely standalone entry (a test driving this class
+   * directly), where there is no chain to continue.
    *
    * <p>The fallback's tenant is {@code effective()}, not {@code current().orElse(ROOT)}: what an
    * unbound thread means is a deployment-wide decision {@code TenantContext} already makes from the

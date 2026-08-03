@@ -62,10 +62,10 @@ public record Money(long amountMinor, String currency) {
    *
    * <p>The invariant this record actually needs is "the amount is representable", and "amount >= 0"
    * in the constructor is a lossy projection of it: an addition that overflows into a positive
-   * number lands squarely inside "non-negative" and is accepted as a perfectly ordinary total
-   * (issue-00077). Where it overflows into a negative one the constructor does reject it — but
-   * reports "amount must be >= 0", which sends the reader looking for a negative input that does
-   * not exist. Both failures are worse than an explicit one.
+   * number lands squarely inside "non-negative" and is accepted as a perfectly ordinary total.
+   * Where it overflows into a negative one the constructor does reject it — but reports "amount
+   * must be >= 0", which sends the reader looking for a negative input that does not exist. Both
+   * failures are worse than an explicit one.
    *
    * <p>Not an argument against {@code long} over {@code BigDecimal}: minor units in a {@code long}
    * is the right model and the one payment processors use. It only has to be arithmetic that can

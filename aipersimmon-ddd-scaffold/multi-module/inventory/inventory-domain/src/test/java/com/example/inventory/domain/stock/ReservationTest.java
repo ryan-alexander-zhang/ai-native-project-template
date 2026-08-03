@@ -33,7 +33,7 @@ class ReservationTest {
   /**
    * A held quantity of zero or less is not a smaller hold, it is corrupt state: it would be
    * persisted without complaint and only explode two transactions later, when the release hands
-   * "-5" to Stock.release in a different aggregate (issue-00145 item 1).
+   * "-5" to Stock.release in a different aggregate.
    */
   @Test
   void rejectsANonPositiveHeldQuantity() {

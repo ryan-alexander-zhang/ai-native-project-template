@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * <p>The decision id comes from {@link IdGenerator}, not {@code UUID.randomUUID()}. This one is not
  * a primary key — it is evidence carried into the aggregate, never indexed — so the time-ordering
  * itself buys nothing here. Minting it the same way as every other identifier is the point: one way
- * to make an id, so nobody has to decide per call site which way applies (decision-00019).
+ * to make an id, so nobody has to decide per call site which way applies.
  *
  * <p><strong>Trade-off — this evidence is a stand-in.</strong> The point of an evidence-bearing
  * type is that it references a fact that exists <em>somewhere else</em>: the cancellation refs are

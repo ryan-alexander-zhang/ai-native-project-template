@@ -1,4 +1,5 @@
--- issue-00091 + issue-00073: the two things V1_2 left behind, for the ordering context.
+-- The two things V1_2 left behind, for the ordering context: tenant-carrying foreign keys,
+-- and the indexes the read paths need.
 --
 -- V1_1 created the tables; V1_2 added tenant_id and reworked the *primary* keys so two tenants could
 -- each own a 'CUST-1'. But a new column changes more than the primary key. It changes every other
@@ -10,7 +11,7 @@
 -- "which constraints and which indexes now need one more column?". Primary keys are the only overlap
 -- between the two, which is why they were the only thing V1_2 got to.
 
--- Part 1 — foreign keys must carry the tenant (issue-00091) ------------------
+-- Part 1 — foreign keys must carry the tenant --------------------------------
 --
 -- V1_1 gave order_lines a single-column foreign key (order_lines.order_id). V1_2's note is right that
 -- orders.id is a globally-unique UUIDv7 and so cannot collide across tenants — but that argument is
@@ -40,7 +41,7 @@ ALTER TABLE ordering.order_lines
 -- V1_2 and is read through the same @TableId(type = IdType.INPUT) on a single column, with the
 -- interceptor supplying tenant_id. orders is only being pulled level with it.
 
--- Part 2 — the indexes those queries need (issue-00073) ----------------------
+-- Part 2 — the indexes those queries need ------------------------------------
 --
 -- Cursor paging's *correctness* — no repeats, no gaps under concurrent inserts — comes from UUIDv7 ids
 -- and `id < :after`, and OrderListPagingTest has covered that from the start. Its *performance* — a

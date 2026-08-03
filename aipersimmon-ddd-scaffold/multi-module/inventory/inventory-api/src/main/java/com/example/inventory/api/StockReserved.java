@@ -16,7 +16,7 @@ public record StockReserved(String orderId, String reservationId) implements Int
 
   public StockReserved {
     // Both ids are the whole message: the reservationId is the very handle the compensation
-    // needs later, so an event without it is unusable (issue-00143).
+    // needs later, so an event without it is unusable.
     Contract.required(orderId, "orderId");
     Contract.required(reservationId, "reservationId");
   }

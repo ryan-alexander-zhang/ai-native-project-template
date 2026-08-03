@@ -6,11 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 /**
- * The published language validates at construction (issue-00143): a payload that cannot honour the
- * contract is refused at parse time, so the consuming bridge classifies it as poison (Jackson
- * surfaces the refusal as a {@code ValueInstantiationException}, a {@code JsonProcessingException},
- * already on the not-retryable list) instead of NPE-ing deep in a handler after a futile retry
- * round. The full classification argument lives with {@code ordering-api}'s test of the same name.
+ * The published language validates at construction: a payload that cannot honour the contract is
+ * refused at parse time, so the consuming bridge classifies it as poison (Jackson surfaces the
+ * refusal as a {@code ValueInstantiationException}, a {@code JsonProcessingException}, already on
+ * the not-retryable list) instead of NPE-ing deep in a handler after a futile retry round. The full
+ * classification argument lives with {@code ordering-api}'s test of the same name.
  */
 class ContractValidationTest {
 

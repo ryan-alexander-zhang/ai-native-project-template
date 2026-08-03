@@ -21,15 +21,15 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * issue-00027 regression: the aggregate write and the outbox write are one transaction. A command
+ * Regression guard: the aggregate write and the outbox write are one transaction. A command
  * interceptor ordered <em>inside</em> the transaction boundary ({@code order > 200}) throws right
  * after the handler runs — so {@code PlaceOrderHandler} has already persisted the order (into
  * {@code ordering.orders}) and written its {@code OrderReadyForFulfilment} row (into {@code
  * aipersimmon_outbox}) when the transaction rolls back. Both must be gone.
  *
- * <p>This assertion is only possible now that aggregates are transactional (plan-00007). With the
- * old in-memory {@code ConcurrentHashMap} the order would survive the rollback while the outbox row
- * vanished — the exact split-brain issue-00027 described.
+ * <p>This assertion is only possible now that aggregates are transactional. With the old in-memory
+ * {@code ConcurrentHashMap} the order would survive the rollback while the outbox row vanished —
+ * the exact split-brain this test exists to keep impossible.
  */
 @SpringBootTest(
     properties = {
@@ -48,7 +48,7 @@ class OutboxAtomicityTest {
 
   @Test
   void aggregateAndOutboxRollBackTogetherWhenTheTransactionFails() {
-    // Precondition (issue-00044): the OrderReadyForFulfilment event is actually written to the
+    // Precondition: the OrderReadyForFulfilment event is actually written to the
     // outbox in the
     // command transaction — i.e. the active publisher is the durable outbox writer, not the
     // in-process fallback. Without this the "outbox == 0 after rollback" assertion below is

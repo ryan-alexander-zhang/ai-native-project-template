@@ -20,9 +20,8 @@ public class CustomerDo implements VersionedRow {
 
   /**
    * Optimistic-lock version; see {@code OrderDo#version}. Guards the credit limit against two
-   * concurrent placements committing against one snapshot (issue-00071). {@code V3} deliberately
-   * left this table unversioned while nothing wrote to it; {@code V5} adds the column now that
-   * something does.
+   * concurrent placements committing against one snapshot. {@code V3} deliberately left this table
+   * unversioned while nothing wrote to it; {@code V5} adds the column now that something does.
    */
   @Version private Long version;
 

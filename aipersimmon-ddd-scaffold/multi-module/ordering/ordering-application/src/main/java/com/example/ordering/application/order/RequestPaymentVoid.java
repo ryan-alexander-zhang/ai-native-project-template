@@ -6,10 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 
 /**
  * Ordering-internal command the process manager sends when it abandons its wait for a payment
- * answer — a timeout, or a customer cancellation racing the authorization (issue-00144). Its
- * handler publishes the {@code PaymentVoidRequested} integration event; the payment context then
- * settles the race on its own operation row: an authorization already granted is voided, one still
- * in flight is refused, one already declined needs nothing.
+ * answer — a timeout, or a customer cancellation racing the authorization. Its handler publishes
+ * the {@code PaymentVoidRequested} integration event; the payment context then settles the race on
+ * its own operation row: an authorization already granted is voided, one still in flight is
+ * refused, one already declined needs nothing.
  *
  * <p>It carries the same {@code paymentOperationId} the earlier {@code RequestPayment} was minted
  * with — remembered in the flow's state, because by the time the flow gives up, the causing

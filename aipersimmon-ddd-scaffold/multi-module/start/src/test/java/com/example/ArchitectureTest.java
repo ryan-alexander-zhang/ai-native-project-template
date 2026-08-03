@@ -62,31 +62,29 @@ class ArchitectureTest {
   /**
    * No inbound adapter depends on a domain directly. An inbound adapter translates a transport
    * (HTTP, a cross-context integration event) into a command or query; a domain-event subscriber
-   * belongs in the application layer, not here (see
-   * decision-00008-event-subscriber-layer-placement). This stricter, opt-in hexagonal rule holds
-   * because every context keeps its persistence adapters in a separate {@code *-infrastructure}
-   * module, so no {@code ..adapter..} class needs the domain.
+   * belongs in the application layer, not here. This stricter, opt-in hexagonal rule holds because
+   * every context keeps its persistence adapters in a separate {@code *-infrastructure} module, so
+   * no {@code ..adapter..} class needs the domain.
    */
   @ArchTest
   static final ArchRule adaptersDoNotDependOnDomain =
       LayeringRules.adapterShouldNotDependOnDomain();
 
   /**
-   * Every reference-typed component of every command declares its Bean Validation contract
-   * (issue-00148). The bus's validation gate guards each entry into the application — including the
-   * internal commands only a relay or an event listener ever sends — but it checks only what a
-   * command declares, and the declarations were found clustered on the two HTTP-bound commands
-   * while eight internal ones said nothing. Opt-in because it presumes Bean Validation, which this
-   * application's bus uses.
+   * Every reference-typed component of every command declares its Bean Validation contract. The
+   * bus's validation gate guards each entry into the application — including the internal commands
+   * only a relay or an event listener ever sends — but it checks only what a command declares, and
+   * the declarations were found clustered on the two HTTP-bound commands while eight internal ones
+   * said nothing. Opt-in because it presumes Bean Validation, which this application's bus uses.
    */
   @ArchTest
   static final ArchRule commandsDeclareTheirValidationContract =
       CqrsRules.commandComponentsShouldDeclareValidationConstraints();
 
   /**
-   * A SKU inside a domain is a {@code Sku}, never a {@code String} (issue-00085). Both contexts
-   * model one, separately and on purpose, and this keeps the next line-carrying type from quietly
-   * regressing to a string that no validation and no type check protects.
+   * A SKU inside a domain is a {@code Sku}, never a {@code String}. Both contexts model one,
+   * separately and on purpose, and this keeps the next line-carrying type from quietly regressing
+   * to a string that no validation and no type check protects.
    *
    * <p>Narrowed to {@code sku} deliberately. The obvious generalisation — no domain field named
    * {@code *Id} or {@code *Code} may be a String — is wrong here, and the counterexamples are in

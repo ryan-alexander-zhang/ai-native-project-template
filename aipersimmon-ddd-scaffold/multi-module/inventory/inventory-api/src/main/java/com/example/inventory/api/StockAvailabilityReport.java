@@ -11,7 +11,7 @@ import java.util.List;
 public record StockAvailabilityReport(List<Item> items) {
 
   public StockAvailabilityReport {
-    // Refused at parse time (issue-00143): a report is a list of verdicts, and "no list" is not
+    // Refused at parse time: a report is a list of verdicts, and "no list" is not
     // the same statement as "no verdicts". The copy also keeps this carrier immutable.
     if (items == null) {
       throw new IllegalArgumentException("items required");

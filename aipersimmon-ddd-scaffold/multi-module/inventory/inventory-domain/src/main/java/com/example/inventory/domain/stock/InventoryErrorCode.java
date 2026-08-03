@@ -11,7 +11,7 @@ import com.aipersimmon.ddd.core.error.ErrorCode;
  * there is deliberately <em>no</em> {@code ProblemCatalog}/{@code ProblemDescriptor} here (those
  * are the HTTP boundary's concern); instead the code travels on the failure event, giving the
  * reacting process manager a stable identity to branch on. This is the event-driven counterpart to
- * ordering's HTTP-facing use of the same {@code ErrorCode} model (design-00003 §4.5/§4.7).
+ * ordering's HTTP-facing use of the same {@code ErrorCode} model.
  */
 public enum InventoryErrorCode implements ErrorCode {
 
@@ -20,7 +20,7 @@ public enum InventoryErrorCode implements ErrorCode {
    * quantity", which this doc used to claim while the code never did: a non-positive quantity is a
    * malformed request the bus's validation refuses long before the domain — {@code Stock.reserve}'s
    * own guard for it is a codeless backstop for callers that bypass the bus, and a codeless
-   * DomainException deliberately surfaces as {@code inventory.unspecified} (issue-00131).
+   * DomainException deliberately surfaces as {@code inventory.unspecified}.
    */
   INSUFFICIENT_STOCK("inventory.insufficient-stock", ErrorCategory.DOMAIN_RULE),
 
@@ -35,7 +35,7 @@ public enum InventoryErrorCode implements ErrorCode {
    * contract: {@code StockReservationFailed.code} promises a stable machine identity and the
    * consuming side enforces that promise ({@code ReservationFailureRef} refuses a null code), so a
    * codeless {@code DomainException} must leave this context wearing <em>something</em> stable
-   * rather than poisoning the consumer's transaction (issue-00131).
+   * rather than poisoning the consumer's transaction.
    */
   UNSPECIFIED("inventory.unspecified", ErrorCategory.DOMAIN_RULE);
 

@@ -31,7 +31,7 @@
     </dependency>
   </dependencies>
 
-  <!-- Domain gate (design-00007 §4.3 / plan-00009 P8b): JaCoCo 90% line/branch/method +
+  <!-- Domain gate: JaCoCo 90% line/branch/method +
        PIT 90% mutation. Config inherited from the multi-module root pluginManagement. -->
   <build>
     <plugins>

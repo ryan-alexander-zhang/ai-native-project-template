@@ -15,8 +15,8 @@ import org.springframework.context.annotation.Configuration;
  * resolver is missing, which is why they live here in the composition root.
  *
  * <p>This reference app has no security context, so the actor is a constant system actor. The
- * tenant, however, is real: with multi-tenancy enabled (design-00009) the tenant is bound into the
- * {@link TenantContext} at the trusted boundary — the web edge filter, or the command bus for a
+ * tenant, however, is real: with multi-tenancy enabled the tenant is bound into the {@link
+ * TenantContext} at the trusted boundary — the web edge filter, or the command bus for a
  * relayed/scheduled dispatch — and this resolver simply reads it back, falling to the {@code
  * __root__} sentinel for any un-tenanted (single-tenant N=1) path. It reads from {@code
  * TenantContext}, never the command payload, exactly because the payload is untrusted.

@@ -30,7 +30,7 @@ public record OrderSnapshot(
     //
     // It was a String with a hand-written allowableValues list, which is a duplicate of the enum
     // maintained by memory, and it had already rotted once: a literal example advertised PLACED, a
-    // state this model does not have (issue-00081). Fixing that instance left the mechanism that
+    // state this model does not have. Fixing that instance left the mechanism that
     // produced it in place — adding a state still meant remembering to edit an annotation. Now
     // adding a state to OrderStatus updates the published schema on the next build.
     @Schema(description = "Current order status.", example = "FULFILMENT_IN_PROGRESS")

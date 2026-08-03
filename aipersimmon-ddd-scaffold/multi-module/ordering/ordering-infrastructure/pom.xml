@@ -24,14 +24,14 @@
 
   <dependencies>
     <!-- Version-checked aggregate repository base + the optimistic-locker InnerInterceptor
-         contribution (design-00011). -->
+         contribution. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
     </dependency>
     <!-- org.springframework.dao.OptimisticLockingFailureException: the repository raises it when a
          version-checked update matches no row, and the framework's ConcurrencyTranslationCommandInterceptor
-         turns it into ConcurrencyConflictException -> HTTP 409 (issue-00051). -->
+         turns it into ConcurrencyConflictException -> HTTP 409. -->
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-tx</artifactId>
@@ -59,7 +59,7 @@
     <!-- MyBatis-Plus for the JDBC persistence adapters (BaseMapper, wrappers, @TableName). No
          <version> here: the reactor root imports mybatis-plus-bom, which manages it. A literal
          version would override the BOM silently and let this module compile against a different
-         line from `start` (issue-00088). -->
+         line from `start`. -->
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-core</artifactId>

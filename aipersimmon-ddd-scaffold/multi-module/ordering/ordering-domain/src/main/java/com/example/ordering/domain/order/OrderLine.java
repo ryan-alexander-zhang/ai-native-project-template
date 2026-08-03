@@ -11,10 +11,10 @@ import com.example.ordering.domain.shared.Sku;
  * nothing outside this package can construct or reference it — the only way in is through {@link
  * Order}.
  *
- * <p>A value object, not an entity (issue-00150): it carries no identity of its own, no lifecycle,
- * every component is final, and persistence rewrites the whole line set rather than tracking
- * individual lines — it was wearing {@code @Entity} while having none of an entity's properties.
- * The record makes the value semantics structural: equality by components, no mutation possible.
+ * <p>A value object, not an entity: it carries no identity of its own, no lifecycle, every
+ * component is final, and persistence rewrites the whole line set rather than tracking individual
+ * lines — it was wearing {@code @Entity} while having none of an entity's properties. The record
+ * makes the value semantics structural: equality by components, no mutation possible.
  */
 @ValueObject
 record OrderLine(Sku sku, int quantity, Money unitPrice) {
@@ -25,13 +25,13 @@ record OrderLine(Sku sku, int quantity, Money unitPrice) {
    * <p>Symmetrical with {@link Order#MAX_LINES}: how many of something a customer can order is a
    * business question, and leaving it to the width of {@code int} answers it with 2,147,483,647 — a
    * number nobody chose. It also caps the multiplication in {@link #subtotal()}, which is one of
-   * the two places a monetary amount could be driven out of range (issue-00077).
+   * the two places a monetary amount could be driven out of range.
    */
   static final int MAX_QUANTITY = 10_000;
 
   OrderLine {
     // No blank check here: Sku enforces that in its own constructor, once, for everybody
-    // (issue-00085). This used to repeat it, and two copies of a rule are two rules waiting to
+    // . This used to repeat it, and two copies of a rule are two rules waiting to
     // disagree.
     if (sku == null) {
       throw new DomainException("sku required");

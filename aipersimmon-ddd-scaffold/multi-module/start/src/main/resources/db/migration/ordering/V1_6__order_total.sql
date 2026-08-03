@@ -1,4 +1,4 @@
--- issue-00083: materialise the order total, so the rule that computes it has one definition.
+-- Materialise the order total, so the rule that computes it has one definition.
 --
 -- The write side owns it (Order.total() = Σ line.subtotal(), with Money.plus refusing to add
 -- across currencies). The read side computed it again in SQL:

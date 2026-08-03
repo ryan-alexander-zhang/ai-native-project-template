@@ -27,7 +27,7 @@ public record StockReleaseRequested(String orderId, String reservationId)
     implements IntegrationEvent {
 
   public StockReleaseRequested {
-    // Both ids are the whole message: without them there is nothing to release (issue-00143).
+    // Both ids are the whole message: without them there is nothing to release.
     Contract.required(orderId, "orderId");
     Contract.required(reservationId, "reservationId");
   }

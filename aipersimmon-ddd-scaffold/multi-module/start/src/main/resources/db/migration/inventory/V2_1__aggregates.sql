@@ -1,4 +1,4 @@
--- plan-00007: the inventory context's aggregate tables, in its own schema.
+-- The inventory context's aggregate tables, in its own schema.
 --
 -- Independent of ordering/V1_*: no foreign key, view or join crosses the boundary, so the only thing
 -- these two version namespaces share is the database (which is what lets an aggregate write and its
@@ -29,4 +29,4 @@ CREATE TABLE inventory.reservation_lines (
 );
 
 -- Structure only. The demo stock levels live in db/dev/afterMigrate__seed.sql, which only the dev
--- profile loads (issue-00072); MigrationContentTest keeps this true.
+-- profile loads; MigrationContentTest keeps this true.

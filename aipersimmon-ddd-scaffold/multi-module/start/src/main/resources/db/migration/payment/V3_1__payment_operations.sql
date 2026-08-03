@@ -1,4 +1,4 @@
--- issue-00069: the payment context's business-idempotency log becomes a table, so that claiming an
+-- The payment context's business-idempotency log is a table rather than a map, so that claiming an
 -- operation and announcing its outcome are one commit.
 --
 -- It was a ConcurrentHashMap, described as "the lightest honest dedupe for a scaffold with no

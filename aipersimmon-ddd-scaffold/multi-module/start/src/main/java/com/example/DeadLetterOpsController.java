@@ -33,8 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Both halves come from ports: {@link DeadLetters} reads and {@link DeadLetterStore} replays, so
  * this class holds no SQL and knows nothing about the {@code aipersimmon_dead_letter} table it is
- * showing (it used to have to — issue-00066). The listing pages by opaque cursor exactly like
- * {@code GET /orders} does, because it is the same read-model shape.
+ * showing (it used to have to, against a table this application does not own). The listing pages by
+ * opaque cursor exactly like {@code GET /orders} does, because it is the same read-model shape.
  */
 @RestController
 @RequestMapping("/ops/dead-letters")

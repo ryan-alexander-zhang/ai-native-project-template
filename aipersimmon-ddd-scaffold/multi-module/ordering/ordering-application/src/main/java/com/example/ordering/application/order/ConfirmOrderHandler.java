@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
  * confirmation — is its own earlier success, not an error. Both are no-ops for the same reason
  * {@link BeginFulfilmentHandler} tolerates its landed state: letting the aggregate's transition
  * table refuse the duplicate would turn every redelivery into a poison effect the relay retries
- * until it dead-letters (issue-00130). Anything else is a genuine wiring error and is left to the
- * aggregate to refuse.
+ * until it dead-letters. Anything else is a genuine wiring error and is left to the aggregate to
+ * refuse.
  */
 @Component
 public class ConfirmOrderHandler implements CommandHandler<ConfirmOrder, Void> {

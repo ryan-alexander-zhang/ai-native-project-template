@@ -15,8 +15,7 @@ import jakarta.validation.constraints.NotBlank;
  * manager derives from the stable identity of the fact that triggered the authorization (so an
  * at-least-once redelivery reuses it). The key rides the {@code PaymentRequested} event to the
  * payment context, which dedupes by it: a redelivered authorization for the same operation must not
- * authorize twice (design-00004 §13.2; complements the transport-level effect id, it does not
- * replace it).
+ * authorize twice (it complements the transport-level effect id, it does not replace it).
  */
 @OperationLog(
     code = "ordering.order.request-payment",

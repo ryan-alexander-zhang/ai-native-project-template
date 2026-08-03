@@ -1,4 +1,4 @@
--- issue-00051 / design-00011: optimistic-lock version on the ordering tables that are written.
+-- Optimistic-lock version on the ordering tables that are written.
 --
 -- Without it two concurrent commands each pass the aggregate's own state guards on the snapshot they
 -- loaded and both write, so the later write silently discards the earlier one: concurrent

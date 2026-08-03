@@ -10,8 +10,8 @@ import com.aipersimmon.ddd.processmanager.model.ProcessStep;
  * <ul>
  *   <li>the {@code reservationId} inventory issued — so the stock can be released on compensation;
  *   <li>the {@code paymentOperationId} the payment request was minted with — so abandoning the
- *       payment wait can void the very operation it opened (issue-00144): by then the causing
- *       envelope is a timer or a cancellation, and the id is not derivable from it;
+ *       payment wait can void the very operation it opened: by then the causing envelope is a timer
+ *       or a cancellation, and the id is not derivable from it;
  *   <li>the {@code paymentDeclineCode} — so the eventual cancellation can name why;
  *   <li>the {@code paymentDeclineEvidenceId} — the <em>envelope id</em> of the causing {@code
  *       PaymentDeclined} fact, kept so the later {@code PaymentDeclineRef} can be identified by the
@@ -59,9 +59,9 @@ public record OrderFulfilmentState(
     /**
      * Waiting for inventory, for an order the customer has already cancelled.
      *
-     * <p>Reachable because {@code READY_FOR_FULFILMENT} is now a state a row actually holds
-     * (issue-00070), so the self-cancel window overlaps the reservation. Whether there is stock to
-     * hand back is not yet known — that is what this step is still waiting to find out.
+     * <p>Reachable because {@code READY_FOR_FULFILMENT} is now a state a row actually holds, so the
+     * self-cancel window overlaps the reservation. Whether there is stock to hand back is not yet
+     * known — that is what this step is still waiting to find out.
      */
     AWAITING_STOCK_ORDER_CANCELLED,
 
@@ -101,7 +101,7 @@ public record OrderFulfilmentState(
 
   /**
    * Records the operation id the flow's {@code RequestPayment} was minted with, so the decision
-   * that later abandons the wait can void the same operation (issue-00144).
+   * that later abandons the wait can void the same operation.
    */
   public OrderFulfilmentState paymentRequested(String operationId) {
     return new OrderFulfilmentState(

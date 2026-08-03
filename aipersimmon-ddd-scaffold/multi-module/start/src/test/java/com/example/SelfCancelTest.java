@@ -69,7 +69,7 @@ class SelfCancelTest {
   }
 
   /**
-   * The case that was unreachable (issue-00070).
+   * The case that was unreachable.
    *
    * <p>{@code CancellableByCustomer.BEFORE_FULFILMENT} is {@code {AWAITING_REVIEW,
    * READY_FOR_FULFILMENT}}, and the second of those never reached a database row: {@code

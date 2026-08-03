@@ -942,7 +942,8 @@ deterministic stand-in for a payment provider; a real deployment declares its ow
 `AuthorizationPolicy` bean and `PaymentPolicyConfig`'s default backs off. The port's javadoc carries
 two obligations that are easy to miss when substituting one: **do not throw** (a throw publishes
 nothing, and silence is indistinguishable from a dead broker, so the order dies of ordering's PAYMENT
-deadline for a reason unrelated to the truth — issue-00075 was exactly this shape), and **carry the
+deadline for a reason unrelated to the truth — an earlier zero-amount regression died exactly this
+way), and **carry the
 operation id as the provider's own idempotency key**.
 
 **`find`-or-`decide`, then always announce.** On a redelivery the *recorded* decision is reused

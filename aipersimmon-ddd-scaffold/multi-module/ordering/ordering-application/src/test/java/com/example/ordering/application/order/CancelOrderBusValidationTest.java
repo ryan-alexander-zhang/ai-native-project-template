@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@link PlaceOrderBusValidationTest}'s counterpart for an <em>internal</em> command — one no web
- * adapter ever binds (issue-00148). {@link CancelOrder} arrives from the fulfilment process
- * manager's relay, so the bus's validation gate is the only validation it will ever meet; if its
- * constraints are missing, a malformed cancel walks straight into the handler and fails deep inside
- * the aggregate as a runtime null check instead of at the door as a validation error. The bus
- * promises the gate for every entry, and this test holds an internal command to that promise.
+ * adapter ever binds. {@link CancelOrder} arrives from the fulfilment process manager's relay, so
+ * the bus's validation gate is the only validation it will ever meet; if its constraints are
+ * missing, a malformed cancel walks straight into the handler and fails deep inside the aggregate
+ * as a runtime null check instead of at the door as a validation error. The bus promises the gate
+ * for every entry, and this test holds an internal command to that promise.
  */
 class CancelOrderBusValidationTest {
 

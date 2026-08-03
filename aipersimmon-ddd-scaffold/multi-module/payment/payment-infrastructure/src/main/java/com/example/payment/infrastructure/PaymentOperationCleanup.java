@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
- * Deletes {@code payment_operations} rows past their retention window (issue-00097).
+ * Deletes {@code payment_operations} rows past their retention window.
  *
  * <p>The table is append-only and grows at the rate orders are paid for, so it needs a retention
  * decision the way the outbox and the inbox do. It did not get one when it was introduced, and the

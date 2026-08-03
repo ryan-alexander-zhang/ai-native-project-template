@@ -41,7 +41,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The credit limit is enforced, not merely consulted (issue-00071).
+ * The credit limit is enforced, not merely consulted.
  *
  * <p>It used to be neither strongly nor eventually consistent, but a third thing: a comparison
  * against a stale snapshot, presented throughout the stack as a hard rule — its own error code, its
@@ -153,7 +153,7 @@ class CreditLimitTest {
     assertEquals(0, usedCreditOf(customer), "compensation must give the credit back");
 
     // Route 2: the customer cancelling their own order over HTTP. A held-for-review order, because
-    // that is the only state the self-cancel window is currently reachable in (issue-00070).
+    // that is the only state the self-cancel window is currently reachable in.
     String selfCancelled = orderIdOf(placeRestricted(customer));
     assertEquals(10_000, usedCreditOf(customer));
     assertEquals(
@@ -167,7 +167,7 @@ class CreditLimitTest {
             .value());
     assertEquals(0, usedCreditOf(customer), "self-cancellation must give the credit back too");
 
-    // Route 3: a reviewer rejecting a held order (issue-00082). It is the newest route, and the
+    // Route 3: a reviewer rejecting a held order. It is the newest route, and the
     // one most likely to have been forgotten — the credit was committed at placement, before
     // anyone looked at the order, so a rejection that did not release would shrink the limit for
     // an order the business explicitly refused.

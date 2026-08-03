@@ -42,14 +42,14 @@ import org.springframework.stereotype.Component;
  * up front and then re-loaded and saved one at a time, and because a save is visible to the re-load
  * that follows it, a later line could fail against stock the earlier lines had already consumed.
  * The catch then swallowed the exception, the transaction committed, and the deducted quantity was
- * stranded — no {@link Reservation} existed, so nothing could ever release it (issue-00094).
+ * stranded — no {@link Reservation} existed, so nothing could ever release it.
  *
  * <p>The other half of the same rule: <strong>one aggregate is loaded at most once per
  * transaction</strong>. Two instances of one {@code Stock} are two writers racing inside a single
  * transaction, each unaware of the other's deduction. The map below makes that structural rather
  * than incidental, and {@link ReserveStock} merges lines repeating a SKU before the handler ever
  * sees them, so inventory no longer depends on ordering's {@code OrderHasDistinctSkus} to stay
- * correct (issue-00076).
+ * correct.
  *
  * <p>On success it also records a {@link Reservation} keyed by a freshly minted {@link
  * ReservationId}, and publishes that id on the event. That id is what makes the later release exact
@@ -93,7 +93,7 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
 
   @Override
   public Void handle(ReserveStock command, CommandContext context) {
-    // Decide once, announce every time (issue-00147) — the same contract payment keeps for its
+    // Decide once, announce every time — the same contract payment keeps for its
     // paymentOperationId, for the same reason: repeating this action does not do compensable work
     // twice, it leaks a resource. A duplicate outside the inbox's retention window reaches this
     // handler, and without this lookup it would deduct the stock again and write a second
@@ -132,7 +132,7 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
       // identity for the reacting process manager to branch on. Never null — the contract promises
       // a code and the consuming side enforces the promise (ordering's ReservationFailureRef
       // refuses a null one), so a codeless DomainException falls back to UNSPECIFIED instead of
-      // poisoning the consumer's transaction (issue-00131).
+      // poisoning the consumer's transaction.
       String code =
           failure.errorCode().map(ErrorCode::code).orElse(InventoryErrorCode.UNSPECIFIED.code());
       integrationEvents.publish(
@@ -147,7 +147,7 @@ public class ReserveStockHandler implements CommandHandler<ReserveStock, Void> {
     for (Stock stock : reserved.values()) {
       stocks.save(stock);
     }
-    // Time-ordered (UUIDv7) primary key from IdGenerator, not UUID.randomUUID() (issue-00054).
+    // Time-ordered (UUIDv7) primary key from IdGenerator, not UUID.randomUUID().
     ReservationId reservationId = new ReservationId(idGenerator.newId());
     reservations.save(new Reservation(reservationId, order, held));
     integrationEvents.publish(new StockReserved(command.orderId(), reservationId.value()), context);

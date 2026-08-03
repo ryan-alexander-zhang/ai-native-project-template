@@ -24,13 +24,12 @@ import org.springframework.test.web.servlet.MockMvc;
  * 9457 problem with the corrected status (422) and the stable domain code, and a missing aggregate
  * renders 404 — both driven through the real web stack.
  *
- * <p>With multi-tenancy enabled (design-00009) every request crosses the tenant-resolution filter
- * first, and {@code missing-policy=REJECT} would 400 a header-less call before it reaches the
- * controller. These requests therefore carry {@code X-Tenant-Id}, standing in for the real edge
- * (JWT/subdomain) that a deployment resolves the tenant from — the same trusted boundary that seeds
- * the tenant onto the command. The tenant's own {@code CUST-1} / {@code SKU-1} are seeded per test,
- * since reads and writes are now scoped to it and the Flyway seed lives under the {@code demo}
- * tenant.
+ * <p>With multi-tenancy enabled, every request crosses the tenant-resolution filter first, and
+ * {@code missing-policy=REJECT} would 400 a header-less call before it reaches the controller.
+ * These requests therefore carry {@code X-Tenant-Id}, standing in for the real edge (JWT/subdomain)
+ * that a deployment resolves the tenant from — the same trusted boundary that seeds the tenant onto
+ * the command. The tenant's own {@code CUST-1} / {@code SKU-1} are seeded per test, since reads and
+ * writes are now scoped to it and the Flyway seed lives under the {@code demo} tenant.
  */
 @SpringBootTest(
     properties = {
@@ -92,8 +91,7 @@ class ExceptionContractTest {
         .andExpect(jsonPath("$.code").value("ordering.credit-exceeded"))
         // RFC 9457's title is the human-readable half of the contract, and the descriptor holds a
         // message-source KEY for it. Until messages.properties existed this returned the key
-        // itself — the resolver falls back rather than failing, so nothing anywhere said so
-        // (issue-00080).
+        // itself — the resolver falls back rather than failing, so nothing anywhere said so.
         .andExpect(jsonPath("$.title").value("Insufficient credit"));
   }
 
@@ -178,7 +176,7 @@ class ExceptionContractTest {
   @Test
   void unknownPathRenders404NotFallback500() throws Exception {
     // A path with no handler is a routing-level NoResourceFoundException. It must render the
-    // proper 404 problem, not the catch-all 500 (issue-00045).
+    // proper 404 problem, not the catch-all 500.
     mvc.perform(get("/no-such-endpoint").header("X-Tenant-Id", TENANT))
         .andExpect(status().isNotFound())
         .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
@@ -187,8 +185,7 @@ class ExceptionContractTest {
 
   @Test
   void wrongMethodRenders405NotFallback500() throws Exception {
-    // /orders is mapped for POST (place) and GET (list) but not DELETE → 405, not 500
-    // (issue-00045).
+    // /orders is mapped for POST (place) and GET (list) but not DELETE → 405, not 500.
     mvc.perform(delete("/orders").header("X-Tenant-Id", TENANT))
         .andExpect(status().isMethodNotAllowed())
         .andExpect(jsonPath("$.status").value(405));
@@ -196,8 +193,8 @@ class ExceptionContractTest {
 
   @Test
   void aMissingQueryParameterRenders400NotFallback500() throws Exception {
-    // GET /orders requires customerId. Omitting it is a client mistake and must render 400
-    // (issue-00065); it used to reach the catch-all and come back as 500, telling the caller to
+    // GET /orders requires customerId. Omitting it is a client mistake and must render 400;
+    // it used to reach the catch-all and come back as 500, telling the caller to
     // retry a request that can never succeed.
     mvc.perform(get("/orders").header("X-Tenant-Id", TENANT))
         .andExpect(status().isBadRequest())
@@ -207,7 +204,7 @@ class ExceptionContractTest {
 
   @Test
   void healthEndpointIsReachableAndUp() throws Exception {
-    // Actuator on the classpath (issue-00045): the health probe resolves to the real endpoint
+    // Actuator on the classpath: the health probe resolves to the real endpoint
     // and reports UP against the Testcontainers PostgreSQL + Kafka, rather than a 500. It carries
     // NO tenant header on purpose: the tenancy filter's exclude-paths default exempts /actuator/**,
     // so a liveness/readiness probe is not rejected under missing-policy=REJECT.
@@ -221,7 +218,7 @@ class ExceptionContractTest {
     // The merged /actuator/health above answers "is anything wrong?", which is not a question a
     // deployment platform can act on: the two things it can do — restart the pod, or stop routing
     // to it — need different answers. management.endpoint.health.probes.enabled maps them
-    // separately (issue-00074); without it both of these are 404 and the platform has to make do
+    // separately; without it both of these are 404 and the platform has to make do
     // with the merged endpoint, treating a lost database as a reason to restart.
     mvc.perform(get("/actuator/health/liveness"))
         .andExpect(status().isOk())
@@ -266,7 +263,7 @@ class ExceptionContractTest {
 
   @Test
   void rejectingTheReviewOfAnOrderNotAwaitingReviewRenders409AndCode() throws Exception {
-    // The refusal side of the same guard (issue-00082). SKU-1 needs no review, so there is no
+    // The refusal side of the same guard. SKU-1 needs no review, so there is no
     // review to reject; the aggregate's policy says so with the same coded conflict.
     String location = placeOrder("SKU-1", 100);
 
@@ -280,7 +277,7 @@ class ExceptionContractTest {
   void cancellingAShippedOrderRenders409AndAsksForAReturnInstead() throws Exception {
     // RETURN_REQUIRED is a good rule that no running application could ever reach: without a ship
     // command there was no way to put an order into SHIPPED, so the branch fired only in the
-    // aggregate's own unit tests (issue-00082). This is that rule seen from outside, over HTTP,
+    // aggregate's own unit tests. This is that rule seen from outside, over HTTP,
     // which is where a client would meet it.
     String location = placeOrder("SKU-1", 100);
     awaitStatus(location, "CONFIRMED");

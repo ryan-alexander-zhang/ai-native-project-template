@@ -19,10 +19,10 @@ package com.example.payment.domain;
  * <ul>
  *   <li><strong>Do not throw.</strong> A throw escapes the handler, rolls the transaction back and
  *       publishes nothing — and silence is indistinguishable from a dead broker, so the order sits
- *       until ordering's PAYMENT deadline cancels it for a reason unrelated to the truth.
- *       issue-00075 was this exact shape: a zero amount failed a constraint, no outcome event was
- *       ever published, and the symptom appeared two minutes later and nowhere near the cause.
- *       Return {@code Declined} instead.
+ *       until ordering's PAYMENT deadline cancels it for a reason unrelated to the truth. A past
+ *       bug was this exact shape: a zero amount failed a constraint, no outcome event was ever
+ *       published, and the symptom appeared two minutes later and nowhere near the cause. Return
+ *       {@code Declined} instead.
  *   <li><strong>Be deterministic for a given amount.</strong> {@code AuthorizePaymentHandler} calls
  *       this only when an operation has never been decided, and reuses the recorded decision on
  *       every redelivery — precisely so a non-deterministic policy cannot give one operation two

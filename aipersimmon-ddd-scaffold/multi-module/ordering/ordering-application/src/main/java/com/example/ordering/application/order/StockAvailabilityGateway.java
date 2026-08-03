@@ -20,8 +20,8 @@ public interface StockAvailabilityGateway {
 
   /**
    * @param lines the order's lines as (sku, quantity) pairs — the quantity is what makes the answer
-   *     useful (issue-00150): "is any on hand?" let a 999-unit order through a stock of 5, placed
-   *     only to walk the whole compensation circle
+   *     useful: "is any on hand?" let a 999-unit order through a stock of 5, placed only to walk
+   *     the whole compensation circle
    * @return the verdict: whether every line's quantity is offerable, and if not, which SKUs are not
    */
   Availability check(List<Line> lines);

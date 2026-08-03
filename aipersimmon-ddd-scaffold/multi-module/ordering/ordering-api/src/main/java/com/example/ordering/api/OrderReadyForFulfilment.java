@@ -64,7 +64,7 @@ public record OrderReadyForFulfilment(String orderId, List<Line> lines, Instant 
     implements IntegrationEvent {
 
   public OrderReadyForFulfilment {
-    // The contract boundary (issue-00143): a payload without an order or without lines cannot be
+    // The contract boundary: a payload without an order or without lines cannot be
     // fulfilled, so it is refused here — at parse time, where the consuming bridge classifies it
     // as poison — not deep in a handler. reservationDeadline stays nullable: the V1 upcast has
     // none to give, and consumers must cope without one.

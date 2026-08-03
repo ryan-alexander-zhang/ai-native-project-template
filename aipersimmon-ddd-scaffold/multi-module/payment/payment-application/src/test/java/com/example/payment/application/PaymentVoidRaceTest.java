@@ -15,10 +15,10 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * The void/authorize race, settled on the operation row (issue-00144). Ordering abandons its wait
- * for an operation — a timeout, or a cancellation racing the authorization — and sends a void; the
- * two requests may arrive here in either order, and every interleaving must leave the operation
- * without a live hold:
+ * The void/authorize race, settled on the operation row. Ordering abandons its wait for an
+ * operation — a timeout, or a cancellation racing the authorization — and sends a void; the two
+ * requests may arrive here in either order, and every interleaving must leave the operation without
+ * a live hold:
  *
  * <ul>
  *   <li>void first — a refusal in advance: the later authorization must not authorize, and must

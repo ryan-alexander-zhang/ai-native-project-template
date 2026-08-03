@@ -15,8 +15,7 @@
     cross-context integration events ride the transactional outbox to Kafka and back
     through an idempotent inbox; the aggregates, the durable process manager, and the
     outbox/inbox tables all live in PostgreSQL (single-source Flyway migrations); and
-    traces export to SigNoz over OTLP. Local infrastructure is in start/compose.yaml;
-    see docs/plan/plan-00006.
+    traces export to SigNoz over OTLP. Local infrastructure is in start/compose.yaml.
 
     (The payment context is the one exception to durable persistence: it keeps only a
     small in-memory operation-dedupe log in payment-infrastructure, since it owns no
@@ -45,8 +44,8 @@
     <spring-boot.version>3.5.10</spring-boot.version>
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
     <aipersimmon-ddd.version>0.1.0-SNAPSHOT</aipersimmon-ddd.version>
-    <!-- Quality toolchain (design-00007 / plan-00009 P8b). Kept in sync with the same block
-         in the library's aipersimmon-ddd-parent; there is no shared quality parent (D1). -->
+    <!-- Quality toolchain. Kept in sync with the same block in the library's
+         aipersimmon-ddd-parent; there is deliberately no shared quality parent. -->
     <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
     <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
@@ -145,9 +144,9 @@
           <version>3.2.5</version>
         </plugin>
 
-        <!-- Quality toolchain (design-00007 / plan-00009 P8b). Management only; a module
-             activates a gate by declaring the plugin in its own <build><plugins>. Same block
-             as the library's aipersimmon-ddd-parent (no shared quality parent, D1); rulesets
+        <!-- Quality toolchain. Management only; a module activates a gate by declaring the
+             plugin in its own <build><plugins>. Same block as the library's
+             aipersimmon-ddd-parent (deliberately no shared quality parent); rulesets
              come from aipersimmon-ddd-quality-config on the plugin classpath. -->
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
@@ -233,8 +232,8 @@
 
     <!-- Active gates for the whole generated project. Spotless is the format gate; SpotBugs and
          PMD/CPD are both enforced gates (failOnError/failOnViolation=true, ratcheted).
-         Coverage/mutation are opt-in per *-domain module (see design-00007 §4.3), so they are NOT
-         here. -->
+         Coverage/mutation are opt-in per *-domain module (each domain pom declares its own
+         JaCoCo/PIT gate), so they are NOT here. -->
     <plugins>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>

@@ -23,7 +23,7 @@
     It has to be a table, and specifically a table on the shared DataSource. The requirement is not
     durability but co-transactionality: recording a decision and publishing its outcome must commit
     or roll back together, or a claim can outlive the event it was claimed for and the outcome is
-    lost permanently. See issue-00069 and the PaymentOperations javadoc.
+    lost permanently. See the PaymentOperations javadoc.
   -->
   <artifactId>payment</artifactId>
   <packaging>pom</packaging>

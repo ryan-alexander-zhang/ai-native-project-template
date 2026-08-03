@@ -6,8 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to dispatch a confirmed order. An operator action, like {@link ApproveReview}: the
- * warehouse says the goods have left, and the order reaches its terminal successful state
- * (issue-00082).
+ * warehouse says the goods have left, and the order reaches its terminal successful state.
  *
  * <p>Without it {@code SHIPPED} was a state no running application could ever hold, which quietly
  * disabled a rule the domain had gone to some trouble to express — {@code OrderLifecyclePolicy}

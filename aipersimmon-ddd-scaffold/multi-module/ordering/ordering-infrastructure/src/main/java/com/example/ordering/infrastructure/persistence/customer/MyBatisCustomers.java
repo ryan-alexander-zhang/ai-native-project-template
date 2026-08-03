@@ -20,8 +20,7 @@ import org.springframework.stereotype.Repository;
  *
  * <p>The version check does the real work. Two concurrent placements load the same {@code
  * usedCredit}, both pass {@code reserveCredit} on that snapshot, and the second save matches zero
- * rows and surfaces as a 409 — which is what makes the limit a constraint rather than a comparison
- * (issue-00071).
+ * rows and surfaces as a 409 — which is what makes the limit a constraint rather than a comparison.
  */
 @Repository
 public class MyBatisCustomers extends MybatisPlusAggregateRepository<Customer, CustomerDo>

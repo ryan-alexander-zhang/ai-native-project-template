@@ -20,9 +20,9 @@ class CustomerTest {
   }
 
   /**
-   * Construction and rehydration guards (issue-00145 item 4): a customer with no id, no limit, or a
-   * used balance in another currency is corrupt however it arrives, and a bad row rehydrated
-   * without complaint explodes later in reserveCredit — far from the row that caused it.
+   * Construction and rehydration guards: a customer with no id, no limit, or a used balance in
+   * another currency is corrupt however it arrives, and a bad row rehydrated without complaint
+   * explodes later in reserveCredit — far from the row that caused it.
    */
   @Test
   void rejectsANullIdAndANullCreditLimit() {
@@ -70,10 +70,10 @@ class CustomerTest {
   }
 
   /**
-   * The distinction the old {@code canAfford} could not make, and the reason issue-00071 called the
-   * rule misnamed: each of these is under the limit on its own, and together they are not. No
-   * concurrency is involved — the previous check compared every order against the untouched limit,
-   * so it would have allowed both.
+   * The distinction the old {@code canAfford} could not make, and the reason that rule was not
+   * really a credit limit: each of these is under the limit on its own, and together they are not.
+   * No concurrency is involved — the previous check compared every order against the untouched
+   * limit, so it would have allowed both.
    */
   @Test
   void creditAlreadyCommittedCountsAgainstTheLimit() {

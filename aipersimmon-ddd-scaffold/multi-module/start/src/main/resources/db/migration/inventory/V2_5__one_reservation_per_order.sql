@@ -1,4 +1,4 @@
--- issue-00147: "one order, one reservation" is a business fact, so it is written into the schema.
+-- "One order, one reservation" is a business fact, so it is written into the schema.
 --
 -- The handler already answers a redelivered ReserveStock by finding the existing reservation and
 -- re-announcing it — but that lookup cannot settle two deliveries racing each other, and the

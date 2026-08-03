@@ -26,8 +26,8 @@ import org.springframework.stereotype.Component;
  * contract are on the topic — {@link OrderReadyForFulfilment} (v2) and the retired {@code
  * OrderReadyForFulfilmentV1} — and this class used to carry a method for each, every future
  * revision widening it further. The {@link OrderReadyForFulfilmentV1Upcaster} moved that cost to
- * the contract boundary (issue-00142): the consumer bridge upcasts a v1 record before dispatch, so
- * a single {@code EventEnvelope<OrderReadyForFulfilment>} method receives both revisions — and the
+ * the contract boundary: the consumer bridge upcasts a v1 record before dispatch, so a single
+ * {@code EventEnvelope<OrderReadyForFulfilment>} method receives both revisions — and the
  * envelope's version says v2, the revision actually delivered.
  *
  * <p><strong>The application layer is untouched, still.</strong> {@code ReserveStock} did not

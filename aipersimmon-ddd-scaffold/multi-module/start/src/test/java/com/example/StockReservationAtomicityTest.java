@@ -19,7 +19,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * A reservation reserves every line or changes nothing (issue-00094, review finding B2).
+ * A reservation reserves every line or changes nothing.
  *
  * <p>The handler's contract has two halves and only one of them was ever tested. That a failed
  * reservation reports {@code StockReservationFailed} is exercised all over the suite, by every
@@ -34,13 +34,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * still commits, and a test that only checked the stock could be passed by a fix that lost the
  * event.
  *
- * <p>Driven straight on the command bus rather than through ordering, which is the point of
- * issue-00076: inventory must give a well-defined answer to any command shaped like this one,
- * whoever sends it. Reaching it through {@code PlaceOrder} would only prove that ordering does not
- * currently send the shape that breaks it.
+ * <p>Driven straight on the command bus rather than through ordering, which is the point: inventory
+ * must give a well-defined answer to any command shaped like this one, whoever sends it. Reaching
+ * it through {@code PlaceOrder} would only prove that ordering does not currently send the shape
+ * that breaks it.
  *
  * <p>Shares its application context (and therefore its containers) with the other tests carrying
- * this exact {@code properties} block — see issue-00092 for why that matters.
+ * this exact {@code properties} block — a divergent copy would start its own container pair, and
+ * {@code TestContextCountTest} pins the count.
  */
 @SpringBootTest(
     properties = {
@@ -141,8 +142,7 @@ class StockReservationAtomicityTest {
   }
 
   /**
-   * A redelivered reservation request holds nothing twice and re-announces the same reservation
-   * (issue-00147).
+   * A redelivered reservation request holds nothing twice and re-announces the same reservation.
    *
    * <p>Sent twice straight on the bus, which is what a duplicate outside the inbox's retention
    * window looks like: the transport-level dedupe has forgotten the first delivery, so the handler
@@ -200,7 +200,7 @@ class StockReservationAtomicityTest {
   }
 
   /**
-   * A status-only save leaves the child rows alone (issue-00090).
+   * A status-only save leaves the child rows alone.
    *
    * <p>Asserted with PostgreSQL's {@code xmin} — the id of the transaction that last wrote each
    * row. Rewriting a row produces a new version with a new {@code xmin}, so an unchanged value is

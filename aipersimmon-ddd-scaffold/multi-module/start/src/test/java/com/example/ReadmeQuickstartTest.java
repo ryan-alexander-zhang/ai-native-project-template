@@ -25,7 +25,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
 /**
- * The README's quickstart is executed, not merely written (issue-00093).
+ * The README's quickstart is executed, not merely written.
  *
  * <p>It had three independent defects at review time — wrong port, missing tenant header, and a
  * tenant that has no seed data — and fixing any two still left a command that could not work. None
@@ -44,9 +44,9 @@ import org.springframework.http.ResponseEntity;
  * is checked separately against {@code application.yml}, which is where the reader's 8090 has to
  * come from.
  *
- * <p>This guard would have caught issue-00096 on the day it was introduced: the header the
- * quickstart carried named a reserved sentinel the tenancy filter rejects, and every request would
- * have come back 400.
+ * <p>This guard would have caught the quickstart's next regression on the day it was introduced:
+ * the header the quickstart carried once named a reserved sentinel the tenancy filter rejects, and
+ * every request would have come back 400.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,

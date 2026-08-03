@@ -19,10 +19,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Being a process-manager effect it arrives at-least-once, so an order found already {@code
  * CANCELLED} is this command's own earlier success and a no-op — the same tolerance {@link
- * BeginFulfilmentHandler} shows its landed state (issue-00130). The no-op must skip the credit
- * release too: the delivery that cancelled the order already released it, and releasing again would
- * hand the customer credit they never committed ({@code Customer.releaseCredit} would refuse only
- * once the balance went negative, which a single duplicate does not reach).
+ * BeginFulfilmentHandler} shows its landed state. The no-op must skip the credit release too: the
+ * delivery that cancelled the order already released it, and releasing again would hand the
+ * customer credit they never committed ({@code Customer.releaseCredit} would refuse only once the
+ * balance went negative, which a single duplicate does not reach).
  */
 @Component
 public class CancelOrderHandler implements CommandHandler<CancelOrder, Void> {

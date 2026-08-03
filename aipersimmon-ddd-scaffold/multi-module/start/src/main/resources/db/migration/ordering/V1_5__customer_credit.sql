@@ -1,4 +1,4 @@
--- issue-00071 / issue-00086: make the credit limit enforceable, which means making Customer a
+-- Make the credit limit enforceable, which means making Customer a
 -- thing that is written.
 --
 -- The limit was compared against but never held. Nothing wrote to ordering.customers, so there was

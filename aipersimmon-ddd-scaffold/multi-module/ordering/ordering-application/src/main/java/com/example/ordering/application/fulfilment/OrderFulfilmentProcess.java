@@ -7,7 +7,7 @@ import com.aipersimmon.ddd.cqrs.CommandContext;
  * through, named by the order id. It hides the durable runtime behind intention-revealing methods,
  * so the inbound adapter and the domain-event bridge depend on this — not on the process-manager
  * runtime or on how the instance is addressed. Swapping the provider (native / Temporal / Seata)
- * replaces the implementation without touching these call sites (design-00004 §13.1).
+ * replaces the implementation without touching these call sites.
  */
 public interface OrderFulfilmentProcess {
 

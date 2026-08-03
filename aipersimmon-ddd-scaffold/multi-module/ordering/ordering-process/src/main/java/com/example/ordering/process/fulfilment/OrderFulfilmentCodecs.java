@@ -40,8 +40,7 @@ import org.springframework.context.annotation.Configuration;
  * {@link CancellationReasonMixIn} here in this module, applied only to the codecs' private mapper.
  * The hand-written codec it replaces carried two latent parsing bugs (unvalidated positional
  * splits, {@code null} fields written as the literal string {@code "null"}) and a maintenance
- * contract nothing checked — precisely the trade the framework's Jackson layer exists to take away
- * (issue-00136).
+ * contract nothing checked — precisely the trade the framework's Jackson layer exists to take away.
  *
  * <p>Hand-writing a {@link ProcessPayloadCodec} bean remains the escape hatch, but the real
  * occasions are now narrower: <strong>encryption</strong> of a payload at rest,
@@ -77,7 +76,7 @@ public class OrderFulfilmentCodecs {
         .payload("ordering.fulfilment.payment-declined", 1, PaymentDeclined.class)
         // The flow's own timers, encoded like any other input: a deadline is delivered back
         // through handle(), so its payload lives in the same catalog as the facts from other
-        // contexts. There are three of them now, one per step that waits on a broker (issue-00068).
+        // contexts. There are three of them now, one per step that waits on a broker.
         .payload("ordering.fulfilment.payment-timed-out", 1, PaymentTimedOut.class)
         .payload("ordering.fulfilment.stock-released", 1, StockReleased.class)
         .payload("ordering.fulfilment.stock-release-timed-out", 1, StockReleaseTimedOut.class)

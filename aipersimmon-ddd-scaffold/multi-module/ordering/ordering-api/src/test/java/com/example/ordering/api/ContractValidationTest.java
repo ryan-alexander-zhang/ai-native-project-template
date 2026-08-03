@@ -12,13 +12,13 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The published language validates at construction (issue-00143): parse, don't validate. The
- * consuming bridge already checks every {@code ce_*} header strictly and dead-letters a malformed
- * one at once — but an empty-object payload used to deserialize successfully and carry its nulls
- * all the way into a handler, where the NPE was classified as ambiguous and retried pointlessly
- * before dead-lettering. With the compact constructors below, Jackson surfaces the refusal as a
- * {@link ValueInstantiationException} — a {@link JsonProcessingException}, which the consumer's
- * error handler already classifies as poison — so a bad payload is dead-lettered exactly like a bad
+ * The published language validates at construction: parse, don't validate. The consuming bridge
+ * already checks every {@code ce_*} header strictly and dead-letters a malformed one at once — but
+ * an empty-object payload used to deserialize successfully and carry its nulls all the way into a
+ * handler, where the NPE was classified as ambiguous and retried pointlessly before dead-lettering.
+ * With the compact constructors below, Jackson surfaces the refusal as a {@link
+ * ValueInstantiationException} — a {@link JsonProcessingException}, which the consumer's error
+ * handler already classifies as poison — so a bad payload is dead-lettered exactly like a bad
  * header: immediately, and naming the field that broke the contract.
  */
 class ContractValidationTest {
@@ -93,7 +93,8 @@ class ContractValidationTest {
 
   @Test
   void paymentRequestedCarriesZeroButRefusesANegativeAmount() {
-    // The issue-00075 range, finally written as code: zero is a legal amount (a fully discounted
+    // The range both contexts agreed on, finally written as code: zero is a legal amount (a fully
+    // discounted
     // basket), negative is not an amount at all.
     assertDoesNotThrow(() -> new PaymentRequested("o-1", "op-1", 0, "USD"));
     assertThrows(

@@ -81,7 +81,7 @@ class ReviewFlowTest {
 
   @Test
   void aRestrictedOrderCanAlsoBeRejected() {
-    // The other answer a reviewer can give (issue-00082). Until RejectReview existed the operator
+    // The other answer a reviewer can give. Until RejectReview existed the operator
     // could only approve, and a held order had no way out but through — while the domain already
     // modelled the refusal down to its own cancellation category.
     int stockBefore = available("SKU-RESTRICTED");

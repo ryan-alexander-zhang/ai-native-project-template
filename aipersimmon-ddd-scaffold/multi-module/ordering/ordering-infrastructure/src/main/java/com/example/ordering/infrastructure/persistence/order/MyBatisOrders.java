@@ -54,7 +54,7 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
     header.setCustomerId(order.customerId().value());
     header.setStatus(order.status().name());
     // Frozen here rather than re-derived by the read model, so "total = Σ line subtotals" has one
-    // definition and the currency rule (Money.plus refuses to mix) travels with it (issue-00083).
+    // definition and the currency rule (Money.plus refuses to mix) travels with it.
     header.setTotalMinor(order.total().amountMinor());
     header.setCurrency(order.total().currency());
     // Stamped on every toRow but written only by the INSERT: the column's FieldStrategy.NEVER
@@ -72,7 +72,7 @@ public class MyBatisOrders extends MybatisPlusAggregateRepository<Order, OrderDo
    * because lines are only set at placement, every <em>other</em> save — a confirm, a cancel, a
    * begin-fulfilment, each of which touches only {@code status} — deleted and re-inserted the whole
    * set to arrive at the rows already there. Pure cost, scaling with the line count, on every
-   * lifecycle transition (issue-00090).
+   * lifecycle transition.
    *
    * <p>Its bound is worth stating because it is what keeps the shortcut honest: this is only
    * correct while nothing can mutate lines without saying so, which is exactly what {@code

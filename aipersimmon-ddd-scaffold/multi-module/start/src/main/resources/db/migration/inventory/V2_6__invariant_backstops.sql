@@ -1,4 +1,4 @@
--- issue-00146: the last line of defence for inventory's flagship rule (see ordering/V1_7 for the
+-- The last line of defence for inventory's flagship rule (see ordering/V1_7 for the
 -- full argument — V1_4/V2_4 made it for tenant isolation, this applies it to the invariants).
 
 -- The anti-oversell rule itself. Until now it was enforced entirely by the application's

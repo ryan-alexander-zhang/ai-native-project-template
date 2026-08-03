@@ -22,11 +22,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * A business aggregate's primary key is a time-ordered UUIDv7 from {@code IdGenerator}, not a
  * random {@code UUID.randomUUID()}.
  *
- * <p>Regression guard for issue-00054. The scaffold used to mint {@code OrderId} with {@code
- * UUID.randomUUID()} while {@code ordering.orders.id} is a {@code VARCHAR(64) PRIMARY KEY} — the
- * scattered-index-write pattern decision-00019 introduced {@code IdGenerator} to remove, on the
- * highest-volume table in the schema. Because the scaffold is what a new project copies, the wrong
- * pattern would have propagated by default.
+ * <p>Regression guard. The scaffold used to mint {@code OrderId} with {@code UUID.randomUUID()}
+ * while {@code ordering.orders.id} is a {@code VARCHAR(64) PRIMARY KEY} — the scattered-index-write
+ * pattern {@code IdGenerator} exists to remove, on the highest-volume table in the schema. Because
+ * the scaffold is what a new project copies, the wrong pattern would have propagated by default.
  *
  * <p>The id stays opaque: this asserts only the UUID version and, for a batch minted in sequence,
  * that lexicographic order follows creation order — the property that makes the key insert near the

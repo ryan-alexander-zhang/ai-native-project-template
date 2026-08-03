@@ -1,4 +1,4 @@
--- issue-00146: recorded_at bounds the 30-day dedupe window, so both its meaning and the cost of
+-- recorded_at bounds the 30-day dedupe window, so both its meaning and the cost of
 -- expiring by it are load-bearing.
 
 -- TIMESTAMP (without time zone) stores a wall-clock reading and silently reinterprets it under the

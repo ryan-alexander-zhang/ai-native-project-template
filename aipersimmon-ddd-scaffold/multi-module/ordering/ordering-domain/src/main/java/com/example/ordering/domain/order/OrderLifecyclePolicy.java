@@ -43,7 +43,7 @@ public final class OrderLifecyclePolicy {
     // Already cancelled is likewise reason-independent, and it must be said as itself: the
     // reason-specific refusals below would misdescribe it — a retrying customer told "the order
     // has entered fulfilment", a redelivered compensation told its failure "is not applicable" —
-    // and a caller acting on those false facts acts wrongly (issue-00130).
+    // and a caller acting on those false facts acts wrongly.
     if (status == OrderStatus.CANCELLED) {
       throw new DomainException(ALREADY_CANCELLED, "the order is already cancelled");
     }
@@ -81,7 +81,7 @@ public final class OrderLifecyclePolicy {
 
     // READY_FOR_FULFILMENT as well as FULFILMENT_IN_PROGRESS, and the first is now the ordinary
     // case. An inventory failure means the reservation never succeeded — and since the order only
-    // advances to FULFILMENT_IN_PROGRESS once it has (issue-00070), a failed or timed-out
+    // advances to FULFILMENT_IN_PROGRESS once it has, a failed or timed-out
     // reservation finds the order still merely ready. Requiring "under fulfilment" here would
     // refuse the compensation for exactly the outcome that compensation exists for.
     if (status != OrderStatus.READY_FOR_FULFILMENT

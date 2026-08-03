@@ -16,11 +16,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The amount range this context accepts, enforced at its own entry (issue-00075). {@link
- * AuthorizePayment} arrives from an integration-event listener rather than from HTTP, so the
- * command bus's validation gate is the only thing standing between ordering's published {@code
- * PaymentRequested} and this handler — and a violation here is not a 400 to a caller, it is a
- * poisoned message that retries until it dead-letters while the ordering flow waits.
+ * The amount range this context accepts, enforced at its own entry. {@link AuthorizePayment}
+ * arrives from an integration-event listener rather than from HTTP, so the command bus's validation
+ * gate is the only thing standing between ordering's published {@code PaymentRequested} and this
+ * handler — and a violation here is not a 400 to a caller, it is a poisoned message that retries
+ * until it dead-letters while the ordering flow waits.
  *
  * <p>Assembled by hand from the real {@link RegistryCommandBus} and {@link
  * ValidationCommandInterceptor}, matching {@code PlaceOrderBusValidationTest} on the ordering side.

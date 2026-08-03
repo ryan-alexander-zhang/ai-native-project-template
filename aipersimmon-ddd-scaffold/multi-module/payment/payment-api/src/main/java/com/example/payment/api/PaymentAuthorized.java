@@ -14,8 +14,7 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 public record PaymentAuthorized(String orderId) implements IntegrationEvent {
 
   public PaymentAuthorized {
-    // The order id is the whole message: an authorization that names no order confirms nothing
-    // (issue-00143).
+    // The order id is the whole message: an authorization that names no order confirms nothing.
     Contract.required(orderId, "orderId");
   }
 

@@ -27,10 +27,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>By the time this handler runs, the order has already survived the fail-fast availability
  * check: {@link StockAvailabilityPrecheck} asks the inventory context about the SKUs in the bus's
- * precheck slot, <em>outside</em> the transaction this handler runs in (issue-00141). The
- * authoritative stock <em>reservation</em> remains a separate, compensable state change that
- * happens once the order is <em>ready for fulfilment</em>, via the {@link
- * com.example.ordering.api.OrderReadyForFulfilment} integration event.
+ * precheck slot, <em>outside</em> the transaction this handler runs in. The authoritative stock
+ * <em>reservation</em> remains a separate, compensable state change that happens once the order is
+ * <em>ready for fulfilment</em>, via the {@link com.example.ordering.api.OrderReadyForFulfilment}
+ * integration event.
  *
  * <p>A {@link ManualReviewPolicy} classifies the order: one needing review starts {@code
  * AWAITING_REVIEW} and reserves nothing until an operator approves it (see {@code
@@ -91,7 +91,7 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
             .toList();
 
     // The aggregate's primary key comes from IdGenerator (UUIDv7), not UUID.randomUUID(): orders is
-    // the highest-volume table here, so a time-ordered key is worth most on it (issue-00054).
+    // the highest-volume table here, so a time-ordered key is worth most on it.
     OrderId orderId = new OrderId(idGenerator.newId());
     ReviewRequirement reviewRequirement = review.assess(lines);
     Order order = Order.place(orderId, customerId, lines, reviewRequirement);
@@ -104,7 +104,8 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
     // This is a choice and it has an alternative — treat the check as advisory and reconcile
     // over-limit orders later, which is closer to how real credit systems behave. It was not taken
     // because eventual consistency here would be manufactured: nothing forces these two aggregates
-    // apart, and an unreconciled "advisory" check is what issue-00071 found — a rule presented as
+    // apart, and an unreconciled "advisory" check is exactly what the credit limit used to be — a
+    // rule presented as
     // enforced (its own error code, its own problem type, a top-up flow) with nothing enforcing it.
     //
     // reserveCredit refuses by throwing CreditExceededException; the version check on the customer
@@ -114,7 +115,7 @@ public class PlaceOrderHandler implements CommandHandler<PlaceOrder, String> {
 
     if (reviewRequirement.isRequired()) {
       // Held for manual review: record the placement, but reserve nothing until it clears. The
-      // repository drains the recorded events as part of saving (issue-00052).
+      // repository drains the recorded events as part of saving.
       orders.save(order);
     } else {
       // Cleared immediately: begin fulfilment and ask inventory to reserve, in this transaction.

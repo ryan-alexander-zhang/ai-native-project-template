@@ -84,7 +84,7 @@ class OrderingFlowTest {
 
   @Test
   void aZeroAmountOrderIsConfirmedRatherThanQuietlyCancelledTwoMinutesLater() {
-    // The cross-context amount range, end to end (issue-00075). Ordering accepts a zero-amount
+    // The cross-context amount range, end to end. Ordering accepts a zero-amount
     // line; payment used to reject the resulting authorization as a constraint violation, which
     // is not a rejection anyone sees — the command never reached its handler and no outcome event
     // was ever published, so the process parked on its AWAITING_PAYMENT step and the order sat at
@@ -100,7 +100,7 @@ class OrderingFlowTest {
 
   @Test
   void theFulfilmentProcessJoinsThePlacingCommandsCausalChain() {
-    // One business flow, one correlation (issue-00137): the process instance the PlaceOrder
+    // One business flow, one correlation: the process instance the PlaceOrder
     // triggers must carry the PlaceOrder's correlationId, not a fresh chain minted at the
     // domain-event hop. Dispatching via sendAs pins the command's identity so the assertion
     // has something known to compare against.
@@ -145,7 +145,7 @@ class OrderingFlowTest {
 
   @Test
   void whenStockVanishesAfterTheGateTheProcessManagerCancelsWithInsufficientStockCode() {
-    // The synchronous gate checks quantities now (issue-00150), so an order it can see is hopeless
+    // The synchronous gate checks quantities now, so an order it can see is hopeless
     // is refused before anything is created — the shape this test used to rely on (999 against a
     // stock of 10 slipping through a SKU-only gate) no longer exists. What the gate still cannot
     // see is the future: it is advisory and holds nothing, so stock that disappears between its

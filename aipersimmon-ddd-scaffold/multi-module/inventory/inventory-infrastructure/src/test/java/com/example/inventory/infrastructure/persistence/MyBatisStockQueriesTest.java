@@ -8,7 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The part of the batch read that a single query cannot do for itself (issue-00084).
+ * The part of the batch read that a single query cannot do for itself.
  *
  * <p>{@code StockLevel} promises a row per requested SKU, with {@code available = 0} for anything
  * not carried, so a caller cannot tell an unknown SKU from an out-of-stock one. The

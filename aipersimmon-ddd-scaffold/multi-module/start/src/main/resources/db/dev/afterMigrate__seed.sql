@@ -1,4 +1,4 @@
--- Demo data for the dev profile only (issue-00072). This location is on spring.flyway.locations in
+-- Demo data for the dev profile only. This location is on spring.flyway.locations in
 -- application-dev.yml and absent from application-prod.yml, which is the entire mechanism: a
 -- production database never sees a customer named Acme.
 --
@@ -15,7 +15,7 @@
 -- These rows used to be seeded under the '__root__' sentinel as well, because an unbound dispatch
 -- silently fell back to it — so bus-driven tests landed in the sentinel bucket without saying so.
 -- With multi-tenancy enabled the framework now refuses to run tenant-scoped work on an unbound
--- thread (issue-00099), so a caller that skips the edge has to name its tenant; there is nothing left
+-- thread, so a caller that skips the edge has to name its tenant; there is nothing left
 -- for a sentinel copy to serve. The sentinel still exists, and every row still carries a tenant — it
 -- is just what a single-tenant (N=1) deployment uses, not a fallback a multi-tenant one drifts into.
 --

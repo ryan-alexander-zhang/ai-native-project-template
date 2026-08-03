@@ -143,13 +143,13 @@ class OrderListPagingTest {
     assertEquals(300, item.path("totalMinor").asLong());
     assertEquals("USD", item.path("currency").asText());
     // READY_FOR_FULFILMENT, not FULFILMENT_IN_PROGRESS: the relays are off in this context, so
-    // nothing has reserved stock yet and the order has not advanced. Before issue-00070 it was
+    // nothing has reserved stock yet and the order has not advanced. It used to be
     // INSERTed as FULFILMENT_IN_PROGRESS regardless — the ready state never reached a row.
     assertEquals("READY_FOR_FULFILMENT", item.path("status").asText());
   }
 
   /**
-   * The list's total is the aggregate's total, because there is only one of them (issue-00083).
+   * The list's total is the aggregate's total, because there is only one of them.
    *
    * <p>This passes today and would have passed before the change too — its value is the day it
    * stops passing. The read side used to re-derive {@code Σ quantity × unit_minor} in SQL, so the
@@ -260,7 +260,7 @@ class OrderListPagingTest {
    * nothing else here can: an unindexed cursor query returns exactly the same right pages, just by
    * reading the whole table to find them — which is the cost cursor paging exists to avoid. The two
    * properties come from different places (time-ordered ids; an index) and only one of them was
-   * ever asserted, which is how a scaffold ends up teaching half a technique (issue-00073).
+   * ever asserted, which is how a scaffold ends up teaching half a technique.
    */
   @Test
   void aPageIsAnsweredByAnIndexRangeScanNotAFullScan() {

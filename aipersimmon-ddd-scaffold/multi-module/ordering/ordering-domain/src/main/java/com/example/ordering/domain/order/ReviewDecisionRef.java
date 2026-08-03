@@ -9,7 +9,7 @@ import com.aipersimmon.ddd.core.exception.DomainException;
  * The same construction as {@link CancellationReason}: what makes evidence trustworthy is that the
  * wrong claim is inexpressible, not that a boolean is conventionally set right. (It used to carry
  * {@code boolean approved}, which no domain code ever read — an {@code approved=false} ref approved
- * an order just the same; issue-00134.)
+ * an order just the same.)
  */
 public sealed interface ReviewDecisionRef extends OrderEvidenceRef {
 

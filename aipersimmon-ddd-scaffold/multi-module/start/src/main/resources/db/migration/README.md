@@ -53,6 +53,6 @@ decision left un-made, and it defaulted to the shape that is hardest to undo.
   a library component.
 - **Structure only, never data.** A versioned migration runs exactly once in *every* environment and
   Flyway offers no way to opt out per profile, so seed rows placed here reach production too. Demo
-  data lives in `db/dev/afterMigrate__seed.sql`, a location only the dev profile loads (issue-00072).
+  data lives in `db/dev/afterMigrate__seed.sql`, a location only the dev profile loads.
   `MigrationContentTest` walks this whole tree and fails on an `INSERT INTO`.
 - **A new context gets a new major**, a new directory, and its own `CREATE SCHEMA IF NOT EXISTS`.

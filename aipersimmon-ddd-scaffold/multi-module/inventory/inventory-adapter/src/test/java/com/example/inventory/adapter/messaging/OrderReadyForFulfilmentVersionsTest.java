@@ -26,12 +26,12 @@ import org.junit.jupiter.api.Test;
  * or drifted. This test is the only thing standing between "we support both revisions" and "we
  * believe we support both revisions".
  *
- * <p>The v1 path here is the one the consumer bridge takes (issue-00142): the {@link
+ * <p>The v1 path here is the one the consumer bridge takes: the {@link
  * OrderReadyForFulfilmentV1Upcaster} carries the retired payload to the current revision, and the
  * single listener method receives the result — there is no per-revision listener method to test
  * anymore, which is the point. No Spring context: the listener is constructed directly over the
- * framework's {@link RecordingCommandBus} (issue-00140), because what is under test is the
- * translation, not the wiring.
+ * framework's {@link RecordingCommandBus}, because what is under test is the translation, not the
+ * wiring.
  */
 class OrderReadyForFulfilmentVersionsTest {
 

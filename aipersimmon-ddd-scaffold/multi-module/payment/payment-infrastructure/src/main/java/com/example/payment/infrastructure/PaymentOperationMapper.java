@@ -54,10 +54,10 @@ public interface PaymentOperationMapper {
       @Param("recordedAt") Instant recordedAt);
 
   /**
-   * Turn an AUTHORIZED outcome into VOIDED (issue-00144). The {@code outcome = 'AUTHORIZED'}
-   * predicate is the idempotency: a redelivered void, or a void of a declined/already-voided
-   * operation, matches zero rows and changes nothing. The one sanctioned UPDATE against this table
-   * — releasing a hold undoes the irreversible act's reservation, it does not re-decide it.
+   * Turn an AUTHORIZED outcome into VOIDED. The {@code outcome = 'AUTHORIZED'} predicate is the
+   * idempotency: a redelivered void, or a void of a declined/already-voided operation, matches zero
+   * rows and changes nothing. The one sanctioned UPDATE against this table — releasing a hold
+   * undoes the irreversible act's reservation, it does not re-decide it.
    */
   @Update(
       """
@@ -74,8 +74,8 @@ public interface PaymentOperationMapper {
    * running under no tenant must still be able to clear every tenant's expired rows.
    *
    * <p>Named {@code purge}, matching {@code PaymentOperationCleanup.purge()} — and it has to stay
-   * that way (issue-00098). SpotBugs decides whether a type is mutable partly by guessing setters
-   * from method-name prefixes, and {@code delete} is one of them. Calling this {@code
+   * that way. SpotBugs decides whether a type is mutable partly by guessing setters from
+   * method-name prefixes, and {@code delete} is one of them. Calling this {@code
    * deleteRecordedBefore} makes this whole interface "mutable" in its eyes, which then raises
    * {@code EI_EXPOSE_REP2} against <em>every class that holds a mapper</em> — including {@code
    * MyBatisPaymentOperations}, which has nothing to do with the change. The report lands on the

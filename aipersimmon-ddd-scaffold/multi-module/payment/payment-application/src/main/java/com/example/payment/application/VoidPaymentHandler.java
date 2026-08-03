@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handles {@link VoidPayment}: settles, on the operation row, the race between ordering abandoning
- * an operation and this context authorizing it (issue-00144).
+ * an operation and this context authorizing it.
  *
  * <p>Three recorded shapes, three answers:
  *

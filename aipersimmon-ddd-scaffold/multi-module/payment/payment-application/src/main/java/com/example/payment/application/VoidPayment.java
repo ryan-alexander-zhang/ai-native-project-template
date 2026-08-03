@@ -6,10 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 
 /**
  * Command to void a payment operation — the payment context's side of ordering's payment
- * compensation (issue-00144). Sent by the {@code PaymentVoidRequestedListener} when ordering's flow
- * abandoned its wait for this operation. Keyed by the same {@code paymentOperationId} the
- * authorization is, which is what lets the operation row settle the race between the two. No
- * result, and no outcome event: nothing waits on a void.
+ * compensation. Sent by the {@code PaymentVoidRequestedListener} when ordering's flow abandoned its
+ * wait for this operation. Keyed by the same {@code paymentOperationId} the authorization is, which
+ * is what lets the operation row settle the race between the two. No result, and no outcome event:
+ * nothing waits on a void.
  */
 @OperationLog(
     code = "payment.operation.void",

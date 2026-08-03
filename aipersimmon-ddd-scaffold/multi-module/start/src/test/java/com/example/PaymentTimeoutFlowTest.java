@@ -120,7 +120,7 @@ class PaymentTimeoutFlowTest {
               assertEquals("CANCELLED", view.step().value());
             });
 
-    // The other half of abandoning the wait (issue-00144): payment never answered, but its
+    // The other half of abandoning the wait: payment never answered, but its
     // authorization may still be in flight somewhere — so the same decision that gave up also
     // voided the operation. With payment's inbound adapter silenced, nothing was ever recorded
     // for this operation, so the void's record lands as the refusal-in-advance: a VOIDED row.

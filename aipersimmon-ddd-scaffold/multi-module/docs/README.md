@@ -97,6 +97,6 @@ the code and these documents reflect the result:
 | A worked v1/v2 published-event coexistence example | [class-diagram.md §9](class-diagram.md), `../README.md` → *Published-event schema evolution* |
 
 The `README`'s stale claim that payment's dedupe log is an in-memory `InMemoryPaymentOperations` was
-corrected at the same time: it is `MyBatisPaymentOperations` over `payment.payment_operations`, and has
-been since `issue-00069` — a map could not be rolled back, so a failed transaction kept the claim and
-lost the authorization permanently.
+corrected at the same time: it is `MyBatisPaymentOperations` over `payment.payment_operations` — a map
+could not be rolled back, so a failed transaction kept the claim and lost the authorization
+permanently.

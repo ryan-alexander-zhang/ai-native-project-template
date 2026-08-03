@@ -31,7 +31,7 @@ import java.util.List;
 @AggregateRoot
 public class Order extends AbstractAggregateRoot<OrderId> {
 
-  // Each edge also names its refusal (issue-00138): the whole mechanical lifecycle contract —
+  // Each edge also names its refusal: the whole mechanical lifecycle contract —
   // what is legal, and what a refusal is called at the edge — reads off this one table.
   private static final Transitions<OrderStatus> RULES =
       Transitions.<OrderStatus>of()
@@ -65,7 +65,7 @@ public class Order extends AbstractAggregateRoot<OrderId> {
    * so a persistence adapter can ask the aggregate a question only the aggregate can answer ("have
    * my lines changed?") instead of guessing, which it previously did by rewriting the whole line
    * set on every save: a confirm or a cancel touches only {@code status}, yet each one deleted and
-   * re-inserted every line at its own version (issue-00090).
+   * re-inserted every line at its own version.
    *
    * <p>Today it is only ever true for a freshly {@link #place}d order, because nothing else mutates
    * the line set. That is the point rather than a shortcut: if a line-editing use case is added
@@ -87,16 +87,15 @@ public class Order extends AbstractAggregateRoot<OrderId> {
    * OrderStatus#READY_FOR_FULFILMENT}. {@code OrderPlacedEvent} means only "the order was created"
    * — it is {@link OrderReadyForFulfilmentEvent} that signals eligibility for fulfilment.
    *
-   * <p><strong>This takes the review verdict, not the review policy — a stated trade-off
-   * (issue-00150).</strong> Passing {@link ManualReviewPolicy} instead and letting the aggregate
-   * ask it would make "every placement is reviewed" unforgeable here; taking the verdict leaves
-   * that force in the application layer's hands, and a caller passing {@code
-   * ReviewRequirement.notRequired()} bypasses review. Chosen anyway, for two reasons: the double
-   * dispatch does not actually close the hole (a caller who would forge a verdict can as easily
-   * pass an always-approving policy), and the verdict-as-value keeps this factory deterministic and
-   * policy-free — the policy is consulted once, in {@code PlaceOrderHandler}, where its
-   * configuration lives, and tests place orders in any review state without staging policy
-   * internals.
+   * <p><strong>This takes the review verdict, not the review policy — a stated trade-off.</strong>
+   * Passing {@link ManualReviewPolicy} instead and letting the aggregate ask it would make "every
+   * placement is reviewed" unforgeable here; taking the verdict leaves that force in the
+   * application layer's hands, and a caller passing {@code ReviewRequirement.notRequired()}
+   * bypasses review. Chosen anyway, for two reasons: the double dispatch does not actually close
+   * the hole (a caller who would forge a verdict can as easily pass an always-approving policy),
+   * and the verdict-as-value keeps this factory deterministic and policy-free — the policy is
+   * consulted once, in {@code PlaceOrderHandler}, where its configuration lives, and tests place
+   * orders in any review state without staging policy internals.
    */
   public static Order place(
       OrderId id, CustomerId customerId, List<LineData> lineData, ReviewRequirement review) {
@@ -177,9 +176,8 @@ public class Order extends AbstractAggregateRoot<OrderId> {
    * Manual review approved the order: it becomes eligible for fulfilment. The state guard is the
    * transition table's — it refuses a non-awaiting order with {@code ORDER_NOT_AWAITING_REVIEW},
    * declared on the edge itself, so this method no longer restates the same rule by hand just to
-   * attach the code (issue-00138). Taking {@link ReviewDecisionRef.Approval} rather than the
-   * interface is the point of the sealed split: a rejection cannot be handed to the approving
-   * method at all (issue-00134).
+   * attach the code. Taking {@link ReviewDecisionRef.Approval} rather than the interface is the
+   * point of the sealed split: a rejection cannot be handed to the approving method at all.
    */
   public void approveReview(ReviewDecisionRef.Approval decision) {
     if (decision == null || !decision.belongsTo(id)) {

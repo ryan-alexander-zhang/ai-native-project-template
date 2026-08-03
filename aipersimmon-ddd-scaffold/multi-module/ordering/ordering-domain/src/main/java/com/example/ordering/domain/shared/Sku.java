@@ -4,7 +4,7 @@ import com.aipersimmon.ddd.core.annotation.ValueObject;
 import com.aipersimmon.ddd.core.exception.DomainException;
 
 /**
- * A stock-keeping unit, as ordering understands it (issue-00085).
+ * A stock-keeping unit, as ordering understands it.
  *
  * <p>This context has a second type of the same name in {@code inventory-domain}, and that is the
  * point rather than an oversight. SKU is <em>defined</em> by inventory — what one is, which ones

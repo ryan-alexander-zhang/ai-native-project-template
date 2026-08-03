@@ -16,9 +16,9 @@ import org.springframework.stereotype.Component;
  * <p>This used to be the first thing {@code PlaceOrderHandler} did, which put a cross-context call
  * inside the write transaction: harmless while inventory answers in-process, but the gateway's own
  * javadoc promises the same interface will one day be an HTTP client — and then the advisory check
- * would hold a database connection hostage to a remote call (issue-00141). As a {@link
- * CommandPrecheck} it runs in the bus's precheck slot, after validation and before the transaction
- * interceptor, so a slow inventory answer costs no connection and a refusal costs no transaction.
+ * would hold a database connection hostage to a remote call. As a {@link CommandPrecheck} it runs
+ * in the bus's precheck slot, after validation and before the transaction interceptor, so a slow
+ * inventory answer costs no connection and a refusal costs no transaction.
  *
  * <p>Still deliberately a <em>read</em>, and advisory by construction: the authoritative stock
  * <em>reservation</em> is a compensable state change that happens asynchronously once the order is

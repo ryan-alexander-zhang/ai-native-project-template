@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Claiming a payment operation and announcing its outcome are one commit (issue-00069).
+ * Claiming a payment operation and announcing its outcome are one commit.
  *
  * <p>The operation log used to be a {@code ConcurrentHashMap}, described as the lightest honest
  * dedupe for a scaffold with no payment datastore. The description misidentified what the pattern

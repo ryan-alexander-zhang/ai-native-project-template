@@ -46,8 +46,8 @@ public record ReserveStock(@NotBlank String orderId, @NotEmpty List<@Valid Line>
    * SKU would otherwise be two claims on the same aggregate. Until now that precondition held only
    * because <em>ordering</em> enforces {@code OrderHasDistinctSkus} on its own aggregate — a
    * bounded context relying on an invariant belonging to another one, across a published language,
-   * an outbox, Kafka and an inbox, with nothing to keep the two in step (issue-00076). Inventory
-   * now establishes it for itself, on the command, where the precondition belongs.
+   * an outbox, Kafka and an inbox, with nothing to keep the two in step. Inventory now establishes
+   * it for itself, on the command, where the precondition belongs.
    *
    * <p>Merging rather than rejecting: a caller asking for two of a SKU and then three more has an
    * unambiguous intent, and honouring it is friendlier than a validation error the caller cannot

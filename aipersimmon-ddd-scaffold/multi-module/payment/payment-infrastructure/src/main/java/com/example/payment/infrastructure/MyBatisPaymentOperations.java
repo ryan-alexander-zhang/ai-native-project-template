@@ -39,9 +39,9 @@ public class MyBatisPaymentOperations implements PaymentOperations {
   private final PaymentOperationMapper operations;
 
   /**
-   * The application's Clock bean, not the database's CURRENT_TIMESTAMP (issue-00146). recorded_at
-   * bounds the dedupe window and the cleanup expires by it with this same clock — one time source
-   * for writing the window and for closing it, and a test can freeze it.
+   * The application's Clock bean, not the database's CURRENT_TIMESTAMP. recorded_at bounds the
+   * dedupe window and the cleanup expires by it with this same clock — one time source for writing
+   * the window and for closing it, and a test can freeze it.
    */
   private final Clock clock;
 

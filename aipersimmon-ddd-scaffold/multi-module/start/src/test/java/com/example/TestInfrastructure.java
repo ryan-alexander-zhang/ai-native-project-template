@@ -28,7 +28,7 @@ import org.springframework.context.annotation.Import;
  * environment, nested {@code @TestConfiguration} and bean overrides all match share one context and
  * one pair; changing any of them silently starts another pair. That is a deliberate trade — it is
  * what lets a class like {@code OutboxAtomicityTest} assert against an entire empty database — but
- * it is also why {@code mvn verify} starts roughly a dozen containers (issue-00092).
+ * it is also why {@code mvn verify} starts roughly a dozen containers.
  */
 @TestConfiguration(proxyBeanMethods = false)
 @Import({PostgresServiceConnection.class, KafkaServiceConnection.class})

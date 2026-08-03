@@ -33,7 +33,7 @@ class OrderLineAndInvariantTest {
   @Test
   void orderLineRejectsBlankSkuAndNonPositiveQuantity() {
     // The blank rejection now happens in Sku's own constructor rather than OrderLine's — one
-    // definition of "a SKU is not blank", which is the point of the type (issue-00085).
+    // definition of "a SKU is not blank", which is the point of the type.
     assertThrows(DomainException.class, () -> new Sku(" "));
     assertThrows(DomainException.class, () -> new OrderLine(null, 1, Money.of(1, "USD")));
     assertThrows(
@@ -43,7 +43,7 @@ class OrderLineAndInvariantTest {
   @Test
   void orderLineRejectsANullUnitPrice() {
     // sku and quantity are guarded; a null unitPrice used to walk in and NPE later in subtotal(),
-    // far from the constructor that accepted it (issue-00145 item 2).
+    // far from the constructor that accepted it.
     assertThrows(DomainException.class, () -> new OrderLine(new Sku("SKU-1"), 1, null));
   }
 
@@ -58,7 +58,7 @@ class OrderLineAndInvariantTest {
   /**
    * The rule existed only as an arithmetic side effect: total() reducing mixed-currency lines
    * tripped Money.requireSameCurrency with a codeless "currency mismatch". A rule the aggregate
-   * enforces deserves a name and a code of its own (issue-00145 item 3).
+   * enforces deserves a name and a code of its own.
    */
   @Test
   void singleCurrencyInvariantIsBrokenByAMixedCurrencyOrder() {

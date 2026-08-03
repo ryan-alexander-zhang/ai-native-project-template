@@ -173,7 +173,7 @@ class OrderPlacementTest {
     assertEquals(OrderingErrorCode.ORDER_NOT_AWAITING_REVIEW, codeOf(ex));
   }
 
-  // ---------- the line set knows whether it changed (issue-00090) ----------
+  // ---------- the line set knows whether it changed ----------
 
   /**
    * A persistence adapter used to rewrite the whole line set on every save, justified by "an

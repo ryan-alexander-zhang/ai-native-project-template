@@ -41,7 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * only when it judges a <strong>business</strong> failure. A technical one (an optimistic-lock
  * conflict against a concurrent reservation of the same SKU, a validation failure, a database
  * outage) throws out of {@code ReserveStockHandler} and publishes nothing at all. To this flow that
- * silence is the payment context's silence exactly (issue-00068).
+ * silence is the payment context's silence exactly.
  *
  * <p>What made it worse than the payment case: the order is already in {@code
  * FULFILMENT_IN_PROGRESS} by then, so the customer's self-cancel window has closed, and there was

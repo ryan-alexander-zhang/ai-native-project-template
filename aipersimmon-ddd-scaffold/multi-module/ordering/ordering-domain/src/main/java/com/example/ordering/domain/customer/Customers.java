@@ -12,10 +12,11 @@ public interface Customers {
   /**
    * Persist a customer whose committed credit has changed.
    *
-   * <p>This port was read-only until credit became enforceable, and its absence was the mechanism
-   * behind issue-00071: with nothing ever written there was no contention point, so no number of
-   * concurrent placements could ever conflict and the limit could be exceeded arbitrarily. A save
-   * with a version check is what turns the rule from a comparison into a constraint.
+   * <p>This port was read-only until credit became enforceable, and that absence was the mechanism
+   * that made the old limit unenforceable: with nothing ever written there was no contention point,
+   * so no number of concurrent placements could ever conflict and the limit could be exceeded
+   * arbitrarily. A save with a version check is what turns the rule from a comparison into a
+   * constraint.
    */
   void save(Customer customer);
 }

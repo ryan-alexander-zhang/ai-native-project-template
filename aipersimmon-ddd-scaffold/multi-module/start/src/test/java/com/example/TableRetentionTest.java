@@ -23,7 +23,7 @@ import org.springframework.core.io.FileSystemResource;
 
 /**
  * Every table this application creates has an answer to "how long do rows live here?" — even when
- * the answer is "forever" (issue-00097).
+ * the answer is "forever".
  *
  * <p>The table that prompted this is {@code payment_operations}. It arrived as a fix for something
  * else and grew at the rate of the order book with nothing to trim it, while the three framework

@@ -20,9 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Test;
 
 /**
- * The business-idempotency guarantee of {@link AuthorizePaymentHandler} (issue-00041, issue-00069):
- * an authorization is keyed by its {@code paymentOperationId}, so an at-least-once redelivery
- * authorises <strong>once</strong> — and announces the outcome <strong>every time</strong>.
+ * The business-idempotency guarantee of {@link AuthorizePaymentHandler}: an authorization is keyed
+ * by its {@code paymentOperationId}, so an at-least-once redelivery authorises
+ * <strong>once</strong> — and announces the outcome <strong>every time</strong>.
  *
  * <p>That second half is the correction. These tests used to assert one outcome event per
  * operation, pinning behaviour where a redelivery returned silently. Silence assumes the previous

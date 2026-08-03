@@ -53,9 +53,9 @@ public class MyBatisReservations extends MybatisPlusAggregateRepository<Reservat
    * Writes the held quantities, and only when the aggregate says they changed.
    *
    * <p>A release changes {@code released} and nothing else, so rewriting every held row on that
-   * save deleted and re-inserted the rows already there — pure cost, scaling with the line count
-   * (issue-00090). The aggregate is asked rather than tracked, and the delete is kept for when the
-   * flag is set, so a future partial-release use case gets replace semantics with no change here.
+   * save deleted and re-inserted the rows already there — pure cost, scaling with the line count.
+   * The aggregate is asked rather than tracked, and the delete is kept for when the flag is set, so
+   * a future partial-release use case gets replace semantics with no change here.
    */
   @Override
   protected void saveChildren(Reservation reservation) {

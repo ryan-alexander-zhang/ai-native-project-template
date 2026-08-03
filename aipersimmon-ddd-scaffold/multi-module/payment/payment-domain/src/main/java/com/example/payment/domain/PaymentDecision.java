@@ -7,9 +7,9 @@ import com.aipersimmon.ddd.core.exception.DomainException;
  * carries the stable code and reason that will ride the outbound {@code PaymentDeclined} event, so
  * the reacting process manager has a machine identity to branch on.
  *
- * <p>{@link Voided} is the compensation outcome (issue-00144): the ordering flow abandoned its wait
- * for this operation (a timeout, or a cancellation racing the authorization) and asked for it to be
- * undone. Recorded against an operation nothing has decided yet, it is a refusal in advance — an
+ * <p>{@link Voided} is the compensation outcome: the ordering flow abandoned its wait for this
+ * operation (a timeout, or a cancellation racing the authorization) and asked for it to be undone.
+ * Recorded against an operation nothing has decided yet, it is a refusal in advance — an
  * authorization arriving afterwards finds it and does not authorize. Recorded over an {@code
  * Authorized}, it is the hold's release. Either way it is terminal: a voided operation never
  * authorizes.

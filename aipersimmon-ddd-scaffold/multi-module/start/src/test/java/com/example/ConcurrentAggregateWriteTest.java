@@ -29,12 +29,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The aggregate is a transactional consistency unit: a write based on a stale snapshot must be
  * refused, not silently applied over a concurrent change.
  *
- * <p>Regression guard for issue-00051. Before the optimistic-lock version existed, {@code Stock}
- * oversold under concurrency: two reservations of one SKU each loaded {@code available = 10}, each
- * passed {@code Stock.reserve(8)} against the snapshot they held, and each stored {@code available
- * = 2}. Both "succeeded", 16 units were committed against 10 in stock, and because the stored value
- * was identical either way, no reconciliation of {@code stocks.available} alone could reveal it —
- * only summing the reservations against it could.
+ * <p>Regression guard. Before the optimistic-lock version existed, {@code Stock} oversold under
+ * concurrency: two reservations of one SKU each loaded {@code available = 10}, each passed {@code
+ * Stock.reserve(8)} against the snapshot they held, and each stored {@code available = 2}. Both
+ * "succeeded", 16 units were committed against 10 in stock, and because the stored value was
+ * identical either way, no reconciliation of {@code stocks.available} alone could reveal it — only
+ * summing the reservations against it could.
  *
  * <p>The conservation invariant below is therefore the assertion that matters: {@code available +
  * total reserved} must equal the starting quantity no matter how the writers interleave.

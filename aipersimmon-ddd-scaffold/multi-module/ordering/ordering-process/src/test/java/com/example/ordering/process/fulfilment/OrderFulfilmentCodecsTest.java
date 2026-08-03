@@ -28,12 +28,11 @@ import org.springframework.beans.factory.ObjectProvider;
  * codecs the framework's Jackson layer generates from {@link OrderFulfilmentCodecs}' catalog, mixin
  * included, so what is tested is what the deployment runs.
  *
- * <p>This file used to specify a hand-written unit-separator format and its two parsing traps
- * (issue-00087). The mix-in route (issue-00136) deleted that codec: free text in {@code detail} is
- * now just a JSON string — no separator can shift fields — and "which variant is this" is a
- * declared discriminator instead of a positional convention. What still deserves pinning is the
- * discriminator itself (wire contract: renaming a class must not change it) and the malformed-row
- * refusal.
+ * <p>This file used to specify a hand-written unit-separator format and its two parsing traps. The
+ * mix-in route deleted that codec: free text in {@code detail} is now just a JSON string — no
+ * separator can shift fields — and "which variant is this" is a declared discriminator instead of a
+ * positional convention. What still deserves pinning is the discriminator itself (wire contract:
+ * renaming a class must not change it) and the malformed-row refusal.
  *
  * <p>Kept apart from {@code OrderFulfilmentDefinitionTest}, which tests the pure transition table
  * and says so — this is about a persisted format, a different subject with a different reason to
@@ -59,7 +58,7 @@ class OrderFulfilmentCodecsTest {
 
   @Test
   void freeTextInTheDetailCannotShiftAnything() {
-    // The old positional format's failure mode (issue-00087): a 0x1F inside inventory's verbatim
+    // The old positional format's failure mode: a 0x1F inside inventory's verbatim
     // message produced one extra field. JSON has no positional fields to shift; kept as the
     // regression witness for the same input.
     CancelOrder command = cancelledBecauseStockWasShort("asked 999\u001Favailable 10");

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * effect targets must tolerate its own success arriving twice. {@code BeginFulfilmentHandler}
  * always did; these tests pin the same contract onto {@code ConfirmOrderHandler} and {@code
  * CancelOrderHandler}, which used to let the aggregate refuse the duplicate — turning each
- * redelivery into a poison effect the relay retries to dead-letter (issue-00130).
+ * redelivery into a poison effect the relay retries to dead-letter.
  */
 class EffectRedeliveryToleranceTest {
 

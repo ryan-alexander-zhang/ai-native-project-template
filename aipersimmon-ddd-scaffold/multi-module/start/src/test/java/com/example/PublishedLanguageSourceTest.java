@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
  * Every published contract names its own producing context (CloudEvents {@code source}) — this
  * application hosts three bounded contexts, so the deployment-wide fallback has no single true
  * answer, and before these declarations existed every event on the wire claimed {@code ordering} as
- * its producer (issue-00135). Pinned per contract because consumers dedup on {@code (source, id)}:
- * silently losing a declaration would change dedup identity, not just a label.
+ * its producer. Pinned per contract because consumers dedup on {@code (source, id)}: silently
+ * losing a declaration would change dedup identity, not just a label.
  */
 class PublishedLanguageSourceTest {
 

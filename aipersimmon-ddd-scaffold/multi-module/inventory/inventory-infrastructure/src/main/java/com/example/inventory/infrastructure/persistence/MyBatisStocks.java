@@ -24,8 +24,8 @@ public class MyBatisStocks extends MybatisPlusAggregateRepository<Stock, StockDo
    * The base class writes the row under its optimistic-lock version and drains the aggregate's
    * events. That version check is what makes overselling impossible: two concurrent reservations of
    * one SKU both pass {@code Stock.reserve} on the snapshot they loaded, but only the first update
-   * matches a row — the second is refused instead of silently storing the same decremented quantity
-   * (issue-00051).
+   * matches a row — the second is refused instead of silently storing the same decremented
+   * quantity.
    */
   @Override
   public void save(Stock stock) {

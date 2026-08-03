@@ -7,12 +7,12 @@ import org.springframework.stereotype.Component;
 
 /**
  * Carries a retired {@link OrderReadyForFulfilmentV1} message forward to {@link
- * OrderReadyForFulfilment} (v2), so this consumer's listener only faces the current revision
- * (issue-00142). Registered once, here at the contract boundary — the consumer bridge applies it
- * before dispatch, which is what let {@code OrderReadyForFulfilmentListener} collapse its
- * one-method-per-revision pair into a single method. The framework reads the {@code (name, v1 →
- * v2)} registration from the two classes' own {@code @EventType} contracts and refuses at startup
- * anything that does not line up.
+ * OrderReadyForFulfilment} (v2), so this consumer's listener only faces the current revision .
+ * Registered once, here at the contract boundary — the consumer bridge applies it before dispatch,
+ * which is what let {@code OrderReadyForFulfilmentListener} collapse its one-method-per-revision
+ * pair into a single method. The framework reads the {@code (name, v1 → v2)} registration from the
+ * two classes' own {@code @EventType} contracts and refuses at startup anything that does not line
+ * up.
  *
  * <p><strong>The upcast supplies nothing, and that is the point worth keeping.</strong> v2 added
  * {@code reservationDeadline}. A v1 message does not carry one, and none can be recovered: the

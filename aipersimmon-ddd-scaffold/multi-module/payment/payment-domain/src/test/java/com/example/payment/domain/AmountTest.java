@@ -16,7 +16,7 @@ class AmountTest {
     assertEquals("USD", amount.currency());
   }
 
-  /** Zero is a legal amount — a fully discounted basket is a real order (issue-00075). */
+  /** Zero is a legal amount — a fully discounted basket is a real order. */
   @Test
   void allowsZero() {
     assertEquals(0, new Amount(0, "USD").amountMinor());

@@ -67,7 +67,7 @@
       <artifactId>aipersimmon-ddd-starter-mybatis-plus</artifactId>
     </dependency>
     <!--
-      Cross-service integration events over Kafka (decision-00006 "方式三": broker + outbox). It is
+      Cross-service integration events over Kafka (broker + outbox). It is
       built ON the outbox the bundle above provides, not instead of it: only @Externalized events
       cross the broker, the ShedLock-guarded relay publishes them as CloudEvents, and the
       inbox-guarded consumer bridge republishes them in process so the existing @EventListener
@@ -158,7 +158,7 @@
     <!--
       Actuator: health / liveness / readiness probes (and the info/metrics endpoints). Without it
       /actuator/** is unmapped, so a probe request falls through to the no-handler path — which the
-      web advice now renders as a proper 404 rather than a 500 (issue-00045), but a deployment still
+      web advice now renders as a proper 404 rather than a 500, but a deployment still
       needs the real health endpoint for orchestration readiness/liveness checks.
     -->
     <dependency>

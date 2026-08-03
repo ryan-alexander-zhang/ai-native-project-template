@@ -1,4 +1,4 @@
--- plan-00007: the ordering context's aggregate tables, in its own schema.
+-- The ordering context's aggregate tables, in its own schema.
 --
 -- Runs as the consumer's OWN Flyway migration (default history table flyway_schema_history), before
 -- the aipersimmon component migrations that own the outbox / inbox / process-manager tables. Same
@@ -36,5 +36,5 @@ CREATE TABLE ordering.order_lines (
 -- No seed data here, and none in any other versioned migration. A versioned migration runs exactly
 -- once in EVERY environment and Flyway gives it no way to opt out, so the demo rows this scaffold
 -- needs (CUST-1, SKU-1, ...) would arrive in a real production database too. They live in
--- db/dev/afterMigrate__seed.sql, a location only the dev profile loads (issue-00072).
+-- db/dev/afterMigrate__seed.sql, a location only the dev profile loads.
 -- MigrationContentTest keeps this true.

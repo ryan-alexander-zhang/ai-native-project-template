@@ -6,7 +6,7 @@
 #
 # The split is worth the two extra files for one reason: a reader can no longer confuse "this is a
 # choice you must understand" with "this is my laptop's address". Before it, both were the same
-# file and only the comments told them apart (issue-00074).
+# file and only the comments told them apart.
 #
 # dev is the default profile, so `mvn spring-boot:run` and the tests behave as they always have.
 # Production is an explicit opt-in: SPRING_PROFILES_ACTIVE=prod.
@@ -28,7 +28,7 @@ spring:
       auto-offset-reset: earliest
     # More than one consumer thread so a slow/retrying record on one partition does not stall the
     # others: the integration-event bridge consumes several bounded contexts' topics, and blocking
-    # retries (issue-00030) would otherwise let one context's backoff delay the rest. Threads are
+    # retries would otherwise let one context's backoff delay the rest. Threads are
     # capped by the partition count, so idle threads simply stay unassigned.
     listener:
       concurrency: 3
@@ -93,11 +93,11 @@ springdoc:
 
 aipersimmon:
   ddd:
-    # CloudEvents `source` FALLBACK (decision-00014): every published contract
+    # CloudEvents `source` FALLBACK: every published contract
     # in this application declares its own on @EventType (source = "/ordering" | "/inventory" |
     # "/payment"), because a process hosting three bounded contexts has no single true answer to
     # "who produced this?" — a shared value made inventory's events claim ordering as their
-    # producer, and consumers dedup on the (source, id) pair (issue-00135).
+    # producer, and consumers dedup on the (source, id) pair.
     integration:
       source: ${spring.application.name}
     # The shared Flyway starter applies each component's schema on its own history table
@@ -107,7 +107,7 @@ aipersimmon:
     # This is the COMPONENT list, which is environment-independent — the application needs the
     # same component schemas wherever it runs. The application's OWN migrations are a separate
     # setting (spring.flyway.locations) and that one IS per profile, because dev additionally
-    # loads the demo seed from db/dev (issue-00072).
+    # loads the demo seed from db/dev.
     flyway:
       components:
         - process-manager
@@ -126,7 +126,7 @@ aipersimmon:
     # production API that means it sets require-key=true, which turns a keyless POST into a 400
     # instead of an unprotected write — application-prod.yml does exactly that.
     #
-    # allow-in-memory-stores=false is the production posture (issue-00058): the three stateful
+    # allow-in-memory-stores=false is the production posture: the three stateful
     # protections may not silently fall back to per-JVM maps, which the second instance would make
     # useless. With aipersimmon-ddd-web-store-jdbc on the classpath the real store is present, so
     # this only guards against someone removing that dependency — at startup, loudly. It is in the
@@ -139,8 +139,8 @@ aipersimmon:
         header: Idempotency-Key
         ttl: 24h
         require-key: false
-    # Integration events cross bounded contexts over Kafka (decision-00006 transport "方式三").
-    # Routing is per event (design-00006): each @Externalized event goes to its own named topic
+    # Integration events cross bounded contexts over Kafka.
+    # Routing is per event: each @Externalized event goes to its own named topic
     # (ordering.events / inventory.events / payment.events), and an event with no @Externalized
     # stays in process. The record key is the aggregate subject (per-aggregate ordering);
     # identity/type rides in ce_* headers. consumer.enabled registers the inbox-guarded consumer
@@ -189,7 +189,7 @@ aipersimmon:
     process-manager:
       deadline-worker:
         poll-delay: 1s
-    # Multi-tenancy (design-00009). enabled=true turns on end-to-end tenant isolation: the web edge
+    # Multi-tenancy. enabled=true turns on end-to-end tenant isolation: the web edge
     # resolves the tenant from the X-Tenant-Id header (default HeaderTenantResolver) and binds it for
     # the request; the command bus seeds it onto CommandContext.tenantId; the outbox stamps it onto
     # ce_tenantid and the Kafka consumer reconstructs it — so an async reservation runs under the
@@ -233,7 +233,7 @@ aipersimmon:
         # Tables that carry tenant_id but are deliberately NOT interceptor-scoped. The startup
         # guard requires every tenant-carrying table to appear in exactly one of these two lists,
         # because a table in neither gets NO tenant predicate at all — every tenant would see
-        # every tenant's rows, silently (issue-00132). payment_operations is written from paths
+        # every tenant's rows, silently. payment_operations is written from paths
         # with and without a bound tenant, so MyBatisPaymentOperations stamps and filters the
         # column itself (see its tenant() method and PaymentOperationTenantScopeTest).
         exempt-tables:
@@ -272,7 +272,7 @@ logging:
       service:
         node-name: ${HOSTNAME:localhost}
 
-# This application's own append-only dedupe table (issue-00097). payment_operations records that a
+# This application's own append-only dedupe table. payment_operations records that a
 # paymentOperationId has been authorized so a redelivery cannot authorize it twice, which is exactly
 # what aipersimmon.ddd.inbox does one layer down — the key is a business id rather than a transport
 # message id, but the retention question and its answer are the same one. So this window is the

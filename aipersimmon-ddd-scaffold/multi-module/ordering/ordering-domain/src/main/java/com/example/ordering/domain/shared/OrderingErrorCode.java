@@ -18,13 +18,13 @@ public enum OrderingErrorCode implements ErrorCode {
   /**
    * An order's lines price themselves in more than one currency. Previously enforced only as an
    * arithmetic side effect ({@code total()} tripping Money's same-currency check, codeless); a rule
-   * the aggregate relies on carries its own name and code (issue-00145).
+   * the aggregate relies on carries its own name and code.
    */
   MIXED_CURRENCY("ordering.mixed-currency", ErrorCategory.DOMAIN_RULE),
   /**
    * A monetary amount, or a quantity feeding one, is too large to represent. Coded rather than a
    * bare DomainException so the refusal survives to the API edge as something a client can branch
-   * on instead of landing in the about:blank family (issue-00077).
+   * on instead of landing in the about:blank family.
    */
   AMOUNT_OVERFLOW("ordering.amount-overflow", ErrorCategory.DOMAIN_RULE),
   QUANTITY_OUT_OF_RANGE("ordering.quantity-out-of-range", ErrorCategory.DOMAIN_RULE),
@@ -56,7 +56,7 @@ public enum OrderingErrorCode implements ErrorCode {
   ORDER_NOT_AWAITING_REVIEW("ordering.order-not-awaiting-review", ErrorCategory.CONFLICT),
 
   // --- Mechanical forward transitions, named per destination in Order's transition table
-  // (issue-00138). One code per destination: the refusal is about where the caller tried to go.
+  // . One code per destination: the refusal is about where the caller tried to go.
   /** Fulfilment was begun on an order that is not ready for fulfilment. */
   ORDER_NOT_READY_FOR_FULFILMENT("ordering.order-not-ready-for-fulfilment", ErrorCategory.CONFLICT),
   /** A confirmation was attempted on an order that is not under fulfilment. */
@@ -72,7 +72,7 @@ public enum OrderingErrorCode implements ErrorCode {
    * The order is already cancelled, whatever the new reason. Its own code because every
    * reason-specific refusal misstates this situation: a retrying customer would be told the order
    * "entered fulfilment", a redelivered compensation that its failure "is not applicable" — both
-   * false, and both harder to act on than the actual fact (issue-00130).
+   * false, and both harder to act on than the actual fact.
    */
   ALREADY_CANCELLED("ordering.already-cancelled", ErrorCategory.CONFLICT);
 

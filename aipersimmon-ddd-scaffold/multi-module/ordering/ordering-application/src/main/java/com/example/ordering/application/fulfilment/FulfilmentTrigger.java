@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  * FULFILMENT_IN_PROGRESS} and no row ever held {@code READY_FOR_FULFILMENT} — the state existed for
  * a few microseconds inside one transaction. Since that is the state the customer's self-cancel
  * window is defined over ({@code CancellableByCustomer.BEFORE_FULFILMENT}), the window was
- * unreachable for any order that did not happen to be held for manual review (issue-00070).
+ * unreachable for any order that did not happen to be held for manual review.
  *
  * <p>The two facts had been collapsed into one method, and they are not the same fact: "this order
  * is cleared" is this context's own conclusion, while "fulfilment has begun" is a claim about work
@@ -87,7 +87,7 @@ public class FulfilmentTrigger {
 
   private static OrderReadyForFulfilment.Line toLine(LineData line) {
     // Unwrapped on the way out: the published contract stays flat, so a consumer never has to
-    // depend on ordering's Sku to read ordering's events (issue-00085).
+    // depend on ordering's Sku to read ordering's events.
     return new OrderReadyForFulfilment.Line(line.sku().value(), line.quantity());
   }
 }

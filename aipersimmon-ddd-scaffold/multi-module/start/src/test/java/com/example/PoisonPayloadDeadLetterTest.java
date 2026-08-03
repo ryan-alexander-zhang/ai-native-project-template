@@ -22,13 +22,13 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
- * The other half of the contract boundary (issue-00143). The consuming bridge already rejects a
- * record with a missing or malformed {@code ce_*} header as a permanent failure — no retries, dead
- * letter at once. A payload of {@code {}} under perfectly valid headers used to take the slow road
- * instead: it deserialized successfully, its nulls travelled into the inventory handler, and the
- * NPE there was classified as ambiguous — a futile exponential-backoff round before the same dead
- * letter. With the published-language records validating in their compact constructors, Jackson now
- * refuses the payload at parse time as a {@code ValueInstantiationException} — a {@code
+ * The other half of the contract boundary. The consuming bridge already rejects a record with a
+ * missing or malformed {@code ce_*} header as a permanent failure — no retries, dead letter at
+ * once. A payload of {@code {}} under perfectly valid headers used to take the slow road instead:
+ * it deserialized successfully, its nulls travelled into the inventory handler, and the NPE there
+ * was classified as ambiguous — a futile exponential-backoff round before the same dead letter.
+ * With the published-language records validating in their compact constructors, Jackson now refuses
+ * the payload at parse time as a {@code ValueInstantiationException} — a {@code
  * JsonProcessingException}, which is on the error handler's not-retryable list. This test pins the
  * end-to-end composition: the DLT record's recorded exception is the parse-time refusal, not a
  * handler NPE — and by the classifier the library pins in {@code KafkaErrorHandlerTest}, that class

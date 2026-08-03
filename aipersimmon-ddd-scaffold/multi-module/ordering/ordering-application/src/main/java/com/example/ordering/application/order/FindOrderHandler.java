@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * by default; a read whose shape follows the aggregate may load it, provided it mutates nothing) —
  * taken here deliberately, because {@code cancellableByCustomer} is a domain specification and
  * loading the aggregate keeps its one definition instead of re-deriving it from a status column in
- * a second place (issue-00150).
+ * a second place.
  */
 @Component
 public class FindOrderHandler implements QueryHandler<FindOrder, Optional<OrderSnapshot>> {

@@ -25,8 +25,8 @@ import java.util.Map;
  * what lets one error code answer in the caller's language. Note the failure mode if that file is
  * missing: {@code ProblemTitleResolver} falls back to the key rather than throwing, so the
  * application starts, the request succeeds, and the client is handed a dotted identifier in the
- * field RFC 9457 reserves for a human-readable summary (issue-00080). The same key must exist for
- * every family a code can fall back to, not only for the codes overridden here.
+ * field RFC 9457 reserves for a human-readable summary. The same key must exist for every family a
+ * code can fall back to, not only for the codes overridden here.
  */
 public class OrderingProblemCatalog implements ProblemCatalog {
 

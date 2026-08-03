@@ -10,7 +10,7 @@ import java.util.List;
  * rehydrating an aggregate per SKU that nobody is going to change — and doing it one query at a
  * time. That is the same distinction {@code OrderQueries} draws against {@code Orders} on the
  * ordering side, and the reason it lives in the application layer rather than the domain: the
- * aggregate boundary governs writes, and this is not one (issue-00084).
+ * aggregate boundary governs writes, and this is not one.
  *
  * <p>The one-query-per-SKU shape mattered because this read sits on the synchronous placement path:
  * {@code PlaceOrder} asks it, over the anti-corruption gateway, before the order is created. A

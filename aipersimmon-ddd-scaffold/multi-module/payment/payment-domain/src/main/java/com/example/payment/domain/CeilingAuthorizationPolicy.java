@@ -5,12 +5,12 @@ package com.example.payment.domain;
  * anything above it. A deterministic stand-in for a real gateway that makes the compensation path
  * exercisable from a test by simply ordering enough value.
  *
- * <p>Zero is authorised by its own branch rather than by falling under the ceiling (issue-00075). A
- * zero-amount order — a gift, a fully discounted basket — is a real thing ordering can produce, and
- * a real gateway has nothing to charge for it, so the round-trip is skipped rather than made with
- * an amount no gateway would accept. Writing it as a branch also keeps the decision visible: it
- * would otherwise be an unremarked consequence of {@code 0 <= ceiling}, and a later ceiling change
- * could take it away without anyone noticing.
+ * <p>Zero is authorised by its own branch rather than by falling under the ceiling. A zero-amount
+ * order — a gift, a fully discounted basket — is a real thing ordering can produce, and a real
+ * gateway has nothing to charge for it, so the round-trip is skipped rather than made with an
+ * amount no gateway would accept. Writing it as a branch also keeps the decision visible: it would
+ * otherwise be an unremarked consequence of {@code 0 <= ceiling}, and a later ceiling change could
+ * take it away without anyone noticing.
  *
  * <p>The ceiling arrives through the constructor rather than a {@code static final} field, so a
  * deployment sets it ({@code payment.authorization.ceiling-minor}) without a rebuild. {@link

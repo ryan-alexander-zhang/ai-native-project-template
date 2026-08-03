@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Every {@code com.example} class this module tests against must come from the reactor, not from
- * the local Maven repository (issue-00095).
+ * the local Maven repository.
  *
  * <p>{@code mvn test -pl start} without {@code -am} looks like a reasonable shortcut in a
  * seventeen-module build whose acceptance tests start containers. It is not one. {@code -pl}

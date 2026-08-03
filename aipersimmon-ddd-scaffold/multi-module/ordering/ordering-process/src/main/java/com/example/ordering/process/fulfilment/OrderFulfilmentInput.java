@@ -48,7 +48,7 @@ public sealed interface OrderFulfilmentInput extends ProcessInput {
    * it answers <em>only</em> when it judges a business failure — a technical failure (an
    * optimistic-lock conflict, a validation error, a database outage) throws out of its handler and
    * publishes nothing at all. From this flow's point of view that silence is identical to the
-   * payment context's (issue-00068).
+   * payment context's.
    *
    * <p>Treated exactly like {@code StockReservationFailed}: no stock was reserved, so there is
    * nothing to release and the order can be cancelled directly. Only the recorded code differs.

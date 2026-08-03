@@ -145,7 +145,7 @@ class ConcurrentApprovalTest {
     // so the integration event it had already written to the outbox went with it.
     // The winner's approval stands: the order left AWAITING_REVIEW. It stops at
     // READY_FOR_FULFILMENT rather than FULFILMENT_IN_PROGRESS because the relays are off here and
-    // nothing has reserved stock — that transition now waits for the reservation (issue-00070).
+    // nothing has reserved stock — that transition now waits for the reservation.
     assertEquals("READY_FOR_FULFILMENT", statusOf(order));
     assertEquals(
         outboxBefore + 1,

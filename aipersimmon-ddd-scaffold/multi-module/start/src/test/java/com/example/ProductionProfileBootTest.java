@@ -26,8 +26,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * <p>Before the profile split there was one {@code application.yml} full of development values and
  * <em>no {@code spring.datasource} at all</em>: the only way this application could obtain a
  * database was for Spring Boot's docker-compose support to derive one from a running compose stack,
- * or for a test to hand it one. There was no path to starting it anywhere else (issue-00074). This
- * test is the assertion that the path now exists.
+ * or for a test to hand it one. There was no path to starting it anywhere else. This test is the
+ * assertion that the path now exists.
  *
  * <p>It is deliberately wired the awkward way round. The PostgreSQL container comes from {@link
  * SharedContainers} — the raw, non-Spring-managed one — and its coordinates are injected under the
@@ -39,7 +39,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * <p>Kafka is absent on purpose rather than by oversight. The broker hop is covered end to end by
  * the other acceptance tests; what is under test here is whether the configuration resolves and the
  * application comes up, so the relays and the consumer bridge are switched off and no second
- * container is started for them (issue-00092 — every distinct context costs a container pair).
+ * container is started for them (every distinct context costs a container pair).
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -84,7 +84,7 @@ class ProductionProfileBootTest {
 
   @Test
   void theDemoSeedIsNotInAProductionDatabase() {
-    // issue-00072, end to end: the seed is an afterMigrate callback in db/dev, and the prod
+    // The seed split, end to end: the seed is an afterMigrate callback in db/dev, and the prod
     // profile's spring.flyway.locations lists db/migration alone. The schema is fully migrated —
     // the tables exist and are queryable — and Acme is simply not in it.
     Integer customers =
@@ -99,7 +99,7 @@ class ProductionProfileBootTest {
   void theContractIsPublishedButTheInteractiveConsoleIsNot() {
     // Two different things, which is why they are two settings: /v3/api-docs is the API's
     // description and stays served; Swagger UI is a write-capable console on the live API, and
-    // there is no authentication in front of it (design-00013).
+    // there is no authentication in front of it.
     assertEquals(
         200,
         get("/v3/api-docs").getStatusCode().value(),
@@ -146,7 +146,7 @@ class ProductionProfileBootTest {
    * <p>Any well-formed tenant will do; nothing here reads a row. Not {@code __root__} though —
    * {@code Tenants.of()} rejects the reserved {@code __} prefix at the edge so a client can never
    * name a framework sentinel, and the request would be a 400 before reaching anything this test is
-   * about (issue-00096).
+   * about.
    */
   private static HttpHeaders tenantHeader() {
     HttpHeaders headers = new HttpHeaders();

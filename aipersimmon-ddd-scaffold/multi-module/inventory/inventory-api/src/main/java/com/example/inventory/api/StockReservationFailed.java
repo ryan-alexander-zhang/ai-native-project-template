@@ -15,11 +15,10 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
  * <p>{@code code} is <strong>never null</strong>: that is a contract guarantee, not a convention. A
  * domain refusal carrying no code of its own leaves inventory as {@code inventory.unspecified}
  * rather than as {@code null} — consumers are entitled to reject a codeless failure outright
- * (ordering's evidence types do), so producing one would poison their consuming transaction
- * (issue-00131). Reporting failure as an event, rather than throwing, is what lets the
- * order-fulfilment process manager react to it as one of the flow's outcomes — and carrying the
- * code on the event is how a bounded context with no HTTP surface still surfaces a stable error
- * identity.
+ * (ordering's evidence types do), so producing one would poison their consuming transaction.
+ * Reporting failure as an event, rather than throwing, is what lets the order-fulfilment process
+ * manager react to it as one of the flow's outcomes — and carrying the code on the event is how a
+ * bounded context with no HTTP surface still surfaces a stable error identity.
  */
 @EventType(
     name = "com.example.inventory.StockReservationFailed",
@@ -31,7 +30,7 @@ public record StockReservationFailed(String orderId, String code, String reason)
 
   public StockReservationFailed {
     // "code is never null" was already this event's documented guarantee, held on the producing
-    // side by a test; now the type itself holds it, on every path (issue-00143). The
+    // side by a test; now the type itself holds it, on every path. The
     // human-readable reason stays optional: the consuming evidence type accepts a null detail.
     Contract.required(orderId, "orderId");
     Contract.required(code, "code");

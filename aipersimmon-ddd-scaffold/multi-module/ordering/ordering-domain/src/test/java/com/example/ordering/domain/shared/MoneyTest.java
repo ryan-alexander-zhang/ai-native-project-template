@@ -36,9 +36,9 @@ class MoneyTest {
 
   /**
    * "usd" and "USD" would be two different currencies to requireSameCurrency, and "XYZ" is not a
-   * currency at all — an arbitrary non-blank string is not a currency identity (issue-00145 item
-   * 6). Validated against ISO 4217 rather than normalised: a caller whose code differs by case has
-   * a bug better surfaced than silently absorbed.
+   * currency at all — an arbitrary non-blank string is not a currency identity. Validated against
+   * ISO 4217 rather than normalised: a caller whose code differs by case has a bug better surfaced
+   * than silently absorbed.
    */
   @Test
   void rejectsANonIso4217CurrencyCode() {
@@ -83,7 +83,7 @@ class MoneyTest {
         DomainException.class, () -> Money.of(100, "USD").lessThanOrEqual(Money.of(100, "EUR")));
   }
 
-  // ---------- overflow (issue-00077) ----------
+  // ---------- overflow ----------
 
   /**
    * The assertions check the message, not just the exception type, and that is the point. Before

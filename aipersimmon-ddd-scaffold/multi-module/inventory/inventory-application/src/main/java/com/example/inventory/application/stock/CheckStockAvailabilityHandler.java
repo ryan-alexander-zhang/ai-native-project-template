@@ -15,8 +15,7 @@ import org.springframework.stereotype.Component;
  * aggregate per line to read a single {@code int} off it and discard the rest. Since this read sits
  * on the synchronous placement path — {@code PlaceOrder} consults it before creating the order — a
  * ten-line order paid ten round trips inside the request the customer was waiting on, and the cost
- * grew with the order (issue-00084). Reads go through a read port for the same reason the order
- * list does.
+ * grew with the order. Reads go through a read port for the same reason the order list does.
  */
 @Component
 public class CheckStockAvailabilityHandler

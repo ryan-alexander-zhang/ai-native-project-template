@@ -16,7 +16,7 @@
     its state and inputs, the persistence codecs, and the runtime-backed implementation of the
     application's business port. Kept a separate module — not a sub-package of application —
     so the process-manager framework dependency is compile-fenced out of the application
-    layer (design-00004 §六/§13.1; analysis-00012 §7).
+    layer.
 
     STORAGE-AGNOSTIC, and named so. This module used to be called
     `ordering-process-mybatis-plus`, which was wrong in a way worth recording: not one class

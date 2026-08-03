@@ -83,7 +83,7 @@ public class OrderController {
 
   // The other half of a review. Approval had an endpoint and refusal did not, so an order held for
   // review could only ever be let through — the domain modelled the refusal (ReviewRejected, its
-  // own cancellation category, its own policy branch) and nothing could reach it (issue-00082).
+  // own cancellation category, its own policy branch) and nothing could reach it.
   @Operation(summary = "Reject the manual review of an order awaiting it")
   @ApiResponse(responseCode = "204", description = "Review rejected; the order is cancelled.")
   @PostMapping("/{id}/reject-review")

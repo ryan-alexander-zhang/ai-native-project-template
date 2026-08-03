@@ -54,8 +54,7 @@ public sealed interface CancellationReason {
 
   /**
    * Manual review rejected the order; the rejecting decision is required. Typed {@link
-   * ReviewDecisionRef.Rejection}: an approval cannot be presented as grounds for cancelling
-   * (issue-00134).
+   * ReviewDecisionRef.Rejection}: an approval cannot be presented as grounds for cancelling.
    */
   record ReviewRejected(ReviewDecisionRef.Rejection reviewDecision) implements CancellationReason {
     public ReviewRejected {

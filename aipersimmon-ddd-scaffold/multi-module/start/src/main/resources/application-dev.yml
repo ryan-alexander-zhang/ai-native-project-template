@@ -25,7 +25,7 @@ spring:
   flyway:
     # The application's own migrations, plus the demo seed. db/migration holds versioned migrations
     # and describes STRUCTURE ONLY; db/dev holds an afterMigrate callback with the CUST-1 / SKU-1
-    # demo rows (issue-00072). Splitting them by location is what makes the seed a per-environment
+    # demo rows. Splitting them by location is what makes the seed a per-environment
     # decision — a versioned migration runs exactly once in every environment with no way to opt
     # out, so demo data placed there would land in a real production database.
     #

@@ -23,9 +23,9 @@ import org.junit.jupiter.api.Test;
  * machine-readable code" — and the consuming side holds it to that: ordering's {@code
  * ReservationFailureRef} refuses a null or blank {@code reasonCode}, so a codeless failure would
  * poison the fulfilment process's consuming transaction and strand the flow until its deadline,
- * misattributed as a timeout (issue-00131). This pins the producing side of the bargain: whatever
- * the domain throws — including a {@code DomainException} carrying no {@code ErrorCode} — the event
- * leaves inventory with a non-null code.
+ * misattributed as a timeout. This pins the producing side of the bargain: whatever the domain
+ * throws — including a {@code DomainException} carrying no {@code ErrorCode} — the event leaves
+ * inventory with a non-null code.
  */
 class StockReservationFailedCodeContractTest {
 

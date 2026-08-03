@@ -11,9 +11,9 @@ import org.springframework.stereotype.Component;
 /**
  * Reacts to ordering's {@link PaymentVoidRequested} integration event by sending a {@link
  * VoidPayment} command through the command bus — the compensation counterpart of {@link
- * PaymentRequestedListener} (issue-00144). Same anti-corruption stance: it reads only ordering's
- * published contract and carries the causing event's context across, so the void stays on the
- * causal chain of the flow that gave the order up.
+ * PaymentRequestedListener}. Same anti-corruption stance: it reads only ordering's published
+ * contract and carries the causing event's context across, so the void stays on the causal chain of
+ * the flow that gave the order up.
  */
 @Component
 public class PaymentVoidRequestedListener {

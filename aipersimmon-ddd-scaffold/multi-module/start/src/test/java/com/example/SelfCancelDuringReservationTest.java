@@ -27,8 +27,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The race that making {@code READY_FOR_FULFILMENT} real opens, and which closing issue-00070
- * without handling would have turned into a stock leak.
+ * The race that making {@code READY_FOR_FULFILMENT} real opens, and which — left unhandled — would
+ * have turned into a stock leak.
  *
  * <p>Once the self-cancel window is genuinely reachable, it overlaps the reservation: the customer
  * can cancel while inventory is still working, and inventory answers a moment later for an order
@@ -38,8 +38,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <p>Left unhandled it fails twice over. {@code BeginFulfilment} would find a {@code CANCELLED}
  * order, the aggregate would refuse the transition, and the effect relay would retry that command
  * until it dead-lettered. And the reserved stock would never come back, because the compensation
- * path is only entered from a payment failure — the same shape as the leak in issue-00094, arrived
- * at from the opposite direction.
+ * path is only entered from a payment failure — the same shape as the stranded-deduction leak the
+ * all-or-nothing reservation fixed, arrived at from the opposite direction.
  *
  * <p>What makes it tractable is that ordering already tells the process manager when an order is
  * cancelled: {@code OrderCancelledEvent} reaches it as an {@code OrderCancelled} input, which the

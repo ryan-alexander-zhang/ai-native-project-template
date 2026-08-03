@@ -26,13 +26,11 @@ import org.springframework.test.context.TestPropertySource;
  * <ul>
  *   <li><strong>A prefix that does not bind.</strong> The process-manager properties moved out of
  *       {@code …process-manager.jdbc} when the component split into an engine plus backends. An
- *       unknown key is discarded without a word, so eleven test classes were configuring nothing
- *       (issue-00060).
+ *       unknown key is discarded without a word, so eleven test classes were configuring nothing.
  *   <li><strong>A delay used as an off-switch.</strong> {@code @Scheduled(fixedDelay)} runs the
  *       task <em>first</em> and waits afterwards, so a one-hour {@code poll-delay-ms} still polls
  *       once at startup — and if that poll holds the ShedLock lease, a direct {@code relay()} call
- *       is skipped entirely, silently (issue-00061, and issue-00059 for the library's own copy of
- *       the mistake).
+ *       is skipped entirely, silently (the library once made the same mistake in its own relay).
  * </ul>
  *
  * <p>Both assertions below exist because neither failure is visible: the first binds nothing, the

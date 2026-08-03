@@ -64,7 +64,7 @@ class OrderCancellationPolicyTest {
    * A <em>ready</em> order is the ordinary case for an inventory failure, and this assertion used
    * to say the opposite.
    *
-   * <p>It encoded the assumption behind issue-00070: that an order under an outstanding reservation
+   * <p>It encoded a since-corrected assumption: that an order under an outstanding reservation
    * request was already {@code FULFILMENT_IN_PROGRESS}. It no longer is — the order advances only
    * once inventory has actually reserved — so a failed or timed-out reservation now finds it merely
    * ready, and refusing the compensation there would refuse it for precisely the outcome
@@ -163,10 +163,10 @@ class OrderCancellationPolicyTest {
 
   /**
    * A cancelled order refuses every further cancellation with the one code that states the actual
-   * fact — not with a reason-specific refusal that misdescribes it (issue-00130). Before this
-   * branch existed, a customer retry was told "the order has entered fulfilment" and a redelivered
-   * compensation was told the failure "only cancels an order that was cleared for fulfilment" —
-   * both false for an order that is simply already cancelled.
+   * fact — not with a reason-specific refusal that misdescribes it. Before this branch existed, a
+   * customer retry was told "the order has entered fulfilment" and a redelivered compensation was
+   * told the failure "only cancels an order that was cleared for fulfilment" — both false for an
+   * order that is simply already cancelled.
    */
   @Test
   void aCancelledOrderRefusesFurtherCancellationAsAlreadyCancelled() {

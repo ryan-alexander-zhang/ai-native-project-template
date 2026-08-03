@@ -18,8 +18,7 @@ import org.springframework.stereotype.Component;
  * authorisation and decline as the two branches of the fulfilment flow.
  *
  * <p>Authorising a payment is an irreversible action, so it is guarded by the {@code
- * paymentOperationId} business idempotency key rather than trusting transport-level dedupe alone
- * (design-00004 §13.2).
+ * paymentOperationId} business idempotency key rather than trusting transport-level dedupe alone.
  *
  * <h2>Decide once, announce every time</h2>
  *
@@ -29,7 +28,7 @@ import org.springframework.stereotype.Component;
  * emitted on every delivery, because the whole premise of at-least-once delivery is that the
  * previous one may never have arrived. Returning silently would make the guarantee "exactly one
  * authorization and <em>at most</em> one outcome", which is a different and much weaker promise
- * than the one this flow is built on (issue-00069).
+ * than the one this flow is built on.
  *
  * <p>Republishing is safe because the reader is idempotent by construction: {@code
  * OrderFulfilmentDefinition} dispatches on {@code (step, input)}, so a second {@code
@@ -85,7 +84,7 @@ public class AuthorizePaymentHandler implements CommandHandler<AuthorizePayment,
       case PaymentDecision.Declined declined ->
           integrationEvents.publish(
               new PaymentDeclined(command.orderId(), declined.code(), declined.reason()), context);
-      // The refusal-in-advance (issue-00144): ordering abandoned this operation before the
+      // The refusal-in-advance: ordering abandoned this operation before the
       // authorization arrived, and the void it sent won the operation row. Announcing a decline
       // keeps the outcome contract intact — every AuthorizePayment gets an answer — and the
       // announcement is harmless by construction: the flow that abandoned the wait ignores it.

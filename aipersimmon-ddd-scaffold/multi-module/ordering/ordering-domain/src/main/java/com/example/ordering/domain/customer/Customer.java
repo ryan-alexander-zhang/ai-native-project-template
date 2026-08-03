@@ -16,13 +16,12 @@ import com.example.ordering.domain.shared.Money;
  * <p>It used to hold a limit and nothing else: every field final, its only behaviour a query, no
  * {@code save} on the repository port, no version column, no way to create one outside a Flyway
  * seed. That is a read-only projection wearing an aggregate's annotations, and it taught the wrong
- * lesson about what the word means (issue-00086). It is a real aggregate now because it has
- * something real to protect — a mutable balance with a rule over it that two concurrent placements
- * can race for.
+ * lesson about what the word means. It is a real aggregate now because it has something real to
+ * protect — a mutable balance with a rule over it that two concurrent placements can race for.
  *
  * <p>Deliberately it protects <em>only</em> that. A customer's name, contact details and lifecycle
  * belong to a customer/CRM context, not to ordering; promoting all of it to a local aggregate would
- * entrench exactly the context-mapping mistake issue-00086 identified. {@code name} survives as a
+ * entrench exactly the context-mapping mistake the old shape embodied. {@code name} survives as a
  * label carried alongside the row, not as state this context governs — nothing mutates it and
  * nothing should. What ordering genuinely owns is the answer to "how much more may this customer
  * order?", because ordering is what spends it and gives it back.
@@ -95,8 +94,8 @@ public class Customer extends AbstractAggregateRoot<CustomerId> {
    * @param version the row's optimistic-lock version, which the repository puts back in the {@code
    *     WHERE} clause when it saves. This is what stops two concurrent placements from each
    *     reserving against the same snapshot of {@code usedCredit} and overshooting the limit
-   *     between them — the concurrency hole issue-00071 described, which existed precisely because
-   *     nothing was ever written here.
+   *     between them — a concurrency hole that existed precisely because nothing was ever written
+   *     here.
    */
   public static Customer reconstitute(
       CustomerId id, String name, Money creditLimit, Money usedCredit, long version) {
@@ -112,7 +111,7 @@ public class Customer extends AbstractAggregateRoot<CustomerId> {
    * credit limit and a per-order cap. The check this replaces compared each order against the full
    * limit in isolation, so two orders of 60,000 both passed a limit of 100,000 with no concurrency
    * involved at all — a rule that never consults what has already been spent is not a credit limit,
-   * whatever the error code is called (issue-00071).
+   * whatever the error code is called.
    */
   public void reserveCredit(Money amount) {
     if (amount == null) {

@@ -19,7 +19,7 @@ import org.apache.ibatis.annotations.Select;
  * only one of which knew its preconditions. {@code MAX(currency)} in particular was a guess rather
  * than a rule: it says nothing about an order having one currency, it just picks one, so
  * mixed-currency rows would have been summed across currencies and displayed, while the domain
- * refuses to construct them at all (issue-00083).
+ * refuses to construct them at all.
  *
  * <p>Skipping the aggregate on a read is right; recomputing its rules on a read is not. The total
  * stops changing once the order is placed, so it is frozen into the row by {@code

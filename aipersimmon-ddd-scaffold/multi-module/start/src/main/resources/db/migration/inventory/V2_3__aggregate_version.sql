@@ -1,4 +1,4 @@
--- issue-00051 / design-00011: optimistic-lock version on the inventory tables that are written.
+-- Optimistic-lock version on the inventory tables that are written.
 --
 -- This is the context where the absence of it is most visible: concurrent ReserveStock on one SKU
 -- oversells it (both read available=10, both reserve 8, both store 2). The column puts the loaded

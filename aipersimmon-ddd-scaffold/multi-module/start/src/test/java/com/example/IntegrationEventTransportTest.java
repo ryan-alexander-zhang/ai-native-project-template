@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * issue-00044 regression: integration events must actually ride the durable outbox → Kafka → inbox
+ * Regression guard: integration events must actually ride the durable outbox → Kafka → inbox
  * transport, not silently degrade to in-process delivery. Two independent proofs, so a future
  * wiring regression cannot pass unnoticed:
  *

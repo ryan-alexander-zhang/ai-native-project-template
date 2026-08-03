@@ -43,7 +43,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <p>A retried {@code POST /orders} comes back with its {@code Location} intact, so the client that
  * never saw the first response still learns where its order is. That is asserted below because it
  * used not to hold: the stored response carried {@code Content-Type} alone and a replayed {@code
- * 201} pointed nowhere (issue-00064).
+ * 201} pointed nowhere.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -90,7 +90,7 @@ class OrderIdempotencyTest {
 
   @Test
   void theSharedStoreIsTheOneInUse() {
-    // Precondition, and the regression guard for issue-00062: the web starter also declares an
+    // Precondition, and a regression guard: the web starter also declares an
     // in-memory IdempotencyStore under @ConditionalOnMissingBean, so without an explicit ordering
     // edge the two race and the per-JVM map can win — while allow-in-memory-stores=false would then
     // refuse to start. This module is the only place both configurations coexist, so this is where
@@ -118,7 +118,7 @@ class OrderIdempotencyTest {
     assertEquals(
         first.getHeaders().getLocation(),
         retry.getHeaders().getLocation(),
-        "a retry that cannot learn where its order is has only half an answer (issue-00064)");
+        "a retry that cannot learn where its order is has only half an answer");
   }
 
   @Test

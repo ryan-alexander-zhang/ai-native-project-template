@@ -16,16 +16,16 @@ import org.springframework.context.annotation.Import;
 /**
  * Both inner interceptors are actually installed, and in the right order.
  *
- * <p>This guards the trap described in {@code design-00011} §3. MyBatis-Plus honours exactly one
- * {@link MybatisPlusInterceptor} bean, and two auto-configurations each registering one under
+ * <p>This guards a composition trap. MyBatis-Plus honours exactly one {@link
+ * MybatisPlusInterceptor} bean, and two auto-configurations each registering one under
  * {@code @ConditionalOnMissingBean} do not compose — the second simply backs off, silently. Either
  * concern can therefore vanish without a single error:
  *
  * <ul>
  *   <li>lose {@link TenantLineInnerInterceptor} and tenants stop being isolated;
  *   <li>lose {@link OptimisticLockerInnerInterceptor} and {@code @Version} stops adding {@code
- *       WHERE version = ?}, so every {@code updateById} reports one row updated and the oversell of
- *       issue-00051 comes back while looking fixed.
+ *       WHERE version = ?}, so every {@code updateById} reports one row updated and the
+ *       concurrent-reservation oversell comes back while looking fixed.
  * </ul>
  *
  * <p>Asserting the composition directly is what makes that silence impossible to ship. It is the

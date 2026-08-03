@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.aipersimmon.ddd.core.exception.DomainException;
 import org.junit.jupiter.api.Test;
 
-/** Ordering's own {@link Sku} value object (issue-00085). */
+/** Ordering's own {@link Sku} value object. */
 class SkuTest {
 
   @Test

@@ -28,7 +28,7 @@ public class Reservation extends AbstractAggregateRoot<ReservationId> {
    * <p>Transient — never persisted, never part of identity. It lets a persistence adapter ask the
    * aggregate a question only the aggregate can answer instead of guessing, which it previously did
    * by rewriting every held line on each save. A release changes only {@link #released}, yet the
-   * quantities were deleted and re-inserted to arrive at the rows already there (issue-00090).
+   * quantities were deleted and re-inserted to arrive at the rows already there.
    *
    * <p>Only ever true for a newly created reservation, because the held set is fixed at creation.
    * Stated as a flag rather than assumed, so a future partial-release use case sets it and the

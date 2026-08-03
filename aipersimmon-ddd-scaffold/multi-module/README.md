@@ -70,7 +70,7 @@ variables, so the file cannot rot.
 ### Before production: the declared debts
 
 Two decisions in this scaffold are demo conveniences that a real deployment **must** revisit, and
-both say so where they live (issue-00150 keeps them on this list so they cannot be forgotten):
+both say so where they live (this list exists so they cannot be forgotten):
 
 - **`/ops/**` is unauthenticated and tenant-exempt.** The dead-letter console
   (`DeadLetterOpsController`) is mounted bare because the scaffold ships no security context, and
@@ -99,10 +99,10 @@ curl -H 'X-Tenant-Id: demo' localhost:8090/orders/<id>
 
 > Not `__root__`. That is the sentinel a single-tenant (N=1) deployment stores on every row, and
 > `Tenants.of()` rejects the reserved `__` prefix at the edge on purpose — so a client can never name
-> a framework sentinel. A curl carrying it is a 400 (issue-00096).
+> a framework sentinel. A curl carrying it is a 400.
 >
 > It is also not a fallback: with multi-tenancy enabled, work that reaches a tenant-scoped table with
-> no tenant bound fails loudly instead of quietly using the sentinel (issue-00099). That is why the
+> no tenant bound fails loudly instead of quietly using the sentinel. That is why the
 > acceptance tests which dispatch straight on the command bus bind `demo` for the test thread — they
 > skip the web edge, so they have to do the edge's job.
 
@@ -135,7 +135,7 @@ waits on another context has one.** The earlier claim that payment was the only 
 wrong test — "will this context refuse me?" Inventory does answer `StockReservationFailed`, but
 only for a *business* failure; a technical one (an optimistic-lock conflict, a validation error, a
 database outage) throws out of its handler and publishes nothing, and that silence is
-indistinguishable from the payment context's (issue-00068).
+indistinguishable from the payment context's.
 
 The three are not symmetrical, because what a step can do about silence differs. Nothing is
 reserved at `AWAITING_STOCK`, so a timeout cancels outright. Stock is held at `AWAITING_PAYMENT`,
@@ -153,7 +153,7 @@ nothing and starts no process until approved. A cleared order is saved as `READY
 and *stays* there while inventory works — asking for a reservation is not having one — so the
 customer's self-cancel window is real for every order, not only for the ones that happened to be
 held for review. `BeginFulfilment`, dispatched by the process manager when the reservation actually
-exists, is what advances it (issue-00070).
+exists, is what advances it.
 
 That makes the window overlap the reservation, which is a race worth knowing about: the customer can
 cancel while inventory is still working. The cancellation wins — it was made while the order was
@@ -245,12 +245,12 @@ list tells you.
 |---|---|---|---|---|
 | Versioned aggregate write | ~0 | — | row implements `VersionedRow` **and** carries `@Version`; table needs `version DEFAULT 1` | none — the base class carries it |
 | Conflict → 409 | 0 | — | none | the lock 409 is `about:blank` with no `code`, while a *domain* 409 is coded: the one a client should retry is the one it cannot recognise |
-| HTTP idempotency | ~8 (yaml) | `Idempotency-Key` | a MyBatis-Plus app still takes a **`-jdbc`** store module; `flyway.components` needs `web-store` | issue-00062, issue-00063 (startup failure), issue-00064 (replay lost `Location`) — all three fixed |
-| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 — and a page costs the page **only because** an index covers `(tenant_id, customer_id, id DESC)`; the two are separate, and losing either is silent | issue-00065 (a missing query param was a 500) — fixed; issue-00073 (no index existed; the paging tests passed anyway) — fixed in `V4` |
+| HTTP idempotency | ~8 (yaml) | `Idempotency-Key` | a MyBatis-Plus app still takes a **`-jdbc`** store module; `flyway.components` needs `web-store` | three library defects surfaced (a startup failure; a replayed `201` that lost its `Location`) — all fixed upstream |
+| Cursor paging + read model | ~90 | `Slice`, `Cursor` | the cursor can be the id **only because** ids are UUIDv7 — and a page costs the page **only because** an index covers `(tenant_id, customer_id, id DESC)`; the two are separate, and losing either is silent | a missing query param used to be a 500 — fixed; no covering index existed and the paging tests passed anyway — fixed in `V4` |
 | Deadlines | ~25 | `DeadlineName`, `ScheduleDeadline`, `CancelDeadline` | arm and cancel on every branch leaving the step; due time must come from `context.now()` | none — this API fits |
-| Dead letters + replay | ~45 | `DeadLetters` (read), `DeadLetterStore` (replay) | none | issue-00066: `replay(eventId)` with no way to obtain an `eventId` — fixed by the read port, which deleted this project's hand-written query |
+| Dead letters + replay | ~45 | `DeadLetters` (read), `DeadLetterStore` (replay) | none | `replay(eventId)` shipped with no way to obtain an `eventId` — fixed by the read port, which deleted this project's hand-written query |
 | `Specification` | ~30 | `Specification` | keep one statement of the rule, or the answer and the refusal drift | none |
-| Test infrastructure | ~2 | `@ServiceConnection` | — | issue-00067: Kafka — the library's own transport — was the one container the module did not provide; fixed |
+| Test infrastructure | ~2 | `@ServiceConnection` | — | Kafka — the library's own transport — was the one container the module did not provide; fixed |
 
 Four patterns are worth more than the individual rows:
 
@@ -337,8 +337,8 @@ ArchUnit gate — the rules are what keeps the claimed architecture true after m
   dedupe log behind the `PaymentOperations` port, held in `payment.payment_operations` and
   implemented by `MyBatisPaymentOperations` in `payment-infrastructure`. It is an outbound adapter,
   so it lives in the infrastructure layer, not the application layer — and it is a table rather than
-  a map because claiming an operation and announcing its outcome have to be one commit
-  (issue-00069). A `ConcurrentHashMap` could not be rolled back, so a failed transaction kept the
+  a map because claiming an operation and announcing its outcome have to be one commit.
+  A `ConcurrentHashMap` could not be rolled back, so a failed transaction kept the
   claim and lost the authorization permanently.
 - **Inventory uses a deliberate multi-aggregate transaction.** Reserving mutates several `Stock`
   roots and creates one `Reservation`; the "all lines or none" rule is enforced by the application

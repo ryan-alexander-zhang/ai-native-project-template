@@ -1,4 +1,4 @@
--- issue-00146: the last line of defence for rules that so far existed only in the application.
+-- The last line of defence for rules that so far existed only in the application.
 --
 -- The argument is V1_4's, applied to the constraints it was not applied to. The aggregates' guards
 -- and the tenant interceptor are the application; a data-fix script, an operator at a psql prompt,

@@ -16,7 +16,7 @@ import org.springframework.test.context.BootstrapUtils;
 import org.springframework.test.context.MergedContextConfiguration;
 
 /**
- * How many application contexts this module's tests ask for, pinned (issue-00092).
+ * How many application contexts this module's tests ask for, pinned.
  *
  * <p>The containers are Spring beans rather than static fields (see {@link TestInfrastructure}), so
  * each distinct context gets its own PostgreSQL and its own Kafka. That is a deliberate trade and a
@@ -46,9 +46,9 @@ class TestContextCountTest {
    *
    * <p>Sixteen of the seventeen bring a container pair. {@code ProductionProfileBootTest} is the
    * exception: it takes a raw container from {@code SharedContainers} and starts no broker at all,
-   * for reasons its own javadoc gives. The review that filed issue-00092 estimated nine to eleven
-   * by reading the test sources — the gap between that estimate and this number is the argument for
-   * computing the key rather than eyeballing it.
+   * for reasons its own javadoc gives. The review that first asked for this pin estimated nine to
+   * eleven by reading the test sources — the gap between that estimate and this number is the
+   * argument for computing the key rather than eyeballing it.
    */
   private static final int EXPECTED_CONTEXTS = 17;
 

@@ -1,7 +1,7 @@
 # The prod profile — activate with SPRING_PROFILES_ACTIVE=prod.
 #
 # This file is a worked example, not a drop-in production configuration: a real deployment adds
-# TLS, authentication (which this scaffold does not have at all — see design-00013), and whatever
+# TLS, authentication (which this scaffold deliberately does not ship), and whatever
 # its platform needs. What it does give is the SHAPE, which is the thing that was missing: every
 # address and credential arrives from the environment, nothing is inherited from a developer's
 # laptop, and the settings that differ from dev differ for a stated reason.
@@ -44,7 +44,7 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
   flyway:
     # Versioned migrations only. db/dev — the CUST-1 / SKU-1 demo seed — is deliberately absent,
-    # which is the point of issue-00072: a real database must never be handed a customer named
+    # which is the point of the split: a real database must never be handed a customer named
     # Acme because the scaffold it was copied from needed one.
     locations: classpath:db/migration
 

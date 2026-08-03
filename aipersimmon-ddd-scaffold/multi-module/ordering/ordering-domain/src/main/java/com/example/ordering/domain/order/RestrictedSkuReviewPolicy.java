@@ -21,9 +21,9 @@ import java.util.Set;
  * came from. {@code OrderingPolicyConfig} in {@code start} does the binding.
  *
  * <p>Typed as {@code Set<Sku>} rather than {@code Set<String>} so the watchlist cannot be confused
- * with — or accidentally checked against — any other collection of strings this context holds
- * (issue-00085). Validation therefore happens at construction: a blank entry fails when its {@link
- * Sku} is built, at startup, rather than silently never matching at runtime.
+ * with — or accidentally checked against — any other collection of strings this context holds.
+ * Validation therefore happens at construction: a blank entry fails when its {@link Sku} is built,
+ * at startup, rather than silently never matching at runtime.
  */
 public final class RestrictedSkuReviewPolicy implements ManualReviewPolicy {
 

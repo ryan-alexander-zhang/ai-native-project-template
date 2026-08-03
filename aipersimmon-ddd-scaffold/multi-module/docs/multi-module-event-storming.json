@@ -342,7 +342,7 @@
       "order": 3,
       "properties": {
         "pivotal": true,
-        "description": "OrderFulfilmentStartedEvent. Past this point the customer can no longer self-cancel. Reached only once a reservation actually exists (issue-00070)."
+        "description": "OrderFulfilmentStartedEvent. Past this point the customer can no longer self-cancel. Reached only once a reservation actually exists."
       }
     },
     {
@@ -758,7 +758,7 @@
         "kind": "risk",
         "priority": "high",
         "state": "open",
-        "description": "Inventory answers StockReservationFailed only for a BUSINESS failure. An optimistic-lock conflict, a validation error or a database outage throws out of the handler and publishes nothing. Mitigated downstream — ordering's STOCK deadline turns the silence into an outcome — but not fixed here (issue-00068)."
+        "description": "Inventory answers StockReservationFailed only for a BUSINESS failure. An optimistic-lock conflict, a validation error or a database outage throws out of the handler and publishes nothing. Mitigated downstream — ordering's STOCK deadline turns the silence into an outcome — but not fixed here."
       }
     },
     {
@@ -798,7 +798,7 @@
       "context": "pay",
       "properties": {
         "rule": "amountMinor == 0 OR amountMinor <= configured ceiling (payment.authorization.ceiling-minor, default 50000) ⇒ Authorized; otherwise Declined (payment.amount-exceeds-ceiling)",
-        "description": "It DECIDES rather than refuses: an over-ceiling amount is a legitimate Declined outcome, not a rejected command. A zero amount is explicitly authorized (issue-00075). Implemented as the AuthorizationPolicy port with CeilingAuthorizationPolicy as the default, so a deployment substitutes a real provider by declaring a bean. The port carries two obligations: never throw (a throw publishes nothing, and silence is indistinguishable from a dead broker), and carry the operation id as the provider's own idempotency key."
+        "description": "It DECIDES rather than refuses: an over-ceiling amount is a legitimate Declined outcome, not a rejected command. A zero amount is explicitly authorized. Implemented as the AuthorizationPolicy port with CeilingAuthorizationPolicy as the default, so a deployment substitutes a real provider by declaring a bean. The port carries two obligations: never throw (a throw publishes nothing, and silence is indistinguishable from a dead broker), and carry the operation id as the provider's own idempotency key."
       }
     },
     {

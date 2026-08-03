@@ -60,7 +60,7 @@ import org.springframework.stereotype.Component;
  * reservation, a validation error, a database outage) throws out of its handler and publishes
  * nothing, and from here that silence is indistinguishable from the payment context's. The right
  * test is "can this step's answer fail to arrive?", and for every {@code AWAITING_*} step that
- * waits on a broker the answer is yes (issue-00068).
+ * waits on a broker the answer is yes.
  *
  * <p>The timeouts are not symmetrical, because what a step can do about silence differs:
  *
@@ -70,10 +70,10 @@ import org.springframework.stereotype.Component;
  *   <li>{@code AWAITING_PAYMENT} — stock is held, so a timeout releases it and then cancels, down
  *       the same path a decline takes. The customer's position is identical however the payment
  *       failed to happen. One addition a decline does not need: abandoning this wait — on timeout
- *       or on a racing cancellation — also dispatches {@code RequestPaymentVoid} (issue-00144),
- *       because payment may still authorize after the flow moves on, and a flow that has reached
- *       its terminal step reacts to nothing; the hold would be orphaned for good. The void is eager
- *       so the abandonment is mutual, and payment settles the race atomically on its operation row.
+ *       or on a racing cancellation — also dispatches {@code RequestPaymentVoid}, because payment
+ *       may still authorize after the flow moves on, and a flow that has reached its terminal step
+ *       reacts to nothing; the hold would be orphaned for good. The void is eager so the
+ *       abandonment is mutual, and payment settles the race atomically on its operation row.
  *   <li>{@code AWAITING_STOCK_RELEASE} — a timeout <em>cannot</em> end the wait, and this is the
  *       interesting one. Cancelling from here needs a {@link
  *       CancellationReason.PaymentDeclinedAfterStockReleased}, which cannot be constructed without
@@ -246,7 +246,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
           "stock-reserved",
           // The reservation exists, so now — and only now — the order really is under fulfilment.
           // Ordering's own state used to be advanced at placement, before anyone had reserved
-          // anything (issue-00070).
+          // anything.
           new DispatchCommand(new BeginFulfilment(orderId)),
           new DispatchCommand(new RequestPayment(orderId, paymentOperationId)),
           new CancelDeadline(STOCK_DEADLINE),
@@ -334,7 +334,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // Nothing was ever reserved and the order is already cancelled, so there is no compensation
       // to run and no command to send. The flow is finished — and the STOCK timer it set when the
       // reservation was requested is disarmed on the way out, like every other exit from a
-      // deadline-guarded step (issue-00150; this was the one terminal decision that left its timer
+      // deadline-guarded step (this used to be the one terminal decision that left its timer
       // armed).
       return completed(
           state.withStep(Step.CANCELLED),
@@ -379,7 +379,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // AWAITING_STOCK to here, so BeginFulfilment found a cancelled order and did nothing. Stock
       // is held, and the order is terminal — release it and finish, without a second CancelOrder.
       //
-      // Payment is also outstanding, and it may already have authorized (issue-00144). The void is
+      // Payment is also outstanding, and it may already have authorized. The void is
       // dispatched now, in the decision that abandons the wait, not in reaction to a late
       // PaymentAuthorized: this flow may reach its terminal step before that late answer arrives,
       // and a terminal instance reacts to nothing — the hold would be orphaned for good. Payment
@@ -400,7 +400,7 @@ public class OrderFulfilmentDefinition implements ProcessDefinition<OrderFulfilm
       // own delivery, so the eventual cancellation names the firing rather than a decline that
       // never happened. No deadline is cancelled here: this decision *is* the deadline.
       //
-      // Plus one thing a decline does not need: the void (issue-00144). A decline is payment's own
+      // Plus one thing a decline does not need: the void. A decline is payment's own
       // recorded decision and can never later authorize; a timeout is only silence, and the
       // authorization may still complete after this flow has moved on. Voiding the operation now
       // makes the abandonment mutual instead of unilateral.

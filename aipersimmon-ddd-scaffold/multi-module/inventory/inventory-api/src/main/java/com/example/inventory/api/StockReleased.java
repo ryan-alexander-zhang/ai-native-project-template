@@ -17,7 +17,7 @@ public record StockReleased(String orderId, String reservationId) implements Int
 
   public StockReleased {
     // Both ids are the whole message: this event is the stock-release evidence the ordering
-    // domain demands, and evidence that names nothing proves nothing (issue-00143).
+    // domain demands, and evidence that names nothing proves nothing.
     Contract.required(orderId, "orderId");
     Contract.required(reservationId, "reservationId");
   }

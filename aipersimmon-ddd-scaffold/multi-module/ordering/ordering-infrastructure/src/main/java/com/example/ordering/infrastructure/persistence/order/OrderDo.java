@@ -20,18 +20,18 @@ public class OrderDo implements VersionedRow {
   private String status;
 
   /**
-   * The order's total, frozen at write time from {@code Order.total()} (issue-00083). The read
-   * model selects these two columns instead of re-deriving the total in SQL, so the rule has one
-   * definition — the aggregate's — and the list query needs no join.
+   * The order's total, frozen at write time from {@code Order.total()}. The read model selects
+   * these two columns instead of re-deriving the total in SQL, so the rule has one definition — the
+   * aggregate's — and the list query needs no join.
    */
   private Long totalMinor;
 
   private String currency;
 
   /**
-   * When the order was placed, written once from the application Clock at insert (issue-00146).
-   * {@code FieldStrategy.NEVER} keeps every later save from touching it: creation time is a fact,
-   * not state.
+   * When the order was placed, written once from the application Clock at insert. {@code
+   * FieldStrategy.NEVER} keeps every later save from touching it: creation time is a fact, not
+   * state.
    */
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Instant createdAt;

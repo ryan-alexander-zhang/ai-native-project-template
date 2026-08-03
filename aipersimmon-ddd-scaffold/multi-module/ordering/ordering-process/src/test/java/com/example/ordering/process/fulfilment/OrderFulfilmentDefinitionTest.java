@@ -40,14 +40,14 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the pure {@link OrderFulfilmentDefinition} transition table — the first tests in
- * the {@code ordering-process} module (issue-00035). They drive {@code react} directly with a
- * hand-built {@link ProcessContext}, so no runtime, database, or Spring context is involved.
+ * the {@code ordering-process} module. They drive {@code react} directly with a hand-built {@link
+ * ProcessContext}, so no runtime, database, or Spring context is involved.
  *
  * <p>They cover the whole {@code (step, input)} matrix: the happy path, both compensation branches,
  * and — the point of the fix — the out-of-order and duplicate facts that a type-only switch
- * mishandled. They also pin the evidence-id source (issue-00042): each ref's id is the causing
- * envelope's {@code messageId}, and the two refs a cancellation carries are distinct; and the
- * stable {@code paymentOperationId} the process manager derives (issue-00041).
+ * mishandled. They also pin the evidence-id source: each ref's id is the causing envelope's {@code
+ * messageId}, and the two refs a cancellation carries are distinct; and the stable {@code
+ * paymentOperationId} the process manager derives.
  */
 class OrderFulfilmentDefinitionTest {
 
@@ -75,12 +75,12 @@ class OrderFulfilmentDefinitionTest {
 
     // Two commands, and the pairing is the point: the reservation now exists, so this is the moment
     // the order is genuinely under fulfilment and the moment payment can be asked for. Ordering's
-    // own state used to be advanced at placement, before anything had been reserved (issue-00070).
+    // own state used to be advanced at placement, before anything had been reserved.
     assertEquals(ORDER, dispatchedCommandOfType(decision, BeginFulfilment.class).orderId());
     RequestPayment command = dispatchedCommandOfType(decision, RequestPayment.class);
     assertEquals(ORDER, command.orderId());
     // The business idempotency key is the stable identity of the triggering fact (the cause), so a
-    // redelivery of the same StockReserved yields the same paymentOperationId (issue-00041).
+    // redelivery of the same StockReserved yields the same paymentOperationId.
     assertEquals("msg-reserved", command.paymentOperationId());
   }
 
@@ -165,7 +165,7 @@ class OrderFulfilmentDefinitionTest {
     assertEquals(Step.AWAITING_STOCK_RELEASE.name(), decision.step().value());
     // "Exactly as a decline does" plus the one thing a decline does not need: the decline path
     // dispatches only the release, while the timeout also voids the still-open operation
-    // (issue-00144) — asserted in its own test above.
+    // — asserted in its own test above.
     RequestStockRelease release = dispatchedCommandOfType(decision, RequestStockRelease.class);
     assertEquals("res-1", release.reservationId(), "the same handle inventory issued");
     // What distinguishes it afterwards is the recorded code and the evidence, not the path.
@@ -175,7 +175,7 @@ class OrderFulfilmentDefinitionTest {
     assertNoEffectOfType(decision, CancelDeadline.class);
   }
 
-  // ---------- the orphaned authorization hold (issue-00144) ----------
+  // ---------- the orphaned authorization hold ----------
 
   @Test
   void abandoningThePaymentWaitOnTimeoutVoidsTheOutstandingOperation() {
@@ -267,7 +267,7 @@ class OrderFulfilmentDefinitionTest {
     assertTrue(decision.effects().isEmpty());
   }
 
-  // ---------- the stock deadlines (issue-00068) ----------
+  // ---------- the stock deadlines ----------
 
   @Test
   void startingTheFlowArmsTheStockDeadline() {
@@ -385,7 +385,7 @@ class OrderFulfilmentDefinitionTest {
         onlyEffectOfType(timedOut, ScheduleDeadline.class).name());
   }
 
-  // ---------- compensation branches + evidence identity (issue-00042) ----------
+  // ---------- compensation branches + evidence identity ----------
 
   @Test
   void reservationFailedCompensatesWithFailureEvidenceIdFromTheCause() {
@@ -400,7 +400,7 @@ class OrderFulfilmentDefinitionTest {
     CancelOrder cancel = assertInstanceOf(CancelOrder.class, dispatchedCommand(decision));
     CancellationReason.InventoryUnavailable reason =
         assertInstanceOf(CancellationReason.InventoryUnavailable.class, cancel.reason());
-    // Evidence id is the causing envelope's messageId, not orderId (issue-00042).
+    // Evidence id is the causing envelope's messageId, not orderId.
     assertEquals("msg-failed", reason.failure().failureId());
   }
 
@@ -438,7 +438,7 @@ class OrderFulfilmentDefinitionTest {
         assertInstanceOf(
             CancellationReason.PaymentDeclinedAfterStockReleased.class, cancel.reason());
     // The decline ref keeps the decline event's id; the release ref takes the release event's id —
-    // distinct identities, not the same business key twice (issue-00042).
+    // distinct identities, not the same business key twice.
     assertEquals("msg-declined", reason.paymentDecline().declineId());
     assertEquals("msg-released", reason.stockRelease().releaseId());
     assertNotEquals(reason.paymentDecline().declineId(), reason.stockRelease().releaseId());
@@ -461,10 +461,10 @@ class OrderFulfilmentDefinitionTest {
   }
 
   /**
-   * The one terminal decision that left its timer armed (issue-00150): a cancelled order whose
-   * reservation then fails is finished — and the STOCK deadline set when the reservation was
-   * requested must be disarmed on the way out, like every other exit from a deadline-guarded step.
-   * The generation guard would absorb the stray firing, but that is the safety net, not the walk.
+   * The one terminal decision that left its timer armed: a cancelled order whose reservation then
+   * fails is finished — and the STOCK deadline set when the reservation was requested must be
+   * disarmed on the way out, like every other exit from a deadline-guarded step. The generation
+   * guard would absorb the stray firing, but that is the safety net, not the walk.
    */
   @Test
   void aFailedReservationForACancelledOrderDisarmsTheStockDeadline() {
@@ -520,7 +520,7 @@ class OrderFulfilmentDefinitionTest {
     assertEquals(3, ids.size(), "failure, decline, and release evidence ids must be distinct");
   }
 
-  // ---------- out-of-order facts must be ignored, not mis-handled (issue-00035) ----------
+  // ---------- out-of-order facts must be ignored, not mis-handled ----------
 
   @Nested
   class OutOfOrderFactsAreIgnored {

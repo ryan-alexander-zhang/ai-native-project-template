@@ -1,9 +1,9 @@
 package com.example.ordering.api;
 
 /**
- * The published language's shared refusals (issue-00143): parse, don't validate. A payload that
- * cannot honour the contract is refused in the record's compact constructor, so the consuming
- * bridge sees a construction failure at deserialization time — Jackson surfaces it as a {@code
+ * The published language's shared refusals: parse, don't validate. A payload that cannot honour the
+ * contract is refused in the record's compact constructor, so the consuming bridge sees a
+ * construction failure at deserialization time — Jackson surfaces it as a {@code
  * ValueInstantiationException}, a {@code JsonProcessingException}, which the consumer's error
  * handler already dead-letters at once — instead of nulls travelling into a handler and failing
  * there as an ambiguous, pointlessly retried NPE. Package-private: this is how the contract types

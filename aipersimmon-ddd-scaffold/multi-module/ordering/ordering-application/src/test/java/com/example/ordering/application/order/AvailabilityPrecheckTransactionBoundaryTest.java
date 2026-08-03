@@ -29,13 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 /**
- * The availability precheck must run <em>outside</em> the command's write transaction
- * (issue-00141). It is a synchronous cross-context call, and the gateway's own javadoc promises it
- * will one day be an HTTP client behind the same interface — at which point a precheck that runs
- * inside the transaction holds a database connection hostage to a remote call, and a slow inventory
- * service amplifies into an exhausted ordering connection pool. The check is advisory (the
- * authoritative reservation is asynchronous and compensable), so it contributes nothing to the
- * transaction it used to occupy.
+ * The availability precheck must run <em>outside</em> the command's write transaction. It is a
+ * synchronous cross-context call, and the gateway's own javadoc promises it will one day be an HTTP
+ * client behind the same interface — at which point a precheck that runs inside the transaction
+ * holds a database connection hostage to a remote call, and a slow inventory service amplifies into
+ * an exhausted ordering connection pool. The check is advisory (the authoritative reservation is
+ * asynchronous and compensable), so it contributes nothing to the transaction it used to occupy.
  *
  * <p>Assembled by hand from the real bus and the real transaction interceptor, with a boundary-
  * marking {@link UnitOfWork} standing in for the transaction manager: whatever runs inside {@code

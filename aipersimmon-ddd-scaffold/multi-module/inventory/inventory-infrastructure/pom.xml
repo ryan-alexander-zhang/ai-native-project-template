@@ -19,20 +19,20 @@
 
   <dependencies>
     <!-- Version-checked aggregate repository base + the optimistic-locker InnerInterceptor
-         contribution (design-00011). -->
+         contribution. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
     </dependency>
     <!-- DomainEvents: the repository drains the aggregate's recorded events as part of save,
-         inside the command transaction, so no handler has to remember a second call (issue-00052). -->
+         inside the command transaction, so no handler has to remember a second call. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-application</artifactId>
     </dependency>
     <!-- org.springframework.dao.OptimisticLockingFailureException: the repository raises it when a
          version-checked update matches no row, and the framework's ConcurrencyTranslationCommandInterceptor
-         turns it into ConcurrencyConflictException -> HTTP 409 (issue-00051). -->
+         turns it into ConcurrencyConflictException -> HTTP 409. -->
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-tx</artifactId>
@@ -46,7 +46,7 @@
       adapters here implement domain repository ports, so inventory-domain was enough; a READ port
       belongs to the application layer (the aggregate boundary governs writes, not reads), which is
       why answering it needs this dependency. Same shape as ordering-infrastructure implementing
-      OrderQueries (issue-00084).
+      OrderQueries.
     -->
     <dependency>
       <groupId>${project.groupId}</groupId>
@@ -57,7 +57,7 @@
       <artifactId>spring-context</artifactId>
     </dependency>
     <!-- MyBatis-Plus for the JDBC persistence adapters (BaseMapper, wrappers, @TableName). No
-         <version> here: the reactor root imports mybatis-plus-bom, which manages it (issue-00088). -->
+         <version> here: the reactor root imports mybatis-plus-bom, which manages it. -->
     <dependency>
       <groupId>com.baomidou</groupId>
       <artifactId>mybatis-plus-core</artifactId>

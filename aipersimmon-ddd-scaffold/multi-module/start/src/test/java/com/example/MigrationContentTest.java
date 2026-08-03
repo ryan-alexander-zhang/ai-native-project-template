@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test;
 /**
  * A versioned migration describes structure; it does not carry data.
  *
- * <p>There is no natural failing test for {@code issue-00072}, because the demo seed is something
- * the test suite <em>wants</em> to exist — seven acceptance tests still place orders for {@code
+ * <p>There is no natural failing test for the rule itself, because the demo seed is something the
+ * test suite <em>wants</em> to exist — seven acceptance tests still place orders for {@code
  * CUST-1}. What was wrong was never the seed itself but its location: {@code db/migration} runs
  * exactly once in every environment Flyway is pointed at, with no way to opt out, so a project
  * copied from this scaffold gets a customer named Acme in its production database on the first
@@ -58,7 +58,7 @@ class MigrationContentTest {
                   + " carries data. A versioned migration runs once in EVERY environment and"
                   + " cannot be switched off per profile, so demo or seed rows placed here reach"
                   + " production too — put them in db/dev, which only the dev profile loads"
-                  + " (issue-00072).");
+                  + ".");
     }
   }
 }

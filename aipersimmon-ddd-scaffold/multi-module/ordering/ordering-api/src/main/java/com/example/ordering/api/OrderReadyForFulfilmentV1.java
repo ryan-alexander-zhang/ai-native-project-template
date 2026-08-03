@@ -41,7 +41,7 @@ public record OrderReadyForFulfilmentV1(String orderId, List<Line> lines)
 
   public OrderReadyForFulfilmentV1 {
     // Frozen does not mean lax: v1 messages still arrive from the wire, so a poison v1 payload is
-    // refused at parse time exactly like a v2 one (issue-00143).
+    // refused at parse time exactly like a v2 one.
     Contract.required(orderId, "orderId");
     if (lines == null || lines.isEmpty()) {
       throw new IllegalArgumentException("lines required and must not be empty");

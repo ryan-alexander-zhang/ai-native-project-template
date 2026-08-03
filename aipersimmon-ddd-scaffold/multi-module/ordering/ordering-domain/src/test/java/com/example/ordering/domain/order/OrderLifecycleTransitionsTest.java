@@ -66,10 +66,10 @@ class OrderLifecycleTransitionsTest {
   }
 
   /**
-   * Every refused mechanical move carries a stable code, declared once in the transition table
-   * (issue-00138). Before the table could name refusals, these three reached the edge as codeless
-   * exceptions while every cancel/review refusal had its own {@code OrderingErrorCode} — the same
-   * aggregate, two error contracts.
+   * Every refused mechanical move carries a stable code, declared once in the transition table.
+   * Before the table could name refusals, these three reached the edge as codeless exceptions while
+   * every cancel/review refusal had its own {@code OrderingErrorCode} — the same aggregate, two
+   * error contracts.
    */
   @Test
   void illegalForwardTransitionsAreRejectedWithTheirDeclaredCodes() {

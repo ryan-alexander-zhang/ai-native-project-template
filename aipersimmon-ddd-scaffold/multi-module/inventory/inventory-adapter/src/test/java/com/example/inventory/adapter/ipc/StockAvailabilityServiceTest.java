@@ -15,12 +15,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * The Open Host Service's verdict is about the quantity asked for (issue-00150). The previous
- * contract carried SKUs alone, so this gate could only answer "is any on hand?" — a 999-unit order
- * passed synchronously against a stock of 5, was placed, and then walked the entire compensation
- * circle a quantity-aware answer would have spared. Assembled from the real handler over the real
- * query bus with a stubbed read port, because what is under test is the verdict arithmetic, not the
- * wiring.
+ * The Open Host Service's verdict is about the quantity asked for. The previous contract carried
+ * SKUs alone, so this gate could only answer "is any on hand?" — a 999-unit order passed
+ * synchronously against a stock of 5, was placed, and then walked the entire compensation circle a
+ * quantity-aware answer would have spared. Assembled from the real handler over the real query bus
+ * with a stubbed read port, because what is under test is the verdict arithmetic, not the wiring.
  */
 class StockAvailabilityServiceTest {
 

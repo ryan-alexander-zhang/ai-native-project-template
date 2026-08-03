@@ -23,9 +23,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Proves pool multi-tenancy (design-00009) end to end on the ordering scaffold: two tenants that
- * share the very same natural keys ({@code CUST-1} / {@code SKU-1}) are fully isolated. Each tenant
- * places an order under its own bound {@link TenantContext}; the write-side authority ({@code
+ * Proves pool multi-tenancy end to end on the ordering scaffold: two tenants that share the very
+ * same natural keys ({@code CUST-1} / {@code SKU-1}) are fully isolated. Each tenant places an
+ * order under its own bound {@link TenantContext}; the write-side authority ({@code
  * CommandContext.tenantId}) rides the whole durable cascade — outbox → Kafka ({@code ce_tenantid})
  * → inbox → the process manager's {@code ConfirmOrder} — so each order confirms under, and only
  * under, its originating tenant.
@@ -124,9 +124,8 @@ class TwoTenantAcceptanceTest {
    * JdbcTemplate} used right here cannot file one tenant's row under another tenant's parent.
    *
    * <p>Deliberately written with the raw template, which the interceptor never sees. Before {@code
-   * V4} the foreign key was {@code order_lines.order_id} alone and this INSERT succeeded
-   * (issue-00091): tenant isolation had exactly one enforcement point, and everything that went
-   * around it had none.
+   * V4} the foreign key was {@code order_lines.order_id} alone and this INSERT succeeded : tenant
+   * isolation had exactly one enforcement point, and everything that went around it had none.
    */
   @Test
   void anOrderLineCannotBeFiledUnderAnotherTenantsOrder() {

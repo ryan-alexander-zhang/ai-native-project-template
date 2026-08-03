@@ -21,7 +21,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The invariants' last line of defence, asserted where it lives: in the schema (issue-00146).
+ * The invariants' last line of defence, asserted where it lives: in the schema.
  *
  * <p>The argument is V1_4's / V2_4's, applied to the rules it was not applied to: the aggregates'
  * guards and the tenant interceptor are the application, and everything that bypasses the
@@ -31,7 +31,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * constraints landed, every insert below was accepted.
  *
  * <p>Shares its application context (and containers) with the other tests carrying this exact
- * {@code properties} block — see issue-00092 for why that matters.
+ * {@code properties} block — a divergent copy would start its own container pair, and {@code
+ * TestContextCountTest} pins the count.
  */
 @SpringBootTest(
     properties = {
