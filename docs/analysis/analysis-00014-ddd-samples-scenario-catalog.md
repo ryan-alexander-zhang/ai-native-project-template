@@ -357,6 +357,11 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-operation-log`（非注解入口记录）、`aipersimmon-ddd-tenancy`；调度与互斥为
 三方选型。
 
+**文档**：[[analysis-00024-samples-scheduled-and-batch-entries]]（已完成）。落地时修正了上面
+"多实例部署时的调度互斥"这条的隐含前提：**互斥不属于调度，属于工作**——库自己的 outbox relay 让每个
+实例都跑调度、按行领取，并在 javadoc 里说明了锁调度为何是更差的交换。因此三方调度锁（ShedLock 等）
+不是本篇的答案，也不是库需要的东西。
+
 ### S12 CQRS 读模型：事件驱动的投影（P1）
 
 **场景描述**：查询的形状与写模型差异很大（跨聚合汇总、列表页、报表），直接查写模型既慢又扭曲

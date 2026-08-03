@@ -29,6 +29,7 @@ variants of the framework modules are not used.
 | S2 Idempotency and replay protection | [s02-http-idempotency](s02-http-idempotency) | `analysis-00017` |
 | S3 Domain events, in process | [s03-domain-events-in-process](s03-domain-events-in-process) | `analysis-00020` |
 | S8 Transactions and the optimistic lock | [s08-local-transaction-aggregate](s08-local-transaction-aggregate) | `analysis-00021` |
+| S11 Entries that are not HTTP | [s11-scheduled-and-batch-entries](s11-scheduled-and-batch-entries) | `analysis-00024` |
 | S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |
 | S17 Aggregate to tables | [s17-aggregate-persistence-mapping](s17-aggregate-persistence-mapping) | `analysis-00018` |
 | S18 Testing strategy | [s18-testing-strategy](s18-testing-strategy) | `analysis-00019` |

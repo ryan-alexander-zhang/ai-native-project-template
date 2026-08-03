@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: s11-scheduled-and-batch-entries
+  datasource:
+    url: jdbc:postgresql://localhost:18111/s11
+    username: s11
+    password: s11
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18110
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ordering:
+  sweep:
+    # Every instance runs this schedule; see ExpiredOrderSweepScheduler for why that is safe.
+    enabled: true
+    poll-delay-ms: 1000
+    # How many orders one round may take on. A round is bounded so a backlog drains over rounds
+    # instead of one round trying to hold the whole backlog.
+    batch-size: 100
