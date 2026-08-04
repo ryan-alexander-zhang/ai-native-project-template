@@ -36,6 +36,7 @@ variants of the framework modules are not used.
 | S9 A flow that must converge, and compensation | [s09-eventual-consistency-process-manager](s09-eventual-consistency-process-manager) | `analysis-00032` |
 | S10 One outcome across two databases (Seata AT and TCC) | [s10-strong-consistency-seata](s10-strong-consistency-seata) | `analysis-00033` |
 | S11 Entries that are not HTTP | [s11-scheduled-and-batch-entries](s11-scheduled-and-batch-entries) | `analysis-00024` |
+| S12 A read model no join could produce | [s12-cqrs-read-model](s12-cqrs-read-model) | `analysis-00034` |
 | S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |
 | S17 Aggregate to tables | [s17-aggregate-persistence-mapping](s17-aggregate-persistence-mapping) | `analysis-00018` |
 | S18 Testing strategy | [s18-testing-strategy](s18-testing-strategy) | `analysis-00019` |

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>aipersimmon-ddd-samples</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s12-cqrs-read-model</artifactId>
+  <packaging>pom</packaging>
+  <name>s12-cqrs-read-model</name>
+  <description>S12: a read model that no join could produce, and what maintaining it costs.</description>
+
+  <!--
+    Two services, because the projection's justification is cross-context.
+
+    S20 already shows a list endpoint served straight from the write model, with paging done properly —
+    and for a list of one context's own data that is the right answer, projection or not. What forces a
+    projection here is that the list needs a product name, and products belong to another bounded
+    context in another database. No SQL join reaches it. That, rather than a row count, is the
+    threshold this sample exists to name.
+
+    No third module, unlike S10 — and the difference is worth naming rather than assuming. There the
+    property under test (one global transaction spanning two resources) genuinely cannot be observed one
+    service at a time, so a harness booting both was the only honest instrument. Here the property is the
+    wire record: the catalogue's test asserts the record it emits, the ordering service's test starts from
+    a record on the topic and asserts what it does with it. Each side is tested against the contract, which
+    is also what a foreign producer or consumer would exercise. S4 settled that pattern; S12 reuses it.
+  -->
+  <modules>
+    <module>catalog-service</module>
+    <module>ordering-service</module>
+  </modules>
+</project>

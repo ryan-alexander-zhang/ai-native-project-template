@@ -1,0 +1,53 @@
+spring:
+  application:
+    # Also the inbox's `consumer` identity and the Kafka consumer group. Two services sharing one inbox
+    # table and one name would suppress each other's processing of the same message.
+    name: s12-ordering-service
+  datasource:
+    url: jdbc:postgresql://localhost:18121/ordering
+    username: ordering
+    password: ordering
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18124
+    consumer:
+      auto-offset-reset: earliest
+
+server:
+  port: 18120
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ordering:
+  catalog-events-topic: catalog.events
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /ordering
+    flyway:
+      # The inbox is what this service needs. The outbox is carried under protest: the Kafka starter's
+      # durable-transport guard fails startup whenever @Externalized events exist and the active publisher is
+      # not durable — and a consumer must declare its copy of the contract @Externalized to derive its topic
+      # set from it. So a consume-only service is forced to carry a durable publisher it never uses, and these
+      # tables stay empty. Already filed against the library as
+      # issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher; S12 confirms it independently.
+      components: [inbox, outbox]
+    outbox:
+      relay:
+        # Nothing is ever written to it, so nothing needs draining.
+        enabled: false
+    messaging:
+      kafka:
+        consumer:
+          # Off by default in the library: producing and consuming are separate decisions. This service
+          # consumes.
+          enabled: true
+
+logging:
+  level:
+    com.example.samples.s12: INFO

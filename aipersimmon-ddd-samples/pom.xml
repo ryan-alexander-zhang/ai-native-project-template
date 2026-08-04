@@ -40,6 +40,7 @@
     <module>s09-eventual-consistency-process-manager</module>
     <module>s10-strong-consistency-seata</module>
     <module>s11-scheduled-and-batch-entries</module>
+    <module>s12-cqrs-read-model</module>
     <module>s16-tactical-modelling</module>
     <module>s17-aggregate-persistence-mapping</module>
     <module>s18-testing-strategy</module>

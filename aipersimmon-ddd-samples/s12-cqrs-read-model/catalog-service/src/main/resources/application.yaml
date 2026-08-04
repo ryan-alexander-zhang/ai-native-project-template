@@ -1,0 +1,44 @@
+spring:
+  application:
+    # Also the outbox relay's ShedLock lock name.
+    name: s12-catalog-service
+  datasource:
+    url: jdbc:postgresql://localhost:18123/catalog
+    username: catalog
+    password: catalog
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18124
+
+server:
+  port: 18122
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+catalog:
+  events-topic: catalog.events
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /catalog
+    flyway:
+      components: [outbox]
+    outbox:
+      relay:
+        enabled: true
+      # 200ms rather than the default, because this delay is one of the two things the sample measures:
+      # it is the first term in "how stale can the order list be".
+      poll-delay-ms: 200
+    messaging:
+      kafka:
+        producer:
+          send-timeout-ms: 10000
+
+logging:
+  level:
+    com.aipersimmon.ddd.outbox: INFO
