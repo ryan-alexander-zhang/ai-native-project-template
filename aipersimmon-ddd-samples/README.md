@@ -33,6 +33,7 @@ variants of the framework modules are not used.
 | S6 Synchronous call between services | [s06-synchronous-call-between-services](s06-synchronous-call-between-services) | `analysis-00030` |
 | S7 A third party, in both directions | [s07-third-party-integration](s07-third-party-integration) | `analysis-00031` |
 | S8 Transactions and the optimistic lock | [s08-local-transaction-aggregate](s08-local-transaction-aggregate) | `analysis-00021` |
+| S9 A flow that must converge, and compensation | [s09-eventual-consistency-process-manager](s09-eventual-consistency-process-manager) | `analysis-00032` |
 | S11 Entries that are not HTTP | [s11-scheduled-and-batch-entries](s11-scheduled-and-batch-entries) | `analysis-00024` |
 | S16 Tactical modelling | [s16-tactical-modelling](s16-tactical-modelling) | `analysis-00016` |
 | S17 Aggregate to tables | [s17-aggregate-persistence-mapping](s17-aggregate-persistence-mapping) | `analysis-00018` |

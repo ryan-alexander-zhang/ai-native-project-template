@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: s09-eventual-consistency-process-manager
+  datasource:
+    url: jdbc:postgresql://localhost:18091/s09
+    username: s09
+    password: s09
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18090
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ticketing:
+  # How long each waiting step is willing to wait. Deliberately short for a sample; in a real deployment
+  # each is "longer than the step's honest worst case, shorter than a customer's patience". Note that both
+  # are the *flow's* numbers rather than the participants': the flow is the only place that knows what to
+  # do when the answer does not come.
+  seat-wait: PT30S
+  payment-wait: PT60S
+
+aipersimmon:
+  ddd:
+    flyway:
+      # The coordinator's four tables (instance, transition, effect, deadline) plus its ShedLock table.
+      # Omit this and the process manager's own schema validator refuses to start, naming this property —
+      # which is the good failure, because the alternative is the first order rolling back at runtime.
+      components: [process-manager]
+    process-manager:
+      # One flow per order, and a second start for the same order id is refused rather than folded into the
+      # first. `fold` is the other option and it is the right one when the starting fact is itself
+      # at-least-once from a broker; here the start comes from a command whose id is already unique, so a
+      # duplicate business key would mean two orders claiming one id — a defect worth hearing about.
+      start-duplicate-business-key: reject
+      # The two workers that make the flow move without anybody asking. Both are ordinary leased pollers,
+      # so every instance runs them and the lease decides who does the work.
+      effect-relay:
+        enabled: true
+        poll-delay: 200ms
+      deadline-worker:
+        enabled: true
+        poll-delay: 200ms
+      observability:
+        # How long an instance may sit at one step before the health indicator calls it stuck. Lower than
+        # the default so a sample's operator endpoint has something to show.
+        stuck-threshold: 2m

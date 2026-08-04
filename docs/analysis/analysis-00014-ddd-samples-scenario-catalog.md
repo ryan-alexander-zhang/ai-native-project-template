@@ -356,6 +356,25 @@ precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最�
 `aipersimmon-ddd-process-manager-engine`、`aipersimmon-ddd-process-manager-mybatis-plus`、
 以及 S4 的全部事件链路组件。
 
+**文档**：[[analysis-00032-samples-eventual-consistency-process-manager]]（已完成，单模块三聚合：座位/钱包/订单，
+业务域是卖一张票）。落地结论：选**编排**的判据是"补偿有顺序（先退钱→再放座→最后取消），有顺序的东西必须有个地方
+住"，代价是参与者的 handler 知道存在协调者。**补偿不是回滚**用钱包分录表钉死：退款是**另一条 credit**
+（`refund-of:<那笔 debit>`），两条永久留在流水上；放座是 `released_at` 而不是 DELETE；出票之后是**不可回头点**，
+而且库比我的代码更强——终态实例被 runtime 直接短路（`DefaultProcessRuntime:510`），定义连问都不会被问到。
+**谁持有真相**：聚合的 status 是真相，流程的 step 只是"在等什么"，两者按设计会不一致（AWAITING_TICKET 时订单仍
+PLACED，有测试断言这个窗口是对的）；判据一句话——**流程可以记事实，不可以记结论**，并有一条反射
+`getRecordComponents()` 的结构性测试禁止 state 里出现 OrderStatus。定义是纯的（ArchUnit 钉住），回报是 7 个不用
+数据库的单测，代价是后续步骤要的东西必须由 state 带走。**不需要 inbox**：effect 以自己的持久化 message id 投递，
+handler 原样交回当 cause，重投产生逐字节相同的 input id 被 runtime 认出——inbox 管的是外部消息，这是同一想法的
+另一个边界。**codec 必须显式登记**，实测：删一条登记＋保留 `declaredPayloads` → 启动失败点名；声明改空 → 启动成功
+且 24 个用例只有 1 红（那条补偿分支）。运维介入走完整条 DEAD→SUSPENDED→改数据→`redriveEffect`→恢复→出票；
+`redriveEffect` 只接受 DEAD（我最初拿它模拟重投，报错才发现）。什么时候该换 Temporal：state 里开始出现计数器和
+待办列表就已越界。两个库的问题：
+[[issue-00163-process-manager-worker-enabled-removes-the-bean-the-outbox-keeps]]（同名属性在 outbox 是停调度、
+在 pm 是删 bean，测试没法手动驱动）、
+[[issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended]]（挂起原因只说"哪件事"，"为什么"只在
+effect 行的 last_error 里，没有端口能读）。
+
 ### S10 强一致性：Seata 跨服务分布式事务（P0，双服务，完整可运行）
 
 **场景描述**：业务上无法接受任何中间态窗口，要求跨服务的多个写操作同时成功或同时失败，且调用方
