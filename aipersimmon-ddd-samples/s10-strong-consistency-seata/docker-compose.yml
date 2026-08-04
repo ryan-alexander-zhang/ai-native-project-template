@@ -1,0 +1,62 @@
+# Ports follow the samples convention: scenario N owns the block starting at 18000 + 10*N.
+# S10 uses 18100 (account service), 18101 (points service), 18102 and 18103 for their databases.
+# Seata's own ports are its defaults — 8091 for the coordinator's netty channel, 7091 for its console —
+# because the clients address it by literal host:port and its file registry has nothing to redirect with.
+#
+# Three things here are load-bearing rather than boilerplate:
+#
+#   1. Two databases, not one schema with two prefixes. A distributed transaction with one resource is a
+#      local transaction with extra steps, and every interesting property of this sample (two branches, two
+#      undo logs, one coordinator decision) needs the resources to be genuinely separate.
+#   2. undo_log is created by the database's own init script, not by either service's migrations. It has to
+#      be: Seata verifies the table exists while the DataSource bean is being constructed, and every
+#      in-application migration mechanism runs after the DataSource exists. There is no switch to defer it.
+#   3. The coordinator stores its state in a file inside the container, which is fine for a sample and wrong
+#      for a deployment — a restart loses in-flight global transactions, so anything mid-rollback stays
+#      half-applied with its locks held. Production uses store.mode=db or raft.
+services:
+  seata-server:
+    image: apache/seata-server:2.6.0.jdk21
+    ports:
+      - "8091:8091"
+      - "7091:7091"
+    environment:
+      # The address the coordinator reports for itself. Must be reachable by the clients.
+      SEATA_IP: 127.0.0.1
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8091 || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  account-db:
+    image: postgres:16-alpine
+    ports:
+      - "18102:5432"
+    environment:
+      POSTGRES_DB: s10_account
+      POSTGRES_USER: s10
+      POSTGRES_PASSWORD: s10
+    volumes:
+      - ./docker/undo_log.sql:/docker-entrypoint-initdb.d/00-undo-log.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s10 -d s10_account"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  points-db:
+    image: postgres:16-alpine
+    ports:
+      - "18103:5432"
+    environment:
+      POSTGRES_DB: s10_points
+      POSTGRES_USER: s10
+      POSTGRES_PASSWORD: s10
+    volumes:
+      - ./docker/undo_log.sql:/docker-entrypoint-initdb.d/00-undo-log.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s10 -d s10_points"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

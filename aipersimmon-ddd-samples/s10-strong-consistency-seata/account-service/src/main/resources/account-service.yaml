@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: s10-account-service
+  datasource:
+    url: jdbc:postgresql://localhost:18102/s10_account
+    username: s10
+    password: s10
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/account
+    # See points-service's application.yaml: undo_log is provisioned with the database, so Flyway inherits
+    # a non-empty schema and must be told to baseline at 0.
+    baseline-on-migrate: true
+    baseline-version: 0
+
+server:
+  port: 18100
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+banking:
+  points-service-url: http://localhost:18101
+  points-connect-timeout-ms: 1000
+  # Must stay well below seata.tm's global transaction timeout, or the coordinator starts rolling back
+  # branches that are still working.
+  points-read-timeout-ms: 3000
+
+aipersimmon:
+  ddd:
+    tenancy:
+      enabled: true
+      trust-header: true
+      mybatis-plus:
+        tenant-tables:
+          - s10_account
+    cqrs:
+      retry-on-conflict:
+        # Deliberately off, and this is the one place in the samples where that is a considered decision
+        # rather than a default. Inside a global transaction the second writer does not fail with
+        # OptimisticLockingFailureException — it fails with a global lock timeout at commit, which this
+        # interceptor does not recognise. Turning it on would add retries that never fire and hide the fact
+        # that the contention is now resolved somewhere else entirely.
+        enabled: false
+
+seata:
+  enabled: true
+  application-id: s10-account-service
+  tx-service-group: default_tx_group
+  enable-auto-data-source-proxy: true
+  data-source-proxy-mode: AT
+  registry:
+    type: file
+  config:
+    type: file
+  service:
+    vgroup-mapping:
+      default_tx_group: default
+    grouplist:
+      default: 127.0.0.1:8091
+  client:
+    rm:
+      lock:
+        # How long a global transaction waits for a lock another one holds before giving up. Short on
+        # purpose: contention on a hot row should surface as a fast refusal rather than a slow queue.
+        retry-times: 10
+        retry-interval: 100
+
+logging:
+  level:
+    org.apache.seata: INFO

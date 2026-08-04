@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>s10-strong-consistency-seata</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s10-distributed-transaction-tests</artifactId>
+  <name>s10-distributed-transaction-tests</name>
+  <description>S10: the assertions that need both services, one coordinator and two databases.</description>
+
+  <!--
+    A module that exists only to hold tests, because the property under test only exists between the two
+    services. Both are compile dependencies here rather than test dependencies: the harness boots them as
+    Spring applications, so it needs their auto-configuration on the classpath the way a deployment would.
+
+    One JVM, two Spring contexts, two Tomcats, two DataSources — so the HTTP hop and the XID header are
+    real and only the process boundary is simulated. What that costs in fidelity is named in the harness.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>com.example.samples</groupId>
+      <artifactId>s10-account-service</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.example.samples</groupId>
+      <artifactId>s10-points-service</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -399,6 +399,27 @@ effect 行的 last_error 里，没有端口能读）。
 `aipersimmon-ddd-persistence-mybatis-plus`、`aipersimmon-ddd-outbox-mybatis-plus`；Seata 为
 三方依赖，sample 自带 seata-server + 多库 compose 与 `undo_log` 迁移。
 
+**文档**：[[analysis-00033-samples-strong-consistency-seata]]（已完成，三模块：account-service +
+points-service + 一个端到端测试模块，两个库、一个真 seata-server，29 个用例）。**§3.1 的阻塞前提已验证通过**：
+AT 与本库的两层 SQL 改写（乐观锁的 `WHERE version = ?` + 租户行的 `AND tenant_id = ?`）能共存，所以主线用 AT，
+TCC 作为可度量的对照而不是退路。证据是直接读 `undo_log.rollback_info`：前后镜像都把 `version` 当普通列捕获
+（前 1 后 2，所以回滚会还原它——否则数据对而行永久不可写）、`tenant_id` 与 `id` 都是 `PRIMARY_KEY`（从表元数据取的
+复合键）、cleared-column 的 `SET ... = NULL` 也进了后镜像。**为什么能共存一句话**：拦截器在 DataSource 之上改写，
+Seata 的代理就是 DataSource，等它解析时改写早已完成。**最先撞到的墙是 undo_log 不能由应用迁移**：Seata 在
+`DataSourceProxy.init` 里无条件检查这张表，那发生在 DataSource bean 构造期间，而 Flyway / `spring.sql.init` /
+本库的 flyway components 全在其后；没有属性能推迟，所以它属于数据库侧，连带要 `baseline-on-migrate: true` +
+`baseline-version: 0`。**边界画在命令总线上面一层**（分支＝一次已提交的本地事务＋它的 undo log，所以本地事务必须在
+全局事务内部起止），并附 Spring 与 Seata 回滚默认值相反这一条。**"强一致"不等于没有中间态**：扣款真的提交了，
+普通读者看得见，实测在事务开着的第 1 秒断言；它保证的是别的**全局事务**碰不到。这既是保证也是账单，实测 AT
+锁住整行整个业务事务（锁键 `s10_points_account:acme_shared-loyalty;s10_points_entry:acme_contend-at`——完整复合主键，
+且**子行和根行一起锁**）而 TCC 在 Try 提交后就放开。**AT/TCC 判据**：TCC 的三方法是聚合承认"已预留"属于它自己的
+语言——业务本来有这个词就该补上，没有就是在造假状态，AT 更诚实；竞争程度是决胜局不是首要问题。对本库使用者的
+具体后果：全局锁超时是 `QueryTimeoutException` 不是 `OptimisticLockingFailureException`，`retry-on-conflict`
+认不出，本篇显式关掉并写了理由。端到端模块顺带暴露三个"两个 Spring Boot 应用共用一个 classpath"的冲突（base
+package 互吞、两个 `application.yaml` 一个赢、两个 `V1__*.sql` 撞版本号），都在服务侧改掉；以及
+`SpringApplicationBuilder.properties(...)` 落在 `defaultProperties` 优先级低于应用 yaml，覆盖会被静默忽略。
+**本轮没有发现库的问题**，这本身是结论：库的写路径在第三方分布式事务框架下一行都不用改。
+
 ### S11 非 HTTP 入口：定时任务 / 批处理（P1）
 
 **场景描述**：业务动作由时间触发（对账、过期关单、批量重算）。这些入口应与 HTTP 入口收敛到
@@ -756,13 +777,25 @@ process-manager 当作业队列用。
 
 这两条不是文档选择，是会决定 sample 能否写成的事实，需在对应场景动工前先验证。
 
-### 3.1 Seata AT 与本库拦截器能否共存（阻塞 S10）
+### 3.1 Seata AT 与本库拦截器能否共存（曾阻塞 S10；**2026-08-04 已验证通过**）
 
-Seata AT 通过解析它拦截到的 SQL 生成 before/after 镜像来构造 `undo_log`；而本库的聚合写入
-已经被乐观锁的版本条件与租户改写过。两层 SQL 改写叠加是否仍能正确回滚，**目前无人验证**。
-S10 要求完整可运行，所以这条必须先跑通一个最小验证：一个带 version 列的聚合在 AT 模式下被
-全局回滚，检查数据与 `undo_log` 是否正确。若不兼容，S10 主线改用 TCC（Try/Confirm/Cancel 与
-聚合方法一一对应，本身也更贴 DDD），AT 作为"为什么不用"的对照写进文档。
+原始疑问：Seata AT 通过解析它拦截到的 SQL 生成 before/after 镜像来构造 `undo_log`；而本库的聚合写入
+已经被乐观锁的版本条件与租户改写过。两层 SQL 改写叠加是否仍能正确回滚。
+
+**结论：能，库一行都不用改。** 先用一个独立探针跑最小验证（一个带 version 列、带 tenant 列、复合主键的
+聚合在 AT 模式下被全局回滚），再把结论落成 S10 里的常驻测试。判据不是"测试绿了"，而是直接读
+`undo_log.rollback_info`：前后镜像把 `version` 当普通列捕获（前 1 后 2 → 回滚会还原它；若留在 2，
+数据是对的而任何持 version=1 快照的写入者永久失败）、`tenant_id` 与 `id` 都标 `PRIMARY_KEY`（Seata 从表
+元数据取复合键，不从被改写的谓词里猜）、框架 cleared-column 强制的 `SET ... = NULL` 也进了后镜像。
+
+**为什么能共存**：拦截器在 DataSource **之上**改写 SQL，而 Seata 的代理**就是** DataSource——等 Seata
+解析时改写早已完成，它看到的是普通最终 SQL。
+
+所以 S10 主线用 AT；TCC 仍然写进 sample，但作为**可度量的对照**（AT 锁住行整个业务事务 vs TCC 在 Try
+提交后放开）而不是退路。详见 [[analysis-00033-samples-strong-consistency-seata]] §1。
+
+顺带确定的一条部署约束：**`undo_log` 不能由应用迁移创建**——Seata 在 `DataSourceProxy.init` 里无条件检查
+它，而那发生在 DataSource bean 构造期间，早于 Flyway / `spring.sql.init` / 本库的 flyway components。
 
 ### 3.2 从未被任何场景覆盖的库能力（本轮已全部认领）
 

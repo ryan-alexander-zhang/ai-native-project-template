@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: s10-points-service
+  datasource:
+    url: jdbc:postgresql://localhost:18103/s10_points
+    username: s10
+    password: s10
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/points
+    # undo_log is provisioned with the database (see the README), so the schema is not empty when Flyway
+    # first runs and it refuses to adopt it without being told to. baseline-version must be 0, or Flyway
+    # baselines *at* 1 and treats V1__points.sql as already applied — which fails much later, as a missing
+    # table rather than as a migration error.
+    baseline-on-migrate: true
+    baseline-version: 0
+
+server:
+  port: 18101
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+aipersimmon:
+  ddd:
+    tenancy:
+      enabled: true
+      # A sample's shortcut: the tenant is believed from the header. Real systems derive it from the
+      # authenticated principal, which is S14's subject.
+      trust-header: true
+      mybatis-plus:
+        tenant-tables:
+          - s10_points_account
+          - s10_points_entry
+
+seata:
+  enabled: true
+  application-id: s10-points-service
+  tx-service-group: default_tx_group
+  # The proxy is what turns this service's local transactions into branches. Without it the service still
+  # works, still answers, and silently stops being a participant — which is negative control 3.
+  enable-auto-data-source-proxy: true
+  data-source-proxy-mode: AT
+  registry:
+    type: file
+  config:
+    type: file
+  service:
+    vgroup-mapping:
+      default_tx_group: default
+    grouplist:
+      default: 127.0.0.1:8091
+
+logging:
+  level:
+    org.apache.seata: INFO

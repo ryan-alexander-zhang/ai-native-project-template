@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>aipersimmon-ddd-samples</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s10-strong-consistency-seata</artifactId>
+  <packaging>pom</packaging>
+  <name>s10-strong-consistency-seata</name>
+  <description>S10: two services, two databases, one outcome — a distributed transaction.</description>
+
+  <!--
+    Three modules, and the third one is the point.
+
+    A global transaction cannot be demonstrated one service at a time. Each service's own tests can
+    show that its writes are correct and that its participant is idempotent, but "the debit and the
+    award commit together or neither does" is a property of the pair plus the transaction coordinator,
+    and it is exactly the property that quietly stops holding when someone forgets to propagate the
+    XID. So the assertions that matter live in a module that boots both services against one Seata
+    server and two databases.
+
+    Seata itself is a third-party dependency here. The library has no Seata integration and does not
+    need one: what makes this work is that the library's write path is ordinary MyBatis-Plus over an
+    ordinary DataSource, which is what Seata's proxy expects.
+  -->
+  <modules>
+    <module>account-service</module>
+    <module>points-service</module>
+    <module>distributed-transaction-tests</module>
+  </modules>
+
+  <properties>
+    <!-- Seata 2.6.0 is the first line that ships an AutoConfiguration.imports, so it is the first
+         that autoconfigures on Spring Boot 3 without a spring.factories shim. -->
+    <seata.version>2.6.0</seata.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.seata</groupId>
+        <artifactId>seata-spring-boot-starter</artifactId>
+        <version>${seata.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>
