@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>aipersimmon-ddd-samples</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s22-operability-deadletters-retention</artifactId>
+  <packaging>pom</packaging>
+  <name>s22-operability-deadletters-retention</name>
+  <description>S22: what a message flow needs before it can be operated — dead letters, replay, retention, and the guards that speak up at startup.</description>
+
+  <!--
+    Two modules, because the two halves of "a message went nowhere" are owned by different services
+    and neither can see the other's evidence. The publisher's give-up ends in a table it owns
+    (aipersimmon_dead_letter) and is replayed through an endpoint it owns. The consumer's give-up
+    ends on a topic (<topic>.DLT) that must have been provisioned before the first bad record, and
+    nothing the publisher does can rescue it. A sample with one module would have to pick a side and
+    would then be silent about the half where most production incidents actually live.
+
+    No third test module (S10 needed one, S12 did not): every claim here is asserted from inside one
+    service, against its own tables or its own broker, so the tests belong with the code they judge.
+  -->
+  <modules>
+    <module>ordering-service</module>
+    <module>inventory-service</module>
+  </modules>
+</project>

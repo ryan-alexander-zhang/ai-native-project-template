@@ -1,0 +1,80 @@
+spring:
+  application:
+    # Also the inbox's `consumer` identity and the Kafka consumer group. Two services sharing one inbox
+    # table and one name would suppress each other's processing of the same message.
+    name: s22-inventory-service
+  datasource:
+    url: jdbc:postgresql://localhost:18223/inventory
+    username: inventory
+    password: inventory
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18224
+    consumer:
+      auto-offset-reset: earliest
+    producer:
+      properties:
+        # A consumer needs a producer too: dead-lettering a record is a publish to <topic>.DLT. If that
+        # topic is missing, this bound is how long the recovery attempt blocks before failing — and while
+        # it blocks, the partition is doing nothing at all. Sixty seconds (the default) turns "the DLT was
+        # never provisioned" into a stall that advances one attempt per minute.
+        max.block.ms: 5000
+
+server:
+  port: 18222
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+inventory:
+  ordering-events-topic: s22.ordering.events
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /inventory
+    flyway:
+      # The inbox is what this service needs. The outbox is here only because the durable-transport guard
+      # forces a consume-only service to carry a durable publisher (issue-00161); its tables stay empty,
+      # and its schema validator would refuse to start if they were missing — so a service can be forced
+      # to provision tables it will never write a row into.
+      components: [inbox, outbox]
+    outbox:
+      relay:
+        # Nothing is ever written to it, so nothing needs draining.
+        enabled: false
+    messaging:
+      kafka:
+        consumer:
+          # Off by default in the library, because producing and consuming are separate decisions.
+          enabled: true
+          # Three retries then the dead-letter topic. This is the ONLY bound that keeps an unforeseen
+          # always-failing record from owning a partition, so it is the number to think about hardest:
+          # too high and a poison record blocks everything behind it for minutes; too low and a genuinely
+          # transient fault (a lock timeout, a leader election) dead-letters healthy work.
+          retry:
+            max-retries: 3
+            initial-interval-ms: 200
+            multiplier: 2.0
+            max-interval-ms: 800
+          # A DataAccessException is treated as the environment being down: retried at this interval
+          # FOREVER and never dead-lettered. The partition waits at the record until the cause is fixed,
+          # which is the deliberate trade — an outage does not flush a healthy backlog into the DLT, and
+          # in exchange nothing behind the record is consumed until someone acts. This interval is also
+          # the report cadence for the WARN that says so, which is the only signal that a partition is
+          # stalled rather than idle.
+          systemic-backoff-interval-ms: 1000
+    # NOTE the absence again: aipersimmon.ddd.inbox.cleanup.* is unset, so the dedup table is never
+    # purged. Unlike the outbox's, this retention is a CORRECTNESS setting rather than a storage one —
+    # once a key is purged, a later redelivery of that same message is no longer recognised as a
+    # duplicate and is processed again. The window must therefore exceed the longest time anything could
+    # still redeliver: the broker's retention, plus a consumer group that gets reset, plus a dead letter
+    # someone replays next week. InboxRetentionTest measures what a too-short window costs. A production
+    # deployment sets:
+    #   inbox:
+    #     cleanup:
+    #       enabled: true
+    #       retention-seconds: 2592000   # 30 days, and pick it from the longest redelivery path

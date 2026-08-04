@@ -43,8 +43,14 @@ variants of the framework modules are not used.
 | S19 Three kinds of "not allowed" | [s19-validation-layers](s19-validation-layers) | `analysis-00022` |
 | S20 The read side's contract | [s20-query-contract-paging](s20-query-contract-paging) | `analysis-00023` |
 | S21 Contract evolution and coexisting revisions | [s21-event-contract-evolution](s21-event-contract-evolution) | `analysis-00026` |
+| S22 Dead letters, replay, retention, startup guards | [s22-operability-deadletters-retention](s22-operability-deadletters-retention) | `analysis-00035` |
 
 Ports: scenario N owns the block starting at `18000 + 10*N`, so several samples can run at once.
+
+One sample configures its own broker rather than using the shared test-support container: **S22** runs
+Kafka with topic auto-creation off, because the two failures it is about (publishing to an unprovisioned
+topic, and a poison record with no `<topic>.DLT`) are both invisible when the broker creates topics on
+demand. Every other sample runs against the permissive default.
 
 Test style is settled in **S18**: five layers, each assertion at the cheapest one that can answer it.
 New samples follow it rather than inventing their own.

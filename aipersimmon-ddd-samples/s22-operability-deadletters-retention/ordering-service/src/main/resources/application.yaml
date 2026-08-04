@@ -1,0 +1,98 @@
+spring:
+  application:
+    # Also the relay's ShedLock lock name and the cleanup job's. Two deployments sharing a database
+    # and a name would take each other's lease and each conclude the other was itself.
+    name: s22-ordering-service
+  datasource:
+    url: jdbc:postgresql://localhost:18221/ordering
+    username: ordering
+    password: ordering
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:18224
+    producer:
+      properties:
+        # Bounds how long ONE send may block inside the producer waiting for topic metadata.
+        #
+        # This is not the same bound as aipersimmon.ddd.messaging.kafka.producer.send-timeout-ms, and
+        # the difference matters exactly when this sample's first failure happens. The library's send
+        # timeout is measured from AFTER the record was handed over
+        # (KafkaOutboxDispatcher.beginDispatch computes its deadline once send() has returned), so it
+        # bounds waiting for the broker's ack. Metadata blocking happens INSIDE send(), before that
+        # deadline exists, and is bounded only here. A topic that does not exist is precisely the case
+        # that blocks in metadata rather than in the ack — so with the 60s default, a relay poll
+        # spends a minute per unknown-topic row on the one thread that delivers everything.
+        #
+        # Five seconds because this sample deliberately publishes to a missing topic and wants the
+        # give-up to be quick. A real deployment should still set it, and should count it in the same
+        # arithmetic the library states for send-timeout-ms: under half of outbox.relay.lease-duration.
+        max.block.ms: 5000
+
+server:
+  port: 18220
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+ordering:
+  events-topic: s22.ordering.events
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /ordering
+    flyway:
+      # Two components' migrations, one property. `outbox` provisions aipersimmon_outbox,
+      # aipersimmon_dead_letter and shedlock together — the dead-letter table is not a separate
+      # component, because an outbox that cannot set a message aside is not a shipped configuration.
+      components: [outbox]
+    outbox:
+      relay:
+        # On, because this is a service that publishes. Individual tests turn it off so a single poll
+        # can be driven and asserted on — the use the library documents for this flag — and one test
+        # keeps it on to prove the schedule is what makes the whole thing autonomous.
+        enabled: true
+        # The relay's recovery bound and nothing else: an instance killed mid-poll releases nothing,
+        # so the rows it had claimed are untouchable for exactly this long. Every other instance keeps
+        # delivering throughout. Short here because a sample restarts constantly; five minutes (the
+        # library default) is a reasonable production value, and the arithmetic to preserve is that a
+        # single dispatch — including the metadata blocking above — finishes within half of it.
+        lease-duration: 30s
+      poll-delay-ms: 500
+      # Three attempts, then the message is set aside. The number is a statement about how long a
+      # transient outage may last before a human should look: with the backoff below, three attempts
+      # spend well under a second, which is right for a sample and wrong for production. A real
+      # deployment wants max-attempts x max-backoff to exceed the length of a routine broker restart,
+      # or every rolling upgrade of the broker fills the dead-letter table with healthy messages.
+      max-attempts: 3
+      retry:
+        base-backoff-ms: 100
+        max-backoff-ms: 400
+      # NOTE the absence: aipersimmon.ddd.outbox.cleanup.enabled is not set here, so it is off, which
+      # is the library's default and this sample's subject. Deleting data is not something a library
+      # may decide for a deployment, and the right retention is not something it can guess. The
+      # consequence of leaving it off is a table that grows for the life of the service — measured in
+      # RetentionTest, together with what switching it on does and what it deliberately does not
+      # touch. A production deployment sets:
+      #   cleanup:
+      #     enabled: true
+      #     retention-seconds: 604800   # 7 days: long enough to reread what was published last week
+      #     batch-size: 500
+    messaging:
+      kafka:
+        producer:
+          send-timeout-ms: 10000
+    web:
+      # This service runs its idempotency guard on the IN-MEMORY store, on purpose, and this line is
+      # the point: the library will not stop you, it will only tell you. Leaving it at the default
+      # (true) means a WARN at startup and a guard that protects one instance of a service that will
+      # be deployed as three. S2 chose Redis and S7 chose the JDBC store; S22's interest is only in
+      # what the framework says when neither is present, and whether it can be made to refuse.
+      # CapabilityAnnouncementTest measures both answers.
+      allow-in-memory-stores: true
+      idempotency:
+        enabled: true
+        require-key: false

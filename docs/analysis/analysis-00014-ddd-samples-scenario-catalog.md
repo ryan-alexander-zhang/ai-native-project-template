@@ -714,6 +714,25 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 `aipersimmon-ddd-outbox-spring-boot-starter`、`aipersimmon-ddd-inbox-mybatis-plus`、
 `aipersimmon-ddd-flyway-spring-boot-starter`、`aipersimmon-ddd-web-store-jdbc`（清理调度）。
 
+**文档**：[[analysis-00035-samples-operability-deadletters-retention]]（sample：
+`aipersimmon-ddd-samples/s22-operability-deadletters-retention`，两个服务，42 个用例）。上面七问全部
+以实测作答，另外四点要回填进本清单：
+
+1. **前提是一个 broker 设置**：`KAFKA_AUTO_CREATE_TOPICS_ENABLE=false`。开着自动建 topic 时，"发布进
+   没建的 topic"和"缺 `<topic>.DLT`"两个隐患**都不可观察**——前者静默成功，后者的 DLT 被那次投递自己建
+   出来。本 sample 是唯一自带 broker 配置的样例，其余样例跑在宽松默认上。
+2. **框架表是五个组件不是四个**（`outbox` / `inbox` / `process-manager` / `operation-log` /
+   `web-store`），而且默认**不统一**：前四个默认关，**`web-store` 默认开、每小时**
+   （`WebStoreCleanupProperties.java:17`）。底下的规则是"行本身写明了自己何时不再重要，才可以默认清"。
+   另外 `aipersimmon_dead_letter` **根本不在任何清理里**。
+3. **消费侧的第三档**清单里没提，但它决定事故形态：`DataAccessException` 被判为环境故障，**无上界重试、
+   永不进 DLT**，分区原地等待。少了这一档，十分钟的数据库抖动会把分区以重试速度排空进 DLT。
+4. **"启动失败 vs WARN"没有统一规则，只有统一的判据**：这个缺失之后还有东西能发现它吗？不能就必须是启动
+   失败（发布进死胡同就是这类：relay 会把事件标成已发送，没有异常/死信/lag）；能就 WARN 加严格开关。
+
+新开 issue：[[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]]（死信的 `last_error` 只
+记最外层异常，最常见的发布失败因此记成 `KafkaException: Send failed`，topic 名与真因全丢）。
+
 ### S23 Schema 演进与数据迁移（P1）
 
 **场景描述**：框架表与业务表的迁移如何共存，以及给已上线的聚合改结构。

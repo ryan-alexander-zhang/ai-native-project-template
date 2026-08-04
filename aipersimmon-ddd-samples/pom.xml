@@ -47,6 +47,7 @@
     <module>s19-validation-layers</module>
     <module>s20-query-contract-paging</module>
     <module>s21-event-contract-evolution</module>
+    <module>s22-operability-deadletters-retention</module>
   </modules>
 
   <dependencyManagement>
