@@ -133,11 +133,17 @@ writes"——**负向对照第一次跑出来 0 红，说明这个说法根本�
 
 ## 10. 库的问题：没有新的，确认了一个旧的
 
-没有发现新的库缺陷。确认了一个已开的：
+没有发现新的库缺陷。确认了一个当时已开的：
 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]——ordering-service 只消费不发布，
 但消费方必须把契约标 `@Externalized`（bridge 由此推导订阅的 topic 集），而 Kafka starter 的
 durable-transport 守卫看到 `@Externalized` 事件却没有耐久发布者就拒绝启动，于是一个只消费的服务被迫带上
-一个它永不使用的 outbox，表一直空着。S12 独立复现，处理方式与 S4 相同（带上并注明原因）。
+一个它永不使用的 outbox，表一直空着。S12 是**第二次独立撞到**它（S4 是第一次），当时的处置与 S4 相同：
+带上并注明原因。
+
+**2026-08-04 已修**：新属性 `aipersimmon.ddd.messaging.kafka.publishes-externalized-events`（默认 `true`），
+本 sample 的 ordering-service 因此删掉了 outbox 依赖与 `flyway.components` 里的 `outbox`，改成一行
+`publishes-externalized-events: false`。这条 issue 最终在四个 sample 里各留了一处同样的迁就
+（S4、S12、S21、S22），四处一起拆掉——**同一条 issue 被独立撞到四次，本身就是"该先修哪个"的答案**。
 
 另外记两条不是缺陷但值得写进文档的交互：
 

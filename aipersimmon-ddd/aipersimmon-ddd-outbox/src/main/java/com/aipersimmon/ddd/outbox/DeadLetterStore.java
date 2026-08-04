@@ -28,7 +28,10 @@ public interface DeadLetterStore {
    * @param message the message being given up on
    * @param attempts how many delivery attempts were made (including the last failure)
    * @param reason why it was given up on
-   * @param lastError a short description of the final failure (class and message)
+   * @param lastError a short description of the final failure and its causes, flattened onto one
+   *     line. The causes are the point: a transport wraps, so the outermost frame of the commonest
+   *     publish failure names neither the destination nor the reason. The relay produces this with
+   *     {@code FailureSummary}, which bounds both the depth walked and the length written
    * @param traceparent the W3C trace context captured when the row was written, or {@code null};
    *     carried into the dead-letter row so a replayed message keeps its original trace identity
    * @param traceState the companion {@code tracestate}, or {@code null}

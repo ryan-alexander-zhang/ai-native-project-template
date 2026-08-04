@@ -94,14 +94,19 @@ key that absorbs the relay's own at-least-once redeliveries. A "replay" that min
 would be a second event about the same fact, and no downstream dedup could catch it. Pressing the button
 twice is a 404, idempotent by consequence rather than by a guard.
 
-### What `lastError` does not tell you
+### What `lastError` tells you, and what it took to get there
 
-Measured, and it is a real gap: the relay records only the outermost exception, so the most common
-publish failure of all reads as `org.springframework.kafka.KafkaException: Send failed` — the topic name
-and the actual cause (`Topic … not present in metadata`, `UnknownTopicOrPartitionException`) are two
-levels down the cause chain and discarded. Filed as **issue-00165**. `DeadLetterTest` asserts the
-current behaviour, including that the topic name is *absent*, rather than matching a substring of
-whatever came out.
+This sample was written against a library where the relay recorded only the outermost exception — so the
+most common publish failure of all read as `org.springframework.kafka.KafkaException: Send failed`, with
+the topic name and the actual cause (`Topic … not present in metadata`,
+`UnknownTopicOrPartitionException`) two levels down the chain and discarded. Filed as **issue-00165**,
+and `DeadLetterTest` asserted the behaviour **as it was**, including that the topic name was *absent*,
+rather than matching a substring of whatever came out.
+
+That choice is what made the fix cheap to land: flattening the cause chain turned those assertions red,
+which is how a test that records a defect is supposed to behave. `lastError` now carries the failure and
+its causes on one line, so it answers "where was this going and why did it not get there" — the question
+the field exists for.
 
 ## Consuming: what a partition does with a record it cannot handle
 

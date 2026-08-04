@@ -96,9 +96,11 @@ replay guard 放它们过去是**对的**。去重是聚合的事，任何边界
 - `signature-header`/`timestamp-header` 在 `replay` 下，nonce 的头在 `replay.nonce` 下。改了前两个、忘了
   第三个，每一个真回调都会因为**头检查**（"Missing nonce"）而 401——一个长得和攻击一模一样、其实全是我方
   配置的失败。
-- `nonce.enabled=false` 不像它读起来那样只是"少一层保护"：滤器只在开关打开时读 nonce 头
-  （`ReplayProtectionFilter:65`），于是把 nonce 签进规范串的方案（正是本库推荐的那种）会**全量验签失败**。
-  已开 [[issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable]]。
+- `nonce.enabled=false` 曾经不像它读起来那样只是"少一层保护"：滤器只在开关打开时读 nonce 头，于是把
+  nonce 签进规范串的方案（正是本库推荐的那种）会**全量验签失败**，而且报的是 "Invalid signature"。
+  [[issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable]] **已修**：头无条件读，去重仍按
+  开关走。**用本篇的对照 3 验收**：同样关掉这个开关，修复前 7 红（6 条是合法回调被拒），修复后**恰好 1 红**
+  且是那条关于重放的。现在关掉去重的代价就是去重。
 
 ## 5. 乱序：比较状态，不比较时间
 
@@ -169,7 +171,7 @@ code 表、验签实现、**以及回调 controller**。包内每一个类型都
 | --- | --- | --- | --- |
 | 1 | `Idempotency-Key` 换成每次新 UUID | 双扣 | `LOSE_FIRST_RESPONSE` 下 `chargesCreated` 2（期望 1），共 3 红。**并且这一轮改出了 sample 自己的问题**：原来的用例用 `FAIL_FIRST_CHARGE`（扣款前失败），换键也只扣一次，所以它的名字过度声明了——加了 `LOSE_FIRST_RESPONSE` 模式与一个新用例 |
 | 2 | 去掉 `status.supersedes(notified)` 判断 | 乱序回退 | 恰好 2 红（手投与三方驱动各一） |
-| 3 | `nonce.enabled=false` | 重放放行 | 7 红。只有 1 个关于重放，另外 6 个是**合法回调被拒**——这一条查出了 [[issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable]] |
+| 3 | `nonce.enabled=false` | 重放放行 | 当时 7 红。只有 1 个关于重放，另外 6 个是**合法回调被拒**——这一条查出了 [[issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable]]。**修复后重跑同一对照：恰好 1 红**，即预期的那条 |
 | 4 | dispatcher 的进程内腿换成空实现 | LOCAL 事件无声丢失 | 恰好 1 红，且行仍被标记已发送——无异常、无死信 |
 | 5 | 删掉 `GatewayFailureClassifier` 的 `@Component` | 400 被当可重试 | 恰好 1 红（一次轮询后死信 0） |
 | 6 | 扫描去掉 `review_reason IS NULL` | 同一告警每轮重放 | 恰好 1 红 |

@@ -34,13 +34,6 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
     </dependency>
-    <!-- Carried by a service that publishes nothing, because the Kafka starter's durable-transport
-         guard reads @Externalized on the consumer's own copy of the contract and demands a durable
-         publisher. Its tables stay empty. issue-00161; S4 and S12 carry it for the same reason. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>

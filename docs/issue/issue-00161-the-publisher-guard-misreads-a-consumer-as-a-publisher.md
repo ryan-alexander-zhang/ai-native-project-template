@@ -2,7 +2,7 @@
 id: issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 发布侧的启动检查把只消费的服务判成发布方（P2，误报）
@@ -102,3 +102,29 @@ outbox 的 schema 校验器拒绝启动）、把 `outbox.relay.enabled` 关掉�
 `aipersimmon-ddd-samples/s04-integration-events-across-services/inventory-service`：把
 `aipersimmon-ddd-outbox-mybatis-plus` 依赖去掉、`flyway.components` 改回 `[inbox]`，启动即失败，异常正文
 就是 `:156-163` 那段。
+
+## 解决记录（2026-08-04）
+
+**选了方案 (A)**：加一个 messaging 模块自己拥有的属性。(B)（把订阅声明与 `@Externalized` 解耦）是根治，
+但它是契约面的改动、与 S21 的契约演进相互影响，代价与本 issue 的严重度（P2 误报）不相称。
+
+- 新属性 `aipersimmon.ddd.messaging.kafka.publishes-externalized-events`，**默认 `true`**（检查保持开启），
+  只消费的服务显式写 `false`。属性 javadoc 写清了它关掉的是什么、以及关错了会丢什么（发布方设成 false
+  就是往死胡同发布：relay 把每个事件标成已发送，没有异常、没有死信、没有 consumer lag）。
+- `aipersimmonDddDurableTransportGuard` 多注入 `KafkaMessagingProperties` 并在属性为 false 时直接返回。
+- 异常正文补一句只消费服务的正确出路，点名新属性——**这是原来最伤人的地方**：旧消息只说"加一个 durable
+  outbox 模块"，把一个从不发布的服务指向了三张永不写入的表。
+
+**测试**：新增 `DurableTransportGuardTest`（2 条，`ApplicationContextRunner`，不碰 broker）：
+① 默认配置下发布方仍然启动失败，且消息同时含 `Add a durable outbox module` 与
+`publishes-externalized-events=false` 两条出路；② 声明只消费之后，没有任何 outbox 也能启动。
+
+**四个 sample 的迁就全部拆掉**（这是本 issue 真正的验收，因为它在四处独立复发过）：
+`s04-inventory-service`、`s12-ordering-service`、`s21-inventory-service`、`s22-inventory-service` 各删掉
+`aipersimmon-ddd-outbox-mybatis-plus` 依赖、`flyway.components` 从 `[inbox, outbox]` 回到 `[inbox]`、
+删掉 `outbox.relay.enabled: false`，换成一行 `publishes-externalized-events: false`。四个模块的测试全绿
+——也就是说 `aipersimmon_outbox`、`aipersimmon_dead_letter`、`shedlock` 这三张表从此不再出现在从不发布的
+服务里。
+
+`CONFIGURATION.md` 的 `messaging.kafka` 表补了新属性一行，并新增"配置一个只消费的服务"小节（两行 yaml
++ 为什么第二行不显然）——这一节原本就该有，issue 也点了。

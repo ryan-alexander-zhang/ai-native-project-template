@@ -104,8 +104,8 @@ bodies of identical length and type against the same endpoint are not.
 | `replay.enabled` | `false` | Verifies the signature and rejects a stale or replayed request. |
 | `replay.tolerance` | `5m` | How far the timestamp may drift before rejection. |
 | `replay.signature-header` / `replay.timestamp-header` | `X-Signature` / `X-Timestamp` | Where they are read from. |
-| `replay.nonce.enabled` | `false` | Also require a single-use nonce — signature plus timestamp alone allow replay inside the tolerance window. |
-| `replay.nonce.header` | `X-Nonce` | Where the nonce is read from. |
+| `replay.nonce.enabled` | `false` | Also require a single-use nonce, and **remember having seen it** — signature plus timestamp alone allow replay inside the tolerance window. It governs the requirement and the dedup, *not* whether the nonce reaches your verifier: the header is read either way, so a scheme that signs the nonce (which this library recommends) verifies with dedup off. Turning it off means the nonce table goes away and a captured request can be replayed inside the tolerance window; it does not mean signatures stop working. |
+| `replay.nonce.header` | `X-Nonce` | Where the nonce is read from — always, so a `SignedRequest` carries whatever the caller sent. |
 | `replay.max-body-size` | `1MB` | Largest body buffered before answering `413`. A signature covers the body, so the body must be held in memory *before* the request is known to be authentic — raise this only to the largest signed request you actually accept. |
 | `replay.url-patterns` | (empty) | Servlet URL patterns the filter applies to; empty means every request. Set it when unsigned traffic still has to be served — a liveness probe, say. Servlet patterns (`/api/*`, `*.json`, an exact path), not Ant patterns: the container matches, on the path it will really dispatch on. |
 
@@ -297,6 +297,7 @@ nothing while every producer mints UUIDs, and breaks the moment one uses per-sou
 | `topic` | `aipersimmon.integration-events` | Fallback topic. Per-event routing comes from `@Externalized("...")`, which may itself contain a `${property}` placeholder. |
 | `producer.send-timeout-ms` | `30000` | How long the relay waits for a broker ack, measured from when the record was handed to the producer rather than from when the wait starts. Keep it below half of `outbox.relay.lease-duration`, so one send cannot outlive the claim on the row it is sending; `batch-size` does not enter into it, because the sends overlap — a whole batch going quiet costs one timeout, not one per row. |
 | `consumer.enabled` | `false` | Registers the consumer bridge. Off by default because publishing and consuming are separate decisions — a service may only produce. |
+| `publishes-externalized-events` | `true` | Whether this service **publishes** the `@Externalized` events it declares. On by default, which turns on the durable-transport guard: `@Externalized` events with a non-durable publisher never leave the JVM, and nothing observable would reveal it, so startup fails. **A service that only consumes must set this to `false`** — see below. Set it wrongly on a real publisher and you publish into a dead end with no exception, no dead letter and no consumer lag. |
 | `consumer.group-id` | `${spring.application.name}`, else `aipersimmon` | The consumer group. |
 | `consumer.skip-locally-unhandled` | `true` | Drop a record whose `(type, version)` no local `@EventListener` handles, before the inbox. Set `false` if you consume through a mechanism the scan cannot see. |
 | `consumer.retry.max-retries` | `3` | Retries for an *ambiguous* failure before the record is dead-lettered to `<topic>.DLT`. |
@@ -306,6 +307,22 @@ nothing while every producer mints UUIDs, and breaks the moment one uses per-sou
 Three failure tiers, worth knowing before tuning: **poison** (unknown type, malformed payload) is
 dead-lettered at once; **systemic** is retried forever and never dead-lettered; **everything else**
 gets the bounded backoff and then the DLT.
+
+**Configuring a service that only consumes.** Two lines, and the second one is not obvious:
+
+```yaml
+aipersimmon.ddd.messaging.kafka:
+  consumer.enabled: true
+  publishes-externalized-events: false   # its @Externalized declarations are SUBSCRIPTIONS
+```
+
+A consumer has to declare the contracts it handles `@Externalized`, because that annotation is how
+the bridge derives its topic set. So the annotation means one thing on a publisher (where an event
+goes) and another on a consumer (which topics to subscribe to), and its presence alone cannot tell
+them apart — nor can anything else, since there is no static evidence of a call to
+`IntegrationEvents.publish`. Without the second line the durable-transport guard reads the
+subscription as a publication and refuses to start, and the remedy it suggests (add a durable outbox
+module) makes a consume-only service provision three tables it will never write a row into.
 
 **Provision `<topic>.DLT` for every topic you consume** (or let the broker auto-create topics in
 environments where that is acceptable). The framework does not create it and deliberately does not

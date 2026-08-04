@@ -143,13 +143,26 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
    * externalized) and {@code @ConditionalOnBean(KafkaTemplate)} (only when a real Kafka transport
    * is present). It throws only when a publisher bean exists and is non-durable; an incomplete
    * context with no {@link IntegrationEvents} bean at all (e.g. a slice test) is left alone.
+   *
+   * <p><strong>And only when the application says it publishes</strong> ({@code
+   * publishes-externalized-events}, on by default). That extra condition exists because
+   * {@code @Externalized} carries two meanings: on a publisher it is a routing decision, and on a
+   * consumer it is the subscription declaration the bridge derives its topic set from. So its
+   * presence cannot distinguish the two, and nothing else can either — there is no static evidence
+   * of a call to {@code IntegrationEvents.publish}. Without the property, a service that only
+   * consumes tripped this guard and was told to add a durable outbox module: it then provisioned
+   * three tables it never wrote a row into, and turned off a relay that had nothing to drain. The
+   * property is the one thing the framework cannot work out and the application can simply state.
    */
   @Bean
   @ConditionalOnBean(KafkaTemplate.class)
   @Conditional(OnExternalizedEventsCondition.class)
   public SmartInitializingSingleton aipersimmonDddDurableTransportGuard(
-      ObjectProvider<IntegrationEvents> integrationEvents) {
+      ObjectProvider<IntegrationEvents> integrationEvents, KafkaMessagingProperties properties) {
     return () -> {
+      if (!properties.isPublishesExternalizedEvents()) {
+        return;
+      }
       IntegrationEvents active = integrationEvents.getIfAvailable();
       if (active != null && !(active instanceof DurableIntegrationEvents)) {
         throw new IllegalStateException(
@@ -160,7 +173,11 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
                 + "events published through it never reach Kafka. Add a durable outbox module "
                 + "(e.g. aipersimmon-ddd-outbox-mybatis-plus or aipersimmon-ddd-outbox-jdbc) so its "
                 + "transactional-outbox writer becomes the IntegrationEvents transport, or remove "
-                + "@Externalized to keep those events LOCAL (in-process) on purpose.");
+                + "@Externalized to keep those events LOCAL (in-process) on purpose. If this service "
+                + "only CONSUMES — its @Externalized declarations being subscriptions rather than "
+                + "publications — set aipersimmon.ddd.messaging.kafka."
+                + "publishes-externalized-events=false instead of carrying an outbox it never "
+                + "writes to.");
       }
     };
   }

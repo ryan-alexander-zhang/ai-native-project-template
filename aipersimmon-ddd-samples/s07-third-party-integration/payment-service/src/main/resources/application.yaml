@@ -113,11 +113,13 @@ aipersimmon:
           # web-store schema is needed: the nonce table is where "seen before" is remembered across
           # instances and restarts.
           #
-          # It is also not as optional as it looks. The filter reads the nonce header ONLY when this is on
-          # (ReplayProtectionFilter:65), so with it off the verifier is handed a null nonce — and any
-          # signing scheme that binds the nonce into the signed string, which is the scheme S2 recommends
-          # and this provider uses, then fails to verify every authentic callback. Measured: turning this
-          # off turns seven tests in CallbackIngestionTest red, only one of which is about replay.
+          # It used to be far less optional than it looks, and that was a library bug (issue-00162, fixed).
+          # The filter read the nonce header ONLY when this flag was on, so with it off the verifier was
+          # handed a null nonce — and any signing scheme that binds the nonce into the signed string, which
+          # is the scheme S2 recommends and this provider uses, then failed to verify EVERY authentic
+          # callback, as "Invalid signature". Measured then: seven red in CallbackIngestionTest, six of them
+          # legitimate callbacks refused. Measured now, with the same switch off: exactly one red, and it is
+          # `thesameSignedBytesCannotBeSentTwice`. Turning off dedup now costs dedup and nothing else.
           enabled: true
       store:
         cleanup:

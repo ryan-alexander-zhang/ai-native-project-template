@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.processmanager.engine.relay;
 
+import com.aipersimmon.ddd.core.error.FailureSummary;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
@@ -243,8 +244,14 @@ public final class ProcessEffectRelay {
     }
   }
 
+  /**
+   * What the process instance records about a failed effect.
+   *
+   * <p>The whole cause chain: an effect fails through an HTTP client, a command bus or a message
+   * send, all of which wrap, and the outermost frame of a wrapped failure names nothing an operator
+   * can act on. Bounds live in {@link FailureSummary}.
+   */
   private static String describe(Throwable failure) {
-    String message = failure.getClass().getName() + ": " + failure.getMessage();
-    return message.length() > 2000 ? message.substring(0, 2000) : message;
+    return FailureSummary.of(failure);
   }
 }

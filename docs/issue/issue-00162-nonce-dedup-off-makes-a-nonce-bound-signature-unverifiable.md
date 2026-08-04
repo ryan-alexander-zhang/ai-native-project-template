@@ -2,7 +2,7 @@
 id: issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 关掉 nonce 去重会让"把 nonce 签进去"的验签方案彻底验不过（P2，配置陷阱）
@@ -78,3 +78,30 @@ String nonce = request.getHeader(nonceHeader);
 7 红。签名两端的实现分别在
 `payment-service/.../infrastructure/gateway/GatewayCallbackSignatureVerifier.java` 与
 `gateway-stub/.../CallbackSigner.java`。
+
+## 解决记录（2026-08-04）
+
+**按修复要求原样改**：`ReplayProtectionFilter` 里那一行
+
+```java
+String nonce = nonceEnabled ? request.getHeader(nonceHeader) : null;   // 之前
+String nonce = request.getHeader(nonceHeader);                          // 现在
+```
+
+去重仍按开关走（`verifyAuthenticity` 里那句不动），`checkHeaders` 的"缺 nonce 即拒"也仍然只在开关打开时
+生效——所以签 `timestamp.body` 的方案（Stripe、Slack）不被逼着发一个头，且拿到的仍是 `null`，对既有部署
+零行为变化。改动点旁边留了一段注释，写明"读"与"去重"是两个决定而只有一个写在了属性名里。
+
+**测试**：新增 `ReplayProtectionNonceBindingTest`（3 条），验签实现是最小的"把 nonce 签进去"模型
+（`sig:<nonce>`），dedup 关：① 带 nonce 的合法请求通过（回归本身）；② 同一个 nonce 连发两次都通过
+（开关仍然只管去重，修复没有偷偷把它打开）；③ 完全不带 nonce 头的方案不受影响。既有
+`ReplayProtectionFilterTest`（7 条，验签忽略 nonce，因此当初看不到这个缺陷）与
+`ReplayProtectionBodyCapTest`（4 条）保持绿。
+
+**用 issue 自己的复现验收**：S7 的 payment-service 把 `nonce.enabled` 改成 `false` 跑
+`CallbackIngestionTest` —— 修复前 **7 红**（6 条是合法回调被拒），修复后 **恰好 1 红**，且是
+`thesameSignedBytesCannotBeSentTwice`。**现在关掉去重的代价就是去重，仅此而已。** S7 的 yaml 注释改成
+记录这次前后对比。
+
+`CONFIGURATION.md` 的 `replay.nonce.enabled` / `replay.nonce.header` 两行改写：说明这个开关管"要求 + 去重"，
+不管"nonce 是否到达验签实现"。

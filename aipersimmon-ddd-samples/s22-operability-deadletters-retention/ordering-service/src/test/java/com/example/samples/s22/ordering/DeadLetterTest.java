@@ -92,17 +92,19 @@ class DeadLetterTest {
     // addressed. Without it a replayed externalized event would come back as in-process — the same
     // silent loss through a second door.
     assertThat(dead.get("destination")).isEqualTo("s22.ordering.never-provisioned");
-    // And here is what the operator actually gets, which is less than this sample wanted to show.
+    // And what the operator actually gets: the whole cause chain, not just the wrapper.
     //
-    // The relay records only the outermost exception's class and message. The real cause of the most
-    // common publish failure there is — "Topic s22.ordering.never-provisioned not present in metadata
-    // after 5000 ms", itself caused by UnknownTopicOrPartitionException — sits two levels down the
-    // cause chain and is discarded. The recorded text is Spring Kafka's content-free wrapper, so
-    // last_error answers "did it fail" and not "where was it going and why". Measured, filed as
-    // issue-00165, and asserted here as it is rather than as it ought to be: a test that quietly
-    // matched a substring of whatever came out would have hidden it.
-    assertThat((String) dead.get("last_error")).contains("Send failed");
-    assertThat((String) dead.get("last_error")).doesNotContain("never-provisioned");
+    // These two lines are the record of a library fix, and they used to read the other way round. The
+    // relay recorded only the outermost exception's class and message — which for the commonest publish
+    // failure of all is Spring Kafka's content-free "Send failed", with the topic name and the reason
+    // ("not present in metadata", UnknownTopicOrPartitionException) discarded two levels down the chain.
+    // That was measured here, filed as issue-00165, and asserted *as it was* rather than as it ought to
+    // be, precisely so that fixing it would break the test. It is fixed (FailureSummary flattens the
+    // chain), so last_error now answers "where was this going and why did it not get there".
+    String lastError = (String) dead.get("last_error");
+    assertThat(lastError).contains("Send failed");
+    assertThat(lastError).contains("never-provisioned");
+    assertThat(lastError).contains("not present in metadata");
     // Moved, not copied: the hot table is empty again.
     assertThat(Outbox.liveCount(jdbc)).isZero();
   }

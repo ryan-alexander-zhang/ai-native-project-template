@@ -62,7 +62,20 @@ public class ReplayProtectionFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     String signature = request.getHeader(signatureHeader);
-    String nonce = nonceEnabled ? request.getHeader(nonceHeader) : null;
+    // Read unconditionally, deduplicate conditionally.
+    //
+    // Two decisions, and only one of them is what `nonce.enabled` is named after. A caller's nonce
+    // is very often part of the signed string — this library recommends exactly that, since binding
+    // it is what stops a captured body being replayed with a fresh timestamp. Handing the verifier
+    // null while the header holds a value therefore computed a different digest from the sender's
+    // and rejected every genuine request, as "Invalid signature": a rejection that reads like an
+    // attacker rather than like a switch somebody turned off.
+    //
+    // Whether the nonce participates in the signature is the verifier's business. This flag governs
+    // only whether we remember having seen it (`verifyAuthenticity`), and `checkHeaders` still
+    // *requires* a nonce only when dedup is on — so a scheme that signs `timestamp.body` (Stripe,
+    // Slack) is not forced to send one, and sees null exactly as before.
+    String nonce = request.getHeader(nonceHeader);
     String headerRejection = checkHeaders(signature, request.getHeader(timestampHeader), nonce);
     if (headerRejection != null) {
       reject(response, headerRejection);

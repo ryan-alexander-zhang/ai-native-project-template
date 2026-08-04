@@ -47,6 +47,10 @@ class OutboxRelayTest {
     private final List<String> timeline = new ArrayList<>();
     private final Set<String> failing = new HashSet<>();
     private final Set<String> failingPermanently = new HashSet<>();
+
+    /** Fails the way a real transport does: a content-free wrapper over the actual cause. */
+    private final Set<String> failingThroughAWrapper = new HashSet<>();
+
     private boolean reachesExternalTargets = true;
 
     @Override
@@ -64,6 +68,12 @@ class OutboxRelayTest {
           // One of the three the default classifier calls permanent: no number of retries
           // supplies an attribute the message never carried.
           throw new MalformedIntegrationEventException("permanently broken " + eventId);
+        }
+        if (failingThroughAWrapper.contains(eventId)) {
+          throw new IllegalStateException(
+              "Send failed",
+              new IllegalArgumentException(
+                  "Topic orders.events not present in metadata after 5000 ms"));
         }
         if (failing.contains(eventId)) {
           throw new IllegalStateException("transiently broken " + eventId);
@@ -340,6 +350,33 @@ class OutboxRelayTest {
 
     assertEquals(List.of("e1"), deadLetters.stored);
     assertEquals(List.of(DeadLetterStore.Reason.RETRIES_EXHAUSTED), deadLetters.reasons);
+  }
+
+  /**
+   * What is recorded about the give-up is the whole cause chain, not the outermost frame.
+   *
+   * <p>The outermost frame of a real transport failure carries nothing an operator can act on —
+   * Spring Kafka's synchronous send failure is {@code KafkaException: Send failed}, and the topic
+   * name and the reason are underneath it. {@code last_error} is the only column in a dead letter
+   * that answers "where was this going and why did it not get there", so recording only the wrapper
+   * turned it into a restatement of the row's own existence. issue-00165.
+   */
+  @Test
+  void thegiveUpRecordsTheCauseChainAndNotJustTheWrapper() {
+    insert("e1", null);
+    dispatcher.failingThroughAWrapper.add("e1");
+
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      clock.advance(Duration.ofHours(1));
+      relay().relay();
+    }
+
+    assertEquals(1, deadLetters.errors.size());
+    String recorded = deadLetters.errors.get(0);
+    assertTrue(recorded.contains("Send failed"), recorded);
+    assertTrue(
+        recorded.contains("Topic orders.events not present in metadata"),
+        "the cause is the half an operator needs: " + recorded);
   }
 
   @Test

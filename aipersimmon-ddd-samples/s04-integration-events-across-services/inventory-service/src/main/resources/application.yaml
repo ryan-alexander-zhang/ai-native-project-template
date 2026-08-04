@@ -30,17 +30,22 @@ aipersimmon:
     integration:
       source: /inventory
     flyway:
-      # The inbox is what this service needs. The outbox is here only because the durable-transport
-      # guard forces a consume-only service to carry a durable publisher (see the pom); its tables
-      # stay empty, and its schema validator would refuse to start if they were missing.
-      components: [inbox, outbox]
-    outbox:
-      relay:
-        # Nothing is ever written to it, so nothing needs draining. Off, so a service that publishes
-        # nothing does not poll an empty table every second forever.
-        enabled: false
+      # The inbox, and only the inbox. A consumer has no outbox: the tables, the relay and the
+      # dead-letter machinery all belong to whoever publishes.
+      #
+      # It used to have one. The durable-transport guard read this service's @Externalized declarations
+      # — which are SUBSCRIPTIONS, since that annotation is how the bridge derives its topic set — as
+      # publications, and refused to start without a durable publisher. issue-00161, fixed: the
+      # messaging module now takes the one statement the framework cannot infer, below.
+      components: [inbox]
     messaging:
       kafka:
+        # The one thing the framework cannot work out: @Externalized means "where this goes" on a
+        # publisher and "which topic to subscribe to" on a consumer, and nothing distinguishes them —
+        # there is no static evidence of a call to IntegrationEvents.publish. So a consumer says so, and
+        # the default (true) stays strict, because a real publisher with no durable transport loses
+        # events with nothing to notice: no exception, no dead letter, no consumer lag.
+        publishes-externalized-events: false
         consumer:
           # Off by default in the library, because producing and consuming are separate decisions.
           # This service is a consumer, so it says so.

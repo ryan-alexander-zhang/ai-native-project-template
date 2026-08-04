@@ -33,26 +33,6 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
     </dependency>
-    <!--
-      An outbox in a service that publishes nothing — carried under protest, and the reason is worth
-      knowing before you copy this.
-
-      A consuming service must declare its copy of the contract @Externalized, because that is what
-      the consumer bridge derives its topic set from (OnExternalizedEventsCondition: "with zero
-      externalized events there is no topic to subscribe to"). But the Kafka starter's
-      durable-transport guard fails startup whenever @Externalized events exist and the active
-      IntegrationEvents publisher is not durable — and without an outbox the active publisher is the
-      in-process one. The guard is right about the danger it names (an @Externalized event published
-      in process leaves the JVM silently never), and it has no exemption for the consume-only shape,
-      so the only way to start is to add a durable publisher this service never uses.
-
-      Cost: the outbox tables and shedlock exist here and stay empty. Filed as an issue against the
-      library rather than papered over.
-    -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>

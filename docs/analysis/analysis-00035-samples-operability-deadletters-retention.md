@@ -79,14 +79,17 @@ ordering-service 发布并提供运维端点、inventory-service 消费；42 个
 吸收 relay 自身 at-least-once 重投的 `(source, ce_id)`。一个铸新 id 的"重放"，是关于同一事实的第二个事件，
 下游任何去重都抓不住。按第二次返回 404：靠后果幂等，不靠守卫。
 
-### 4.2 `lastError` 说不出的那一半 → issue-00165
+### 4.2 `lastError` 曾经说不出的那一半 → issue-00165（已修）
 
 实测且是真缺口：relay 只记最外层异常，所以最常见的发布失败读作
 `org.springframework.kafka.KafkaException: Send failed` ——topic 名和真实原因
 （`Topic … not present in metadata`、`UnknownTopicOrPartitionException`）在 cause 链下两层，被丢掉。
-已开 [[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]]。`DeadLetterTest` 断言的是**现状**，
-包括"topic 名不在其中"，而不是拿个子串糊过去——按 [[isolate-before-attributing-a-fix]] 的规矩，测试要能在
-修好之后反过来。
+[[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]] **2026-08-04 已修**（新增
+`FailureSummary` 有界摊平 cause 链，outbox relay 与 process-manager relay 两处共用）。
+
+写这篇时 `DeadLetterTest` 断言的是**现状**，包括"topic 名不在其中"，而不是拿个子串糊过去——按
+[[isolate-before-attributing-a-fix]] 的规矩，测试要能在修好之后反过来。**这条规矩当天就兑现了**：改完库，
+那两条断言变红，改成正向断言即可，不靠任何人记得回来收尾。
 
 ## 5. 消费侧：分区拿一条处理不了的记录怎么办
 
@@ -195,13 +198,17 @@ ordering-service 发布并提供运维端点、inventory-service 消费；42 个
 
 ## 10. 库的问题：一个新的，一个旧的，一处措辞
 
-**新开 [[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]]（P2，可运维性）**：
-`OutboxRelay.java:472` 的 `summarize` 只取最外层异常，`ProcessEffectRelay.java:247` 同形状。修法是复用
-`DefaultFailureClassifier.java:24-38` 已有的有界走链。
+**新开 [[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]]（P2，可运维性）——当天已修**：
+`OutboxRelay.java:472` 的 `summarize` 只取最外层异常，`ProcessEffectRelay.java:247` 同形状。修法就是复用
+`DefaultFailureClassifier` 已有的有界走链，提成 `core.error.FailureSummary` 供两处共用（"两处各写一遍"正是
+成因）。
 
-**复现旧的 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]**：inventory-service 只
-消费不发布，却被守卫逼着带 outbox，并因此**被逼给一张永不写入的表跑 migration**（`flyway.components` 里那个
-`outbox` 就是这么来的）。与 S4、S12 同因。
+**复现旧的 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]——也已修**：
+inventory-service 只消费不发布，却被守卫逼着带 outbox，并因此**被逼给三张永不写入的表跑 migration**
+（`flyway.components` 里那个 `outbox` 就是这么来的）。这是它第四次被独立撞到（S4、S12、S21、S22），
+**同一条 issue 复发四次本身就是优先级信号**。修法：messaging 模块新增
+`publishes-externalized-events`（默认 `true` 保持严格），四个 sample 的迁就一起拆掉。本篇的 yaml 与 pom
+现在只带 `[inbox]`，而"一个服务可以被逼着建它永不写入的表"这句话，从此只是历史。
 
 **一处措辞**（不是缺陷）：库为 `send-timeout-ms` 给出的算术（"低于 `lease-duration` 的一半"）漏了
 `max.block.ms`。`KafkaOutboxDispatcher.java:81-83` 的 deadline 是在 `send()` 返回**之后**算的，而元数据阻塞

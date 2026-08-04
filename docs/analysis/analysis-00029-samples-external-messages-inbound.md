@@ -33,8 +33,10 @@ parent: analysis-00014-ddd-samples-scenario-catalog
 | 去重 | 桥，键 `(ce_source, ce_id)` | **handler**，在命令事务内，且**只在需要的地方** |
 | 失败分级 | 桥的三档 | 本 sample 自己的策略，写在一处 |
 
-顺带一个装配上的好处：没有 `@Externalized` 事件，所以 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]
-那条把 outbox 强加给纯消费服务的启动检查在这里根本不触发——`flyway.components` 只有 `[inbox]`。
+顺带一个装配上的好处：没有 `@Externalized` 事件，所以
+[[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]] 那条把 outbox 强加给纯消费服务的
+启动检查在这里根本不触发——`flyway.components` 只有 `[inbox]`。（该 issue 2026-08-04 已修；S5 本来就
+不在它的射程内，因为它订阅的是外系统的消息、不经 `@Externalized` 声明。）
 
 ## 2. 防腐翻译放在哪：一个类，一个方向
 

@@ -117,9 +117,12 @@ aipersimmon.ddd.flyway.components: [outbox]          # ordering
 aipersimmon.ddd.flyway.components: [inbox, outbox]   # inventory — see below
 ```
 
-The inventory service carries an outbox it never writes to, because the Kafka starter's
-durable-transport guard reads its subscription-declaring `@Externalized` as publication intent. Filed
-as `docs/issue/issue-00161`; the pom says so at the dependency.
+The inventory service used to carry an outbox it never wrote to, because the Kafka starter's
+durable-transport guard read its subscription-declaring `@Externalized` as publication intent
+(`docs/issue/issue-00161`, since fixed). It now says what it is in one line —
+`aipersimmon.ddd.messaging.kafka.publishes-externalized-events: false` — and provisions the inbox and
+nothing else. The default stays `true`: a real publisher with no durable transport loses events with
+nothing at all to notice.
 
 ## S13 — the tenant, and the code that never mentions it
 

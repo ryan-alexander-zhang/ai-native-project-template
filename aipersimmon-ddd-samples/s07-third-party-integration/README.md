@@ -105,9 +105,11 @@ Two configuration traps, both marked in `application.yaml`:
 - `signature-header` and `timestamp-header` live under `replay`; the nonce header lives under `replay.nonce`.
   Rename the first two and forget the third and every authentic callback 401s on the *header* check — a
   failure that looks exactly like an attack and is entirely ours.
-- `nonce.enabled=false` is not the "one less layer" switch it reads as. The filter reads the nonce header only
-  when it is on (`ReplayProtectionFilter:65`), so a scheme that signs the nonce — the scheme this library
-  recommends — fails to verify **every** authentic callback. Filed as `issue-00162`.
+- `nonce.enabled=false` was not the "one less layer" switch it reads as. The filter read the nonce header
+  only when it was on, so a scheme that signs the nonce — the scheme this library recommends — failed to
+  verify **every** authentic callback, and said "Invalid signature" while doing it. `issue-00162`, fixed:
+  the header is read unconditionally, dedup still follows the switch. Re-measured with the same control
+  below: 7 red before, **exactly 1 after**.
 
 ## Out of order, contradictory, unintelligible
 
@@ -187,7 +189,7 @@ drift.
 | --- | --- |
 | A fresh key per attempt | 3 — including two debits for one payment |
 | No rank comparison | exactly 2, the out-of-order pair |
-| `nonce.enabled=false` | 7 — only one about replay; the other six found `issue-00162` |
+| `nonce.enabled=false` | 7 at the time — only one about replay; the other six found `issue-00162`. **Re-run after the fix: exactly 1**, the replay one |
 | The in-process leg emptied | exactly 1, and the row was still marked sent |
 | `GatewayFailureClassifier` unregistered | exactly 1 (no dead letter after one poll) |
 | Scan without `review_reason IS NULL` | exactly 1 |

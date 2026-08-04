@@ -1,5 +1,6 @@
 package com.aipersimmon.ddd.outbox.engine.relay;
 
+import com.aipersimmon.ddd.core.error.FailureSummary;
 import com.aipersimmon.ddd.observability.NoOpStoreAndForwardTracer;
 import com.aipersimmon.ddd.observability.StoreAndForwardTracer;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
@@ -469,7 +470,15 @@ public class OutboxRelay {
     return Duration.ofNanos(System.nanoTime() - startNanos);
   }
 
+  /**
+   * What the dead letter records about the failure.
+   *
+   * <p>The whole cause chain, not just the outermost frame. The outermost frame is routinely the
+   * least informative one — a transport wraps, and Spring Kafka's synchronous send failure arrives
+   * as {@code KafkaException: Send failed}, which names neither the destination nor the reason. See
+   * {@link FailureSummary} for the bounds.
+   */
   private static String summarize(Throwable error) {
-    return error.getClass().getName() + ": " + error.getMessage();
+    return FailureSummary.of(error);
   }
 }

@@ -84,13 +84,12 @@ class QuarantineController {
    * the destination, then replay. {@code PERMANENT} says the relay knew on the first failure that no
    * number of attempts would help — replaying changes nothing until the cause is gone.
    *
-   * <p>{@code lastError} is the weakest of these today and it is worth knowing why before relying on
-   * it: the relay records only the outermost exception, so a failure that arrives wrapped — which the
-   * commonest one, a missing topic, does — reads as {@code KafkaException: Send failed} with the
-   * topic name and the actual cause discarded. Measured in {@code DeadLetterTest} and filed as
-   * issue-00165. Until that is fixed, {@code type} plus the relay's own ERROR log line is where the
-   * cause actually lives, and an operations screen should link to the log rather than pretend this
-   * field is sufficient.
+   * <p>{@code lastError} carries the failure <em>and its causes</em>, flattened onto one line, which is
+   * what makes it worth reading at all. The distinction is not academic: a transport wraps, so the
+   * commonest failure of all — a topic nobody provisioned — arrives as {@code KafkaException: Send
+   * failed}, and the topic name and the reason are two levels down. This sample was written against a
+   * library that recorded only the outer frame, measured the resulting emptiness, and filed
+   * issue-00165; the fix flattens the chain, and {@code DeadLetterTest} asserts the difference.
    */
   private static Map<String, Object> body(DeadLetter letter) {
     Map<String, Object> map = new LinkedHashMap<>();

@@ -30,19 +30,21 @@ aipersimmon:
     integration:
       source: /ordering
     flyway:
-      # The inbox is what this service needs. The outbox is carried under protest: the Kafka starter's
-      # durable-transport guard fails startup whenever @Externalized events exist and the active publisher is
-      # not durable — and a consumer must declare its copy of the contract @Externalized to derive its topic
-      # set from it. So a consume-only service is forced to carry a durable publisher it never uses, and these
-      # tables stay empty. Already filed against the library as
-      # issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher; S12 confirms it independently.
-      components: [inbox, outbox]
-    outbox:
-      relay:
-        # Nothing is ever written to it, so nothing needs draining.
-        enabled: false
+      # The inbox, and only the inbox. This service publishes nothing, so it owns no outbox.
+      #
+      # It carried one under protest until issue-00161 was fixed: the durable-transport guard read the
+      # @Externalized on this service's copy of the rename contract as a publication, when it is a
+      # subscription — that annotation is how the bridge derives its topic set. The statement the
+      # framework cannot infer is now a property of its own, below.
+      components: [inbox]
     messaging:
       kafka:
+        # The one thing the framework cannot work out: @Externalized means "where this goes" on a
+        # publisher and "which topic to subscribe to" on a consumer, and nothing distinguishes them —
+        # there is no static evidence of a call to IntegrationEvents.publish. So a consumer says so, and
+        # the default (true) stays strict, because a real publisher with no durable transport loses
+        # events with nothing to notice: no exception, no dead letter, no consumer lag.
+        publishes-externalized-events: false
         consumer:
           # Off by default in the library: producing and consuming are separate decisions. This service
           # consumes.

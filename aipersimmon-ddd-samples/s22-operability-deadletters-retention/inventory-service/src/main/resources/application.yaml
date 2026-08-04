@@ -37,17 +37,20 @@ aipersimmon:
     integration:
       source: /inventory
     flyway:
-      # The inbox is what this service needs. The outbox is here only because the durable-transport guard
-      # forces a consume-only service to carry a durable publisher (issue-00161); its tables stay empty,
-      # and its schema validator would refuse to start if they were missing — so a service can be forced
-      # to provision tables it will never write a row into.
-      components: [inbox, outbox]
-    outbox:
-      relay:
-        # Nothing is ever written to it, so nothing needs draining.
-        enabled: false
+      # The inbox, and only the inbox — which is the interesting part for an operability sample. This
+      # service used to provision aipersimmon_outbox, aipersimmon_dead_letter and shedlock and never
+      # write a row into any of them, because the durable-transport guard read its subscriptions as
+      # publications (issue-00161, fixed). Three tables, a schema validator and a disabled relay, all
+      # to satisfy a check about something this service does not do.
+      components: [inbox]
     messaging:
       kafka:
+        # The one thing the framework cannot work out: @Externalized means "where this goes" on a
+        # publisher and "which topic to subscribe to" on a consumer, and nothing distinguishes them —
+        # there is no static evidence of a call to IntegrationEvents.publish. So a consumer says so, and
+        # the default (true) stays strict, because a real publisher with no durable transport loses
+        # events with nothing to notice: no exception, no dead letter, no consumer lag.
+        publishes-externalized-events: false
         consumer:
           # Off by default in the library, because producing and consuming are separate decisions.
           enabled: true

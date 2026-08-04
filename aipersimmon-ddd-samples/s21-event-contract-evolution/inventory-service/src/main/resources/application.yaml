@@ -32,14 +32,17 @@ aipersimmon:
     integration:
       source: /inventory
     flyway:
-      # inbox is what a consumer needs. outbox is the tax the durable-transport guard levies on a
-      # consume-only service (see the pom, and docs/issue/issue-00161); its tables stay empty.
-      components: [inbox, outbox]
-    outbox:
-      relay:
-        enabled: false
+      # inbox is what a consumer needs, and now all it needs: issue-00161 (the durable-transport guard
+      # reading a subscription as a publication) is fixed, so the outbox tax is gone.
+      components: [inbox]
     messaging:
       kafka:
+        # The one thing the framework cannot work out: @Externalized means "where this goes" on a
+        # publisher and "which topic to subscribe to" on a consumer, and nothing distinguishes them —
+        # there is no static evidence of a call to IntegrationEvents.publish. So a consumer says so, and
+        # the default (true) stays strict, because a real publisher with no durable transport loses
+        # events with nothing to notice: no exception, no dead letter, no consumer lag.
+        publishes-externalized-events: false
         consumer:
           enabled: true
           # Left at its default (true) deliberately. It is what makes the "delete only the upcaster"

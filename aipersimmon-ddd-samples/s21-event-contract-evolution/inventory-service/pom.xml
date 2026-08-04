@@ -31,19 +31,6 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
     </dependency>
-    <!--
-      An outbox in a service that publishes nothing, carried under protest — the same tax S4 pays, and
-      for the same reason: the Kafka starter's durable-transport guard reads the @Externalized
-      annotations this service needs in order to SUBSCRIBE as evidence that it PUBLISHES, so without a
-      durable publisher it refuses to start. Filed as docs/issue/issue-00161.
-
-      It costs more here than it did in S4. This service declares three revisions, all @Externalized,
-      so the guard is triggered by three classes that exist purely to be read.
-    -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>

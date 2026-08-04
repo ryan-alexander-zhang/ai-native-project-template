@@ -18,6 +18,30 @@ public class KafkaMessagingProperties {
    */
   private String topic = "aipersimmon.integration-events";
 
+  /**
+   * Whether this application <em>publishes</em> the {@code @Externalized} events it declares.
+   *
+   * <p>On by default, and what it turns on is the durable-transport guard: with
+   * {@code @Externalized} events, a Kafka transport, and a non-durable publisher, those events
+   * would be published in process and silently never leave the JVM, so startup fails. For a
+   * publisher that is the only correct answer — nothing observable would ever reveal the loss.
+   *
+   * <p>Set it to {@code false} in a service that <strong>only consumes</strong>. Such a service
+   * must also declare its contracts {@code @Externalized}, because that annotation is how the
+   * consumer bridge learns which topics to subscribe to — so the annotation alone cannot
+   * distinguish a publisher from a subscriber, and the framework cannot infer the difference: there
+   * is no static evidence of a call to {@code IntegrationEvents.publish}. Left at the default, a
+   * consume-only service is forced to add a durable outbox module it never writes a row into,
+   * provision its tables, and turn its relay off.
+   *
+   * <p>What you lose by setting it wrongly: a service that <em>does</em> publish and sets this to
+   * {@code false} publishes into a dead end. The relay marks every event sent, so there is no
+   * exception, no dead letter and no consumer lag — the downstream simply never hears from you.
+   * Which is why the default is the strict one and this is an explicit statement about what the
+   * service is.
+   */
+  private boolean publishesExternalizedEvents = true;
+
   private final Producer producer = new Producer();
 
   private final Consumer consumer = new Consumer();
@@ -28,6 +52,14 @@ public class KafkaMessagingProperties {
 
   public void setTopic(String topic) {
     this.topic = topic;
+  }
+
+  public boolean isPublishesExternalizedEvents() {
+    return publishesExternalizedEvents;
+  }
+
+  public void setPublishesExternalizedEvents(boolean publishesExternalizedEvents) {
+    this.publishesExternalizedEvents = publishesExternalizedEvents;
   }
 
   public Producer getProducer() {

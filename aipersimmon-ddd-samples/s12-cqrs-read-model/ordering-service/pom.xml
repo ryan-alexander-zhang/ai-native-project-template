@@ -34,12 +34,6 @@
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
     </dependency>
-    <!-- Carried under protest by a service that publishes nothing; see ordering-service.yaml and
-         issue-00161. -->
-    <dependency>
-      <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-starter-messaging-kafka</artifactId>
