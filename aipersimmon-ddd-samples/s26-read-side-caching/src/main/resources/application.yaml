@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: s26-read-side-caching
+  datasource:
+    url: jdbc:postgresql://localhost:18261/s26
+    username: s26
+    password: s26
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: localhost
+      port: 18262
+
+server:
+  port: 18260
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+aipersimmon:
+  ddd:
+    cqrs:
+      retry-on-conflict:
+        # On, because this sample is partly about what a cache does to a retry. Every command handler
+        # here is transactional and side-effect-free, which is the assertion the property exists to
+        # make; the framework cannot check it, so the deployment says so.
+        enabled: true
+        max-attempts: 3
+        initial-backoff: 10ms
+
+s26:
+  cache:
+    # How stale a product detail may get. This is the sample's only bound on staleness for the part of
+    # the value nobody invalidates (the sales count), and the fallback bound for everything else if an
+    # eviction is ever lost.
+    detail-ttl: 60s
+    # Spread expiries so a batch of entries written together does not expire together. ±10% of the TTL.
+    jitter-ratio: 0.1
+    # Collapse concurrent misses on the same key into one execution. Off would be the naive cache, and
+    # StampedeWithoutSingleFlightTest measures what that costs.
+    single-flight: true
+    # AFTER_COMMIT or IN_TRANSACTION. The wrong one is a stale entry that outlives the write that
+    # should have removed it; InvalidationInTransactionTest is that failure, measured.
+    invalidate: AFTER_COMMIT
+
+logging:
+  level:
+    com.example.samples.s26: INFO
