@@ -45,6 +45,7 @@ variants of the framework modules are not used.
 | S21 Contract evolution and coexisting revisions | [s21-event-contract-evolution](s21-event-contract-evolution) | `analysis-00026` |
 | S22 Dead letters, replay, retention, startup guards | [s22-operability-deadletters-retention](s22-operability-deadletters-retention) | `analysis-00035` |
 | S23 Schema evolution and data migration | [s23-schema-migration](s23-schema-migration) | `analysis-00036` |
+| S24 Adding a third bounded context, and keeping the option of splitting it out | [s24-add-bounded-context](s24-add-bounded-context) | `analysis-00041` |
 | S26 A cache, a projection, and what each cannot do | [s26-read-side-caching](s26-read-side-caching) | `analysis-00037` |
 | S27 Three things called delete, and a compliance erasure | [s27-soft-delete-and-erasure](s27-soft-delete-and-erasure) | `analysis-00039` |
 | S28 Where the synchronous limit is, and what a job resource looks like | [s28-long-running-endpoints](s28-long-running-endpoints) | `analysis-00040` |

@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: s24-add-bounded-context
+  datasource:
+    url: jdbc:postgresql://localhost:18241/s24
+    username: s24
+    password: s24
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18240
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
