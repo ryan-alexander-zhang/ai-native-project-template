@@ -1,0 +1,132 @@
+spring:
+  application:
+    # Also the outbox relay's ShedLock lock name. Naming a service is not cosmetic here.
+    name: s07-payment-service
+  datasource:
+    url: jdbc:postgresql://localhost:18071/payments
+    username: payments
+    password: payments
+  flyway:
+    # This service's own schema. The framework's is a separate runner with its own history table.
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18070
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+payments:
+  gateway:
+    # Where the provider is. The stub module runs here by default: see the README for the one command.
+    base-url: http://localhost:18072
+    # The signing secret, shared out of band. In production it comes from a secret manager; a checked-in
+    # value is a sample's compromise and would be a finding anywhere else.
+    callback-secret: s07-gateway-secret
+    # The outbox destination that means "this leaves by HTTP, to the payment provider". Not a topic; a
+    # routing key that this application's own EventDestinations bean produces and its own dispatcher
+    # understands. The library only requires that it be resolved when the row is written.
+    destination: gateway:charges
+    currency: EUR
+    # Two numbers that decide what a bad day at the provider costs. Spring's default request factory has
+    # no read timeout at all, so without this a provider that goes quiet holds a relay thread forever —
+    # and the relay pool is small.
+    connect-timeout-ms: 1000
+    read-timeout-ms: 3000
+  reconciliation:
+    # The channel that exists because the callback may never come. Off would be a deployment choosing to
+    # let unsettled payments accumulate silently.
+    enabled: true
+    poll-delay-ms: 60000
+    # When a payment becomes worth asking about. It has a floor: longer than the provider's normal
+    # callback latency AND longer than our own outbox takes to send the charge request, or every round
+    # asks about payments the provider has not been told about yet. Shorter than a human would notice.
+    stale-after: PT30S
+    # When "the provider still has not decided" stops being patience. Past this, a pending payment is a
+    # person's problem — it is never automatically failed.
+    give-up-after: PT10M
+    batch-size: 100
+
+aipersimmon:
+  ddd:
+    integration:
+      # The provenance stamped on events whose @EventType leaves source empty. Ours names its own.
+      source: /payments
+    flyway:
+      # Two components, because this service uses two of the framework's schemas: the outbox (the
+      # durable outbound intent) and the web store (the nonce table behind the replay guard). Omit one
+      # and the corresponding startup validator refuses to boot, naming this property — which is the
+      # good failure, since the alternative is a 500 at the edge or a command rolling back on its first
+      # publication.
+      components: [outbox, web-store]
+    cqrs:
+      retry-on-conflict:
+        # Safe here, and the reason is architectural rather than a preference. The library documents why
+        # this is opt-in: rerunning a command is safe by construction unless a handler performed a
+        # non-transactional side effect, which the framework cannot verify. In this service no handler
+        # makes an HTTP call — the outbound request is made by the relay's dispatcher, and the pull
+        # channel is called by the reconciliation round *before* it dispatches anything — so a rerun
+        # repeats nothing outside the database. That is the assertion this flag makes, and moving one
+        # gateway call into a handler would silently invalidate it.
+        enabled: true
+    outbox:
+      relay:
+        # On in a real deployment. Tests turn it off so a single poll can be driven and asserted on,
+        # which is the use the library documents for the flag.
+        enabled: true
+      poll-delay-ms: 500
+      # Ten attempts at a payment provider, then the dead-letter table. The reconciler is what stops a
+      # dead letter from being the end of the story: it finds the payment unsettled and asks.
+      max-attempts: 10
+      retry:
+        base-backoff-ms: 1000
+        max-backoff-ms: 60000
+    web:
+      # Refuse to start on an in-memory edge store. With the JDBC store present this changes nothing;
+      # without it, the application would protect one instance out of however many are running.
+      allow-in-memory-stores: false
+      replay:
+        enabled: true
+        # Servlet patterns, not Ant. Only the provider's callback is signed — our own API is not, and
+        # covering it would mean asking our clients to implement someone else's HMAC scheme.
+        url-patterns:
+          - /gateway-callbacks/*
+        # The provider's header names, not the library's defaults (X-Signature / X-Timestamp / X-Nonce).
+        # Which headers carry a signature is the provider's decision, and these properties exist so that
+        # decision does not have to be reimplemented as a filter.
+        signature-header: X-Gateway-Signature
+        timestamp-header: X-Gateway-Timestamp
+        # How far out of date a signed request may be. Wide enough for clock skew and a redelivery,
+        # narrow enough that a captured request stops being useful.
+        tolerance: 5m
+        nonce:
+          # The provider's nonce header, and the one that is easy to forget: signature-header and
+          # timestamp-header live directly under `replay`, this one lives under `replay.nonce`, so
+          # renaming the first two and leaving this at its default (X-Nonce) makes every authentic
+          # callback fail the *header* check — "Missing nonce" — before its signature is even computed.
+          # A 401 that looks exactly like an attack and is entirely our own configuration.
+          header: X-Gateway-Nonce
+          # Without this the ReplayGuard is never consulted at all, and a signature alone does not stop
+          # the same signed bytes being sent twice inside the tolerance window. It is also the reason the
+          # web-store schema is needed: the nonce table is where "seen before" is remembered across
+          # instances and restarts.
+          #
+          # It is also not as optional as it looks. The filter reads the nonce header ONLY when this is on
+          # (ReplayProtectionFilter:65), so with it off the verifier is handed a null nonce — and any
+          # signing scheme that binds the nonce into the signed string, which is the scheme S2 recommends
+          # and this provider uses, then fails to verify every authentic callback. Measured: turning this
+          # off turns seven tests in CallbackIngestionTest red, only one of which is about replay.
+          enabled: true
+      store:
+        cleanup:
+          # The JDBC store's own retention sweep. Redis expires keys for you; a table does not, and a
+          # nonce table nobody prunes is a table that grows for as long as the service runs.
+          enabled: true
+          poll-delay: 1h
+      # Idempotency is deliberately left off, and not out of indifference. It has no url-patterns, only
+      # methods, so require-key would cover every POST in the application — including the provider's
+      # callback, and no payment provider sends an Idempotency-Key. S2 covers what it does where it fits.
+      idempotency:
+        enabled: false

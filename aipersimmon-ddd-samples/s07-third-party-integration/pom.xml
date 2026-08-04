@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>aipersimmon-ddd-samples</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s07-third-party-integration</artifactId>
+  <packaging>pom</packaging>
+  <name>s07-third-party-integration</name>
+  <description>S7: integrating with a system nobody here controls, in both directions.</description>
+
+  <!--
+    Two modules, and only one of them is ours.
+
+    S4 and S6 pair two services we own, so the interesting question there is what the contract between
+    them should be. Here the second module is a stand-in for a payment gateway: a system with its own
+    vocabulary, its own reliability, and no interest in our conventions. It is deliberately built the
+    way a foreign system is encountered rather than the way we would build one — plain Java, no Spring,
+    no DDD, ISO-8583-flavoured response codes — because an anticorruption layer that faces something
+    designed by the same hands is not being tested.
+
+    It is a real module rather than a test fixture for two reasons. It runs standalone (`java -jar`), so
+    the whole flow including the callback can be driven by hand; and the callback signing contract lives
+    in exactly one place, on the sending side, which is where the client half of a webhook contract
+    belongs. The payment service depends on it in `test` scope only.
+  -->
+  <modules>
+    <module>gateway-stub</module>
+    <module>payment-service</module>
+  </modules>
+</project>

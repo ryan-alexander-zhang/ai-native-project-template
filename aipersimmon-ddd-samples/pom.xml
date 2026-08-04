@@ -35,6 +35,7 @@
     <module>s04-integration-events-across-services</module>
     <module>s05-external-messages-inbound</module>
     <module>s06-synchronous-call-between-services</module>
+    <module>s07-third-party-integration</module>
     <module>s08-local-transaction-aggregate</module>
     <module>s11-scheduled-and-batch-entries</module>
     <module>s16-tactical-modelling</module>

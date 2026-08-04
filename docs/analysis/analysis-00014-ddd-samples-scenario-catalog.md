@@ -293,6 +293,21 @@ precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最�
 `aipersimmon-ddd-web` + `aipersimmon-ddd-web-store-jdbc`（回调幂等/验签/防重放）、
 `aipersimmon-ddd-process-manager`（悬挂态推进，视深度）。
 
+**文档**：[[analysis-00031-samples-third-party-integration]]（已完成，两个模块：我们的支付服务 + 一个不受控的
+网关 stub；process-manager 没用上，悬挂态用聚合状态 + 定时对账推进，编排引擎留给 S9）。落地结论：**出站真的走
+了库的 outbox**（`@Externalized("gateway:charges")` + 自己的 `EventDestinations` 与 `OutboxDispatcher`），换来
+同事务落库、租约、退避、死信；代价三条——一个应用只有一个 dispatcher（所以要自己组合回进程内那条腿，否则 LOCAL
+事件被无声标记已发送）、中继是快递员不能记录答案、因此三方契约必须是"同步只回 202"。幂等键用 payment id，并且
+**只有"已扣款、响应丢了"这种失败能证明它**（换键重试实测双扣；扣款前失败换键也只扣一次，原来的用例名过度声
+明，为此给 stub 加了 `LOSE_FIRST_RESPONSE`）。入站用 web-store-**jdbc**（S2 用 redis，两种都覆盖），核心区分是
+**传输重放 ≠ 业务重复**：网关重发换新 nonce 新签名，两条都是真的，去重只能在聚合里。乱序靠状态 rank，不信到达
+顺序也不信对方时钟。矛盾终态 / 未知 result code / 未知 payment：前两个一律 2xx + 交人（未知即失败是这类集成最
+贵的一行代码），第三个 404。对账通道必须有，并且我第一版写错了：`NoRecord` 立即升级，结果对账定时器比中继早
+13ms，把一笔还没发出去的付款永久打标（打标是粘性的）——改设计而不是改测试，**对缺席要有耐心**，由此 `stale-after`
+有下界。布局分歧一处：回调 controller 放在 `infrastructure.gateway` 而不是 `interfaces`（它不是我们的 API，是
+出站调用的返回路径），换来两个方向共用一张 code 表，整包 package-private。八个负向对照全部单跑实测，其中
+`nonce.enabled=false` 那一轮查出库的问题 → [[issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable]]。
+
 ### S8 本地事务：聚合边界、乐观锁与冲突重试（P0）
 
 **场景描述**：单服务、单库内一次业务操作的事务处理。"一个事务只修改一个聚合"在真实业务压力下

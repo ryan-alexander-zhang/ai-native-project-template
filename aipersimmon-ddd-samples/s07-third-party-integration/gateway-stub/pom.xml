@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.example.samples</groupId>
+    <artifactId>s07-third-party-integration</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>s07-gateway-stub</artifactId>
+  <name>s07-gateway-stub</name>
+  <description>A fake payment gateway: foreign vocabulary, hostile behaviour, no Spring.</description>
+
+  <dependencies>
+    <!--
+      Jackson and nothing else. No Spring, no aipersimmon-ddd, not even a logging facade: the whole
+      point of this module is that the far side of an integration shares none of our stack. If it
+      compiled against our framework, every design claim in the payment service about isolating a
+      foreign model would be untestable — the model would not be foreign.
+    -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        A plain executable jar, not a Spring Boot repackage. Two reasons: there is no Spring here to
+        repackage, and a Boot-repackaged jar hides its classes under BOOT-INF, which would make this
+        module unusable as the payment service's test dependency without a classifier dance.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>com.example.thirdparty.paygate.GatewayStubMain</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
