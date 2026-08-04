@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: s28-long-running-endpoints
+  datasource:
+    url: jdbc:postgresql://localhost:18281/s28
+    username: s28
+    password: s28
+    hikari:
+      # Left at the default on purpose, and written out because this sample is partly *about* this number.
+      # An export that streams for four minutes holds one of these ten for four minutes; ten concurrent
+      # exports is the whole pool. SynchronousLimitTest measures that with the number turned down to 2.
+      maximum-pool-size: 10
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18280
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    # The default result-set type, so the streaming mapper's @Options(resultSetType = FORWARD_ONLY) is
+    # a statement about that one query rather than a global switch.
+    default-fetch-size: 100
+
+s28:
+  export:
+    # How the worker reads the source table.
+    #   SNAPSHOT — one read-only transaction, one server-side cursor, one consistent picture of the period.
+    #   CHUNKED  — keyset pages, each in its own short transaction; no long transaction, no single snapshot.
+    # Both are defensible and they are not equivalent; StreamingExportTest measures the difference by
+    # inserting a row while an export is running.
+    read-mode: SNAPSHOT
+    # Rows per keyset page, in CHUNKED mode only. The SNAPSHOT cursor's fetch size is an annotation value in
+    # ExportSourceMapper and cannot be configured — see ExportSettings.
+    page-size: 500
+    # How often the worker publishes progress and looks for a cancellation, in rows.
+    progress-interval: 1000
+    # How progress reaches the outside world.
+    #   OWN_TRANSACTION  — each tick commits immediately on its own connection. The default, and the only
+    #                      mode in which a progress query can answer anything while the export is running.
+    #   SAME_TRANSACTION — joins the export's read transaction. Reachable only by setting this, because it
+    #                      is the shape that looks right and publishes nothing until the export is over.
+    progress-transaction: OWN_TRANSACTION
+    # How long a claim is good for without a heartbeat. Short for a sample; in a deployment this is
+    # "longer than one heartbeat interval by a wide margin, shorter than a human's patience for a stuck job".
+    lease: PT30S
+    # How often the running worker pushes its lease forward.
+    heartbeat: PT5S
+    # Where artifacts land. A local directory is honest for a sample and wrong for more than one instance —
+    # see FileArtifactStore.
+    artifact-dir: ${java.io.tmpdir}/s28-exports
+  worker:
+    # On, because a job queue nobody drains is not a running service. The tests turn it off — every one of
+    # them drives a single run explicitly, and a poller in the background would decide the outcome first.
+    enabled: true
+    poll-delay: 500ms
+
+aipersimmon:
+  ddd:
+    flyway:
+      # The process manager's four tables. Created so the counterexample can be measured against the real
+      # engine; nothing in main code starts a process.
+      components: [process-manager]
+    process-manager:
+      # Both workers off: this sample stages no effects and schedules no deadlines. Leaving them on would
+      # spend two poller threads proving nothing.
+      effect-relay:
+        enabled: false
+      deadline-worker:
+        enabled: false

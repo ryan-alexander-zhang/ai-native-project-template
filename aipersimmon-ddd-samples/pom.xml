@@ -51,6 +51,7 @@
     <module>s23-schema-migration</module>
     <module>s26-read-side-caching</module>
     <module>s27-soft-delete-and-erasure</module>
+    <module>s28-long-running-endpoints</module>
   </modules>
 
   <dependencyManagement>
