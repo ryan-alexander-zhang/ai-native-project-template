@@ -44,6 +44,7 @@ variants of the framework modules are not used.
 | S20 The read side's contract | [s20-query-contract-paging](s20-query-contract-paging) | `analysis-00023` |
 | S21 Contract evolution and coexisting revisions | [s21-event-contract-evolution](s21-event-contract-evolution) | `analysis-00026` |
 | S22 Dead letters, replay, retention, startup guards | [s22-operability-deadletters-retention](s22-operability-deadletters-retention) | `analysis-00035` |
+| S23 Schema evolution and data migration | [s23-schema-migration](s23-schema-migration) | `analysis-00036` |
 
 Ports: scenario N owns the block starting at `18000 + 10*N`, so several samples can run at once.
 

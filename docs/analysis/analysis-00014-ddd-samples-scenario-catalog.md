@@ -745,6 +745,24 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 **预计涉及的组件**：`aipersimmon-ddd-flyway-spring-boot-starter`、
 `aipersimmon-ddd-persistence-mybatis-plus`。
 
+**文档**：[[analysis-00036-samples-schema-migration]]（sample：`aipersimmon-ddd-samples/s23-schema-migration`，
+一个部署单元、两个上下文，26 个用例）。六问全部以实测作答，四点要回填进本清单：
+
+1. **"谁先跑"的答案背后有个坑**：库那个 `FlywayMigrationStrategy` 是 `@ConditionalOnMissingBean`，
+   而**第二个上下文逼你定义自己的 strategy**——一定义，框架组件的 migration 就不再运行。底线是启动失败
+   （validator 拦住），但**消息指向的修法是错的**（它让你去加 `flyway.components`，那一行通常本来就对）。
+   习惯：自己写的 strategy 最后一行必须调 `AipersimmonFlywayMigrator.migrate`。
+2. **"不停机步骤"里最关键的一步不是 migration**：扩(V2) / **部署** / 缩(V3)，中间那步是"停止写旧列的
+   release"，不在 `db/migration` 里，也正是被跳过的那一步。且缩之前的**等待**以天计——列一删，应用就不能
+   回滚了。
+3. **回填判据一句话**：把行里已有的字节重新表述是 SQL；**做判断、或必须告知任何人**，是命令。V2 是前者、
+   V4 是后者。命令通道额外买到规则单份、公告与变更同事务、聚合级幂等、分页可停。
+4. **编号隔离的代价是一行 baseline**：跑在第二位的上下文历史里会多出 `version 0`（schema 已非空必须
+   baseline），因此 baseline 版本必须是 `0` —— 写 `1` 会把它的 V1 标成已应用而表永远不建。实测得出。
+
+另记一处**诊断误导**（未开 issue，属文案+一行日志）：框架 strategy 退让时不出声，validator 的建议又指向
+一个已经正确的配置项。
+
 ### S24 在既有服务里新建一个限界上下文（P1）
 
 **场景描述**：读完前面所有示例后，团队要做的第一件事就是加一个新上下文。没人讲过这件事的步骤。

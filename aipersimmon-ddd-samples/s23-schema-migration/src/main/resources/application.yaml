@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: s23-schema-migration
+  datasource:
+    url: jdbc:postgresql://localhost:18231/s23
+    username: s23
+    password: s23
+  flyway:
+    enabled: true
+    # Boot's single Flyway is the ORDERING context's. Note the path: db/migration/ordering, not
+    # db/migration — billing has a V1 of its own, and two contexts in one location is two V1s in one
+    # version space, which Flyway refuses outright. The other two sets are run by MigrationConfiguration,
+    # which also decides the order.
+    locations: classpath:db/migration/ordering
+    # Named, rather than left as the default flyway_schema_history. The default belongs to whoever got
+    # there first, and in a codebase that is always the first context — which then has its history
+    # indistinguishable from "the application's". Naming both from the start costs one line and removes
+    # that asymmetry.
+    table: flyway_schema_history_ordering
+    # Left at Boot 3's default (true), and asserted rather than assumed: CleanIsRefusedTest calls clean()
+    # and expects it to throw. A destructive command that is available by default is one an incident will
+    # eventually reach for.
+    clean-disabled: true
+
+server:
+  port: 18230
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /ordering
+    flyway:
+      # The third set. It is applied by MigrationConfiguration calling AipersimmonFlywayMigrator
+      # explicitly — because defining a FlywayMigrationStrategy of our own (which the second context
+      # forces) makes the framework's own strategy back off. Delete that call and the outbox tables are
+      # never created; the outbox's schema validator then refuses to start and names this very property.
+      components: [outbox]
+    outbox:
+      relay:
+        # Off. This sample never delivers anything: it uses the outbox as the place a backfill's
+        # announcements land, and asserts on the rows. Delivery is S4's subject and dead letters are S22's.
+        enabled: false

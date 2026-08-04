@@ -48,6 +48,7 @@
     <module>s20-query-contract-paging</module>
     <module>s21-event-contract-evolution</module>
     <module>s22-operability-deadletters-retention</module>
+    <module>s23-schema-migration</module>
   </modules>
 
   <dependencyManagement>
