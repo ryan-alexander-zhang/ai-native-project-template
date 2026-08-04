@@ -25,7 +25,7 @@ variants of the framework modules are not used.
 
 | Scenario | Directory | Document |
 | --- | --- | --- |
-| S1 HTTP command and query | [s01-http-command-query](s01-http-command-query) | `analysis-00015` |
+| S1 HTTP command and query (hosts **S14** the operation log) | [s01-http-command-query](s01-http-command-query) | `analysis-00015`, `-00038` |
 | S2 Idempotency and replay protection | [s02-http-idempotency](s02-http-idempotency) | `analysis-00017` |
 | S3 Domain events, in process | [s03-domain-events-in-process](s03-domain-events-in-process) | `analysis-00020` |
 | S4 Integration events across services (hosts **S13** tenancy and **S15** tracing) | [s04-integration-events-across-services](s04-integration-events-across-services) | `analysis-00025`, `-00027`, `-00028` |

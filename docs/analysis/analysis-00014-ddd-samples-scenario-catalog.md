@@ -528,6 +528,31 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 `aipersimmon-ddd-operation-log-cqrs-spring-boot-starter`、
 `aipersimmon-ddd-operation-log-mybatis-plus`。
 
+**文档**：[[analysis-00038-samples-operation-log]]（sample：`aipersimmon-ddd-samples/s01-http-command-query`，
+S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S13 与 S15 随宿主 S4 交付了，S14 一直没有，
+2026-08-04 之前 samples 树里没有任何模块依赖过这个组件。五问全部以实测作答，四点要回填进本清单：
+
+1. **"注解式与非注解式各适用什么"的判据不是"要不要 before/after"。** 更硬的约束是：注解的 `targetId`
+   模板只编译在一个 root `input` 上（`AnnotationOperationLogDefinition.java:58`、`:111`），所以**一个在
+   handler 里铸造 id 的创建，注解根本无法指向它的目标**——`${input.customerId}` 会编译、会启动，然后把
+   每条订单操作记在一个客户 id 名下。由此还推出一条没人会预料的后果：**"能不能审计一次失败"取决于目标
+   的身份是否在操作之前就存在**，因为 `Target` 要求非空 id。要审计失败的创建，身份必须在命令之前铸造。
+2. **actor 的答案是"绑定 + 清除"，而清除是唯一的安全属性。** 未绑定返回 `Actor.system(应用名)`（抛异常
+   会让审计可用性变成业务可用性；空 actor 与 bug 无法区分；回退到上一个 actor 就是那个失败本身）。
+   **我为泄漏写的第一个测试是空的**：控制（删掉 filter 的 `finally`）跑出 **0 红**，因为
+   `TestRestTemplate` 的请求在容器线程、后续命令在 JUnit 线程，两条线程从来不是同一条。改成在本线程上
+   直接驱动 filter 后同一控制 **2 红**。教训：**跨线程泄漏对任何不停在一条线程上的测试都不可见。**
+3. **`outcome` 与 `completion` 是两列不是一个状态**，我猜错了两次：领域拒绝与校验失败**都是 `REJECTED`**
+   （不是 `FAILED`——那是并发冲突与意料之外的），区分它们的是 `completion`（`ROLLED_BACK` vs
+   `NOT_STARTED`）。`failure_code` 直接是本上下文的 `ErrorCode`，与 HTTP problem document 同码。
+4. **"不该记什么"的机制是 allowlist，不是事后脱敏。** `OperationLogs.record` 的 javadoc 说它 "redacts"
+   容易被读成会替你脱敏 PII；`Redactor` 实际做的只是去 CR/LF + 截断，它的类 javadoc 自己写明不负责判断
+   敏感性。**写入之后没有第二道关**——这正是 S27 的合规擦除要面对的前提。模板白名单里的 `mask` 是遮蔽
+   不是删除（首字符 + `***` + 末字符）。
+
+库的问题：**一条也没有**。本篇被库纠正了三次（`Actor.system` 的 displayName、两处 outcome），三次都是
+库更对。
+
 ### S15 可观测性（X，寄宿 S4）
 
 **场景描述**：一次业务请求穿过 HTTP → 命令 → 聚合 → outbox → Kafka → inbox → 下游命令，排障

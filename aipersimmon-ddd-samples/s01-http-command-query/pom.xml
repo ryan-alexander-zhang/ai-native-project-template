@@ -16,17 +16,39 @@
 
   <dependencies>
     <!--
-      The smallest dependency set for HTTP -> command -> aggregate -> save.
+      The smallest dependency set for HTTP -> command -> aggregate -> save, plus the operation log
+      (scenario S14 is hosted here).
 
-      Deliberately NOT aipersimmon-ddd-starter-mybatis-plus: that bundle also brings the outbox,
-      inbox, process-manager and operation-log modules, each of which registers a schema validator
-      that runs whenever a SqlSessionFactory exists. With no aipersimmon.ddd.flyway.components set,
-      startup then fails on the first missing framework table. This sample owns no framework table,
-      so it takes the three modules it actually uses.
+      Still deliberately NOT aipersimmon-ddd-starter-mybatis-plus: that bundle also brings the
+      outbox, inbox and process-manager modules, each of which registers a schema validator that
+      runs whenever a SqlSessionFactory exists — and this sample owns exactly one framework table,
+      the audit log. Taking the bundle would mean either declaring three more components in
+      aipersimmon.ddd.flyway.components and carrying tables nothing writes to, or a startup failure
+      on the first missing one.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-starter</artifactId>
+    </dependency>
+    <!--
+      S14, hosted here. Two artifacts, because the operation log is two separable jobs: capturing an
+      operation around the command boundary (-cqrs, the interceptors and the annotation compiler) and
+      storing the row (-mybatis-plus, the sink and the retention purge). A service that wanted to send
+      audit rows somewhere else would keep the first and replace the second.
+    -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-cqrs-spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
+    </dependency>
+    <!-- The audit table's DDL ships inside the component's jar, so the framework's migrator has to
+         run: see aipersimmon.ddd.flyway.components in application.yaml. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-flyway-spring-boot-starter</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
