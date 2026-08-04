@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: s27-soft-delete-and-erasure
+  datasource:
+    url: jdbc:postgresql://localhost:18271/s27
+    username: s27
+    password: s27
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18270
+
+mybatis-plus:
+  global-config:
+    db-config:
+      # The infrastructure switch, configured once. @TableLogic on the field says which column; these say
+      # what the two values mean. Left at MyBatis-Plus's own defaults and written out anyway, because a
+      # reader has to know whether `deleted` is a boolean or a timestamp to make sense of the schema.
+      logic-delete-value: true
+      logic-not-delete-value: false
+  configuration:
+    map-underscore-to-camel-case: true
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /customers
+    flyway:
+      # All three, and each is here because an erasure has to answer for it.
+      components: [outbox, inbox, operation-log]
+    outbox:
+      relay:
+        # Off. This sample never delivers anything: it uses the outbox as the place the announcements land
+        # and asserts on the rows, because what an erasure has to reckon with is what those rows contain.
+        # Delivery is S4's subject.
+        enabled: false
+    operation-log:
+      source: s27-soft-delete-and-erasure

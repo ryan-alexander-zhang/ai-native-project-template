@@ -46,15 +46,18 @@ variants of the framework modules are not used.
 | S22 Dead letters, replay, retention, startup guards | [s22-operability-deadletters-retention](s22-operability-deadletters-retention) | `analysis-00035` |
 | S23 Schema evolution and data migration | [s23-schema-migration](s23-schema-migration) | `analysis-00036` |
 | S26 A cache, a projection, and what each cannot do | [s26-read-side-caching](s26-read-side-caching) | `analysis-00037` |
+| S27 Three things called delete, and a compliance erasure | [s27-soft-delete-and-erasure](s27-soft-delete-and-erasure) | `analysis-00039` |
 
 Ports: scenario N owns the block starting at `18000 + 10*N`, so several samples can run at once.
 
-One sample ships two deliberate anti-patterns so their consequences can be measured rather than asserted.
+Two samples ship deliberate anti-patterns so their consequences can be measured rather than asserted.
 **S26** has `CachedProducts`, which memoises the aggregate repository — four lines, passes every read-side
 test, and makes a rename report success while writing nothing — in **test scope only**; and
 `ProductCacheInvalidation.Eager`, which evicts inside the transaction, in main but reachable only by setting
-`s26.cache.invalidate=IN_TRANSACTION` away from its default. Each has a sibling test showing the correct
-arrangement behaves differently, because a failure demonstrated without its control is not a finding.
+`s26.cache.invalidate=IN_TRANSACTION` away from its default. **S27** has `HandRolledFlag`, a second row class
+over the same table that maintains its delete flag without `@TableLogic`, also test scope only. Each has a
+sibling test showing the correct arrangement behaves differently, because a failure demonstrated without its
+control is not a finding.
 
 One sample configures its own broker rather than using the shared test-support container: **S22** runs
 Kafka with topic auto-creation off, because the two failures it is about (publishing to an unprovisioned

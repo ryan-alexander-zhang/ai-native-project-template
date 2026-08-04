@@ -875,6 +875,39 @@ UUIDv7 主键、租户判别列、框架表。遗留表是自增主键、没有�
 **预计涉及的组件**：`aipersimmon-ddd-persistence-mybatis-plus`、
 `aipersimmon-ddd-operation-log-mybatis-plus`、`aipersimmon-ddd-inbox-mybatis-plus`。
 
+**文档**：[[analysis-00039-samples-soft-delete-and-erasure]]（sample：`aipersimmon-ddd-samples/s27-soft-delete-and-erasure`，
+一个部署单元、42 个用例）。六问全部以实测作答，五点要回填进本清单：
+
+1. **判据不是技术性的**：有没有业务规则读它？有没有人会撤销它？有没有人会要一份清单？三个都否 → 基础设施
+   开关；任一为是 → 领域状态。而**判断错了有机械后果**：把标记当普通列自己维护，`ClearedColumns` 会把它
+   连同其他未映射列一起强制写 null。实测把 `@TableLogic` 从行类上摘掉，**42 个用例里 22 个红，全部红在
+   `null value in column "deleted"`——不是"隐藏的行行为异常",是一次写都不成**。这是好结果；危险的是
+   `NOT NULL` 缺席时它会静默提交成"既非 true 也非 false"，两种过滤器都看不见（推论，未实测）。
+2. **"整根覆盖写入遇上逻辑删除列"库已经处理过，但那一行从没被跑过**：`ClearedColumns.isEmittedAnyway` 里
+   `tableInfo.isWithLogicDelete() && field.isLogicDelete()` 是全仓**唯一**提到 `@TableLogic` 的地方。本篇
+   跑了它，并同时断言排除是**窄的**（聚合真正清空的 phone 照旧被强制写 null）。
+3. **唯一索引的冲突有第二半**：部分索引（`WHERE deleted = FALSE`）修好"被隐藏的人永久占住邮箱"，
+   而**擦除的墓碑也占着这个索引**，所以墓碑必须按 id 唯一——常量墓碑让第二次擦除撞唯一键（实测 2 红，
+   含 `duplicate key ... uq_s27_customer_email_live`）。MySQL 无部分索引，替代做法里**不能用 NULL 表示
+   活着**，否则两个活行能同邮箱（与意图相反，且只删一行的测试全绿）。
+4. **"合规擦除对已发事件/inbox/审计行分别意味着什么"——三个答案完全不同，这是本篇的核心**：
+   - **outbox**：事后没有正确动作（照发＝造新副本；删掉＝下游永久错误；改写＝契约撒谎），所以
+     **顺序必须事先安排**：排空后才擦除，擦除在队列非空时**拒绝**并给可重试的 409。这是本系列唯一读
+     outbox 的业务命令。洞：进了死信表的公告不再阻塞擦除，但仍握着那份数据。
+   - **inbox**：**什么都不做**。表里没有任何一列指向人（实测查 `information_schema`），键是消息 id 不是
+     主体，所以既无法定向也无需定向；而"按时间窗口顺手清一下"会**打断 exactly-once**（实测：同一条消息
+     被处理第二次）。留着键还让擦除对迟到的重投免疫。
+   - **审计行**：**留，且它的内容在写下的那刻就定了**——组件没有 update 端口也没有按 id 删除，`Redactor`
+     只做去控制字符与截断。所以正确做法是设计时就别写进去：擦除自己的行只提 id 与工单号，改邮箱的行用
+     `mask()`。通行写法"从 A 改到 B" 会把旧邮箱永久留在一张多年保留的 append-only 表里。
+5. **"擦除"这个词本身要改**：它不是删除。行留着（**它的存在是证据**），个人数据被覆写成模型仍接受的墓碑
+   值。这也是能扛住合规审查的**代理键论证**：拿邮箱做主键的话擦除就等于删行，连带删掉每条审计与账目对它
+   的引用，义务与"证明履行了义务"直接冲突。
+
+库的问题：[[issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected]]（P2，
+`DefaultFailureClassifier` 没有 `ApplicationException` 分支，于是每一次 404/409 在审计表里都是
+`FAILED`/`unexpected` 且自带的 `ErrorCode` 被丢掉；三行可修）。
+
 ### S28 长耗时与大数据量端点（P1）
 
 **场景描述**：文件上传、导出百万行、耗时数分钟的作业。库只给了分页，团队会误把
