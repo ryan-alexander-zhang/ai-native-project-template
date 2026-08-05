@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: s25-strangler-legacy-adoption
+  datasource:
+    url: jdbc:postgresql://localhost:18251/s25
+    username: s25
+    password: s25
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 18250
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+s25:
+  # Which path serves refunds. The strangler's dial, and the only thing that changes as the migration
+  # proceeds — every other file is written once.
+  #   LEGACY_ONLY  — as inherited. The monolith owns the table; the new context is not consulted.
+  #   NEW_WRITES   — the legacy entry point delegates its writes to the new context. The state this
+  #                  sample argues you should get to as fast as possible, because it is the only one in
+  #                  which the library's optimistic lock means anything (see VersionColumnTest).
+  #   NEW_ONLY     — the legacy entry point is gone. The done criterion, not a config value you set
+  #                  hopefully.
+  refunds:
+    route: NEW_WRITES
+
+aipersimmon:
+  ddd:
+    integration:
+      source: /refunds
+    flyway:
+      components: [outbox]
+    outbox:
+      relay:
+        enabled: false

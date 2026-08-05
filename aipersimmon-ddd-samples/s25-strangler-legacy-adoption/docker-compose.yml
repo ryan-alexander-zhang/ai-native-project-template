@@ -1,0 +1,11 @@
+# Only needed to poke at the schema by hand; the tests use Testcontainers.
+# Scenario N owns the port block starting at 18000 + 10*N.
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "18251:5432"
+    environment:
+      POSTGRES_DB: s25
+      POSTGRES_USER: s25
+      POSTGRES_PASSWORD: s25

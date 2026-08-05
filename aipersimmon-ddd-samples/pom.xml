@@ -50,6 +50,7 @@
     <module>s22-operability-deadletters-retention</module>
     <module>s23-schema-migration</module>
     <module>s24-add-bounded-context</module>
+    <module>s25-strangler-legacy-adoption</module>
     <module>s26-read-side-caching</module>
     <module>s27-soft-delete-and-erasure</module>
     <module>s28-long-running-endpoints</module>
