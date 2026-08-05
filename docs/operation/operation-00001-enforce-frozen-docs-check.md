@@ -1,9 +1,9 @@
 ---
 id: operation-00001-enforce-frozen-docs-check
 type: operation
-role: main
 status: active
-parent: decision-00003-docs-system-owned-by-main
+parent:
+implements: [decision-00003-docs-system-owned-by-main]
 ---
 
 # Make `frozen-docs` a required check on lang branches

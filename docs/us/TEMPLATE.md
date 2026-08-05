@@ -1,9 +1,8 @@
 ---
 id: us-00001-example-slug
 type: us
-role: main|patch
 status: draft|active|archived
-parent: <spec-id>
+parent: <spec-id>                             # required: the spec this story belongs to
 ---
 
 # User Story: <short name>

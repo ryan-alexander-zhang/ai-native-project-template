@@ -1,7 +1,6 @@
 ---
 id: plan-00001-example-slug
 type: plan
-role: main|patch
 status: draft|open|resolved|archived|wontfix
-parent: <id>
+implements: [<spec-id | design-id | report-id>]  # required: what this plan makes real
 ---

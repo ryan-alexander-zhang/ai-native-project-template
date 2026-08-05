@@ -22,10 +22,10 @@ Use `TEMPLATE.md` for front matter.
 - Every GWT scenario cites the `us-<n>-FR-<i>` it verifies, and covers unwanted
   paths, not just the happy path.
 
-## Parent
+## Relations
 
-`parent` is always the `spec` this story belongs to. A user story never
-attaches directly to a `prd`.
+- `parent` — always the `spec` this story belongs to. A user story never attaches
+  directly to a `prd`.
 
 ## Exclude
 
@@ -35,6 +35,4 @@ attaches directly to a `prd`.
 ## Note
 
 Ids and filenames use the `us-00001-...` prefix. A spec links its stories; a
-story links back to its spec. Most small features can keep a single story inline
-in the spec — create a separate story doc when there are several, or when a
-story is reused or tracked on its own.
+story links back to its spec.

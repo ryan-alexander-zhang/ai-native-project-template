@@ -11,7 +11,7 @@ restate them — it covers placement, status transitions, and done.
 
 - Place anything under `docs/` via [docs/README.md](docs/README.md); choose the smallest correct folder.
 - Keep repo-wide policy and workflow in the root canonical docs, not under `docs/`.
-- Keep one current main doc per topic; do not create parallel structures.
+- Keep one current doc per topic; do not create parallel structures.
 - When a taxonomy or folder rule changes, update `docs/README.md` and the affected templates and folder `README.md` files together.
 
 ## Status Workflow
@@ -29,5 +29,5 @@ A documentation change is done when:
 
 - the doc is in the correct location with valid front matter
 - links, paths, and examples were checked
-- no topic has two live main docs
+- no topic has two live docs
 - no doc it governs is left in `draft`

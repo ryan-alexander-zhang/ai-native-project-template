@@ -15,6 +15,11 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `parent` — the `idea` this PRD grew out of, or empty when the PRD is the entry
+  point.
+
 ## Exclude
 
 - implementation design

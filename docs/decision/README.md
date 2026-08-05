@@ -19,6 +19,15 @@ Add more when useful.
 - future contributors would ask "why did we choose this?"
 - the decision affects more than one file, workflow, or contributor
 
+## Relations
+
+- `motivated_by` — what created the need for the choice: usually an `analysis`,
+  `report`, `spec`, `prd`, or `idea`.
+- `constrains` — the `spec` / `design` / `plan` / `operation` docs the choice binds,
+  minus any that already declare `implements: [<this decision>]`. When a new doc
+  later falls under an `active` decision, add it here: the list is metadata about
+  reach, not content, so updating it is not an amendment to the decision.
+
 ## Exclude
 
 - temporary discussion or brainstorming notes

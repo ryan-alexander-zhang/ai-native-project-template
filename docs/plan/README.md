@@ -14,6 +14,14 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `implements` — **required**: the `spec` and/or `design` this plan makes real, or
+  the `report` whose findings a remediation plan works through. It is the only
+  thing tying a plan to what it builds.
+- A feature-sized plan reaching `resolved` needs a [`record`](../record/README.md)
+  whose `verifies` lists the requirement ids it checked.
+
 ## Exclude
 
 - pure product requirements

@@ -13,6 +13,12 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `parent` — the `plan` this record accepts.
+- `verifies` — what was verified: `us` / `spec` ids, or requirement ids down to
+  `us-00001-AC-1.1` granularity. It must match the acceptance checklist below.
+
 ## Exclude
 
 - long-term rules

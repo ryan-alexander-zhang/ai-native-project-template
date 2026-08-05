@@ -12,6 +12,10 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `parent` — the `plan` this task belongs to. **Required.**
+
 ## Exclude
 
 - full design documents

@@ -1,7 +1,6 @@
 ---
 id: decision-00003-docs-system-owned-by-main
 type: decision
-role: main
 status: active
 parent:
 ---

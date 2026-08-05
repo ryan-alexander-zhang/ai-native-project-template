@@ -1,7 +1,6 @@
 ---
 id: decision-00002-spec-links-a-design-doc
 type: decision
-role: main
 status: active
 parent:
 ---
@@ -22,9 +21,11 @@ the technical design into one readable document, and forcing every trivial
 design into its own file adds ceremony and produces many thin files.
 
 The repo already externalizes user stories the same way: a `us/` doc owns each
-story by default, with a small-spec exception that allows one story inline. The
-machinery for an independent design already exists — an extracted design's
-`parent` may be a `spec`, a `plan`, or empty.
+story. (At the time of this decision that rule still carried a small-spec
+exception allowing one story inline; decision-00005 later removed it, so stories
+are now always externalized and only the design keeps an inline exception.) The
+machinery for an independent design already exists — an extracted design stands
+on its own, with no `parent`.
 
 ## Decision
 

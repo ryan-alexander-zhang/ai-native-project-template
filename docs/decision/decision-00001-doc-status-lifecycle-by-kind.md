@@ -1,7 +1,6 @@
 ---
 id: decision-00001-doc-status-lifecycle-by-kind
 type: decision
-role: main
 status: active
 parent:
 ---

@@ -10,6 +10,11 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `informs` — the `spec` / `plan` docs this design is input for. May be empty while
+  the design waits to be picked up.
+
 ## Exclude
 
 - task breakdown
@@ -21,8 +26,8 @@ Add more when useful.
 Default to a design doc here: a `spec` links its Technical Design to a `design/`
 doc rather than embedding it. This keeps designs collectable in one folder, lets
 a design be written before its spec and associated later, and lets one design be
-reused by more than one `spec`/`plan`. An extracted design is independent: its
-`parent` may be a `spec`, a `plan`, or empty.
+reused by more than one `spec`/`plan`. An extracted design is independent: it
+stands on its own and is not part of any one spec.
 
 Small-spec exception: keep the design inline in the `spec` (its Technical Design
 section) when the scope is small, and extract it here once it is reused or large

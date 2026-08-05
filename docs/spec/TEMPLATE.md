@@ -1,7 +1,6 @@
 ---
 id: spec-00001-example-slug
 type: spec
-role: main|patch
 status: draft|active|archived
 parent: <prd-id | idea-id | empty = spec is the entry point>
 ---
@@ -21,14 +20,10 @@ Each story is its own `docs/us/` doc that owns its value statement, EARS
 requirements, and GWT acceptance. Reference a requirement globally as
 `us-<n>-FR-<i>`.
 
-| Story | Doc | Status | Summary |
-| --- | --- | --- | --- |
-| US1 | [us-00001-pay-invoice](../us/us-00001-pay-invoice.md) | active | Creator pays an unpaid invoice by card |
-| US2 | [us-00002-payment-outcome](../us/us-00002-payment-outcome.md) | draft | Creator sees the payment outcome and reason |
-
-> Small-spec exception: one small story may be written inline here instead of a
-> separate file. Split into files once there are multiple stories, or a story is
-> reused / tracked on its own.
+| Story | Doc | Summary |
+| --- | --- | --- |
+| US1 | [us-00001-pay-invoice](../us/us-00001-pay-invoice.md) | Creator pays an unpaid invoice by card |
+| US2 | [us-00002-payment-outcome](../us/us-00002-payment-outcome.md) | Creator sees the payment outcome and reason |
 
 ## 3. Cross-cutting / System Requirements
 Requirements that support the feature but belong to no single story

@@ -25,9 +25,6 @@ sprint-sized story is not its own spec; it is a story under one.
   statement, EARS requirements, and GWT acceptance. The spec lists and links
   them in a table.
 - Reference a requirement globally as `us-<n>-FR-<i>`.
-- Small-spec exception: one small story may be written inline in the spec
-  instead of a separate file. Split into files once there are multiple stories,
-  or a story is reused / tracked on its own.
 
 ## Technical Design
 
@@ -40,10 +37,11 @@ sprint-sized story is not its own spec; it is a story under one.
   section when the scope is small. Extract it to a `design/` doc once it is
   reused or needs independent review.
 
-## Parent
+## Relations
 
-`parent` may be a `prd`, an `idea`, or empty when the spec is itself the entry
-point. Use the upstream main doc id when one exists.
+- `parent` — a `prd`, an `idea`, or empty when the spec is itself the entry point.
+- The `plan` declares `implements: [<this spec>]`; the `design` declares
+  `informs: [<this spec>]`. See [Relations](../README.md#relations).
 
 ## Exclude
 
