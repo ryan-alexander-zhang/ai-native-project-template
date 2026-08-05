@@ -54,6 +54,36 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>It also requires an active transaction, for the same reason it publishes events: the root row,
  * the child rows and the events are one atomic outcome or they are a corrupted aggregate.
  *
+ * <h2>Two premises about the table, both of which bite on a schema this class did not design</h2>
+ *
+ * <p><strong>{@code version == 0} means "never persisted".</strong> {@link #saveAggregate} reads it
+ * as the insert signal, so it is not a value a stored row may hold. When a version column is added
+ * to a table that already has rows, its default must therefore be {@code 1}:
+ *
+ * <pre>{@code
+ * ALTER TABLE legacy_refunds ADD COLUMN version BIGINT NOT NULL DEFAULT 1;  -- not 0
+ * }</pre>
+ *
+ * <p>With {@code DEFAULT 0} every pre-existing row reads back as unsaved, and the first write to
+ * any of them is an insert of a row that already exists — a {@link DuplicateEntityException} whose
+ * cause is the column default rather than anything the code did.
+ *
+ * <p><strong>A second writer to the same table must advance the version itself.</strong> Some
+ * writes legitimately bypass {@code saveAggregate} — claiming a row for a worker ({@code FOR UPDATE
+ * SKIP LOCKED} plus a conditional {@code UPDATE}, where losing the race is not information and so
+ * must not raise), a batch data repair, an operations script. Every such statement has to include
+ * {@code version = version + 1}:
+ *
+ * <pre>{@code
+ * UPDATE export_jobs SET state = 'RUNNING', version = version + 1 WHERE id = ? AND state = 'QUEUED'
+ * }</pre>
+ *
+ * <p>Omit it and a transaction that loaded the aggregate before the claim still commits — it checks
+ * the version, and the version genuinely is unchanged. Nothing throws, and the result does not look
+ * like a concurrency defect afterwards; it looks like a write that succeeded. This is a premise,
+ * not something this class can enforce: a claim has to bypass the version check to be useful at
+ * all, and {@code saveAggregate} cannot know who else writes the table.
+ *
  * @param <A> the aggregate root type
  * @param <D> the row type for the root's own table
  */
@@ -118,11 +148,20 @@ public abstract class MybatisPlusAggregateRepository<
    * CONFLICT DO NOTHING} or {@code INSERT IGNORE}; a conflict-tolerant insert belongs behind an
    * explicit application-level check, not silently inside save.
    *
-   * <p>A duplicate key is rethrown as {@link DuplicateEntityException} naming both plausible
-   * causes, because the stack trace alone cannot distinguish them: a genuine race between two
-   * creates of the same identity, or an update that mistakenly took this branch.
+   * <p>The row must already carry its primary key, checked before the statement runs. MyBatis-Plus
+   * would otherwise let an {@code IdType.AUTO} column be filled by the database, and the insert
+   * would <em>succeed</em> with an identity the application never learns — leaving the in-memory
+   * aggregate, the events already published under its id, and the row disagreeing about what was
+   * just created. Failing here instead makes that a refusal at the write rather than a
+   * misattribution discovered one write later.
+   *
+   * <p>A duplicate key is rethrown as {@link DuplicateEntityException} naming the plausible causes,
+   * because the stack trace alone cannot distinguish them: a genuine race between two creates of
+   * the same identity, an update that mistakenly took this branch, or a stored row whose version
+   * column defaults to 0.
    */
   private void insertExactlyOnce(D row, A aggregate) {
+    requirePrimaryKeyBeforeInsert(row, aggregate);
     int inserted;
     try {
       inserted = mapper.insert(row);
@@ -136,7 +175,10 @@ public abstract class MybatisPlusAggregateRepository<
               + " genuine conflict the client should see as 409 — or this aggregate was"
               + " reconstituted by a factory that forgot to call restoreVersion(...), leaving its"
               + " version at 0 so save took the insert branch; if this write was meant to be an"
-              + " update, that is the bug to fix.",
+              + " update, that is the bug to fix. A third cause looks like neither: the row comes"
+              + " from a table whose version column was added with DEFAULT 0, so every row that"
+              + " predates that migration reads back as never-persisted. Retrofit such a column with"
+              + " DEFAULT 1.",
           e);
     }
     if (inserted == 0) {
@@ -197,6 +239,47 @@ public abstract class MybatisPlusAggregateRepository<
               + " row of the table. Map the aggregate's identity onto the row.");
     }
     return id;
+  }
+
+  /**
+   * Refuse an insert whose row has no primary key.
+   *
+   * <p>The update path checks this because a missing key would match every row. The insert path
+   * checks it for a different and less visible reason: the statement would <em>work</em>. A column
+   * declared {@code IdType.AUTO} over {@code BIGSERIAL} or {@code AUTO_INCREMENT} is filled by the
+   * database, so the row lands, {@link #saveAggregate} advances the version, and the events publish
+   * — all under the identity the aggregate was constructed with, which is not the identity in the
+   * table. Nothing fails until the next write to the same aggregate, by which point the
+   * misattribution has committed and reached whatever consumed those events.
+   *
+   * <p>So the identity has to be known <em>before</em> the insert, not after it. Reserve it from
+   * the table's own sequence ({@code nextval(pg_get_serial_sequence('t', 'id'))}) and map it onto
+   * the row; do not read it back afterwards, which would mean mutating an aggregate's id after its
+   * events were published.
+   */
+  private void requirePrimaryKeyBeforeInsert(D row, A aggregate) {
+    TableInfo tableInfo = TableInfoHelper.getTableInfo(row.getClass());
+    if (tableInfo == null || tableInfo.getKeyProperty() == null) {
+      throw new IllegalStateException(
+          row.getClass().getName()
+              + " has no MyBatis-Plus primary key, so its identity cannot be established before the"
+              + " insert. Annotate the identity field with @TableId.");
+    }
+    if (tableInfo.getPropertyValue(row, tableInfo.getKeyProperty()) != null) {
+      return;
+    }
+    throw new IllegalStateException(
+        row.getClass().getName()
+            + " came back from toRow with no primary key value while inserting aggregate "
+            + aggregate.getClass().getSimpleName()
+            + "["
+            + aggregate.id()
+            + "]. If this table's primary key is assigned by the database (BIGSERIAL,"
+            + " AUTO_INCREMENT), reserve the value yourself before inserting — for example"
+            + " nextval(pg_get_serial_sequence('the_table', 'id')) — and map it onto the row. This"
+            + " write path has to know the identity before the insert, because the aggregate's events"
+            + " and its version are both recorded against it, and an id read back afterwards would"
+            + " arrive too late for either.");
   }
 
   /**

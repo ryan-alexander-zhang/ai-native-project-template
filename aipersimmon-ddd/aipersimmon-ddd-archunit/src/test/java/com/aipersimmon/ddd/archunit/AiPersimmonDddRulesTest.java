@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.archunit;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,6 +19,16 @@ class AiPersimmonDddRulesTest {
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.bad");
   private static final JavaClasses APIDOC_BAD =
       new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.apidoc");
+
+  /**
+   * Isolated so the after-commit assertions can be exact: one misplaced, unmarked
+   * {@code @TransactionalEventListener} and one plain method that merely takes a domain event.
+   * Anything the event rules report over this package is either that one method or a false
+   * positive.
+   */
+  private static final JavaClasses AFTER_COMMIT =
+      new ClassFileImporter().importPackages("com.aipersimmon.ddd.archunit.fixture.aftercommit");
+
   private static final JavaClasses VALIDATION_GOOD =
       new ClassFileImporter()
           .importPackages("com.aipersimmon.ddd.archunit.fixture.validation.good");
@@ -91,6 +102,82 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () -> EventRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler().check(BAD));
+  }
+
+  /**
+   * The placement rule sees {@code @TransactionalEventListener}, which carries
+   * {@code @EventListener} as a meta-annotation rather than directly. Measured over the isolated
+   * fixture so the assertion is about this method and not about the other violations the {@code
+   * bad} package is full of.
+   */
+  @Test
+  void domainEventListenersShouldResideInApplicationOrDomain_seesAfterCommitSubscribers() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                EventRules.domainEventListenersShouldResideInApplicationOrDomain()
+                    .check(AFTER_COMMIT));
+    assertTrue(
+        error.getMessage().contains("AfterCommitSubscriberInAdapter"),
+        () -> "the after-commit subscriber should be reported: " + error.getMessage());
+  }
+
+  /** Same for the marker rule — the second of the three rules built on that predicate. */
+  @Test
+  void domainEventListenersShouldBeAnnotatedWithDomainEventHandler_seesAfterCommitSubscribers() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                EventRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler()
+                    .check(AFTER_COMMIT));
+    assertTrue(
+        error.getMessage().contains("AfterCommitSubscriberInAdapter"),
+        () -> "the unmarked after-commit subscriber should be reported: " + error.getMessage());
+  }
+
+  /**
+   * And the control that keeps the widened predicate honest: a method that takes a domain event but
+   * carries no subscription annotation, direct or meta, is not a subscriber. It sits in the same
+   * misplaced package as the reported one, so if the predicate had degenerated into "takes a domain
+   * event" it would appear in both reports.
+   */
+  @Test
+  void aplainMethodTakingADomainEventIsNotTreatedAsASubscriber() {
+    AssertionError placement =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                EventRules.domainEventListenersShouldResideInApplicationOrDomain()
+                    .check(AFTER_COMMIT));
+    AssertionError marker =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                EventRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler()
+                    .check(AFTER_COMMIT));
+    assertFalse(
+        placement.getMessage().contains("NotASubscriberInAdapter"),
+        () -> "plain method reported by the placement rule: " + placement.getMessage());
+    assertFalse(
+        marker.getMessage().contains("NotASubscriberInAdapter"),
+        () -> "plain method reported by the marker rule: " + marker.getMessage());
+  }
+
+  /**
+   * The third rule on that predicate, in the meta-annotated spelling: an integration-event
+   * subscriber declared with {@code @TransactionalEventListener} outside an adapter is reported.
+   */
+  @Test
+  void integrationEventListenersShouldResideInAdapter_seesAfterCommitSubscribers() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> EventRules.integrationEventListenersShouldResideInAdapter().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadAfterCommitIntegrationEventListenerInApplication"),
+        () -> "the after-commit integration subscriber should be reported: " + error.getMessage());
   }
 
   @Test
@@ -241,6 +328,68 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () -> BuildingBlockRules.domainBuildingBlocksShouldResideInDomain().check(BAD));
+  }
+
+  /**
+   * A published value object keeps its marker: {@code ..api..} is a legal home for
+   * {@code @ValueObject} so that a multi-context layout does not have to choose between this rule
+   * and {@link BoundedContextRules#dependOnEachOtherOnlyThroughApi(String)}. The {@code good}
+   * fixture has one in {@code ordering.api}, and it must not be reported.
+   */
+  @Test
+  void apublishedValueObjectMayResideInApi() {
+    assertDoesNotThrow(
+        () -> BuildingBlockRules.valueObjectsShouldResideInDomainOrApi().check(GOOD));
+    assertDoesNotThrow(
+        () -> BuildingBlockRules.domainBuildingBlocksShouldResideInDomain().check(GOOD));
+  }
+
+  /**
+   * The allowance is for value objects only. An {@code @Entity} in {@code ..api..} is still a
+   * violation — asserted by name, because the point of this test is that the relaxation did not
+   * spread to the annotations that must not be published.
+   */
+  @Test
+  void anentityInApiIsStillReported() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> BuildingBlockRules.aggregatesAndEntitiesShouldResideInDomain().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadEntityInApi"),
+        () -> "an @Entity in ..api.. should be reported: " + error.getMessage());
+  }
+
+  /**
+   * And the check the allowance exists to restore: because a published value object may keep its
+   * marker, {@code valueObjectsShouldBeImmutable} still covers it. A mutable one in {@code ..api..}
+   * is reported by name.
+   */
+  @Test
+  void amutablePublishedValueObjectIsStillReported() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> BuildingBlockRules.valueObjectsShouldBeImmutable().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadMutablePublishedValueObject"),
+        () -> "a mutable published value object should be reported: " + error.getMessage());
+  }
+
+  /**
+   * A {@code @ValueObject} in the application layer is neither domain nor api, so it is still
+   * reported. Names the fixture, because a rule that had been widened to {@code resideInAnyPackage}
+   * with a pattern too loose would let this through silently.
+   */
+  @Test
+  void avalueObjectOutsideDomainAndApiIsStillReported() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> BuildingBlockRules.valueObjectsShouldResideInDomainOrApi().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadValueObjectInApplication"),
+        () -> "a @ValueObject in the application layer should be reported: " + error.getMessage());
   }
 
   @Test

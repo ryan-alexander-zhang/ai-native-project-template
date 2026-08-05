@@ -51,44 +51,56 @@ class AutoIncrementIdentityTest extends StranglerTestBase {
   @Autowired private PlatformTransactionManager transactions;
 
   /**
-   * <strong>The friction, and it is not where I expected it.</strong> The insert succeeds; the <em>second</em> write is
-   * where an auto-increment table fails.
+   * <strong>The friction, and it is not where I expected it</strong> — twice over, because the answer changed.
    *
    * <p>The prediction going in was that {@code saveAggregate} would refuse the insert, because it guards against a row
-   * with no primary key. It does guard — in the <em>update</em> path, where a missing key would make the statement match
-   * every row of the table. The insert path has no such check, so MyBatis-Plus happily lets the database assign the id.
+   * with no primary key. When this sample was written it did guard — but only in the <em>update</em> path, where a
+   * missing key would make the statement match every row of the table. The insert path had no such check, so
+   * MyBatis-Plus let the database assign the id and the write <strong>succeeded</strong>.
    *
-   * <p>Which is worse than a refusal, and the measurement says why: the row now exists with an id <strong>the application
-   * never learned</strong>. The in-memory aggregate still holds whatever identity it was constructed with, the events have
-   * been published under that identity, and the version has been advanced. Nothing has failed yet. The failure arrives on
-   * the next write to the same aggregate, by which time the misattribution is already in the database and in whatever
-   * consumed the events.
+   * <p>Which is worse than a refusal, and that measurement is what made it worth filing. The row existed with an id
+   * <strong>the application never learned</strong>: the in-memory aggregate still held the identity it was constructed
+   * with, the events had been published under that identity, and the version had been advanced. Nothing failed until
+   * the next write to the same aggregate, by which time the misattribution was in the database and in whatever consumed
+   * those events.
    *
-   * <p>So the rule for a legacy {@code BIGSERIAL} table is not "the library will stop you" — it is "reserve the id
-   * yourself", and the reason is that nothing will stop you. See {@code RefundIds}, and {@code docs/issue/issue-00171}.
+   * <p>Filed as {@code docs/issue/issue-00171} and fixed: the insert path now checks the key before the statement runs,
+   * so the failure lands at the write that caused it and says what to do about it. The advice for a legacy
+   * {@code BIGSERIAL} table is unchanged — reserve the id yourself, see {@code RefundIds} — but it is now advice the
+   * library gives you rather than advice you need to have read first.
    */
   @Test
-  void anautoIncrementInsertSucceedsAndTheRowGetsAnIdTheApplicationNeverLearns() {
+  void anautoIncrementInsertIsRefusedBeforeTheRowCanGetAnIdTheApplicationNeverLearns() {
     long orderId = placeLegacyOrder(10_000);
-    inATransaction(() -> assigning.insertWithoutAnId(orderId));
 
-    Long assignedId =
-        jdbc.queryForObject("SELECT id FROM legacy_refunds WHERE order_id = ?", Long.class, orderId);
-    assertThat(assignedId).as("the insert went through and the database assigned an id").isNotNull();
-    assertThat(assignedId)
-        .as("and it is not the identity the aggregate was constructed with, which was 1")
-        .isNotEqualTo(1L);
+    assertThatThrownBy(() -> inATransaction(() -> assigning.insertWithoutAnId(orderId)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("no primary key value while inserting aggregate")
+        .as("and it names the way out rather than only the symptom")
+        .hasMessageContaining("BIGSERIAL");
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM legacy_refunds WHERE order_id = ?", Long.class, orderId))
+        .as("nothing was written, so no id was assigned behind the application's back")
+        .isZero();
   }
 
-  /** And the guard does exist — one write later, where a missing key would have matched every row. */
+  /**
+   * And the update path's guard is still the update path's guard, with its own message.
+   *
+   * <p>Reached directly now rather than through a successful insert, which is the honest way to state it: the two
+   * checks exist for different reasons. On update a missing key would match every row of the table; on insert it would
+   * quietly work. Same omission in {@code toRow}, two different failure modes, two different messages.
+   */
   @Test
-  void thesecondWriteIsWhereTheMissingKeyIsCaught() {
+  void theupdatePathHasItsOwnMissingKeyMessageAboutMatchingEveryRow() {
     long orderId = placeLegacyOrder(10_000);
-    inATransaction(() -> assigning.insertWithoutAnId(orderId));
 
     assertThatThrownBy(() -> inATransaction(() -> assigning.updateWithoutAnId(orderId)))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("came back from toRow with no primary key value");
+        .hasMessageContaining("came back from toRow with no primary key value")
+        .hasMessageContaining("would match every");
   }
 
   /**
@@ -98,9 +110,12 @@ class AutoIncrementIdentityTest extends StranglerTestBase {
    * added with {@code DEFAULT 0} gives every existing row exactly that value — so the first write to a row that predates
    * the migration is an insert of a row that already exists.
    *
-   * <p>The exception is {@code DuplicateEntityException} and its message names two plausible causes, both of which are
-   * wrong here: no two creates raced, and no factory forgot {@code restoreVersion}. The column default handed it a zero.
-   * Which is why V2 of this sample's migration uses {@code DEFAULT 1}, and why that one character is worth a paragraph.
+   * <p>The exception is {@code DuplicateEntityException}, and when this sample was written its message named two
+   * plausible causes, both of which are wrong here: no two creates raced, and no factory forgot {@code restoreVersion} —
+   * it faithfully restored the zero the column handed it. The cause was the column default, and the message did not
+   * mention that it could be. Filed as {@code docs/issue/issue-00171} and fixed, so the third cause is now named and
+   * the assertion below pins it. Which is also why V2 of this sample's migration uses {@code DEFAULT 1}, and why that
+   * one character is worth a paragraph.
    */
   @Test
   void aversionOfZeroMakesAPreExistingRowLookLikeANewAggregate() {
@@ -115,7 +130,9 @@ class AutoIncrementIdentityTest extends StranglerTestBase {
 
     assertThatThrownBy(() -> inATransaction(() -> refunds.save(asIfDefaultZero)))
         .isInstanceOf(DuplicateEntityException.class)
-        .hasMessageContaining("already exists");
+        .hasMessageContaining("already exists")
+        .as("the message names the cause that actually applies here, not only the two that do not")
+        .hasMessageContaining("version column was added with DEFAULT 0");
   }
 
   /** The workaround, and it is two lines: take the id from the table's own sequence first. */

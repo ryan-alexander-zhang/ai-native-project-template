@@ -2,7 +2,7 @@
 id: issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 手写 SQL 与版本化聚合共存时必须自己 `version = version + 1`，库里没有任何一处说过（P2，文档）
@@ -61,3 +61,25 @@ status: open
 `saveAggregate` 也无从知道别人在做什么。这是一条**前提**，前提的正确位置是文档。
 
 相关：[[analysis-00040-samples-long-running-endpoints]] §5。
+
+## 解决记录（2026-08-05）
+
+按建议只动文档，不动代码。`MybatisPlusAggregateRepository` 的类 javadoc 新增一节
+"Two premises about the table, both of which bite on a schema this class did not design"，
+第二段就是这一条：另有写入者时那条语句必须自己 `version = version + 1`，配一句 `UPDATE ... SET
+state = 'RUNNING', version = version + 1 WHERE id = ? AND state = 'QUEUED'`，并写明后果的形状——
+"不抛，事后也不像并发缺陷，只像一次成功的写入"，以及为什么这是前提而非库能检测的东西。放在类
+javadoc 而不是 `saveAggregate` 上，理由同 issue。第一段是 issue-00171 的版本列默认值，两条前提
+正好同源，合在一节里。
+
+### 本条里有一处写错了，顺手改过来
+
+原文说"库自己的租约中继（outbox / process-effect）遵守这一条"。**核实后不成立**：outbox 与
+process-manager 的表根本没有乐观锁版本列——`aipersimmon_outbox` 的 `version INT NOT NULL`
+（`V1__aipersimmon_outbox.sql:9`）是**事件类型版本**（`ce_version`），`OutboxRecord.version` 对应的
+就是它；process-manager 的四张表 grep `version` 零命中。没有列，就无所谓"遵守"。
+
+真正"两个写入者共存于一张带版本列的表"的地方只有 S28 自己，它的
+`reconciliation/infrastructure/package-info.java` 也正是这么写的（"the only place in the samples
+where those two coexist"）。所以新加的 javadoc **没有**引用库自己的中继作为示范——那句话会把读者
+指向一个不存在的先例。

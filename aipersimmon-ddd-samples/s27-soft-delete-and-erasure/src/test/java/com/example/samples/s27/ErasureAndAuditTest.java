@@ -100,6 +100,13 @@ class ErasureAndAuditTest extends CustomerTestBase {
    * own base type for, in its words, "a conflicting request". The values asserted below are what the component
    * actually records for it, not what seemed likely; the first version of this test guessed and was wrong, and §8 of
    * the companion document is about the gap that turned up.
+   *
+   * <p><strong>The gap is now closed, and these three assertions are the record of it.</strong> They used to read
+   * {@code FAILED} / {@code unexpected} / {@code UNEXPECTED} — the measured behaviour at the time, filed as
+   * issue-00168. The classifier had no {@code ApplicationException} branch, so every application-level refusal (this
+   * one, and every {@code EntityNotFoundException} behind a 404) was indistinguishable from a broken database and
+   * threw away the code it was carrying. The branch exists now, so a refusal records as a rejection under this
+   * context's own code — which is what makes {@code failure_code} join to the problem document the client saw.
    */
   @Test
   void arefusedErasureIsAudited() {
@@ -110,8 +117,8 @@ class ErasureAndAuditTest extends CustomerTestBase {
     Map<String, Object> row = auditRowsFor("customer.erase").get(0);
     assertThat(row.get("target_id")).isEqualTo(ALICE);
     assertThat((String) row.get("summary")).contains("Could not erase");
-    assertThat(row.get("outcome")).isEqualTo("FAILED");
-    assertThat(row.get("failure_code")).isEqualTo("unexpected");
-    assertThat(row.get("failure_category")).isEqualTo("UNEXPECTED");
+    assertThat(row.get("outcome")).isEqualTo("REJECTED");
+    assertThat(row.get("failure_code")).isEqualTo("customer.announcements-still-queued");
+    assertThat(row.get("failure_category")).isEqualTo("CONFLICT");
   }
 }

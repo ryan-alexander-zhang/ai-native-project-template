@@ -2,7 +2,7 @@
 id: issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 三条领域事件订阅者的 ArchUnit 规则都看不见 `@TransactionalEventListener`（P2，架构守卫）
@@ -117,3 +117,32 @@ method.isAnnotatedWith(SPRING_EVENT_LISTENER) || method.isMetaAnnotatedWith(SPRI
 S26 的 `ArchitectureTest.everyDomainEventSubscriberIsMarked` 是这条规则的 meta-annotation 版，
 就地写在 sample 里并指向本 issue。修好之后那条 sample 规则就是多余的，可以删掉——
 它存在的唯一理由是库这条还没修。
+
+## 解决记录（2026-08-05）
+
+**改法与建议一致，一行谓词。** `EventRules.areEventListenersHandling` 现在是
+`isAnnotatedWith(...) || isMetaAnnotatedWith(...)`，三条规则同时修好。三条规则与谓词的 javadoc
+都补了"meta 也算"以及为什么这个洞正好盖住 after-commit 那一类。存量一条没改（issue 里查过的三处
+都已标注），全仓复跑确认。
+
+**测试**：新增 `fixture/aftercommit/` 一个隔离包，好处是断言可以精确——里面只有两个方法：
+一个错放且未标记的 `@TransactionalEventListener`（`AfterCommitSubscriberInAdapter`），
+一个只是"参数恰好是领域事件"的普通方法（`NotASubscriberInAdapter`）。四条新用例：
+
+- 两条断言两个领域事件规则报出了前者（按名字断言，不是靠"抛了就算"）；
+- 一条断言两个规则都**没有**报出后者——把谓词放宽到 meta 之后，不能退化成"接受领域事件参数就算订阅者"；
+- 一条在 `bad` 包里断言集成事件规则报出了新增的 `BadAfterCommitIntegrationEventListenerInApplication`
+  （三条规则里的第三条）。
+
+另加 `fixture/good/.../GoodOrderPlacedAfterCommitHandler`（`AFTER_COMMIT` + 已标记，GOOD 仍绿）与
+`fixture/bad/.../BadAfterCommitDomainEventListenerInAdapter`。archunit 模块加了 test-scope 的
+`spring-tx`（`@TransactionalEventListener` 不在 spring-context 里），规则本身仍按字符串匹配，
+**不引入编译期 Spring 依赖**。
+
+**负向对照**：把谓词退回只看直接标注，`AiPersimmonDddRulesTest` 恰好红 4 条（65 用例），而且红的方式
+正是这个洞的形状——两条 after-commit 规则**什么都没抛**（"Expected AssertionError to be thrown, but
+nothing was thrown"），集成事件那条只报了直接标注的那个。恢复后 65 全绿。
+
+**验收**：库 full `mvn clean install` + `mvn test` 绿；25 个 sample 全绿；multi-module scaffold 绿。
+S26 的 `ArchitectureTest.everyDomainEventSubscriberIsMarked` 及其 `subscribeToADomainEvent()` 谓词
+已删除（它存在的唯一理由是本条没修），把来龙去脉挪到该文件 `ddd` 字段的 javadoc 上。

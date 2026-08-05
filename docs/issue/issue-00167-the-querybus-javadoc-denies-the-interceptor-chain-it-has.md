@@ -2,7 +2,7 @@
 id: issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # `QueryBus` 的 javadoc 说自己没有拦截器链，而它有（P3，文档）
@@ -49,3 +49,12 @@ S26 整篇就建立在这个接缝上（`CachingQueryInterceptor` 通过不调�
 ## 验收
 
 `QueryBus`、`QueryInterceptor`、`RegistryQueryBus` 三处对“读侧有没有拦截器链”的说法一致。
+
+## 解决记录（2026-08-05）
+
+`QueryBus` 的类 javadoc 改成："没有事务（因为查询既不改状态也不记事件），**有**可选的
+`QueryInterceptor` 链"，并点名那条链能做什么（查询日志、鉴权、慢查询观测、短路的缓存）以及
+"框架自己不注册任何拦截器，所以没有拦截器的 bus 行为与从前一致"——后半句是从 `RegistryQueryBus`
+与 `QueryInterceptor` 抄来的既有说法，四处现在一致。
+
+纯文档，无测试可加。库 full 绿。

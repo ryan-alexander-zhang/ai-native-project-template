@@ -43,12 +43,14 @@ mvn -pl s26-read-side-caching spring-boot:run
 # 租户 key：把 CacheKeys.of 里的租户段去掉 → 7 红，含一次跨租户命中
 ```
 
-## 库的两个 issue（本篇发现，未修）
+## 库的两个 issue（本篇发现，均已修）
 
 - **issue-00166**（P2）：三条领域事件订阅者的 ArchUnit 规则看不见 `@TransactionalEventListener`。
-  本 sample 的 `ArchitectureTest.everyDomainEventSubscriberIsMarked` 就地写了 meta-annotation 版；
-  库修好之后那条可以删。
-- **issue-00167**（P3）：`QueryBus` 的 javadoc 说读侧没有拦截器链，而它有。
+  谓词已改为 `isAnnotatedWith(...) || isMetaAnnotatedWith(...)`，三条规则同时修好；本 sample 就地写的
+  meta-annotation 版 `ArchitectureTest.everyDomainEventSubscriberIsMarked` 已删除，来龙去脉挪到
+  `ddd` 字段的 javadoc 上。
+- **issue-00167**（P3）：`QueryBus` 的 javadoc 说读侧没有拦截器链，而它有。已改为与
+  `RegistryQueryBus`、`QueryInterceptor` 一致的说法。
 
 ## 不在本篇范围内
 

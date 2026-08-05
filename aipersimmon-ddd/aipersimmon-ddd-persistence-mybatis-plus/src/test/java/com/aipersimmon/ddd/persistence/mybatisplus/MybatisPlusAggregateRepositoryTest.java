@@ -255,6 +255,98 @@ class MybatisPlusAggregateRepositoryTest {
     assertThat(thing.version()).isZero();
   }
 
+  /**
+   * The third cause of a duplicate key, which is the one a retrofitted legacy table hits and the
+   * only one the reader cannot deduce from the other two.
+   *
+   * <p>A version column added to a populated table with {@code DEFAULT 0} gives every pre-existing
+   * row the value this class reads as "never persisted", so the first write to any of them takes
+   * the insert branch against a row that is already there. No creates raced, and no factory forgot
+   * {@code restoreVersion} — it faithfully restored the zero the column supplied. Naming only the
+   * first two causes sent the reader looking for a bug that was not there.
+   */
+  @Test
+  void aDuplicateKeyOnInsertAlsoNamesTheRetrofittedVersionColumn() {
+    when(mapper.insert(any(ThingRow.class))).thenThrow(new DuplicateKeyException("dup"));
+
+    assertThatThrownBy(() -> things.save(Thing.brandNew("t-1")))
+        .isInstanceOf(DuplicateEntityException.class)
+        .hasMessageContaining("version column was added with DEFAULT 0")
+        .hasMessageContaining("DEFAULT 1");
+  }
+
+  /**
+   * An insert whose row has no primary key is refused before the statement runs.
+   *
+   * <p>This is the check whose absence was worse than a refusal. An {@code IdType.AUTO} column over
+   * {@code BIGSERIAL} or {@code AUTO_INCREMENT} is filled by the database, so the insert
+   * <em>succeeded</em>: the row landed under an identity the application never learned, while the
+   * in-memory aggregate kept the one it was constructed with, the version advanced, and the events
+   * published against the wrong id. Nothing failed until the next write, by which point the
+   * misattribution had committed and reached whatever consumed those events.
+   *
+   * <p>So the assertions here are about all four consequences not happening, not only about the
+   * throw.
+   */
+  @Test
+  void aninsertWithNoPrimaryKeyIsRefusedBeforeAnythingIsWritten() {
+    IdlessThings idless = new IdlessThings(mapper, events);
+    Thing thing = Thing.brandNew("t-1");
+    thing.rename();
+
+    assertThatThrownBy(() -> idless.save(thing))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("no primary key value while inserting aggregate")
+        .hasMessageContaining("BIGSERIAL");
+
+    verify(mapper, never()).insert(any(ThingRow.class));
+    assertThat(events.published)
+        .as("nothing is published under an identity that was not stored")
+        .isEmpty();
+    assertThat(idless.childWrites).as("nor are children written").isZero();
+    assertThat(thing.version()).as("and the version does not advance").isZero();
+  }
+
+  /**
+   * The same omission on the update path keeps its own message, because it fails for a different
+   * reason: there a missing key would make the statement match every row, rather than quietly work.
+   */
+  @Test
+  void anupdateWithNoPrimaryKeyStillReportsMatchingEveryRow() {
+    assertThatThrownBy(() -> new IdlessThings(mapper, events).save(Thing.loadedAt("t-1", 4L)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("came back from toRow with no primary key value")
+        .hasMessageContaining("would match every");
+  }
+
+  /**
+   * The repository anybody writes first against an auto-increment column: {@link #toRow} leaves the
+   * id out and lets the database supply it. Identical to {@link Things} otherwise, so the two
+   * missing-key cases differ only in which branch of {@code saveAggregate} they reach.
+   */
+  private static final class IdlessThings extends MybatisPlusAggregateRepository<Thing, ThingRow> {
+    private int childWrites;
+
+    IdlessThings(BaseMapper<ThingRow> mapper, DomainEvents domainEvents) {
+      super(mapper, domainEvents);
+    }
+
+    void save(Thing thing) {
+      saveAggregate(thing);
+    }
+
+    @Override
+    protected ThingRow toRow(Thing thing) {
+      return new ThingRow(); // no setId: the column is BIGSERIAL, so the obvious thing is to omit
+      // it
+    }
+
+    @Override
+    protected void saveChildren(Thing thing) {
+      childWrites++;
+    }
+  }
+
   @Test
   void anUpdateThatMatchesNoRowIsRefused() {
     when(mapper.update(any(ThingRow.class), any())).thenReturn(0);

@@ -66,10 +66,17 @@ DELETE /imports/{id}                → 放弃,带原因
 # 从 mapper 删掉 fetchSize               → 1 红 / 77,且行为层面全绿。这个回归没有行为症状
 ```
 
-## 库的一个 issue(本篇发现,未修)
+## 库的一个 issue(本篇发现,已修)
 
 **issue-00169**(P2,文档):手写 SQL 与版本化聚合共存时必须自己 `version = version + 1`,
-库里一处都没写过——而库自己的租约中继一直这么做。三句话的修法。
+库里一处都没写过。`MybatisPlusAggregateRepository` 的类 javadoc 已补上这条前提(以及它的孪生前提
+issue-00171 的版本列默认值)。
+
+顺带纠正本篇当初报 issue 时写错的一句:原文说"库自己的租约中继一直这么做"。**不成立**——outbox 与
+process-manager 的表根本没有乐观锁版本列(`aipersimmon_outbox` 的 `version` 是事件类型版本,
+process-manager 四表零命中),没有列就无所谓遵守。"两个写入者共存于一张带版本列的表"整个仓里只有本篇,
+`reconciliation/infrastructure/package-info.java` 说的正是这件事。所以新加的 javadoc 没有拿库自己的
+中继当示范。
 
 ## 不在本篇范围内
 

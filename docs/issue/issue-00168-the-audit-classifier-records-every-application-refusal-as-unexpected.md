@@ -2,7 +2,7 @@
 id: issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected
 type: issue
 role: main
-status: open
+status: resolved
 ---
 
 # 操作日志把每一次 application 层的业务拒绝都记成 `FAILED` / `unexpected`（P2，可运维性）
@@ -111,3 +111,29 @@ if (failure instanceof ApplicationException application) {
 - S27 的 `ErasureAndAuditTest.arefusedErasureIsAudited` 现在断言的是缺陷现状
   （`FAILED` / `unexpected` / `UNEXPECTED`），修好后那三条断言要反过来——与 S22 的 issue-00165 同一手法：
   **把缺陷写进断言，修好就打红，不靠人记得回来收尾。**
+
+## 解决记录（2026-08-05）
+
+**改法与建议一致，包括 fallback category 的取舍。** `DefaultFailureClassifier` 在
+`ConcurrencyConflictException` 之后、`DomainException` 之后加了 `ApplicationException` 分支：
+带码就用那个码与那个 category，不带码是 `application.rejected` + `UNEXPECTED`（按 issue 里倾向的
+第一种，理由写进注释：没带码的 `ApplicationException` 该补码，不该被归好类）。类 javadoc 与
+`aipersimmon-ddd-application` 无关的依赖都不用动——engine 的 pom 早就依赖 application。
+
+**测试**（`DefaultFailureClassifierTest` 从 6 条到 9 条）：
+
+- `anapplicationExceptionWithACodeIsRejectedWithThatCode`：`EntityNotFoundException` 带
+  `customer.not-found` / `NOT_FOUND` → `REJECTED` + 那个码 + 那个 category；
+- `anapplicationExceptionWithoutACodeIsRejectedWithoutBorrowingACategory`：不抛，且不借
+  `DOMAIN_RULE`；
+- `aconcurrencyConflictIsNotSwallowedByTheApplicationBranch`：带码的 `ConcurrencyConflictException`
+  仍是 `FAILED` / `concurrency.conflict` / `CONCURRENCY`。
+
+**负向对照做了两次，第二次才是有信息量的那次。** 第一次把新分支停掉：恰好红 2 条（带码/不带码那两条），
+而顺序那条**照旧绿**——说明它当时并没有在测顺序。于是把新分支移到 `ConcurrencyConflictException`
+**之上**再跑：红的正是顺序那条加上既有的 `concurrency_conflict_is_failed_concurrency`
+（`expected: <FAILED> but was: <REJECTED>`），这才证明那条用例真的钉住了"窄的判断必须在前"。恢复后 9 全绿。
+
+**验收**：S27 的 `ErasureAndAuditTest.arefusedErasureIsAudited` 三条断言按预期反过来——
+`REJECTED` / `customer.announcements-still-queued` / `CONFLICT`，并在 javadoc 里写明它们原先是
+缺陷现状的记录。全仓查过没有别的地方断言 `"unexpected"`。库 full 绿，25 个 sample 全绿，scaffold 绿。

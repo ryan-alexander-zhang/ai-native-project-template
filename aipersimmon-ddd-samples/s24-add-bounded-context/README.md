@@ -72,13 +72,16 @@ s24/
 
 结论:**"只经 api 依赖"是必要的,远不是充分的。**
 
-## 库的一个 issue(本篇发现,未修)
+## 库的一个 issue(本篇发现,已修)
 
 **issue-00170**(P2,规则集):一个发布出去的值对象无法同时满足
 `domainBuildingBlocksShouldResideInDomain`(必须在 domain)与 `BoundedContextRules`(必须在 api)。
-所以 `CouponCode` 与 `Money` 都不标 `@ValueObject`,连带失去 `valueObjectsShouldBeImmutable`——
-`thepublishedTypesAreStillImmutable` 手写补回。库自己在事件上已经解过同样的问题
-(`domainEventsShouldStayInDomain` vs `integrationEventsShouldResideInApi`),只差值对象这一对。
+库自己在事件上早就解过同样的问题(`domainEventsShouldStayInDomain` vs
+`integrationEventsShouldResideInApi`),只差值对象这一对——现在补上了:`@ValueObject` 允许 domain
+**或** api,`@AggregateRoot` / `@Entity` 仍只允许 domain。所以 `CouponCode` 与 `Money` 都重新标上了
+`@ValueObject`,`valueObjectsShouldBeImmutable` 也跟着回来了。
+`thepublishedTypesAreStillImmutable` 保留,但它的理由变了:它比注解范围更宽——`..api..` 里所有顶层类
+(集成事件、响应体)都不是 `@ValueObject`,而它们同样不该可变。
 
 ## 不在本篇范围内
 

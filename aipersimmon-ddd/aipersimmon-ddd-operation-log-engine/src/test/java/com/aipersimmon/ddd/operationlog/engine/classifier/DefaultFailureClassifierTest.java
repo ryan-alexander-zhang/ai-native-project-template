@@ -2,7 +2,9 @@ package com.aipersimmon.ddd.operationlog.engine.classifier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.aipersimmon.ddd.application.ApplicationException;
 import com.aipersimmon.ddd.application.ConcurrencyConflictException;
+import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.core.error.ErrorCategory;
 import com.aipersimmon.ddd.core.error.ErrorCode;
 import com.aipersimmon.ddd.core.exception.DomainException;
@@ -49,6 +51,73 @@ class DefaultFailureClassifierTest {
     assertEquals(Outcome.REJECTED, out.outcome());
     assertEquals("domain.rejected", out.failure().code());
     assertEquals("DOMAIN_RULE", out.failure().category());
+  }
+
+  /**
+   * An application-level refusal carries its own code into the row.
+   *
+   * <p>This is the branch that was missing. {@code ApplicationException} is the library's own base
+   * type for "a missing aggregate or a conflicting request", it carries an {@link ErrorCode}
+   * exactly as {@link DomainException} does, and every one of them used to land on {@code FAILED} /
+   * {@code unexpected} — so a 404 was indistinguishable from a broken database, and the code the
+   * exception was carrying never reached the audit row.
+   */
+  @Test
+  void anapplicationExceptionWithACodeIsRejectedWithThatCode() {
+    ClassifiedOutcome out =
+        classifier.classify(
+            new EntityNotFoundException(
+                codeOf("customer.not-found", ErrorCategory.NOT_FOUND), "no"),
+            null);
+    assertEquals(Outcome.REJECTED, out.outcome());
+    assertEquals("customer.not-found", out.failure().code());
+    assertEquals("NOT_FOUND", out.failure().category());
+  }
+
+  /**
+   * And the ordering that the new branch depends on: {@link ConcurrencyConflictException} extends
+   * {@link ApplicationException}, so a branch placed above it would have swallowed the one case in
+   * this family that genuinely is a transient technical fault. Losing an optimistic-lock race is
+   * not the client being wrong, and it is the one of the three subclasses that should be retried.
+   */
+  @Test
+  void aconcurrencyConflictIsNotSwallowedByTheApplicationBranch() {
+    ClassifiedOutcome out =
+        classifier.classify(
+            new ConcurrencyConflictException(
+                codeOf("ordering.stale-write", ErrorCategory.CONFLICT), "clash", null),
+            null);
+    assertEquals(Outcome.FAILED, out.outcome());
+    assertEquals("concurrency.conflict", out.failure().code());
+    assertEquals("CONCURRENCY", out.failure().category());
+  }
+
+  /**
+   * A codeless {@code ApplicationException} has a defined outcome and does not throw: the row is a
+   * rejection, but the category stays {@code UNEXPECTED} rather than borrowing {@code DOMAIN_RULE}
+   * — there is no honest category to claim, and an application exception with no code is one that
+   * ought to be given a code rather than quietly classified.
+   */
+  @Test
+  void anapplicationExceptionWithoutACodeIsRejectedWithoutBorrowingACategory() {
+    ClassifiedOutcome out = classifier.classify(new ApplicationException("plain"), null);
+    assertEquals(Outcome.REJECTED, out.outcome());
+    assertEquals("application.rejected", out.failure().code());
+    assertEquals("UNEXPECTED", out.failure().category());
+  }
+
+  private static ErrorCode codeOf(String code, ErrorCategory category) {
+    return new ErrorCode() {
+      @Override
+      public String code() {
+        return code;
+      }
+
+      @Override
+      public ErrorCategory category() {
+        return category;
+      }
+    };
   }
 
   /**

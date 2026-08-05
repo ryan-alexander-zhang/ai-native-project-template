@@ -10,6 +10,7 @@ import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.CompositeArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
@@ -23,27 +24,74 @@ public final class BuildingBlockRules {
   private BuildingBlockRules() {}
 
   /**
-   * The tactical building blocks that make up an aggregate — a type carrying {@link
-   * AggregateRoot @AggregateRoot}, {@link Entity @Entity}, or {@link ValueObject @ValueObject} —
-   * reside in the domain layer. Each marks a model concept, so it belongs with the model, never in
-   * the application, infrastructure, or interface layers. Part of {@link
-   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that annotates no
-   * building blocks.
+   * The tactical building blocks that make up an aggregate reside where they belong: a type
+   * carrying {@link AggregateRoot @AggregateRoot} or {@link Entity @Entity} in the domain layer, a
+   * type carrying {@link ValueObject @ValueObject} in the domain layer or in an {@code ..api..}
+   * published-contract package. Each marks a model concept, so none of them belongs in the
+   * application, infrastructure, or interface layers. Part of {@link AiPersimmonDddRules#all()};
+   * matches nothing (and so passes) in a project that annotates no building blocks.
+   *
+   * <p><strong>Why a value object gets the extra package and an entity does not.</strong> A value
+   * object is sometimes deliberately published — a multi-context layout has to put the identifier
+   * one context exposes for others to hold, and a shared kernel's value types, in {@code ..api..},
+   * which is where {@link BoundedContextRules#dependOnEachOtherOnlyThroughApi(String)} requires
+   * anything another context may touch to live. Held to {@code ..domain..} alone, those two rules
+   * had no package that satisfied both, and the way out was to drop the annotation from exactly the
+   * types most exposed — which also dropped {@link #valueObjectsShouldBeImmutable()} on them. This
+   * is the same distinction {@link EventRules} already draws between {@link
+   * EventRules#domainEventsShouldStayInDomain()} and {@link
+   * EventRules#integrationEventsShouldResideInApi()}: the internal fact stays in the domain, the
+   * published one lives with the contract.
+   *
+   * <p>An aggregate root and an entity get no such allowance, because publishing one is not a thing
+   * a bounded context should do: it has identity, a lifecycle and invariants, and exposing it makes
+   * a shared model out of what contexts exist to keep separate. A published value object is a word
+   * in the contract's vocabulary; a published entity is somebody else's aggregate.
    */
   public static ArchRule domainBuildingBlocksShouldResideInDomain() {
+    return CompositeArchRule.of(aggregatesAndEntitiesShouldResideInDomain())
+        .and(valueObjectsShouldResideInDomainOrApi())
+        .as(
+            "@AggregateRoot and @Entity types should reside in the domain layer, and @ValueObject "
+                + "types in the domain layer or a published ..api.. package");
+  }
+
+  /**
+   * The strict half of {@link #domainBuildingBlocksShouldResideInDomain()}: {@link
+   * AggregateRoot @AggregateRoot} and {@link Entity @Entity} in {@code ..domain..}, with no
+   * published exception. Exposed separately so a project can state that half on its own.
+   */
+  public static ArchRule aggregatesAndEntitiesShouldResideInDomain() {
     return classes()
         .that()
         .areAnnotatedWith(AggregateRoot.class)
         .or()
         .areAnnotatedWith(Entity.class)
-        .or()
-        .areAnnotatedWith(ValueObject.class)
         .should()
         .resideInAPackage("..domain..")
-        .as("@AggregateRoot, @Entity, and @ValueObject types should reside in the domain layer")
+        .as("@AggregateRoot and @Entity types should reside in the domain layer")
         .because(
-            "aggregate roots, entities, and value objects are model concepts that belong with "
-                + "the domain, not in the application, infrastructure, or interface layers")
+            "an aggregate root and an entity have identity, a lifecycle and invariants, so they "
+                + "belong with the domain and are never part of a published contract")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * The other half of {@link #domainBuildingBlocksShouldResideInDomain()}: a {@link
+   * ValueObject @ValueObject} resides in {@code ..domain..} or in an {@code ..api..}
+   * published-contract package — never in application, infrastructure, or interface code. Exposed
+   * separately so a project can state that half on its own.
+   */
+  public static ArchRule valueObjectsShouldResideInDomainOrApi() {
+    return classes()
+        .that()
+        .areAnnotatedWith(ValueObject.class)
+        .should()
+        .resideInAnyPackage("..domain..", "..api..")
+        .as("@ValueObject types should reside in the domain layer or a published ..api.. package")
+        .because(
+            "a value object is a model concept, so it belongs with the domain — or, when it is "
+                + "deliberately published for other contexts to hold, with the outward contract")
         .allowEmptyShould(true);
   }
 

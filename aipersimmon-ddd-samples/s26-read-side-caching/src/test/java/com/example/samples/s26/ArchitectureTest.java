@@ -1,14 +1,9 @@
 package com.example.samples.s26;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.aipersimmon.ddd.archunit.AiPersimmonDddRules;
-import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.example.samples.s26.catalog.domain.Products;
-import com.tngtech.archunit.base.DescribedPredicate;
-import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -20,6 +15,20 @@ import com.tngtech.archunit.lang.ArchRule;
     importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
+  /**
+   * The library bundle — which now covers this sample's two subscribers equally, and did not when the
+   * sample was written.
+   *
+   * <p>{@code domainEventListenersShouldBeAnnotatedWithDomainEventHandler} and the two placement rules
+   * built on the same predicate matched {@code @EventListener} only where it was <em>directly
+   * present</em>, so {@code @TransactionalEventListener} — which carries it as a meta-annotation, and is
+   * the form to use for anything that must not run before the commit — was invisible to all three. This
+   * sample is what turned that up, and the measurement was the whole point: two subscribers in one file,
+   * same events, same package, differing only in the annotation, and {@code all()} rejected the
+   * {@code @EventListener} one while saying nothing about the other. Filed as issue-00166 and fixed in
+   * the library with {@code isMetaAnnotatedWith}, so the meta-annotation-aware rule this file used to
+   * restate locally is gone — {@code ddd} covers both spellings now.
+   */
   @ArchTest static final ArchRule ddd = AiPersimmonDddRules.all();
 
   /**
@@ -80,39 +89,4 @@ class ArchitectureTest {
           .as("invalidation is the read side's problem, and the domain should not have heard of it")
           .allowEmptyShould(true);
 
-  /**
-   * Every domain-event subscriber is marked, however its annotation is spelled.
-   *
-   * <p>The library has this rule and it misses half the cases:
-   * {@code EventRules.domainEventListenersShouldBeAnnotatedWithDomainEventHandler} matches
-   * {@code @EventListener} <em>directly present</em> by name, and
-   * {@code @TransactionalEventListener} carries it as a meta-annotation. So the after-commit form — the one
-   * the library's own guidance recommends for anything that must not run before a commit — is invisible to
-   * the three placement rules built on that predicate. Measured here rather than deduced: this sample has
-   * two subscribers in one file, same events, same package, differing only in the annotation, and
-   * {@code AiPersimmonDddRules.all()} rejected the {@code @EventListener} one and said nothing about the
-   * other. Filed as issue-00166.
-   *
-   * <p>{@code isMetaAnnotatedWith} is what the library's predicate needs; the {@code ||} keeps this rule
-   * correct whichever way ArchUnit treats a directly-present annotation.
-   */
-  @ArchTest
-  static final ArchRule everyDomainEventSubscriberIsMarked =
-      methods()
-          .that(subscribeToADomainEvent())
-          .should()
-          .beDeclaredInClassesThat()
-          .areAnnotatedWith(DomainEventHandler.class)
-          .as("a domain-event subscriber must be findable by annotation, after-commit ones included")
-          .allowEmptyShould(true);
-
-  private static DescribedPredicate<JavaMethod> subscribeToADomainEvent() {
-    String eventListener = "org.springframework.context.event.EventListener";
-    return DescribedPredicate.describe(
-        "subscribe to a domain event, however the annotation is spelled",
-        method ->
-            (method.isAnnotatedWith(eventListener) || method.isMetaAnnotatedWith(eventListener))
-                && method.getRawParameterTypes().stream()
-                    .anyMatch(parameter -> parameter.isAssignableTo(DomainEvent.class)));
-  }
 }

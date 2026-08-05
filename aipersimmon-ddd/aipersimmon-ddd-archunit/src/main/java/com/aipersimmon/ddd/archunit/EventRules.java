@@ -62,8 +62,9 @@ public final class EventRules {
   }
 
   /**
-   * A subscriber of an in-process domain event (an {@code @EventListener} method whose argument is
-   * a {@link DomainEvent}) resides in the application layer (or the domain), never in an inbound
+   * A subscriber of an in-process domain event (a method annotated {@code @EventListener}, directly
+   * or as a meta-annotation — so {@code @TransactionalEventListener} counts — whose argument is a
+   * {@link DomainEvent}) resides in the application layer (or the domain), never in an inbound
    * adapter. A domain event is consumed within its own bounded context; its subscriber orchestrates
    * a use case or starts a process, which is application (or domain) work — not the transport
    * translation an adapter does. Part of {@link AiPersimmonDddRules#all()}; the rule matches
@@ -83,13 +84,13 @@ public final class EventRules {
   }
 
   /**
-   * A subscriber of an integration event (an {@code @EventListener} method whose argument is an
-   * {@link IntegrationEvent}) resides in the interface/adapter layer. An integration event arrives
-   * from another context over a transport; the subscriber is the inbound adapter that receives it
-   * at the boundary and translates it into a command (or hands a correlation id to a process
-   * manager) — it holds no orchestration or domain logic itself. Part of {@link
-   * AiPersimmonDddRules#all()}; the rule matches nothing (and so passes) in a project that has no
-   * such subscribers.
+   * A subscriber of an integration event (a method annotated {@code @EventListener}, directly or as
+   * a meta-annotation — so {@code @TransactionalEventListener} counts — whose argument is an {@link
+   * IntegrationEvent}) resides in the interface/adapter layer. An integration event arrives from
+   * another context over a transport; the subscriber is the inbound adapter that receives it at the
+   * boundary and translates it into a command (or hands a correlation id to a process manager) — it
+   * holds no orchestration or domain logic itself. Part of {@link AiPersimmonDddRules#all()}; the
+   * rule matches nothing (and so passes) in a project that has no such subscribers.
    */
   public static ArchRule integrationEventListenersShouldResideInAdapter() {
     return methods()
@@ -106,8 +107,9 @@ public final class EventRules {
   }
 
   /**
-   * A subscriber of an in-process domain event (an {@code @EventListener} method whose argument is
-   * a {@link DomainEvent}) is declared in a class annotated {@link
+   * A subscriber of an in-process domain event (a method annotated {@code @EventListener}, directly
+   * or as a meta-annotation — so {@code @TransactionalEventListener} counts — whose argument is a
+   * {@link DomainEvent}) is declared in a class annotated {@link
    * DomainEventHandler @DomainEventHandler}. This makes the subscriber's role explicit and lets
    * tools locate domain-event handlers by annotation rather than by a naming or parameter-shape
    * heuristic. Pairs with {@link #domainEventListenersShouldResideInApplicationOrDomain()}: that
@@ -270,12 +272,23 @@ public final class EventRules {
    * A method that both carries Spring's {@code @EventListener} (matched by name, see {@link
    * #SPRING_EVENT_LISTENER}) and takes a parameter assignable to the given event marker — i.e. an
    * event subscriber for that kind of event.
+   *
+   * <p>Meta-annotated counts. {@code @TransactionalEventListener} is itself annotated
+   * {@code @EventListener}, so a direct-presence check alone misses every after-commit subscriber —
+   * which is the form the framework recommends for anything that must not run before the commit
+   * (sending a notification, calling outward, invalidating a cache), and therefore exactly the
+   * subscribers most in need of being in the right layer and findable by annotation. All three
+   * placement rules are built on this predicate, so the omission was three gaps in {@link
+   * AiPersimmonDddRules#all()} rather than one. The {@code ||} keeps the check correct whichever
+   * way ArchUnit treats a directly-present annotation, and matching by name still costs the module
+   * no compile dependency on Spring.
    */
   private static DescribedPredicate<JavaMethod> areEventListenersHandling(Class<?> eventMarker) {
     return DescribedPredicate.describe(
         "@EventListener methods handling a " + eventMarker.getSimpleName(),
         method ->
-            method.isAnnotatedWith(SPRING_EVENT_LISTENER)
+            (method.isAnnotatedWith(SPRING_EVENT_LISTENER)
+                    || method.isMetaAnnotatedWith(SPRING_EVENT_LISTENER))
                 && method.getRawParameterTypes().stream()
                     .anyMatch(parameter -> parameter.isAssignableTo(eventMarker)));
   }

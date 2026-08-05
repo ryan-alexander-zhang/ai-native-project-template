@@ -52,11 +52,13 @@ mvn -pl s27-soft-delete-and-erasure spring-boot:run
 # 墓碑改成常量(去掉 id)              → 2 红,含 duplicate key ... uq_s27_customer_email_live
 ```
 
-## 库的一个 issue(本篇发现,未修)
+## 库的一个 issue(本篇发现,已修)
 
 **issue-00168**(P2):`DefaultFailureClassifier` 的 `instanceof` 链没有 `ApplicationException` 分支,
 所以每一次 application 层的业务拒绝(404、409)在审计表里都是 `FAILED` / `unexpected`,自带的 `ErrorCode`
-被丢掉。`ErasureAndAuditTest.arefusedErasureIsAudited` 断言的是缺陷现状,修好会打红。
+被丢掉。分支已补(必须在 `ConcurrencyConflictException` 之后,它是子类且确实是技术性 `FAILED`)。
+`ErasureAndAuditTest.arefusedErasureIsAudited` 原本断言的是缺陷现状,如约打红后已反过来:
+`REJECTED` / `customer.announcements-still-queued` / `CONFLICT`。
 
 ## 不在本篇范围内
 

@@ -87,20 +87,20 @@ class ArchitectureTest {
           .allowEmptyShould(true);
 
   /**
-   * <strong>Published types are immutable</strong> — the guarantee the {@code @ValueObject} annotation would have given,
-   * put back by hand.
+   * <strong>Every published type is immutable</strong> — annotated or not.
    *
-   * <p>The hole this closes is not a design hole, it is a collision between two of the library's own rules.
-   * {@code BuildingBlockRules.domainBuildingBlocksShouldResideInDomain} — inside the parameterless {@code all()} —
-   * requires every {@code @ValueObject} to live in {@code ..domain..}. {@code BoundedContextRules} requires anything
-   * another context may touch to live in {@code ..api..}. A published identifier ({@code CouponCode}) and a shared-kernel
-   * value ({@code Money}) are both value objects that must be in {@code api}, so they cannot carry the annotation — and
-   * with it goes {@code valueObjectsShouldBeImmutable}, on precisely the types most exposed.
+   * <p>This began as a workaround. The library's {@code domainBuildingBlocksShouldResideInDomain} required every
+   * {@code @ValueObject} to live in {@code ..domain..}, while {@code BoundedContextRules} requires anything another
+   * context may touch to live in {@code ..api..} — so a published identifier ({@code CouponCode}) and a shared-kernel
+   * value ({@code Money}) could carry the annotation or satisfy the rules, not both. Dropping it dropped
+   * {@code valueObjectsShouldBeImmutable} along with it, on precisely the types most exposed. Filed as
+   * {@code issue-00170} and fixed in the library, which now accepts a {@code @ValueObject} in {@code ..domain..} or
+   * {@code ..api..}; both types carry the marker again, so {@code ddd} above covers them.
    *
-   * <p>The library already makes the distinction this needs, one concept over: a domain event stays in {@code domain}
-   * while an <em>integration</em> event legitimately lives in {@code api}. There is no such pair for value objects. Filed
-   * as {@code issue-00170}; this rule is the local workaround, and it is weaker than the annotation because it has to be
-   * spelled out per project.
+   * <p>The rule stays because it is <em>wider</em> than the annotation-scoped one, which is the part that was never a
+   * workaround: it holds every top-level class in {@code ..api..} to final fields — integration events and response
+   * shapes included, none of which is a {@code @ValueObject}. A published type is read by code this context does not
+   * own and cannot recompile, so a mutable one is a defect regardless of which building block it is.
    */
   @ArchTest
   static final ArchRule thepublishedTypesAreStillImmutable =

@@ -1,5 +1,6 @@
 package com.example.samples.s24.sharedkernel.api;
 
+import com.aipersimmon.ddd.core.annotation.ValueObject;
 import java.util.Objects;
 
 /**
@@ -26,14 +27,16 @@ import java.util.Objects;
  * <strong>depends on no context</strong>. It is a leaf. The moment it needs to know about one, it is that context's
  * type wearing a shared name. {@code ArchitectureTest.thesharedKernelIsALeaf} pins it.
  *
- * <p><strong>It is not annotated {@code @ValueObject}, and that is not an oversight.</strong> The library's
- * {@code BuildingBlockRules.domainBuildingBlocksShouldResideInDomain} — part of the parameterless {@code all()} — requires
- * every {@code @ValueObject} to live in {@code ..domain..}, while {@code BoundedContextRules} requires anything another
- * context may touch to live in {@code ..api..}. A shared-kernel value type cannot satisfy both, so a project that adopts
- * both rules has to leave the annotation off exactly the types that are most exposed — and loses
- * {@code valueObjectsShouldBeImmutable} on them. {@code ArchitectureTest.thepublishedTypesAreStillImmutable} puts that
- * guarantee back by hand. See {@code docs/issue/issue-00170}.
+ * <p><strong>It is annotated {@code @ValueObject}, and for a while it could not be.</strong>
+ * {@code BuildingBlockRules.domainBuildingBlocksShouldResideInDomain} — part of the parameterless {@code all()} —
+ * required every {@code @ValueObject} to live in {@code ..domain..}, while {@code BoundedContextRules} requires anything
+ * another context may touch to live in {@code ..api..}. A shared-kernel value type satisfied neither pair, so the only
+ * way to a green build was to strip the annotation from exactly the types that are most exposed — which also stripped
+ * {@code valueObjectsShouldBeImmutable} from them. Filed as issue-00170 and fixed in the library, which now allows a
+ * {@code @ValueObject} in {@code ..domain..} <em>or</em> {@code ..api..} while still holding {@code @AggregateRoot} and
+ * {@code @Entity} to the domain. The marker is back, and with it the immutability check.
  */
+@ValueObject
 public record Money(long minor, String currency) {
 
   public Money {

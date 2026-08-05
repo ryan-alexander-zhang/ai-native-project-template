@@ -1,5 +1,6 @@
 package com.example.samples.s24.coupons.api;
 
+import com.aipersimmon.ddd.core.annotation.ValueObject;
 import com.aipersimmon.ddd.core.model.Identifier;
 
 /**
@@ -22,14 +23,16 @@ import com.aipersimmon.ddd.core.model.Identifier;
  * dependency an {@code api} package legitimately has — and it is a marker interface with no behaviour, which is why it
  * does not make the contract a shared model.
  *
- * <p><strong>It is not annotated {@code @ValueObject}, and that is not an oversight.</strong> The library's
- * {@code BuildingBlockRules.domainBuildingBlocksShouldResideInDomain} — part of the parameterless {@code all()} — requires
- * every {@code @ValueObject} to live in {@code ..domain..}, while {@code BoundedContextRules} requires anything another
- * context may touch to live in {@code ..api..}. A published value type cannot satisfy both, so a project that adopts both
- * rules has to leave the annotation off exactly the types that are most exposed — and loses
- * {@code valueObjectsShouldBeImmutable} on them. {@code ArchitectureTest.thepublishedTypesAreStillImmutable} puts that
- * guarantee back by hand. See {@code docs/issue/issue-00170}.
+ * <p><strong>It is annotated {@code @ValueObject}, and for a while it could not be.</strong>
+ * {@code BuildingBlockRules.domainBuildingBlocksShouldResideInDomain} — part of the parameterless {@code all()} —
+ * required every {@code @ValueObject} to live in {@code ..domain..}, while {@code BoundedContextRules} requires anything
+ * another context may touch to live in {@code ..api..}. A published value type satisfied neither pair, so the only way to
+ * a green build was to strip the annotation from exactly the types that are most exposed — which also stripped
+ * {@code valueObjectsShouldBeImmutable} from them. Filed as issue-00170 and fixed in the library, which now allows a
+ * {@code @ValueObject} in {@code ..domain..} <em>or</em> {@code ..api..} while still holding {@code @AggregateRoot} and
+ * {@code @Entity} to the domain. The marker is back, and with it the immutability check.
  */
+@ValueObject
 public record CouponCode(String value) implements Identifier {
 
   public CouponCode {

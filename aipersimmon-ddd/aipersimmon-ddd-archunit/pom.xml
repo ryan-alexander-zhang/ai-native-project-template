@@ -114,6 +114,16 @@
       <artifactId>spring-context</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test only: @TransactionalEventListener, which lives here rather than in spring-context. The
+         event-listener rules match @EventListener by name including as a meta-annotation, and this
+         is the annotation that carries it that way — so the fixtures need the real thing for the
+         meta-annotated case to be measured rather than simulated. Still never a compile dependency:
+         the rules name Spring's annotation as a string. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Test only: fixtures that carry the @OperationLog annotation and (mis)use the component, so
          the OperationLogRules have real classes to accept and reject. The rules themselves match the
          annotation and the operationlog packages by name, so this is never a compile dependency —
