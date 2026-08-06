@@ -1,7 +1,6 @@
 ---
 id: issue-00037-parked-input-replay-order-non-monotonic
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00066-dead-letter-store-can-replay-but-cannot-be-read
 type: issue
-role: main
 status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

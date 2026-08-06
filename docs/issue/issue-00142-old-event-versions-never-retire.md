@@ -1,7 +1,6 @@
 ---
 id: issue-00142-old-event-versions-never-retire
 type: issue
-role: main
 status: resolved
 ---
 

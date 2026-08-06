@@ -1,7 +1,6 @@
 ---
 id: issue-00005-integration-event-logical-type-resolution
 type: issue
-role: main
 status: resolved
 parent: decision-00014-cloudevents-integration-event-contract
 ---

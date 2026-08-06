@@ -1,7 +1,6 @@
 ---
 id: issue-00064-a-replayed-idempotent-response-loses-its-location-header
 type: issue
-role: main
 status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

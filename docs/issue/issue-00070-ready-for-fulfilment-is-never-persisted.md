@@ -1,7 +1,6 @@
 ---
 id: issue-00070-ready-for-fulfilment-is-never-persisted
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

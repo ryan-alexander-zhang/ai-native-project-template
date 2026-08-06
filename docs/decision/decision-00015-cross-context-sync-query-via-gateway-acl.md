@@ -1,7 +1,6 @@
 ---
 id: decision-00015-cross-context-sync-query-via-gateway-acl
 type: decision
-role: main
 status: active
 parent:
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00055-aggregate-root-missing-identity-equality
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00143-the-headers-are-checked-and-the-payload-is-trusted
 type: issue
-role: main
 status: resolved
 ---
 

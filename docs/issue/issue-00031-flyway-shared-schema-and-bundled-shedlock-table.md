@@ -1,7 +1,6 @@
 ---
 id: issue-00031-flyway-shared-schema-and-bundled-shedlock-table
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00085-ordering-carries-sku-as-a-bare-string
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00097-the-payment-operation-log-has-no-cleanup
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

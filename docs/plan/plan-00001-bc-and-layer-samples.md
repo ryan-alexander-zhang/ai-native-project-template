@@ -1,7 +1,6 @@
 ---
 id: plan-00001-bc-and-layer-samples
 type: plan
-role: main
 status: resolved
 parent:
 ---

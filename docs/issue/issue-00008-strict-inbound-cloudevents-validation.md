@@ -1,7 +1,6 @@
 ---
 id: issue-00008-strict-inbound-cloudevents-validation
 type: issue
-role: main
 status: resolved
 parent: decision-00014-cloudevents-integration-event-contract
 ---

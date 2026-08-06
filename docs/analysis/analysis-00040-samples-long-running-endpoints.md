@@ -1,7 +1,6 @@
 ---
 id: analysis-00040-samples-long-running-endpoints
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

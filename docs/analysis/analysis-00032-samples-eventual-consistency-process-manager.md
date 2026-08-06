@@ -1,7 +1,6 @@
 ---
 id: analysis-00032-samples-eventual-consistency-process-manager
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

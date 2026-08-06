@@ -1,7 +1,6 @@
 ---
 id: issue-00041-payment-missing-business-idempotency-key
 type: issue
-role: main
 status: resolved
 parent: design-00004-durable-process-manager-runtime
 ---

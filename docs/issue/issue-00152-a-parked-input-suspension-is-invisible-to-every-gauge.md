@@ -1,7 +1,6 @@
 ---
 id: issue-00152-a-parked-input-suspension-is-invisible-to-every-gauge
 type: issue
-role: main
 status: resolved
 ---
 

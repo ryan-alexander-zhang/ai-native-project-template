@@ -1,7 +1,6 @@
 ---
 id: analysis-00011-event-send-consume-mechanisms
 type: analysis
-role: main
 status: active
 parent:
 ---

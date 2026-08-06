@@ -1,7 +1,6 @@
 ---
 id: analysis-00010-exception-model
 type: analysis
-role: main
 status: active
 parent:
 ---

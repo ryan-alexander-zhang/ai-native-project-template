@@ -1,7 +1,6 @@
 ---
 id: issue-00091-the-order-lines-foreign-key-omits-the-tenant
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

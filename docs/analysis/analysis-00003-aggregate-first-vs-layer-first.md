@@ -1,7 +1,6 @@
 ---
 id: analysis-00003-aggregate-first-vs-layer-first
 type: analysis
-role: main
 status: draft
 parent:
 ---

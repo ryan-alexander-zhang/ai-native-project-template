@@ -1,7 +1,6 @@
 ---
 id: decision-00007-web-api-response-envelope
 type: decision
-role: main
 status: active
 parent:
 ---

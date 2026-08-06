@@ -1,7 +1,6 @@
 ---
 id: issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules
 type: issue
-role: main
 status: resolved
 ---
 

@@ -1,7 +1,6 @@
 ---
 id: issue-00071-credit-limit-is-checked-but-not-enforced
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

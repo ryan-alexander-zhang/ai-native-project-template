@@ -1,7 +1,6 @@
 ---
 id: issue-00068-stock-waits-have-no-deadline-and-can-park-forever
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: analysis-00014-ddd-samples-scenario-catalog
 type: analysis
-role: main
 status: draft
 parent:
 ---

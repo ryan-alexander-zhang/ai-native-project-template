@@ -1,7 +1,6 @@
 ---
 id: issue-00106-an-empty-flyway-component-list-created-every-table
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

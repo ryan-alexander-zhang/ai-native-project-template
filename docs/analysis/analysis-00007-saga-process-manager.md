@@ -1,7 +1,6 @@
 ---
 id: analysis-00007-saga-process-manager
 type: analysis
-role: main
 status: active
 parent:
 ---

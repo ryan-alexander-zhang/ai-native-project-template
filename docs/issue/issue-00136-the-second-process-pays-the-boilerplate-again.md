@@ -1,7 +1,6 @@
 ---
 id: issue-00136-the-second-process-pays-the-boilerplate-again
 type: issue
-role: main
 status: resolved
 ---
 

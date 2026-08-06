@@ -1,7 +1,6 @@
 ---
 id: issue-00122-the-four-process-tables-grew-forever
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00014-inbox-record-composite-key-tableid
 type: issue
-role: main
 status: resolved
 parent: issue-00003-messaging-delivery-reliability
 ---

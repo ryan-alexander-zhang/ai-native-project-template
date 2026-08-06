@@ -1,7 +1,6 @@
 ---
 id: issue-00026-clock-bean-ambiguity-across-starters
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

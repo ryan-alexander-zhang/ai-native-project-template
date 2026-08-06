@@ -1,7 +1,6 @@
 ---
 id: plan-00008-integration-event-routing-implementation
 type: plan
-role: main
 status: resolved
 parent: design-00006-integration-event-routing
 ---

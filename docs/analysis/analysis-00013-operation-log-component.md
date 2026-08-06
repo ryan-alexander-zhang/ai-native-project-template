@@ -1,7 +1,6 @@
 ---
 id: analysis-00013-operation-log-component
 type: analysis
-role: main
 status: active
 parent:
 ---

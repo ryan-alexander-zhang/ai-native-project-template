@@ -1,7 +1,6 @@
 ---
 id: issue-00018-lease-expiry-reclaim-inflates-retry-budget
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

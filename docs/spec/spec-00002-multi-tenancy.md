@@ -1,7 +1,6 @@
 ---
 id: spec-00002-multi-tenancy
 type: spec
-role: main
 status: active
 parent:
 ---

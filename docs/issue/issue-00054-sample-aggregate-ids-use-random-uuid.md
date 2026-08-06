@@ -1,7 +1,6 @@
 ---
 id: issue-00054-sample-aggregate-ids-use-random-uuid
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

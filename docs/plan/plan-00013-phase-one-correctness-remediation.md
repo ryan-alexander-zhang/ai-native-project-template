@@ -1,7 +1,6 @@
 ---
 id: plan-00013-phase-one-correctness-remediation
 type: plan
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

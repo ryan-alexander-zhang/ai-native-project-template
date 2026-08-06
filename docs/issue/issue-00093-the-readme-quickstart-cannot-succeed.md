@@ -1,7 +1,6 @@
 ---
 id: issue-00093-the-readme-quickstart-cannot-succeed
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

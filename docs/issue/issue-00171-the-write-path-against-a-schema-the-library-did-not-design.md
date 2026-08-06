@@ -1,7 +1,6 @@
 ---
 id: issue-00171-the-write-path-against-a-schema-the-library-did-not-design
 type: issue
-role: main
 status: resolved
 ---
 

@@ -1,7 +1,6 @@
 ---
 id: issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

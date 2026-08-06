@@ -1,7 +1,6 @@
 ---
 id: issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: decision-00016-durable-runtime-staged-message-identity
 type: decision
-role: patch
 status: active
 parent: decision-00013-command-context-and-causation-propagation
 ---

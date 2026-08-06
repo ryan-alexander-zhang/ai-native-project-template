@@ -1,7 +1,6 @@
 ---
 id: issue-00150-a-dozen-small-inconsistencies-from-the-2026-07-30-review
 type: issue
-role: main
 status: resolved
 ---
 

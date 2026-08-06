@@ -1,7 +1,6 @@
 ---
 id: plan-00010-operation-log-implementation
 type: plan
-role: main
 status: resolved
 parent: design-00008-operation-log-component
 ---

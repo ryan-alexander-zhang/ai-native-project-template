@@ -1,7 +1,6 @@
 ---
 id: decision-00014-cloudevents-integration-event-contract
 type: decision
-role: main
 status: active
 parent:
 ---

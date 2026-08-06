@@ -1,7 +1,6 @@
 ---
 id: analysis-00030-samples-synchronous-call-between-services
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

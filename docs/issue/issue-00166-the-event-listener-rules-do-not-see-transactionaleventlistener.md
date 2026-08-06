@@ -1,7 +1,6 @@
 ---
 id: issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener
 type: issue
-role: main
 status: resolved
 ---
 

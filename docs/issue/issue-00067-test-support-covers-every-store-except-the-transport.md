@@ -1,7 +1,6 @@
 ---
 id: issue-00067-test-support-covers-every-store-except-the-transport
 type: issue
-role: main
 status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

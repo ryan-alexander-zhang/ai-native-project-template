@@ -1,7 +1,6 @@
 ---
 id: issue-00114-one-name-per-role-and-what-the-module-count-actually-measures
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

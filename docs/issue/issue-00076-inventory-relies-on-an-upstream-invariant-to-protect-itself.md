@@ -1,7 +1,6 @@
 ---
 id: issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

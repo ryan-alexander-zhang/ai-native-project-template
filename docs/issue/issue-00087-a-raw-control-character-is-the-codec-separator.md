@@ -1,7 +1,6 @@
 ---
 id: issue-00087-a-raw-control-character-is-the-codec-separator
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

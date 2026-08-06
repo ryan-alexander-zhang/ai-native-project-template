@@ -1,7 +1,6 @@
 ---
 id: issue-00027-outbox-atomicity-broken-by-in-memory-aggregate
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

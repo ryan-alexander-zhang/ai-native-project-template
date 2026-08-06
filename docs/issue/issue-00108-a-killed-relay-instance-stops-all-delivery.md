@@ -1,7 +1,6 @@
 ---
 id: issue-00108-a-killed-relay-instance-stops-all-delivery
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

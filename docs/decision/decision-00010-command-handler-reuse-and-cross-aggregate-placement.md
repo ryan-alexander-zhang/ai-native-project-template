@@ -1,7 +1,6 @@
 ---
 id: decision-00010-command-handler-reuse-and-cross-aggregate-placement
 type: decision
-role: main
 status: active
 parent:
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

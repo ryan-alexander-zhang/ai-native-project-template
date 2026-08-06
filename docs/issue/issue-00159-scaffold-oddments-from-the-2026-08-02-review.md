@@ -1,7 +1,6 @@
 ---
 id: issue-00159-scaffold-oddments-from-the-2026-08-02-review
 type: issue
-role: main
 status: resolved
 ---
 

@@ -1,7 +1,6 @@
 ---
 id: issue-00149-the-library-cites-documents-its-readers-cannot-open
 type: issue
-role: main
 status: resolved
 ---
 

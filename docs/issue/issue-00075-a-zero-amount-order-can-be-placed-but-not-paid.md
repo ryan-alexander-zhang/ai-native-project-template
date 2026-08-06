@@ -1,7 +1,6 @@
 ---
 id: issue-00075-a-zero-amount-order-can-be-placed-but-not-paid
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

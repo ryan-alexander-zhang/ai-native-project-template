@@ -1,7 +1,6 @@
 ---
 id: issue-00021-starter-config-fail-fast-and-wiring
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

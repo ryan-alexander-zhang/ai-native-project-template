@@ -1,7 +1,6 @@
 ---
 id: design-00011-aggregate-persistence-contract
 type: design
-role: main
 status: active
 parent: plan-00013-phase-one-correctness-remediation
 ---

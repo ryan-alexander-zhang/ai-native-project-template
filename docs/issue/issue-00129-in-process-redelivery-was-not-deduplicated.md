@@ -1,7 +1,6 @@
 ---
 id: issue-00129-in-process-redelivery-was-not-deduplicated
 type: issue
-role: main
 status: resolved
 ---
 

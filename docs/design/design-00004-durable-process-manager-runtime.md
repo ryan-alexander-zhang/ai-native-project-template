@@ -1,7 +1,6 @@
 ---
 id: design-00004-durable-process-manager-runtime
 type: design
-role: main
 status: active
 parent:
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00137-the-bridge-starts-a-new-causal-chain
 type: issue
-role: main
 status: resolved
 ---
 

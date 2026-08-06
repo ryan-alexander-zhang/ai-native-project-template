@@ -1,7 +1,6 @@
 ---
 id: issue-00090-order-lines-are-rewritten-on-every-save
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

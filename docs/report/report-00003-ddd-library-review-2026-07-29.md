@@ -1,7 +1,6 @@
 ---
 id: report-00003-ddd-library-review-2026-07-29
 type: report
-role: main
 status: active
 parent: report-00001-ddd-framework-review
 ---

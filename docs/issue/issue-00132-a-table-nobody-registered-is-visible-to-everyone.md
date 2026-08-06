@@ -1,7 +1,6 @@
 ---
 id: issue-00132-a-table-nobody-registered-is-visible-to-everyone
 type: issue
-role: main
 status: resolved
 ---
 

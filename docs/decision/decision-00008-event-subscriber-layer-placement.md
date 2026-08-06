@@ -1,7 +1,6 @@
 ---
 id: decision-00008-event-subscriber-layer-placement
 type: decision
-role: main
 status: active
 parent:
 ---

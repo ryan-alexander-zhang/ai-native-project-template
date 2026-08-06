@@ -1,7 +1,6 @@
 ---
 id: issue-00072-demo-seed-data-ships-in-a-production-migration
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

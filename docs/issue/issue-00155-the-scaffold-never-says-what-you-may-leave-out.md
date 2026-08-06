@@ -1,7 +1,6 @@
 ---
 id: issue-00155-the-scaffold-never-says-what-you-may-leave-out
 type: issue
-role: main
 status: resolved
 ---
 

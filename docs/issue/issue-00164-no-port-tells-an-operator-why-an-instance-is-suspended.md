@@ -1,7 +1,6 @@
 ---
 id: issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended
 type: issue
-role: main
 status: open
 ---
 

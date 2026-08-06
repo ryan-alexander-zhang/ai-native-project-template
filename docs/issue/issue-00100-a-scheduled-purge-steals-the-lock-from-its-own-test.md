@@ -1,7 +1,6 @@
 ---
 id: issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test
 type: issue
-role: patch
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

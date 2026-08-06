@@ -1,7 +1,6 @@
 ---
 id: issue-00004-enforce-no-command-handler-to-command-handler-dependency
 type: issue
-role: main
 status: resolved
 parent: decision-00010-command-handler-reuse-and-cross-aggregate-placement
 ---

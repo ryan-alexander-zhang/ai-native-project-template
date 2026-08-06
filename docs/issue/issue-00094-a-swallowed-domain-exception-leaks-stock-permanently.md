@@ -1,7 +1,6 @@
 ---
 id: issue-00094-a-swallowed-domain-exception-leaks-stock-permanently
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

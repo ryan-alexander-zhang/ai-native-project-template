@@ -1,7 +1,6 @@
 ---
 id: decision-00020-outbox-engine-over-one-store-port
 type: decision
-role: main
 status: active
 parent: report-00003-ddd-library-review-2026-07-29
 ---

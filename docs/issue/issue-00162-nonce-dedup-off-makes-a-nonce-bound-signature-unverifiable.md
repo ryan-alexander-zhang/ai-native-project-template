@@ -1,7 +1,6 @@
 ---
 id: issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable
 type: issue
-role: main
 status: resolved
 ---
 

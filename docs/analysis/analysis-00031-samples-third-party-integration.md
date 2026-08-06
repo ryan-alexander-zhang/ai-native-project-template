@@ -1,7 +1,6 @@
 ---
 id: analysis-00031-samples-third-party-integration
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

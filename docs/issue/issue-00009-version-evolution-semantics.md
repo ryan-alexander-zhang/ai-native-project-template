@@ -1,7 +1,6 @@
 ---
 id: issue-00009-version-evolution-semantics
 type: issue
-role: patch
 status: resolved
 parent: decision-00014-cloudevents-integration-event-contract
 ---

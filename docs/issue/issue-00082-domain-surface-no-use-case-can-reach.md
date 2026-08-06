@@ -1,7 +1,6 @@
 ---
 id: issue-00082-domain-surface-no-use-case-can-reach
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

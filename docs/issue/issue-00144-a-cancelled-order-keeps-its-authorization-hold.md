@@ -1,7 +1,6 @@
 ---
 id: issue-00144-a-cancelled-order-keeps-its-authorization-hold
 type: issue
-role: main
 status: resolved
 ---
 

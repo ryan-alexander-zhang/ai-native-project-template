@@ -1,7 +1,6 @@
 ---
 id: plan-00002-exception-model-implementation
 type: plan
-role: main
 status: open
 parent: design-00003-exception-model
 ---

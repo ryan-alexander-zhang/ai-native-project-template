@@ -1,7 +1,6 @@
 ---
 id: issue-00042-process-evidence-ids-fabricated-from-business-keys
 type: issue
-role: main
 status: resolved
 parent: design-00004-durable-process-manager-runtime
 ---

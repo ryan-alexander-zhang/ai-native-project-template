@@ -1,7 +1,6 @@
 ---
 id: issue-00033-process-ref-lookup-ignores-type-and-key
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

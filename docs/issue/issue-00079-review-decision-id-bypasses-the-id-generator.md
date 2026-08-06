@@ -1,7 +1,6 @@
 ---
 id: issue-00079-review-decision-id-bypasses-the-id-generator
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

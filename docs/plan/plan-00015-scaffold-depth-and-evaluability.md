@@ -1,7 +1,6 @@
 ---
 id: plan-00015-scaffold-depth-and-evaluability
 type: plan
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

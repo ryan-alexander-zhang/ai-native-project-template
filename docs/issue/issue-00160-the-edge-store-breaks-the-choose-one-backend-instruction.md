@@ -1,7 +1,6 @@
 ---
 id: issue-00160-the-edge-store-breaks-the-choose-one-backend-instruction
 type: issue
-role: main
 status: open
 ---
 

@@ -1,7 +1,6 @@
 ---
 id: issue-00148-eight-internal-commands-skip-the-promised-validation
 type: issue
-role: main
 status: resolved
 ---
 

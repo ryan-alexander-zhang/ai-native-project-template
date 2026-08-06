@@ -1,7 +1,6 @@
 ---
 id: issue-00019-starter-beans-not-gated-on-jdbctemplate
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

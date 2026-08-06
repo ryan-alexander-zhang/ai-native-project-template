@@ -1,7 +1,6 @@
 ---
 id: issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher
 type: issue
-role: main
 status: resolved
 ---
 

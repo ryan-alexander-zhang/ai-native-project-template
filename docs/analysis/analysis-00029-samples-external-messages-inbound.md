@@ -1,7 +1,6 @@
 ---
 id: analysis-00029-samples-external-messages-inbound
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00139-the-query-bus-kept-the-mine-the-command-bus-defused
 type: issue
-role: main
 status: resolved
 ---
 

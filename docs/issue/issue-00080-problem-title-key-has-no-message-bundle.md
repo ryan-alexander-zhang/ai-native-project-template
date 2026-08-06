@@ -1,7 +1,6 @@
 ---
 id: issue-00080-problem-title-key-has-no-message-bundle
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

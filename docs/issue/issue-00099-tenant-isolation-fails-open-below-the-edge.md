@@ -1,7 +1,6 @@
 ---
 id: issue-00099-tenant-isolation-fails-open-below-the-edge
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

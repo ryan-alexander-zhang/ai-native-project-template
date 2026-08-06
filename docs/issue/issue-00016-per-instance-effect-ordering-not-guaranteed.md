@@ -1,7 +1,6 @@
 ---
 id: issue-00016-per-instance-effect-ordering-not-guaranteed
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

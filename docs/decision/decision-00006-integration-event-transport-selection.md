@@ -1,7 +1,6 @@
 ---
 id: decision-00006-integration-event-transport-selection
 type: decision
-role: main
 status: active
 parent:
 ---

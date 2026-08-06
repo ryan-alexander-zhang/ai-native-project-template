@@ -1,7 +1,6 @@
 ---
 id: plan-00009-code-quality-gates-implementation
 type: plan
-role: main
 status: open
 parent: design-00007-code-quality-gates
 ---

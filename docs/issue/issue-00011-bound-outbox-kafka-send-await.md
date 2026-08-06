@@ -1,7 +1,6 @@
 ---
 id: issue-00011-bound-outbox-kafka-send-await
 type: issue
-role: main
 status: resolved
 parent: issue-00003-messaging-delivery-reliability
 ---

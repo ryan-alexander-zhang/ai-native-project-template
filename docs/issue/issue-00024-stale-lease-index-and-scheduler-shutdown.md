@@ -1,7 +1,6 @@
 ---
 id: issue-00024-stale-lease-index-and-scheduler-shutdown
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

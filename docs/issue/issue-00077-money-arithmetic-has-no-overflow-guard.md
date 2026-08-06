@@ -1,7 +1,6 @@
 ---
 id: issue-00077-money-arithmetic-has-no-overflow-guard
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

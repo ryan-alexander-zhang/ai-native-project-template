@@ -1,7 +1,6 @@
 ---
 id: plan-00012-time-ordered-identifiers-implementation
 type: plan
-role: main
 status: resolved
 parent: design-00010-time-ordered-identifiers
 ---

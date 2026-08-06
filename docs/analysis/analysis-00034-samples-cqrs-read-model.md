@@ -1,7 +1,6 @@
 ---
 id: analysis-00034-samples-cqrs-read-model
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

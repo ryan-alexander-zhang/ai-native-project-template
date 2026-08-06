@@ -1,7 +1,6 @@
 ---
 id: plan-00003-durable-process-manager-implementation
 type: plan
-role: main
 status: open
 parent: design-00004-durable-process-manager-runtime
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00140-every-team-will-write-the-same-fakes
 type: issue
-role: main
 status: resolved
 ---
 

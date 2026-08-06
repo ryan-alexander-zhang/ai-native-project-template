@@ -1,7 +1,6 @@
 ---
 id: design-00005-observability-and-distributed-tracing
 type: design
-role: main
 status: active
 parent:
 ---

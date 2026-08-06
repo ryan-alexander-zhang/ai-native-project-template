@@ -1,7 +1,6 @@
 ---
 id: issue-00057-unlimited-systemic-retry-is-invisible
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

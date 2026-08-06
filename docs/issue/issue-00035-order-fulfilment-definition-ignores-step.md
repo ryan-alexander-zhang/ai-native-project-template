@@ -1,7 +1,6 @@
 ---
 id: issue-00035-order-fulfilment-definition-ignores-step
 type: issue
-role: main
 status: resolved
 parent: design-00004-durable-process-manager-runtime
 ---

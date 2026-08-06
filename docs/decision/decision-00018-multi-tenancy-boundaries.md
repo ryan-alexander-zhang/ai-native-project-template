@@ -1,7 +1,6 @@
 ---
 id: decision-00018-multi-tenancy-boundaries
 type: decision
-role: main
 status: active
 parent:
 ---

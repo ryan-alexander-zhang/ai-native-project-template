@@ -1,7 +1,6 @@
 ---
 id: issue-00154-a-missing-audit-table-rolls-back-every-audited-command
 type: issue
-role: main
 status: resolved
 ---
 

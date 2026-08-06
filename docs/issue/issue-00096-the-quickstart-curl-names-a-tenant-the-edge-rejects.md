@@ -1,7 +1,6 @@
 ---
 id: issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

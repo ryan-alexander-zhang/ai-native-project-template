@@ -1,7 +1,6 @@
 ---
 id: decision-00017-operation-log-component-boundaries
 type: decision
-role: main
 status: active
 parent: analysis-00013-operation-log-component
 ---

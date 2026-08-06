@@ -1,7 +1,6 @@
 ---
 id: issue-00065-a-missing-request-parameter-is-reported-as-a-server-error
 type: issue
-role: main
 status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

@@ -1,7 +1,6 @@
 ---
 id: decision-00013-command-context-and-causation-propagation
 type: decision
-role: main
 status: active
 parent:
 ---

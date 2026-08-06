@@ -1,7 +1,6 @@
 ---
 id: issue-00081-openapi-examples-name-a-status-that-does-not-exist
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

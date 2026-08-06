@@ -1,7 +1,6 @@
 ---
 id: report-00001-ddd-framework-review
 type: report
-role: main
 status: active
 ---
 

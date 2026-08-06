@@ -1,7 +1,6 @@
 ---
 id: analysis-00021-samples-local-transaction-aggregate
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

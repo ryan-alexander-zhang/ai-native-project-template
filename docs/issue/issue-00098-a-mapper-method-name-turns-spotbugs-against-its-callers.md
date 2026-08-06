@@ -1,7 +1,6 @@
 ---
 id: issue-00098-a-mapper-method-name-turns-spotbugs-against-its-callers
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: analysis-00012-multi-module-process-manager-layering
 type: analysis
-role: main
 status: active
 parent: design-00004-durable-process-manager-runtime
 ---

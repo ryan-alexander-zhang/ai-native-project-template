@@ -1,7 +1,6 @@
 ---
 id: issue-00134-the-approved-flag-was-never-read
 type: issue
-role: main
 status: resolved
 ---
 

@@ -1,7 +1,6 @@
 ---
 id: issue-00127-the-least-portable-statement-had-no-database-to-run-on
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

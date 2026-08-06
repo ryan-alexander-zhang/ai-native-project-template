@@ -1,7 +1,6 @@
 ---
 id: issue-00017-cancelled-deadline-can-still-fire
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

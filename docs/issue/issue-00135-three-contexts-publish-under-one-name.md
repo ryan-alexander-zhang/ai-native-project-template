@@ -1,7 +1,6 @@
 ---
 id: issue-00135-three-contexts-publish-under-one-name
 type: issue
-role: main
 status: resolved
 ---
 

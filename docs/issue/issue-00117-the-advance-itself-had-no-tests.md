@@ -1,7 +1,6 @@
 ---
 id: issue-00117-the-advance-itself-had-no-tests
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

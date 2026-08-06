@@ -1,7 +1,6 @@
 ---
 id: issue-00045-web-handler-maps-unknown-route-to-500
 type: issue
-role: main
 status: resolved
 parent: design-00003-exception-model
 ---

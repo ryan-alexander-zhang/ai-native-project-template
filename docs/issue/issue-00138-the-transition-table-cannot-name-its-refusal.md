@@ -1,7 +1,6 @@
 ---
 id: issue-00138-the-transition-table-cannot-name-its-refusal
 type: issue
-role: main
 status: resolved
 ---
 

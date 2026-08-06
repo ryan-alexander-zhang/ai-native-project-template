@@ -1,7 +1,6 @@
 ---
 id: issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist
 type: issue
-role: main
 status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

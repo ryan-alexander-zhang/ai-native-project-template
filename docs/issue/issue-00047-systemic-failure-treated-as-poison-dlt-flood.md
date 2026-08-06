@@ -1,7 +1,6 @@
 ---
 id: issue-00047-systemic-failure-treated-as-poison-dlt-flood
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

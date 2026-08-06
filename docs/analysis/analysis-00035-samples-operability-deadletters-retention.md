@@ -1,7 +1,6 @@
 ---
 id: analysis-00035-samples-operability-deadletters-retention
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

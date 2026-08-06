@@ -1,7 +1,6 @@
 ---
 id: issue-00032-integration-event-effect-replay-mints-new-eventid
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

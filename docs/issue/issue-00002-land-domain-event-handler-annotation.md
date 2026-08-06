@@ -1,7 +1,6 @@
 ---
 id: issue-00002-land-domain-event-handler-annotation
 type: issue
-role: main
 status: resolved
 parent: decision-00009-event-type-markers-and-handler-contracts
 ---

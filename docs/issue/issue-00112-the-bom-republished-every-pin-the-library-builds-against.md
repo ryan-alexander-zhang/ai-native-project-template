@@ -1,7 +1,6 @@
 ---
 id: issue-00112-the-bom-republished-every-pin-the-library-builds-against
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

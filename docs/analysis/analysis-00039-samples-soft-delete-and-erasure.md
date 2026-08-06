@@ -1,7 +1,6 @@
 ---
 id: analysis-00039-samples-soft-delete-and-erasure
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

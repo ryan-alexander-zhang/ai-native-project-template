@@ -1,7 +1,6 @@
 ---
 id: issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

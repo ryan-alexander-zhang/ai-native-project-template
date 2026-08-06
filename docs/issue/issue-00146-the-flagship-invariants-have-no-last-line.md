@@ -1,7 +1,6 @@
 ---
 id: issue-00146-the-flagship-invariants-have-no-last-line
 type: issue
-role: main
 status: resolved
 ---
 

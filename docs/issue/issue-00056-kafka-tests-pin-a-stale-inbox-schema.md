@@ -1,7 +1,6 @@
 ---
 id: issue-00056-kafka-tests-pin-a-stale-inbox-schema
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

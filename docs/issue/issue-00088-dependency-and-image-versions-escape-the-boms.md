@@ -1,7 +1,6 @@
 ---
 id: issue-00088-dependency-and-image-versions-escape-the-boms
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

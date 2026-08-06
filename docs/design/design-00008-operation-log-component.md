@@ -1,7 +1,6 @@
 ---
 id: design-00008-operation-log-component
 type: design
-role: main
 status: active
 parent: decision-00017-operation-log-component-boundaries
 ---

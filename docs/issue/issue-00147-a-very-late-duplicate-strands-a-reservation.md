@@ -1,7 +1,6 @@
 ---
 id: issue-00147-a-very-late-duplicate-strands-a-reservation
 type: issue
-role: main
 status: resolved
 ---
 

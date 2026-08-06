@@ -1,7 +1,6 @@
 ---
 id: issue-00006-require-cloudevents-id-on-inbound
 type: issue
-role: main
 status: resolved
 parent: decision-00014-cloudevents-integration-event-contract
 ---

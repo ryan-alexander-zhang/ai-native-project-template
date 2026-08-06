@@ -1,7 +1,6 @@
 ---
 id: decision-00005-package-per-aggregate
 type: decision
-role: main
 status: active
 parent:
 ---

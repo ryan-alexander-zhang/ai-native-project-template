@@ -1,7 +1,6 @@
 ---
 id: analysis-00009-saga-implementation-deep-dive
 type: analysis
-role: main
 status: active
 parent: analysis-00007-saga-process-manager
 ---

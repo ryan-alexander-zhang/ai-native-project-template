@@ -1,7 +1,6 @@
 ---
 id: design-00009-multi-tenancy-tenant-id
 type: design
-role: main
 status: active
 parent: decision-00018-multi-tenancy-boundaries
 ---

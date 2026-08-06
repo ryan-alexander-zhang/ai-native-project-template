@@ -1,7 +1,6 @@
 ---
 id: design-00002-web-layer
 type: design
-role: main
 status: active
 parent: decision-00007-web-api-response-envelope
 ---

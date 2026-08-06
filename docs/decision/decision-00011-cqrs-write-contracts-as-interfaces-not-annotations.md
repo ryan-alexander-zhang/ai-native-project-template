@@ -1,7 +1,6 @@
 ---
 id: decision-00011-cqrs-write-contracts-as-interfaces-not-annotations
 type: decision
-role: main
 status: active
 parent:
 ---

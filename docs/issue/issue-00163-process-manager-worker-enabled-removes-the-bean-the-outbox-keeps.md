@@ -1,7 +1,6 @@
 ---
 id: issue-00163-process-manager-worker-enabled-removes-the-bean-the-outbox-keeps
 type: issue
-role: main
 status: open
 ---
 

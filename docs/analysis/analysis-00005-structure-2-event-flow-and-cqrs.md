@@ -1,7 +1,6 @@
 ---
 id: analysis-00005-structure-2-event-flow-and-cqrs
 type: analysis
-role: main
 status: active
 parent:
 ---

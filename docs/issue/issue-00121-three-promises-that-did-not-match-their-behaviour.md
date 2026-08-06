@@ -1,7 +1,6 @@
 ---
 id: issue-00121-three-promises-that-did-not-match-their-behaviour
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

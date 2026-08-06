@@ -1,7 +1,6 @@
 ---
 id: issue-00010-verify-kafka-dlt-with-embedded-broker
 type: issue
-role: patch
 status: resolved
 parent: issue-00003-messaging-delivery-reliability
 ---

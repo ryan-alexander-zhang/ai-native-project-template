@@ -1,7 +1,6 @@
 ---
 id: issue-00015-re-suspend-clobbers-resume-lifecycle
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

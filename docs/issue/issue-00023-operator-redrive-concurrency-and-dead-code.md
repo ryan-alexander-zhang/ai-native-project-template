@@ -1,7 +1,6 @@
 ---
 id: issue-00023-operator-redrive-concurrency-and-dead-code
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

@@ -1,7 +1,6 @@
 ---
 id: report-00002-scaffold-ddd-review
 type: report
-role: main
 status: active
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

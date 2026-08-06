@@ -1,7 +1,6 @@
 ---
 id: plan-00011-multi-tenancy-implementation
 type: plan
-role: main
 status: open
 parent: design-00009-multi-tenancy-tenant-id
 ---

@@ -1,7 +1,6 @@
 ---
 id: design-00003-exception-model
 type: design
-role: main
 status: active
 parent: decision-00010-exception-model
 ---

@@ -1,7 +1,6 @@
 ---
 id: analysis-00015-samples-http-command-query
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

@@ -1,7 +1,6 @@
 ---
 id: design-00001-aipersimmon-ddd-and-scaffold
 type: design
-role: main
 status: active
 parent:
 ---

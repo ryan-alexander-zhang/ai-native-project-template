@@ -1,7 +1,6 @@
 ---
 id: issue-00131-one-side-allowed-null-the-other-side-threw
 type: issue
-role: main
 status: resolved
 ---
 

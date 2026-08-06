@@ -1,7 +1,6 @@
 ---
 id: issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00043-analysis-00012-stale-definition-placement
 type: issue
-role: main
 status: resolved
 parent: analysis-00012-multi-module-process-manager-layering
 ---

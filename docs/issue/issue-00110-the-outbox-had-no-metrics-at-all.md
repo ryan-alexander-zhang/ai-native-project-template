@@ -1,7 +1,6 @@
 ---
 id: issue-00110-the-outbox-had-no-metrics-at-all
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

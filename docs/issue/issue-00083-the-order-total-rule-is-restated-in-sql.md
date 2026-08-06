@@ -1,7 +1,6 @@
 ---
 id: issue-00083-the-order-total-rule-is-restated-in-sql
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: decision-00009-event-type-markers-and-handler-contracts
 type: decision
-role: main
 status: active
 parent:
 ---

@@ -1,7 +1,6 @@
 ---
 id: design-00013-actor-identity-and-authorization
 type: design
-role: main
 status: draft
 parent: report-00002-scaffold-ddd-review
 ---

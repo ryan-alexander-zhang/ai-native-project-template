@@ -1,7 +1,6 @@
 ---
 id: issue-00125-the-claim-sorted-one-instance-last-forever
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

@@ -1,7 +1,6 @@
 ---
 id: spec-00001-operation-log-component
 type: spec
-role: main
 status: active
 parent:
 ---

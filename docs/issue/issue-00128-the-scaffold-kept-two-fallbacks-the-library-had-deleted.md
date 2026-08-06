@@ -1,7 +1,6 @@
 ---
 id: issue-00128-the-scaffold-kept-two-fallbacks-the-library-had-deleted
 type: issue
-role: main
 status: resolved
 ---
 

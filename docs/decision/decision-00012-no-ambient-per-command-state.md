@@ -1,7 +1,6 @@
 ---
 id: decision-00012-no-ambient-per-command-state
 type: decision
-role: main
 status: active
 parent:
 ---

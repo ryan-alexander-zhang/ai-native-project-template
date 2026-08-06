@@ -1,7 +1,6 @@
 ---
 id: issue-00089-the-generated-project-links-a-document-it-does-not-have
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

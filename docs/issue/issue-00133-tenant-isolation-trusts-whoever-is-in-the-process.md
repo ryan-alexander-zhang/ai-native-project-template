@@ -1,7 +1,6 @@
 ---
 id: issue-00133-tenant-isolation-trusts-whoever-is-in-the-process
 type: issue
-role: main
 status: resolved
 ---
 

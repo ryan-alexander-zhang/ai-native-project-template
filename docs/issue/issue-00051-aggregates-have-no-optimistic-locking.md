@@ -1,7 +1,6 @@
 ---
 id: issue-00051-aggregates-have-no-optimistic-locking
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

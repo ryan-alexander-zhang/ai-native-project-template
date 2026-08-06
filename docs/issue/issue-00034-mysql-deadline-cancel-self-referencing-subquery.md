@@ -1,7 +1,6 @@
 ---
 id: issue-00034-mysql-deadline-cancel-self-referencing-subquery
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

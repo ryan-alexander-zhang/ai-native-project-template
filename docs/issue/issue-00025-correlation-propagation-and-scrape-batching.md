@@ -1,7 +1,6 @@
 ---
 id: issue-00025-correlation-propagation-and-scrape-batching
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

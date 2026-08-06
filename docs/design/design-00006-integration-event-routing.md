@@ -1,7 +1,6 @@
 ---
 id: design-00006-integration-event-routing
 type: design
-role: main
 status: active
 parent:
 ---

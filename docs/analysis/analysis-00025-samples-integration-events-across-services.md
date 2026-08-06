@@ -1,7 +1,6 @@
 ---
 id: analysis-00025-samples-integration-events-across-services
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has
 type: issue
-role: main
 status: resolved
 ---
 

@@ -1,7 +1,6 @@
 ---
 id: issue-00153-the-audit-log-promises-a-tenant-switch-that-is-wired-to-nothing
 type: issue
-role: main
 status: resolved
 ---
 

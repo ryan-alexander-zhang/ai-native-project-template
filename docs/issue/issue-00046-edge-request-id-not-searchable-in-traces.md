@@ -1,7 +1,6 @@
 ---
 id: issue-00046-edge-request-id-not-searchable-in-traces
 type: issue
-role: main
 status: resolved
 parent: design-00005-observability-and-distributed-tracing
 ---

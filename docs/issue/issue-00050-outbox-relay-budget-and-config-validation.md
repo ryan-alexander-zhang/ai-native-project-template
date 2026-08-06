@@ -1,7 +1,6 @@
 ---
 id: issue-00050-outbox-relay-budget-and-config-validation
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

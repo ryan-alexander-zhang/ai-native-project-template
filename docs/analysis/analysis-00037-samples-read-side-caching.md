@@ -1,7 +1,6 @@
 ---
 id: analysis-00037-samples-read-side-caching
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

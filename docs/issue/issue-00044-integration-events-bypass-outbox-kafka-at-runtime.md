@@ -1,7 +1,6 @@
 ---
 id: issue-00044-integration-events-bypass-outbox-kafka-at-runtime
 type: issue
-role: main
 status: resolved
 parent: design-00006-integration-event-routing
 ---

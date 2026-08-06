@@ -1,7 +1,6 @@
 ---
 id: design-00010-time-ordered-identifiers
 type: design
-role: main
 status: active
 parent: decision-00019-time-ordered-uuidv7-identifiers
 ---

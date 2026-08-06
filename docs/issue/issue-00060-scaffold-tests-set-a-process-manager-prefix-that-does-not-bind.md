@@ -1,7 +1,6 @@
 ---
 id: issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

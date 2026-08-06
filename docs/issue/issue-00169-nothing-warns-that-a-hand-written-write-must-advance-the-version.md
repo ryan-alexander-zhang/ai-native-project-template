@@ -1,7 +1,6 @@
 ---
 id: issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version
 type: issue
-role: main
 status: resolved
 ---
 

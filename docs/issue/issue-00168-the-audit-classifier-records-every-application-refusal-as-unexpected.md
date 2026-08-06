@@ -1,7 +1,6 @@
 ---
 id: issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected
 type: issue
-role: main
 status: resolved
 ---
 

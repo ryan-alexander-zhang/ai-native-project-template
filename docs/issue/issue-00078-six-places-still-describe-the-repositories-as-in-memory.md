@@ -1,7 +1,6 @@
 ---
 id: issue-00078-six-places-still-describe-the-repositories-as-in-memory
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

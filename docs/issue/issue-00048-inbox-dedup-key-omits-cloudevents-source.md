@@ -1,7 +1,6 @@
 ---
 id: issue-00048-inbox-dedup-key-omits-cloudevents-source
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

@@ -1,7 +1,6 @@
 ---
 id: analysis-00001-domain-event-publishing
 type: analysis
-role: main
 status: active
 parent:
 ---

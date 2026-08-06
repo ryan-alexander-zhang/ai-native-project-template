@@ -1,7 +1,6 @@
 ---
 id: plan-00007-aggregate-persistence-mybatis-plus
 type: plan
-role: main
 status: resolved
 parent: design-00001-aipersimmon-ddd-and-scaffold
 ---

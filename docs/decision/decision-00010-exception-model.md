@@ -1,7 +1,6 @@
 ---
 id: decision-00010-exception-model
 type: decision
-role: main
 status: active
 parent:
 ---

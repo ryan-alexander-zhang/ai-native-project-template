@@ -1,7 +1,6 @@
 ---
 id: analysis-00002-domain-vs-integration-events
 type: analysis
-role: main
 status: active
 parent:
 ---

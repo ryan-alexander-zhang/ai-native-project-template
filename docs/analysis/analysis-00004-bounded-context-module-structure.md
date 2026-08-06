@@ -1,7 +1,6 @@
 ---
 id: analysis-00004-bounded-context-module-structure
 type: analysis
-role: main
 status: active
 parent:
 ---

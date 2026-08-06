@@ -1,7 +1,6 @@
 ---
 id: issue-00013-mark-sent-failure-not-a-dispatch-failure
 type: issue
-role: main
 status: resolved
 parent: issue-00003-messaging-delivery-reliability
 ---

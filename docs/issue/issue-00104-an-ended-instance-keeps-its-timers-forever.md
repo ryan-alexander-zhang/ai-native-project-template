@@ -1,7 +1,6 @@
 ---
 id: issue-00104-an-ended-instance-keeps-its-timers-forever
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

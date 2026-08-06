@@ -1,7 +1,6 @@
 ---
 id: issue-00038-mysql-text-payload-column-below-max-bytes
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

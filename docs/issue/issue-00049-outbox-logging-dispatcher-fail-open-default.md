@@ -1,7 +1,6 @@
 ---
 id: issue-00049-outbox-logging-dispatcher-fail-open-default
 type: issue
-role: main
 status: resolved
 parent: plan-00006-middleware-integration
 ---

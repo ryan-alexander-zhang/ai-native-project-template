@@ -1,7 +1,6 @@
 ---
 id: issue-00095-a-partial-reactor-build-silently-tests-stale-siblings
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

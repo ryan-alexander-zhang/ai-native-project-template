@@ -1,7 +1,6 @@
 ---
 id: issue-00052-domain-events-lost-when-publish-and-clear-forgotten
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

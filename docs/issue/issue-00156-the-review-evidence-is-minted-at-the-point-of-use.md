@@ -1,7 +1,6 @@
 ---
 id: issue-00156-the-review-evidence-is-minted-at-the-point-of-use
 type: issue
-role: main
 status: resolved
 ---
 

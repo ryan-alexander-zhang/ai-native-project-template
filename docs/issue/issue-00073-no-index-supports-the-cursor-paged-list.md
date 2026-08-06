@@ -1,7 +1,6 @@
 ---
 id: issue-00073-no-index-supports-the-cursor-paged-list
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

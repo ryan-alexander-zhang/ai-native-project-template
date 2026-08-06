@@ -1,7 +1,6 @@
 ---
 id: issue-00103-parked-input-replay-is-not-crash-safe
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

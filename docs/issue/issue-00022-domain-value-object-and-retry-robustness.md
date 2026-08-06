@@ -1,7 +1,6 @@
 ---
 id: issue-00022-domain-value-object-and-retry-robustness
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00141-the-precheck-holds-a-transaction-hostage
 type: issue
-role: main
 status: resolved
 ---
 

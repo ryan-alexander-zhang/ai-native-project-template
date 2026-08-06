@@ -1,7 +1,6 @@
 ---
 id: issue-00130-two-of-three-effect-handlers-forgot-the-redelivery
 type: issue
-role: main
 status: resolved
 ---
 

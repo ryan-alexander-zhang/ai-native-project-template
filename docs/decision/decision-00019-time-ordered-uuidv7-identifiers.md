@@ -1,7 +1,6 @@
 ---
 id: decision-00019-time-ordered-uuidv7-identifiers
 type: decision
-role: main
 status: active
 parent:
 ---

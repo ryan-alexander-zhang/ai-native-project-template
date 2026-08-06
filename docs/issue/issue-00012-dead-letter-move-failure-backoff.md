@@ -1,7 +1,6 @@
 ---
 id: issue-00012-dead-letter-move-failure-backoff
 type: issue
-role: main
 status: resolved
 parent: issue-00003-messaging-delivery-reliability
 ---

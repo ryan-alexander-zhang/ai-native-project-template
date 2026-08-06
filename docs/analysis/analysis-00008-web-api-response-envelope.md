@@ -1,7 +1,6 @@
 ---
 id: analysis-00008-web-api-response-envelope
 type: analysis
-role: main
 status: active
 parent:
 ---

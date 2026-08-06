@@ -1,7 +1,6 @@
 ---
 id: design-00012-module-naming-and-spring-freedom
 type: design
-role: main
 status: active
 parent: plan-00014-adoption-threshold-and-architecture-simplification
 ---

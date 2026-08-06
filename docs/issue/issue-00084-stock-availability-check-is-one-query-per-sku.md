@@ -1,7 +1,6 @@
 ---
 id: issue-00084-stock-availability-check-is-one-query-per-sku
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

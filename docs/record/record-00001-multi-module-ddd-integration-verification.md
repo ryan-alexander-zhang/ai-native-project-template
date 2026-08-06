@@ -1,7 +1,6 @@
 ---
 id: record-00001-multi-module-ddd-integration-verification
 type: record
-role: main
 status: active
 parent: plan-00007
 ---

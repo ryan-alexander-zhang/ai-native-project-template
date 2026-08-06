@@ -1,7 +1,6 @@
 ---
 id: issue-00001-move-domain-event-listener-to-application
 type: issue
-role: main
 status: resolved
 parent: decision-00008-event-subscriber-layer-placement
 ---

@@ -1,7 +1,6 @@
 ---
 id: issue-00151-the-opt-in-retry-never-sees-the-conflict-it-waits-for
 type: issue
-role: main
 status: resolved
 ---
 

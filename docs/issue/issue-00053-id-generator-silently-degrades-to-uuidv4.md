@@ -1,7 +1,6 @@
 ---
 id: issue-00053-id-generator-silently-degrades-to-uuidv4
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

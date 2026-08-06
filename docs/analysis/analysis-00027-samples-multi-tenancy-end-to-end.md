@@ -1,7 +1,6 @@
 ---
 id: analysis-00027-samples-multi-tenancy-end-to-end
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

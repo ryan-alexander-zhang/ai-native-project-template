@@ -1,7 +1,6 @@
 ---
 id: issue-00145-aggregates-trust-their-callers-at-the-door
 type: issue
-role: main
 status: resolved
 ---
 

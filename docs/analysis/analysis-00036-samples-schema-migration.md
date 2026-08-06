@@ -1,7 +1,6 @@
 ---
 id: analysis-00036-samples-schema-migration
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

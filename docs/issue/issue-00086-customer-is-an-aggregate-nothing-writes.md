@@ -1,7 +1,6 @@
 ---
 id: issue-00086-customer-is-an-aggregate-nothing-writes
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

@@ -1,7 +1,6 @@
 ---
 id: analysis-00020-samples-domain-events-in-process
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

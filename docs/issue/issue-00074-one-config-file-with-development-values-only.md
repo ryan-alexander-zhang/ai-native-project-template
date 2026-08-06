@@ -1,7 +1,6 @@
 ---
 id: issue-00074-one-config-file-with-development-values-only
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

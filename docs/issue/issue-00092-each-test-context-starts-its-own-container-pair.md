@@ -1,7 +1,6 @@
 ---
 id: issue-00092-each-test-context-starts-its-own-container-pair
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

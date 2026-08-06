@@ -1,7 +1,6 @@
 ---
 id: issue-00165-a-dead-letters-last-error-drops-the-only-useful-half
 type: issue
-role: main
 status: resolved
 ---
 

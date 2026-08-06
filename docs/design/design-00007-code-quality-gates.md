@@ -1,7 +1,6 @@
 ---
 id: design-00007-code-quality-gates
 type: design
-role: main
 status: active
 parent:
 ---

@@ -1,7 +1,6 @@
 ---
 id: analysis-00023-samples-query-contract-paging
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

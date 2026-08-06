@@ -1,7 +1,6 @@
 ---
 id: issue-00126-an-anonymous-caller-chose-the-allocation
 type: issue
-role: main
 status: resolved
 parent: issue-00119-ten-majors-were-never-scheduled
 ---

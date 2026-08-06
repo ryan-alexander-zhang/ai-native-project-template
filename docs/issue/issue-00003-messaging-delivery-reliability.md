@@ -1,7 +1,6 @@
 ---
 id: issue-00003-messaging-delivery-reliability
 type: issue
-role: main
 status: resolved
 parent: design-00001-aipersimmon-ddd-and-scaffold
 ---

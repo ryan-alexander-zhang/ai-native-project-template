@@ -1,7 +1,6 @@
 ---
 id: issue-00111-the-relay-waited-for-each-send-in-turn
 type: issue
-role: main
 status: resolved
 parent: report-00003-ddd-library-review-2026-07-29
 ---

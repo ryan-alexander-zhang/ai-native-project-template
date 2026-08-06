@@ -1,7 +1,6 @@
 ---
 id: issue-00062-web-store-module-does-not-displace-the-in-memory-stores
 type: issue
-role: main
 status: resolved
 parent: plan-00015-scaffold-depth-and-evaluability
 ---

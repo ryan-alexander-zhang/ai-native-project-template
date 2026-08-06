@@ -1,7 +1,6 @@
 ---
 id: issue-00036-max-lifetime-backstop-overwrites-definition-deadline
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

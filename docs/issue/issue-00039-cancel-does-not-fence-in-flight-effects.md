@@ -1,7 +1,6 @@
 ---
 id: issue-00039-cancel-does-not-fence-in-flight-effects
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

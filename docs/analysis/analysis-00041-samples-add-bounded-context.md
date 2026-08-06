@@ -1,7 +1,6 @@
 ---
 id: analysis-00041-samples-add-bounded-context
 type: analysis
-role: main
 status: draft
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---

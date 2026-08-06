@@ -1,7 +1,6 @@
 ---
 id: issue-00007-ordering-across-backoff-window
 type: issue
-role: main
 status: resolved
 parent: issue-00003-messaging-delivery-reliability
 ---

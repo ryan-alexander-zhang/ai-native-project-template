@@ -1,7 +1,6 @@
 ---
 id: issue-00059-outbox-relay-tests-race-the-startup-poll
 type: issue
-role: main
 status: resolved
 parent: report-00001-ddd-framework-review
 ---

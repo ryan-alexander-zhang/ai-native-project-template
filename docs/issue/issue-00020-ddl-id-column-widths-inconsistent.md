@@ -1,7 +1,6 @@
 ---
 id: issue-00020-ddl-id-column-widths-inconsistent
 type: issue
-role: main
 status: resolved
 parent: plan-00003-durable-process-manager-implementation
 ---

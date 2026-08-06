@@ -1,7 +1,6 @@
 ---
 id: issue-00069-payment-idempotency-claim-is-outside-the-transaction
 type: issue
-role: main
 status: resolved
 parent: report-00002-scaffold-ddd-review
 ---

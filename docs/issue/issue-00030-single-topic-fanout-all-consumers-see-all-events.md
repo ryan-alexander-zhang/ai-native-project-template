@@ -1,7 +1,6 @@
 ---
 id: issue-00030-single-topic-fanout-all-consumers-see-all-events
 type: issue
-role: main
 status: open
 parent: plan-00006-middleware-integration
 ---

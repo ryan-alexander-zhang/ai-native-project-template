@@ -1,7 +1,6 @@
 ---
 id: analysis-00006-ddd-building-blocks-library
 type: analysis
-role: main
 status: active
 parent:
 ---
