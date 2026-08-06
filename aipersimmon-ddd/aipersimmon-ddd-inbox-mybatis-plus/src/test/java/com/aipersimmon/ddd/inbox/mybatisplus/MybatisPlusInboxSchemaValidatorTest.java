@@ -21,8 +21,8 @@ import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 /**
- * The MyBatis-Plus sibling of {@code JdbcInboxSchemaValidatorTest}: a missing inbox table fails
- * startup naming the configuration lever; a migrated schema passes silently.
+ * The startup probe on the inbox table: a missing inbox table fails startup naming the
+ * configuration lever; a migrated schema passes silently.
  */
 class MybatisPlusInboxSchemaValidatorTest {
 

@@ -48,15 +48,14 @@
       <artifactId>aipersimmon-ddd-web-spring-boot-starter</artifactId>
     </dependency>
     <!--
-      The store behind the replay guard, and the one documented departure from "MyBatis-Plus only" in
-      these samples: the library ships web-store-jdbc and web-store-redis, and there is no MyBatis-Plus
-      variant. S2 took Redis; this one takes JDBC, so the pair is covered across the two samples. It
-      needs no extra infrastructure — the nonce table lives in the database that is already here — and
-      it brings a startup schema validator and a retention scheduler that Redis gets from TTLs.
+      The store behind the replay guard. The library ships two edge stores — this one and
+      web-store-redis; S2 took Redis, so the pair is covered across the two samples. This one needs
+      no extra infrastructure (the nonce table lives in the database that is already here) and it
+      brings a startup schema validator and a retention scheduler that Redis gets from TTLs.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-web-store-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-web-store-mybatis-plus</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

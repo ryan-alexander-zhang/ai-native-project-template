@@ -128,7 +128,8 @@ aipersimmon:
     #
     # allow-in-memory-stores=false is the production posture: the three stateful
     # protections may not silently fall back to per-JVM maps, which the second instance would make
-    # useless. With aipersimmon-ddd-web-store-jdbc on the classpath the real store is present, so
+    # useless. With aipersimmon-ddd-web-store-mybatis-plus on the classpath the real store is
+    # present, so
     # this only guards against someone removing that dependency — at startup, loudly. It is in the
     # base file, not the prod one, because a fallback that is wrong in production is also wrong in
     # the environment where you would like to find out about it.

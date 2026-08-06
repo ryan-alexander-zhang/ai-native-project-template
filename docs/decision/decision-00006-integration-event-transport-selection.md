@@ -46,7 +46,7 @@ monolith-first 原则下,不应一上来强制 broker;但要让**升级路径平
   属性 `aipersimmon.ddd.outbox.dispatch=in-process` 切进程内重投、引入 `-messaging-kafka` 则
   Kafka dispatcher `@ConditionalOnMissingBean` 顶替默认。
 - **dispatcher 契约与存储正交**。dispatcher 选择在存储无关的 `aipersimmon-ddd-outbox`(core);
-  写库后端可选 `-outbox-jdbc` 或 `-outbox-mybatis-plus`(同表结构可互换);`-messaging-kafka`
+  写库后端当时可选 `-outbox-jdbc` 或 `-outbox-mybatis-plus`(同表结构可互换);现只留后者。`-messaging-kafka`
   依赖 core,故可与任一存储组合。**方式二/三下消费者需显式引入恰好一个 outbox 存储 starter。**
 - 使用者始终可定义自己的 `IntegrationEvents` / `OutboxDispatcher` bean 覆盖以上默认。
 
@@ -74,15 +74,15 @@ deps: aipersimmon-ddd-events-spring
 （无 outbox 时自动生效)
 
 # 方式二 进程内异步 + outbox
-deps: aipersimmon-ddd-outbox-jdbc | aipersimmon-ddd-outbox-mybatis-plus   （选一个存储)
+deps: aipersimmon-ddd-outbox-mybatis-plus   （唯一存储后端;当时还有 -outbox-jdbc 可选)
 props: aipersimmon.ddd.outbox.dispatch=in-process
-消费端: aipersimmon-ddd-inbox-jdbc | -inbox-mybatis-plus   （幂等,建议)
+消费端: aipersimmon-ddd-inbox-mybatis-plus   （幂等,建议)
 
 # 方式三 broker + outbox
 deps: aipersimmon-ddd-messaging-kafka
-    + aipersimmon-ddd-outbox-jdbc | -outbox-mybatis-plus   （显式选一个存储)
+    + aipersimmon-ddd-outbox-mybatis-plus   （显式引入存储后端)
 props: aipersimmon.ddd.messaging.kafka.consumer.enabled=true   （启用消费桥)
-消费端: aipersimmon-ddd-inbox-jdbc | -inbox-mybatis-plus   （去重)
+消费端: aipersimmon-ddd-inbox-mybatis-plus   （去重)
 ```
 
 outbox / inbox 表由消费者自行建(Flyway/Liquibase);DDL 以**分方言 Flyway migration** 为单一来源

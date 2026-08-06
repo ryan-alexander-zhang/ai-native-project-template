@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.aipersimmon.ddd</groupId>
+    <artifactId>aipersimmon-ddd-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    MyBatis-Plus-backed store for the web layer's stateful SPIs: idempotency,
+    replay-nonce, and rate-limit counters. Adding it (once MyBatis-Plus has produced
+    a SqlSessionFactory) replaces the in-memory defaults in -web-spring, so the state
+    is shared across instances.
+
+    Uses the same SqlSessionFactory, DataSource, and transaction manager as the rest
+    of the persistence, rather than a separate JdbcTemplate. It registers ONLY its own
+    mappers (via MapperFactoryBeans), so it never triggers or hijacks the consumer's
+    @MapperScan, and it uses MyBatis-Plus @TableName rather than a JPA @Entity, so it
+    never affects entity scanning. The DDL ships as Flyway migrations in
+    aipersimmon-ddd-web; the consumer applies them (via the optional Flyway starter, or
+    its own Flyway/Liquibase).
+
+    Note that a fixed-window relational rate limiter is adequate but not optimal under
+    high concurrency; prefer -web-store-redis there. Include at most one SQL web store.
+  -->
+  <artifactId>aipersimmon-ddd-web-store-mybatis-plus</artifactId>
+  <name>aipersimmon-ddd-web-store-mybatis-plus</name>
+  <description>MyBatis-Plus-backed idempotency / replay-nonce / rate-limit stores for the web layer.</description>
+
+  <dependencies>
+    <!-- The web SPIs implemented here, and the single source of the web-store DDL. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-web</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Reads the ambient tenant (TenantContext) to scope keys per tenant in the composite PK. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-tenancy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

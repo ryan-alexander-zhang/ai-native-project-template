@@ -7,6 +7,12 @@ implements: [design-00010-time-ordered-identifiers]
 
 # 时间有序标识符落地计划
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 把 [[design-00010-time-ordered-identifiers]] / [[decision-00019-time-ordered-uuidv7-identifiers]] 落成代码：一个
 framework-free 的 `IdGenerator` SPI（`aipersimmon-ddd-core`，零依赖），一个库支撑的 UUIDv7 默认实现（新模块
 `aipersimmon-ddd-id` + autoconfig），以及把现有五处 `UUID.randomUUID()` 铸造点统一收口到注入的 `IdGenerator`。

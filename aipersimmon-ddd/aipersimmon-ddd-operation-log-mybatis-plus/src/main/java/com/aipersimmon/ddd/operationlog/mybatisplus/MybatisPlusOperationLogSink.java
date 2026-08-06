@@ -18,10 +18,10 @@ import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 
 /**
- * The MyBatis-Plus {@link OperationLogSink}. Behaviorally equivalent to the JDBC backend: appends
- * one row in the caller's transaction; a duplicate idempotency key converges to {@link
- * AppendResult.Duplicate} without aborting the transaction — via {@code ON CONFLICT DO NOTHING} on
- * PostgreSQL, and a caught duplicate on H2/MySQL. A genuine failure propagates (fail-closed).
+ * The MyBatis-Plus {@link OperationLogSink}: appends one row in the caller's transaction; a
+ * duplicate idempotency key converges to {@link AppendResult.Duplicate} without aborting the
+ * transaction — via {@code ON CONFLICT DO NOTHING} on PostgreSQL, and a caught duplicate on
+ * H2/MySQL. A genuine failure propagates (fail-closed).
  */
 public final class MybatisPlusOperationLogSink implements OperationLogSink {
 

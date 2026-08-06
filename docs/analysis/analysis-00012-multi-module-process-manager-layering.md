@@ -348,7 +348,7 @@ ArchUnit 规则"。）现状 C（Definition 在 app、Codec 在 infra）是最�
 
 1. **命名轴改为"持久化家族"**（jdbc / temporal / seata）后，`jdbc` 足够宽，**JdbcTemplate 与后续的 MyBatis-Plus
    都归其下**，扩展不必改名。（注：MyBatis-Plus 不是 Temporal 那种"另一个引擎"，它仍是 JDBC/关系型；其改造主要
-   落在框架 `aipersimmon-ddd-process-manager-jdbc`，本 consumer 模块的 Definition/State/codec 是持久化无关的，
+   落在框架的存储后端（当时是 `aipersimmon-ddd-process-manager-jdbc`，现为 `-process-manager-mybatis-plus`），本 consumer 模块的 Definition/State/codec 是持久化无关的，
    换 MyBatis-Plus 一行不动，唯一沾 JDBC 的是 `RuntimeOrderFulfilmentProcess` 里的 `JdbcProcessQuery`。）
 2. **`native` 撞 GraalVM native-image 语义**，Java/Spring 语境下易误读。
 3. **`native` 是 Java 保留字**——`package com.example.ordering.process.native;` **根本编译不过**；`jdbc` 无此问题。
@@ -368,7 +368,7 @@ ArchUnit 规则"。）现状 C（Definition 在 app、Codec 在 infra）是最�
 ## Sources
 
 - 代码：`aipersimmon-ddd-scaffold/multi-module/ordering/{ordering-application,ordering-infrastructure,ordering-adapter}`
-- 框架：`aipersimmon-ddd/{process-manager,process-manager-jdbc,process-manager-jdbc-spring-boot-starter}`
+- 框架：`aipersimmon-ddd/{process-manager,process-manager-engine,process-manager-mybatis-plus}`（当时的名字是 `process-manager-jdbc` 与 `process-manager-jdbc-spring-boot-starter`）
 - 设计：`docs/design/design-00004-durable-process-manager-runtime.md` §13.1–§13.2
 - 提交：`dd3214a`、`0861cc2`、`bf051e9`
 - 旧实现（对比）：`git show dd3214a^:…/fulfilment/OrderFulfilmentProcessManager.java`

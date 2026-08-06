@@ -23,7 +23,7 @@ flowchart LR
   id["aipersimmon-ddd-id<br/>Uuidv7IdGenerator + autoconfig<br/>(依赖 JUG/uuid-creator)"]
   id --> core
   cqrs["cqrs-spring: RegistryCommandBus"] -.注入.-> core
-  ob["outbox-jdbc/mp: OutboxWriter"] -.注入.-> core
+  ob["outbox-engine: OutboxWriter"] -.注入.-> core
   ev["events-spring: SpringIntegrationEvents"] -.注入.-> core
   pm["process-manager-engine: id supplier"] -.注入.-> core
   ol["operation-log-engine: recordId supplier"] -.注入.-> core
@@ -66,7 +66,7 @@ public final class Uuidv7IdGenerator implements IdGenerator {
 | 模块 / 类 | 现状 | 改为 |
 |---|---|---|
 | `cqrs-spring` `RegistryCommandBus` | `idGenerator` 默认 `() -> UUID.randomUUID().toString()` | 默认注入 `IdGenerator::newId` |
-| `outbox-jdbc` / `outbox-mybatis-plus` `OutboxWriter` | 内联 `UUID.randomUUID().toString()` | 注入 `IdGenerator` |
+| `outbox-engine` `OutboxWriter`（当时在 `outbox-jdbc` / `outbox-mybatis-plus` 各一份） | 内联 `UUID.randomUUID().toString()` | 注入 `IdGenerator` |
 | `events-spring` `SpringIntegrationEvents` | 内联 `UUID.randomUUID().toString()` | 注入 `IdGenerator` |
 | `process-manager-engine` autoconfig id supplier | `() -> UUID.randomUUID().toString()` | 默认 `IdGenerator::newId` |
 | `operation-log-engine` autoconfig `recordId` supplier | 默认 `UUID.randomUUID()`（DDL 注释已声明 v7） | 默认 `IdGenerator::newId` |

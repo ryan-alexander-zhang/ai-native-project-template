@@ -7,6 +7,12 @@ implements: [report-00001-ddd-framework-review]
 
 # 阶段一：正确性止血落地计划
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 把 [[report-00001-ddd-framework-review]] 的阶段一（P0-1 / P0-2 / P0-3 / P0-4 / P2-5）落成代码。目标是让框架在
 **「聚合是一个事务一致性单元」**这个 DDD 最核心的承诺上真正成立——当前它只是文档声明，运行期不成立。
 

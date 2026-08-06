@@ -12,7 +12,7 @@ import org.apache.ibatis.annotations.Update;
  * plain-candidate + atomic-conditional-{@code UPDATE} variant (H2).
  *
  * <p>Which rows are claimable, and in what order, comes from {@link ProcessClaimSql} — the same
- * constants the JDBC backend uses. Only the concurrency mechanism and the {@code LIMIT} differ, and
+ * constants the engine publishes. Only the concurrency mechanism and the {@code LIMIT} differ, and
  * those are all that should ever be appended here.
  */
 public interface ProcessClaimMapper {

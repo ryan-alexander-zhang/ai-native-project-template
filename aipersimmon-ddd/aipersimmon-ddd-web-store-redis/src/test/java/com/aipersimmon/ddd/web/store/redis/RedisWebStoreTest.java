@@ -26,8 +26,8 @@ import org.springframework.context.annotation.Import;
 
 /**
  * Exercises the Redis-backed stores against a real Redis via Testcontainers, proving the same
- * semantics as the in-memory and JDBC backends. Skipped when Docker is not available so it never
- * breaks a container-less build.
+ * semantics as the in-memory and MyBatis-Plus backends. Skipped when Docker is not available so it
+ * never breaks a container-less build.
  */
 @Import(RedisServiceConnection.class)
 @EnabledIf("com.aipersimmon.ddd.testsupport.DockerAvailable#dockerAvailable")

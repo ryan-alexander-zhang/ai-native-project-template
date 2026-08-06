@@ -63,11 +63,11 @@ flowchart TD
   end
   subgraph starter["可插拔 starter (Spring/JPA/Kafka)"]
     events["-events-spring"]
-    outbox["-outbox (contracts) / -outbox-engine<br/>-outbox-jdbc / -outbox-mybatis-plus"]
-    inbox["-inbox-jdbc / -inbox-mybatis-plus"]
+    outbox["-outbox (contracts) / -outbox-engine<br/>-outbox-mybatis-plus"]
+    inbox["-inbox-mybatis-plus"]
     msg["-messaging-kafka / -rabbit"]
     cqrsSpring["-cqrs-spring"]
-    processManagerJdbc["-process-manager-jdbc<br/>/ -process-manager-jdbc-spring-boot-starter"]
+    processManagerJdbc["-process-manager-engine<br/>/ -process-manager-mybatis-plus"]
   end
   arch["aipersimmon-ddd-archunit (test)"]
   bom["aipersimmon-ddd-bom"]
@@ -176,7 +176,7 @@ com.aipersimmon.ddd.core
 
 ### 5.8 `aipersimmon-ddd-outbox-jdbc`(starter,→ `-application` + `-integration` + `spring-boot-starter-jdbc` + Jackson)
 
-> **实现阶段发现**:库里放 JPA `@Entity` 有"实体扫描覆盖"陷阱——库的 `@EntityScan` 会让使用者靠默认扫描的自有实体失效。故**先做 `-outbox-jdbc`**(`JdbcTemplate`,无 `@Entity`/`@EntityScan`,零扫描冲突);`-outbox-jpa` 作为后续变体。发布 port `IntegrationEvents` 已加到 `-application`。
+> **实现阶段发现**:库里放 JPA `@Entity` 有"实体扫描覆盖"陷阱——库的 `@EntityScan` 会让使用者靠默认扫描的自有实体失效。故**先做 `-outbox-jdbc`**（该模块后已删除，只留 `-outbox-mybatis-plus`）(`JdbcTemplate`,无 `@Entity`/`@EntityScan`,零扫描冲突);`-outbox-jpa` 作为后续变体。发布 port `IntegrationEvents` 已加到 `-application`。
 
 > **第二次演进(已交付,[[decision-00020-outbox-engine-over-one-store-port]])**:writer / relay / 调度触发器 /
 > 保留期清理与共享的 Spring 装配再从两个后端上抽到 **`aipersimmon-ddd-outbox-engine`**,后端只留一个
@@ -262,7 +262,7 @@ analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction
 
 ### 5.13 JDBC Runtime 与 Spring Boot Starter
 
-生产目标拆为 `aipersimmon-ddd-process-manager-jdbc` 与
+生产目标拆为 `aipersimmon-ddd-process-manager-jdbc`（后改名 `-engine` + `-mybatis-plus`）与
 `aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`：前者负责四表持久化、原子推进、effect relay、durable deadline、
 租约/围栏、幂等与运维能力；后者只负责 Boot 自动装配、配置、worker 生命周期、可观测性和启动校验。两者的完整边界、
 Temporal/Seata provider 策略及非规范性订单 Sample 统一以 [[design-00004-durable-process-manager-runtime]] 为准。
@@ -279,7 +279,7 @@ Temporal/Seata provider 策略及非规范性订单 Sample 统一以 [[design-00
 
 interface(入站 HTTP)层构件族,详见 [[design-00002-web-layer]]:纯契约 `-web`(ProblemDescriptor/ProblemRegistry/ApiError/Page/Cursor +
 横切 SPI)+ Spring starter `-web-spring`(异常→RFC 9457 ProblemDetail、traceId、分页、i18n、幂等/防重放/限流,
-逐项 opt-in)+ 可换存储 `-web-store-redis`/`-web-store-jdbc`(与 outbox 存储后端同构)。策略见
+逐项 opt-in)+ 可换存储 `-web-store-redis`/`-web-store-mybatis-plus`(与 outbox 存储后端同构;后者当时叫 `-web-store-jdbc`)。策略见
 [[decision-00007-web-api-response-envelope]],证据见 [[analysis-00008-web-api-response-envelope]]。
 
 ## 六、脚手架设计(`multi-module`)

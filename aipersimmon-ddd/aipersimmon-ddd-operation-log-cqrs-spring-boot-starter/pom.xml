@@ -70,7 +70,8 @@
       <artifactId>jakarta.validation-api</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- End-to-end capture: real CommandBus + TransactionCommandInterceptor + JDBC backend. -->
+    <!-- End-to-end capture: real CommandBus + TransactionCommandInterceptor + MyBatis-Plus
+         backend. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-cqrs-spring-boot-starter</artifactId>
@@ -79,7 +80,7 @@
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-operation-log-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

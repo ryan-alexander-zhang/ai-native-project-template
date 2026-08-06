@@ -28,9 +28,8 @@
       <artifactId>aipersimmon-ddd-mybatis-plus-spring-boot-starter</artifactId>
     </dependency>
     <!--
-      The shared edge store. The library ships two: this one and -web-store-jdbc; there is no
-      MyBatis-Plus variant, because these are the framework's own edge tables rather than anyone's
-      aggregates. Redis is the choice here — it needs no DDL, no Flyway component and no cleanup
+      The shared edge store. The library ships two: this one and -web-store-mybatis-plus.
+      Redis is the choice here — it needs no DDL, no Flyway component and no cleanup
       scheduler, and it is the backend the library recommends for rate limiting under concurrency.
       It brings spring-boot-starter-data-redis transitively, which is what produces the
       StringRedisTemplate all three store beans are conditional on.

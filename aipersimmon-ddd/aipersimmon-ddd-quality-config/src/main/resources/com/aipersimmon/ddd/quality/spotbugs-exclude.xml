@@ -49,7 +49,7 @@
 
   <!--
     EI_EXPOSE_REP2 on infrastructure beans that hold an injected collaborator by reference
-    (NamedParameterJdbcTemplate/JdbcTemplate, Clock, KafkaTemplate, TransactionTemplate,
+    (MyBatis-Plus mappers, Clock, KafkaTemplate, TransactionTemplate,
     ObjectMapper, StringRedisTemplate, other stores). Sharing the injected reference is the
     intent of constructor injection, not a defect — and these objects cannot be meaningfully
     copied. Listed explicitly rather than by package so that a future value carrier added to
@@ -61,9 +61,6 @@
     <Or>
       <Class name="com.aipersimmon.ddd.cqrs.spring.TransactionTemplateUnitOfWork"/>
       <Class name="com.aipersimmon.ddd.flyway.AipersimmonFlywayMigrator"/>
-      <Class name="com.aipersimmon.ddd.inbox.jdbc.InboxCleanup"/>
-      <Class name="com.aipersimmon.ddd.inbox.jdbc.JdbcInbox"/>
-      <Class name="com.aipersimmon.ddd.inbox.jdbc.JdbcInboxSchemaValidator"/>
       <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaIntegrationEventListener"/>
       <Class name="com.aipersimmon.ddd.messaging.kafka.KafkaOutboxDispatcher"/>
       <Class name="com.aipersimmon.ddd.outbox.spring.InProcessOutboxDispatcher"/>
@@ -71,10 +68,6 @@
       <Class name="com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay"/>
       <Class name="com.aipersimmon.ddd.outbox.engine.write.OutboxWriter"/>
       <Class name="com.aipersimmon.ddd.outbox.engine.observe.OutboxBacklog"/>
-      <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore"/>
-      <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetters"/>
-      <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxSchemaValidator"/>
-      <Class name="com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxStore"/>
       <Class name="com.aipersimmon.ddd.outbox.mybatisplus.MybatisDeadLetterStore"/>
       <Class name="com.aipersimmon.ddd.outbox.mybatisplus.MybatisOutboxStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessManagerStartupValidator"/>
@@ -85,19 +78,10 @@
       <Class name="com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.replay.ParkedInputWorker"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessQuery"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessRetentionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessRetentionStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime"/>
       <Class name="com.aipersimmon.ddd.operationlog.engine.autoconfigure.MicrometerOperationLogMetrics"/>
-      <Class name="com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogCleanup"/>
       <Class name="com.aipersimmon.ddd.operationlog.mybatisplus.MybatisPlusOperationLogCleanup"/>
-      <Class name="com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogSchemaValidator"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.autoconfigure.JdbcProcessSchemaValidator"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.lease.JdbcProcessClaimStrategy"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessDeadlineStore"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessEffectStore"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessInstanceStore"/>
-      <Class name="com.aipersimmon.ddd.processmanager.jdbc.store.JdbcProcessTransitionStore"/>
       <Class name="com.aipersimmon.ddd.tenancy.mybatisplus.TenantTableRegistrationGuard"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessDeadlineStore"/>
       <Class name="com.aipersimmon.ddd.processmanager.mybatisplus.store.MybatisProcessEffectStore"/>
@@ -108,12 +92,12 @@
       <Class name="com.aipersimmon.ddd.web.spring.ProblemHttpResponseWriter"/>
       <Class name="com.aipersimmon.ddd.web.spring.RateLimitFilter"/>
       <Class name="com.aipersimmon.ddd.web.spring.ReplayProtectionFilter"/>
-      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcIdempotencyStore"/>
-      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcRateLimiter"/>
-      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcWebStoreCleanup"/>
-      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcWebStoreSchemaValidator"/>
-      <Class name="com.aipersimmon.ddd.web.store.jdbc.WebStoreCleanupScheduler"/>
-      <Class name="com.aipersimmon.ddd.web.store.jdbc.JdbcReplayGuard"/>
+      <Class name="com.aipersimmon.ddd.web.store.mybatisplus.MybatisPlusIdempotencyStore"/>
+      <Class name="com.aipersimmon.ddd.web.store.mybatisplus.MybatisPlusRateLimiter"/>
+      <Class name="com.aipersimmon.ddd.web.store.mybatisplus.MybatisPlusWebStoreCleanup"/>
+      <Class name="com.aipersimmon.ddd.web.store.mybatisplus.MybatisPlusWebStoreSchemaValidator"/>
+      <Class name="com.aipersimmon.ddd.web.store.mybatisplus.WebStoreCleanupScheduler"/>
+      <Class name="com.aipersimmon.ddd.web.store.mybatisplus.MybatisPlusReplayGuard"/>
       <Class name="com.aipersimmon.ddd.web.store.redis.RedisIdempotencyStore"/>
       <Class name="com.aipersimmon.ddd.web.store.redis.RedisRateLimiter"/>
       <Class name="com.aipersimmon.ddd.web.store.redis.RedisReplayGuard"/>

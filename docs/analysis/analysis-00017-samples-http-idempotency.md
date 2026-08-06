@@ -185,7 +185,7 @@ sample 的 `theSameSignedBytesCannotBeSentTwice` 就是这条：完全相同、�
 
 库只提供两种共享实现，**没有 MyBatis-Plus 变体**（它们存的是框架自己的边界表，不是聚合）：
 
-| | `-web-store-redis`（sample 用这个） | `-web-store-jdbc` |
+| | `-web-store-redis`（sample 用这个） | `-web-store-mybatis-plus`（当时叫 `-web-store-jdbc`） |
 | --- | --- | --- |
 | 需要建表 | 无 | 3 张表、4 个 migration |
 | 需要的配置 | 0 | `flyway.components: [web-store]`、`schema-validation`、两个 cleanup 属性 |

@@ -6,9 +6,8 @@ import org.apache.ibatis.annotations.Select;
 
 /**
  * Startup schema probe: a zero-row {@code SELECT} per outbox table, so a missing or stale migration
- * fails fast with a clear message (mirrors {@code JdbcOutboxSchemaValidator}). Each probe names
- * columns the later migrations added rather than a literal, because "table exists" is not "schema
- * is current". Never creates tables.
+ * fails fast with a clear message. Each probe names columns the later migrations added rather than
+ * a literal, because "table exists" is not "schema is current". Never creates tables.
  */
 public interface OutboxSchemaMapper {
 

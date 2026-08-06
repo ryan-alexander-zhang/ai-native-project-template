@@ -89,7 +89,7 @@ effect)**。它打破了「创建 == 发送」的隐含前提:
 - `aipersimmon-ddd-cqrs`:`CommandBus` 增 `sendAs(Command, CommandContext)`;`RegistryCommandBus` 实现为「逐字派发、
   不铸不派生」。现有 `send(cmd)` / `send(cmd, cause)` 与 `LoggingCommandInterceptor`(仍从 `correlationId` 播 MDC)不变。
 - `aipersimmon-ddd-archunit`:新增规则,禁止 `CommandHandler`/application 调用 `sendAs(...)`。
-- `aipersimmon-ddd-process-manager-jdbc`:effect relay 的 `CommandEffectDispatcher` 从 effect 行重建 `CommandContext`
+- 存储后端(当时 `aipersimmon-ddd-process-manager-jdbc`,现 `-process-manager-mybatis-plus`):effect relay 的 `CommandEffectDispatcher` 从 effect 行重建 `CommandContext`
   并经 `sendAs` 派发;`IntegrationEventEffectDispatcher` 沿用 `IntegrationEvents.publish`(其身份 outbox 早已负责)。
 - 下游去重:以 `messageId = effectId` 作 inbox 键(接收端)与/或业务操作 id(发送端)幂等,二者按 §Decision 5 分层。
 - 与 [[decision-00013-command-context-and-causation-propagation]] 的关系:本文**只增补 §1 的「唯一铸造方」表述**,其余

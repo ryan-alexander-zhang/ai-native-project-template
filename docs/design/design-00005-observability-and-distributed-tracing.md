@@ -99,7 +99,7 @@ W3C Trace Context 中可续接的上下文是 `SpanContext`：
 
 **durable store-and-forward 是 ambient 唯一穿不过的一跳**：effect/deadline/outbox 行在事务 A（命令线程，ambient 活跃）写入，稍后由 relay/worker 轮询线程在事务 B 捞起——原 context 已消失，且没有任何自动埋点认识你自建的 `process_effect` / `aipersimmon_outbox` 表。这是 OTEL messaging 约定与"outbox 丢 trace 上下文"的标准场景，标准解法：**写行时把 ambient context 序列化进行，捞起时 extract 复原**。全库这样的跳点**只有两处**（outbox relay、PM relay/deadline，§三已穷举）。
 
-为不让 `outbox` / `process-manager-jdbc` 依赖 OTEL，用 framework-free 的**双向** tracer SPI（默认 no-op，OTEL 实现在可选模块）：
+为不让 `outbox` / 进程管理器存储后端依赖 OTEL，用 framework-free 的**双向** tracer SPI（默认 no-op，OTEL 实现在可选模块）：
 
 ```java
 // aipersimmon-ddd-observability（framework-free 契约，no-op 默认实现随之提供）
@@ -151,7 +151,7 @@ flowchart LR
 | 入站 ACL | 入站 `@EventListener EventEnvelope` 包一层 | `acl <EventType>` | `messaging.system`、`event.type`、`correlation.id` |
 | 推进 | `JdbcProcessRuntime.start/handle` 内经抽象 `Tracer` SPI（保持 jdbc 模块 OTEL-free） | `process.advance <ProcessType>` | `process.type`、`business_key`、`definition_version`、`decision_code`、`from/to.step` |
 
-要点：`TracingCommandInterceptor` 等实现位于 OTEL 模块、可直接用 OTEL API；只有必须保持 OTEL-free 的 `process-manager-jdbc`（推进 span）与 `outbox`（§五）经抽象 SPI。装饰/拦截均在 ambient 上开子 span，天然串进 §五 的同步链路。
+要点：`TracingCommandInterceptor` 等实现位于 OTEL 模块、可直接用 OTEL API；只有必须保持 OTEL-free 的进程管理器存储后端（推进 span）与 `outbox`（§五）经抽象 SPI。装饰/拦截均在 ambient 上开子 span，天然串进 §五 的同步链路。
 
 ## 七、异步复原语义：Span Link 优先于 parent-child
 
@@ -209,7 +209,7 @@ trace_state VARCHAR(512)   -- 可选，可空
 
 `process_instance` 不加列（快照，非因果边界）；这些列无索引（不参与 claim 谓词）。
 
-> **DDL 同步警示**：PM 四表 DDL 跨 7 文件重复（生产 `{h2,mysql,postgresql}` + 测试副本 + scaffold 消费方副本，见 [[process-manager-schema-copies]]），**加上** `outbox-jdbc` 与 `outbox-mybatis-plus` 各自的 schema——所有副本须一并改；MySQL 内联 `KEY` vs PG/H2 `CREATE INDEX`；相关模块在同一 reactor 里构建验证。
+> **DDL 同步警示**：PM 四表 DDL 跨 7 文件重复（生产 `{h2,mysql,postgresql}` + 测试副本 + scaffold 消费方副本，见 [[process-manager-schema-copies]]），**加上** `outbox-mybatis-plus` 各自的 schema——所有副本须一并改；MySQL 内联 `KEY` vs PG/H2 `CREATE INDEX`；相关模块在同一 reactor 里构建验证。
 
 ## 十、三柱闭环
 
@@ -289,8 +289,8 @@ flowchart TD
   otel["aipersimmon-ddd-observability-otel（可选）<br/>OTEL 实现 + Boot 装配 + opentelemetry-spring-boot-starter"]
 
   core["core / cqrs / integration"]
-  pm["process-manager-jdbc"]
-  ob["outbox-engine (over outbox-jdbc / -mybatis-plus)"]
+  pm["process-manager-mybatis-plus"]
+  ob["outbox-engine (over outbox-mybatis-plus)"]
   cqrsSpring["cqrs-spring / events-spring / web-spring / messaging-kafka"]
 
   core --> obs

@@ -268,7 +268,7 @@ pool 模型下，租户只是行上的数据：
 - 新增：`aipersimmon-ddd-tenancy`、`aipersimmon-ddd-tenancy-spring`。
 - Tier1 写核心：`cqrs`(CommandContext)、`integration`(EventEnvelope)。
 - Tier2 耐久：`outbox`/`-jdbc`/`-mybatis-plus`、`messaging-kafka`、`inbox`/`-jdbc`/`-mybatis-plus`、
-  `process-manager-engine`/`-jdbc`/`-mybatis-plus`、`saga`/`saga-spring`、`web-store-jdbc`/`-redis`、`flyway`。
+  `process-manager-engine`/`-jdbc`/`-mybatis-plus`、`saga`/`saga-spring`、`web-store-jdbc`/`-redis`、`flyway`（其中 `-jdbc` 后端与 `saga` 后已删除，`web-store-jdbc` 由 `-web-store-mybatis-plus` 取代）。
 - Tier3 读侧：`cqrs`/`cqrs-spring`（取 §九 方案 A）。
 - Tier4 观测：`observability`/`-otel`/`-otel-spring-boot-starter`。
 - 兜底：`archunit`。

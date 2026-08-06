@@ -13,7 +13,7 @@
 
   <!--
     Cross-service integration events over Kafka. Add it beside a storage bundle
-    (-starter-mybatis-plus or -starter-jdbc): the broker transport is built ON the transactional
+    (-starter-mybatis-plus): the broker transport is built ON the transactional
     outbox, not instead of it, so a storage bundle is a prerequisite rather than an alternative.
 
     Only events annotated @Externalized cross the broker; everything else stays in process. If a

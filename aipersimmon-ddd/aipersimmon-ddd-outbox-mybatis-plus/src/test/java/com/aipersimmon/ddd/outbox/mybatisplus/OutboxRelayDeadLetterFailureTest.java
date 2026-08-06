@@ -23,10 +23,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The MyBatis-Plus backend's counterpart to the JDBC starter's dead-letter-failure test: when the
- * dead-letter move itself fails, the relay backs the row off (keeping it selectable) rather than
- * hammering it every poll or letting the failure abort the poll, so the two backends behave the
- * same.
+ * The dead-letter-failure contract: when the dead-letter move itself fails, the relay backs the row
+ * off (keeping it selectable) rather than hammering it every poll or letting the failure abort the
+ * poll, so the two backends behave the same.
  */
 @SpringBootTest(
     classes = OutboxRelayDeadLetterFailureTest.TestApp.class,

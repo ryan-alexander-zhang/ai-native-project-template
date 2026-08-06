@@ -7,6 +7,12 @@ blocks: [issue-00003-messaging-delivery-reliability]
 
 # 死信迁移失败时无退避兜底:放弃行被每轮重投(无间隔忙循环),甚至静默搁浅
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 [[issue-00003-messaging-delivery-reliability]] 的生产侧加固里,relay 对「放弃」的行(永久失败 / 耗尽重试)
 调 `DeadLetterStore.store()` **同事务从 outbox 移入**死信表。但 `handleFailure` 的两条放弃分支**只在
 `store()` 成功的前提下**才算数——`store()` 一旦抛异常(死信表不可用/被删/迁移事务失败),既有代码既不退避、

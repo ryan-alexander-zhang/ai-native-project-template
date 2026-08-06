@@ -29,8 +29,8 @@ import org.springframework.context.annotation.Bean;
 /**
  * Boot slice test: the MyBatis-Plus backend auto-configures the whole runtime against an in-memory
  * H2, collecting the consumer's Definition and codecs, and an end-to-end start → relay delivers the
- * command under the effect's identity — identical to the JDBC starter's behavior. The workers' poll
- * delay is set very high so the background scheduler stays idle and the relay is driven directly.
+ * command under the effect's identity. The workers' poll delay is set very high so the background
+ * scheduler stays idle and the relay is driven directly.
  */
 @SpringBootTest(
     classes = ProcessManagerMybatisPlusAutoConfigurationTest.TestApp.class,

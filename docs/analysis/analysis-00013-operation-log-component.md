@@ -26,7 +26,7 @@ status: active
    result、entity、异常或 before/after 对象。
 6. 第一阶段只做三个模块：
    `aipersimmon-ddd-operation-log`、`aipersimmon-ddd-operation-log-cqrs-spring`、
-   `aipersimmon-ddd-operation-log-jdbc`。MQ、中心化日志服务、MyBatis-Plus、合规审计能力都不是 MVP。
+   `aipersimmon-ddd-operation-log-jdbc`（该后端后来被删除，改为只留 MyBatis-Plus）。MQ、中心化日志服务、合规审计能力都不是 MVP。
 
 本报告只研究上述**通用组件**，不依赖任何特定业务示例，也不包含实现代码。方案进入编码前，仍需按仓库流程
 补 `CONTEXT.md` 术语、新 ADR、design/spec/plan，并把本报告列出的验收矩阵转成可执行测试。
@@ -223,7 +223,7 @@ aipersimmon-ddd-operation-log-cqrs-spring          (CQRS + Spring adapter)
   ├─ transaction coordination
   └─ auto-configuration and startup validation
 
-aipersimmon-ddd-operation-log-jdbc            (outbound adapter)
+aipersimmon-ddd-operation-log-mybatis-plus    (outbound adapter；当时是 -operation-log-jdbc)
   ├─ append-only JDBC sink
   ├─ query adapter（P3）
   ├─ H2 / MySQL / PostgreSQL migrations

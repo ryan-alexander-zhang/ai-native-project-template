@@ -35,7 +35,7 @@ informs: [decision-00017-operation-log-component-boundaries]
 | `aipersimmon-ddd-operation-log` | framework-free、CQRS-free 的不可变模型、`OperationLogDefinition` 生命周期、`OperationLogs`/`OperationLogSink`/`OperationLogReader` **端口**、`FailureClassifier` SPI、`@OperationLog` 元数据 | Spring、JDBC、CQRS、模板求值、线程、MQ、DDL |
 | `aipersimmon-ddd-operation-log-engine` | storage-agnostic、Spring-aware：`OperationLogs` **默认实现**（normalize/validate/redact/freeze pipeline）、sink/reader 装配、**共享三方言 DDL**、启动期尺寸/隐私预算。direct-API（batch/scheduler/CLI，无 CQRS）消费者依赖此模块 | 存储实现、CQRS、模板、业务语义 |
 | `aipersimmon-ddd-operation-log-cqrs-spring` | 两个 `CommandInterceptor`、annotation compiler、受限模板 renderer、actor/tenant resolver、事务协调、捕获侧自动装配与启动期校验 | 存储实现、业务语义、通用 method AOP |
-| `aipersimmon-ddd-operation-log-jdbc` | 基于 `JdbcTemplate` 的 append-only `OperationLogSink`（及 `OperationLogReader`，P3）；实现 engine 的存储端口 | DDL 自动执行以外的业务；不携带 DDL |
+| `aipersimmon-ddd-operation-log-jdbc`（**后已删除**，只留 `-operation-log-mybatis-plus`） | 基于 `JdbcTemplate` 的 append-only `OperationLogSink`（及 `OperationLogReader`，P3）；实现 engine 的存储端口 | DDL 自动执行以外的业务；不携带 DDL |
 | `aipersimmon-ddd-operation-log-mybatis-plus` | 基于 MyBatis-Plus 的同一组存储端口实现 | 同上；与 `-jdbc` 二选一 |
 
 消费方**恰好选一个存储后端**（`-jdbc` 或 `-mybatis-plus`），与 process-manager “include exactly one backend” 一致。
@@ -80,7 +80,7 @@ flowchart LR
   ol["aipersimmon-ddd-operation-log<br/>framework-free · CQRS-free contracts"]
   eng["aipersimmon-ddd-operation-log-engine<br/>OperationLogs pipeline + DDL + 装配"]
   olcs["aipersimmon-ddd-operation-log-cqrs-spring<br/>CommandInterceptor 捕获 + 模板"]
-  oljdbc["aipersimmon-ddd-operation-log-jdbc<br/>JdbcTemplate sink/reader"]
+  oljdbc["aipersimmon-ddd-operation-log-jdbc<br/>JdbcTemplate sink/reader<br/>(后已删除)"]
   olmp["aipersimmon-ddd-operation-log-mybatis-plus<br/>MyBatis-Plus sink/reader"]
 
   springTx["spring-tx / spring-boot-autoconfigure"]
@@ -113,7 +113,7 @@ flowchart LR
   常量的 no-op SPI）+ `spring-tx` / `spring-boot-autoconfigure`；携带 DDL 与 `OperationLogs` 默认实现；**不**依赖 CQRS
   与任何存储后端。这是 direct-API 消费者的最小依赖单元。
 - `operation-log-cqrs-spring` 依赖 `engine` + `cqrs`（interceptor 契约）；只做捕获与模板，不含存储与 `OperationLogs` 装配。
-- `operation-log-jdbc` / `operation-log-mybatis-plus` 各依赖 `engine`，只实现 `OperationLogSink`/`OperationLogReader`；
+- `operation-log-jdbc` / `operation-log-mybatis-plus` 各依赖 `engine`，只实现 `OperationLogSink`/`OperationLogReader`（前者后已删除）；
   互不依赖、二选一；不依赖 `-cqrs-spring`。
 - 五个模块都不得依赖任何 scaffold 或 bounded-context 模块。消费方 domain 模块**不得**依赖 operation-log（ArchUnit 强制，§十一）。
 
@@ -422,7 +422,7 @@ compiled metadata（有界 cache）（对齐 [[decision-00012-no-ambient-per-com
 - 主查询索引 `(tenant_id, target_type, target_id, occurred_at, record_id)`；辅助索引按真实查询增加。
 - JSON 仅存有界 `changes/details`，不存整个 input/result/entity。
 - cursor pagination，禁止无界 list；`(occurred_at, record_id)` 只保证确定性分页，不等于提交顺序。
-- `-jdbc` 实现风格对齐 `outbox-jdbc`：plain `JdbcTemplate` + `private static final String` SQL 常量 + `RowMapper`，
+- `-jdbc` 实现风格对齐当时的 `outbox-jdbc`：plain `JdbcTemplate` + `private static final String` SQL 常量 + `RowMapper`，
   无 JPA 实体（避免影响消费方 entity scan）。`-mybatis-plus` 用 `BaseMapper` + 显式 entity/`@TableName`，行为与 `-jdbc`
   等价。两个后端都**不携带、不自动执行 DDL**——DDL 只在 `-engine`，由 `aipersimmon-ddd-flyway` 运行。
 
@@ -670,7 +670,7 @@ outcome 属 ubiquitous language 的业务概念、completion 属技术事务事�
 
 **D2 — 五模块、依赖单向；core 保持 framework-free & CQRS-free。**
 推荐：`operation-log`(纯契约) → `operation-log-engine`(pipeline+DDL+装配) → `operation-log-cqrs-spring`(捕获) /
-`operation-log-jdbc` / `operation-log-mybatis-plus`(后端二选一)，依赖方向见 §二。DDL 与 `OperationLogs` 默认实现在
+`operation-log-jdbc` / `operation-log-mybatis-plus`(当时后端二选一;现只留后者)，依赖方向见 §二。DDL 与 `OperationLogs` 默认实现在
 engine；后端只实现存储端口、共享同一份 DDL。
 *理由*：MyBatis-Plus 已确定要做，直接对齐 process-manager 的 core/engine/jdbc/mybatis-plus 现状，避免“先放 jdbc、
 后提升”的返工；engine 让 direct-API 消费者无需拉入 CQRS。符合仓库“framework-free 内核 + 技术后缀 adapter”惯例。
@@ -783,7 +783,7 @@ sink 全部由 auto-config 装好，**消费方不接触 interceptor**。
 <!-- 存储后端：二选一 -->
 <dependency>
   <groupId>com.aipersimmon.ddd</groupId>
-  <artifactId>aipersimmon-ddd-operation-log-jdbc</artifactId>        <!-- 或 -operation-log-mybatis-plus -->
+  <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>   <!-- 当时可选 -operation-log-jdbc，后者已删除 -->
 </dependency>
 ```
 
@@ -1043,7 +1043,7 @@ class OrderOperationHistory {
 - [[design-00007-code-quality-gates]]
 - 代码：`aipersimmon-ddd/aipersimmon-ddd-cqrs/.../CommandInterceptor.java`、`.../Command.java`、`.../CommandContext.java`
 - 代码：`aipersimmon-ddd/aipersimmon-ddd-cqrs-spring/.../RegistryCommandBus.java`、`.../TransactionCommandInterceptor.java`
-- 代码：`aipersimmon-ddd/aipersimmon-ddd-outbox-jdbc/...`（JDBC sink 风格）、`aipersimmon-ddd/aipersimmon-ddd-flyway/...`（migration 发现）
+- 代码：`aipersimmon-ddd/aipersimmon-ddd-outbox-jdbc/...`（JDBC sink 风格；该模块后已删除）、`aipersimmon-ddd/aipersimmon-ddd-flyway/...`（migration 发现）
 
 外部：
 

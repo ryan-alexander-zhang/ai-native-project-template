@@ -9,7 +9,6 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
  * aipersimmon.ddd.flyway.components} entry surfaces only when the first delivery arrives — on a
  * listener thread, as a failed dedup check, far from the configuration list that caused it. Never
  * creates tables. Disabled when {@code schema-validation=none}. The MyBatis-Plus sibling of {@code
- * JdbcInboxSchemaValidator}.
  */
 @DependsOnDatabaseInitialization
 public final class MybatisPlusInboxSchemaValidator implements InitializingBean {

@@ -7,6 +7,12 @@ blocks: [decision-00014-cloudevents-integration-event-contract]
 
 # 覆盖 `eventType()` 的集成事件无法被默认 resolver 消费(逻辑类型注册表按简单类名建键)
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 [[decision-00014-cloudevents-integration-event-contract]] 命题一确立"事件类型是**逻辑契约**,不是 Java 类",
 并推荐把 `eventType()` 覆盖成版本化、命名空间化的名字(如 `com.example.ordering.OrderPlaced.v1`)。但默认
 类型注册表**按 `Class.getSimpleName()` 建键**,与生产侧写到线上的 `eventType()` 不一致——**一旦按推荐做法覆盖

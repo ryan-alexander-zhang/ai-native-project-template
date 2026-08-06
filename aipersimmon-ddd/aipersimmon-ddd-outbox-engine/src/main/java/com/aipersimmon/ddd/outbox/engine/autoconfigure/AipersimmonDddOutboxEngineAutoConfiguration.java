@@ -36,8 +36,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Wires the outbox writer, relay, scheduled trigger and retention cleanup once a storage backend
  * has contributed an {@link OutboxStore}. Everything here is storage-agnostic: the backend ({@code
- * aipersimmon-ddd-outbox-jdbc}, {@code aipersimmon-ddd-outbox-mybatis-plus}) supplies the store,
- * the dead-letter store and its read side, and nothing else.
+ * aipersimmon-ddd-outbox-mybatis-plus}) supplies the store, the dead-letter store and its read
+ * side, and nothing else.
  *
  * <p>Ordered after the backend registrations (so the {@link ConditionalOnBean} gates below see the
  * store), after the storage-agnostic {@link AipersimmonDddOutboxAutoConfiguration} that picks the
@@ -46,10 +46,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * background; an application can override any of these beans.
  */
 @AutoConfiguration(
-    afterName = {
-      "com.aipersimmon.ddd.outbox.jdbc.AipersimmonDddOutboxJdbcAutoConfiguration",
-      "com.aipersimmon.ddd.outbox.mybatisplus.AipersimmonDddOutboxMybatisPlusAutoConfiguration"
-    },
+    afterName =
+        "com.aipersimmon.ddd.outbox.mybatisplus.AipersimmonDddOutboxMybatisPlusAutoConfiguration",
     after = AipersimmonDddOutboxAutoConfiguration.class,
     // String form: this module does not depend on events-spring, and an absent target is ignored.
     beforeName = "com.aipersimmon.ddd.events.spring.AipersimmonDddEventsAutoConfiguration")

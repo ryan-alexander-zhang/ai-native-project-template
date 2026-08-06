@@ -91,9 +91,8 @@ So "we got an error, so nothing happened" is never a safe reading of a remote ca
 
 The callback endpoint is an unauthenticated POST from the public internet. The library's
 `ReplayProtectionFilter` verifies the signature, bounds the timestamp, and rejects a nonce it has seen. The
-store behind it is `aipersimmon-ddd-web-store-jdbc` — the documented exception to "MyBatis-Plus only" in these
-samples, since the library ships only JDBC and Redis edge stores. S2 took Redis; this takes JDBC, so both are
-covered.
+store behind it is `aipersimmon-ddd-web-store-mybatis-plus` — the library ships two edge stores, this one and
+Redis. S2 took Redis; this takes the relational one, so both are covered.
 
 **A signature and a nonce stop the same bytes being sent twice. They do not stop the same outcome being sent
 twice.** The provider mints a fresh `event_id`, nonce and signature per delivery, so two "charge approved"

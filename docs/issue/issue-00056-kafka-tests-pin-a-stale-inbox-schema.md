@@ -7,6 +7,12 @@ blocks: [report-00001-ddd-framework-review]
 
 # `messaging-kafka` 的测试固定加载 V1 版 inbox schema，租户迁移 V2 后三个集成测试永久超时
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 ## 问题（现状，file:line 为证）
 
 - **等级：High（不是产品缺陷，但让三个「消费端端到端」测试长期失去意义——它们只会超时，不会检验任何契约）**。

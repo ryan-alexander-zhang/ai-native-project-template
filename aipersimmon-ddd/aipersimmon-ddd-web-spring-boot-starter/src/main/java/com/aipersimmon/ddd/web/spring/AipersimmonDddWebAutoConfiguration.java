@@ -351,7 +351,7 @@ public class AipersimmonDddWebAutoConfiguration {
               + "JVM and therefore stops working as soon as there is a second instance:\n  - "
               + String.join("\n  - ", degraded)
               + "\nAdd a shared backend (aipersimmon-ddd-web-store-redis or "
-              + "aipersimmon-ddd-web-store-jdbc), or declare your own store bean. Single instance "
+              + "aipersimmon-ddd-web-store-mybatis-plus), or declare your own store bean. Single instance "
               + "and staying that way? Keep aipersimmon.ddd.web.allow-in-memory-stores=true.";
       if (!properties.isAllowInMemoryStores()) {
         throw new IllegalStateException(

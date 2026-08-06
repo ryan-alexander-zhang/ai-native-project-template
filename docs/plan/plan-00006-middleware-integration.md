@@ -7,6 +7,12 @@ implements: [design-00001-aipersimmon-ddd-and-scaffold]
 
 # 多模块参考应用中间件集成落地计划
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 把 `aipersimmon-ddd-scaffold/multi-module` 从"进程内、内存、无 broker"的最小可跑示例，升级为一个
 **接真实中间件的完整应用示例**：集成事件走 **Kafka**（transactional outbox → Kafka → 幂等 inbox → 进程内桥接），
 所有可靠消息与编排状态落 **PostgreSQL**（outbox / inbox / process-manager 三套表，单一来源 Flyway 迁移），

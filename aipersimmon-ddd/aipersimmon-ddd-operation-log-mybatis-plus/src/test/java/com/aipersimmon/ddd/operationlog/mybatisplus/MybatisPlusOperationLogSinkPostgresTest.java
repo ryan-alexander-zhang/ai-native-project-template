@@ -7,7 +7,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * The MyBatis-Plus sink on a real PostgreSQL, using the {@code ON CONFLICT DO NOTHING} path so a
- * duplicate inside a transaction does not abort it — behaviorally equivalent to the JDBC backend.
+ * duplicate inside a transaction does not abort it.
  */
 @EnabledIf("com.aipersimmon.ddd.testsupport.DockerAvailable#dockerAvailable")
 class MybatisPlusOperationLogSinkPostgresTest {

@@ -179,7 +179,7 @@ the order. `SelfCancelDuringReservationTest` covers it.
 | Ordered compensation (release then cancel) | `OrderFulfilmentDefinition` compensation branches | `PaymentCompensationFlowTest` |
 | Deadlines (a wait that can end) | `OrderFulfilmentDefinition` arms/cancels the `STOCK`, `PAYMENT` and `STOCK_RELEASE` deadlines; `*TimedOut` inputs | `OrderFulfilmentDefinitionTest` (unit), `PaymentTimeoutFlowTest` and `StockReservationTimeoutFlowTest` (e2e, each context silent in turn) |
 | Cursor-paged read model (no aggregate loaded) | `OrderQueries` + `OrderListMapper` → `GET /orders?customerId=`; `Slice`/`Cursor` | `OrderListPagingTest`, `FindCustomerOrdersHandlerTest` |
-| HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-jdbc` on `POST /orders` | `OrderIdempotencyTest` |
+| HTTP idempotency (a retry that does not buy twice) | `aipersimmon.ddd.web.idempotency` + `-web-store-mybatis-plus` on `POST /orders` | `OrderIdempotencyTest` |
 | Optimistic-lock conflict rendered as 409 | version-checked `save` → `ConcurrencyConflictException` → problem document | `ConcurrentApprovalTest`, `ConcurrentAggregateWriteTest` |
 | Dead letters and operator replay | `DeadLetterOpsController` over the `DeadLetters` + `DeadLetterStore` ports (`GET /ops/dead-letters` cursor-paged, `GET /ops/dead-letters/{id}`, `POST /ops/dead-letters/{id}/replay`) | `DeadLetterReplayTest` |
 | `Specification` answers, `Invariant` refuses | `CancellableByCustomer` (on `OrderSnapshot.cancellableByCustomer`) vs `OrderLifecyclePolicy`; `POST /orders/{id}/cancel` — reachable for every order, not just reviewed ones | `CancellableByCustomerTest`, `SelfCancelTest`, `SelfCancelDuringReservationTest` |
@@ -273,7 +273,7 @@ Four patterns are worth more than the individual rows:
 
 | | Why |
 |---|---|
-| The JDBC stack (`-starter-jdbc`, `-persistence-jdbc`, …) | A second backend would double the build for a story already told. The library's module guide presents it as an equal path ([DOCS.md](DOCS.md)); only this one has a worked example. |
+| Hand-mapped SQL for the application's own tables | The framework's tables go through MyBatis-Plus; your own need not. Anything on the same `DataSource` joins the same transaction, and showing a second mapping style would double the build for a story already told. |
 | Redis web stores, rate limiting, replay protection | Idempotency already demonstrates the edge-store wiring; the other two differ only in what they count. |
 | `sendAs` / `publishAs` | The replay path preserves identity structurally — the row keeps its id — so nothing here needed the explicit carry-an-existing-identity entry points. They remain unexercised. |
 | A second topology (modulith, microservice) | Dropped in `605fab3`; the transport story is the same one, packaged differently. |

@@ -15,16 +15,23 @@ import com.aipersimmon.ddd.operationlog.annotation.OperationLog;
 import com.aipersimmon.ddd.operationlog.engine.classifier.DefaultFailureClassifier;
 import com.aipersimmon.ddd.operationlog.engine.pipeline.DefaultOperationLogs;
 import com.aipersimmon.ddd.operationlog.engine.pipeline.OperationLogLimits;
-import com.aipersimmon.ddd.operationlog.jdbc.JdbcOperationLogSink;
 import com.aipersimmon.ddd.operationlog.model.Actor;
+import com.aipersimmon.ddd.operationlog.mybatisplus.MybatisPlusOperationLogSink;
+import com.aipersimmon.ddd.operationlog.mybatisplus.OperationLogMapper;
 import com.aipersimmon.ddd.operationlog.port.OperationLogs;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -35,7 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * End-to-end capture scenarios exercised against a real database and the real command pipeline
  * (RegistryCommandBus + the built-in TransactionCommandInterceptor + the two operation-log
- * interceptors + the JDBC sink). Reused for H2 and PostgreSQL to prove backend/dialect equivalence.
+ * interceptors + the MyBatis-Plus sink). Reused for H2 and PostgreSQL to prove dialect equivalence.
  */
 public final class OperationLogEndToEndScenarios {
 
@@ -55,7 +62,7 @@ public final class OperationLogEndToEndScenarios {
     jdbc.update("DELETE FROM aipersimmon_operation_log");
     jdbc.update("DELETE FROM demo_resource");
 
-    CommandBus bus = buildBus(jdbc, dataSource);
+    CommandBus bus = buildBus(dataSource, "postgresql".equals(dialectDirectory));
 
     // 1. success: business row and SUCCEEDED+COMMITTED log commit together.
     bus.send(new UpdateResource("res-1", "hello", false));
@@ -104,11 +111,12 @@ public final class OperationLogEndToEndScenarios {
     return new DataSourceTransactionManager(dataSource);
   }
 
-  private static CommandBus buildBus(JdbcTemplate jdbc, DataSource dataSource) {
+  private static CommandBus buildBus(DataSource dataSource, boolean postgres) {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     DataSourceTransactionManager txManager = new DataSourceTransactionManager(dataSource);
     OperationLogs operationLogs =
         new DefaultOperationLogs(
-            JdbcOperationLogSink.create(jdbc, dataSource, new ObjectMapper()),
+            new MybatisPlusOperationLogSink(mapper(dataSource), postgres, new ObjectMapper()),
             Clock.systemUTC(),
             () -> UUID.randomUUID().toString(),
             OperationLogLimits.defaults());
@@ -138,6 +146,21 @@ public final class OperationLogEndToEndScenarios {
         List.of(new UpdateResourceHandler(jdbc), new FailingUpdateHandler(jdbc)),
         List.of(failed, transaction, completed),
         () -> UUID.randomUUID().toString());
+  }
+
+  /**
+   * The sink's mapper, wired by hand over the caller's DataSource. A {@code
+   * SpringManagedTransactionFactory} is what makes the sink join the command's transaction rather
+   * than open one of its own — the whole point of scenarios 1, 3 and 5 below.
+   */
+  private static OperationLogMapper mapper(DataSource dataSource) {
+    MybatisConfiguration configuration = new MybatisConfiguration();
+    configuration.setMapUnderscoreToCamelCase(true);
+    configuration.setEnvironment(
+        new Environment("test", new SpringManagedTransactionFactory(), dataSource));
+    configuration.addMapper(OperationLogMapper.class);
+    SqlSessionFactory factory = new MybatisSqlSessionFactoryBuilder().build(configuration);
+    return new SqlSessionTemplate(factory).getMapper(OperationLogMapper.class);
   }
 
   private static AnnotationOperationLogDefinition annotation(Class<?> commandType) {

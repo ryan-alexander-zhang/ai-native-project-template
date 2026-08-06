@@ -10,7 +10,7 @@ motivated_by: [report-00003-ddd-library-review-2026-07-29]
 ## 结论先行
 
 > **outbox 家族改为 engine-over-store-port**：新增 `aipersimmon-ddd-outbox-engine`，承载 writer、relay、
-> 调度触发器、保留期清理与共享的 Spring 装配；`aipersimmon-ddd-outbox-jdbc` 与
+> 调度触发器、保留期清理与共享的 Spring 装配；当时的 `aipersimmon-ddd-outbox-jdbc` 与
 > `aipersimmon-ddd-outbox-mybatis-plus` 只提供 `OutboxStore` 适配器、死信 store 与死信读侧、以及
 > ShedLock 的 `LockProvider`。这与 `-process-manager-engine`、`-operation-log-engine` 已经用过两次的形状一致，
 > outbox 只是因为早于那次重构而没跟上。

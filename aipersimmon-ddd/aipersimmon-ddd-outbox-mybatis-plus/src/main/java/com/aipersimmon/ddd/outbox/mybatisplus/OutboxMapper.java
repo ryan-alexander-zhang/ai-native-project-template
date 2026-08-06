@@ -26,9 +26,8 @@ public interface OutboxMapper extends BaseMapper<OutboxRecord> {
    * key.
    *
    * <p>Hand-written SQL (with an explicit outer alias) rather than a wrapper, because the
-   * correlated NOT EXISTS needs an unambiguous self-join; kept equivalent to the JDBC starter's
-   * query so both backends behave the same. Only the ids are selected — the claim then reads back
-   * the rows it won by lease token.
+   * correlated NOT EXISTS needs an unambiguous self-join. Only the ids are selected — the claim
+   * then reads back the rows it won by lease token.
    */
   @Select(
       "SELECT o.event_id FROM aipersimmon_outbox o "

@@ -7,6 +7,12 @@ blocks: [issue-00003-messaging-delivery-reliability]
 
 # 投递成功但标记 sent 失败被误判为投递失败:重试重复,末次更把已投递消息死信
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 `OutboxRelay.relay()` 把 `dispatcher.dispatch()` 与随后的 `MARK_SENT` 更新放在**同一个 `try`** 里。二者失败
 语义完全不同——前者「消息没发出去」,后者「消息已发出去、只是没记上账」——却共用一个 `catch → handleFailure`,
 于是**标记失败被当成投递失败**处理。

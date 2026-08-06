@@ -47,8 +47,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * here discards events, and {@link #aipersimmonDddExternalReachGuard} refuses to start an
  * application whose {@code @Externalized} events have no way out.
  *
- * <p>The storage starter ({@code aipersimmon-ddd-outbox-jdbc}, {@code -outbox-mybatis-plus}, ...)
- * orders itself after this class so the chosen dispatcher bean exists when its relay is built.
+ * <p>The storage starter ({@code aipersimmon-ddd-outbox-mybatis-plus}, ...) orders itself after
+ * this class so the chosen dispatcher bean exists when its relay is built.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(OutboxProperties.class)
@@ -162,7 +162,7 @@ public class AipersimmonDddOutboxAutoConfiguration {
       log.warn(
           "aipersimmon-ddd outbox in-process dispatch has NO inbox: a relay redelivery reaches "
               + "@EventListener handlers again, so every handler must tolerate its own earlier "
-              + "success. Add an inbox backend (aipersimmon-ddd-inbox-jdbc or "
+              + "success. Add an inbox backend "
               + "aipersimmon-ddd-inbox-mybatis-plus) to deduplicate redeliveries here, as the "
               + "Kafka consumer bridge does.");
       return new InProcessOutboxDispatcher(publisher, mapper, catalog);

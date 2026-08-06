@@ -80,7 +80,7 @@ stub 为此专门加了 `LOSE_FIRST_RESPONSE` 模式。
 ## 4. 入站：三层护栏与"传输重放 ≠ 业务重复"
 
 回调端点是公网上一个**不带认证的 POST**。库的 `ReplayProtectionFilter` 提供三件事：验签、时间窗、nonce
-去重。边界存储用 `aipersimmon-ddd-web-store-jdbc`——这是 samples 里"一律 MyBatis-Plus"的那条唯一例外
+去重。边界存储用 `aipersimmon-ddd-web-store-mybatis-plus`——写这条时它还叫 `-web-store-jdbc`，是 samples 里"一律 MyBatis-Plus"的那条唯一例外
 （库只有 jdbc 与 redis 两种边界存储实现），S2 取 redis，本篇取 jdbc，两种就都覆盖到了。它不需要额外
 基础设施，代价是要跑 schema 校验器和一个保留期清理调度（redis 靠 TTL）。
 

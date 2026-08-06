@@ -1,5 +1,5 @@
 /**
- * Framework-free observability seams for the JDBC Process Manager: a push-style {@link
+ * Framework-free observability seams for the durable Process Manager: a push-style {@link
  * com.aipersimmon.ddd.processmanager.engine.observe.ProcessObserver} the runtime and relay report
  * timing/counter signals to, and a pull-style {@link
  * com.aipersimmon.ddd.processmanager.engine.observe.ProcessBacklog} that reads backlog SLIs from

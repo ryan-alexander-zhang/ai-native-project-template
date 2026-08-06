@@ -9,8 +9,8 @@ status: active
 本文定义三个**与具体业务无关**的生产级 Process Manager 构件：
 
 - `aipersimmon-ddd-process-manager`；
-- `aipersimmon-ddd-process-manager-jdbc`；
-- `aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`。
+- `aipersimmon-ddd-process-manager-jdbc`（后拆为 `-process-manager-engine` + `-process-manager-mybatis-plus`）；
+- `aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`（同上，已并入 engine 的自动装配）。
 
 业务流程名称、业务状态和领域规则不属于这些模块。具体 bounded context 只是消费者，在自己的 application/provider
 模块中定义流程输入、状态和协调策略。正文不使用 Order、Inventory、Payment 等业务类型定义框架契约；这些类型只在
@@ -463,7 +463,7 @@ stateDiagram-v2
 `SUSPENDED` 只改变 lifecycle，必须保存 `resumeLifecycle` 并保留原 business step；redrive 后从原 step 继续。
 `COMPLETED`、`FAILED`、`CANCELLED` 是终态，普通业务输入只能成为幂等 no-op，不能重新打开实例。
 
-## 四、`aipersimmon-ddd-process-manager-jdbc`
+## 四、`aipersimmon-ddd-process-manager-jdbc`（现为 `-process-manager-engine` + `-process-manager-mybatis-plus`）
 
 ### 4.1 模块定位与依赖
 
@@ -878,7 +878,7 @@ parked 输入的重放不在其中，由 §4.6 的 parked-input worker 从持久
 （[[issue-00103-parked-input-replay-is-not-crash-safe]]）。代价是重放延迟一个 poll 间隔，
 与 effect/deadline 的既有形状一致。
 
-## 五、`aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`
+## 五、`aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`（现并入 `-process-manager-engine` 的自动装配）
 
 ### 5.1 模块定位
 

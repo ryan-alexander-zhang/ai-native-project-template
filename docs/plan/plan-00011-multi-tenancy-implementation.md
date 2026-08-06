@@ -7,6 +7,12 @@ implements: [design-00009-multi-tenancy-tenant-id]
 
 # 原生多租户落地计划
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 把 [[design-00009-multi-tenancy-tenant-id]] / [[decision-00018-multi-tenancy-boundaries]] / [[spec-00002-multi-tenancy]]
 落成代码：pool 判别列 `tenant_id`，租户经**与 decision-00013 同一条传播脊柱**（`CommandContext` → `EventEnvelope` →
 `ce_tenantid` header → 耐久行列 → 消费端重建）端到端流动，读侧与基础设施强制按租户隔离；单租户是 N=1 的同一套 schema。

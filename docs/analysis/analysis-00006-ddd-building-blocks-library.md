@@ -78,8 +78,8 @@ status: active
 | `aipersimmon-ddd-events-spring` | infrastructure | Spring | `ApplicationEventPublisher`→`DomainEvents` port 桥接;`@TransactionalEventListener` 装配;日志/装饰器 |
 | `aipersimmon-ddd-cqrs-spring` | infrastructure(可选) | `-cqrs` + Spring | Spring 实现的 `CommandBus` + 装饰器链(Logging→Validation→Transaction,用 `TransactionTemplate` 接管 UnitOfWork);领域事件在 save 处同事务排空,无线程域收集器(见§五、[[decision-00012-no-ambient-per-command-state]]) |
 | `aipersimmon-ddd-outbox` | infrastructure(存储无关 core) | `spring-context` + Jackson | 投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、默认 dispatcher(logging / in-process)+ dispatch autoconfig;无持久化 |
-| `aipersimmon-ddd-outbox-jdbc` / `aipersimmon-ddd-outbox-mybatis-plus`(`-outbox-jpa` 待做) | infrastructure | `-outbox` + JDBC / MyBatis-Plus | outbox 表 writer + relay/poller;两者同表结构可互换,消费者选一个 |
-| `aipersimmon-ddd-inbox-jdbc` / `aipersimmon-ddd-inbox-mybatis-plus`(`-inbox-jpa` 待做) | infrastructure | JDBC / MyBatis-Plus | 幂等/inbox,消费方去重;`Inbox` 契约在 `-application` |
+| `aipersimmon-ddd-outbox-mybatis-plus` | infrastructure | `-outbox` + MyBatis-Plus | outbox 表 writer + relay/poller。**当前唯一的存储后端**(早期还有一个 `-outbox-jdbc` 平行实现,已删除) |
+| `aipersimmon-ddd-inbox-mybatis-plus` | infrastructure | MyBatis-Plus | 幂等/inbox,消费方去重;`Inbox` 契约在 `-application`。**当前唯一的存储后端**(早期的 `-inbox-jdbc` 已删除) |
 | `aipersimmon-ddd-messaging-kafka` / `aipersimmon-ddd-messaging-rabbit` | infrastructure | Kafka / Rabbit | 集成事件传输;**随拓扑选**(见§七) |
 
 ### 校验与治理

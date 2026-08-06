@@ -11,9 +11,8 @@ import java.util.Optional;
 
 /**
  * Reads the {@code aipersimmon_dead_letter} table for an operator, via MyBatis-Plus. Mirrors the
- * JDBC starter's reader so the two backends page and order identically: newest failure first, keyed
- * on the table's identity column (see {@code JdbcDeadLetters} for why that column and not {@code
- * failed_at}).
+ * dead-letter reading contract: newest failure first, keyed on the table's identity column (see
+ * {@code JdbcDeadLetters} for why that column and not {@code failed_at}).
  */
 public class MybatisDeadLetters implements DeadLetters {
 

@@ -88,7 +88,7 @@ sequenceDiagram
 | 模块 | 内容 |
 |---|---|
 | `aipersimmon-ddd-persistence-mybatis-plus` | `MybatisPlusAggregateRepository` + `VersionedRow` + 乐观锁 `InnerInterceptor` 贡献 |
-| `aipersimmon-ddd-persistence-jdbc` | `JdbcAggregateRepository` |
+| `aipersimmon-ddd-persistence-jdbc`（后已删除） | `JdbcAggregateRepository` |
 | `aipersimmon-ddd-mybatis-plus` | **实施中新增**：持有唯一 `MybatisPlusInterceptor` 并组合所有 `InnerInterceptor` 贡献（见 §3） |
 
 前两者依赖 `-core`（`AbstractAggregateRoot`）+ `-application`（`DomainEvents`）。

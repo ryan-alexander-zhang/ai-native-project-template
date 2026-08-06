@@ -9,8 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Bound, storage-agnostic outbox relay configuration ({@code aipersimmon.ddd.outbox.*}), replacing
  * the scattered {@code @Value} injections that carried no validation. Registered via
  * {@code @EnableConfigurationProperties} by {@link AipersimmonDddOutboxAutoConfiguration}, and
- * consumed by the storage starters ({@code -outbox-jdbc}, {@code -outbox-mybatis-plus}) when they
- * build the relay and cleanup beans.
+ * consumed by the storage starter ({@code -outbox-mybatis-plus}) when it build the relay and
+ * cleanup beans.
  *
  * <p>Validation is explicit and dependency-free (no {@code jakarta.validation}): {@link
  * #afterPropertiesSet()} rejects values that would silently misbehave rather than fail — a

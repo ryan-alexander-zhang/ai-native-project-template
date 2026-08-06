@@ -7,6 +7,12 @@ implements: [design-00005-observability-and-distributed-tracing]
 
 # 可观测性闭环落地计划
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 把 [[design-00005-observability-and-distributed-tracing]] 落成代码：为 `aipersimmon-ddd` 脚手架建立
 Trace / Log / Metric 全链路闭环——同步链路骑 OTEL ambient、两处异步跳（outbox relay、PM relay/deadline）
 capture/restore 缝合、领域主干（命令/查询/领域事件/入站 ACL/推进）由脚手架自带 span、并打通三柱互通。

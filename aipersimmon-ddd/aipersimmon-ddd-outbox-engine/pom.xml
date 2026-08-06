@@ -15,7 +15,7 @@
     The storage-agnostic engine of the transactional outbox: the writer, the relay (ordering,
     classification, backoff, dead-lettering), the scheduled lease-guarded trigger, the retention
     cleanup, and the shared Spring wiring — everything that is NOT tied to a particular database. It
-    runs against one store port (OutboxStore); a storage backend (aipersimmon-ddd-outbox-jdbc,
+    runs against one store port (OutboxStore); a storage backend
     aipersimmon-ddd-outbox-mybatis-plus) supplies the adapter.
 
     Why it exists: the relay is the most concurrency-sensitive code in the framework — per-aggregate

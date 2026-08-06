@@ -17,9 +17,13 @@ import com.aipersimmon.ddd.outbox.RetryBackoff;
 import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.outbox.engine.relay.RelayLeases;
 import com.aipersimmon.ddd.outbox.engine.write.OutboxWriter;
-import com.aipersimmon.ddd.outbox.jdbc.JdbcDeadLetterStore;
-import com.aipersimmon.ddd.outbox.jdbc.JdbcOutboxStore;
+import com.aipersimmon.ddd.outbox.mybatisplus.DeadLetterMapper;
+import com.aipersimmon.ddd.outbox.mybatisplus.MybatisDeadLetterStore;
+import com.aipersimmon.ddd.outbox.mybatisplus.MybatisOutboxStore;
+import com.aipersimmon.ddd.outbox.mybatisplus.OutboxMapper;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
@@ -36,9 +40,12 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import javax.sql.DataSource;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -53,9 +60,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * ambient context or producer auto-instrumentation can do across the table and the scheduler-thread
  * boundary.
  *
- * <p>Wired by hand against a real OTEL SDK + in-memory exporter so the assertion is on
- * actually-emitted spans and links; the individual capture/restore/interceptor behaviours are
- * unit-tested elsewhere, this pins their composition.
+ * <p>Wired by hand against a real OTEL SDK + in-memory exporter (and the MyBatis-Plus outbox
+ * backend over an embedded H2) so the assertion is on actually-emitted spans and links; the
+ * individual capture/restore/interceptor behaviours are unit-tested elsewhere, this pins their
+ * composition.
  */
 class ConnectedTraceEndToEndTest {
 
@@ -82,7 +90,9 @@ class ConnectedTraceEndToEndTest {
             .addScript(
                 "classpath:aipersimmon/db/migration/outbox/h2/V5__destination_on_the_row.sql")
             .build();
-    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    SqlSessionTemplate session = session(dataSource);
+    OutboxMapper outboxMapper = session.getMapper(OutboxMapper.class);
+    DeadLetterMapper deadLetterMapper = session.getMapper(DeadLetterMapper.class);
     commandTransaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
 
     exporter = InMemorySpanExporter.create();
@@ -101,7 +111,7 @@ class ConnectedTraceEndToEndTest {
         new OpenTelemetryStoreAndForwardTracer(
             otelTracer, sdk.getPropagators().getTextMapPropagator());
 
-    JdbcOutboxStore store = new JdbcOutboxStore(jdbc);
+    MybatisOutboxStore store = new MybatisOutboxStore(outboxMapper);
     writer =
         new OutboxWriter(
             store,
@@ -116,8 +126,11 @@ class ConnectedTraceEndToEndTest {
         new OutboxRelay(
             store,
             dispatcher,
-            new JdbcDeadLetterStore(
-                jdbc, new TransactionTemplate(new DataSourceTransactionManager(dataSource)), CLOCK),
+            new MybatisDeadLetterStore(
+                outboxMapper,
+                deadLetterMapper,
+                new TransactionTemplate(new DataSourceTransactionManager(dataSource)),
+                CLOCK),
             new DefaultFailureClassifier(),
             new RetryBackoff(1000, 60000),
             CLOCK,
@@ -161,6 +174,23 @@ class ConnectedTraceEndToEndTest {
         command.getSpanContext().getTraceId(),
         publish.getSpanContext().getTraceId(),
         "the dispatch is a new trace linked to (not a child of) the command — correct for a delayed relay");
+  }
+
+  /**
+   * The outbox mappers, wired by hand over the embedded database. A {@code
+   * SpringManagedTransactionFactory} is what makes the writer join the command transaction opened
+   * below — a store on its own session would commit the row independently, which is the very thing
+   * the outbox exists to prevent.
+   */
+  private static SqlSessionTemplate session(DataSource dataSource) {
+    MybatisConfiguration configuration = new MybatisConfiguration();
+    configuration.setMapUnderscoreToCamelCase(true);
+    configuration.setEnvironment(
+        new Environment("otel-test", new SpringManagedTransactionFactory(), dataSource));
+    configuration.addMapper(OutboxMapper.class);
+    configuration.addMapper(DeadLetterMapper.class);
+    SqlSessionFactory factory = new MybatisSqlSessionFactoryBuilder().build(configuration);
+    return new SqlSessionTemplate(factory);
   }
 
   private SpanData span(String name) {

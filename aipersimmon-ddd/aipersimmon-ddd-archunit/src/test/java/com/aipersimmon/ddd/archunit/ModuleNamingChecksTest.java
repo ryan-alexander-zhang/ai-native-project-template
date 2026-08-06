@@ -105,8 +105,11 @@ class ModuleNamingChecksTest {
   void thePluggableSuffixesAreExempt(@TempDir Path root) throws IOException {
     String spring = dependency("org.springframework.boot", "spring-boot-autoconfigure", null);
     for (String artifactId :
+        // -jdbc is still an exempt suffix even though this library now ships only MyBatis-Plus
+        // backends: the rule is applied by consumers to their own modules too, and a project that
+        // maps its own SQL names its adapter that way. Hence a hypothetical artifactId here.
         List.of(
-            "aipersimmon-ddd-inbox-jdbc",
+            "aipersimmon-ddd-example-jdbc",
             "aipersimmon-ddd-outbox-mybatis-plus",
             "aipersimmon-ddd-web-store-redis",
             "aipersimmon-ddd-messaging-kafka",

@@ -4,7 +4,7 @@
 
 DDD building blocks for services that have to stay correct under concurrency and at-least-once
 delivery. The tactical model (`core`, `cqrs`, `integration`, …) is framework-free; Spring,
-MyBatis-Plus, JDBC, Kafka and Redis live in separate pluggable modules you add only if you use them.
+MyBatis-Plus, Kafka and Redis live in separate pluggable modules you add only if you use them.
 
 **Three guides, in the order you need them**
 
@@ -74,8 +74,8 @@ aggregate repositories, a transactional outbox, a consumer inbox, the durable pr
 operation log, multi-tenancy and the schema applier — in one dependency. Nothing is *enabled* merely
 by being present; see [CONFIGURATION.md](CONFIGURATION.md).
 
-Prefer plain `JdbcTemplate`? Use `aipersimmon-ddd-starter-jdbc`. Want to pick modules one at a time?
-That is fully supported — see [CHOOSING-MODULES.md](CHOOSING-MODULES.md).
+Want to pick modules one at a time? That is fully supported — see
+[CHOOSING-MODULES.md](CHOOSING-MODULES.md).
 
 ### 2. An aggregate
 
@@ -227,7 +227,7 @@ Listing nothing creates nothing.
 | You add | You get | It costs |
 | --- | --- | --- |
 | `-starter` | command/query buses, in-process events, UUIDv7 ids, RFC 9457 errors | nothing to operate |
-| `-starter-mybatis-plus` / `-starter-jdbc` | the above, plus versioned repositories, outbox, inbox, process manager, operation log, tenancy, Flyway | tables, and background pollers once configured |
+| `-starter-mybatis-plus` | the above, plus versioned repositories, outbox, inbox, process manager, operation log, tenancy, Flyway | tables, and background pollers once configured |
 | `-starter-messaging-kafka` | `@Externalized` events cross a broker, exactly-once in effect | a broker, a topic, and the inbox |
 
 Cross-service messaging is built **on** the outbox, not instead of it: a storage bundle is a

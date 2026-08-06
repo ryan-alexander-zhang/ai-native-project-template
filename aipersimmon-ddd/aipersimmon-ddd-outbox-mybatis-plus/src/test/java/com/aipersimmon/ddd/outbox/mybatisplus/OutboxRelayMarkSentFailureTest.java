@@ -24,13 +24,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The MyBatis-Plus backend's counterpart to the JDBC starter's mark-sent-failure test: a dispatch
- * that reached the broker but whose {@code sent=TRUE} update then failed must not be dead-lettered
- * or counted against the retry budget — it is re-dispatched (an accepted at-least-once duplicate),
- * which the consumer's inbox dedups. The mapper issues the mark-sent through the SqlSessionFactory
- * (not the JdbcTemplate), so the failure is forced with an H2 trigger that rejects the update which
- * sets {@code sent = TRUE} — and only that one, so the relay's claim on the row and the release
- * that follows still work.
+ * The mark-sent-failure contract: a dispatch that reached the broker but whose {@code sent=TRUE}
+ * update then failed must not be dead-lettered or counted against the retry budget — it is
+ * re-dispatched (an accepted at-least-once duplicate), which the consumer's inbox dedups. The
+ * mapper issues the mark-sent through the SqlSessionFactory (not the JdbcTemplate), so the failure
+ * is forced with an H2 trigger that rejects the update which sets {@code sent = TRUE} — and only
+ * that one, so the relay's claim on the row and the release that follows still work.
  *
  * <p>{@code max-attempts=1} makes the sharp edge explicit: before the fix a single mark-sent
  * failure exhausts the budget and dead-letters a message that was already delivered.

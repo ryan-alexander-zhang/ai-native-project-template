@@ -69,7 +69,7 @@ keys per operation.
 
 | | Why |
 | --- | --- |
-| `-web-store-jdbc` | Redis needs no DDL, no Flyway component and no cleanup tuning. The JDBC store is a fine choice for a service that already owns a database — the companion document compares them. |
+| `-web-store-mybatis-plus` | Redis needs no DDL, no Flyway component and no cleanup tuning. The relational store is a fine choice for a service that already owns a database — the companion document compares them. |
 | Handling the callback properly | Translating it, making its effect idempotent, reconciling when it never arrives: S7. |
 | Naturally idempotent commands | Making the *domain* tolerate repetition, rather than the edge: S8. |
 | Tenant-scoped keys | All three stores prefix by tenant already; showing it needs a second tenant, which is S13. |

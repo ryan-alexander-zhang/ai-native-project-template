@@ -7,6 +7,12 @@ blocks: [issue-00003-messaging-delivery-reliability]
 
 # H3 代码成立,但 AC-5 验收结论言过其实(且暴露 DLT 目的地潜伏缺陷)
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 [[issue-00003-messaging-delivery-reliability]] 的 Kafka 错误处理/退避/DLT recoverer 装配正确,但其 **AC-5** 明确要求
 "以 Testcontainers(Postgres + Kafka)验证",而 H3 实际只用 H2 + mock recoverer(不接触 broker),却在落地进度里声称
 "AC-1..AC-5 达成"。这是 over-claim:没有真实 broker 端到端,就不能宣称 AC-3/AC-5 已验证。

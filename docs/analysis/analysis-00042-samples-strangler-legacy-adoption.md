@@ -28,7 +28,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 **一条库的 issue**：[[issue-00171-the-write-path-against-a-schema-the-library-did-not-design]]（P2，两处
 行为都正确但异常信息指向错的原因，而这两处恰好是遗留表必然踩的两处）。
 
-**与清单建议组件的一处偏离，是刻意的**：清单建议用 `-persistence-jdbc` / `-outbox-jdbc`，理由是"更贴近遗留 SQL"。
+**与清单建议组件的一处偏离，是刻意的**：清单建议用当时的 `-persistence-jdbc` / `-outbox-jdbc`（两者后来都删了，库只留 MyBatis-Plus 后端），理由是"更贴近遗留 SQL"。
 本篇的遗留侧**一个框架模块都不用**——纯 `JdbcTemplate` 加手写 SQL，比 JDBC 变体更贴近；新上下文按本系列的既定
 约束用 MyBatis-Plus。实测下来有意思的摩擦都在写入路径与 schema 上，与 SQL 方言无关。
 

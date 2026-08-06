@@ -17,7 +17,7 @@
     observability — everything that is NOT tied to a particular database. It runs against four store
     ports (ProcessInstanceStore / ProcessTransitionStore / ProcessEffectStore / ProcessDeadlineStore),
     one ProcessClaimStrategy, and a ProcessUnitOfWork; a storage backend
-    (aipersimmon-ddd-process-manager-jdbc, aipersimmon-ddd-process-manager-mybatis-plus) supplies the
+    (aipersimmon-ddd-process-manager-mybatis-plus) supplies the
     adapters. Because the engine lives here once, both backends run identical logic — only the SQL
     access differs.
 

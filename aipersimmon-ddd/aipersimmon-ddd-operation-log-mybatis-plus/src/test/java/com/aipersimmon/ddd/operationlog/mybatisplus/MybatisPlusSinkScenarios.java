@@ -65,7 +65,7 @@ final class MybatisPlusSinkScenarios {
     assertEquals(3, count(jdbc));
   }
 
-  private static OperationLogMapper mapper(DataSource dataSource) {
+  static OperationLogMapper mapper(DataSource dataSource) {
     MybatisConfiguration configuration = new MybatisConfiguration();
     configuration.setMapUnderscoreToCamelCase(true);
     configuration.setEnvironment(

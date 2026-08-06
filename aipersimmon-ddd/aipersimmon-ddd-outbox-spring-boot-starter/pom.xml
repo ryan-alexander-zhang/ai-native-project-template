@@ -18,7 +18,7 @@
     scanner that builds the integration-event type registry from the bean factory.
 
     It exists so aipersimmon-ddd-outbox can stay Spring-free. That module is a CONTRACT module —
-    -outbox-jdbc, -outbox-mybatis-plus and -messaging-kafka all depend on it for OutboxMessage and
+    -outbox-mybatis-plus and -messaging-kafka both depend on it for OutboxMessage and
     OutboxDispatcher — and a contract module is exactly the kind a domain layer may depend on, so it
     must not drag a framework in.
   -->

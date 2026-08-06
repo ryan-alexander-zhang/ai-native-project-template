@@ -7,6 +7,12 @@ parent: plan-00007-aggregate-persistence-mybatis-plus
 
 # 多模块脚手架 DDD 组件集成验证报告
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 对 `aipersimmon-ddd-scaffold/multi-module` 样例进行启动 + 端到端测试，验证集成的 aipersimmon-ddd
 组件（Web、可观测性、事件、CQRS、Flyway、流程管理器、ArchUnit）是否生效且按预期工作。
 

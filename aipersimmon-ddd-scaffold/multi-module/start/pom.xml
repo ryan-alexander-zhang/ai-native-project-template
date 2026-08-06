@@ -99,14 +99,13 @@
       instance exists; allow-in-memory-stores=false turns that fallback into a startup failure
       rather than a silent weakening.
 
-      Note the suffix: -web-store-jdbc, in an application whose other tables are MyBatis-Plus. The
-      framework's edge stores speak plain JdbcTemplate on the same DataSource, and there is no
-      -mybatis-plus variant, so a MyBatis-Plus application still declares this one. It shares the
-      transaction and the connection pool, so nothing else changes.
+      It rides the application's own SqlSessionFactory and DataSource, registering only its own
+      mappers, so it shares the transaction and the connection pool and nothing else changes. The
+      DDL ships with aipersimmon-ddd-web and is applied by the Flyway component named 'web-store'.
     -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-web-store-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-web-store-mybatis-plus</artifactId>
     </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

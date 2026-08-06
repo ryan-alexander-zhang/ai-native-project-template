@@ -35,9 +35,9 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 
 | 模块 | 适配器代码 | AutoConfiguration.imports |
 | --- | --- | --- |
-| `-inbox-jdbc` | `JdbcInbox` | ✓ |
+| `-inbox-jdbc`（后已删除） | `JdbcInbox` | ✓ |
 | `-outbox-mybatis-plus` | writer / relay | ✓ |
-| `-process-manager-jdbc` | 四个 store | ✓ |
+| `-process-manager-jdbc`（后已删除） | 四个 store | ✓ |
 | `-web-store-redis` | 三个 store | ✓ |
 | `-messaging-kafka` | dispatcher + listener | ✓ |
 | （其余 8 个后端模块同理） | | ✓ |
@@ -55,14 +55,14 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 
 > **一个领域层可以依赖的模块，必须零 Spring。**
 
-后端适配器不在这个集合里——领域层从不依赖 `-inbox-jdbc`，基础设施层才依赖。它们正是根 pom 说的
+后端适配器不在这个集合里——领域层从不依赖 `-inbox-mybatis-plus`，基础设施层才依赖。它们正是根 pom 说的
 "pluggable modules"，携带 Spring 是**被豁免的、正确的**。真正违规的是**契约模块携带 Spring**，因为契约模块
 恰恰是领域层要依赖的东西。
 
 按这个标准重测，42 个模块里真正的违规者只有一个：
 
 - **`aipersimmon-ddd-outbox`** —— 它同时是 `OutboxMessage` / `OutboxDispatcher` / `FailureClassifier` 的契约家园
-  （`-outbox-jdbc`、`-outbox-mybatis-plus`、`-messaging-kafka` 都依赖它）**和** Spring 装配的家园
+  （`-outbox-mybatis-plus`、`-messaging-kafka` 都依赖它）**和** Spring 装配的家园
   （`AipersimmonDddOutboxAutoConfiguration`、`OutboxProperties`、`InProcessOutboxDispatcher`）。
 
 报告点名的另外三个（`-id`、`-operation-log-engine`、`-process-manager-engine`）**不是**这类违规：
@@ -115,7 +115,7 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 
 **不做 —— 并说明理由**
 
-- `-persistence-jdbc` / `-persistence-mybatis-plus`：已符合 `<domain>-<backend>`。它们携带 Spring 是被豁免的。
+- `-persistence-jdbc` / `-persistence-mybatis-plus`：已符合 `<domain>-<backend>`。它们携带 Spring 是被豁免的。（前者后已删除。）
 - 13 个后端适配器一律不拆 starter：见第一节，那是与 P1-1 相反的方向。
 - 两个 `-engine`：`-engine` 是第四种后缀，但它表达的东西（存储无关运行时）真实存在且没有更好的词；
   改成 `-spring-boot-starter` 是错的（它们含大量实现代码），改成 `-<backend>` 也是错的（它们与后端无关）。
@@ -146,7 +146,7 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 | --- | --- |
 | `aipersimmon-ddd-starter` | 默认装配：cqrs + events + id + web |
 | `aipersimmon-ddd-starter-mybatis-plus` | 上者 + 全部 MyBatis-Plus 后端 + tenancy + flyway |
-| `aipersimmon-ddd-starter-jdbc` | 上者 + 全部 JDBC 后端 + tenancy 传播 + flyway |
+| `aipersimmon-ddd-starter-jdbc`（后已删除） | 上者 + 全部 JDBC 后端 + tenancy 传播 + flyway |
 | `aipersimmon-ddd-starter-messaging-kafka` | Kafka 传输（建立在存储捆绑包之上，非替代） |
 
 为什么中缀而不是后缀：

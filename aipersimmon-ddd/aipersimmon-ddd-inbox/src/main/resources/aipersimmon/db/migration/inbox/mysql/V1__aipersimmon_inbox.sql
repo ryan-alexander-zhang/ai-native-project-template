@@ -1,5 +1,5 @@
 -- Flyway migration (MySQL 8+) for the aipersimmon-ddd inbox table. Single source of the inbox
--- schema, shared by the -inbox-jdbc and -inbox-mybatis-plus adapters. DATETIME(3) for millisecond
+-- schema, used by the -inbox-mybatis-plus adapter. DATETIME(3) for millisecond
 -- precision; inline KEY (MySQL does not support CREATE INDEX IF NOT EXISTS). The primary key
 -- (consumer, source, message_key) scopes idempotency dedup to one consuming application and,
 -- within it, to one producer: message_key (ce_id) is unique only within its source, so source

@@ -56,7 +56,7 @@ flowchart TD
   end
   subgraph webstore["可换存储后端"]
     redis["aipersimmon-ddd-web-store-redis"]
-    jdbc["aipersimmon-ddd-web-store-jdbc"]
+    jdbc["aipersimmon-ddd-web-store-mybatis-plus"]
   end
 
   web --> core
@@ -230,7 +230,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
   `@ConditionalOnProperty(...enabled=true)` 守卫;**默认内存 SPI 实现**(`InMemoryIdempotencyStore` 等)用
   `@ConditionalOnMissingBean` 兜底——存储后端在 classpath 时被顶替。
 
-## 六、存储后端 `-web-store-redis` / `-web-store-jdbc`(→ `-web` + Redis/JDBC)
+## 六、存储后端 `-web-store-redis` / `-web-store-mybatis-plus`(→ `-web` + Redis/MyBatis-Plus;后者当时叫 `-web-store-jdbc`)
 
 同 §二约束 2/3,提供三个 SPI 的实现,**同 SPI 可互换**;消费者按需引恰好一个(多实例生产必须引)。
 
@@ -321,7 +321,7 @@ Content-Type: application/problem+json
 1. `-web`(纯契约 + SPI + 值对象);单测:`ApiError`/`Page`/`Cursor` 构造校验、`ProblemDescriptor` + `ProblemCatalog` override 样例。
 2. `-web-spring` 核心(advice + traceId + 分页 + i18n);切片测试 `@WebMvcTest`:异常→problem+json、扩展成员、traceId 回显。
 3. `-web-spring` opt-in 三能力(幂等/防重放/限流)+ 内存默认实现;filter 级测试 + 开关矩阵。
-4. `-web-store-redis` / `-web-store-jdbc`;各自 SPI 契约测试(Testcontainers Redis / H2),验证与内存实现同语义 + 装配顶替。
+4. `-web-store-redis` / `-web-store-mybatis-plus`;各自 SPI 契约测试(Testcontainers Redis / H2),验证与内存实现同语义 + 装配顶替。
 5. `-bom` 追加 4 个坐标;`-archunit`(可选)加一条"controller/adapter 不得依赖 domain 内部"规则。
 
 **测试不依赖实时外部件**:Redis 用 Testcontainers,JDBC 用 H2,limiter 用固定时钟注入。

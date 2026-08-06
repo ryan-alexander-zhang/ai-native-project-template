@@ -186,7 +186,7 @@ public class AipersimmonDddProcessManagerMybatisPlusAutoConfiguration {
   }
 
   private static String probe(DataSource dataSource) {
-    // Shared with the JDBC backend so the two can never answer differently — and deliberately
+    // Owned by the engine rather than restated here — and deliberately
     // does not recognise MariaDB; see ProcessVendors for why.
     return ProcessVendors.probe(dataSource, "aipersimmon.ddd.process-manager.dialect");
   }

@@ -100,7 +100,7 @@
          end-to-end connected trace (command span -> captured row -> restored linked span). -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

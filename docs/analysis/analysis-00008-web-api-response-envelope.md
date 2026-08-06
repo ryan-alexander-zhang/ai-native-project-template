@@ -329,14 +329,14 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 严格承接 [[analysis-00006-ddd-building-blocks-library]] 的铁律——**HTTP 是 interface 层关注点,
 绝不能污染 framework-free 的 domain**。§六~§六C 的横切能力里,**错误映射、traceId、分页、幂等、防重放、
 限流**纳入本期,每项 **opt-in**;需要状态者(幂等 key / nonce / 限流计数)共用一套 SPI + 可换存储——
-与 outbox `-outbox`+`-outbox-jdbc`/`-mybatis-plus` 完全同构。**CORS 用 Spring 原生 / 网关,不进构件;
+与 outbox `-outbox`+`-outbox-mybatis-plus` 完全同构。**CORS 用 Spring 原生 / 网关,不进构件;
 401/403→Problem Details 列为未来项**(理由见下与 [[decision-00007-web-api-response-envelope]] §六)。拆成三档:
 
 | 模块(建议名) | 层 / 性质 | 依赖 | 内容 |
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-web`(纯契约) | interface 契约,**framework-free** | `-core`(极薄) | `ProblemDescriptor`/`ProblemRegistry`(错误码→传输映射);`Page<T>`/`Slice<T>`/`Cursor` 值对象;`ApiError` 语义模型(对齐 9457,不绑 Spring);**横切 SPI**:`IdempotencyStore`/`ReplayGuard`/`RateLimiter`/`RequestSignatureVerifier` |
 | `aipersimmon-ddd-web-spring`(脏 starter) | interface 实现 | `-web` + Spring Web | `@RestControllerAdvice` 异常→`ProblemDetail`(含 429);`traceId` filter;分页序列化;i18n;各能力 filter + **开关** + 默认内存 SPI 实现 |
-| `aipersimmon-ddd-web-store-redis` / `-web-store-jdbc`(可换后端) | infrastructure | `-web` + Redis / JDBC | 幂等/nonce/限流计数的 Redis(TTL、原子 INCR、令牌桶) 或 JDBC 实现;同 SPI 可互换 |
+| `aipersimmon-ddd-web-store-redis` / `-web-store-mybatis-plus`(可换后端) | infrastructure | `-web` + Redis / MyBatis-Plus | 幂等/nonce/限流计数的 Redis(TTL、原子 INCR、令牌桶) 或关系库实现;同 SPI 可互换。关系库那个当时叫 `-web-store-jdbc` |
 
 - **与既有 starter 对称**:正如 `-cqrs`+`-cqrs-spring`、outbox 的"契约 + 可换存储",
   `-web` 纯 + `-web-spring` 脏 + `-web-store-*` 可换,不破坏 [[analysis-00006-ddd-building-blocks-library]] 的纯净性硬约束。

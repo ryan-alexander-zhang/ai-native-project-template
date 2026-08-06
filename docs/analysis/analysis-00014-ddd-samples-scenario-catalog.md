@@ -26,9 +26,9 @@ status: draft
   什么配置项、什么启动校验，示例就按它实际的样子演示。
 - **数据访问一律用 MyBatis-Plus 系组件，不用 JDBC 系**：`-persistence-mybatis-plus`、
   `-outbox-mybatis-plus`、`-inbox-mybatis-plus`、`-process-manager-mybatis-plus`、
-  `-operation-log-mybatis-plus`、`-tenancy-mybatis-plus`。`-persistence-jdbc` 一类模块不出现在
+  `-operation-log-mybatis-plus`、`-tenancy-mybatis-plus`。当时并存的 `-persistence-jdbc` 一类模块（后已删除）不出现在
   任何 sample 里，也不作对照。**唯一的例外是 web 边界存储**：库只提供
-  `aipersimmon-ddd-web-store-jdbc` 与 `-web-store-redis` 两种实现，**没有 mybatis-plus 变体**，
+  `aipersimmon-ddd-web-store-jdbc` 与 `-web-store-redis` 两种实现，**当时没有 mybatis-plus 变体**（后来 JDBC 版本被 `-web-store-mybatis-plus` 取代），
   所以 S2/S7/S22 用到幂等/限流/防重放存储时只能在这两者之间选（它们存的是框架自己的边界表，
   不是业务聚合）。
 
@@ -140,7 +140,7 @@ sample 内演示，不单独建目录。
 **预计涉及的组件**：`aipersimmon-ddd-web`（`IdempotencyStore` / `ReplayGuard` /
 `RequestSignatureVerifier` / `RateLimiter` / `IdempotencyPrincipalResolver` SPI）、
 `aipersimmon-ddd-web-store-redis`（sample 选它：无 DDL、无 Flyway 组件、无清理线程；
-`-web-store-jdbc` 作为有库服务的替代在文档里对比）、`aipersimmon-ddd-web-spring-boot-starter`。
+关系库版本作为有库服务的替代在文档里对比）、`aipersimmon-ddd-web-spring-boot-starter`。
 **注意 `RequestSignatureVerifier` 库里没有任何实现，必须自己写**，否则防重放静默失效。
 
 **文档**：[[analysis-00017-samples-http-idempotency]]（已完成）。
@@ -288,7 +288,7 @@ precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最�
 - 三方沙箱不可用时 sample 如何自包含（本地 stub 服务）。
 
 **预计涉及的组件**：`aipersimmon-ddd-application`、`aipersimmon-ddd-outbox`（出站任务化）、
-`aipersimmon-ddd-web` + `aipersimmon-ddd-web-store-jdbc`（回调幂等/验签/防重放）、
+`aipersimmon-ddd-web` + 关系库边界存储（当时 `-web-store-jdbc`，现 `-web-store-mybatis-plus`）（回调幂等/验签/防重放）、
 `aipersimmon-ddd-process-manager`（悬挂态推进，视深度）。
 
 **文档**：[[analysis-00031-samples-third-party-integration]]（已完成，两个模块：我们的支付服务 + 一个不受控的
@@ -735,7 +735,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 
 **预计涉及的组件**：`aipersimmon-ddd-outbox`（`DeadLetters` / `DeadLetterStore`）、
 `aipersimmon-ddd-outbox-spring-boot-starter`、`aipersimmon-ddd-inbox-mybatis-plus`、
-`aipersimmon-ddd-flyway-spring-boot-starter`、`aipersimmon-ddd-web-store-jdbc`（清理调度）。
+`aipersimmon-ddd-flyway-spring-boot-starter`、关系库边界存储（清理调度）。
 
 **文档**：[[analysis-00035-samples-operability-deadletters-retention]]（sample：
 `aipersimmon-ddd-samples/s22-operability-deadletters-retention`，两个服务，42 个用例）。上面七问全部
@@ -856,13 +856,13 @@ UUIDv7 主键、租户判别列、框架表。遗留表是自增主键、没有�
 不打架，outbox 能不能用来把事实喂给新上下文；遗留代码如何被 ACL 包住而不是被到处直接调用；
 迁移完成的判据是什么、旧路径何时删除。
 
-**预计涉及的组件**：`aipersimmon-ddd-persistence-jdbc`（更贴近遗留 SQL）、
-`aipersimmon-ddd-outbox-jdbc`、`aipersimmon-ddd-core`、`aipersimmon-ddd-application`。
+**预计涉及的组件**：`aipersimmon-ddd-persistence-jdbc`（更贴近遗留 SQL；该模块后已删除）、
+`aipersimmon-ddd-outbox-jdbc`（后已删除，改用 `-outbox-mybatis-plus`）、`aipersimmon-ddd-core`、`aipersimmon-ddd-application`。
 
 **文档**：[[analysis-00042-samples-strangler-legacy-adoption]]（sample：`s25-strangler-legacy-adoption`，
 一个单体 + 一个切出来的聚合，48 个用例）。**本条是本清单的最后一个场景。**
 
-**与本条建议组件的一处刻意偏离**：本条建议 `-persistence-jdbc` / `-outbox-jdbc`，理由是"更贴近遗留 SQL"。
+**与本条建议组件的一处刻意偏离**：本条建议当时的 `-persistence-jdbc` / `-outbox-jdbc`，理由是"更贴近遗留 SQL"。
 sample 的遗留侧**一个框架模块都不用**（纯 `JdbcTemplate` + 手写 SQL，比 JDBC 变体更贴近），新上下文按本系列约束
 用 MyBatis-Plus。实测下来有意思的摩擦都在**写入路径与 schema** 上，与 SQL 方言无关。
 

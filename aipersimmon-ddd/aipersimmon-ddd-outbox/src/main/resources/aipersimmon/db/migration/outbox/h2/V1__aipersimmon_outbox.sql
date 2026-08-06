@@ -1,5 +1,5 @@
 -- Flyway migration (H2) for the aipersimmon-ddd outbox tables. Single source of the outbox
--- schema, shared by the -outbox-jdbc and -outbox-mybatis-plus adapters (identical structure).
+-- schema, used by the -outbox-mybatis-plus adapter (identical structure).
 -- Applied automatically by the optional aipersimmon-ddd-flyway-spring-boot-starter starter (dedicated history
 -- table flyway_schema_history_aipersimmon_outbox), or copy into your own Flyway/Liquibase.
 CREATE TABLE IF NOT EXISTS aipersimmon_outbox (

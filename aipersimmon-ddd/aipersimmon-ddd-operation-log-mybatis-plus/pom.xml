@@ -13,7 +13,7 @@
 
   <!--
     MyBatis-Plus storage backend for the Operation Log component: an OperationLogSink over a
-    BaseMapper, behaviorally equivalent to the JDBC backend (dialect-native duplicate convergence:
+    BaseMapper, with dialect-native duplicate convergence:
     ON CONFLICT DO NOTHING on PostgreSQL, caught duplicate on H2/MySQL). An alternative to the JDBC
     backend, not additive — include exactly one. Carries no DDL.
   -->

@@ -11,7 +11,7 @@
  * com.aipersimmon.ddd.processmanager.engine.autoconfigure.ProcessManagerStartupValidator}), and
  * exposes optional Micrometer/Actuator observability. Every bean is overridable; no business
  * package is scanned and no DDL is executed. A storage backend
- * (aipersimmon-ddd-process-manager-jdbc, aipersimmon-ddd-process-manager-mybatis-plus) supplies the
- * store adapters and is ordered before this class.
+ * (aipersimmon-ddd-process-manager-mybatis-plus) supplies the store adapters and is ordered before
+ * this class.
  */
 package com.aipersimmon.ddd.processmanager.engine.autoconfigure;

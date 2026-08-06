@@ -119,11 +119,11 @@ bodies of identical length and type against the same endpoint are not.
 | `rate-limit.key-header` | `X-Api-Key` | The header used when `key=header`. |
 | `rate-limit.headers` | `ietf` | Which `RateLimit-*` response headers to emit. |
 
-> Enabling any of the three without a `-web-store-jdbc` / `-web-store-redis` module (or your own store
+> Enabling any of the three without a `-web-store-mybatis-plus` / `-web-store-redis` module (or your own store
 > bean) means an in-memory store: state per JVM, so a second instance stops honouring the protection.
 > Startup WARNs, naming what breaks. `allow-in-memory-stores=false` turns that into a failure.
 
-### Web-store cleanup (`-web-store-jdbc` only; on by default)
+### Web-store cleanup (`-web-store-mybatis-plus` only; on by default)
 
 The three tables each delete expired rows only for the key in front of them, and only when that key
 is presented again — which for an idempotency key or a nonce is nearly never. This sweep is what
@@ -139,7 +139,7 @@ removes the rest. The Redis store expires keys itself and has no equivalent.
 > rows are business records and how long to keep them is your decision, whereas `expires_at` here is
 > the store's own statement that the row is dead.
 
-### Web-store schema validation (`-web-store-jdbc` only; on by default)
+### Web-store schema validation (`-web-store-mybatis-plus` only; on by default)
 
 | Property | Default | Effect |
 | --- | --- | --- |
@@ -219,9 +219,9 @@ is the correct choice.
 | `baseline-on-migrate` / `baseline-version` | `true` / `0` | Lets the framework's migrations start cleanly on a database that already has your tables. |
 | `history-table-prefix` | `flyway_schema_history_aipersimmon_` | Each component gets its own history table, so framework migrations never interleave with yours. |
 
-**Bundling is not enabling.** A bundle starter (`aipersimmon-ddd-starter-jdbc`,
-`-starter-mybatis-plus`) puts five components' migrations on the classpath at once, and being on the
-classpath does not make the framework write DDL into your database — you name what you want:
+**Bundling is not enabling.** The `aipersimmon-ddd-starter-mybatis-plus` bundle puts five
+components' migrations on the classpath at once, and being on the classpath does not make the
+framework write DDL into your database — you name what you want:
 
 ```yaml
 aipersimmon:

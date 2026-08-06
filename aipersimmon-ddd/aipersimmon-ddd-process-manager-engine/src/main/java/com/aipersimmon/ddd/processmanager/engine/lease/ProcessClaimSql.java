@@ -11,8 +11,8 @@ package com.aipersimmon.ddd.processmanager.engine.lease;
  * One copy cannot drift from itself.
  *
  * <p>Written with MyBatis's {@code #{name}} placeholders so the mapper annotations can use these
- * constants directly (an annotation argument must be a compile-time constant); the JDBC backend
- * rewrites them to {@code ?} once, at class-init.
+ * constants directly (an annotation argument must be a compile-time constant); a backend rewrites
+ * them to {@code ?} once, at class-init.
  */
 public final class ProcessClaimSql {
 

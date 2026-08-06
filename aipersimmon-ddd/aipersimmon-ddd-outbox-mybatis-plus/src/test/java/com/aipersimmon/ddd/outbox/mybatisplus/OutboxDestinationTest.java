@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.outbox.mybatisplus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,8 +12,13 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.outbox.DeadLetterStore;
 import com.aipersimmon.ddd.outbox.EventDestinations;
 import com.aipersimmon.ddd.outbox.OutboxDispatcher;
+import com.aipersimmon.ddd.outbox.OutboxMessage;
+import com.aipersimmon.ddd.outbox.engine.relay.OutboxRelay;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import java.sql.Timestamp;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,14 +31,22 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The destination column on the MyBatis-Plus store. The relay's behaviour around it is the engine's
- * and is tested once, on the JDBC store; what is a second implementation here is moving the column
- * into and out of the two tables — including across a dead-letter replay, which copies a row back
- * into the outbox and would otherwise resurrect an externalized event as in-process.
+ * Where an event goes is decided when it is written and stored on the row, not re-decided from the
+ * annotations of whatever code is deployed when the relay reaches it.
+ *
+ * <p>The dispatcher here is deliberately one that admits it cannot reach an external target, which
+ * is the situation that used to lose events silently: a row destined for a broker fell through to
+ * in-process delivery and was marked sent — no exception, no dead letter, no consumer lag. These
+ * pin that it now fails, retries, and ends up visible.
  */
 @SpringBootTest(
     classes = OutboxDestinationTest.TestApp.class,
-    properties = "aipersimmon.ddd.outbox.relay.enabled=false")
+    properties = {
+      "aipersimmon.ddd.outbox.relay.enabled=false",
+      "aipersimmon.ddd.outbox.max-attempts=2",
+      "aipersimmon.ddd.outbox.retry.base-backoff-ms=0",
+      "aipersimmon.ddd.outbox.retry.max-backoff-ms=0"
+    })
 class OutboxDestinationTest {
 
   private static final String TOPIC = "ordering.events";
@@ -41,16 +55,31 @@ class OutboxDestinationTest {
   @EnableAutoConfiguration
   static class TestApp {
 
+    /** Stands in for a transport starter's routing table: one event is externalized, one is not. */
     @Bean
     EventDestinations eventDestinations() {
       return (type, version) ->
           Externalised.TYPE.equals(type) ? Optional.of(TOPIC) : Optional.empty();
     }
 
-    /** Present only so dispatcher selection has something to pick. */
     @Bean
-    OutboxDispatcher noOpDispatcher() {
-      return message -> {};
+    LocalOnlyDispatcher localOnlyDispatcher() {
+      return new LocalOnlyDispatcher();
+    }
+  }
+
+  /** An in-process dispatcher: it delivers, but it cannot reach anything outside the JVM. */
+  static class LocalOnlyDispatcher implements OutboxDispatcher {
+    final List<String> dispatched = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void dispatch(OutboxMessage message) {
+      dispatched.add(message.eventId());
+    }
+
+    @Override
+    public boolean reachesExternalTargets() {
+      return false;
     }
   }
 
@@ -73,7 +102,9 @@ class OutboxDestinationTest {
   }
 
   @Autowired IntegrationEvents events;
+  @Autowired OutboxRelay relay;
   @Autowired DeadLetterStore deadLetterStore;
+  @Autowired LocalOnlyDispatcher dispatcher;
   @Autowired JdbcTemplate jdbc;
   @Autowired PlatformTransactionManager transactionManager;
 
@@ -81,8 +112,12 @@ class OutboxDestinationTest {
   void reset() {
     jdbc.update("DELETE FROM aipersimmon_outbox");
     jdbc.update("DELETE FROM aipersimmon_dead_letter");
+    dispatcher.dispatched.clear();
   }
 
+  /**
+   * The writer refuses to write outside a transaction, so publish the way a command handler does.
+   */
   private void publish(IntegrationEvent event) {
     new TransactionTemplate(transactionManager)
         .executeWithoutResult(
@@ -118,11 +153,62 @@ class OutboxDestinationTest {
   }
 
   @Test
-  void aDeadLetteredRowKeepsItsDestinationAndGetsItBackOnReplay() {
+  void aRowDestinedForABrokerIsNeverDeliveredInProcessAndMarkedSent() {
     publish(new Externalised("o-3"));
     String eventId = onlyEventId("aipersimmon_outbox");
-    deadLetterStore.store(
-        message(eventId), 3, DeadLetterStore.Reason.RETRIES_EXHAUSTED, "simulated", null, null);
+
+    relay.relay();
+
+    assertEquals(
+        List.of(),
+        dispatcher.dispatched,
+        "a dispatcher that cannot reach the destination must not be handed the row at all");
+    assertEquals(
+        Boolean.FALSE,
+        jdbc.queryForObject(
+            "SELECT sent FROM aipersimmon_outbox WHERE event_id = ?", Boolean.class, eventId),
+        "and the row must not be archived as sent — that is the silent loss being prevented");
+    assertEquals(
+        Integer.valueOf(1),
+        jdbc.queryForObject(
+            "SELECT attempts FROM aipersimmon_outbox WHERE event_id = ?", Integer.class, eventId),
+        "it counts as a failed attempt");
+    assertNotNull(
+        jdbc.queryForObject(
+            "SELECT next_attempt_at FROM aipersimmon_outbox WHERE event_id = ?",
+            Timestamp.class,
+            eventId),
+        "and is retried rather than given up on at once: a missing transport is often a rolling "
+            + "deploy, not a verdict");
+  }
+
+  @Test
+  void anUndeliverableDestinationEndsAsAVisibleDeadLetter() {
+    publish(new Externalised("o-4"));
+
+    relay.relay(); // attempt 1
+    relay.relay(); // attempt 2 reaches max-attempts
+
+    assertEquals(
+        0,
+        (int) jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_outbox", Integer.class),
+        "the row leaves the outbox");
+    assertEquals(
+        1,
+        (int) jdbc.queryForObject("SELECT COUNT(*) FROM aipersimmon_dead_letter", Integer.class),
+        "and is preserved where an operator can see it, instead of vanishing as sent");
+    assertTrue(
+        jdbc.queryForObject("SELECT last_error FROM aipersimmon_dead_letter", String.class)
+            .contains(TOPIC),
+        "the recorded error names the destination that could not be reached");
+  }
+
+  @Test
+  void aDeadLetterRemembersItsDestinationAcrossAReplay() {
+    publish(new Externalised("o-5"));
+    String eventId = onlyEventId("aipersimmon_outbox");
+    relay.relay();
+    relay.relay();
 
     assertEquals(
         TOPIC,
@@ -136,26 +222,5 @@ class OutboxDestinationTest {
         destinationOf("aipersimmon_outbox", eventId),
         "a replayed row must come back destined for the broker: resurrecting it as in-process "
             + "would be the same silent loss through a second door");
-  }
-
-  /** Reads the row back the way the relay would hand it to the dead-letter store. */
-  private com.aipersimmon.ddd.outbox.OutboxMessage message(String eventId) {
-    return jdbc.queryForObject(
-        "SELECT event_id, source, type, version, payload, occurred_at, subject, tenant_id, "
-            + "correlation_id, causation_id, destination FROM aipersimmon_outbox WHERE event_id = ?",
-        (rs, n) ->
-            new com.aipersimmon.ddd.outbox.OutboxMessage(
-                rs.getString("event_id"),
-                rs.getString("source"),
-                rs.getString("type"),
-                rs.getInt("version"),
-                rs.getString("payload"),
-                rs.getTimestamp("occurred_at").toInstant(),
-                rs.getString("subject"),
-                rs.getString("tenant_id"),
-                rs.getString("correlation_id"),
-                rs.getString("causation_id"),
-                rs.getString("destination")),
-        eventId);
   }
 }

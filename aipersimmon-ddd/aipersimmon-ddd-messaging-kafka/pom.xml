@@ -90,11 +90,11 @@
       <artifactId>spring-kafka-test</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- A real JDBC inbox (H2) so the DLT test can assert the poison's inbox mark is
+    <!-- A real MyBatis-Plus inbox (H2) so the DLT test can assert the poison's inbox mark is
          rolled back while a good message's is committed. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
-      <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
+      <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

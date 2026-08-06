@@ -4,7 +4,7 @@ package com.aipersimmon.ddd.observability;
  * Opens spans around the self-written domain spine that library auto-instrumentation does not
  * recognise — command/query dispatch, domain-event handling, inbound ACL, and process-manager
  * advance. It exists so modules that must stay framework-free (notably {@code
- * aipersimmon-ddd-process-manager-jdbc}) can emit spans without a compile dependency on
+ * aipersimmon-ddd-process-manager-mybatis-plus}) can emit spans without a compile dependency on
  * OpenTelemetry; Spring-side spans are created directly against OTEL in the optional otel module
  * and do not need this SPI.
  *

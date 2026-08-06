@@ -11,7 +11,6 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
  * of at the first advance — or, worse, on a background worker's poll. It never creates tables — the
  * DDL ships as a sample (see {@code aipersimmon/db/migration/process-manager}) and is applied via
  * Flyway/Liquibase. Disabled when {@code schema-validation=none}. The MyBatis-Plus sibling of
- * {@code JdbcProcessSchemaValidator}.
  */
 @DependsOnDatabaseInitialization
 public final class MybatisProcessSchemaValidator implements InitializingBean {

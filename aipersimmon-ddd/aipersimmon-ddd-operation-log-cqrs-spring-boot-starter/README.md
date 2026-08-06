@@ -10,8 +10,7 @@ handlers.
 You need **four** things. The interceptors, template engine, annotation scanning, and transaction
 coordination are auto-configured; you do not touch them.
 
-1. **A storage backend** (choose one), on the classpath of your bootstrap/composition module:
-   - `aipersimmon-ddd-operation-log-jdbc`, or
+1. **A storage backend**, on the classpath of your bootstrap/composition module:
    - `aipersimmon-ddd-operation-log-mybatis-plus`.
 
    The backend supplies the `OperationLogSink` and ships the schema (the three-dialect DDL lives in

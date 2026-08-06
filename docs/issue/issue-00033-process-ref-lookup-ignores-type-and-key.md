@@ -7,6 +7,12 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 # `ProcessRef` 只按 `instanceId` 定位行,`processType`/`businessKey` 从不参与校验
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 ## 问题(现状,file:line 为证)
 
 - **等级:Low/Medium**(防御性加固,非可利用 correctness bug)。原始 review 定为 **High**;本 issue **降级**并在根因中说明理由。

@@ -24,8 +24,7 @@
     persistence, rather than a separate JdbcTemplate. It registers ONLY its own
     mapper (via a MapperFactoryBean), so it never triggers or hijacks the
     consumer's @MapperScan. The consumer creates the inbox table (a documented
-    DDL). This is the MyBatis-Plus sibling of aipersimmon-ddd-inbox-jdbc; include
-    exactly one inbox starter.
+    DDL). This is the only inbox starter the library ships.
   -->
   <artifactId>aipersimmon-ddd-inbox-mybatis-plus</artifactId>
   <name>aipersimmon-ddd-inbox-mybatis-plus</name>

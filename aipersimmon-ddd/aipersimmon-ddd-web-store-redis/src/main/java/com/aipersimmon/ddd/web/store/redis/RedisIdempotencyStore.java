@@ -99,7 +99,7 @@ public class RedisIdempotencyStore implements IdempotencyStore {
       return objectMapper.readValue(json, Entry.class);
     } catch (Exception e) {
       // An entry that cannot be read back is unusable, and answering a retry with a partially
-      // understood response would be worse than failing. The JDBC backend fails the same way for
+      // understood response would be worse than failing. The SQL backend fails the same way for
       // the
       // same reason — the two must not disagree here.
       throw new IllegalStateException("stored idempotency entry is unreadable", e);

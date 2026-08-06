@@ -53,7 +53,7 @@ design-00008 已给出结构设计。本 ADR 把 analysis-00013 §12 / design-00
 
 3. **（D2）拆五个模块**：`aipersimmon-ddd-operation-log`（framework-free、CQRS-free 纯契约）、
    `-operation-log-engine`（storage-agnostic：`OperationLogs` 默认实现 + 装配 + 三方言 DDL）、
-   `-operation-log-cqrs-spring`（CommandInterceptor 捕获 + 受限模板 + resolver）、`-operation-log-jdbc`、
+   `-operation-log-cqrs-spring`（CommandInterceptor 捕获 + 受限模板 + resolver）、`-operation-log-jdbc`（后已删除）、
    `-operation-log-mybatis-plus`。依赖单向如 design-00008 §二；消费方 domain 模块不得依赖 operation-log（ArchUnit 强制）。
 4. **（D2）DDL 与 `OperationLogs` pipeline 落在 engine**，两个存储后端只实现 `OperationLogSink`/`OperationLogReader`
    端口、共享同一份 DDL、**二选一**。direct-API（batch/scheduler/CLI）消费者只依赖 `core + engine + 一个后端`，

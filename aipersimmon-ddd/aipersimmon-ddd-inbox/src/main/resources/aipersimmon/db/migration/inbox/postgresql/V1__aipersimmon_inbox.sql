@@ -1,5 +1,5 @@
 -- Flyway migration (PostgreSQL) for the aipersimmon-ddd inbox table. Single source of the inbox
--- schema, shared by the -inbox-jdbc and -inbox-mybatis-plus adapters. The primary key
+-- schema, used by the -inbox-mybatis-plus adapter. The primary key
 -- (consumer, source, message_key) scopes idempotency dedup to one consuming application and,
 -- within it, to one producer: message_key (ce_id) is unique only within its source, so source
 -- belongs in the key rather than in a data column (see the Inbox port).

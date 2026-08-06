@@ -12,8 +12,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * In-memory {@link IdempotencyStore} for single-node and development use. Not suitable for multiple
  * instances — each JVM would hold its own claims, so the same key could execute once per instance;
- * use a store backend module ({@code -web-store-redis}/{@code -web-store-jdbc}) in production,
- * which replaces this bean.
+ * use a store backend module ({@code -web-store-redis}/{@code -web-store-mybatis-plus}) in
+ * production, which replaces this bean.
  *
  * <p>Atomicity comes from {@link ConcurrentHashMap#compute}, which holds the bin lock for the key
  * while the state transition is decided — the local equivalent of the conditional insert the

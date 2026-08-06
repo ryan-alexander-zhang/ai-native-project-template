@@ -24,7 +24,7 @@ import org.springframework.scheduling.annotation.Scheduled;
  * page reads the oldest {@code batchSize} timestamps below the cutoff and deletes everything up to
  * the last of them; timestamp ties can make a page slightly larger than asked, which is harmless —
  * the point is that the first purge of a long-lived table is many small transactions, not one giant
- * one. The JDBC sibling pages the same way.
+ * one.
  */
 public class InboxCleanup {
 

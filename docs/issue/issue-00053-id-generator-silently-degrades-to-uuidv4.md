@@ -7,6 +7,12 @@ blocks: [report-00001-ddd-framework-review]
 
 # 缺少 `aipersimmon-ddd-id` 时五处铸造点静默退回 UUIDv4：立项要消除的索引写放大被悄悄放回，无任何启动信号
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 ## 问题（现状，file:line 为证）
 
 - **等级：Medium（静默性能退化，非数据损坏；但退化在小数据量下完全不可观测，暴露时已难溯因）**。

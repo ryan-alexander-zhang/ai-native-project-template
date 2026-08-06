@@ -20,9 +20,9 @@ public final class OperationLogRules {
 
   /**
    * The Operation Log component's root package. Every module of the component ({@code
-   * -operation-log}, {@code -engine}, {@code -jdbc}, {@code -cqrs-spring}, {@code -mybatis-plus})
-   * lives under it, so a single package match covers the whole component regardless of which
-   * backend a project wires in.
+   * -operation-log}, {@code -engine}, {@code -cqrs-spring}, {@code -mybatis-plus}) lives under it,
+   * so a single package match covers the whole component regardless of which backend a project
+   * wires in.
    */
   private static final String OPERATION_LOG_PACKAGE = "com.aipersimmon.ddd.operationlog..";
 

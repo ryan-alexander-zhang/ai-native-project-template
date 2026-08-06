@@ -24,9 +24,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The MyBatis-Plus outbox is the same store-and-forward hop as the JDBC one: the writer captures
- * the trace context onto the row and the relay restores it (as a linked span) on dispatch. Verified
- * with a recording {@link StoreAndForwardTracer} — no OTEL needed here.
+ * The outbox is a store-and-forward hop: the writer captures the trace context onto the row and the
+ * relay restores it (as a linked span) on dispatch. Verified with a recording {@link
+ * StoreAndForwardTracer} — no OTEL needed here.
  */
 @SpringBootTest(
     classes = OutboxTracingTest.TestApp.class,

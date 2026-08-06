@@ -6,9 +6,9 @@ import org.apache.ibatis.annotations.Select;
 
 /**
  * Startup schema probe: a zero-row {@code SELECT} per process table, so a missing or stale
- * migration fails fast with a clear message (mirrors {@code JdbcProcessSchemaValidator}). Each
- * probe names the columns the latest migrations added rather than a literal, because "table exists"
- * is not "schema is current". Never creates tables.
+ * migration fails fast with a clear message. Each probe names the columns the latest migrations
+ * added rather than a literal, because "table exists" is not "schema is current". Never creates
+ * tables.
  */
 public interface ProcessSchemaMapper {
 

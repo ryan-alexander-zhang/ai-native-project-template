@@ -18,7 +18,7 @@
  * contracts and live in {@code com.aipersimmon.ddd.cqrs.page}, so an application layer can return a
  * paged result without depending on the web tier. This module's starter only serializes them.
  *
- * <p>A Spring starter implements these ports; pluggable Redis/JDBC backends implement the SPIs.
- * Nothing here depends on Spring, Jackson, or the servlet API.
+ * <p>A Spring starter implements these ports; pluggable Redis/MyBatis-Plus backends implement the
+ * SPIs. Nothing here depends on Spring, Jackson, or the servlet API.
  */
 package com.aipersimmon.ddd.web;

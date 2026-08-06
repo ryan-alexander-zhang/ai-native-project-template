@@ -7,6 +7,12 @@ implements: [design-00006-integration-event-routing]
 
 # 集成事件逐事件路由落地：`@Externalized` + `RoutingOutboxDispatcher` + 多 topic
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 把 [[design-00006-integration-event-routing]] 从设计落成代码：集成事件传输从"装了 Kafka 就全上 broker"细化到
 **逐事件 opt-in**——默认 LOCAL（进程内 outbox+inbox），只有显式标注 `@Externalized` 的事件才外发到**命名 topic**，
 未标注者永不碰 broker。承接 [[decision-00006-integration-event-transport-selection]]（三传输、单 dispatcher）并按

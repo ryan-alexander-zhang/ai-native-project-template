@@ -8,8 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The MyBatis-Plus implementation of {@link ProcessClaimStrategy}. It reproduces the JDBC dialects:
- * a {@code SKIP LOCKED} claim (locks the due candidates, skipping contended rows, then marks them
+ * The MyBatis-Plus implementation of {@link ProcessClaimStrategy}, in two dialect flavours: a
+ * {@code SKIP LOCKED} claim (locks the due candidates, skipping contended rows, then marks them
  * {@code IN_FLIGHT}) on PostgreSQL/MySQL, and an atomic conditional-{@code UPDATE} claim (races
  * each due candidate into {@code IN_FLIGHT}, keeping only the winners) where {@code SKIP LOCKED} is
  * unavailable (H2). The claim runs inside the transaction opened by the engine's unit of work.

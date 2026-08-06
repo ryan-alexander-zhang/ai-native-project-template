@@ -38,7 +38,7 @@ outbox 的"契约 + 可换存储"同构。
 **采用"流派 A":成功直接返资源 + 正确 HTTP 状态码,不套通用成功信封;错误统一走 RFC 9457
 Problem Details。把 Web 层横切(错误映射、traceId、分页、幂等、防重放、限流)封装为一套构件:
 framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-ddd-web-spring`(脏)
-+ 可插拔存储后端 `-web-store-redis`/`-web-store-jdbc`。每项横切能力**独立开关、默认关**
++ 可插拔存储后端 `-web-store-redis`/`-web-store-mybatis-plus`(当时叫 `-web-store-jdbc`)。每项横切能力**独立开关、默认关**
 (除 Problem Details/traceId 这类零风险项),需要状态的能力(幂等/nonce/限流计数)走**统一 SPI + 可换存储**。
 **CORS 用 Spring 原生 / 网关,不进构件;401/403→Problem Details 移出 v1(未来项,见 §六)。**
 明确不做的只有 `ApiResponse`/`ApiRequest` 通用外壳。**
@@ -65,10 +65,10 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 | `aipersimmon-ddd-web` | interface 契约,**framework-free** | `-core`(极薄) | `ProblemDescriptor` + `ProblemRegistry`(错误码→传输映射,身份与传输组合;见 [[design-00003-exception-model]] §4.7);`ApiError`/字段错误语义模型(对齐 9457,不绑 Spring);`Page<T>`/`Slice<T>`/`Cursor` 分页值对象;**横切 SPI**:`IdempotencyStore`、`ReplayGuard`(nonce)、`RateLimiter`、`RequestSignatureVerifier` |
 | `aipersimmon-ddd-web-spring` | interface 实现,脏 starter | `-web` + Spring Web | 共享 `@RestControllerAdvice`(异常 → `ProblemDetail`,含 400/404/409/422/429);`traceId` filter;分页序列化;i18n(`MessageSource`);各横切能力的 filter + **开关** + 默认**内存** SPI 实现 |
 | `aipersimmon-ddd-web-store-redis` | infrastructure,可选后端 | `-web` + Redis | Redis 实现 `IdempotencyStore`/`ReplayGuard`/`RateLimiter`(TTL、原子 `INCR`、令牌桶 Lua) |
-| `aipersimmon-ddd-web-store-jdbc` | infrastructure,可选后端 | `-web` + JDBC | JDBC 实现同一批 SPI(表 + 过期清理);与 Redis 同 SPI 可互换 |
+| `aipersimmon-ddd-web-store-mybatis-plus` | infrastructure,可选后端 | `-web` + MyBatis-Plus | 关系库实现同一批 SPI(表 + 过期清理);与 Redis 同 SPI 可互换。当时叫 `-web-store-jdbc` |
 
 - **统一 SPI + 可换存储**:幂等 key、防重放 nonce、限流计数本质都是"带 TTL 的短时键值状态",
-  故共用一套 store 后端——**与 outbox `-outbox`+`-outbox-jdbc`/`-mybatis-plus` 完全同构**。
+  故共用一套 store 后端——**与 outbox `-outbox`+`-outbox-mybatis-plus` 完全同构**。
 - **装配确定性**(照搬 outbox 模式):store 后端在 classpath → 用它;否则内存兜底(`@ConditionalOnMissingBean`)。
   内存实现仅供单机/开发;多实例生产必须显式引入一个 `-web-store-*`。
 - 拓扑无关:三种拓扑复用同一批 web 构件。可选:最小形态可不引,各 BC 自写。
@@ -172,13 +172,13 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 - **默认时间窗内可重放**:防重放不开 nonce 时仅靠 5 分钟时间窗,窗内仍可重放;高安全场景须开 `nonce.enabled`
   并接一个 `-web-store-*`,承担其存储/清理成本。
 - **内存实现不可用于多实例生产**:幂等/nonce/限流的内存 SPI 只在单进程有效;多实例必须显式引入
-  `-web-store-redis` 或 `-web-store-jdbc`,否则去重/限流在实例间失效(与 outbox 存储选择同理)。
+  `-web-store-redis` 或 `-web-store-mybatis-plus`,否则去重/限流在实例间失效(与 outbox 存储选择同理)。
 - **限流通常网关也做**:构件内限流是"应用兜底/细粒度",与网关限流可叠加;别把二者配额混算。
 - **错误格式在 auth 边界暂不统一**:401/403 移出 v1(见 §六),故这两个状态码仍是 Spring Security 默认体、
   非 problem+json;调用方需知悉此不一致,将来补条件化增量消除。
 - `type` 用相对 URI 且不要求可解析——需在文档约定这是**标识符**而非可访问链接(承接 Zalando 的取舍)。
 - 错误码枚举跨 BC 增长需治理(命名前缀按 BC),否则易冲突;`type`/`code` 一旦发布即成对外契约,变更要走版本。
-- **构件增多**:新增 `-web-store-redis`/`-web-store-jdbc` 两个后端,需纳入 `-bom` 统一版本管理。
+- **构件增多**:新增 `-web-store-redis`/`-web-store-mybatis-plus` 两个后端,需纳入 `-bom` 统一版本管理。
 
 ## Sources
 

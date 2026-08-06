@@ -12,7 +12,6 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
  * a forgotten {@code aipersimmon.ddd.flyway.components} entry rolls back <em>every</em> command
  * that publishes an {@code @Externalized} event — far from the configuration list that caused it.
  * Never creates tables. Disabled when {@code schema-validation=none}. The MyBatis-Plus sibling of
- * {@code JdbcOutboxSchemaValidator}.
  *
  * <p>{@code shedlock} is probed too, even though only the retention purge — an opt-in — actually
  * takes a lease on it: the shipped outbox migration always provisions the table, so a migrated

@@ -184,7 +184,7 @@ gjf 内置，无需 config-artifact。
 
 ## 七、测试基建：test-support（Testcontainers 单例复用）
 
-现状：Testcontainers 已在 3 个模块（process-manager-jdbc 的 PG、其 starter 的 MySQL、web-store-redis）各写各的
+现状：Testcontainers 已在 3 个模块（当时 process-manager-jdbc 的 PG、其 starter 的 MySQL、web-store-redis）各写各的
 `@Testcontainers`/`@Container`，样板重复、容器每类重启。新增 **`aipersimmon-ddd-test-support`** testkit 模块，与
 `aipersimmon-ddd-archunit` 对称——消费者 **test scope** 引入，**绝不进 pure tier 的 main classpath**：
 

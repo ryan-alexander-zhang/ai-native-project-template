@@ -10,8 +10,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Backs the {@link DeadLetterStore} with the {@code aipersimmon_dead_letter} table via
  * MyBatis-Plus. Every move runs in one {@link TransactionTemplate} transaction — the dead-letter
  * insert and the outbox delete commit together — so a message is never duplicated across the two
- * tables nor lost between them. Mirrors the JDBC starter's store so the two backends behave
- * identically.
+ * tables nor lost between them. Behaves identically.
  */
 public class MybatisDeadLetterStore implements DeadLetterStore {
 

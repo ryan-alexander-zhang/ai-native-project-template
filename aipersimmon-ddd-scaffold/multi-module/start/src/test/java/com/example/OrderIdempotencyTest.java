@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.aipersimmon.ddd.web.spi.IdempotencyStore;
-import com.aipersimmon.ddd.web.store.jdbc.JdbcIdempotencyStore;
+import com.aipersimmon.ddd.web.store.mybatisplus.MybatisPlusIdempotencyStore;
 import java.net.URI;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,7 +95,7 @@ class OrderIdempotencyTest {
     // edge the two race and the per-JVM map can win — while allow-in-memory-stores=false would then
     // refuse to start. This module is the only place both configurations coexist, so this is where
     // the ordering can be asserted at all.
-    assertInstanceOf(JdbcIdempotencyStore.class, idempotencyStore);
+    assertInstanceOf(MybatisPlusIdempotencyStore.class, idempotencyStore);
   }
 
   @Test

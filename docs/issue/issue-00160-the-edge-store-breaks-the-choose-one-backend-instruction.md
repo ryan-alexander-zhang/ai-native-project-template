@@ -6,6 +6,12 @@ status: open
 
 # 边界存储让"只选一种后端"这条指令无法执行（P2，一致性/文档）
 
+> **注（2026-08-06 补）**：本记录写于库同时并存 JDBC 与 MyBatis-Plus 两套存储后端的时期。
+> `-persistence-jdbc`、`-outbox-jdbc`、`-inbox-jdbc`、`-process-manager-jdbc`、`-operation-log-jdbc`、
+> `-web-store-jdbc`、`-starter-jdbc` 已全部删除（库只留 MyBatis-Plus 后端；web 边界存储由
+> `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
+> 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
+
 2026-08-03 写 samples 时撞到（S2 幂等与重放防护那一篇）。**不是缺陷，是矩阵与自家建议冲突，需要一个
 书面裁决。**
 

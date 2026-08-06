@@ -63,7 +63,7 @@ isActive()           // = !status.isTerminal()
 
 | | 协同式 Choreography(默认) | 编排式 Orchestration(saga 模块) |
 | --- | --- | --- |
-| 本库如何实现 | **无专门 saga 构件**;用 `events-spring`(进程内)或 `outbox-jdbc + messaging-kafka`(跨服务)发布/订阅事件,各上下文自行 react | `saga` + `saga-spring`:`@ProcessManager` + `SagaState` + `SagaStore` + `DeadlineScheduler` |
+| 本库如何实现 | **无专门 saga 构件**;用 `events-spring`(进程内)或 `outbox-mybatis-plus + messaging-kafka`(跨服务)发布/订阅事件,各上下文自行 react | `saga` + `saga-spring`:`@ProcessManager` + `SagaState` + `SagaStore` + `DeadlineScheduler` |
 | 有无协调者 | 无 | 有(中央状态机) |
 | 何时用 | 步骤少、耦合低 | 步骤/分支/超时多到需要显式状态机 |
 
@@ -85,7 +85,7 @@ Saga 独有、纯状态机没有的三样:**补偿(`COMPENSATING`)**、**跨边�
 saga 建立在"至少投递一次 + 可能重试"之上,**支付这类不可逆副作用步骤必须幂等**,否则重复扣款。
 要区分**两层幂等**:
 
-1. **接收端(saga 消费事件)**:重复收到不能重复推进 → 靠去重表 `Inbox`(`inbox-jdbc` 模块)。
+1. **接收端(saga 消费事件)**:重复收到不能重复推进 → 靠去重表 `Inbox`(`inbox-mybatis-plus` 模块；当时叫 `inbox-jdbc`)。
 2. **发送端(支付动作本身)**:重试不能重复扣款 → 靠**业务幂等键**(通常用 `correlationId`/订单号)透传给支付网关。
 
 本库提供的三道防线(接收端):
@@ -94,7 +94,7 @@ saga 建立在"至少投递一次 + 可能重试"之上,**支付这类不可逆�
 - `JdbcSagaStore` 乐观锁:并发/重复事件只有一个 `WHERE version=?` 命中,另一个抛 `OptimisticLockingFailureException`。
 - 生命周期守卫 + `filter(isActive)`:已终止 saga 的迟到事件 / deadline 是 no-op。
 
-**关键提醒**:`saga-spring` 只依赖 `saga`,**不自动引入 `inbox-jdbc`**;需要接收端去重的应用要**显式**加该依赖。
+**关键提醒**:`saga-spring` 只依赖 `saga`,**不自动引入 inbox 后端**;需要接收端去重的应用要**显式**加该依赖。
 补偿动作(退款、释放库存)同样可能重试,**补偿也必须幂等**。
 
 ## 六、持久化与数据模型
@@ -233,7 +233,7 @@ seata_state_inst          状态实例(每执行一个节点一行:service_name/
 
 1. **多步且需运维观测的 saga**:当前内核偏薄。要么方案 A(`data` 存 JSON + 数据库 JSON 生成列/索引查 step),
    要么方案 B(覆写 `JdbcSagaStore` 建带 `step` 列的表),要么直接上 Seata / Axon。
-2. **接收端幂等**:凡消费外部消息的 saga,显式加 `inbox-jdbc`,并在同事务内 `alreadyProcessed`。
+2. **接收端幂等**:凡消费外部消息的 saga,显式加 inbox 后端,并在同事务内 `alreadyProcessed`。
 3. **发送端幂等**:支付/扣款等透传 `correlationId` 作幂等键给下游网关。
 4. **多实例部署**:`JdbcDeadlineScheduler` 当前无租约会重复触发,依赖 handler 幂等;若要精确一次需补 `SKIP LOCKED` 租约(见 §七 B-8)。
 5. **升级引擎**:满足 00007 §七信号(小时/天级等待、人工审批、需 BPMN 可视化)时外接 Temporal / Camunda,只换实现不改契约。

@@ -5,9 +5,8 @@ import org.apache.ibatis.annotations.Select;
 
 /**
  * Startup schema probe: a zero-row {@code SELECT} against the inbox table, so a missing migration
- * fails fast with a clear message (mirrors {@code JdbcInboxSchemaValidator}). The probe names a
- * column a later migration added rather than a literal, because "table exists" is not "schema is
- * current". Never creates tables.
+ * fails fast with a clear message. The probe names a column a later migration added rather than a
+ * literal, because "table exists" is not "schema is current". Never creates tables.
  */
 public interface InboxSchemaMapper {
 

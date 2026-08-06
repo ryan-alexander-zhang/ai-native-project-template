@@ -22,7 +22,7 @@
     Depends only on the pure core tier. A Spring implementation of these ports —
     the exception-to-ProblemDetail advice, trace-id, pagination, i18n, and the
     opt-in idempotency / replay / rate-limit filters — lives in a separate
-    starter, and pluggable Redis/JDBC backends implement the SPIs.
+    starter, and pluggable Redis/MyBatis-Plus backends implement the SPIs.
   -->
   <artifactId>aipersimmon-ddd-web</artifactId>
   <name>aipersimmon-ddd-web</name>

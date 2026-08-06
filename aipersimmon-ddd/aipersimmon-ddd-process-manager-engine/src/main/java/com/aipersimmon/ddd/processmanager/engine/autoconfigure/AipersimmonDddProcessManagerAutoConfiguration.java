@@ -61,9 +61,9 @@ import org.springframework.transaction.PlatformTransactionManager;
  * own thread pools. Every bean is {@link ConditionalOnMissingBean}, so a consumer overrides any of
  * them. It scans no business packages and never executes DDL.
  *
- * <p>A storage backend ({@code aipersimmon-ddd-process-manager-jdbc}, {@code
- * aipersimmon-ddd-process-manager-mybatis-plus}) declares its store/claim beans and is ordered
- * before this class, so the {@link ConditionalOnBean} gates below see them.
+ * <p>A storage backend ({@code aipersimmon-ddd-process-manager-mybatis-plus}) declares its
+ * store/claim beans and is ordered before this class, so the {@link ConditionalOnBean} gates below
+ * see them.
  */
 @AutoConfiguration(after = DataSourceTransactionManagerAutoConfiguration.class)
 @ConditionalOnProperty(

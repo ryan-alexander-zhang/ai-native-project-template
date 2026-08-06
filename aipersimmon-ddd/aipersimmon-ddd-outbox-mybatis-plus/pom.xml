@@ -26,7 +26,7 @@
 
     Delivery is at-least-once: a crash between dispatch and marking a row sent
     causes a redelivery, so consumers must be idempotent (see the inbox). This is
-    the MyBatis-Plus sibling of aipersimmon-ddd-outbox-jdbc; include exactly one
+    the only outbox storage backend the library ships; include exactly one
     outbox storage starter. A broker starter (aipersimmon-ddd-messaging-kafka)
     plugs into either because both share the outbox core's dispatcher contract.
   -->
@@ -102,6 +102,46 @@
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- The observability seam is exercised here rather than in the engine, which has no test
+         harness of its own: Micrometer is optional there and test-scoped here. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Real-engine coverage for the claim SQL: the head-of-subject NOT EXISTS predicate and the
+         CAS lease UPDATE rest on engine-specific semantics that H2 cannot vouch for. -->
+    <dependency>
+      <groupId>com.aipersimmon.ddd</groupId>
+      <artifactId>aipersimmon-ddd-test-support</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>mysql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

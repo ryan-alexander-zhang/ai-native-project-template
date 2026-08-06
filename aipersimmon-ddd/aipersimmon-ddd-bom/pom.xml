@@ -128,11 +128,6 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-persistence-jdbc</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-persistence-mybatis-plus</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -153,11 +148,6 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-operation-log-jdbc</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-operation-log-mybatis-plus</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -169,11 +159,6 @@
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-process-manager-engine</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-process-manager-jdbc</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -203,22 +188,12 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-outbox-jdbc</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-outbox-mybatis-plus</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-inbox</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-inbox-jdbc</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -248,7 +223,7 @@
       </dependency>
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-web-store-jdbc</artifactId>
+        <artifactId>aipersimmon-ddd-web-store-mybatis-plus</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -309,11 +284,6 @@
       <dependency>
         <groupId>com.aipersimmon.ddd</groupId>
         <artifactId>aipersimmon-ddd-starter-mybatis-plus</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.aipersimmon.ddd</groupId>
-        <artifactId>aipersimmon-ddd-starter-jdbc</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

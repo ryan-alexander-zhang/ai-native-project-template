@@ -156,11 +156,10 @@ flowchart TD
     class starter,starterMp,starterKafka b;
 ```
 
-The JDBC adapters (`persistence-jdbc`, `outbox-jdbc`, `inbox-jdbc`, `process-manager-jdbc`,
-`operation-log-jdbc`, `web-store-jdbc`), `web-store-redis`, and the remaining wiring modules
-(`tenancy-…`, `operation-log-cqrs-…`, `flyway-…`, `openapi-…`, `observability-otel-…`) are omitted from
-the diagram only to keep it legible; they sit in the same tiers as their MyBatis-Plus counterparts and
-are listed in full below.
+`web-store-mybatis-plus`, `web-store-redis`, and the remaining wiring modules (`tenancy-…`,
+`operation-log-cqrs-…`, `flyway-…`, `openapi-…`, `observability-otel-…`) are omitted from the diagram
+only to keep it legible; they sit in the same tiers as the backends shown and are listed in full
+below.
 
 Edges are `compile` scope and the graph is acyclic. `core` and `integration` are roots with no internal
 dependencies; `integration` in particular must **stay** a root, so a service that publishes integration
@@ -195,14 +194,14 @@ events and nothing else does not inherit the command bus.
 
 | Module | Holds |
 | --- | --- |
-| `persistence-mybatis-plus` / `persistence-jdbc` | Version-checked aggregate repository bases: versioned write, affected-rows check, event draining |
-| `outbox-mybatis-plus` / `outbox-jdbc` | Outbox writer plus the ShedLock-guarded relay with per-subject ordering |
-| `inbox-mybatis-plus` / `inbox-jdbc` | The `Inbox` implementation and its retention cleanup |
-| `process-manager-mybatis-plus` / `-jdbc` | The four-table store, claim strategy (`SKIP LOCKED` on JDBC), dialect selection |
-| `operation-log-mybatis-plus` / `-jdbc` | Audit sink with dialect-native duplicate convergence |
+| `persistence-mybatis-plus` | Version-checked aggregate repository bases: versioned write, affected-rows check, event draining |
+| `outbox-mybatis-plus` | The outbox store and dead-letter store the engine's writer and relay run on |
+| `inbox-mybatis-plus` | The `Inbox` implementation and its retention cleanup |
+| `process-manager-mybatis-plus` | The four-table store, claim strategy (`SKIP LOCKED` where the engine supports it), dialect selection |
+| `operation-log-mybatis-plus` | Audit sink with dialect-native duplicate convergence |
 | `tenancy-mybatis-plus` | Tenant-line inner interceptor over an opt-in table allow-list |
 | `messaging-kafka` | Kafka `OutboxDispatcher`, per-event routing, inbox-guarded consumer bridge, three-tier error handling |
-| `web-store-jdbc` / `web-store-redis` | Shared idempotency / nonce / rate-limit stores |
+| `web-store-mybatis-plus` / `web-store-redis` | Shared idempotency / nonce / rate-limit stores |
 | `observability-otel` | OpenTelemetry implementation of the observability SPIs |
 
 **Wiring**
@@ -226,8 +225,7 @@ events and nothing else does not inherit the command bus.
 | Module | Aggregates |
 | --- | --- |
 | `starter` | cqrs + events + id + web |
-| `starter-mybatis-plus` | `starter` + every MyBatis-Plus backend + tenancy + Flyway |
-| `starter-jdbc` | `starter` + every JDBC backend + tenant propagation + Flyway |
+| `starter-mybatis-plus` | `starter` + every storage backend + tenancy + Flyway |
 | `starter-messaging-kafka` | The Kafka transport, on top of a storage bundle |
 
 **Tooling**

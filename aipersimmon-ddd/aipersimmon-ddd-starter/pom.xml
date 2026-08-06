@@ -16,8 +16,8 @@
     publishing, time-ordered ids, and the HTTP error/pagination contract. One dependency instead of
     five, chosen so that a service with no database of its own still works.
 
-    It bundles nothing storage-specific — add aipersimmon-ddd-starter-mybatis-plus or
-    aipersimmon-ddd-starter-jdbc for that, and either of those already includes this one.
+    It bundles nothing storage-specific — add aipersimmon-ddd-starter-mybatis-plus for that,
+    and that bundle already includes this one.
 
     A bundle only aggregates; every component inside stays independently usable and every bean stays
     @ConditionalOnMissingBean, so picking modules by hand remains fully supported.

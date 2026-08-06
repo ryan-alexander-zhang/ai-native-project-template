@@ -1,5 +1,5 @@
 -- Flyway migration (MySQL 8+) for the aipersimmon-ddd outbox tables. Single source of the
--- outbox schema, shared by the -outbox-jdbc and -outbox-mybatis-plus adapters. MySQL specifics:
+-- outbox schema, used by the -outbox-mybatis-plus adapter. MySQL specifics:
 -- BIGINT AUTO_INCREMENT identity, LONGTEXT payloads, DATETIME(3) timestamps, inline KEY indexes.
 CREATE TABLE IF NOT EXISTS aipersimmon_outbox (
     id          BIGINT       NOT NULL AUTO_INCREMENT,

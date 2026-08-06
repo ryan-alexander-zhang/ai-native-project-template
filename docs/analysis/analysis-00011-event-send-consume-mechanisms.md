@@ -78,7 +78,7 @@ status: active
 | # | 发布路径 | 传输 | 同步/异步 | 文件 |
 |---|---|---|---|---|
 | 1 | `SpringIntegrationEvents` | 进程内 Spring 事件,无 Outbox/Broker | **同步**(同线程/同事务) | `aipersimmon-ddd-events-spring/.../events/spring/SpringIntegrationEvents.java` |
-| 2 | `OutboxWriter`(JDBC) | 事务性 Outbox 落库(`INSERT` 进 `aipersimmon_outbox`,与聚合变更同事务) | 落库同步、投递异步 | `aipersimmon-ddd-outbox-jdbc/.../outbox/jdbc/OutboxWriter.java` |
+| 2 | `OutboxWriter`(JDBC) | 事务性 Outbox 落库(`INSERT` 进 `aipersimmon_outbox`,与聚合变更同事务) | 落库同步、投递异步 | `aipersimmon-ddd-outbox-engine/.../outbox/engine/write/OutboxWriter.java`（当时在 `-outbox-jdbc`） |
 | 3 | `OutboxWriter`(MyBatis-Plus) | 事务性 Outbox 落库(第二套存储后端) | 同上 | `aipersimmon-ddd-outbox-mybatis-plus/.../outbox/mybatisplus/OutboxWriter.java` |
 
 选路开关:events 自动装配只在 `@ConditionalOnMissingClass("...outbox.jdbc.OutboxWriter")` 时才用 `SpringIntegrationEvents`——
@@ -107,7 +107,7 @@ Outbox 行由 `OutboxRelay`(`@Scheduled` 轮询)取出,交给以下 `OutboxDispa
 | 8 | `KafkaIntegrationEventListener`(`@KafkaListener` + `@Transactional`) | 跨进程 Kafka 消费:查 Inbox(键 `ce_id`)去重 → 经 `IntegrationEventTypeResolver` 解析 `ce_type` → 由 `ce_` 头重建 `EventEnvelope` → 经 `ApplicationEventPublisher` 转发为进程内事件 | `aipersimmon-ddd-messaging-kafka/.../messaging/kafka/KafkaIntegrationEventListener.java` |
 
 **Inbox 幂等消费者**(`Inbox.alreadyProcessed(messageKey)`,`aipersimmon-ddd-application/.../application/Inbox.java`),两套后端:
-- `JdbcInbox`——`aipersimmon-ddd-inbox-jdbc/.../inbox/jdbc/JdbcInbox.java`
+- `MybatisPlusInbox`——`aipersimmon-ddd-inbox-mybatis-plus/.../inbox/mybatisplus/MybatisPlusInbox.java`（当时是 `-inbox-jdbc` 的 `JdbcInbox`）
 - `MybatisPlusInbox`——`aipersimmon-ddd-inbox-mybatis-plus/.../inbox/mybatisplus/MybatisPlusInbox.java`
 
 均按 `consumer` 列隔离(多服务共表),**PG-safe 先查后插**(先 `SELECT COUNT(*)` 再 `INSERT`,避免失败插入的约束冲突把整个 PostgreSQL 事务打断),
@@ -139,7 +139,7 @@ Outbox 行由 `OutboxRelay`(`@Scheduled` 轮询)取出,交给以下 `OutboxDispa
 - 两类事件"概念上永远区分"的判定轴与大厂实践:[[analysis-00002-domain-vs-integration-events]]
 - Outbox→Broker→Inbox 完整链路与 CQRS-lite 读侧:[[analysis-00005-structure-2-event-flow-and-cqrs]]
 - 库源码(逐文件,已读):`aipersimmon-ddd/` 下 `-core` / `-application` / `-integration` / `-cqrs` / `-cqrs-spring` /
-  `-events-spring` / `-outbox` / `-outbox-jdbc` / `-outbox-mybatis-plus` / `-inbox-jdbc` / `-inbox-mybatis-plus` /
+  `-events-spring` / `-outbox` / `-outbox-mybatis-plus` / `-inbox-mybatis-plus` /
   `-messaging-kafka` / `-archunit` 各模块。
 - 近期加固提交:`4a0e94b`(outbox/inbox 生产级加固:locking、PG-safe dedup、ordering、DLQ、retention)、
   `b45cf30`(显式 `CommandContext` + CloudEvents 集成事件)、`918dd6f`(保存时 drain 领域事件、移除 ThreadLocal `AggregateCollector`)。

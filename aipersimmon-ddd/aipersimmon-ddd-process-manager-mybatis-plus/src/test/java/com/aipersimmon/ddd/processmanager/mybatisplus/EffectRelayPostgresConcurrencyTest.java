@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -55,7 +56,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * The SKIP LOCKED claim gate on a real PostgreSQL, over the MyBatis-Plus backend: two workers
  * polling concurrently over many due effects must claim disjoint sets, so every effect is
  * dispatched exactly once. This proves the MyBatis {@code FOR UPDATE SKIP LOCKED} claim behaves
- * identically to the JDBC backend — the guarantee H2 cannot exercise.
+ * correctly under real row locking — the guarantee H2 cannot exercise.
  */
 class EffectRelayPostgresConcurrencyTest {
 
@@ -75,6 +76,12 @@ class EffectRelayPostgresConcurrencyTest {
   @BeforeEach
   void setUp() throws Exception {
     DataSource ds = TestDataSources.from(POSTGRES);
+    // Drop first: this container is shared with the other PostgreSQL tests in the module, so the
+    // tables may already be there — and re-running V3's ALTER TABLE over them fails the setup.
+    new JdbcTemplate(ds)
+        .execute(
+            "DROP TABLE IF EXISTS aipersimmon_process_effect, aipersimmon_process_transition, "
+                + "aipersimmon_process_deadline, aipersimmon_process_instance");
     new ResourceDatabasePopulator(
             new ClassPathResource(
                 "aipersimmon/db/migration/process-manager/postgresql/V1__aipersimmon_process_manager.sql"),

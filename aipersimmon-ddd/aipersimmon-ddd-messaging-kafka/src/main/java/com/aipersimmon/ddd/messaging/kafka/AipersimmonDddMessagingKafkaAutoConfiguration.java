@@ -171,7 +171,7 @@ public class AipersimmonDddMessagingKafkaAutoConfiguration {
                 + active.getClass().getName()
                 + "', which is in-process and not durable. @Externalized "
                 + "events published through it never reach Kafka. Add a durable outbox module "
-                + "(e.g. aipersimmon-ddd-outbox-mybatis-plus or aipersimmon-ddd-outbox-jdbc) so its "
+                + "(e.g. aipersimmon-ddd-outbox-mybatis-plus) so its "
                 + "transactional-outbox writer becomes the IntegrationEvents transport, or remove "
                 + "@Externalized to keep those events LOCAL (in-process) on purpose. If this service "
                 + "only CONSUMES — its @Externalized declarations being subscriptions rather than "

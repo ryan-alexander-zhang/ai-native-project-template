@@ -9,11 +9,8 @@ reasons for wanting to turn out to be configuration questions, not dependency qu
 ```mermaid
 flowchart TD
     A["Does this service own a database?"] -->|no| B["aipersimmon-ddd-starter"]
-    A -->|yes| C{"Which data-access stack?"}
-    C -->|MyBatis-Plus| D["aipersimmon-ddd-starter-mybatis-plus"]
-    C -->|"plain JdbcTemplate"| E["aipersimmon-ddd-starter-jdbc"]
+    A -->|yes| D["aipersimmon-ddd-starter-mybatis-plus"]
     D --> F{"Do events cross a service boundary?"}
-    E --> F
     B --> F
     F -->|"no, one deployable"| G["done"]
     F -->|yes| H["+ aipersimmon-ddd-starter-messaging-kafka"]
@@ -40,20 +37,21 @@ interceptor chain, in-process events, time-ordered ids and the RFC 9457 web cont
 Everything below assumes a database, because the outbox, the inbox, the process manager and the
 operation log are all "state that survives a restart".
 
-### "MyBatis-Plus or plain JdbcTemplate?"
+### "Which data-access stack?"
 
-Pick the one your team already uses for its own tables. It matters that the framework's tables and
-your aggregates share **one** `DataSource` and transaction, so that an aggregate write and its outbox
-write commit together — that is the whole point of a transactional outbox.
+There is one: **`aipersimmon-ddd-starter-mybatis-plus`**. Every storage component — versioned
+repositories, outbox, inbox, process manager, operation log — has exactly one backend, and it is
+MyBatis-Plus. That is deliberate: the framework's tables and your aggregates must share **one**
+`SqlSessionFactory`, `DataSource` and transaction, so that an aggregate write and its outbox write
+commit together — the whole point of a transactional outbox — and a second backend to keep in step
+bought nothing but a second place for the two to drift apart.
 
-- **`aipersimmon-ddd-starter-mybatis-plus`** — also gives you SQL-level tenant scoping, because tenant
-  rewriting is a MyBatis-Plus interceptor capability.
-- **`aipersimmon-ddd-starter-jdbc`** — the same components over `JdbcTemplate`. Tenant *resolution and
-  propagation* are included (the tenant rides on `CommandContext`, the `EventEnvelope` and every
-  durable row); automatic row scoping is not, so you write the tenant predicate in your own SQL.
+It also gives you SQL-level tenant scoping, because tenant rewriting is a MyBatis-Plus interceptor
+capability.
 
-Mixing the two backends for different components works but buys nothing, and doubles what you have to
-reason about. Choose one.
+Your own tables need not go through MyBatis-Plus: a `JdbcTemplate`, a hand-written mapper or anything
+else on the same `DataSource` enlists in the same transaction. The requirement is the shared
+`DataSource`, not a shared style.
 
 ### "Do events cross a service boundary?"
 
@@ -118,7 +116,7 @@ something.
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-starter[-<stack>]` | a **bundle**: aggregates other modules | yes | no |
 | `aipersimmon-ddd-<concern>` | a **contract**: ports, value objects, state machines | **no** | **yes** |
-| `aipersimmon-ddd-<concern>-<backend>` | an **adapter** for `jdbc` / `mybatis-plus` / `redis` / `kafka` | yes | no |
+| `aipersimmon-ddd-<concern>-<backend>` | an **adapter** for `mybatis-plus` / `redis` / `kafka` | yes | no |
 | `aipersimmon-ddd-<concern>-engine` | a **storage-agnostic runtime** shared by backends | yes | no |
 | `aipersimmon-ddd-<concern>-spring-boot-starter` | **wiring** for one concern | yes | no |
 

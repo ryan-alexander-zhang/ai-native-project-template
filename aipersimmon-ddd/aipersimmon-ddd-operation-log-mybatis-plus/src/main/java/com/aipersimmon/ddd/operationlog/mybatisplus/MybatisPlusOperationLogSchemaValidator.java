@@ -10,7 +10,6 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
  * without this probe a forgotten {@code aipersimmon.ddd.flyway.components} entry rolls back
  * <em>every</em> {@code @OperationLog} command — far from the configuration list that caused it.
  * Never creates tables. Disabled when {@code schema-validation=none}. The MyBatis-Plus sibling of
- * {@code JdbcOperationLogSchemaValidator}.
  */
 @DependsOnDatabaseInitialization
 public final class MybatisPlusOperationLogSchemaValidator implements InitializingBean {
