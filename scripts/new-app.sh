@@ -101,6 +101,12 @@ mvn -B --no-transfer-progress -q archetype:generate -DinteractiveMode=false \
 mv "$staging/$APP_ARTIFACT_ID" app
 rm -rf aipersimmon-ddd-scaffold
 
+# Publishing the archetype is the template's business, not the consumer's, and the
+# workflow builds the directory that just went away — it would fail on their first
+# release. publish-library.yml stays: they keep aipersimmon-ddd/ and may well want
+# to publish it.
+rm -f .github/workflows/publish-archetype.yml
+
 # The template's own files point at the path we just deleted, and one of them is not
 # prose: ci.yml builds it. Repoint them at app/ so the project that lands is one that
 # actually builds. Only the paths are rewritten — surrounding wording still calls it
