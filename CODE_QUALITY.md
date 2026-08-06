@@ -1,54 +1,67 @@
-# CODE_QUALITY
+# Code Quality
 
-SOP for keeping code within the quality gates. When a gate fails or a review flags
-complexity/duplication: **solve it per this file. Never raise a threshold or suppress a
-finding just to make a build pass.**
+## Purpose
+
+SOP for keeping code inside this repo's quality gates.
+
+Sections 2 and 3 are **fill-in**: the gates and thresholds depend on the language
+and toolchain you bring. Everything else is language-neutral — keep it as written
+unless you are deliberately changing the way of working.
+
+When a gate fails, or a review flags complexity or duplication:
+**solve it per this file. Never raise a threshold or suppress a finding just to
+make a build pass.**
+
+Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them.
 
 ## 1. Metrics — what each catches
 
 | metric | counts | flags | lever |
 |---|---|---|---|
-| Cyclomatic | decision points (`if`/loop/`case`/`&&`/`\|\|`/`?:`) | test & change risk (paths) | fewer branches |
-| Cognitive | nesting depth + linear-flow breaks | reading difficulty | flatten + extract |
-| NPath | product of independent branches | (multiplicative; noisy) | split method |
-| ExcessiveParameterList | params | often DI, not data | param object / tune |
-| TooManyMethods | methods | often per-item classes | split / tune |
-| GodClass | WMC + ATFD + low cohesion (TCC) | several classes glued in one | Extract Class |
-| CPD | duplicated tokens | copy-paste | DRY-extract |
+| Cyclomatic complexity | decision points (`if`/loop/`case`/`&&`/`\|\|`/`?:`) | test & change risk (paths) | fewer branches |
+| Cognitive complexity | nesting depth + linear-flow breaks | reading difficulty | flatten + extract |
+| NPath complexity | product of independent branches | (multiplicative; noisy) | split function |
+| Parameter count | params | often injected collaborators, not data | param object / tune |
+| Members per type | methods or functions | often per-item types | split / tune |
+| God class | size + reach into other types + low cohesion | several types glued into one | Extract Class |
+| Duplication | repeated token runs across files | copy-paste | DRY-extract |
 
-Metrics are **review triggers, not design goals.** Cognitive complexity is the primary
-readability guard; cyclomatic/NPath are secondary.
+Rule names differ per tool; the metric is what matters.
 
-## 2. Enforced gates (fail the build)
+Metrics are **review triggers, not design goals.** Cognitive complexity is the
+primary readability guard; cyclomatic and NPath are secondary.
 
-| gate | tool | scope |
-|---|---|---|
-| Format | Spotless (google-java-format) | all |
-| Complexity + duplication | PMD + CPD (`failOnViolation=true`) | all |
-| Bytecode defects | SpotBugs (`failOnError=true`) | all |
-| Coverage + mutation | JaCoCo + PIT | opt-in per domain module (design-00007 §4.3) |
+## 2. Enforced gates — fill in
 
-Shared config lives in `aipersimmon-ddd-quality-config` (`pmd-ruleset.xml`,
-`spotbugs-exclude.xml`). By D1 there is no shared provider parent, so the library parent
-pom and the scaffold `multi-module/pom.xml` carry the plugin block **by hand, in sync.**
+List every check that fails the build. A check that only warns is not a gate.
 
-## 3. Tuned thresholds (and why)
+| gate | tool | scope | config |
+|---|---|---|---|
+| Format | `<formatter>` | `<what it covers>` | `<config path>` |
+| Complexity + duplication | `<linter>` | `<what it covers>` | `<config path>` |
+| Static analysis | `<analyzer>` | `<what it covers>` | `<config path>` |
+| Coverage | `<tool>` | `<what it covers>` — bar per [TESTING.md](TESTING.md) | `<config path>` |
+| `<other>` | `<tool>` | `<what it covers>` | `<config path>` |
 
-| rule | value | rationale |
-|---|---|---|
-| CognitiveComplexity | 15 | default; the real readability guard — kept strict |
-| CyclomaticComplexity | 15 | raised from PMD default 10 to the accepted upper bound; over → refactor, don't raise further |
-| NPathComplexity | 200 | PMD default; over → refactor or suppress |
-| ExcessiveParameterList | 18 | raised: DI-heavy constructors / `@Bean` factories carry collaborators, not data |
-| TooManyMethods | 30 | raised: per-item classes (config `@Bean`, DAO-per-query, codec, state handlers) |
-| CPD minimumTokens | 250 (library) / 100 (scaffold) | library: MyBatis entity accessor boilerplate; generated projects keep the strict default |
+Record where the shared config lives. If more than one build file carries the
+same gate configuration, name each one here — they must be changed together.
+
+## 3. Tuned thresholds (and why) — fill in
+
+Start from the tool defaults. Record every deviation here **and** next to the
+config itself, with the reason. A tuned value with no recorded rationale is
+indistinguishable from a value that was raised to silence a failure.
+
+| check | default | this repo | rationale |
+|---|---|---|---|
+| `<check>` | `<default>` | `<value>` | `<why the default does not fit a correct pattern here>` |
 
 ## 4. Refactoring levers (effect per metric)
 
 | technique | cyclomatic | cognitive |
 |---|---|---|
 | Guard clause / early return | ~ | ↓↓ |
-| Extract method (named step) | ↓ local | ↓ |
+| Extract function (named step) | ↓ local | ↓ |
 | Name a boolean condition | ~ | ↓ |
 | Strategy / polymorphism (repeated type-switch) | ↓ caller | ↓ |
 | Decision / transition table | ↓↓ | ↓↓ |
@@ -58,7 +71,7 @@ pom and the scaffold `multi-module/pom.xml` carry the plugin block **by hand, in
 ## 5. SOP — refactoring order (do not skip step 1)
 
 1. **Test first.** Characterize current behavior + key branches with tests that pass on the *unchanged* code — the safety net. (Pure move/extract with full existing coverage may reuse it; state which tests cover the change.)
-2. **Flatten nesting** — guard clauses / early return. Domain code throws a named error, never a silent `return`.
+2. **Flatten nesting** — guard clauses / early return. Domain code raises a named error, never a silent empty return.
 3. **Extract by business step** — names express intent (`priceAndValidateLines`, not `handle1`).
 4. **Find the repeated decision dimension** (payment method, order state, level, channel).
 5. **Pick the structure:** type-varying behavior → Strategy · state machine → transition table / State · finite input combos → decision table · standalone constraint → Specification · fixed sequence → Pipeline · God Class → Extract Class by cohesive field-cluster.
@@ -68,8 +81,8 @@ pom and the scaffold `multi-module/pom.xml` carry the plugin block **by hand, in
 ## 6. Resolve → Tune → Suppress (strict priority)
 
 1. **Solve (refactor).** Default. Extract the genuine outlier; do not design around the number.
-2. **Tune a threshold.** Only when a high count is *inherent to a correct pattern* (DI ctors, DAO-per-query, config beans). Document the reason in `pmd-ruleset.xml`. **Never raise a threshold to swallow one outlier — refactor the outlier.**
-3. **Suppress.** Only for framework boilerplate or a true false positive. Must be **visible + reasoned**: a `spotbugs-exclude.xml` entry, a CPD `minimumTokens` bump, or `@SuppressWarnings` with a comment. Prefer narrow/local over global.
+2. **Tune a threshold.** Only when a high count is *inherent to a correct pattern* in this stack. Document the reason in §3 and in the config. **Never raise a threshold to swallow one outlier — refactor the outlier.**
+3. **Suppress.** Only for framework boilerplate or a true false positive. Must be **visible + reasoned**: an entry in the tool's exclusion file, or an inline suppression carrying a comment. Prefer narrow and local over global.
 
 ## 7. Anti-patterns (never)
 
@@ -81,5 +94,5 @@ pom and the scaffold `multi-module/pom.xml` carry the plugin block **by hand, in
 
 ## 8. New vs legacy
 
-Block **new** violations at the gate. Record legacy as debt and ratchet thresholds down
-over time — do not mass-rewrite a working system in one pass.
+Block **new** violations at the gate. Record legacy as debt and ratchet
+thresholds down over time — do not mass-rewrite a working system in one pass.

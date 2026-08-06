@@ -33,6 +33,13 @@ Every issue should first be reproduced by a failing test, then fixed:
 If a failing test is not practical, record the reason and the strongest
 verification used instead.
 
+## Relations
+
+- `blocks` — **required**: the docs this issue blocks or clarifies. Usually a
+  `task`, `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
+  issue contradicts is just as valid. An issue that blocks nothing has no reader
+  who needs it.
+
 ## Exclude
 
 - long-term architecture decisions

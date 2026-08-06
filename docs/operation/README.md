@@ -13,6 +13,10 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `implements` — the `decision` or `design` this procedure carries out.
+
 ## Exclude
 
 - product requirements

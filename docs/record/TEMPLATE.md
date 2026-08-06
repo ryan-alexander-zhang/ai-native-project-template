@@ -1,7 +1,7 @@
 ---
 id: record-00001-example-slug
 type: record
-role: main|patch
 status: draft|active|archived
-parent: <id>
+parent: <plan-id>                             # the plan this record accepts
+verifies: [<spec-id | rule-id | requirement-id>, ...]   # what this record verified
 ---

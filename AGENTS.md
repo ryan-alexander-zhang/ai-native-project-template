@@ -68,16 +68,23 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## 6. Document Workflow
 
 - For document work, including status transitions, follow `DOCUMENT.md`.
+- As soon as a `spec`, `rule`, or `design` draft is written or substantively changed — and
+  before a human is asked to review it — a subagent that did not write it audits it: first
+  against that folder's `README.md`, then against the content itself. Name the missing
+  rules, cases, and GWTs, the readings taken silently, and every value it cannot confirm.
+  Each finding becomes an amendment or a named Open Question; what only a domain owner can
+  settle is never left as an assumption.
+- When writing the acceptance for a `spec` or a `rule`, derive the set per `ACCEPTANCE.md`.
 
 ## 7. Development Workflow
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
-- When a quality gate fails (Spotless / PMD+CPD / SpotBugs / coverage / mutation) or a
-  review flags complexity or duplication, refactor per `CODE_QUALITY.md`: solve it — do not
-  raise a threshold or suppress a finding to make the build pass.
+- When a quality gate fails (format / complexity / duplication / static analysis / coverage)
+  or a review flags complexity or duplication, refactor per `CODE_QUALITY.md`: solve it — do
+  not raise a threshold or suppress a finding to make the build pass.
 - When you discover a bug or defect during any task, before fixing it, create a
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
   with a failing test, following `docs/issue/README.md`. Only then apply the fix.
 - Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
-- Before a feature-sized `plan` becomes `resolved`, have a subagent verify from the docs that every linked `us`/`spec` GWT has a passing test and no requirement is unfinished, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.
+- Before a feature-sized `plan` becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test and that no `spec-<n>-FR-<i>` or `rule-<n>-BR-<i>` is unverified, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.

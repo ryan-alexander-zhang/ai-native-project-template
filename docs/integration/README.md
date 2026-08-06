@@ -12,6 +12,10 @@ Use `TEMPLATE.md` for front matter.
 
 Add more when useful.
 
+## Relations
+
+- `informs` — the `spec` / `design` / `plan` docs these notes are input for.
+
 ## Exclude
 
 - general reference materials

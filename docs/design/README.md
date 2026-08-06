@@ -1,33 +1,39 @@
 # Designs
 
-This directory stores reusable design docs.
+This directory stores design docs.
 Use `TEMPLATE.md` for front matter.
 
 ## Must Include
 
-- reusable design content that is worth linking from one or more `spec` or
-  `plan` docs
+- the design for the `spec` / `plan` docs that link it — any size, reusable or
+  one-off. Design is never inlined in a `spec` or a `plan`.
 
 Add more when useful.
 
+## Relations
+
+- `informs` — the `spec` / `plan` docs this design is input for. May be empty while
+  the design waits to be picked up.
+
 ## Exclude
 
+- business rules (use `rule/`)
+- system requirements and their acceptance (use the consuming `spec`)
 - task breakdown
 - execution steps
-- one-off implementation notes that belong inside a single `spec` or `plan`
 
-## When To Extract
+## Guideline
 
-Default to a design doc here: a `spec` links its Technical Design to a `design/`
-doc rather than embedding it. This keeps designs collectable in one folder, lets
-a design be written before its spec and associated later, and lets one design be
-reused by more than one `spec`/`plan`. An extracted design is independent: its
-`parent` may be a `spec`, a `plan`, or empty.
+Prefer Mermaid:
 
-Small-spec exception: keep the design inline in the `spec` (its Technical Design
-section) when the scope is small, and extract it here once it is reused or large
-enough to review on its own.
+1. Domain — class diagram.
+2. Lifecycle — state diagram.
+3. Database — ER diagram plus the SQL schema.
+4. Interaction — sequence diagram.
+5. Branching process — flowchart.
+6. API — the contract itself, not a diagram.
 
 ## Note
 
-Prefer Mermaid for design diagrams, such as class, ER, sequence, and state diagrams.
+No fixed structure. Domain, database, API, integration, process, deployment —
+structure the body around the subject.

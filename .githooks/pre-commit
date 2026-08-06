@@ -1,7 +1,7 @@
 #!/bin/sh
 # Block committing docs still in an intermediate 'draft' status.
 # A doc must be reviewed and promoted (living -> active, work item -> open)
-# or resolved before it is committed. See "Document Status Workflow" in AGENTS.md.
+# or resolved before it is committed.
 #
 # Enable once per clone:  git config core.hooksPath .githooks
 # Bypass intentionally:   git commit --no-verify
