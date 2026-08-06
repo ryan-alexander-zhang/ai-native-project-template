@@ -1,5 +1,5 @@
 {
-  "exclude": [".codex/", "docs/*/[^A-Z]*"],
+  "exclude": [".codex/", ".understand-anything/", "docs/*/[^A-Z]*"],
   "vars": {
     "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" },
     "APP_GROUP_ID": { "when_variant": "ddd", "prompt": "Application groupId", "default": "com.example" },
