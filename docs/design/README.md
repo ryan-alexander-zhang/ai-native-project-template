@@ -1,12 +1,12 @@
 # Designs
 
-This directory stores reusable design docs.
+This directory stores design docs.
 Use `TEMPLATE.md` for front matter.
 
 ## Must Include
 
-- reusable design content that is worth linking from one or more `spec` or
-  `plan` docs
+- the design for the `spec` / `plan` docs that link it — any size, reusable or
+  one-off. Design is never inlined in a `spec` or a `plan`.
 
 Add more when useful.
 
@@ -21,7 +21,6 @@ Add more when useful.
 - system requirements and their acceptance (use the consuming `spec`)
 - task breakdown
 - execution steps
-- one-off implementation notes that belong inside a single `spec` or `plan`
 
 ## Guideline
 
