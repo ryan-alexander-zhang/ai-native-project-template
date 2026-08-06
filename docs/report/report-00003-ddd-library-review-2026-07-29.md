@@ -2,7 +2,6 @@
 id: report-00003-ddd-library-review-2026-07-29
 type: report
 status: active
-informs: [report-00001-ddd-framework-review]
 ---
 
 对 `aipersimmon-ddd/` 库树（47 个模块，约 2.8 万行 main 代码，725 个 Java 文件）的第二次全量评审：
