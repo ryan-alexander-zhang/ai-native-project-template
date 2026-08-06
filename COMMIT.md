@@ -29,9 +29,8 @@
 
 ## Hooks
 
-This repo ships a `pre-commit` hook that blocks committing docs still in `draft`
-(see the Document Status Workflow in [AGENTS.md](AGENTS.md)). Enable it once per
-clone:
+This repo ships a `pre-commit` hook that blocks committing docs still in `draft`.
+Enable it once per clone:
 
 ```bash
 git config core.hooksPath .githooks
