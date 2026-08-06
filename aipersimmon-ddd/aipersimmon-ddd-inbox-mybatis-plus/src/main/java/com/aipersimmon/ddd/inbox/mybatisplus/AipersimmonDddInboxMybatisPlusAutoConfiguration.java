@@ -84,8 +84,14 @@ public class AipersimmonDddInboxMybatisPlusAutoConfiguration {
   @EnableScheduling
   static class InboxCleanupConfiguration {
 
+    // Gated on SqlSessionFactory, not on InboxMapper, even though the mapper is what it needs.
+    // Spring processes a member class before the enclosing class's @Bean methods, so a
+    // @ConditionalOnBean(InboxMapper.class) here is evaluated before the enclosing class has
+    // registered aipersimmonInboxMapper and never matches — this cleanup was unwireable. The
+    // SqlSessionFactory comes from an earlier auto-configuration, so it is already a definition;
+    // the mapper itself is resolved at instantiation time, by which point it exists.
     @Bean
-    @ConditionalOnBean(InboxMapper.class)
+    @ConditionalOnBean(SqlSessionFactory.class)
     @ConditionalOnMissingBean
     public InboxCleanup inboxCleanup(
         InboxMapper inboxMapper,
