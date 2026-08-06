@@ -2,7 +2,7 @@
 id: plan-00009-code-quality-gates-implementation
 type: plan
 status: open
-parent: design-00007-code-quality-gates
+implements: [design-00007-code-quality-gates]
 ---
 
 # 代码质量门禁落地计划

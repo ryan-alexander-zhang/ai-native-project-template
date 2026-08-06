@@ -2,7 +2,7 @@
 id: issue-00046-edge-request-id-not-searchable-in-traces
 type: issue
 status: resolved
-parent: design-00005-observability-and-distributed-tracing
+blocks: [design-00005-observability-and-distributed-tracing]
 ---
 
 # 边缘 request id 未上报到 trace,SigNoz 里按 X-Request-Id 搜不到

@@ -2,7 +2,7 @@
 id: issue-00059-outbox-relay-tests-race-the-startup-poll
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # outbox relay 测试与「启动时的第一次轮询」抢 ShedLock 锁：间歇性失败，`poll-delay-ms` 挡不住

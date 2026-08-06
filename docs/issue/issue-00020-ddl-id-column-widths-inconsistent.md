@@ -2,7 +2,7 @@
 id: issue-00020-ddl-id-column-widths-inconsistent
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # PostgreSQL/H2 的 id 列宽比其承载的 id 源列窄,长 id 会溢出回滚

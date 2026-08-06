@@ -2,7 +2,7 @@
 id: issue-00019-starter-beans-not-gated-on-jdbctemplate
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 无 DataSource 时 starter 不干净退避,反而让应用上下文启动失败

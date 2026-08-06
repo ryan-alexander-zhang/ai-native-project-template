@@ -2,7 +2,7 @@
 id: analysis-00009-saga-implementation-deep-dive
 type: analysis
 status: active
-parent: analysis-00007-saga-process-manager
+informs: [analysis-00007-saga-process-manager]
 ---
 
 # Saga 已落地实现深度剖析:原理、数据模型、能力边界与 Seata 对照

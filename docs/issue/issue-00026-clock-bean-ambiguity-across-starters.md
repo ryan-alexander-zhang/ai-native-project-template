@@ -2,7 +2,7 @@
 id: issue-00026-clock-bean-ambiguity-across-starters
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # 多个 starter 各自贡献 `Clock` bean 时,按参数名注入失效 → 上下文启动失败

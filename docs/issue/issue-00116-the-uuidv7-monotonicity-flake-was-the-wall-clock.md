@@ -2,7 +2,7 @@
 id: issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # UUIDv7 单调性 flake：是墙钟，不是并发，也不是 JUG 的 bug

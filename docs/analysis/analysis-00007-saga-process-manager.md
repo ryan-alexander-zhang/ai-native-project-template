@@ -2,7 +2,6 @@
 id: analysis-00007-saga-process-manager
 type: analysis
 status: active
-parent:
 ---
 
 # 跨聚合长流程怎么封装：Saga / Process Manager 的构件取舍

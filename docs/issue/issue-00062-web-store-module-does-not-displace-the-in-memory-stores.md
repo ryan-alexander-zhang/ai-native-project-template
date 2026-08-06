@@ -2,7 +2,7 @@
 id: issue-00062-web-store-module-does-not-displace-the-in-memory-stores
 type: issue
 status: resolved
-parent: plan-00015-scaffold-depth-and-evaluability
+blocks: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 # 加了 `-web-store-jdbc` 也不一定生效：两个自动配置对同一个 bean 没有先后关系

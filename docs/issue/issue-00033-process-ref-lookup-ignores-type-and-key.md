@@ -2,7 +2,7 @@
 id: issue-00033-process-ref-lookup-ignores-type-and-key
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # `ProcessRef` 只按 `instanceId` 定位行,`processType`/`businessKey` 从不参与校验

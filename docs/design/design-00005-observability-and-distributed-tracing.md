@@ -2,7 +2,6 @@
 id: design-00005-observability-and-distributed-tracing
 type: design
 status: active
-parent:
 ---
 
 # 可观测性与分布式追踪：Trace / Log / Metric 全链路闭环

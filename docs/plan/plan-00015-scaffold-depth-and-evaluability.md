@@ -2,7 +2,7 @@
 id: plan-00015-scaffold-depth-and-evaluability
 type: plan
 status: resolved
-parent: report-00001-ddd-framework-review
+implements: [report-00001-ddd-framework-review]
 ---
 
 # 脚手架：把回流缺口补上，并让它能被用来"评估组件好不好用"

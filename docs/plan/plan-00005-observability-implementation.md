@@ -2,7 +2,7 @@
 id: plan-00005-observability-implementation
 type: plan
 status: resolved
-parent: design-00005-observability-and-distributed-tracing
+implements: [design-00005-observability-and-distributed-tracing]
 ---
 
 # 可观测性闭环落地计划

@@ -2,7 +2,6 @@
 id: analysis-00011-event-send-consume-mechanisms
 type: analysis
 status: active
-parent:
 ---
 
 # 脚手架事件收发机制清单：领域事件 / 集成事件到底提供了多少种发送与消费方式

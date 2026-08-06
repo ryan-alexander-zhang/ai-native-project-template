@@ -2,7 +2,7 @@
 id: analysis-00016-samples-tactical-modelling
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S16 战术建模：实体、值对象、聚合与规则原语

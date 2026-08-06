@@ -2,7 +2,7 @@
 id: issue-00080-problem-title-key-has-no-message-bundle
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # RFC 9457 的 title 是 message key，但 scaffold 没有任何 messages 资源包

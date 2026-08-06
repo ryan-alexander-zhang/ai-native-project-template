@@ -2,7 +2,6 @@
 id: design-00001-aipersimmon-ddd-and-scaffold
 type: design
 status: active
-parent:
 ---
 
 # aipersimmon-ddd 库 + Maven-archetype 脚手架：最终形态与 Phase 1 设计

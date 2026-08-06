@@ -2,7 +2,7 @@
 id: analysis-00021-samples-local-transaction-aggregate
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S8 本地事务：聚合边界、乐观锁与冲突重试

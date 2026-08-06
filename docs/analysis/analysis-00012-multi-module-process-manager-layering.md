@@ -2,7 +2,7 @@
 id: analysis-00012-multi-module-process-manager-layering
 type: analysis
 status: active
-parent: design-00004-durable-process-manager-runtime
+informs: [design-00004-durable-process-manager-runtime]
 ---
 
 # multi-module 订单履约 Process Manager —— 从入口到闭环的完整梳理

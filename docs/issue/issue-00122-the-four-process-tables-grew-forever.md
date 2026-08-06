@@ -2,7 +2,7 @@
 id: issue-00122-the-four-process-tables-grew-forever
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # 流程管理器的四张表，永远只增不减

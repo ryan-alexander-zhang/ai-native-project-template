@@ -2,7 +2,6 @@
 id: analysis-00014-ddd-samples-scenario-catalog
 type: analysis
 status: draft
-parent:
 ---
 
 # DDD 示例场景总纲：`aipersimmon-ddd-samples` 规划

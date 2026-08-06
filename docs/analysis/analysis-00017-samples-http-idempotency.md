@@ -2,7 +2,7 @@
 id: analysis-00017-samples-http-idempotency
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S2 HTTP 写接口的幂等提交与重放防护

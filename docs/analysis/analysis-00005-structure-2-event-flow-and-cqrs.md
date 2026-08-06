@@ -2,7 +2,6 @@
 id: analysis-00005-structure-2-event-flow-and-cqrs
 type: analysis
 status: active
-parent:
 ---
 
 # structure-2 事件驱动蓝图：领域事件 / 集成事件完整链路 + CQRS-lite 读模型（扩充设计）

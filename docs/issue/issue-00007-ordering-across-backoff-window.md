@@ -2,7 +2,7 @@
 id: issue-00007-ordering-across-backoff-window
 type: issue
 status: resolved
-parent: issue-00003-messaging-delivery-reliability
+blocks: [issue-00003-messaging-delivery-reliability]
 ---
 
 # 退避窗口内同 `subject` 的后续事件越过失败事件(破坏 per-aggregate 顺序)

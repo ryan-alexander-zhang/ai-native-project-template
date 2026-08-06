@@ -2,7 +2,7 @@
 id: issue-00034-mysql-deadline-cancel-self-referencing-subquery
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # MySQL deadline cancel 的自引用子查询触发 ERROR 1093(cancel/schedule 路径无 MySQL 覆盖故全绿)

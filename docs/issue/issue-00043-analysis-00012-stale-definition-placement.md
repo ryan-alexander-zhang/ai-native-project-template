@@ -2,7 +2,7 @@
 id: issue-00043-analysis-00012-stale-definition-placement
 type: issue
 status: resolved
-parent: analysis-00012-multi-module-process-manager-layering
+blocks: [analysis-00012-multi-module-process-manager-layering]
 ---
 
 # `analysis-00012` §1 现在时仍称 Definition 在 application 层，与已落地代码不符（文档漂移，非自相矛盾）

@@ -2,7 +2,7 @@
 id: analysis-00029-samples-external-messages-inbound
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S5 消费外部系统的消息（非本体系事件格式）

@@ -2,7 +2,6 @@
 id: decision-00009-event-type-markers-and-handler-contracts
 type: decision
 status: active
-parent:
 ---
 
 # 事件类型标记与三种 Handler 的契约形态

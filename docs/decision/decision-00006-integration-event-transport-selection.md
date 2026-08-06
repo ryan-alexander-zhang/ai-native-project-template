@@ -2,7 +2,6 @@
 id: decision-00006-integration-event-transport-selection
 type: decision
 status: active
-parent:
 ---
 
 # 集成事件传输:三种方式、确定性装配、monolith-first 默认

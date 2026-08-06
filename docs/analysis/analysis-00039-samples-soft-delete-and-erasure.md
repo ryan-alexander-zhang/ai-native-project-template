@@ -2,7 +2,7 @@
 id: analysis-00039-samples-soft-delete-and-erasure
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S27 软删除、数据保留与擦除

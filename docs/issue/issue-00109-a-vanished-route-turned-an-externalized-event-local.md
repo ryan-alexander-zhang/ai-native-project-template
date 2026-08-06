@@ -2,7 +2,7 @@
 id: issue-00109-a-vanished-route-turned-an-externalized-event-local
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 路由消失时，外发事件被静默改判为本地投递并标记已发送

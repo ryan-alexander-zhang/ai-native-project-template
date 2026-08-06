@@ -2,7 +2,7 @@
 id: issue-00106-an-empty-flyway-component-list-created-every-table
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # `flyway.components` 为空时代码全建表，而四份文档承诺不建：往生产库写 DDL 的两种说法

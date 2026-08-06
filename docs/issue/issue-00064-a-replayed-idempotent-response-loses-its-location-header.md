@@ -2,7 +2,7 @@
 id: issue-00064-a-replayed-idempotent-response-loses-its-location-header
 type: issue
 status: resolved
-parent: plan-00015-scaffold-depth-and-evaluability
+blocks: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 # 幂等重放只还原 `Content-Type`：重试拿到 201 却没有 `Location`，找不到自己创建的资源

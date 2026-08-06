@@ -2,7 +2,7 @@
 id: issue-00050-outbox-relay-budget-and-config-validation
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # Outbox relay:出厂默认违反自身租约预算不变量 + 关键配置属性无 Bean Validation

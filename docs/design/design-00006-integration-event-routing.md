@@ -2,7 +2,6 @@
 id: design-00006-integration-event-routing
 type: design
 status: active
-parent:
 ---
 
 # 集成事件路由：进程内默认 + 逐事件选择性外发到命名 topic

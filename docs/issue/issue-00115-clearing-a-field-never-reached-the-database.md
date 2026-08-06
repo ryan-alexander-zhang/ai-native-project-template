@@ -2,7 +2,7 @@
 id: issue-00115-clearing-a-field-never-reached-the-database
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 领域方法清空的字段，从来没有写进数据库

@@ -2,7 +2,7 @@
 id: issue-00125-the-claim-sorted-one-instance-last-forever
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # 认领把某个实例永远排在最后

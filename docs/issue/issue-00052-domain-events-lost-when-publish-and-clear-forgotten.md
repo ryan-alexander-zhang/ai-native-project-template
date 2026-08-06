@@ -2,7 +2,7 @@
 id: issue-00052-domain-events-lost-when-publish-and-clear-forgotten
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # `save` 与 `publishAndClear` 是两次手工调用：漏掉第二次则领域事件静默丢失，无异常、无日志、无任何信号

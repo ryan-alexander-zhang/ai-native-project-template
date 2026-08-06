@@ -2,7 +2,7 @@
 id: issue-00082-domain-surface-no-use-case-can-reach
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 领域建了应用层用不到的能力：ship / ReviewRejected / PaymentOperations.find 三处不可达

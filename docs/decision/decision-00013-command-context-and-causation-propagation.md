@@ -2,7 +2,6 @@
 id: decision-00013-command-context-and-causation-propagation
 type: decision
 status: active
-parent:
 ---
 
 # 命令派发上下文与因果传播:`CommandContext` + 全链路 `EventEnvelope`

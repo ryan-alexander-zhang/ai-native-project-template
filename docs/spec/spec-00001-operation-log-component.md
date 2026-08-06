@@ -2,7 +2,6 @@
 id: spec-00001-operation-log-component
 type: spec
 status: active
-parent:
 ---
 
 # Spec: 通用操作日志组件（Operation Log）MVP

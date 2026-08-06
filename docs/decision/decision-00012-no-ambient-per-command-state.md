@@ -2,7 +2,6 @@
 id: decision-00012-no-ambient-per-command-state
 type: decision
 status: active
-parent:
 ---
 
 # 禁止 ambient 每命令状态:领域事件在 save 处排空,移除 `AggregateCollector`/ThreadLocal

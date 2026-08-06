@@ -2,7 +2,7 @@
 id: issue-00037-parked-input-replay-order-non-monotonic
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # PARKED input 重放顺序非确定:排序键(`created_at`+随机 UUID)无每实例单调性

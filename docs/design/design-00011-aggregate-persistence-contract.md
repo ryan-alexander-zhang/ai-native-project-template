@@ -2,7 +2,7 @@
 id: design-00011-aggregate-persistence-contract
 type: design
 status: active
-parent: plan-00013-phase-one-correctness-remediation
+informs: [plan-00013-phase-one-correctness-remediation]
 ---
 
 # 聚合持久化契约：版本化写入、事件发布收口，与 MyBatis-Plus 拦截器组合

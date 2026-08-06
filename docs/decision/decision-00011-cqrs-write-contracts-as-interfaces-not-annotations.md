@@ -2,7 +2,6 @@
 id: decision-00011-cqrs-write-contracts-as-interfaces-not-annotations
 type: decision
 status: active
-parent:
 ---
 
 # CQRS 写侧契约用接口、查询侧标记用注解:不提供 `@Command`

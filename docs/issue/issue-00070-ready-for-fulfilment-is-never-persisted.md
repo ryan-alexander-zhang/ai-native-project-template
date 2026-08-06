@@ -2,7 +2,7 @@
 id: issue-00070-ready-for-fulfilment-is-never-persisted
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # `READY_FOR_FULFILMENT` 从未落库：应用层把两个状态压成一个，客户自助取消在主流程不可达

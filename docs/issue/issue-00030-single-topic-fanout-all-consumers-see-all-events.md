@@ -2,7 +2,7 @@
 id: issue-00030-single-topic-fanout-all-consumers-see-all-events
 type: issue
 status: open
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # 入站消费桥订阅全部外发 topic 并全量进程内重投:无选择性订阅

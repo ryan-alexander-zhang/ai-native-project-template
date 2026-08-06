@@ -2,7 +2,7 @@
 id: issue-00077-money-arithmetic-has-no-overflow-guard
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # Money 的加法与乘法没有溢出保护：一个演示金额建模的值对象会静默回绕

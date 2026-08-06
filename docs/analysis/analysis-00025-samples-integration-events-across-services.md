@@ -2,7 +2,7 @@
 id: analysis-00025-samples-integration-events-across-services
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S4 集成事件跨服务：outbox 发布 + Kafka + inbox 消费

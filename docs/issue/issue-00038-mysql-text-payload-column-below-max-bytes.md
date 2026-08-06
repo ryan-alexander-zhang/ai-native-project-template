@@ -2,7 +2,7 @@
 id: issue-00038-mysql-text-payload-column-below-max-bytes
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # MySQL 样例 DDL 的 `TEXT` payload 列容量远低于 `payload.max-bytes`,合法 payload 仍会插入失败

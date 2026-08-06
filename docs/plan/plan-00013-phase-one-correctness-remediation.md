@@ -2,7 +2,7 @@
 id: plan-00013-phase-one-correctness-remediation
 type: plan
 status: resolved
-parent: report-00001-ddd-framework-review
+implements: [report-00001-ddd-framework-review]
 ---
 
 # 阶段一：正确性止血落地计划

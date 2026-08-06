@@ -2,7 +2,7 @@
 id: plan-00006-middleware-integration
 type: plan
 status: resolved
-parent: design-00001-aipersimmon-ddd-and-scaffold
+implements: [design-00001-aipersimmon-ddd-and-scaffold]
 ---
 
 # 多模块参考应用中间件集成落地计划

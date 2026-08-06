@@ -2,7 +2,6 @@
 id: design-00004-durable-process-manager-runtime
 type: design
 status: active
-parent:
 ---
 
 # Durable Process Manager：通用构件、JDBC Runtime 与 Spring Boot Starter

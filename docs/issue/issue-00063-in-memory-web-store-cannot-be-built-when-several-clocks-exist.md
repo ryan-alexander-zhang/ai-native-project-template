@@ -2,7 +2,7 @@
 id: issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist
 type: issue
 status: resolved
-parent: plan-00015-scaffold-depth-and-evaluability
+blocks: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 # 开启幂等即启动失败：内存兜底注入裸 `Clock`，而框架自己装了 5 个 `Clock`

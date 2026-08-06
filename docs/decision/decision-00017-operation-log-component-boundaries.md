@@ -2,7 +2,7 @@
 id: decision-00017-operation-log-component-boundaries
 type: decision
 status: active
-parent: analysis-00013-operation-log-component
+motivated_by: [analysis-00013-operation-log-component]
 ---
 
 # 通用操作日志组件：定位、模块、事务与安全边界

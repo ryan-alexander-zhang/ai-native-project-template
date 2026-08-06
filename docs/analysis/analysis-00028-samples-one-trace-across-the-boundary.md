@@ -2,7 +2,7 @@
 id: analysis-00028-samples-one-trace-across-the-boundary
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S15 可观测性：跨边界追一次请求（寄宿 S4）

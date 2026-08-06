@@ -2,7 +2,7 @@
 id: issue-00027-outbox-atomicity-broken-by-in-memory-aggregate
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # 事务性 outbox 骑在内存聚合上,原子性保证形同虚设

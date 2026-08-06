@@ -2,7 +2,7 @@
 id: issue-00120-mariadb-was-support-nobody-had-declared
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # MariaDB 是一份没有人声明过的"支持"

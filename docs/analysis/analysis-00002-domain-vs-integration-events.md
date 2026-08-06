@@ -2,7 +2,6 @@
 id: analysis-00002-domain-vs-integration-events
 type: analysis
 status: active
-parent:
 ---
 
 # 领域事件 vs 集成事件：要不要区分？怎么落地？

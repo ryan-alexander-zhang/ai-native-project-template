@@ -2,7 +2,6 @@
 id: analysis-00008-web-api-response-envelope
 type: analysis
 status: active
-parent:
 ---
 
 # Web 层封装怎么做：`ApiResponse` / `ApiRequest` 该不该有——15+ 大厂 HTTP 接口约定对比

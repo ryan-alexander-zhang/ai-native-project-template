@@ -2,7 +2,7 @@
 id: issue-00103-parked-input-replay-is-not-crash-safe
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 挂起期间 park 的输入，重放只活在 redrive 的调用栈里：崩溃即永久丢失，且全树无人扫描

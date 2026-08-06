@@ -2,7 +2,7 @@
 id: issue-00118-the-recovery-paths-had-no-tests
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 两条恢复路径，正是修 critical 的那些代码，一条测试都没有

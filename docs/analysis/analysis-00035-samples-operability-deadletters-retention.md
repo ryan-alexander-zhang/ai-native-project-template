@@ -2,7 +2,7 @@
 id: analysis-00035-samples-operability-deadletters-retention
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S22 运维面：死信、重放、保留清理与启动自检

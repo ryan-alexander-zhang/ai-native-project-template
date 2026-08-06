@@ -2,7 +2,7 @@
 id: issue-00054-sample-aggregate-ids-use-random-uuid
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 旗舰样例的聚合主键用 `UUID.randomUUID()`：正是 `IdGenerator` 立项要消除的随机 VARCHAR 主键，且样例是使用者第一个抄的东西

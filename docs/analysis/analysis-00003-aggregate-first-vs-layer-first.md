@@ -2,7 +2,6 @@
 id: analysis-00003-aggregate-first-vs-layer-first
 type: analysis
 status: draft
-parent:
 ---
 
 # Aggregate-first vs layer-first packaging

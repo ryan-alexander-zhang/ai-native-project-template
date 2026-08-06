@@ -2,7 +2,7 @@
 id: issue-00112-the-bom-republished-every-pin-the-library-builds-against
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # BOM 继承 parent：把「本库恰好用什么版本编译」当成对消费方的承诺发布出去

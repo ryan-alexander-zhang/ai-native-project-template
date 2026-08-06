@@ -2,7 +2,7 @@
 id: issue-00005-integration-event-logical-type-resolution
 type: issue
 status: resolved
-parent: decision-00014-cloudevents-integration-event-contract
+blocks: [decision-00014-cloudevents-integration-event-contract]
 ---
 
 # 覆盖 `eventType()` 的集成事件无法被默认 resolver 消费(逻辑类型注册表按简单类名建键)

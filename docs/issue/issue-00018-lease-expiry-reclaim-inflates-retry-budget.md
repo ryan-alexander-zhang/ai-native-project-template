@@ -2,7 +2,7 @@
 id: issue-00018-lease-expiry-reclaim-inflates-retry-budget
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 租约过期重认领会消耗重试预算,可能把健康实例误判为耗尽并挂起

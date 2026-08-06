@@ -2,7 +2,7 @@
 id: issue-00081-openapi-examples-name-a-status-that-does-not-exist
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # OpenAPI 示例里的订单状态是一个不存在的值，id 示例也自相矛盾

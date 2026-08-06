@@ -2,7 +2,7 @@
 id: issue-00049-outbox-logging-dispatcher-fail-open-default
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # Outbox 默认 dispatcher 是 fail-open 的 LoggingOutboxDispatcher:无真实传输时消息被"记日志即标 sent",静默不投递

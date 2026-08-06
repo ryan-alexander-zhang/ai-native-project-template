@@ -2,7 +2,7 @@
 id: design-00003-exception-model
 type: design
 status: active
-parent: decision-00010-exception-model
+informs: [decision-00010-exception-model]
 ---
 
 # aipersimmon-ddd 异常/错误体系:完整设计

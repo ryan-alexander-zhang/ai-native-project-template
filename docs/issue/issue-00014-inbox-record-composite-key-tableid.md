@@ -2,7 +2,7 @@
 id: issue-00014-inbox-record-composite-key-tableid
 type: issue
 status: resolved
-parent: issue-00003-messaging-delivery-reliability
+blocks: [issue-00003-messaging-delivery-reliability]
 ---
 
 # MyBatis 收件箱 `InboxRecord` 的 `@TableId` 误标在 `message_key` 上,与复合主键 `(consumer, message_key)` 不一致

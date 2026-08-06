@@ -2,7 +2,7 @@
 id: issue-00095-a-partial-reactor-build-silently-tests-stale-siblings
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # `mvn -pl start` 会静默地拿 ~/.m2 里的陈旧兄弟构件跑测试，症状指向完全错误的方向

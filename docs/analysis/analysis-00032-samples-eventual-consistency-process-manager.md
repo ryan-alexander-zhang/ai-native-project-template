@@ -2,7 +2,7 @@
 id: analysis-00032-samples-eventual-consistency-process-manager
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S9 最终一致性：process-manager 编排多步流程与补偿

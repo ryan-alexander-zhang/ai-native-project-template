@@ -2,7 +2,7 @@
 id: issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # `OutboxCleanupTest` 间歇失败：被测方法的定时首跑抢走 ShedLock 锁，直调被静默跳过

@@ -2,7 +2,7 @@
 id: plan-00007-aggregate-persistence-mybatis-plus
 type: plan
 status: resolved
-parent: design-00001-aipersimmon-ddd-and-scaffold
+implements: [design-00001-aipersimmon-ddd-and-scaffold]
 ---
 
 # 聚合落 PostgreSQL（MyBatis-Plus）+ per-BC schema 隔离

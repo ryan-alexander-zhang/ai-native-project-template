@@ -2,7 +2,7 @@
 id: plan-00008-integration-event-routing-implementation
 type: plan
 status: resolved
-parent: design-00006-integration-event-routing
+implements: [design-00006-integration-event-routing]
 ---
 
 # 集成事件逐事件路由落地：`@Externalized` + `RoutingOutboxDispatcher` + 多 topic

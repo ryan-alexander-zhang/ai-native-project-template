@@ -2,7 +2,7 @@
 id: issue-00090-order-lines-are-rewritten-on-every-save
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 子行集在每一次聚合保存时被整体重写，包括只改状态的那些保存

@@ -2,7 +2,7 @@
 id: design-00009-multi-tenancy-tenant-id
 type: design
 status: active
-parent: decision-00018-multi-tenancy-boundaries
+informs: [decision-00018-multi-tenancy-boundaries]
 ---
 
 # 多租户设计：`tenant_id` 判别列、租户原语组件与端到端传播

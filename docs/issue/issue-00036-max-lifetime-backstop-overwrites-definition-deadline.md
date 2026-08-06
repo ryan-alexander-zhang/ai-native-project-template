@@ -2,7 +2,7 @@
 id: issue-00036-max-lifetime-backstop-overwrites-definition-deadline
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 默认 max-lifetime backstop 覆盖 Definition 在 start 中对保留 deadline 的调度

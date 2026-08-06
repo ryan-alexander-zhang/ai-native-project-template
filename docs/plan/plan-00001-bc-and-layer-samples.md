@@ -2,7 +2,6 @@
 id: plan-00001-bc-and-layer-samples
 type: plan
 status: resolved
-parent:
 ---
 
 # Plan: `bc-and-layer-samples` — three runnable structures from analysis-00004

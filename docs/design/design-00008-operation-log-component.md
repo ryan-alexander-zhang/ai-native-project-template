@@ -2,7 +2,7 @@
 id: design-00008-operation-log-component
 type: design
 status: active
-parent: decision-00017-operation-log-component-boundaries
+informs: [decision-00017-operation-log-component-boundaries]
 ---
 
 # 通用操作日志组件：framework-free 内核、CQRS/Spring 捕获与 JDBC 存储

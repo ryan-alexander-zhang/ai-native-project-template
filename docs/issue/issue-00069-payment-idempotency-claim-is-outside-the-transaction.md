@@ -2,7 +2,7 @@
 id: issue-00069-payment-idempotency-claim-is-outside-the-transaction
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 演示的业务幂等模式有回滚洞：认领在事务外，且重投递静默返回而不重发结果

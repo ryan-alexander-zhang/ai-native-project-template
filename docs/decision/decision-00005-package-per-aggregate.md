@@ -2,7 +2,6 @@
 id: decision-00005-package-per-aggregate
 type: decision
 status: active
-parent:
 ---
 
 # Package per aggregate, with aggregate internals package-private

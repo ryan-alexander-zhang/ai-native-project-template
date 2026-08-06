@@ -2,7 +2,7 @@
 id: issue-00010-verify-kafka-dlt-with-embedded-broker
 type: issue
 status: resolved
-parent: issue-00003-messaging-delivery-reliability
+blocks: [issue-00003-messaging-delivery-reliability]
 ---
 
 # H3 代码成立,但 AC-5 验收结论言过其实(且暴露 DLT 目的地潜伏缺陷)

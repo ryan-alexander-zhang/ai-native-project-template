@@ -2,7 +2,7 @@
 id: issue-00071-credit-limit-is-checked-but-not-enforced
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 信用额度被检查、但没有被强制：跨聚合不变量走了既非强一致也非最终一致的第三条路

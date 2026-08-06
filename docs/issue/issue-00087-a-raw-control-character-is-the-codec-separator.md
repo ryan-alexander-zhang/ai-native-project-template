@@ -2,7 +2,7 @@
 id: issue-00087-a-raw-control-character-is-the-codec-separator
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 手写 codec 的分隔符是源码里一个裸的不可打印字节，且字段无转义

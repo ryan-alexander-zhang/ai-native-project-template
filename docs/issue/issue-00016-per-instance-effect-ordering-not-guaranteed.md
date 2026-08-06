@@ -2,7 +2,7 @@
 id: issue-00016-per-instance-effect-ordering-not-guaranteed
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 每实例效果顺序无强保证:`created_at` 并列即失序(排序键非单调)

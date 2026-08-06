@@ -2,7 +2,7 @@
 id: issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 幂等/重放/限流的 in-memory 默认实现在多实例下静默失效：一个只在 Javadoc 里警告的生产陷阱

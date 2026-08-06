@@ -2,7 +2,6 @@
 id: analysis-00001-domain-event-publishing
 type: analysis
 status: active
-parent:
 ---
 
 # 领域事件的发布与消费：跨 reference 对比 + 可插拔发布策略实现

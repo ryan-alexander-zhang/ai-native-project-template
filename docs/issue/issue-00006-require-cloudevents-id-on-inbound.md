@@ -2,7 +2,7 @@
 id: issue-00006-require-cloudevents-id-on-inbound
 type: issue
 status: resolved
-parent: decision-00014-cloudevents-integration-event-contract
+blocks: [decision-00014-cloudevents-integration-event-contract]
 ---
 
 # 缺 `ce_id` 的入站记录绕过 inbox、并在每次重投补造新身份

@@ -2,7 +2,7 @@
 id: issue-00078-six-places-still-describe-the-repositories-as-in-memory
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 内存仓储时代的注释还留在六个地方，另有一处 README 断言与端点实际不符

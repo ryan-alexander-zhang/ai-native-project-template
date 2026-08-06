@@ -2,7 +2,6 @@
 id: decision-00018-multi-tenancy-boundaries
 type: decision
 status: active
-parent:
 ---
 
 # 多租户：隔离模型、传播、唯一键与强制隔离边界

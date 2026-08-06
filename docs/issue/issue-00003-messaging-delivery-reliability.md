@@ -2,7 +2,7 @@
 id: issue-00003-messaging-delivery-reliability
 type: issue
 status: resolved
-parent: design-00001-aipersimmon-ddd-and-scaffold
+blocks: [design-00001-aipersimmon-ddd-and-scaffold]
 ---
 
 # 消息投递可靠性:重试上限 + 退避 + 死信(DLQ)

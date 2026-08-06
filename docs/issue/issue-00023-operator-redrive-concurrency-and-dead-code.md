@@ -2,7 +2,7 @@
 id: issue-00023-operator-redrive-concurrency-and-dead-code
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 并发 redrive 未对实例加锁可致假卡死;replay 中的死代码

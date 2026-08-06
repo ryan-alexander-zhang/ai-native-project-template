@@ -2,7 +2,7 @@
 id: issue-00084-stock-availability-check-is-one-query-per-sku
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 库存可用性查询是每个 SKU 一次往返，而它在下单的同步热路径上

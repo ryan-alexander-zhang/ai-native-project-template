@@ -2,7 +2,7 @@
 id: plan-00010-operation-log-implementation
 type: plan
 status: resolved
-parent: design-00008-operation-log-component
+implements: [design-00008-operation-log-component]
 ---
 
 # 通用操作日志组件落地计划

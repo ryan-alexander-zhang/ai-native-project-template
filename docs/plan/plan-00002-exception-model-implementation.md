@@ -2,7 +2,7 @@
 id: plan-00002-exception-model-implementation
 type: plan
 status: open
-parent: design-00003-exception-model
+implements: [design-00003-exception-model]
 ---
 
 # 异常/错误体系落地计划

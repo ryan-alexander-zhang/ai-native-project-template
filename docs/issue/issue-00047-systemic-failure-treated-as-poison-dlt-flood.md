@@ -2,7 +2,7 @@
 id: issue-00047-systemic-failure-treated-as-poison-dlt-flood
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # 消费者把系统性/基础设施故障当毒丸:DB 短暂不可用即批量误进 DLT,并破坏同 aggregate 顺序

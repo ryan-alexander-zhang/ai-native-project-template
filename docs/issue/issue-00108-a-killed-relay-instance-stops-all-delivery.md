@@ -2,7 +2,7 @@
 id: issue-00108-a-killed-relay-instance-stops-all-delivery
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 被杀掉的 relay 实例会让全体停止投递，而那个旋钮同时管着两件事

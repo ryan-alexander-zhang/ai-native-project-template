@@ -2,7 +2,7 @@
 id: issue-00126-an-anonymous-caller-chose-the-allocation
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # 匿名调用者说了算的那次分配

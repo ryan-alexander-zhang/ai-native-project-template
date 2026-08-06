@@ -2,7 +2,7 @@
 id: issue-00035-order-fulfilment-definition-ignores-step
 type: issue
 status: resolved
-parent: design-00004-durable-process-manager-runtime
+blocks: [design-00004-durable-process-manager-runtime]
 ---
 
 # 样例 `OrderFulfilmentDefinition.react()` 只按输入类型分派、忽略当前 Business Step,乱序事实即误推进

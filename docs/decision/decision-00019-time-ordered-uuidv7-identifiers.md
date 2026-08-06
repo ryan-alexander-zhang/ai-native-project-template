@@ -2,7 +2,6 @@
 id: decision-00019-time-ordered-uuidv7-identifiers
 type: decision
 status: active
-parent:
 ---
 
 # 框架生成的 per-row 标识符改用时间有序 UUIDv7

@@ -2,7 +2,7 @@
 id: issue-00044-integration-events-bypass-outbox-kafka-at-runtime
 type: issue
 status: resolved
-parent: design-00006-integration-event-routing
+blocks: [design-00006-integration-event-routing]
 ---
 
 # 运行期集成事件被进程内发布器抢占,出站箱→Kafka→入站箱可靠传输整体被旁路

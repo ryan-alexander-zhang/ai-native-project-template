@@ -2,7 +2,7 @@
 id: issue-00089-the-generated-project-links-a-document-it-does-not-have
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 生成出来的项目引用了两篇它不拥有的文档

@@ -2,7 +2,7 @@
 id: analysis-00027-samples-multi-tenancy-end-to-end
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S13 多租户端到端传播（寄宿 S4）

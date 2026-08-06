@@ -2,7 +2,7 @@
 id: issue-00085-ordering-carries-sku-as-a-bare-string
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 同一个概念两种建模精度：inventory 有 Sku 值对象，ordering 用裸 String

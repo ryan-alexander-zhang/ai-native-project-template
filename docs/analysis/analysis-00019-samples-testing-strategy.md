@@ -2,7 +2,7 @@
 id: analysis-00019-samples-testing-strategy
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S18 分层测试策略

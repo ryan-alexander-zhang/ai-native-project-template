@@ -2,7 +2,7 @@
 id: issue-00032-integration-event-effect-replay-mints-new-eventid
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # IntegrationEvent 效果重投铸造新 eventId → 下游 Inbox 去重失效,同一 effect 被当两条

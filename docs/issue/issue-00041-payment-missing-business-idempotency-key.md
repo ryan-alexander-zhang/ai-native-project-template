@@ -2,7 +2,7 @@
 id: issue-00041-payment-missing-business-idempotency-key
 type: issue
 status: resolved
-parent: design-00004-durable-process-manager-runtime
+blocks: [design-00004-durable-process-manager-runtime]
 ---
 
 # Payment 缺业务幂等键 `paymentOperationId`,样例无法证明扣款安全

@@ -2,7 +2,7 @@
 id: issue-00048-inbox-dedup-key-omits-cloudevents-source
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # Inbox 去重 key 缺少 CloudEvents source:ce_id 仅同源唯一,跨源同 id 会被误判为重复

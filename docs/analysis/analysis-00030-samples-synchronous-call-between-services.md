@@ -2,7 +2,7 @@
 id: analysis-00030-samples-synchronous-call-between-services
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S6 服务间同步调用

@@ -2,7 +2,7 @@
 id: issue-00083-the-order-total-rule-is-restated-in-sql
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 订单总额的计算规则在 SQL 里被重述了一遍，且靠一个隐含假设成立

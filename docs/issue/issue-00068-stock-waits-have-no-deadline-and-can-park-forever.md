@@ -2,7 +2,7 @@
 id: issue-00068-stock-waits-have-no-deadline-and-can-park-forever
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 只有 payment 装了 deadline：等库存与等释放同样是外部作答，却可以永久停住

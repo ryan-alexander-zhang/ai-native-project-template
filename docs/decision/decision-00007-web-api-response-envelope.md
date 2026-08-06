@@ -2,7 +2,6 @@
 id: decision-00007-web-api-response-envelope
 type: decision
 status: active
-parent:
 ---
 
 # Web 层封装:无通用信封 + RFC 9457,横切能力全做但都 opt-in + 可插拔

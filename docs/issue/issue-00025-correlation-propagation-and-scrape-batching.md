@@ -2,7 +2,7 @@
 id: issue-00025-correlation-propagation-and-scrape-batching
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 跨 deadline/replay 的相关性链断裂;健康探针/指标未批量取样

@@ -2,7 +2,7 @@
 id: issue-00091-the-order-lines-foreign-key-omits-the-tenant
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 子表外键不含 tenant_id：数据库层面允许一条订单行指向另一个租户的订单

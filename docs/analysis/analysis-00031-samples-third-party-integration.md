@@ -2,7 +2,7 @@
 id: analysis-00031-samples-third-party-integration
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S7 调用外部三方应用（防腐层 + 出站/回调 + 对账）

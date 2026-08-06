@@ -2,7 +2,6 @@
 id: decision-00010-exception-model
 type: decision
 status: active
-parent:
 ---
 
 # 异常/错误体系:领域贯穿式错误码 + Invariant 一等抽象 + 默认 throw(不上 Result)

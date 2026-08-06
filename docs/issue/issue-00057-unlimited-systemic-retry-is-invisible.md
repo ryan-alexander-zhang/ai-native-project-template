@@ -2,7 +2,7 @@
 id: issue-00057-unlimited-systemic-retry-is-invisible
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 被判为 systemic 的消费失败无限重试却从不说出原因：卡死的分区和空闲的分区在日志里长得一样

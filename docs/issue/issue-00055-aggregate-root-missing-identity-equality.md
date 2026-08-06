@@ -2,7 +2,7 @@
 id: issue-00055-aggregate-root-missing-identity-equality
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # `AbstractAggregateRoot` 未实现基于身份的 `equals`/`hashCode`：与 `Entity` 的文档契约直接矛盾，同一聚合加载两次即被视为两个对象

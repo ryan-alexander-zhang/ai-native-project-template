@@ -2,7 +2,7 @@
 id: issue-00022-domain-value-object-and-retry-robustness
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 一组值对象/重试健壮性缺陷(EncodedPayload 值语义、ProcessView 不变量、亚毫秒退避、Jackson 异常包装)

@@ -2,7 +2,7 @@
 id: issue-00039-cancel-does-not-fence-in-flight-effects
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # operator cancel 不 fence 已认领的 IN_FLIGHT effect,cancel 返回后仍可能对外发出副作用

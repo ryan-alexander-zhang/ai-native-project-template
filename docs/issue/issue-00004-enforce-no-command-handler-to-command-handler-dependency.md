@@ -2,7 +2,7 @@
 id: issue-00004-enforce-no-command-handler-to-command-handler-dependency
 type: issue
 status: resolved
-parent: decision-00010-command-handler-reuse-and-cross-aggregate-placement
+blocks: [decision-00010-command-handler-reuse-and-cross-aggregate-placement]
 ---
 
 # 机器固化:CommandHandler 不得依赖 CommandHandler

@@ -2,7 +2,7 @@
 id: issue-00074-one-config-file-with-development-values-only
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 单一 application.yml 全是开发值：没有 profile、没有外部化数据源、没有探针分组

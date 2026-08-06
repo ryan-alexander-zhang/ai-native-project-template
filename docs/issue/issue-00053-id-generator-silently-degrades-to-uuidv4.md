@@ -2,7 +2,7 @@
 id: issue-00053-id-generator-silently-degrades-to-uuidv4
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 缺少 `aipersimmon-ddd-id` 时五处铸造点静默退回 UUIDv4：立项要消除的索引写放大被悄悄放回，无任何启动信号

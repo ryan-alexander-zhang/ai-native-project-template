@@ -2,7 +2,7 @@
 id: design-00010-time-ordered-identifiers
 type: design
 status: active
-parent: decision-00019-time-ordered-uuidv7-identifiers
+informs: [decision-00019-time-ordered-uuidv7-identifiers]
 ---
 
 # 时间有序标识符设计：`IdGenerator` SPI + UUIDv7 默认实现 + 铸造点收口

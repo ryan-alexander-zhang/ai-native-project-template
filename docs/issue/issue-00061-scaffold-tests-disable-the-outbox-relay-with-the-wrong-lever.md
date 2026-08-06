@@ -2,7 +2,7 @@
 id: issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 样例 4 个测试类仍用 `poll-delay-ms` 当调度开关：issue-00059 的修复没有回流到样例

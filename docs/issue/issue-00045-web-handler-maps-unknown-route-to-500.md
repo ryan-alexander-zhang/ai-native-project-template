@@ -2,7 +2,7 @@
 id: issue-00045-web-handler-maps-unknown-route-to-500
 type: issue
 status: resolved
-parent: design-00003-exception-model
+blocks: [design-00003-exception-model]
 ---
 
 # Web 全局异常处理把"未知路由/错误方法"兜底成 500,应为 404/405;健康探针因此不可用

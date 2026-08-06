@@ -2,7 +2,7 @@
 id: analysis-00036-samples-schema-migration
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S23 Schema 演进与数据迁移

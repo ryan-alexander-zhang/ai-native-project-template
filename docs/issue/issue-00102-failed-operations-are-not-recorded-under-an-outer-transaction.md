@@ -2,7 +2,7 @@
 id: issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 外层事务里派发的命令，失败审计被静默跳过；两个默认策略又把常见失败判错

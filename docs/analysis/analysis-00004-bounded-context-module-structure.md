@@ -2,7 +2,6 @@
 id: analysis-00004-bounded-context-module-structure
 type: analysis
 status: active
-parent:
 ---
 
 # How bounded contexts and layers map to modules — structure options

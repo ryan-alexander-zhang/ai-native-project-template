@@ -2,7 +2,7 @@
 id: decision-00016-durable-runtime-staged-message-identity
 type: decision
 status: active
-parent: decision-00013-command-context-and-causation-propagation
+motivated_by: [decision-00013-command-context-and-causation-propagation]
 ---
 
 # 增补：durable runtime 是 staged effect 的合法消息身份铸造方；`CommandBus` 新增 `sendAs`

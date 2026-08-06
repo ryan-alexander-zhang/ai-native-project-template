@@ -2,7 +2,6 @@
 id: analysis-00006-ddd-building-blocks-library
 type: analysis
 status: active
-parent:
 ---
 
 # DDD 构件库怎么封装：按 Layer 切分的 `aipersimmon-ddd-*` 库

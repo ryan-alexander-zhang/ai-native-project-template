@@ -2,7 +2,7 @@
 id: issue-00079-review-decision-id-bypasses-the-id-generator
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 审核决定的 id 绕过 IdGenerator 直接用 UUID.randomUUID()

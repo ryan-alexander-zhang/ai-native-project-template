@@ -2,7 +2,7 @@
 id: issue-00101-idempotency-records-instead-of-claiming
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 幂等只记录不抢占：并发首次请求双执行，且键不含调用方——任何人猜到键就能取回别人的响应

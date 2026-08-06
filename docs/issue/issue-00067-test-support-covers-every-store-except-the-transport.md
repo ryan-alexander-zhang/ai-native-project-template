@@ -2,7 +2,7 @@
 id: issue-00067-test-support-covers-every-store-except-the-transport
 type: issue
 status: resolved
-parent: plan-00015-scaffold-depth-and-evaluability
+blocks: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 # `-test-support` 有 PostgreSQL / MySQL / Redis，唯独没有 Kafka——而 Kafka 是库自己的传输

@@ -2,7 +2,7 @@
 id: issue-00015-re-suspend-clobbers-resume-lifecycle
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 二次挂起把 `resume_lifecycle` 覆盖成 `SUSPENDED`,导致实例永久卡死

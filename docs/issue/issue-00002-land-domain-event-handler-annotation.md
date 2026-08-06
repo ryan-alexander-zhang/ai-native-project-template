@@ -2,7 +2,7 @@
 id: issue-00002-land-domain-event-handler-annotation
 type: issue
 status: resolved
-parent: decision-00009-event-type-markers-and-handler-contracts
+blocks: [decision-00009-event-type-markers-and-handler-contracts]
 ---
 
 # 落地 @DomainEventHandler 架构语义注解

@@ -2,7 +2,7 @@
 id: issue-00104-an-ended-instance-keeps-its-timers-forever
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 终态实例从不回收未决 deadline：永不可领取、永远 DEGRADED、扫描无界膨胀

@@ -2,7 +2,6 @@
 id: spec-00002-multi-tenancy
 type: spec
 status: active
-parent:
 ---
 
 # Spec: 原生多租户（Multi-Tenancy）MVP

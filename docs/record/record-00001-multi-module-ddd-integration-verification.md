@@ -2,7 +2,7 @@
 id: record-00001-multi-module-ddd-integration-verification
 type: record
 status: active
-parent: plan-00007
+parent: plan-00007-aggregate-persistence-mybatis-plus
 ---
 
 # 多模块脚手架 DDD 组件集成验证报告

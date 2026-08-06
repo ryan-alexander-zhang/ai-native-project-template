@@ -2,7 +2,7 @@
 id: analysis-00026-samples-event-contract-evolution
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S21 事件契约演进与多版本共存

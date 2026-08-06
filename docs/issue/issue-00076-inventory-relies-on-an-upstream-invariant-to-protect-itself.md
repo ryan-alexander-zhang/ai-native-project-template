@@ -2,7 +2,7 @@
 id: issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # inventory 靠 ordering 的不变量才不出事：重复 SKU 会让同一聚合被加载两次

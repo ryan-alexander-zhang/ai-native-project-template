@@ -2,7 +2,7 @@
 id: issue-00117-the-advance-itself-had-no-tests
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 决定每一次流转的那个类，一条测试都没有

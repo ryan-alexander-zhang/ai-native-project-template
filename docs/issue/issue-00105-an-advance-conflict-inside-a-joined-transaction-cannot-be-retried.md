@@ -2,7 +2,7 @@
 id: issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # `withRetry` 在加入外层事务时必然失效；并发首次 start 又漏了唯一键映射

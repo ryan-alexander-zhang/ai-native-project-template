@@ -2,7 +2,7 @@
 id: issue-00107-silent-degradations-become-loud-failures
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 四处「保证蒸发但什么都不报」：无事务管理器、两个仓储基类无事务、乐观锁静默消失、outbox 行独立提交

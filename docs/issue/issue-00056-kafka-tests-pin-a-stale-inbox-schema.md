@@ -2,7 +2,7 @@
 id: issue-00056-kafka-tests-pin-a-stale-inbox-schema
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # `messaging-kafka` 的测试固定加载 V1 版 inbox schema，租户迁移 V2 后三个集成测试永久超时

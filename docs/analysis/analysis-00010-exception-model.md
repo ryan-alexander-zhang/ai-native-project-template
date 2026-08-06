@@ -2,7 +2,6 @@
 id: analysis-00010-exception-model
 type: analysis
 status: active
-parent:
 ---
 
 # aipersimmon-ddd 异常/错误体系:现状盘点、对照与缺口分析

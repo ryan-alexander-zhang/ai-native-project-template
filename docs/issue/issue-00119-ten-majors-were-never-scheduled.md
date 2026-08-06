@@ -2,7 +2,7 @@
 id: issue-00119-ten-majors-were-never-scheduled
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # §2 的 Major 有 10 条从来没有被排过期

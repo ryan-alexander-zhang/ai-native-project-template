@@ -2,7 +2,7 @@
 id: design-00012-module-naming-and-spring-freedom
 type: design
 status: active
-parent: plan-00014-adoption-threshold-and-architecture-simplification
+informs: [plan-00014-adoption-threshold-and-architecture-simplification]
 ---
 
 # 模块命名规则与「Spring 自由」的可执行边界

@@ -2,7 +2,7 @@
 id: analysis-00018-samples-aggregate-persistence-mapping
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S17 聚合与数据表的映射

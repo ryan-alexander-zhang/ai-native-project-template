@@ -2,7 +2,6 @@
 id: decision-00014-cloudevents-integration-event-contract
 type: decision
 status: active
-parent:
 ---
 
 # 集成事件对外契约对齐 CloudEvents(逻辑类型 + 聚合分区键 + source)

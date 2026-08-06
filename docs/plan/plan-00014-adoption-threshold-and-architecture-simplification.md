@@ -2,7 +2,7 @@
 id: plan-00014-adoption-threshold-and-architecture-simplification
 type: plan
 status: resolved
-parent: report-00001-ddd-framework-review
+implements: [report-00001-ddd-framework-review]
 ---
 
 # 阶段二 + 阶段三：采纳门槛与架构精简

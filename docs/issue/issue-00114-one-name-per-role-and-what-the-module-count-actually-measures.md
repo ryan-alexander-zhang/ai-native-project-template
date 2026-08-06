@@ -2,7 +2,7 @@
 id: issue-00114-one-name-per-role-and-what-the-module-count-actually-measures
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 一个概念一个名字；以及"48 个模块"到底量的是什么

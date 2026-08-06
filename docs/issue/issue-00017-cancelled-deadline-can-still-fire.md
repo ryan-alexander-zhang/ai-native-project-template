@@ -2,7 +2,7 @@
 id: issue-00017-cancelled-deadline-can-still-fire
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 已取消的 deadline 仍可能触发;fire 前的 generation/实例校验存在 TOCTOU

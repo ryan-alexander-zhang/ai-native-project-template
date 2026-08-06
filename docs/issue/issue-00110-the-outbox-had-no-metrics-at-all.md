@@ -2,7 +2,7 @@
 id: issue-00110-the-outbox-had-no-metrics-at-all
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # outbox 零指标：两条最经典的告警必须手写 SQL 打库才能得到

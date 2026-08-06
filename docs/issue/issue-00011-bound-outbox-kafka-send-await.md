@@ -2,7 +2,7 @@
 id: issue-00011-bound-outbox-kafka-send-await
 type: issue
 status: resolved
-parent: issue-00003-messaging-delivery-reliability
+blocks: [issue-00003-messaging-delivery-reliability]
 ---
 
 # outbox relay 等待 Kafka 发送无超时:单条 stall 即永久卡死 relay 线程并击穿 ShedLock 租约

@@ -2,7 +2,7 @@
 id: issue-00013-mark-sent-failure-not-a-dispatch-failure
 type: issue
 status: resolved
-parent: issue-00003-messaging-delivery-reliability
+blocks: [issue-00003-messaging-delivery-reliability]
 ---
 
 # 投递成功但标记 sent 失败被误判为投递失败:重试重复,末次更把已投递消息死信

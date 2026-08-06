@@ -2,7 +2,7 @@
 id: issue-00042-process-evidence-ids-fabricated-from-business-keys
 type: issue
 status: resolved
-parent: design-00004-durable-process-manager-runtime
+blocks: [design-00004-durable-process-manager-runtime]
 ---
 
 # 样例进程用业务键伪造证据 ref,弃用可得的因果 envelope id

@@ -2,7 +2,7 @@
 id: analysis-00022-samples-validation-layers
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S19 校验的三层分工

@@ -2,7 +2,7 @@
 id: issue-00111-the-relay-waited-for-each-send-in-turn
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # relay 逐条等 ack：每轮的代价是往返之和，而不是一次往返

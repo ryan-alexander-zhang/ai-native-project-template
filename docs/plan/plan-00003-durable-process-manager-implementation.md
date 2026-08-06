@@ -2,7 +2,7 @@
 id: plan-00003-durable-process-manager-implementation
 type: plan
 status: open
-parent: design-00004-durable-process-manager-runtime
+implements: [design-00004-durable-process-manager-runtime]
 ---
 
 # Durable Process Manager 落地计划

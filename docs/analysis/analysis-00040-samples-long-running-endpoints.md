@@ -2,7 +2,7 @@
 id: analysis-00040-samples-long-running-endpoints
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S28 长耗时与大数据量端点

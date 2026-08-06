@@ -2,7 +2,7 @@
 id: issue-00073-no-index-supports-the-cursor-paged-list
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 三个迁移里零 CREATE INDEX：被当作性能特性宣传的游标分页，底下是全表扫

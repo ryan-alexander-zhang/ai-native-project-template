@@ -2,7 +2,7 @@
 id: issue-00121-three-promises-that-did-not-match-their-behaviour
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # 三条"文档承诺 A、代码行为 B"的残余

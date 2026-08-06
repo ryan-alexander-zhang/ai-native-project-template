@@ -2,7 +2,7 @@
 id: issue-00065-a-missing-request-parameter-is-reported-as-a-server-error
 type: issue
 status: resolved
-parent: plan-00015-scaffold-depth-and-evaluability
+blocks: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 # 少传一个查询参数返回 500：参数类失败不在 RFC 9457 的覆盖范围内

@@ -2,7 +2,7 @@
 id: issue-00040-distinct-versions-scans-terminal-instances
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # `distinctVersionsInUse()` 扫描终态历史实例 → 旧 Definition/codec 版本被永久绑住

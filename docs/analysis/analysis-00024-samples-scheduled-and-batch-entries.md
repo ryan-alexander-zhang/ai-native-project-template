@@ -2,7 +2,7 @@
 id: analysis-00024-samples-scheduled-and-batch-entries
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S11 非 HTTP 入口：定时任务 / 批处理（入口适配器总论）

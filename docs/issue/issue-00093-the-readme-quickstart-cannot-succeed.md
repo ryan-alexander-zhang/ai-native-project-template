@@ -2,7 +2,7 @@
 id: issue-00093-the-readme-quickstart-cannot-succeed
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # README 的 quickstart 三处都错，照着敲一定失败

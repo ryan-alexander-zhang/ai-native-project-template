@@ -2,7 +2,7 @@
 id: report-00002-scaffold-ddd-review
 type: report
 status: active
-parent: plan-00015-scaffold-depth-and-evaluability
+informs: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 对 `aipersimmon-ddd-scaffold/multi-module` 的一次整体评审：它同时是**组件库的用法样例**和**别人复制去起新项目的 DDD 参考实现**，所以从两个身份分别审——DDD 建模是否走样，以及作为脚手架是否够用、可生产、易上手。

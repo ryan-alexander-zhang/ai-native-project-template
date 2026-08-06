@@ -2,7 +2,7 @@
 id: issue-00127-the-least-portable-statement-had-no-database-to-run-on
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # 最不可移植的那条语句，没有一个数据库跑过它

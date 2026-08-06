@@ -2,7 +2,7 @@
 id: issue-00113-the-quality-gates-sat-where-the-risk-was-not
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 覆盖率门禁的分布与风险的分布正好相反

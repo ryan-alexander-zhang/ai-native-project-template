@@ -2,7 +2,7 @@
 id: issue-00086-customer-is-an-aggregate-nothing-writes
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # Customer 被标成聚合根，但没有生命周期、没有写入、没有状态变化

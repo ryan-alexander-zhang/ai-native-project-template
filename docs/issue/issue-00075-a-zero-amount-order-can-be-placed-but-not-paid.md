@@ -2,7 +2,7 @@
 id: issue-00075-a-zero-amount-order-can-be-placed-but-not-paid
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 0 元订单可以下单但无法支付：跨上下文契约在"金额能否为零"上不一致

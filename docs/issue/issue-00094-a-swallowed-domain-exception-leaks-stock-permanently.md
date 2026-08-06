@@ -2,7 +2,7 @@
 id: issue-00094-a-swallowed-domain-exception-leaks-stock-permanently
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 吞掉 DomainException 让事务照常提交：预留失败会永久扣掉一部分库存

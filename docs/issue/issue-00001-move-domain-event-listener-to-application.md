@@ -2,7 +2,7 @@
 id: issue-00001-move-domain-event-listener-to-application
 type: issue
 status: resolved
-parent: decision-00008-event-subscriber-layer-placement
+blocks: [decision-00008-event-subscriber-layer-placement]
 ---
 
 # 把领域事件订阅移出 adapter,让 ordering-adapter 不再依赖 domain

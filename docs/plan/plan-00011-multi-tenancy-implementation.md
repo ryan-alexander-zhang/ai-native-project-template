@@ -2,7 +2,7 @@
 id: plan-00011-multi-tenancy-implementation
 type: plan
 status: open
-parent: design-00009-multi-tenancy-tenant-id
+implements: [design-00009-multi-tenancy-tenant-id]
 ---
 
 # 原生多租户落地计划

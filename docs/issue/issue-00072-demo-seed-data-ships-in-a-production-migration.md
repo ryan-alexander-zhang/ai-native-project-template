@@ -2,7 +2,7 @@
 id: issue-00072-demo-seed-data-ships-in-a-production-migration
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 演示种子数据写在 V1 生产迁移里，会在每一个环境执行

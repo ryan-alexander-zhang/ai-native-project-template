@@ -2,7 +2,7 @@
 id: analysis-00037-samples-read-side-caching
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S26 读侧加速：缓存与投影的取舍

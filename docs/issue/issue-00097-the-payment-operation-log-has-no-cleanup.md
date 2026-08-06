@@ -2,7 +2,7 @@
 id: issue-00097-the-payment-operation-log-has-no-cleanup
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # `payment_operations` 无界增长：框架的每张同类表都有 cleanup，唯独这张新表没有

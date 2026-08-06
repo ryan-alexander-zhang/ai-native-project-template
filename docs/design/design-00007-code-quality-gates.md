@@ -2,7 +2,6 @@
 id: design-00007-code-quality-gates
 type: design
 status: active
-parent:
 ---
 
 # 代码质量管控：domain 层强制 90% 单元覆盖 + 90% 变异门禁，无 opinionated parent（纯 BOM + 各项目自声明）

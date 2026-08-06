@@ -2,7 +2,7 @@
 id: analysis-00020-samples-domain-events-in-process
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S3 领域事件的发布与消费（同进程）

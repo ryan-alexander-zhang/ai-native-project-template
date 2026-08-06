@@ -2,7 +2,7 @@
 id: issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # README 快速开始的 curl 必然 400：种子只在 `__root__`，而 `__root__` 是客户端不可命名的保留租户

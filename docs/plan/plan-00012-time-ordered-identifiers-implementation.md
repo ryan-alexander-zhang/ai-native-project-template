@@ -2,7 +2,7 @@
 id: plan-00012-time-ordered-identifiers-implementation
 type: plan
 status: resolved
-parent: design-00010-time-ordered-identifiers
+implements: [design-00010-time-ordered-identifiers]
 ---
 
 # 时间有序标识符落地计划

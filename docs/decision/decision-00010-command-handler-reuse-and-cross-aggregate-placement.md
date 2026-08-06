@@ -2,7 +2,6 @@
 id: decision-00010-command-handler-reuse-and-cross-aggregate-placement
 type: decision
 status: active
-parent:
 ---
 
 # CommandHandler 不得依赖 CommandHandler;复用逻辑按类型分流与分层落点

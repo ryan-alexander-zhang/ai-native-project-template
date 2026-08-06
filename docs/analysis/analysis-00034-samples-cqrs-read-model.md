@@ -2,7 +2,7 @@
 id: analysis-00034-samples-cqrs-read-model
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S12 CQRS 读模型：事件驱动的投影

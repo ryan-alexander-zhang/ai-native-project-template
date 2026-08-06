@@ -2,7 +2,7 @@
 id: issue-00051-aggregates-have-no-optimistic-locking
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 业务聚合没有乐观锁：并发命令各自通过状态机守卫后互相覆盖，聚合的一致性边界在聚合外被静默破坏

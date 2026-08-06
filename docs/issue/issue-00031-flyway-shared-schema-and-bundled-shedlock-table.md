@@ -2,7 +2,7 @@
 id: issue-00031-flyway-shared-schema-and-bundled-shedlock-table
 type: issue
 status: resolved
-parent: plan-00006-middleware-integration
+blocks: [plan-00006-middleware-integration]
 ---
 
 # Flyway starter:多实例共管同一 schema + 默认自动基线 + 通用 shedlock 表塞进 outbox 迁移

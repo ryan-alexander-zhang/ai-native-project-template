@@ -2,7 +2,7 @@
 id: issue-00008-strict-inbound-cloudevents-validation
 type: issue
 status: resolved
-parent: decision-00014-cloudevents-integration-event-contract
+blocks: [decision-00014-cloudevents-integration-event-contract]
 ---
 
 # 入站 CloudEvents 契约校验不完整(与 ADR "source 必填 / 畸形即刻 DLT" 未对齐)

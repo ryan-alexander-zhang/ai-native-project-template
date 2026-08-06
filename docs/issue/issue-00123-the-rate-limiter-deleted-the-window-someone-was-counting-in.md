@@ -2,7 +2,7 @@
 id: issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in
 type: issue
 status: resolved
-parent: issue-00119-ten-majors-were-never-scheduled
+blocks: [issue-00119-ten-majors-were-never-scheduled]
 ---
 
 # 限流器把别人正在计数的那个窗口删掉了

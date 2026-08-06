@@ -2,7 +2,7 @@
 id: issue-00098-a-mapper-method-name-turns-spotbugs-against-its-callers
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 给 mapper 加一个 `delete` 开头的方法，SpotBugs 就把它的**所有持有者**判红

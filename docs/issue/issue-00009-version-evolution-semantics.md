@@ -2,7 +2,7 @@
 id: issue-00009-version-evolution-semantics
 type: issue
 status: resolved
-parent: decision-00014-cloudevents-integration-event-contract
+blocks: [decision-00014-cloudevents-integration-event-contract]
 ---
 
 # `@EventType` 版本演进语义与 `(type, version)` 精确键自相矛盾(文档漏改)

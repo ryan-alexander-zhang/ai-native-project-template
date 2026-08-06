@@ -2,7 +2,7 @@
 id: issue-00099-tenant-isolation-fails-open-below-the-edge
 type: issue
 status: resolved
-parent: report-00003-ddd-library-review-2026-07-29
+blocks: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # 边缘之下租户隔离全线 fail-open：丢一次绑定就静默读写 `__root__` 共享桶

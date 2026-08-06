@@ -2,7 +2,7 @@
 id: issue-00012-dead-letter-move-failure-backoff
 type: issue
 status: resolved
-parent: issue-00003-messaging-delivery-reliability
+blocks: [issue-00003-messaging-delivery-reliability]
 ---
 
 # 死信迁移失败时无退避兜底:放弃行被每轮重投(无间隔忙循环),甚至静默搁浅

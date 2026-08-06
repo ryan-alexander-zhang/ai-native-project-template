@@ -2,7 +2,7 @@
 id: analysis-00041-samples-add-bounded-context
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S24 在既有服务里新建一个限界上下文

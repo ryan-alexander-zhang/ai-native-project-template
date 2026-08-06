@@ -2,7 +2,7 @@
 id: issue-00088-dependency-and-image-versions-escape-the-boms
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 两处版本逃出了 BOM 与镜像固定：mybatis-plus 硬编码两遍，kafka-ui 用 latest

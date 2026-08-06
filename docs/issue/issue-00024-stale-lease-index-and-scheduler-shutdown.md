@@ -2,7 +2,7 @@
 id: issue-00024-stale-lease-index-and-scheduler-shutdown
 type: issue
 status: resolved
-parent: plan-00003-durable-process-manager-implementation
+blocks: [plan-00003-durable-process-manager-implementation]
 ---
 
 # 陈旧租约重认领无索引;调度器关停不升级到 shutdownNow

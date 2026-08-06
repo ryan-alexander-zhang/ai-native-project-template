@@ -2,7 +2,7 @@
 id: issue-00066-dead-letter-store-can-replay-but-cannot-be-read
 type: issue
 status: resolved
-parent: plan-00015-scaffold-depth-and-evaluability
+blocks: [plan-00015-scaffold-depth-and-evaluability]
 ---
 
 # `DeadLetterStore` 能重放却不能查询：运维拿不到那个 `eventId`

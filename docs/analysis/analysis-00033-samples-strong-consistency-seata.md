@@ -2,7 +2,7 @@
 id: analysis-00033-samples-strong-consistency-seata
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S10 强一致性：Seata 跨服务分布式事务

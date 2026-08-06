@@ -2,7 +2,7 @@
 id: decision-00020-outbox-engine-over-one-store-port
 type: decision
 status: active
-parent: report-00003-ddd-library-review-2026-07-29
+motivated_by: [report-00003-ddd-library-review-2026-07-29]
 ---
 
 # outbox 的投递逻辑归入 `-outbox-engine`，两个后端只提供一个 store 端口的适配器

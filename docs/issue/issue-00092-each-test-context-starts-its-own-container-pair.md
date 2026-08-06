@@ -2,7 +2,7 @@
 id: issue-00092-each-test-context-starts-its-own-container-pair
 type: issue
 status: resolved
-parent: report-00002-scaffold-ddd-review
+blocks: [report-00002-scaffold-ddd-review]
 ---
 
 # 每个不同的测试上下文都会另起一对容器，且这件事没有写在任何地方

@@ -2,7 +2,7 @@
 id: analysis-00023-samples-query-contract-paging
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S20 读侧查询契约：分页、排序、过滤

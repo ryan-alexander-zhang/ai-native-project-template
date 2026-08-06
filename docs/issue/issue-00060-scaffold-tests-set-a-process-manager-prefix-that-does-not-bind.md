@@ -2,7 +2,7 @@
 id: issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind
 type: issue
 status: resolved
-parent: report-00001-ddd-framework-review
+blocks: [report-00001-ddd-framework-review]
 ---
 
 # 样例 11 个测试类设置的 process-manager 配置键不存在，被静默忽略

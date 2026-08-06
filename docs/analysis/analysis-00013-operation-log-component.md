@@ -2,7 +2,6 @@
 id: analysis-00013-operation-log-component
 type: analysis
 status: active
-parent:
 ---
 
 # `aipersimmon-ddd` 通用操作日志组件预研

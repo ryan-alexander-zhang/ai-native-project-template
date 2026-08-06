@@ -2,7 +2,7 @@
 id: analysis-00042-samples-strangler-legacy-adoption
 type: analysis
 status: draft
-parent: analysis-00014-ddd-samples-scenario-catalog
+informs: [analysis-00014-ddd-samples-scenario-catalog]
 ---
 
 # S25 遗留系统绞杀式接入

@@ -2,7 +2,7 @@
 id: design-00002-web-layer
 type: design
 status: active
-parent: decision-00007-web-api-response-envelope
+informs: [decision-00007-web-api-response-envelope]
 ---
 
 # aipersimmon-ddd Web 层构件族设计:`-web` / `-web-spring` / `-web-store-{redis,jdbc}`
