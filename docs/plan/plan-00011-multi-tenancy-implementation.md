@@ -176,7 +176,7 @@ observability / archunit / flyway。
 >   JdbcTemplate 播种绕过拦截器只测读侧改写）；**#3 inbox/outbox 租户往返(单元级,免 EmbeddedKafka)**——出站
 >   `KafkaOutboxDispatcherTest` 已断 ce_tenantid；入站 `KafkaIntegrationEventListenerTest` 加两例证重建 envelope 租户 +
 >   handling 全程 runAs 绑定 + 缺 header→__root__。**T18 余量**：process mybatis-plus runtime 变体（mp 无 runtime 测试骨架，
->   需较重 Spring 装配）、MySQL/PG 参数化、迁移安全；**RLS 相关用例(XAC-9.1 池不泄漏/XAC-8.2 漏写谓词兜底)待 T13**。
+>   需较重 Spring 装配）、MySQL/PG 参数化、迁移安全；**RLS 相关用例(AC-9.1 池不泄漏/AC-8.2 漏写谓词兜底)待 T13**。
 > - ✅ **T17（operation-log 租户对齐 TenantContext + 哨兵统一 __root__）**：operation-log 原有**独立**租户概念(哨兵
 >   `GLOBAL`、`OperationTenantResolver` app 必供)。改为：`operation-log-cqrs-spring` 加 tenancy 依赖 + 提供**默认**
 >   `OperationTenantResolver` bean 委托 `TenantContext.current().orElse(ROOT)`（`@ConditionalOnMissingBean`，app 仍可覆盖；
@@ -249,8 +249,8 @@ observability / archunit / flyway。
 ### 横切（贯穿 P1–P3）
 
 - **T18** `[test]` 双租户 consumer fixture + 验收矩阵：把 spec §3 XAC 参数化为 `-jdbc`/`-mybatis-plus` × H2/MySQL/PostgreSQL
-   （用 `aipersimmon-ddd-test-support` Testcontainers）。必含：跨租户读隔离（三机制各一）、**RLS 连接池不泄漏**（XAC-9.1）、
-   **RLS 漏写谓词兜底**（XAC-8.2）、后台跨租户扫 + 盖 header（XAC-10.1）、缺租户 REJECT、`enabled=false` 回归等价、迁移安全。
+   （用 `aipersimmon-ddd-test-support` Testcontainers）。必含：跨租户读隔离（三机制各一）、**RLS 连接池不泄漏**（AC-9.1）、
+   **RLS 漏写谓词兜底**（AC-8.2）、后台跨租户扫 + 盖 header（AC-10.1）、缺租户 REJECT、`enabled=false` 回归等价、迁移安全。
 
 ## 三、验收路径
 

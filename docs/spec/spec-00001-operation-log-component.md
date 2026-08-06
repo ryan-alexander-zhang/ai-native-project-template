@@ -115,46 +115,46 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 
 面向整个组件、不属单个 story 的系统要求（幂等、事务、隐私、租户、尺寸、方言）。
 
-- **spec-00001-XFR-1**（Unwanted）若同一 `(tenant, source, messageId, operationCode, outcome, completion)` 被重投，
+- **spec-00001-FR-12**（Unwanted）若同一 `(tenant, source, messageId, operationCode, outcome, completion)` 被重投，
   则系统应至多产生一条 entry，并返回既有 `recordId`。
-- **spec-00001-XFR-2**（Complex）当成功路径 append 命中唯一键冲突时（在业务事务内），系统应使用方言原生
+- **spec-00001-FR-13**（Complex）当成功路径 append 命中唯一键冲突时（在业务事务内），系统应使用方言原生
   `ON CONFLICT DO NOTHING` / `SAVEPOINT` 收敛而**不 abort 业务事务**；仅失败路径的隔离事务可用 catch-异常收敛。
-- **spec-00001-XFR-3**（Unwanted）若成功路径 append 发生非重复键（genuine）错误，则系统应回滚业务事务（fail-closed）。
-- **spec-00001-XFR-4**（Unwanted）若异常/回滚路径记录失败，则系统应保留并重抛原业务异常，并输出 failure-loss metric+alert。
-- **spec-00001-XFR-5**（Ubiquitous）系统应默认拒绝记录任何字段（消费方逐项 allowlist），且 secret/token/凭据/生物信息
+- **spec-00001-FR-14**（Unwanted）若成功路径 append 发生非重复键（genuine）错误，则系统应回滚业务事务（fail-closed）。
+- **spec-00001-FR-15**（Unwanted）若异常/回滚路径记录失败，则系统应保留并重抛原业务异常，并输出 failure-loss metric+alert。
+- **spec-00001-FR-16**（Ubiquitous）系统应默认拒绝记录任何字段（消费方逐项 allowlist），且 secret/token/凭据/生物信息
   永不入库；summary/label/value 入库前去除 CR/LF；failure 只存 `code/category/safeSummary`。
-- **spec-00001-XFR-6**（Where 多租户开启）系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
-- **spec-00001-XFR-7**（Unwanted）若渲染后的 summary/changes/details/单值/总 payload 超过配置预算，则系统应按策略拒绝或截断并可观测。
-- **spec-00001-XFR-8**（Ubiquitous）系统应在 `-jdbc` 与 `-mybatis-plus` 两后端 × H2/MySQL/PostgreSQL 三方言下，
+- **spec-00001-FR-17**（Where 多租户开启）系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
+- **spec-00001-FR-18**（Unwanted）若渲染后的 summary/changes/details/单值/总 payload 超过配置预算，则系统应按策略拒绝或截断并可观测。
+- **spec-00001-FR-19**（Ubiquitous）系统应在 `-jdbc` 与 `-mybatis-plus` 两后端 × H2/MySQL/PostgreSQL 三方言下，
   唯一约束、幂等收敛、时间序与分页排序行为等价。
-- **spec-00001-XFR-9**（Ubiquitous）系统不应引入任何 ambient/ThreadLocal 每命令状态；成功与失败两路各持不可变局部对象。
+- **spec-00001-FR-20**（Ubiquitous）系统不应引入任何 ambient/ThreadLocal 每命令状态；成功与失败两路各持不可变局部对象。
 
 **Acceptance（GWT）**
-- **spec-00001-XAC-1.1**（spec-00001-XFR-1）
+- **spec-00001-AC-12.1**（spec-00001-FR-12）
   Given 一条已提交的 `SUCCEEDED+COMMITTED` entry
   When 同 result kind 的命令被重投
   Then 不产生第二条记录，`record(...)` 返回 `DUPLICATE(existingRecordId)`
-- **spec-00001-XAC-1.2**（spec-00001-XFR-1）
+- **spec-00001-AC-12.2**（spec-00001-FR-12）
   Given 一条命令首次 `FAILED+ROLLED_BACK`
   When 重投后 `SUCCEEDED+COMMITTED`
   Then 保留两条各自收敛的 entry（result kind 不同）
-- **spec-00001-XAC-2.1**（spec-00001-XFR-2）
+- **spec-00001-AC-13.1**（spec-00001-FR-13）
   Given PostgreSQL、成功路径、同 idempotency_key 已存在
   When 重投在业务事务内 append
   Then 业务事务成功提交、业务变更不丢失、无虚假 `FAILED`，日志收敛为 DUPLICATE
-- **spec-00001-XAC-3.1**（spec-00001-XFR-3）
+- **spec-00001-AC-14.1**（spec-00001-FR-14）
   Given 成功路径 sink 注入一个 genuine 写错误
   When 命令处理
   Then 业务事务回滚，异常契约稳定
-- **spec-00001-XAC-5.1**（spec-00001-XFR-5）
+- **spec-00001-AC-16.1**（spec-00001-FR-16）
   Given 一个含 token/密码/原始异常的输入
   When 记录
   Then entry 不含 secret/token/stack/SQL/完整对象；只有 allowlist 字段落库
-- **spec-00001-XAC-6.1**（spec-00001-XFR-6）
+- **spec-00001-AC-17.1**（spec-00001-FR-17）
   Given 多租户开启
   When 查询未带 tenant
   Then 请求被拒绝（criteria 强制 tenant），且不存在跨 tenant 结果
-- **spec-00001-XAC-8.1**（spec-00001-XFR-8）
+- **spec-00001-AC-19.1**（spec-00001-FR-19）
   Given 后端 × 方言 参数化测试矩阵
   When 跑同一组用例
   Then 唯一约束/幂等/排序结果在 6 组合下一致
@@ -180,12 +180,12 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 | 情况 | 处理 | 需求 |
 | --- | --- | --- |
 | validation/authorization 拒绝 | `REJECTED+NOT_STARTED`，Failed 独立事务 | spec-00001-FR-3 |
-| handler/commit 技术失败 | `FAILED+ROLLED_BACK`，成功日志随之回滚 | spec-00001-FR-3 / spec-00001-XFR-3 |
-| 成功路径重复键（重投） | `ON CONFLICT DO NOTHING` 收敛，不 abort 事务 | spec-00001-XFR-2 / XAC-2.1 |
-| 失败路径重复键 | 隔离事务 catch → DUPLICATE | spec-00001-XFR-1 |
-| 记录失败 | 不替换原业务异常，metric+alert | spec-00001-XFR-4 |
-| 敏感字段 | 默认拒绝 + 脱敏 | spec-00001-XFR-5 |
-| 超预算 payload | 拒绝或截断且可观测 | spec-00001-XFR-7 |
+| handler/commit 技术失败 | `FAILED+ROLLED_BACK`，成功日志随之回滚 | spec-00001-FR-3 / spec-00001-FR-14 |
+| 成功路径重复键（重投） | `ON CONFLICT DO NOTHING` 收敛，不 abort 事务 | spec-00001-FR-13 / AC-13.1 |
+| 失败路径重复键 | 隔离事务 catch → DUPLICATE | spec-00001-FR-12 |
+| 记录失败 | 不替换原业务异常，metric+alert | spec-00001-FR-15 |
+| 敏感字段 | 默认拒绝 + 脱敏 | spec-00001-FR-16 |
+| 超预算 payload | 拒绝或截断且可观测 | spec-00001-FR-18 |
 
 ## 5. Out of Scope
 - `OperationLogReader` 查询、cursor 分页、查询授权示例（P3）
