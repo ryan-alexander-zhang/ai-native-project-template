@@ -34,6 +34,7 @@ Start here after creating a repo from this template:
    - [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md)
    - [API_TESTING.md](API_TESTING.md)
    - [E2E_TESTING.md](E2E_TESTING.md)
+   - [CODE_QUALITY.md](CODE_QUALITY.md)
 5. Use [docs/README.md](docs/README.md) to decide where durable docs belong.
 6. Add your runtime code in the structure that fits the project.
 
@@ -47,6 +48,8 @@ Start here after creating a repo from this template:
 - [E2E_TESTING.md](E2E_TESTING.md) — choose the E2E framework
 - [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) — Testcontainers is pinned; fill in commands and environment
 - [API_TESTING.md](API_TESTING.md) — Bruno is pinned; fill in base URL, auth, and command
+- [CODE_QUALITY.md](CODE_QUALITY.md) — fill in the build-failing gates and any tuned
+  threshold; the metrics and refactoring SOP stay as written
 
 **Project / domain — fill in, but not language-driven:**
 
