@@ -27,6 +27,7 @@ Confirm the goal, constraints, and affected boundaries.
 
 Decide how before building.
 
+- Never build against a `draft` doc; promote it first.
 - For a feature-sized `spec` (multiple files, real ordering or design choices),
   create or refresh a `docs/plan/` doc before implementing, then work it
   task-by-task. Follow the `idea -> prd -> spec -> plan` flow in

@@ -21,7 +21,7 @@ Status values are defined in [docs/README.md](docs/README.md). Never change stat
 - New docs start as `draft`.
 - A doc with open questions stays `draft`.
 - After creating or substantively updating a `draft` doc, ask if it is reviewed. If yes, promote it: living docs to `active`, work items to `open`.
-- When the work is done, set the work item to `resolved`; living docs stay `active`.
+- When the work is done, set the work item to `resolved`; living docs stay `active`. A feature-sized `plan` needs its `docs/record/` acceptance checklist first.
 - Do not commit a doc left in `draft`; promote it or confirm the exception first.
 
 ## Definition of Done
