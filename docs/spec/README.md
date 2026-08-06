@@ -10,6 +10,8 @@ Use `TEMPLATE.md` for front matter.
 - system requirements, EARS numbered `spec-<n>-FR-<i>`, acceptance
   `spec-<n>-AC-<i>.<k>`; error and rejection behaviour is an Unwanted requirement,
   not a table
+- acceptance for every requirement: each `spec-<n>-FR-<i>` needs at least one
+  `spec-<n>-AC-<i>.<k>`; an `FR` no acceptance references is unverified
 - links to the `rule/` docs the feature obeys
 - links to the `design/` docs it builds
 - open questions — what is still undecided

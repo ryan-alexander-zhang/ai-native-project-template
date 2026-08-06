@@ -36,10 +36,7 @@ names no violation response leaves the implementer to invent one.
 
 ### Acceptance
 
-1. Every `BR` needs at least one example; an unreferenced rule is unverified.
-2. Examples sample the rules, they do not enumerate the input space.
-3. A Constraint needs at least one example that violates it.
-4. On a `FIRST` table, sample both sides of each boundary an earlier row creates.
+Every `BR` needs at least one example; an unreferenced rule is unverified.
 
 ## Relations
 

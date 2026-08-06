@@ -65,6 +65,7 @@ Use this stage when the change needs durable docs, notes, or decisions.
 ## Development Guides
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): system structure, boundaries, design constraints.
+- [ACCEPTANCE.md](ACCEPTANCE.md): deriving the acceptance set for a spec or rule.
 - [TESTING.md](TESTING.md): test levels, required tests, coverage.
 - [COMMIT.md](COMMIT.md): commit scope, message rules, commit hygiene.
 - [PR.md](PR.md): PR readiness, review flow, merge rules.

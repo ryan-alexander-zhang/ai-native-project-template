@@ -57,6 +57,8 @@ Start here after creating a repo from this template:
 - `CONTEXT.md` (from [CONTEXT_TEMPLATE.md](CONTEXT_TEMPLATE.md)) — domain glossary
 - [REVIEW.md](REVIEW.md) — review checklist (starts empty)
 - [THIRDPARTY.md](THIRDPARTY.md) — external reference-only sources
+- [ACCEPTANCE.md](ACCEPTANCE.md) — the derivation rules stay as written; fill in the
+  omissions this domain actually produces
 
 **Generic policy — keep as-is unless you are deliberately changing the way of working:**
 
@@ -73,6 +75,7 @@ Start here after creating a repo from this template:
   project glossary
 - [DEVELOPMENT.md](DEVELOPMENT.md): implementation workflow and Definition of Done
 - [DOCUMENT.md](DOCUMENT.md): document management rules
+- [ACCEPTANCE.md](ACCEPTANCE.md): how to derive the acceptance criteria a requirement owes
 - [TESTING.md](TESTING.md): test-level policy and testing Definition of Done
 - [CODE_QUALITY.md](CODE_QUALITY.md): quality gates and refactoring order
 - [REVIEW.md](REVIEW.md): project-specific review checklist (starts empty)

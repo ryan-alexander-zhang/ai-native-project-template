@@ -74,6 +74,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   rules, cases, and GWTs, the readings taken silently, and every value it cannot confirm.
   Each finding becomes an amendment or a named Open Question; what only a domain owner can
   settle is never left as an assumption.
+- When writing the acceptance for a `spec` or a `rule`, derive the set per `ACCEPTANCE.md`.
 
 ## 7. Development Workflow
 

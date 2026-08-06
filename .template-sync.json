@@ -3,6 +3,7 @@
   "frozen": [
     "AGENTS.md",
     "DOCUMENT.md",
+    "ACCEPTANCE.md",
     "COMMIT.md",
     "PR.md",
     "REVIEW.md",
