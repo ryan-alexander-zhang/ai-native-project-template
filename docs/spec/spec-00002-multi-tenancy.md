@@ -108,6 +108,10 @@ silo **seam** 预留在范围内（FR-17），其路由实现不在。
   Given 一条带 `ce_tenantid=A` 的记录
   When 消费端 `reconstruct`
   Then `EventEnvelope` 租户为 A、处理在 `runAs(A)` 内，下游写入 `tenant_id=A`
+- **spec-00002-AC-3.1**（spec-00002-FR-3，一次写入不可变）
+  Given 请求在 trusted boundary 已绑定租户 A
+  When 业务代码尝试再次写入 `TenantContext`（改写为 B 或重复写 A）
+  Then 写入被拒绝（编译期不可达或运行期抛错），请求余下部分 `effective()` 恒为 A
 - **spec-00002-AC-8.1**（spec-00002-FR-7 / spec-00002-FR-8，读隔离，参数化 MP/JDBC/RLS 三组）
   Given 库中同时存在 A、B 的行
   When 以租户 A 上下文查询
@@ -144,10 +148,30 @@ silo **seam** 预留在范围内（FR-17），其路由实现不在。
   Given `tenancy.enabled=true`，无 `TenantResolver` bean，未设 `trust-header`
   When 启动应用
   Then 启动失败，错误指明"从认证主体解析"与"由不可绕过的边缘重写该头"两种接法
+- **spec-00002-AC-15.1**（spec-00002-FR-15，开启时死信）
+  Given `tenancy.enabled=true`
+  When 消费一条缺 `ce_tenantid` 的集成事件
+  Then 按格式错误永久失败进死信，不重试、不归属 `__root__`
+- **spec-00002-AC-15.2**（spec-00002-FR-15，关闭时容忍）
+  Given `tenancy.enabled=false`
+  When 消费同一条缺 `ce_tenantid` 的集成事件
+  Then 正常处理，落 `tenant_id=__root__`
 - **spec-00002-AC-16.1**（spec-00002-FR-16，穿越）
   Given `exclude-paths = /actuator/**`
   When 请求 `/actuator/../orders`（容器派发到 `/orders`）
   Then 过滤器**不**跳过，照常解析并按策略处置
+- **spec-00002-AC-17.1**（spec-00002-FR-17，seam 可替换）
+  Given MVP 的单库 pass-through 数据源 bean
+  When 以一个读 `TenantContext` 的替身实现覆盖该 bean
+  Then 应用照常启动、请求路由到替身，且没有任何 mapper 或仓储代码改动
+- **spec-00002-AC-18.1**（spec-00002-FR-18，维度就位）
+  Given `tenancy.enabled=true`、请求绑定租户 A
+  When 处理请求
+  Then span 带 `tenant.id=A`、日志 MDC 带 `tenant=A`
+- **spec-00002-AC-18.2**（spec-00002-FR-18，与 trace 分离）
+  Given 同一租户 A 的两个请求分属不同 trace，以及同一 trace 内跨租户的后台动作
+  When 检查遥测
+  Then 租户维度不随 trace 传播、也不被 trace 覆盖：前者两个 trace 同为 A，后者租户按各自绑定取值
 - **spec-00002-AC-1.2**（spec-00002-FR-1，迁移）
   Given 存量单租户库
   When 执行 `ADD COLUMN tenant_id NOT NULL DEFAULT '__root__'`（仅租户相对键表升级唯一约束）

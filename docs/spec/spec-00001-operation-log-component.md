@@ -144,6 +144,10 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
   Given 成功路径 sink 注入一个 genuine 写错误
   When 命令处理
   Then 业务事务回滚，异常契约稳定
+- **spec-00001-AC-15.1**（spec-00001-FR-15）
+  Given 一个 handler 抛出业务异常、且失败路径的隔离事务写入被注入错误
+  When 命令处理
+  Then 抛给调用方的仍是原业务异常（未被记录异常替换或包装），且 failure-loss metric 计数 +1 并触发 alert
 - **spec-00001-AC-16.1**（spec-00001-FR-16）
   Given 一个含 token/密码/原始异常的输入
   When 记录
@@ -152,10 +156,26 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
   Given 多租户开启
   When 查询未带 tenant
   Then 请求被拒绝（criteria 强制 tenant），且不存在跨 tenant 结果
+- **spec-00001-AC-18.1**（spec-00001-FR-18，拒绝策略）
+  Given 预算策略为 `REJECT`，一个渲染后恰好超出 summary 预算 1 字符的输入
+  When 记录
+  Then 不写入 entry，调用方得到可定位的超预算错误，且预算违规计数可观测
+- **spec-00001-AC-18.2**（spec-00001-FR-18，截断策略与边界）
+  Given 预算策略为 `TRUNCATE`
+  When 分别记录恰好等于预算与超出预算 1 字符的两个输入
+  Then 前者原样落库、后者被截断并带截断标记，两者都可观测
 - **spec-00001-AC-19.1**（spec-00001-FR-19）
   Given 后端 × 方言 参数化测试矩阵
   When 跑同一组用例
   Then 唯一约束/幂等/排序结果在 6 组合下一致
+- **spec-00001-AC-20.1**（spec-00001-FR-20）
+  Given 同一线程上先后处理两条命令，第一条走成功路径、第二条走失败路径
+  When 第二条命令处理完毕
+  Then 两条各自持有的记录状态互不可见，线程上不残留任何每命令绑定（ThreadLocal 清点为空）
+- **spec-00001-AC-20.2**（spec-00001-FR-20）
+  Given 一条命令在其 handler 内嵌套派发另一条带 `@OperationLog` 的命令
+  When 内层命令完成
+  Then 内外两条各记一条 entry、字段互不串写，外层状态不被内层覆盖
 
 ## 4. Technical Design
 
