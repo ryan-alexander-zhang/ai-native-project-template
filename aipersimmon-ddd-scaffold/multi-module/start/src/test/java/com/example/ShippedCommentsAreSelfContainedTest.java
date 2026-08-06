@@ -100,14 +100,17 @@ class ShippedCommentsAreSelfContainedTest {
   }
 
   /**
-   * The scaffold reactor root, found by walking up from this module rather than assumed. The {@code
-   * archetype.properties} marker exists only at the root of this tree.
+   * The reactor root, found by walking up from this module rather than assumed. The marker has to
+   * be something a <em>generated</em> project has too — this test runs there as well, and anything
+   * that exists only in the authoring repository (an {@code archetype.properties}, say) would make
+   * it throw for every consumer. An aggregator pom next to a {@code start} module is the first
+   * ancestor that qualifies from either tree, and nothing above it in either tree does.
    */
   private static Path reactorRoot() {
     for (Path candidate = Path.of("").toAbsolutePath();
         candidate != null;
         candidate = candidate.getParent()) {
-      if (Files.exists(candidate.resolve("archetype.properties"))
+      if (Files.exists(candidate.resolve("pom.xml"))
           && Files.exists(candidate.resolve("start/pom.xml"))) {
         return candidate;
       }

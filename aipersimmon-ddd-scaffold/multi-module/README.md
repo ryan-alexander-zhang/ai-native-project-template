@@ -189,7 +189,7 @@ the order. `SelfCancelDuringReservationTest` covers it.
 | Persistence (MyBatis / PostgreSQL) | `ordering-infrastructure`, `inventory-infrastructure` (`MyBatis*` mappers); schema in `start/src/main/resources/db/migration/`, **one directory per bounded context** with a version major each — `ordering/` (`1.x`), `inventory/` (`2.x`), `payment/` (`3.x`). See that directory's `README.md` | `OutboxAtomicityTest`, `MigrationContentTest`, `TableRetentionTest` |
 | Replaceable business policies | `ManualReviewPolicy` + `RestrictedSkuReviewPolicy` (ordering), `AuthorizationPolicy` + `CeilingAuthorizationPolicy` (payment); bound in `OrderingPolicyConfig` / `PaymentPolicyConfig` | `ManualReviewPolicyTest`, `AuthorizationPolicyTest` (incl. a non-default ceiling) |
 | Published-event schema evolution | `OrderReadyForFulfilment` (v2) alongside `OrderReadyForFulfilmentV1`, both consumed by `OrderReadyForFulfilmentListener` | `OrderReadyForFulfilmentVersionsTest` |
-| Architecture rules (layering, context isolation, event placement) | `AiPersimmonDddRules` applied over `com.example` | `ArchitectureTest`, `PackageInfoTest` |
+| Architecture rules (layering, context isolation, event placement) | `AiPersimmonDddRules` applied over this project's base package | `ArchitectureTest`, `PackageInfoTest` |
 
 ## Replaceable policies
 

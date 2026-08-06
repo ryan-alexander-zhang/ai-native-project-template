@@ -6,7 +6,7 @@ these follow the code and say so.
 
 | Document | Answers |
 |---|---|
-| [multi-module-event-storming.json](multi-module-event-storming.json) | **What happens, in the business's own words.** The domain as actors, commands, aggregates, policies, constraints, domain events, read models, hotspots and opportunities across the three bounded contexts. Importable into the Event Storming editor. |
+| [event-storming.json](event-storming.json) | **What happens, in the business's own words.** The domain as actors, commands, aggregates, policies, constraints, domain events, read models, hotspots and opportunities across the three bounded contexts. Importable into the Event Storming editor. |
 | [c4.md](c4.md) | **What runs, and what depends on what.** System context → containers → components (one section per bounded context) → where a code-level zoom is worth it. Plus the integration topology and every cross-cutting concern. |
 | [class-diagram.md](class-diagram.md) | **What the types are.** Nine class diagrams: the `Order` aggregate, the cancellation rules, placement and money, the application ports, the process manager, inventory, payment, the persistence adapters, and the cross-context contracts. |
 | [sequence-diagram.md](sequence-diagram.md) | **What talks to what, in what order.** Eight flows — happy path, both review answers, reservation failure, payment decline, payment timeout, stock timeout, the self-cancel race, ship-then-refuse — plus the outbox path and payment idempotency in detail. |
