@@ -4,9 +4,9 @@
 
 SOP for keeping code inside this repo's quality gates.
 
-Sections 2 and 3 are **fill-in**: the gates and thresholds depend on the language
-and toolchain you bring. Everything else is language-neutral — keep it as written
-unless you are deliberately changing the way of working.
+Sections 2 and 3 record this repo's Java toolchain — the gates that fail the
+build and every threshold tuned away from its default. Everything else is
+language-neutral and comes from the template.
 
 When a gate fails, or a review flags complexity or duplication:
 **solve it per this file. Never raise a threshold or suppress a finding just to
@@ -31,22 +31,23 @@ Rule names differ per tool; the metric is what matters.
 Metrics are **review triggers, not design goals.** Cognitive complexity is the
 primary readability guard; cyclomatic and NPath are secondary.
 
-## 2. Enforced gates — fill in
+## 2. Enforced gates
 
 List every check that fails the build. A check that only warns is not a gate.
 
 | gate | tool | scope | config |
 |---|---|---|---|
-| Format | `<formatter>` | `<what it covers>` | `<config path>` |
-| Complexity + duplication | `<linter>` | `<what it covers>` | `<config path>` |
-| Static analysis | `<analyzer>` | `<what it covers>` | `<config path>` |
-| Coverage | `<tool>` | `<what it covers>` — bar per [TESTING.md](TESTING.md) | `<config path>` |
-| `<other>` | `<tool>` | `<what it covers>` | `<config path>` |
+| Format | Spotless (google-java-format) | all modules | `spotless` plugin block |
+| Complexity + duplication | PMD + CPD (`failOnViolation=true`) | all modules | `aipersimmon-ddd-quality-config` → `pmd-ruleset.xml` |
+| Bytecode defects | SpotBugs (`failOnError=true`) | all modules | `aipersimmon-ddd-quality-config` → `spotbugs-exclude.xml` |
+| Coverage + mutation | JaCoCo + PIT | opt-in per domain module (`design-00007` §4.3) | per-module pom — bar per [TESTING.md](TESTING.md) |
 
-Record where the shared config lives. If more than one build file carries the
-same gate configuration, name each one here — they must be changed together.
+Shared config lives in `aipersimmon-ddd-quality-config`. There is no shared
+provider parent, so **two** build files carry the plugin block by hand and must
+be changed together: the library parent pom, and the scaffold
+`multi-module/pom.xml`.
 
-## 3. Tuned thresholds (and why) — fill in
+## 3. Tuned thresholds (and why)
 
 Start from the tool defaults. Record every deviation here **and** next to the
 config itself, with the reason. A tuned value with no recorded rationale is
@@ -54,7 +55,12 @@ indistinguishable from a value that was raised to silence a failure.
 
 | check | default | this repo | rationale |
 |---|---|---|---|
-| `<check>` | `<default>` | `<value>` | `<why the default does not fit a correct pattern here>` |
+| CognitiveComplexity | 15 | 15 | kept at the default — the real readability guard |
+| CyclomaticComplexity | 10 | 15 | the accepted upper bound; over it → refactor, do not raise further |
+| NPathComplexity | 200 | 200 | kept at the default; over it → refactor or suppress |
+| ExcessiveParameterList | 10 | 18 | DI-heavy constructors and `@Bean` factories carry collaborators, not data |
+| TooManyMethods | 10 | 30 | per-item classes: config `@Bean`, DAO-per-query, codec, state handlers |
+| CPD minimumTokens | 100 | 250 library / 100 scaffold | library: MyBatis entity accessor boilerplate. Generated projects keep the strict default |
 
 ## 4. Refactoring levers (effect per metric)
 
