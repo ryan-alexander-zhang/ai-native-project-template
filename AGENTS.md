@@ -68,6 +68,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## 6. Document Workflow
 
 - For document work, including status transitions, follow `DOCUMENT.md`.
+- As soon as a `spec`, `rule`, or `design` draft is written or substantively changed — and
+  before a human is asked to review it — a subagent that did not write it audits it: first
+  against that folder's `README.md`, then against the content itself. Name the missing
+  rules, cases, and GWTs, the readings taken silently, and every value it cannot confirm.
+  Each finding becomes an amendment or a named Open Question; what only a domain owner can
+  settle is never left as an assumption.
 
 ## 7. Development Workflow
 
