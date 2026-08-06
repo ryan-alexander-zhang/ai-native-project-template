@@ -30,8 +30,8 @@ Decide how before building.
 - Never build against a `draft` doc; promote it first.
 - For a feature-sized `spec` (multiple files, real ordering or design choices),
   create or refresh a `docs/plan/` doc before implementing, then work it
-  task-by-task. Follow the `idea -> prd -> spec -> plan` flow in
-  [docs/README.md](docs/README.md).
+  task-by-task. The plan declares `implements: [<the spec>]`; the product flow
+  ahead of it is `idea -> prd -> spec`, per [docs/README.md](docs/README.md).
 - Link a `docs/design/` doc for the spec's design; inline only for a small spec.
 - For small or localized changes, inline reasoning is enough — do not create a
   plan doc.
@@ -69,6 +69,7 @@ Use this stage when the change needs durable docs, notes, or decisions.
 - [PR.md](PR.md): PR readiness, review flow, merge rules.
 - [SECURITY.md](SECURITY.md): security rules, risk handling.
 - [CODE_STYLE.md](CODE_STYLE.md): naming, formatting, consistency.
+- [CODE_QUALITY.md](CODE_QUALITY.md): quality gates, thresholds, refactoring order.
 - [DOCUMENT.md](DOCUMENT.md): doc taxonomy and management.
 
 ## Commands
@@ -103,5 +104,7 @@ A change is done only when all of these are true:
 - relevant tests pass and meet the [TESTING.md](TESTING.md) DoD
 - relevant docs are updated per the [DOCUMENT.md](DOCUMENT.md) DoD
 - code style meets the [CODE_STYLE.md](CODE_STYLE.md) DoD
+- quality gates pass per [CODE_QUALITY.md](CODE_QUALITY.md), with no raised
+  threshold and no suppressed finding
 - security-sensitive changes meet the [SECURITY.md](SECURITY.md) DoD
 - no known regression is left behind

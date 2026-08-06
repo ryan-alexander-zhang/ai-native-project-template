@@ -71,6 +71,7 @@ Start here after creating a repo from this template:
 - [DEVELOPMENT.md](DEVELOPMENT.md): implementation workflow and Definition of Done
 - [DOCUMENT.md](DOCUMENT.md): document management rules
 - [TESTING.md](TESTING.md): test-level policy and testing Definition of Done
+- [CODE_QUALITY.md](CODE_QUALITY.md): quality gates and refactoring order
 - [REVIEW.md](REVIEW.md): project-specific review checklist (starts empty)
 - [THIRDPARTY.md](THIRDPARTY.md): register of external reference-only sources
 - [docs/README.md](docs/README.md): source of truth for the docs taxonomy
