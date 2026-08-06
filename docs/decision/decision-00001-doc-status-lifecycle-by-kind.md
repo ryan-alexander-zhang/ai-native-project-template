@@ -26,11 +26,13 @@ superseded.
 
 Use two status sub-vocabularies:
 
-- Living docs (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`,
-  `integration`, `reference`, `us`, `memory`, `operation`, `record`,
-  `prompt`, `report`): `draft -> active -> archived`.
 - Work items (`issue`, `plan`, `task`): `draft -> open -> resolved`, with
   terminal alternatives `wontfix` and `archived`.
+- Living docs — every other type: `draft -> active -> archived`.
+
+Work items are the closed set; living docs are its complement, so the split
+survives types being added or retired. The live membership list is in
+[docs/README.md](../README.md#front-matter-rules); this doc does not restate it.
 
 `archived` means "this file is no longer the live source". It is not a synonym
 for "done". Work completion is recorded with `resolved`; deliberate non-action

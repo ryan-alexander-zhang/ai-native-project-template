@@ -3,5 +3,5 @@ id: record-00001-example-slug
 type: record
 status: draft|active|archived
 parent: <plan-id>                             # the plan this record accepts
-verifies: [<us-id | spec-id | requirement-id>, ...]   # what this record verified
+verifies: [<spec-id | rule-id | requirement-id>, ...]   # what this record verified
 ---

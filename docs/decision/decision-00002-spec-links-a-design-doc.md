@@ -1,7 +1,7 @@
 ---
 id: decision-00002-spec-links-a-design-doc
 type: decision
-status: active
+status: archived
 parent:
 ---
 
@@ -23,7 +23,10 @@ design into its own file adds ceremony and produces many thin files.
 The repo already externalizes user stories the same way: a `us/` doc owns each
 story. (At the time of this decision that rule still carried a small-spec
 exception allowing one story inline; decision-00005 later removed it, so stories
-are now always externalized and only the design keeps an inline exception.) The
+were always externalized and only the design kept an inline exception.
+decision-00007 then retired the `us` type altogether — a story is now a row in
+the spec — and applied this same extraction pattern to business rules, so the
+`design`/`rule` pair are the two externalized assets a spec links.) The
 machinery for an independent design already exists — an extracted design stands
 on its own, with no `parent`.
 

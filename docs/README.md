@@ -9,7 +9,7 @@ Every doc should start with:
 ```md
 ---
 id: <type>-<five-digit-number>-<slug>
-type: analysis|decision|design|idea|integration|issue|memory|operation|plan|prd|prompt|record|report|spec|task|us
+type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec|task
 status: draft   # start here; promote per kind (see Front Matter Rules below)
 ---
 ```
@@ -21,11 +21,19 @@ Write the document description or comment after the front matter.
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]` and set the old doc to `archived`.
 - `status` has two sub-vocabularies, by document kind:
-  - **Living docs** (`spec`, `design`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `us`, `memory`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
+  - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
 - Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
-- `us` (user story) docs own a requirement unit (value statement + EARS requirements + GWT acceptance). Requirement ids carry the doc id, e.g. `us-00001-FR-1` and `us-00001-AC-1.1`.
+- There are exactly two requirement id namespaces, and both carry their doc id:
+  - `spec` owns **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.
+  - `rule` owns **business rules** — `rule-00001-BR-1`, acceptance `rule-00001-AC-1.1`.
+  The test for which one applies: remove the software. If the statement is still
+  true, it is a rule. A requirement that applies a rule cites it instead of
+  restating it.
+- A **story** is a planning token, not a document: a row in the spec's Stories
+  table naming one shippable slice and the requirement and rule ids it delivers.
+  Stories own no id namespace and carry no acceptance of their own.
 - Relation rules:
   - A field the document's type does not carry must not appear at all.
   - **Declare each edge once**, on the document that depends on the other. Do not
@@ -41,7 +49,7 @@ Write the document description or comment after the front matter.
 
 | Field | Meaning |
 | --- | --- |
-| `parent` | which doc this one is *part of*, or the next stage of — single-valued, and only six types carry it |
+| `parent` | which doc this one is *part of*, or the next stage of — single-valued, and only five types carry it |
 | `implements` | this doc makes the listed docs real |
 | `informs` | this doc is input for the listed docs without binding them |
 | `motivated_by` | what created the need for this doc |
@@ -68,17 +76,16 @@ Each folder is marked **core** (most projects need it) or **situational**
 (use only when the project actually calls for it).
 
 - `prd/` — **core** — product requirements
-- `spec/` — **core** — feature specs (feature view + technical design)
+- `spec/` — **core** — feature specs: story slices, system requirements, links to rules and design
+- `rule/` — **core** — business rules: decision tables and the examples verifying them
 - `plan/` — **core** — implementation plans
 - `decision/` — **core** — durable decision records
 - `issue/` — **core** — development issues, fixes, and verification
 - `operation/` — **core** — runbook and operations docs
-- `memory/` — **core** — reusable long-term knowledge
 - `idea/` — **core** — early ideas (some projects skip and start at `prd/`)
 - `design/` — situational — durable structural design docs
 - `analysis/` — situational — codebase and business analysis docs
 - `task/` — situational — execution tasks (only for large plans)
-- `us/` — situational — user stories: requirement units (EARS + GWT) linked from specs
 - `integration/` — situational — third-party integration notes
 - `record/` — situational — reports and process records
 - `reference/` — situational — external references
@@ -88,11 +95,11 @@ Each folder is marked **core** (most projects need it) or **situational**
 ## Rules
 
 - Keep one document per topic, and amend it in place.
+- `rule` says what is true in the business, with or without the software.
 - `spec` says what the system should do.
 - `plan` says how to do it.
 - Use `task` only for large plans.
 - Use `issue` for a development problem, the fix, and the verification result.
 - Use `analysis` for exploratory codebase or business analysis that informs later docs.
 - Write a decision record for major business, architecture, product-shape, or technology choices with real trade-offs.
-- Keep long-term knowledge in `memory/`.
 - Keep reports and evidence in `record/`.

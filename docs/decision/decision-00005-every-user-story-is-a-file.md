@@ -1,7 +1,7 @@
 ---
 id: decision-00005-every-user-story-is-a-file
 type: decision
-status: active
+status: archived
 parent:
 ---
 

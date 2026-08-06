@@ -39,15 +39,15 @@ Narrow `parent` to a single meaning and give every other relation its own
 optional, multi-valued field.
 
 `parent` answers only: *which document is this one a part of, or the next stage
-of?* Six types carry it: `us` → `spec` and `task` → `plan` (required), `record` →
-`plan`, `spec` → `prd`/`idea`, `prd` → `idea`, and `analysis` → the catalog
-analysis that enumerates it.
+of?* Only these carry it: `task` → `plan` (required), `record` → `plan`,
+`spec` → `prd`/`idea`, `prd` → `idea`, and `analysis` → the catalog analysis
+that enumerates it.
 
-The other ten types — `decision`, `design`, `idea`, `integration`, `issue`,
-`memory`, `operation`, `plan`, `prompt`, `report` — are not part of another
-document, so `parent` is not merely empty for them: **it must not appear**. It is
-absent from their templates, which is a stronger guard than a rule saying "leave
-it blank", and it gives a checker something exact to reject.
+Every other type is not part of another document, so `parent` is not merely empty
+for them: **it must not appear**. It is absent from their templates, which is a
+stronger guard than a rule saying "leave it blank", and it gives a checker
+something exact to reject — and it means the templates, not this prose, are the
+live list.
 
 The relation fields are `implements`, `informs`, `motivated_by`, `constrains`,
 `blocks`, `verifies`, and `supersedes`, defined in
