@@ -28,18 +28,90 @@ parent:
   [[decision-00013-command-context-and-causation-propagation]]（不扩展 `CommandContext`）、
   [[decision-00016-durable-runtime-staged-message-identity]]（at-least-once 幂等）、[[design-00003-exception-model]]（异常分类）。
 
-## 2. User Stories
+## 2. Stories
 
-每个 story 独立成 `docs/us/` 文档，各自拥有 value statement、EARS 需求与 GWT 验收；requirement 全局引用
-`us-<n>-FR-<i>`。story 面向**消费方开发者**（记录侧）；业务查询者（读取侧）在 P3、不在本 spec。
+Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧）在 P3、不在本 spec。
 
-| Story | Doc | Status | Summary |
-| --- | --- | --- | --- |
-| US1 注解捕获 | [[us-00001-operation-log-annotation-capture]] | draft | 在 application `Command` 上加 `@OperationLog` 即自动记录一条操作日志 |
-| US2 Definition 捕获 | [[us-00002-operation-log-definition-capture]] | draft | 用类型安全 `OperationLogDefinition` 表达 before/after、diff、id→label、条件与脱敏 |
-| US3 direct-API 记录 | [[us-00003-operation-log-direct-api]] | draft | 在 batch/scheduler/CLI 无 CommandBus 场景显式 `OperationLogs.record(draft)` |
+| Story | Value | Delivers |
+| --- | --- | --- |
+| S1 注解捕获 | 作为消费方开发者，我想在 application `Command` 上声明稳定操作码、目标与安全文案模板，以便无需改 handler 就自动记录一条操作日志 | spec-00001-FR-1 … spec-00001-FR-4 |
+| S2 Definition 捕获 | 作为消费方开发者，我想用类型安全 `OperationLogDefinition` 捕获修改前后的业务化变化并注入 read port，以便记录 opaque id 的人类可读名称、字段级 diff 与条件性"不记录" | spec-00001-FR-5 … spec-00001-FR-8 |
+| S3 direct-API 记录 | 作为消费方开发者，我想在无 CommandBus 的 batch/scheduler/CLI 中显式记录操作日志，以便系统动作也有可信 actor 与如实的事务完成态 | spec-00001-FR-9 … spec-00001-FR-11 |
 
-## 3. Cross-cutting / System Requirements
+## 3. System Requirements
+
+### 3.1 Story requirements
+
+**S1 注解捕获**
+
+- **spec-00001-FR-1**（Event）当带 `@OperationLog` 的 command 正常返回时，系统应恰好记录一条
+  `outcome=SUCCEEDED, completion=COMMITTED` 的 entry，且与业务变更同事务提交。
+- **spec-00001-FR-2**（Optional）当注解声明了 `rejectedWhen` 谓词且其对结果投影为真时，系统应把该次正常返回记为
+  `REJECTED, COMMITTED`。
+- **spec-00001-FR-3**（Unwanted）若带 `@OperationLog` 的 command 抛异常且 `recordFailure=true`，则系统应记录一条
+  `REJECTED/FAILED`（由 `FailureClassifier` 判定），并**重新抛出原异常**。
+- **spec-00001-FR-4**（Ubiquitous）系统应只在启动期编译并校验注解模板；非法模板阻止启动。
+
+**S2 Definition 捕获**
+
+- **spec-00001-FR-5**（Event）当 Definition 的 `prepare` 在成功路径执行时，系统应在业务事务内**只捕获一次**
+  allowlisted before projection。
+- **spec-00001-FR-6**（Event）当 `complete(result)` 返回 draft 时，系统应经同一 normalize/validate/redact/freeze
+  pipeline 落库（与等价注解一致）。
+- **spec-00001-FR-7**（Optional）当 `complete`/`failed` 返回 empty 时，系统应不记录任何 entry（`RecordResult.SKIPPED`）。
+- **spec-00001-FR-8**（Unwanted）若同一 input type 同时匹配注解与 Definition、或有重复 Definition、或泛型不可判定，
+  则系统应在启动期失败。
+
+**S3 direct-API 记录**
+
+- **spec-00001-FR-9**（Event）当调用 `OperationLogs.record(draft)` 且存在当前事务时，系统应把 append 加入该事务。
+- **spec-00001-FR-10**（Unwanted）若无当前事务，则系统应记 `completion=UNKNOWN`，不冒充原子性。
+- **spec-00001-FR-11**（Ubiquitous）系统应要求调用方显式提供 actor、可信 tenant/source、target、outcome；可重试调用须提供稳定 `idempotencyKey`。
+
+**Acceptance（GWT）**
+
+- **spec-00001-AC-1.1**（spec-00001-FR-1）
+  Given 一个带 `@OperationLog` 的 command 与已提交的业务变更
+  When 它正常返回
+  Then 存在恰好一条 `SUCCEEDED+COMMITTED` entry，actor/target/code/causality 正确，且与业务行同事务
+- **spec-00001-AC-1.2**（spec-00001-FR-1）
+  Given 同上
+  When 业务事务因其它原因回滚
+  Then 不存在虚假的 `SUCCEEDED` entry
+- **spec-00001-AC-2.1**（spec-00001-FR-2）
+  Given 一个带 `rejectedWhen` 谓词的注解 command
+  When 它正常返回且谓词对结果投影为真
+  Then 存在一条 `REJECTED+COMMITTED` entry，与业务事务一起提交
+- **spec-00001-AC-3.1**（spec-00001-FR-3）
+  Given `recordFailure=true` 的注解 command
+  When handler 抛技术异常导致回滚
+  Then 存在一条 `FAILED+ROLLED_BACK` entry，且原异常被重新抛出、未被替换
+- **spec-00001-AC-4.1**（spec-00001-FR-4）
+  Given 一个含非法属性路径 / 未知根对象的注解模板
+  When 应用启动
+  Then 启动失败并给出可定位的模板编译错误
+- **spec-00001-AC-5.1**（spec-00001-FR-5, spec-00001-FR-6）
+  Given 一个改地址的 Definition
+  When 命令成功
+  Then before projection 只执行一次，entry 的 `changes` 只含 allowlist 的实际变化，并与等价注解走同一 pipeline
+- **spec-00001-AC-7.1**（spec-00001-FR-7）
+  Given 一个在无变化时返回 empty 的 Definition
+  When 命令成功但无可记录变化
+  Then 不产生任何 entry，`record(...)` 结果为 `SKIPPED`
+- **spec-00001-AC-8.1**（spec-00001-FR-8）
+  Given 同一 input type 既有注解又有 Definition
+  When 应用启动
+  Then 启动失败并给出可定位的冲突信息
+- **spec-00001-AC-9.1**（spec-00001-FR-9, spec-00001-FR-10）
+  Given 一个 `@Transactional` batch 与一个无事务 CLI 动作
+  When 各自 `record(draft)`
+  Then 前者 `completion=COMMITTED` 与业务同事务，后者 `completion=UNKNOWN`
+- **spec-00001-AC-11.1**（spec-00001-FR-11）
+  Given 一个会重跑的 batch 动作，为每条记录提供稳定 `idempotencyKey`
+  When 该动作重跑
+  Then 不产生重复 entry，`record(...)` 返回 `DUPLICATE(existingRecordId)`
+
+### 3.2 Cross-cutting requirements
 
 面向整个组件、不属单个 story 的系统要求（幂等、事务、隐私、租户、尺寸、方言）。
 
@@ -107,8 +179,8 @@ parent:
 ### 4.4 Error Handling（映射需求 id）
 | 情况 | 处理 | 需求 |
 | --- | --- | --- |
-| validation/authorization 拒绝 | `REJECTED+NOT_STARTED`，Failed 独立事务 | us-00001-FR-3 |
-| handler/commit 技术失败 | `FAILED+ROLLED_BACK`，成功日志随之回滚 | us-00001-FR-3 / spec-00001-XFR-3 |
+| validation/authorization 拒绝 | `REJECTED+NOT_STARTED`，Failed 独立事务 | spec-00001-FR-3 |
+| handler/commit 技术失败 | `FAILED+ROLLED_BACK`，成功日志随之回滚 | spec-00001-FR-3 / spec-00001-XFR-3 |
 | 成功路径重复键（重投） | `ON CONFLICT DO NOTHING` 收敛，不 abort 事务 | spec-00001-XFR-2 / XAC-2.1 |
 | 失败路径重复键 | 隔离事务 catch → DUPLICATE | spec-00001-XFR-1 |
 | 记录失败 | 不替换原业务异常，metric+alert | spec-00001-XFR-4 |

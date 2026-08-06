@@ -121,11 +121,11 @@ flowchart LR
 ## 三、验收路径
 
 1. 全 reactor `mvn -q verify` 绿；`aipersimmon-ddd-operation-log` 零 Spring/JDBC/CQRS（T13/enforcer 守护）。
-2. **注解路径**：`SUCCEEDED+COMMITTED` 恰一条、同事务（us-00001-AC-1.1）；回滚无虚假 `SUCCEEDED`（us-00001-AC-1.2）；
-   `recordFailure` 抛异常时 `FAILED+ROLLED_BACK` 且原异常不被替换（us-00001-AC-3.1）；`rejectedWhen` 为真 → `REJECTED+COMMITTED`（us-00001-AC-2.1）。
-3. **Definition 路径**：before 每 invocation 只执行一次、`changes` 仅 allowlist 变化、与等价注解走同一 pipeline（us-00002-AC-1.1）；
-   `complete/failed` 返回 empty → `SKIPPED` 无行（us-00002-AC-3.1）；注解+Definition 双绑 → 启动失败（us-00002-AC-4.1）。
-4. **direct-API**：`@Transactional` batch → `COMMITTED` 同事务，无事务 CLI → `UNKNOWN`（us-00003-AC-1.1）；稳定 key 重跑 → `DUPLICATE`（us-00003-AC-3.1）。
+2. **注解路径**：`SUCCEEDED+COMMITTED` 恰一条、同事务（spec-00001-AC-1.1）；回滚无虚假 `SUCCEEDED`（spec-00001-AC-1.2）；
+   `recordFailure` 抛异常时 `FAILED+ROLLED_BACK` 且原异常不被替换（spec-00001-AC-3.1）；`rejectedWhen` 为真 → `REJECTED+COMMITTED`（spec-00001-AC-2.1）。
+3. **Definition 路径**：before 每 invocation 只执行一次、`changes` 仅 allowlist 变化、与等价注解走同一 pipeline（spec-00001-AC-5.1）；
+   `complete/failed` 返回 empty → `SKIPPED` 无行（spec-00001-AC-7.1）；注解+Definition 双绑 → 启动失败（spec-00001-AC-8.1）。
+4. **direct-API**：`@Transactional` batch → `COMMITTED` 同事务，无事务 CLI → `UNKNOWN`（spec-00001-AC-9.1）；稳定 key 重跑 → `DUPLICATE`（spec-00001-AC-11.1）。
 5. **幂等/事务（阻断项）**：PostgreSQL 成功路径重投重复键 → 业务提交成功、变更不丢、无虚假 `FAILED`、日志 `DUPLICATE`
    （spec XAC-2.1）；失败后重投成功保留两条（XAC-1.2）；成功路径 genuine 写错 → 业务回滚（XAC-3.1）。
 6. **隐私/租户**：secret/token/stack/完整对象不落库（XAC-5.1）；多租户开启时无 tenant 查询被拒、无跨 tenant 结果（XAC-6.1）；超预算按策略裁剪且可观测。
