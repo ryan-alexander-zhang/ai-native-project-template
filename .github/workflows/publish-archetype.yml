@@ -1,0 +1,55 @@
+# Publish the multi-module archetype to GitHub Packages.
+#
+# The archetype is derived from aipersimmon-ddd-scaffold/multi-module rather than
+# hand-written, so this workflow derives it fresh on every run: the scaffold is the
+# source of truth and a published archetype that drifted from it would be worse than
+# none. Consumers who set ARCHETYPE_SOURCE=published (see scripts/new-app.sh) take
+# the archetype from here instead of paying for a local library build.
+name: Publish archetype
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+          server-id: github
+
+      # create-from-project cannot even read the scaffold's pom until the imported
+      # aipersimmon-ddd-bom resolves: an unresolvable import BOM fails Maven's model
+      # building before any goal runs.
+      - name: Install the library
+        run: mvn -B --no-transfer-progress -DskipTests -f aipersimmon-ddd/pom.xml install
+
+      - name: Derive the archetype
+        working-directory: aipersimmon-ddd-scaffold/multi-module
+        run: mvn -B --no-transfer-progress archetype:create-from-project -Darchetype.properties=./archetype.properties
+
+      # The derived pom carries no distributionManagement — create-from-project does
+      # not invent one — so name the target repository explicitly. The `github` id
+      # matches the server setup-java wrote into settings.xml, and the URL matches
+      # aipersimmon-ddd/pom.xml's distributionManagement.
+      - name: Deploy to GitHub Packages
+        run: >
+          mvn -B --no-transfer-progress
+          -f aipersimmon-ddd-scaffold/multi-module/target/generated-sources/archetype/pom.xml
+          deploy
+          -DaltDeploymentRepository=github::https://maven.pkg.github.com/ryan-alexander-zhang/ai-native-project-template
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
