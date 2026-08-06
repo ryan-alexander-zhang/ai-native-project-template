@@ -2,7 +2,6 @@
 id: design-00013-actor-identity-and-authorization
 type: design
 status: draft
-informs: [report-00002-scaffold-ddd-review]
 ---
 
 # 操作者身份与授权：把 actor 接进 tenant 已经铺好的那条骨架
