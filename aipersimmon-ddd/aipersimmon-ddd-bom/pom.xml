@@ -46,7 +46,7 @@
   -->
   <groupId>com.aipersimmon.ddd</groupId>
   <artifactId>aipersimmon-ddd-bom</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.1.0</version>
   <packaging>pom</packaging>
   <name>aipersimmon-ddd-bom</name>
   <description>BOM aligning versions of the AiPersimmon DDD building-block modules.</description>
