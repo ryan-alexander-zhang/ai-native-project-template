@@ -281,3 +281,12 @@ __marimo__/
 # Project
 #   File lock
 .idea-number.lock
+
+# maven-release-plugin scratch. release:prepare writes a backup of every pom, the
+# rewritten ones, and its resume file; release:clean removes them on a run that
+# finishes. A run that fails or is interrupted leaves all of them behind — 89 files
+# for this reactor — and none of them should ever be committed.
+*.releaseBackup
+pom.xml.tag
+pom.xml.next
+release.properties
