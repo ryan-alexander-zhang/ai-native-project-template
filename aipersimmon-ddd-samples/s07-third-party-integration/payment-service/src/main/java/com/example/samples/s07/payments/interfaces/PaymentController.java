@@ -1,15 +1,14 @@
 package com.example.samples.s07.payments.interfaces;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.example.samples.s07.payments.application.FindPayment;
+import com.example.samples.s07.payments.application.PaymentView;
 import com.example.samples.s07.payments.application.RequestPayment;
-import com.example.samples.s07.payments.domain.Payment;
-import com.example.samples.s07.payments.domain.PaymentId;
-import com.example.samples.s07.payments.domain.Payments;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import java.net.URI;
-import java.util.HashMap;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,11 +36,11 @@ import org.springframework.web.bind.annotation.RestController;
 class PaymentController {
 
   private final CommandBus commandBus;
-  private final Payments payments;
+  private final QueryBus queryBus;
 
-  PaymentController(CommandBus commandBus, Payments payments) {
+  PaymentController(CommandBus commandBus, QueryBus queryBus) {
     this.commandBus = commandBus;
-    this.payments = payments;
+    this.queryBus = queryBus;
   }
 
   @PostMapping
@@ -53,29 +52,11 @@ class PaymentController {
   }
 
   @GetMapping("/{id}")
-  ResponseEntity<Map<String, Object>> payment(@PathVariable String id) {
-    return payments
-        .find(new PaymentId(id))
-        .map(PaymentController::body)
+  ResponseEntity<PaymentView> payment(@PathVariable String id) {
+    return queryBus
+        .ask(new FindPayment(id))
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
-  }
-
-  /**
-   * The review flag is exposed rather than hidden. A client integration that can see "this payment needs a
-   * human" can stop asking and say so; one that cannot will poll a stuck payment forever and show the
-   * customer a spinner.
-   */
-  private static Map<String, Object> body(Payment payment) {
-    Map<String, Object> body = new HashMap<>();
-    body.put("id", payment.id().value());
-    body.put("orderRef", payment.orderRef());
-    body.put("amountMinor", payment.amountMinor());
-    body.put("status", payment.status().name());
-    body.put("gatewayRef", payment.gatewayRef());
-    body.put("needsReview", payment.needsReview());
-    body.put("reviewReason", payment.reviewReason());
-    return body;
   }
 
   record RequestPaymentRequest(@NotBlank String orderRef, @Positive long amountMinor) {}

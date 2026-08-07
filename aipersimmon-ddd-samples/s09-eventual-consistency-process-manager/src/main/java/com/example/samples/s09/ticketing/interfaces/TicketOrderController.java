@@ -1,16 +1,15 @@
 package com.example.samples.s09.ticketing.interfaces;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.example.samples.s09.ticketing.application.FindTicketOrder;
 import com.example.samples.s09.ticketing.application.PlaceTicketOrder;
 import com.example.samples.s09.ticketing.application.RequestCancellation;
-import com.example.samples.s09.ticketing.domain.TicketOrder;
-import com.example.samples.s09.ticketing.domain.TicketOrderId;
-import com.example.samples.s09.ticketing.domain.TicketOrders;
+import com.example.samples.s09.ticketing.application.TicketOrderView;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import java.net.URI;
-import java.util.HashMap;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,11 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 class TicketOrderController {
 
   private final CommandBus commandBus;
-  private final TicketOrders orders;
+  private final QueryBus queryBus;
 
-  TicketOrderController(CommandBus commandBus, TicketOrders orders) {
+  TicketOrderController(CommandBus commandBus, QueryBus queryBus) {
     this.commandBus = commandBus;
-    this.orders = orders;
+    this.queryBus = queryBus;
   }
 
   @PostMapping
@@ -55,10 +54,9 @@ class TicketOrderController {
   }
 
   @GetMapping("/{id}")
-  ResponseEntity<Map<String, Object>> order(@PathVariable String id) {
-    return orders
-        .find(new TicketOrderId(id))
-        .map(TicketOrderController::body)
+  ResponseEntity<TicketOrderView> order(@PathVariable String id) {
+    return queryBus
+        .ask(new FindTicketOrder(id))
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
   }
@@ -72,17 +70,6 @@ class TicketOrderController {
       @PathVariable String id, @Valid @RequestBody CancelRequest request) {
     commandBus.send(new RequestCancellation(id, request.reason()));
     return ResponseEntity.accepted().body(Map.of("id", id, "requested", "cancellation"));
-  }
-
-  private static Map<String, Object> body(TicketOrder order) {
-    Map<String, Object> body = new HashMap<>();
-    body.put("id", order.id().value());
-    body.put("customerId", order.customerId());
-    body.put("seatClass", order.seatClass());
-    body.put("amountMinor", order.amountMinor());
-    body.put("status", order.status().name());
-    body.put("cancelReason", order.cancelReason());
-    return body;
   }
 
   record PlaceRequest(

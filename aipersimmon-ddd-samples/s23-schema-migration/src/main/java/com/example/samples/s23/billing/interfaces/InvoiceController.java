@@ -1,9 +1,10 @@
 package com.example.samples.s23.billing.interfaces;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.example.samples.s23.billing.application.FindInvoice;
+import com.example.samples.s23.billing.application.InvoiceView;
 import com.example.samples.s23.billing.application.RaiseInvoice;
-import com.example.samples.s23.billing.domain.InvoiceId;
-import com.example.samples.s23.billing.domain.Invoices;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -23,11 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 class InvoiceController {
 
   private final CommandBus commandBus;
-  private final Invoices invoices;
+  private final QueryBus queryBus;
 
-  InvoiceController(CommandBus commandBus, Invoices invoices) {
+  InvoiceController(CommandBus commandBus, QueryBus queryBus) {
     this.commandBus = commandBus;
-    this.invoices = invoices;
+    this.queryBus = queryBus;
   }
 
   @PostMapping
@@ -37,15 +38,9 @@ class InvoiceController {
   }
 
   @GetMapping("/{id}")
-  ResponseEntity<Map<String, Object>> invoice(@PathVariable String id) {
-    return invoices
-        .find(new InvoiceId(id))
-        .map(
-            invoice ->
-                Map.<String, Object>of(
-                    "id", invoice.id().value(),
-                    "orderId", invoice.orderId(),
-                    "amountMinor", invoice.amountMinor()))
+  ResponseEntity<InvoiceView> invoice(@PathVariable String id) {
+    return queryBus
+        .ask(new FindInvoice(id))
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
   }

@@ -1,9 +1,8 @@
 package com.example.samples.s04.inventory.interfaces;
 
-import com.example.samples.s04.inventory.domain.Sku;
-import com.example.samples.s04.inventory.domain.StockItem;
-import com.example.samples.s04.inventory.domain.StockItems;
-import java.util.Map;
+import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.example.samples.s04.inventory.application.FindStock;
+import com.example.samples.s04.inventory.application.StockView;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,33 +10,29 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * A window onto the result, so the chain can be observed from outside the process. A read this small
- * loading the aggregate is the legitimate case {@code Query}'s own javadoc allows; the list-shaped
- * treatment is S20.
+ * A window onto this service's stock, so what the ordering context's event did is observable from
+ * outside.
+ *
+ * <p>It asks the query bus rather than the repository. The difference is not ceremony: the read now
+ * runs inside the transaction and the interceptor chain the bus establishes, and the shape of the
+ * answer lives in a {@code @ReadModel} that a second caller can reuse instead of in a response map
+ * only this class can build.
  */
 @RestController
 @RequestMapping("/stock")
 class StockController {
 
-  private final StockItems stockItems;
+  private final QueryBus queryBus;
 
-  StockController(StockItems stockItems) {
-    this.stockItems = stockItems;
+  StockController(QueryBus queryBus) {
+    this.queryBus = queryBus;
   }
 
   @GetMapping("/{sku}")
-  ResponseEntity<Map<String, Object>> stock(@PathVariable String sku) {
-    return stockItems
-        .findBySku(new Sku(sku))
-        .map(this::body)
+  ResponseEntity<StockView> stock(@PathVariable String sku) {
+    return queryBus
+        .ask(new FindStock(sku))
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
-  }
-
-  private Map<String, Object> body(StockItem item) {
-    return Map.of(
-        "sku", item.id().value(),
-        "available", item.available(),
-        "reserved", item.reserved());
   }
 }

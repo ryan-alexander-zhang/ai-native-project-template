@@ -1,10 +1,10 @@
 package com.example.samples.s22.ordering.interfaces;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.example.samples.s22.ordering.application.FindOrder;
+import com.example.samples.s22.ordering.application.OrderView;
 import com.example.samples.s22.ordering.application.PlaceOrder;
-import com.example.samples.s22.ordering.domain.Order;
-import com.example.samples.s22.ordering.domain.OrderId;
-import com.example.samples.s22.ordering.domain.Orders;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -28,11 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 class OrderController {
 
   private final CommandBus commandBus;
-  private final Orders orders;
+  private final QueryBus queryBus;
 
-  OrderController(CommandBus commandBus, Orders orders) {
+  OrderController(CommandBus commandBus, QueryBus queryBus) {
     this.commandBus = commandBus;
-    this.orders = orders;
+    this.queryBus = queryBus;
   }
 
   @PostMapping
@@ -43,16 +43,9 @@ class OrderController {
   }
 
   @GetMapping("/{id}")
-  ResponseEntity<Map<String, Object>> order(@PathVariable String id) {
-    return orders
-        .find(new OrderId(id))
-        .map(
-            order ->
-                Map.<String, Object>of(
-                    "id", order.id().value(),
-                    "customerId", order.customerId(),
-                    "sku", order.sku(),
-                    "quantity", order.quantity()))
+  ResponseEntity<OrderView> order(@PathVariable String id) {
+    return queryBus
+        .ask(new FindOrder(id))
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
   }

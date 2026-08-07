@@ -1,10 +1,10 @@
 package com.example.samples.s04.ordering.interfaces;
 
 import com.aipersimmon.ddd.cqrs.CommandBus;
+import com.aipersimmon.ddd.cqrs.QueryBus;
+import com.example.samples.s04.ordering.application.FindOrder;
+import com.example.samples.s04.ordering.application.OrderView;
 import com.example.samples.s04.ordering.application.PlaceOrder;
-import com.example.samples.s04.ordering.domain.Order;
-import com.example.samples.s04.ordering.domain.OrderId;
-import com.example.samples.s04.ordering.domain.Orders;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -33,11 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 class OrderController {
 
   private final CommandBus commandBus;
-  private final Orders orders;
+  private final QueryBus queryBus;
 
-  OrderController(CommandBus commandBus, Orders orders) {
+  OrderController(CommandBus commandBus, QueryBus queryBus) {
     this.commandBus = commandBus;
-    this.orders = orders;
+    this.queryBus = queryBus;
   }
 
   @PostMapping
@@ -58,22 +58,11 @@ class OrderController {
    * 403 — a 403 confirms the id exists, and the caller is not entitled to know that either.
    */
   @GetMapping("/{id}")
-  ResponseEntity<Map<String, Object>> order(@PathVariable String id) {
-    return orders
-        .find(new OrderId(id))
-        .map(this::body)
+  ResponseEntity<OrderView> order(@PathVariable String id) {
+    return queryBus
+        .ask(new FindOrder(id))
         .map(ResponseEntity::ok)
         .orElseGet(() -> ResponseEntity.notFound().build());
-  }
-
-  private Map<String, Object> body(Order order) {
-    return Map.of(
-        "id", order.id().value(),
-        "customerId", order.customerId(),
-        "lines",
-            order.lines().stream()
-                .map(line -> Map.of("sku", line.sku(), "quantity", line.quantity()))
-                .toList());
   }
 
   record PlaceOrderRequest(
