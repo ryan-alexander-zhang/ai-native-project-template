@@ -24,7 +24,7 @@
 
   <properties>
     <java.version>21</java.version>
-    <aipersimmon-ddd.version>0.1.0</aipersimmon-ddd.version>
+    <aipersimmon-ddd.version>0.2.0-SNAPSHOT</aipersimmon-ddd.version>
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
   </properties>
 

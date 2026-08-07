@@ -14,7 +14,7 @@
   -->
   <groupId>com.aipersimmon.ddd</groupId>
   <artifactId>aipersimmon-ddd-parent</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>aipersimmon-ddd-parent</name>
   <description>Parent and aggregator for the framework-free AiPersimmon DDD building blocks.</description>

@@ -43,7 +43,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <spring-boot.version>3.5.10</spring-boot.version>
     <mybatis-plus.version>3.5.15</mybatis-plus.version>
-    <aipersimmon-ddd.version>0.1.0</aipersimmon-ddd.version>
+    <aipersimmon-ddd.version>0.2.0-SNAPSHOT</aipersimmon-ddd.version>
     <!-- Quality toolchain. Kept in sync with the same block in the library's
          aipersimmon-ddd-parent; there is deliberately no shared quality parent. -->
     <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
