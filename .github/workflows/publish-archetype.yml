@@ -59,6 +59,26 @@ jobs:
       - name: Install the library
         run: mvn -B --no-transfer-progress -DskipTests -f aipersimmon-ddd/pom.xml install
 
+      # The archetype embeds the scaffold's pom TEXT into archetype-resources/, so whatever
+      # version that file names is the version every generated project will ask for. It names
+      # a SNAPSHOT during development, which is right for developing against the library in
+      # this same tree and wrong for a consumer -- they would generate a project pinned to a
+      # version that may be overwritten under them, or that they cannot resolve at all.
+      #
+      # A -D override cannot fix it: create-from-project copies the file, it does not render
+      # the effective model. (-Darchetype.version does not even reach the derivation -- the
+      # properties file wins.) So the two places the version lives outside the library reactor
+      # are rewritten here, in the workspace only, never committed.
+      - name: Stamp the released version into the scaffold
+        run: |
+          VERSION="${GITHUB_REF_NAME#lang/java/ddd/v}"
+          echo "Deriving the archetype at $VERSION"
+          mvn -B --no-transfer-progress versions:set-property \
+            -f aipersimmon-ddd-scaffold/multi-module/pom.xml \
+            -Dproperty=aipersimmon-ddd.version -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+          sed -i "s/^archetype\.version=.*/archetype.version=$VERSION/" \
+            aipersimmon-ddd-scaffold/multi-module/archetype.properties
+
       - name: Derive the archetype
         working-directory: aipersimmon-ddd-scaffold/multi-module
         run: mvn -B --no-transfer-progress archetype:create-from-project -Darchetype.properties=./archetype.properties
