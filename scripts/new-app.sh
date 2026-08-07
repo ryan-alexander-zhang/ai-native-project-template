@@ -10,7 +10,7 @@
 # collected. Running it by hand is the same call:
 #
 #   APP_GROUP_ID=com.acme APP_ARTIFACT_ID=my-ddd APP_VERSION=0.0.1-SNAPSHOT \
-#   APP_PACKAGE=com.acme.myddd ARCHETYPE_SOURCE=local ARCHETYPE_VERSION=0.0.1-SNAPSHOT \
+#   APP_PACKAGE=com.acme.myddd ARCHETYPE_SOURCE=local ARCHETYPE_VERSION=0.1.0-SNAPSHOT \
 #   sh scripts/new-app.sh
 #
 # ARCHETYPE_SOURCE picks where the archetype comes from:
@@ -27,7 +27,7 @@ set -eu
 : "${APP_VERSION:?set APP_VERSION (e.g. 0.0.1-SNAPSHOT)}"
 : "${APP_PACKAGE:?set APP_PACKAGE (e.g. com.acme.myddd)}"
 : "${ARCHETYPE_SOURCE:?set ARCHETYPE_SOURCE to local or published}"
-: "${ARCHETYPE_VERSION:?set ARCHETYPE_VERSION (e.g. 0.0.1-SNAPSHOT)}"
+: "${ARCHETYPE_VERSION:?set ARCHETYPE_VERSION (e.g. 0.1.0-SNAPSHOT)}"
 ARCHETYPE_REPOSITORY="${ARCHETYPE_REPOSITORY:-}"
 
 ARCHETYPE_GROUP_ID=com.ryan.persimmon

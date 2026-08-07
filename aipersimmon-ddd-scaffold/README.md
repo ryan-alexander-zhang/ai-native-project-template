@@ -33,7 +33,7 @@ mvn -f target/generated-sources/archetype/pom.xml install
 mvn archetype:generate \
   -DarchetypeGroupId=com.ryan.persimmon \
   -DarchetypeArtifactId=persimmon-scaffold-archetype \
-  -DarchetypeVersion=0.0.1-SNAPSHOT \
+  -DarchetypeVersion=0.1.0-SNAPSHOT \
   -DgroupId=com.acme -DartifactId=shop -Dversion=1.0.0-SNAPSHOT -Dpackage=com.acme.shop \
   -DinteractiveMode=false
 
