@@ -41,6 +41,23 @@ tag 名镜像分支名，加 `/vX.Y.Z`。前缀不是装饰：**tag 是仓库全
 
 ## 步骤
 
+用 `scripts/release.sh`：
+
+```bash
+scripts/release.sh 0.1.0 0.2.0-SNAPSHOT     # 改版本、提交、打 tag、再开发版。不推送
+PUSH=1 scripts/release.sh 0.1.0 0.2.0-SNAPSHOT   # ...并推送，这一步才会发布
+```
+
+不推送时它会打印怎么 review、以及怎么把它做的一切撤销（tag 和两个 commit 全在本地）。
+
+脚本存在的理由主要是 **tag 名**：整条发布链挂在它匹配 `lang/java/ddd/v*` 上，而打错名字的 tag
+会正常建出来、静默不触发任何 workflow。脚本从版本号拼出来，敲不错。
+
+它另外拦掉这些：不在 `lang/java/ddd` 分支、工作区不干净、拿 `-SNAPSHOT` 当发布版、下个开发版忘了带
+`-SNAPSHOT`、tag 已存在（本地或远端）。这些检查全部在任何改动发生**之前**退出。
+
+下面是它逐步做的事，手动执行也是这一套。
+
 ### 1. 把库的版本改成发布版
 
 ```bash
