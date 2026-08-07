@@ -478,7 +478,7 @@
       "properties": {
         "execution": "automatic",
         "condition": "stock is held for this order",
-        "description": "OrderFulfilmentDefinition at AWAITING_PAYMENT. A decline and a payment timeout take the SAME path — release the held stock, then cancel — because the customer's position is identical however the payment failed to happen. Only the recorded decline code differs (PAYMENT_TIMEOUT vs the payment context's own code)."
+        "description": "OrderFulfilmentDefinition at AWAITING_PAYMENT. A decline and a payment timeout take the same compensation — release the held stock, then cancel — because the customer's position is identical however the payment failed to happen. Two things differ: the recorded decline code (PAYMENT_TIMEOUT vs the payment context's own), and the timeout's extra RequestPaymentVoid, which a decline does not need because a decline can never later become an authorization."
       }
     },
     {
@@ -872,6 +872,65 @@
       "context": "pay",
       "properties": {
         "description": "Authorization holds funds; capture takes them. Only the first half is modelled, which is why the money never actually moves in this reference."
+      }
+    },
+    {
+      "id": "ord-c-request-payment-void",
+      "type": "command",
+      "label": "Request Payment Void",
+      "context": "ord",
+      "properties": {
+        "description": "RequestPaymentVoid → RequestPaymentVoidHandler. Fire-and-forget: no outcome is awaited, because by the time ordering asks it has already stopped listening."
+      }
+    },
+    {
+      "id": "ord-e-payment-void-requested",
+      "type": "domainEvent",
+      "label": "Payment Void Requested",
+      "context": "ord",
+      "order": 6,
+      "properties": {
+        "description": "PaymentVoidRequested integration event on ordering.events. Produced directly by RequestPaymentVoidHandler, with no ordering aggregate changing."
+      }
+    },
+    {
+      "id": "ord-p-void-abandoned-payment",
+      "type": "policy",
+      "label": "Void Abandoned Payment Policy",
+      "context": "ord",
+      "properties": {
+        "execution": "automatic",
+        "condition": "the wait for payment is abandoned while an authorization may still complete",
+        "description": "OrderFulfilmentDefinition at AWAITING_PAYMENT, on PaymentTimedOut and on OrderCancelled. Deliberately NOT on a decline: a decline is payment's own recorded decision and can never later authorize, so there is nothing to release. A timeout and a racing cancellation are only silence — the authorization may still complete after this flow has moved on, and a flow at its terminal step reacts to nothing, so the hold would be orphaned for good. The void is therefore eager, issued in the same decision that abandons the wait, which makes the abandonment mutual instead of unilateral."
+      }
+    },
+    {
+      "id": "pay-p-void-on-request",
+      "type": "policy",
+      "label": "Void On Request Policy",
+      "context": "pay",
+      "properties": {
+        "execution": "automatic",
+        "description": "PaymentVoidRequestedListener — the inbound anticorruption layer for ordering's PaymentVoidRequested, translating it into payment's own VoidPayment command on the same paymentOperationId the authorization claim is keyed on."
+      }
+    },
+    {
+      "id": "pay-c-void",
+      "type": "command",
+      "label": "Void Payment",
+      "context": "pay",
+      "properties": {
+        "description": "VoidPayment → VoidPaymentHandler. Announces nothing: authorization is decide-once-announce-every-time because a flow waits on the announcement, and nothing waits on a void."
+      }
+    },
+    {
+      "id": "pay-x-void-settles-race",
+      "type": "constraint",
+      "label": "An abandoned operation is settled once, whichever side got there first",
+      "context": "pay",
+      "properties": {
+        "rule": "nothing recorded ⇒ record Voided (a refusal in advance; a later authorization finds it and declines with payment.voided); Authorized ⇒ release the hold; Declined or Voided ⇒ nothing is held, fall through",
+        "description": "The race between ordering abandoning an operation and this context authorizing it is settled on the operation row rather than by ordering, because only the row can be read and written atomically. Every branch is idempotent, which is what lets ordering fire-and-forget over an at-least-once relay."
       }
     }
   ],
@@ -1529,6 +1588,54 @@
       "source": "pay-o-capture",
       "target": "pay-e-authorized",
       "relation": "highlights"
+    },
+    {
+      "id": "e-110",
+      "source": "ord-e-payment-timeout",
+      "target": "ord-p-void-abandoned-payment",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-111",
+      "source": "ord-e-cancelled",
+      "target": "ord-p-void-abandoned-payment",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-112",
+      "source": "ord-p-void-abandoned-payment",
+      "target": "ord-c-request-payment-void",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-113",
+      "source": "ord-c-request-payment-void",
+      "target": "ord-e-payment-void-requested",
+      "relation": "produces"
+    },
+    {
+      "id": "e-114",
+      "source": "ord-e-payment-void-requested",
+      "target": "pay-p-void-on-request",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-115",
+      "source": "pay-p-void-on-request",
+      "target": "pay-c-void",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-116",
+      "source": "pay-c-void",
+      "target": "pay-x-void-settles-race",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-117",
+      "source": "pay-c-void",
+      "target": "pay-x-decide-once",
+      "relation": "constrainedBy"
     }
   ]
 }

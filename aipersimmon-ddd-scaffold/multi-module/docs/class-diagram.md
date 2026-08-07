@@ -5,8 +5,9 @@ diagram stops at its own boundary: **no class from one context appears inside an
 they meet only through the `*-api` records in the last section, which is the whole point of the
 layout.
 
-Visibility is real Java visibility. `OrderLine` and `OrderHasDistinctSkus` are package-private, and
-that is shown, because it is what stops anything outside `ordering.domain.order` from holding a line.
+Visibility is real Java visibility. `OrderLine` and both invariants (`OrderHasDistinctSkus`,
+`OrderHasSingleCurrency`) are package-private, and that is shown, because it is what stops anything
+outside `ordering.domain.order` from holding a line or re-checking a rule the aggregate owns.
 
 ---
 
@@ -98,6 +99,13 @@ classDiagram
         +message() String
         +errorCode() ErrorCode
     }
+    class OrderHasSingleCurrency {
+        <<record, Invariant, package-private>>
+        +lines List~OrderLine~
+        +isBroken() boolean
+        +message() String
+        +errorCode() ErrorCode
+    }
 
     AbstractAggregateRoot <|-- Order
     Order *-- "1..100" OrderLine : owns
@@ -105,6 +113,7 @@ classDiagram
     Order --> OrderId : identity
     Order ..> LineData : place / reconstitute / lineData
     Order ..> OrderHasDistinctSkus : checkInvariant
+    Order ..> OrderHasSingleCurrency : checkInvariant
     OrderLine *-- LineData : same three fields
     Orders ..> Order : loads and saves
 ```
@@ -118,6 +127,13 @@ without ever holding an entity.
 a question only the aggregate can answer — "have my lines changed?" — instead of guessing, which it
 previously did by rewriting every line on every save. A `confirm` or a `cancel` touches only
 `status`.
+
+**Two invariants, both checked on the root because both span all the lines.** `OrderHasDistinctSkus`
+refuses the same SKU twice. `OrderHasSingleCurrency` refuses a mixed-currency order — a rule that was
+always true here, but only as an arithmetic side effect: `Order#total()` reducing mixed lines
+happened to trip `Money`'s same-currency check and throw a codeless "currency mismatch" naming
+neither the order nor the rule. A rule the aggregate relies on gets a name, a stable code, and a
+place in the aggregate's own invariant list.
 
 ## 2. Ordering domain — the cancellation rules
 
@@ -748,16 +764,16 @@ classDiagram
     class Reservation {
         <<AggregateRoot>>
         -id ReservationId
-        -orderId String
+        -orderId OrderRef
         -heldBySku Map~Sku, Integer~
         -released boolean
         -heldSetChanged boolean
-        +Reservation(ReservationId, String, Map~Sku, Integer~)
-        +reconstitute(ReservationId, String, Map, boolean, long) Reservation $
+        +Reservation(ReservationId, OrderRef, Map~Sku, Integer~)
+        +reconstitute(ReservationId, OrderRef, Map, boolean, long) Reservation $
         +markReleased() boolean
         +isReleased() boolean
         +held() List~Entry~Sku, Integer~~
-        +orderId() String
+        +orderId() OrderRef
         +heldSetChanged() boolean
         +id() ReservationId
     }
@@ -767,6 +783,10 @@ classDiagram
     }
     class ReservationId {
         <<record, Identifier>>
+        +value String
+    }
+    class OrderRef {
+        <<record, ValueObject>>
         +value String
     }
     class Stocks {
@@ -827,6 +847,7 @@ classDiagram
     AbstractAggregateRoot <|-- Reservation
     Stock --> Sku : identity
     Reservation --> ReservationId : identity
+    Reservation --> OrderRef : holds stock for
     Reservation --> "1..*" Sku : holds quantity per SKU
     Stocks ..> Stock
     Reservations ..> Reservation
@@ -842,9 +863,12 @@ classDiagram
     StockQueries ..> StockLevel
 ```
 
-**`Reservation` references its order by a raw `String`, not an `OrderId`.** That is correct, not
-sloppy: `OrderId` is *ordering's* type, and inventory may not depend on it. The context-isolation
-rule would fail the build if it did.
+**`Reservation` references its order by inventory's own `OrderRef`, not by `OrderId` and not by a
+bare `String`.** `OrderId` is *ordering's* type and inventory may not depend on it — the
+context-isolation rule would fail the build. But dropping to a `String` was the opposite mistake: it
+left the one id this context's entire compensation path hangs off looking like every other string in
+the context. `OrderRef` is a local `@ValueObject` that rejects null and blank, which is the whole of
+its behaviour and enough of it. Isolation costs a type; it does not have to cost the type system.
 
 **Two `Sku` types exist in this codebase** — `ordering.domain.shared.Sku` and
 `inventory.domain.stock.Sku` — and neither imports the other. `OrderReadyForFulfilment` carries a
@@ -860,9 +884,14 @@ process manager's wait always resolve without the stock ever double-counting.
 classDiagram
     direction TB
 
+    class Amount {
+        <<record, ValueObject>>
+        +amountMinor long
+        +currency String
+    }
     class AuthorizationPolicy {
         <<interface, port>>
-        +decide(long amountMinor, String currency) PaymentDecision
+        +decide(Amount amount) PaymentDecision
     }
     class CeilingAuthorizationPolicy {
         <<final, the scaffold's default>>
@@ -871,7 +900,7 @@ classDiagram
         -ceilingMinor long
         +CeilingAuthorizationPolicy(long ceilingMinor)
         +CeilingAuthorizationPolicy()
-        +decide(long amountMinor, String currency) PaymentDecision
+        +decide(Amount amount) PaymentDecision
     }
     class PaymentDecision {
         <<sealed interface>>
@@ -884,6 +913,9 @@ classDiagram
         <<record>>
         +code String
         +reason String
+    }
+    class Voided {
+        <<record>>
     }
     class AuthorizePayment {
         <<record, Command~Void~, @OperationLog>>
@@ -899,10 +931,21 @@ classDiagram
         +AuthorizePaymentHandler(AuthorizationPolicy, IntegrationEvents, PaymentOperations)
         +handle(AuthorizePayment, CommandContext) Void
     }
+    class VoidPayment {
+        <<record, Command~Void~>>
+        +orderId String
+        +paymentOperationId String
+    }
+    class VoidPaymentHandler {
+        -operations PaymentOperations
+        +VoidPaymentHandler(PaymentOperations)
+        +handle(VoidPayment, CommandContext) Void
+    }
     class PaymentOperations {
         <<interface, port>>
         +find(String operationId) Optional~PaymentDecision~
         +record(String operationId, PaymentDecision decision) void
+        +markVoided(String operationId) void
     }
     class MyBatisPaymentOperations {
         -operations PaymentOperationMapper
@@ -924,11 +967,15 @@ classDiagram
 
     PaymentDecision <|-- Authorized
     PaymentDecision <|-- Declined
+    PaymentDecision <|-- Voided
     AuthorizationPolicy <|.. CeilingAuthorizationPolicy
+    AuthorizationPolicy ..> Amount : decides on
     AuthorizationPolicy --> PaymentDecision : decides
     AuthorizePaymentHandler ..> AuthorizePayment
     AuthorizePaymentHandler --> AuthorizationPolicy
     AuthorizePaymentHandler --> PaymentOperations
+    VoidPaymentHandler ..> VoidPayment
+    VoidPaymentHandler --> PaymentOperations
     PaymentOperations <|.. MyBatisPaymentOperations
     MyBatisPaymentOperations --> PaymentOperationMapper
     PaymentOperationCleanup --> PaymentOperationMapper
@@ -950,6 +997,23 @@ operation id as the provider's own idempotency key**.
 verbatim rather than re-derived — re-running the policy could reach a different answer if a rule or a
 rate changed in between, and one operation must not have two outcomes. Both paths then leave through
 the same `switch`, which is exactly the property that makes a lost outcome event recoverable.
+
+**`Voided` is the third outcome, and it exists because abandonment has to be mutual.** When ordering
+stops waiting for a payment — its `PAYMENT` deadline fired, or the customer cancelled mid-wait — it
+dispatches `RequestPaymentVoid`, which reaches here as `VoidPayment`. Without it the authorization
+could still complete after the flow reached a terminal step, and a terminal instance reacts to
+nothing: the hold would be orphaned for good. The race is settled on the operation row, and
+`VoidPaymentHandler` answers each of the three recorded shapes differently:
+
+| Recorded | What `VoidPayment` does |
+|---|---|
+| nothing | records `Voided` — a refusal *in advance*. A later `AuthorizePayment` finds it and announces a decline (`payment.voided`) instead of authorizing. Two concurrent inserts are resolved by the primary key, exactly as two concurrent authorizations are. |
+| `Authorized` | `markVoided` releases the hold (in a real deployment, alongside the provider's void call) |
+| `Declined` or `Voided` | falls through — nothing is held. Idempotent by construction, which is what lets ordering fire-and-forget over an at-least-once relay |
+
+**No outcome event, unlike authorization's decide-once-announce-every-time.** That discipline exists
+because a flow waits on the announcement. Nothing waits on a void: by the time ordering asks, it has
+already moved on. So the void is the one command here that answers to no one.
 
 ## 8. Infrastructure — the persistence adapters
 
@@ -1103,6 +1167,11 @@ classDiagram
         +amountMinor long
         +currency String
     }
+    class PaymentVoidRequested {
+        <<record, @EventType v1, @Externalized ordering.events>>
+        +orderId String
+        +paymentOperationId String
+    }
     class StockReleaseRequested {
         <<record, @EventType v1, @Externalized ordering.events>>
         +orderId String
@@ -1155,6 +1224,7 @@ classDiagram
     IntegrationEvent <|.. OrderReadyForFulfilment
     IntegrationEvent <|.. OrderReadyForFulfilmentV1
     IntegrationEvent <|.. PaymentRequested
+    IntegrationEvent <|.. PaymentVoidRequested
     IntegrationEvent <|.. StockReleaseRequested
     IntegrationEvent <|.. StockReserved
     IntegrationEvent <|.. StockReservationFailed
@@ -1178,7 +1248,7 @@ Three properties hold across all of them:
 3. **Every list is defensively copied in the constructor,** so a published event cannot be mutated
    through the caller's reference after the fact.
 
-**Nine classes, eight logical events.** `OrderReadyForFulfilment` is at `version = 2` and
+**Ten classes, nine logical events.** `OrderReadyForFulfilment` is at `version = 2` and
 `OrderReadyForFulfilmentV1` is the retired revision, kept because at the moment of a rollout the topic
 still holds v1 messages. Both carry the *same* `@EventType(name = …)` and differ only in `version`;
 the catalog is keyed by that pair, so they coexist, and two classes claiming the same pair fail
@@ -1188,6 +1258,17 @@ The nested `Line` records are deliberately **not** shared between the two. Shari
 frozen revision to the live one, so a later change to v2's line shape would silently rewrite what v1
 claims to have meant — and the stored messages v1 exists to read would no longer match it.
 
-Where the difference is absorbed: `OrderReadyForFulfilmentListener` in `inventory-adapter`, one
-listener per revision funnelling into one internal call. `ReserveStock` and `ReserveStockHandler` are
-untouched and do not know a version exists.
+Where the difference is absorbed: **`OrderReadyForFulfilmentV1Upcaster`**, an `EventUpcaster<V1, v2>`
+registered once at inventory's contract boundary. The consumer bridge applies it *before* dispatch,
+so `OrderReadyForFulfilmentListener` has a single `on(EventEnvelope<OrderReadyForFulfilment>)` method
+that faces only the current revision — it no longer carries one method per revision. The framework
+reads the `(name, v1 → v2)` registration from the two classes' own `@EventType` contracts and refuses
+at startup anything that does not line up. `ReserveStock` and `ReserveStockHandler` are untouched and
+do not know a version exists.
+
+**The upcast supplies nothing, deliberately.** v2 added `reservationDeadline`; a v1 message does not
+carry one and none can be recovered — the value is ordering's configured timeout added to the moment
+it published, and the envelope's `occurredAt` gives the moment but not the budget. So the upcast
+states *no* deadline, which is precisely what v1 always meant. A fabricated instant would be
+indistinguishable from a real one at the point of use, on the day some consumer starts acting on the
+field.

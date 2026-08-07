@@ -141,8 +141,8 @@ stateDiagram-v2
 
     AWAITING_PAYMENT --> AWAITING_ORDER_CONFIRMATION : PaymentAuthorized<br/>▸ ConfirmOrder<br/>▸ cancel PAYMENT
     AWAITING_PAYMENT --> AWAITING_STOCK_RELEASE : PaymentDeclined<br/>▸ RequestStockRelease<br/>▸ cancel PAYMENT<br/>▸ arm STOCK_RELEASE (PT1M)
-    AWAITING_PAYMENT --> AWAITING_STOCK_RELEASE : PaymentTimedOut<br/>▸ RequestStockRelease<br/>▸ arm STOCK_RELEASE<br/>(code PAYMENT_TIMEOUT)
-    AWAITING_PAYMENT --> AWAITING_STOCK_RELEASE_ORDER_CANCELLED : OrderCancelled<br/>▸ RequestStockRelease<br/>▸ cancel PAYMENT<br/>▸ arm STOCK_RELEASE
+    AWAITING_PAYMENT --> AWAITING_STOCK_RELEASE : PaymentTimedOut<br/>▸ RequestStockRelease<br/>▸ RequestPaymentVoid<br/>▸ arm STOCK_RELEASE<br/>(code PAYMENT_TIMEOUT)
+    AWAITING_PAYMENT --> AWAITING_STOCK_RELEASE_ORDER_CANCELLED : OrderCancelled<br/>▸ RequestStockRelease<br/>▸ RequestPaymentVoid<br/>▸ cancel PAYMENT<br/>▸ arm STOCK_RELEASE
 
     AWAITING_STOCK_RELEASE --> AWAITING_ORDER_CANCELLATION : StockReleased<br/>▸ CancelOrder(PaymentDeclined<br/>AfterStockReleased)<br/>▸ cancel STOCK_RELEASE
     AWAITING_STOCK_RELEASE --> AWAITING_STOCK_RELEASE : StockReleaseTimedOut<br/>▸ RequestStockRelease again<br/>▸ RE-ARM STOCK_RELEASE
@@ -219,8 +219,19 @@ of its handler and publishes nothing, and that silence is indistinguishable from
 | Step | Is stock held? | What the timeout does |
 |---|---|---|
 | `AWAITING_STOCK` | no | cancel outright — same branch as a refusal, different code |
-| `AWAITING_PAYMENT` | **yes** | release, then cancel — the decline's path, unchanged |
+| `AWAITING_PAYMENT` | **yes** | release, then cancel — the decline's path, **plus a `RequestPaymentVoid`** |
 | `AWAITING_STOCK_RELEASE` | **yes** | **cannot end the wait** — re-ask and re-arm |
+
+**The one thing a timeout needs that a decline does not: the void.** A decline is payment's own
+recorded decision and can never later become an authorization, so abandoning the wait is safe. A
+timeout is only *silence* — the authorization may still complete after this flow has moved on, and a
+flow that has reached its terminal step reacts to nothing, so the hold would be orphaned for good.
+`RequestPaymentVoid` is therefore dispatched **eagerly, in the decision that abandons the wait**,
+rather than in reaction to a late `PaymentAuthorized` that may arrive too late to be reacted to. The
+same applies to a cancellation racing the payment: `OrderCancelled` at `AWAITING_PAYMENT` sends the
+void alongside the release. Payment settles the race atomically on its operation row — authorized
+becomes voided, in-flight finds the void first and is refused, declined needs nothing — so the
+abandonment is mutual instead of unilateral.
 
 The third is where the evidence-bearing `CancellationReason` earns its complexity. Cancelling from
 there needs a `StockReleaseRef` proving the stock came back, and a timeout is precisely the *absence*

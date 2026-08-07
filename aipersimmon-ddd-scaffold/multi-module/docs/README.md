@@ -28,8 +28,10 @@ cross between them**. That is the discipline `ArchitectureTest` enforces in code
 - **Two `Sku` types are shown, not one.** `ordering.domain.shared.Sku` and
   `inventory.domain.stock.Sku` are separate classes and neither imports the other; the published event
   carries a flat `String`. Collapsing them into one box would misrepresent the isolation.
-- **`Reservation` references its order as a raw `String`.** Not an `OrderId` — that is ordering's type,
-  and the build would fail if inventory depended on it.
+- **`Reservation` references its order as inventory's own `OrderRef`.** Not ordering's `OrderId` — the
+  build would fail if inventory depended on it — but not a bare `String` either: that was the opposite
+  mistake, leaving the one id this context's whole compensation path hangs off indistinguishable from
+  any other string. A local `@ValueObject` wrapping a non-blank value is the third option.
 - **The only shared classes are the `*-api` records**, and they appear in exactly one place:
   [§9 of the class diagrams](class-diagram.md#9-the-cross-context-contracts-api).
 
@@ -42,7 +44,7 @@ purpose. Each is covered in `c4.md` instead, which is the right home for them.
 |---|---|
 | Kafka, PostgreSQL, the outbox relay, the inbox | transport and storage, not business facts. The *facts* they carry are modelled; the pipe is not. |
 | The dead-letter ops console (`/ops/dead-letters`) | an operator surface over framework tables this application does not own. Real, and technical. |
-| The `payment_operations` dedupe log as a node | it is technical state, which is why it sits behind a port in the *infrastructure* layer even though it stores decisions. Its *rule* is modelled, as the `pay-x-decide-once` constraint. |
+| The `payment_operations` dedupe log as a node | it is technical state, which is why it sits behind a port in the *infrastructure* layer even though it stores decisions. Its *rules* are modelled, as the `pay-x-decide-once` and `pay-x-void-settles-race` constraints. |
 | Any `externalSystem` node | **there are none.** `CeilingAuthorizationPolicy` decides in-process against a configured ceiling and `RestrictedSkuReviewPolicy` against a configured SKU watchlist, so this system has no external business dependency at all. Both are *ports* now, so an adopter adds the missing system by declaring a bean — but a configurable stand-in is still a stand-in, so both absences remain hotspots rather than invented systems. |
 
 Two modelling choices are worth naming, because a reader could reasonably expect otherwise:

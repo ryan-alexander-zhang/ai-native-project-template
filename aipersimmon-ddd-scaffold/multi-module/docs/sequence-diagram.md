@@ -33,6 +33,7 @@ sequenceDiagram
     actor C as Customer
     participant CTRL as OrderController<br/>(ordering-adapter)
     participant BUS as CommandBus<br/>(library)
+    participant PRE as StockAvailabilityPrecheck<br/>(CommandPrecheck)
     participant POH as PlaceOrderHandler
     participant GW as StockAvailabilityGateway<br/>→ StockAvailabilityApi
     participant CUST as Customer<br/>(aggregate)
@@ -46,15 +47,17 @@ sequenceDiagram
 
     C->>CTRL: POST /orders<br/>X-Tenant-Id, Idempotency-Key
     CTRL->>BUS: send(PlaceOrder)
-    Note over BUS: validation · tenancy · @OperationLog<br/>opens ONE transaction
+    Note over BUS: validation · tenancy
+    BUS->>PRE: precheck slot — BEFORE the transaction interceptor
+    PRE->>GW: check(distinct skus)
+    GW->>INV: StockAvailabilityApi.check (sync, in-process)
+    INV-->>GW: report(all available)
+    Note over PRE,GW: fail-fast on availability only — the quantity<br/>reservation is still async. Outside the transaction<br/>on purpose: a slow answer holds no connection
+
+    Note over BUS: @OperationLog<br/>opens ONE transaction
     BUS->>POH: handle(cmd, context)
 
     POH->>CUST: customers.findById
-    POH->>GW: check(distinct skus)
-    GW->>INV: StockAvailabilityApi.check (sync, in-process)
-    INV-->>GW: report(all available)
-    Note over POH,GW: fail-fast on availability only —<br/>the quantity reservation is still async
-
     POH->>POH: ManualReviewPolicy.assess → notRequired
     POH->>ORD: Order.place(id=UUIDv7, …, notRequired)
     Note over ORD: status = READY_FOR_FULFILMENT<br/>registers OrderPlacedEvent<br/>+ OrderReadyForFulfilmentEvent
@@ -72,7 +75,7 @@ sequenceDiagram
     CTRL-->>C: 201 Created<br/>Location: /orders/{id}
 
     TX->>INV: OrderReadyForFulfilment (ordering.events)
-    Note over INV: OrderReadyForFulfilmentListener — the ACL.<br/>Handles v2 AND the retired v1, both funnelling<br/>into the same ReserveStock (own command)
+    Note over INV: the ACL. A retired v1 message is carried forward by<br/>OrderReadyForFulfilmentV1Upcaster BEFORE dispatch, so<br/>OrderReadyForFulfilmentListener faces one revision and<br/>issues ReserveStock (inventory's own command)
     INV->>INV: DECIDE over a Map of Sku to Stock<br/>then WRITE + new Reservation (UUIDv7)
     INV->>TX: publish StockReserved (inventory.events)
     TX->>PM: StockReserved → process.stockReserved
@@ -273,19 +276,29 @@ sequenceDiagram
     DW->>PM: PaymentTimedOut(orderId) — the timer fires
     PM->>PM: AWAITING_PAYMENT + PaymentTimedOut<br/>→ COMPENSATING, AWAITING_STOCK_RELEASE
     Note over PM: state.declined(PAYMENT_TIMEOUT,<br/>evidenceId = the TIMER's own delivery id)<br/>No CancelDeadline — this decision IS the deadline
-    PM->>BUS: DispatchCommand RequestStockRelease<br/>+ ScheduleDeadline(STOCK_RELEASE)
+    PM->>BUS: DispatchCommand RequestStockRelease<br/>+ DispatchCommand RequestPaymentVoid<br/>+ ScheduleDeadline(STOCK_RELEASE)
 
-    Note over PM,ORD: from here the path is byte-for-byte the decline's:<br/>release the stock, then cancel with<br/>PaymentDeclinedAfterStockReleased
+    BUS->>PAY: PaymentVoidRequested → VoidPayment
+    Note over PAY: settles the race on the operation row:<br/>nothing recorded → record Voided (refuse in advance)<br/>Authorized → markVoided, release the hold<br/>Declined/Voided → nothing held, fall through
+
+    Note over PM,ORD: the rest is the decline's path:<br/>release the stock, then cancel with<br/>PaymentDeclinedAfterStockReleased
     BUS->>INV: ReleaseStock → StockReleased
     INV->>PM: process.stockReleased
     PM->>BUS: CancelOrder(PaymentDeclinedAfterStockReleased)
     BUS->>ORD: → CANCELLED, category PAYMENT_DECLINED
 ```
 
-**Silence is an answer, and it is the *same* answer.** The customer's position is identical however
-the payment failed to happen, so the compensation is unchanged. Only the recorded code differs —
-`PAYMENT_TIMEOUT` rather than the payment context's own — which is what lets an operator afterwards
-tell "payment said no" from "payment said nothing".
+**Silence is an answer, and it is *almost* the same answer.** The customer's position is identical
+however the payment failed to happen, so the compensation is the decline's. Only the recorded code
+differs — `PAYMENT_TIMEOUT` rather than the payment context's own — which is what lets an operator
+afterwards tell "payment said no" from "payment said nothing".
+
+**The one addition a decline does not need is the void.** A decline is payment's own recorded
+decision and can never later authorize. A timeout is only silence: the authorization may still
+complete after this flow has moved on, and a terminal instance reacts to nothing, so the hold would
+be orphaned for good. `RequestPaymentVoid` goes out *eagerly*, in the same decision that abandons
+the wait, which makes the abandonment mutual rather than unilateral. Nothing waits on it — there is
+no outcome event — because by the time ordering asks, it has already stopped listening.
 
 **The evidence id is the timer's own delivery,** so the cancellation names the firing rather than a
 decline that never happened.
@@ -405,6 +418,13 @@ stock might not be" states, and each has precisely two ways out — neither of w
 returns without doing anything (it is idempotent on `FULFILMENT_IN_PROGRESS` and `CANCELLED`). The
 `AWAITING_PAYMENT + OrderCancelled` branch then releases the held stock and finishes, again with no
 second `CancelOrder`.
+
+That branch has **one effect the `AWAITING_STOCK` one does not: `RequestPaymentVoid`**. By then
+`PaymentRequested` is already out, so payment may be about to authorize — or may already have — for
+an order that no longer exists. The void goes out in the same decision that abandons the wait,
+because once this flow reaches its terminal step it reacts to nothing and a late `PaymentAuthorized`
+would leave the hold orphaned. See [§5](#5-payment-timeout--the-same-path-as-a-decline) for how
+payment settles the race on its operation row.
 
 ## 8. Ship, and the refusal that follows
 
