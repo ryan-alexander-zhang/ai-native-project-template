@@ -5,10 +5,60 @@
 # resolves the aipersimmon-ddd-* SNAPSHOTs it imports via the BOM.
 name: CI
 
+# Skipped only for changes this job provably never reads. The tempting rule -- "docs and
+# scripts cannot affect a Maven artifact, so skip them" -- is wrong here, because this job
+# is not only an artifact check. It is also what keeps three documents honest, and each is
+# a file someone would classify as "just docs" or "just a script":
+#
+#   * scripts/check-config-coverage.py is RUN by this job (step 3), and it reads
+#     aipersimmon-ddd/CONFIGURATION.md. A config key with metadata and no row there fails
+#     the build -- that is the whole point of the step.
+#   * ReadmeQuickstartTest EXECUTES the scaffold's README.md: it parses the curl commands
+#     out of its fenced bash blocks and runs them against a live app. Editing that
+#     quickstart is editing a test fixture.
+#   * DocumentationReferenceTest walks the scaffold reactor over .md/.yml/.yaml/.java/
+#     .xml/.properties and fails on any *.md reference that would dangle in a generated
+#     project. Renaming a markdown file there breaks it from a pure-docs commit.
+#
+# So the list below is an allow-list of things outside this job's reach, not a pattern
+# like '**/*.md' or 'scripts/**'. The two scanning tests are scoped to the scaffold
+# (surefire's working directory is the start module, so their root is
+# aipersimmon-ddd-scaffold/multi-module), which is what leaves the repository-root docs/
+# genuinely untouched by any of it.
+#
+# The scripts are named one by one rather than globbed, so a script added later runs CI
+# until someone decides otherwise -- the safe direction to be wrong in.
+#
+# GitHub skips a run only when EVERY changed file matches, so a commit touching both a
+# document and a pom still builds.
+#
+# The list is written out twice because GitHub Actions does not support YAML anchors --
+# an `&ignored` / `*ignored` pair parses as valid YAML and is rejected by the workflow
+# parser. Keep the two copies identical.
 on:
   push:
     branches: ['**']
+    paths-ignore:
+      - 'docs/**'
+      # Not built by this job at all -- see the steps below, which cover the library
+      # reactor and the multi-module scaffold only.
+      - 'aipersimmon-ddd-samples/**'
+      - '.github/workflows/publish-library.yml'
+      - '.github/workflows/publish-archetype.yml'
+      - '.github/workflows/frozen-docs.yml'
+      - 'scripts/release.sh'
+      - 'scripts/new-app.sh'
+      - 'scripts/sync-docs.sh'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'aipersimmon-ddd-samples/**'
+      - '.github/workflows/publish-library.yml'
+      - '.github/workflows/publish-archetype.yml'
+      - '.github/workflows/frozen-docs.yml'
+      - 'scripts/release.sh'
+      - 'scripts/new-app.sh'
+      - 'scripts/sync-docs.sh'
 
 jobs:
   build:
