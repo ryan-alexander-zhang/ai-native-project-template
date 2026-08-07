@@ -1,0 +1,39 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.outbox.poll-delay-ms",
+      "type": "java.lang.Long",
+      "defaultValue": 1000,
+      "description": "How often the relay looks for unsent rows, after the first poll. @Scheduled(fixedDelay) runs first and waits afterwards, so raising this does not prevent a poll at startup — that is what relay.enabled=false is for. Lower means lower latency and more empty queries."
+    },
+    {
+      "name": "aipersimmon.ddd.outbox.relay.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Whether the relay is scheduled. false removes only the schedule, not the relay: nothing polls on its own, and a caller can drive OutboxRelay.relay() directly."
+    },
+    {
+      "name": "aipersimmon.ddd.outbox.cleanup.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Deletes sent rows past retention. Off by default — an unbounded table is visible, whereas deleting rows someone still wanted is not. Nothing else under cleanup takes effect until it is on."
+    },
+    {
+      "name": "aipersimmon.ddd.outbox.cleanup.poll-delay-ms",
+      "type": "java.lang.Long",
+      "defaultValue": 3600000,
+      "description": "How often cleanup runs (1 hour)."
+    },
+    {
+      "name": "aipersimmon.ddd.outbox.cleanup.lock-name",
+      "type": "java.lang.String",
+      "description": "ShedLock name for the cleanup schedule, so one instance at a time purges. Defaults to '${spring.application.name}-outbox-cleanup'."
+    },
+    {
+      "name": "aipersimmon.ddd.outbox.cleanup.lock-at-most-for",
+      "type": "java.lang.String",
+      "defaultValue": "PT10M",
+      "description": "ShedLock upper bound on how long a cleanup run may hold its lock."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.messaging.kafka.consumer.group-id",
+      "type": "java.lang.String",
+      "description": "The consumer group the integration-event bridge joins. Defaults to spring.application.name, else 'aipersimmon'."
+    }
+  ]
+}

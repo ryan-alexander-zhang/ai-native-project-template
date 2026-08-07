@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.web.store.schema-validation",
+      "type": "java.lang.String",
+      "defaultValue": "validate",
+      "description": "Whether to check at startup that the web-store tables exist and carry the columns of the latest migration. 'validate' fails fast instead of at the first guarded request; 'none' disables."
+    }
+  ]
+}

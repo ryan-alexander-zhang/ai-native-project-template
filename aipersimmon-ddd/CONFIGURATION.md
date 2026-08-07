@@ -16,6 +16,9 @@ Ordered roughly as you meet them.
 | Property | Default | Effect |
 | --- | --- | --- |
 | `transaction.required` | `true` | Whether the application refuses to start without a `PlatformTransactionManager`. |
+| `retry-on-conflict.enabled` | `false` | Whether an optimistic-locking conflict is retried inside the bus instead of surfacing to the caller. Off by default because turning it on is an assertion about *your* handlers: a retry reruns the whole handler, so anything it did outside the transaction (a mail, a third-party call) happens again. Leave it off and a conflict reaches the caller, which is the honest outcome when rerunning is not known to be safe. |
+| `retry-on-conflict.max-attempts` | `3` | Total attempts, the first included — `3` means "retry twice, then let the conflict stand". |
+| `retry-on-conflict.initial-backoff` | `50ms` | Backoff before the first retry; doubles per further retry. |
 
 The starter's guarantee is that one command is one transaction: the aggregate write, the outbox row
 and the domain events commit together or not at all. That is implemented by two beans conditional on a
@@ -118,6 +121,7 @@ bodies of identical length and type against the same endpoint are not.
 | `rate-limit.key` | `ip` | What identifies a caller: `ip` or `header`. |
 | `rate-limit.key-header` | `X-Api-Key` | The header used when `key=header`. |
 | `rate-limit.headers` | `ietf` | Which `RateLimit-*` response headers to emit. |
+| `rate-limit.policy-name` | `default` | Policy name echoed in those headers. Cosmetic to the limiter; it exists so a caller reading `RateLimit-Policy` can tell which of your policies it hit. |
 
 > Enabling any of the three without a `-web-store-mybatis-plus` / `-web-store-redis` module (or your own store
 > bean) means an in-memory store: state per JVM, so a second instance stops honouring the protection.
@@ -158,6 +162,8 @@ Entirely inert until enabled, so bundling it costs nothing at N=1.
 | `exclude-paths` | `/actuator/**` | Paths the resolution filter skips. Probes have no tenant. Matched against the path the container dispatches on, so a traversal like `/actuator/../orders` cannot borrow an excluded prefix. |
 | `mybatis-plus.tenant-column` | `tenant_id` | The discriminator column name. |
 | `mybatis-plus.tenant-tables` | (empty) | **Opt-in allow-list** of tables the interceptor rewrites. Empty means no rewriting: naming your tables here is the deliberate act. The framework's own background-polled tables are deliberately absent — a poller runs with no request tenant. |
+| `mybatis-plus.exempt-tables` | (empty) | Tables that carry the discriminator column but are deliberately **not** interceptor-scoped, because their repository stamps and filters it itself (a dedup log written from paths with and without a bound tenant, say). Listing a table here is a statement of intent; it is not a way to silence the guard below for a table you have not thought about. |
+| `mybatis-plus.guard-tables` | `true` | Whether startup verifies that every base table carrying the discriminator column appears in `tenant-tables` or `exempt-tables`. On by default, and worth leaving on: the allow-list **fails open** — a tenant-carrying table in neither list gets no tenant predicate at all, so it is read across tenants silently. Completeness of an allow-list is exactly the kind of property a machine should check rather than a reviewer. |
 
 ### Isolation fails closed
 
@@ -286,6 +292,9 @@ what identifies a message globally. Keying on the id alone would drop a message 
 because a *different* producer had already used that id — silently, as a phantom duplicate. It costs
 nothing while every producer mints UUIDs, and breaks the moment one uses per-source sequence numbers.
 
+| Property | Default | Effect |
+| --- | --- | --- |
+| `cleanup.enabled` | `false` | Deletes handled keys past retention. Off by default, and **nothing else under `cleanup` does anything until it is on** — setting a retention alone is silently inert. Off is the safe side: a key dropped too early stops guarding its duplicate, and the reprocessing that follows is silent, whereas a growing table is visible. |
 | `cleanup.retention-seconds` | `2592000` (30 days) | How long a handled key is remembered. Must exceed the longest possible redelivery delay, or a very late redelivery is processed twice. |
 | `cleanup.poll-delay-ms` | `3600000` (1 hour) | How often cleanup runs. |
 | `cleanup.batch-size` | `500` | Rows per time-sliced delete page (the key is composite, so pages advance by timestamp; ties can make a page slightly larger). Same purpose as the outbox's: many small transactions instead of one giant first purge. |
@@ -402,7 +411,9 @@ Records only commands carrying `@OperationLog`, so adding the module logs nothin
 | `limits.max-changes` / `max-details` | `20` / `20` | Caps on recorded field changes and detail entries. |
 | `limits.max-value-chars` | `512` | Per-value truncation. |
 
-| `cleanup.enabled` | `false` | Deletes audit records past retention. Off by default twice over: deleting data is a deployment decision everywhere, and removing *audit* rows should be a statement someone can be asked about — retention obligations are often regulatory. |
+| Property | Default | Effect |
+| --- | --- | --- |
+| `cleanup.enabled` | `false` | Deletes audit records past retention. Off by default twice over: deleting data is a deployment decision everywhere, and removing *audit* rows should be a statement someone can be asked about — retention obligations are often regulatory. Nothing else under `cleanup` takes effect until it is on. |
 | `cleanup.retention-seconds` | `31536000` (365 days) | How long an audit record is kept. Enabling cleanup asserts this window satisfies your obligations. |
 | `cleanup.poll-delay-ms` | `3600000` (1 hour) | How often cleanup runs. |
 | `cleanup.batch-size` | `500` | Records deleted per id page; the purge loops pages until one comes back short, so the first purge of a long-lived table is many small transactions. |
@@ -451,6 +462,9 @@ springdoc and OpenTelemetry:
 3. `aipersimmon.ddd.flyway.components` lists exactly the components you use.
 4. `producer.send-timeout-ms` below half of `outbox.relay.lease-duration`, and that lease short enough
    that a killed instance's rows coming back that late is acceptable.
-5. `inbox.cleanup.retention-seconds` longer than your worst redelivery delay.
+5. `inbox.cleanup.retention-seconds` longer than your worst redelivery delay — and note it only
+   applies once `inbox.cleanup.enabled=true`. Left off (the default), the retention is inert and the
+   inbox table grows for the lifetime of the deployment; that is a valid choice, but make it one.
 6. `tenancy.mybatis-plus.tenant-tables` lists every tenant-owned table, if tenancy is on.
-7. `outbox.cleanup.enabled` considered — decided either way, not left unread.
+7. `outbox.cleanup.enabled`, `inbox.cleanup.enabled` and `operation-log.cleanup.enabled` considered —
+   decided either way, not left unread. All three default to off.

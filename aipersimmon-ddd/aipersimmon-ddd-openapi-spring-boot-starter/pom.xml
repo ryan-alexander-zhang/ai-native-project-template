@@ -33,6 +33,14 @@
   <description>Spring Boot auto-configuration that pulls in springdoc and documents the framework's cross-cutting web contracts (RFC 9457 problem responses) in the generated OpenAPI spec.</description>
 
   <dependencies>
+    <!-- Build-time only: generates META-INF/spring-configuration-metadata.json from this module's
+         @ConfigurationProperties, so a consumer's IDE completes every key with its type, default and
+         javadoc without leaving application.yml. optional, so it never reaches a consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The framework-free web contract: ApiError / FieldError / DefaultProblemFamilies shape the
          problem responses the customizer attaches, so the spec matches what -web-spring emits. -->
     <dependency>

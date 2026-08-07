@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.integration.source",
+      "type": "java.lang.String",
+      "description": "This application's identity as an event producer — written to every envelope's ce_source, and half of the consumer-side dedup key (consumer, source, message_key). Defaults to spring.application.name, else 'aipersimmon'. Changing it on a live service makes already-handled messages look new to consumers."
+    },
+    {
+      "name": "aipersimmon.ddd.integration.scan-packages",
+      "type": "java.lang.String",
+      "description": "Comma-separated packages scanned for @Externalized integration events, in ADDITION to the application's own auto-configuration packages — it widens the scan, it does not narrow it. Needed when integration events live outside the application's package, such as a shared contracts module two services depend on."
+    }
+  ]
+}

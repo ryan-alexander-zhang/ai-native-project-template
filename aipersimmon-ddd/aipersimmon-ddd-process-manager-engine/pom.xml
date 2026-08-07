@@ -33,6 +33,14 @@
   <description>Storage-agnostic engine of the durable Process Manager: runtime, relay, deadline worker, and shared Spring wiring over store ports.</description>
 
   <dependencies>
+    <!-- Build-time only: generates META-INF/spring-configuration-metadata.json from this module's
+         @ConfigurationProperties, so a consumer's IDE completes every key with its type, default and
+         javadoc without leaving application.yml. optional, so it never reaches a consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The UUIDv7 IdGenerator implementation, at runtime scope: this module compiles against the
          IdGenerator SPI in aipersimmon-ddd-core and never names anything in this starter, but the
          bean has to exist or the framework mints ids with UUID.randomUUID() and reintroduces the

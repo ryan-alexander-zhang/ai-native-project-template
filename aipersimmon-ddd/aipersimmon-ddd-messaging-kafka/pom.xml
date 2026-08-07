@@ -39,6 +39,14 @@
   <description>Kafka transport for integration events over the transactional outbox: a Kafka OutboxDispatcher and an inbox-guarded in-process consumer bridge.</description>
 
   <dependencies>
+    <!-- Build-time only: generates META-INF/spring-configuration-metadata.json from this module's
+         @ConfigurationProperties, so a consumer's IDE completes every key with its type, default and
+         javadoc without leaving application.yml. optional, so it never reaches a consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The storage-agnostic outbox core supplies the OutboxDispatcher port and
          OutboxMessage this transport implements and carries, plus the dispatch
          auto-configuration this module orders itself before. Depending on the core

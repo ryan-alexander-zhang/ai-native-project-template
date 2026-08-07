@@ -35,6 +35,15 @@
   <description>Transactional-outbox storage over MyBatis-Plus for reliable integration-event delivery.</description>
 
   <dependencies>
+    <!-- Build-time only: merges META-INF/additional-spring-configuration-metadata.json into this
+         module's generated metadata, so the @Value/@ConditionalOnProperty keys it reads complete in
+         a consumer's IDE like the @ConfigurationProperties ones do. optional: never reaches a
+         consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- Observability SPI (framework-free, no-op default): capture on write, restore on dispatch. -->
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>

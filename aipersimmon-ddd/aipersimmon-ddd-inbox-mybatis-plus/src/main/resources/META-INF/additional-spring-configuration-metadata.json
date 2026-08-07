@@ -1,0 +1,39 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.inbox.consumer",
+      "type": "java.lang.String",
+      "description": "This application's identity in the dedup key (consumer, source, message_key). Several services sharing one inbox table must differ here, or they suppress each other's processing of the same message. Defaults to spring.application.name, else 'aipersimmon'."
+    },
+    {
+      "name": "aipersimmon.ddd.inbox.schema-validation",
+      "type": "java.lang.String",
+      "defaultValue": "validate",
+      "description": "Whether to check at startup that aipersimmon_inbox exists and carries the columns of the latest migration. 'validate' fails fast instead of at the first consumed message, on a listener thread; 'none' disables."
+    },
+    {
+      "name": "aipersimmon.ddd.inbox.cleanup.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Whether to schedule the inbox cleanup. Off by default: dropping handled keys is a retention decision, not a default."
+    },
+    {
+      "name": "aipersimmon.ddd.inbox.cleanup.retention-seconds",
+      "type": "java.lang.Long",
+      "defaultValue": 2592000,
+      "description": "How long a handled key is remembered (30 days). Must exceed the longest possible redelivery delay, or a very late redelivery is processed twice."
+    },
+    {
+      "name": "aipersimmon.ddd.inbox.cleanup.poll-delay-ms",
+      "type": "java.lang.Long",
+      "defaultValue": 3600000,
+      "description": "How often cleanup runs (1 hour)."
+    },
+    {
+      "name": "aipersimmon.ddd.inbox.cleanup.batch-size",
+      "type": "java.lang.Integer",
+      "defaultValue": 500,
+      "description": "Rows per time-sliced delete page. Many small transactions instead of one giant first purge."
+    }
+  ]
+}

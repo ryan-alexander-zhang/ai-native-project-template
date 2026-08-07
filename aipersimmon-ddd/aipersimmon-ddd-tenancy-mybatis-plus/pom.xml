@@ -27,6 +27,14 @@
   <description>MyBatis-Plus tenant-line interceptor that scopes a configurable set of tables to the ambient TenantContext.</description>
 
   <dependencies>
+    <!-- Build-time only: generates META-INF/spring-configuration-metadata.json from this module's
+         @ConfigurationProperties, so a consumer's IDE completes every key with its type, default and
+         javadoc without leaving application.yml. optional, so it never reaches a consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The shared MyBatis-Plus seam that owns the single MybatisPlusInterceptor and composes this
          module's TenantLineInnerInterceptor contribution into it. -->
     <dependency>

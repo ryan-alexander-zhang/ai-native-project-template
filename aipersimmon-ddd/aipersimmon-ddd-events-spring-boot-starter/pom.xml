@@ -28,6 +28,16 @@
   <description>Spring starter bridging the DomainEvents port to Spring's ApplicationEventPublisher.</description>
 
   <dependencies>
+    <!-- Build-time only: merges META-INF/additional-spring-configuration-metadata.json into this
+         module's generated metadata. This module owns the aipersimmon.ddd.integration.* keys for
+         indexing: they are read from several optional modules (outbox engine, outbox starter,
+         messaging-kafka), and declaring them once here — in the base starter — keeps a single
+         definition rather than a duplicate per reader. optional: never reaches a consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The UUIDv7 IdGenerator implementation, at runtime scope: this module compiles against the
          IdGenerator SPI in aipersimmon-ddd-core and never names anything in this starter, but the
          bean has to exist or the framework mints ids with UUID.randomUUID() and reintroduces the

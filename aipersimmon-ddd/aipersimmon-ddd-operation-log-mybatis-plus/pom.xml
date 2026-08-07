@@ -22,6 +22,15 @@
   <description>MyBatis-Plus storage backend for the Operation Log component: an OperationLogSink over a BaseMapper with dialect-native duplicate convergence.</description>
 
   <dependencies>
+    <!-- Build-time only: merges META-INF/additional-spring-configuration-metadata.json into this
+         module's generated metadata, so the @Value/@ConditionalOnProperty keys it reads complete in
+         a consumer's IDE like the @ConfigurationProperties ones do. optional: never reaches a
+         consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>com.aipersimmon.ddd</groupId>
       <artifactId>aipersimmon-ddd-operation-log-engine</artifactId>

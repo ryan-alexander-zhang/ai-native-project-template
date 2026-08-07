@@ -36,6 +36,15 @@
   <description>Storage-agnostic engine of the transactional outbox: writer, relay, scheduler, cleanup, and shared Spring wiring over one store port.</description>
 
   <dependencies>
+    <!-- Build-time only: merges META-INF/additional-spring-configuration-metadata.json into this
+         module's generated metadata, so the @Value/@ConditionalOnProperty keys it reads complete in
+         a consumer's IDE like the @ConfigurationProperties ones do. optional: never reaches a
+         consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <!-- The UUIDv7 IdGenerator implementation, at runtime scope: this module compiles against the
          IdGenerator SPI in aipersimmon-ddd-core and never names anything in this starter, but the
          bean has to exist or the framework mints ids with UUID.randomUUID() and reintroduces the

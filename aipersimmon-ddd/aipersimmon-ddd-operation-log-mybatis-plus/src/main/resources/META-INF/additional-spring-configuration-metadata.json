@@ -1,0 +1,34 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.operation-log.schema-validation",
+      "type": "java.lang.String",
+      "defaultValue": "validate",
+      "description": "Whether to check at startup that the operation-log table exists and carries the columns of the latest migration. 'validate' fails fast; 'none' disables."
+    },
+    {
+      "name": "aipersimmon.ddd.operation-log.cleanup.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Whether to schedule the operation-log cleanup. Off by default: discarding audit records is a statement, never a default."
+    },
+    {
+      "name": "aipersimmon.ddd.operation-log.cleanup.retention-seconds",
+      "type": "java.lang.Long",
+      "defaultValue": 31536000,
+      "description": "How long a business audit record is kept (365 days)."
+    },
+    {
+      "name": "aipersimmon.ddd.operation-log.cleanup.poll-delay-ms",
+      "type": "java.lang.Long",
+      "defaultValue": 3600000,
+      "description": "How often cleanup runs (1 hour)."
+    },
+    {
+      "name": "aipersimmon.ddd.operation-log.cleanup.batch-size",
+      "type": "java.lang.Integer",
+      "defaultValue": 500,
+      "description": "Rows per time-sliced delete page. Many small transactions instead of one giant first purge."
+    }
+  ]
+}

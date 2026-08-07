@@ -26,6 +26,13 @@ jobs:
       - name: Build and install the building-block library
         run: mvn -B --no-transfer-progress -f aipersimmon-ddd/pom.xml install
 
+      - name: Check every setting is indexed and documented
+        # Reads the configuration metadata the build just generated, so it has to follow
+        # the library build. A key the code reads but that is missing from either the
+        # metadata or CONFIGURATION.md is invisible to whoever configures a deployment,
+        # and the failure mode is silence: the setting does nothing and nothing says so.
+        run: python3 scripts/check-config-coverage.py
+
       - name: Build the scaffold reference project
         run: |
           # multi-module runs the full quality gate (Spotless + PMD/SpotBugs + domain

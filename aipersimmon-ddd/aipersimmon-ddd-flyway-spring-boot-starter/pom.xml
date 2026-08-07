@@ -31,6 +31,14 @@
   <description>Opt-in, schema-agnostic Flyway runner that auto-applies every aipersimmon-ddd component schema on its own history table.</description>
 
   <dependencies>
+    <!-- Build-time only: generates META-INF/spring-configuration-metadata.json from this module's
+         @ConfigurationProperties, so a consumer's IDE completes every key with its type, default and
+         javadoc without leaving application.yml. optional, so it never reaches a consumer. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>

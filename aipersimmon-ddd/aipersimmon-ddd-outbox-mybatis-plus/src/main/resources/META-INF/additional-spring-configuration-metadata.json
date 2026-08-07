@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "aipersimmon.ddd.outbox.schema-validation",
+      "type": "java.lang.String",
+      "defaultValue": "validate",
+      "description": "Whether to check at startup that the outbox tables (and shedlock) exist and carry the columns of the latest migration. 'validate' fails fast instead of rolling back the first command that publishes an @Externalized event — the outbox insert runs inside the business transaction. 'none' disables."
+    }
+  ]
+}
