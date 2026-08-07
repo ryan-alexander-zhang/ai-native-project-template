@@ -296,7 +296,14 @@ class AutoIncrementIdentityTest extends StranglerTestBase {
       public void insertWithoutAnId(long orderId) {
         saveAggregate(
             com.example.samples.s25.refunds.domain.Refund.raise(
-                new RefundId(1), orderId, 100, "no id in the row", false, 10_000, false));
+                new RefundId(1),
+                orderId,
+                100,
+                "no id in the row",
+                UUID.randomUUID(),
+                false,
+                10_000,
+                false));
       }
 
       /** Save an aggregate that is already persisted, so the update path is the one that runs. */

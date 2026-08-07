@@ -2,6 +2,7 @@ package com.example.samples.s25.refunds.application;
 
 import com.aipersimmon.ddd.application.EntityNotFoundException;
 import com.aipersimmon.ddd.application.IntegrationEvents;
+import com.aipersimmon.ddd.core.id.IdGenerator;
 import com.aipersimmon.ddd.cqrs.CommandContext;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
 import com.example.samples.s25.refunds.api.RefundRaised;
@@ -10,6 +11,7 @@ import com.example.samples.s25.refunds.domain.RefundErrorCode;
 import com.example.samples.s25.refunds.domain.RefundId;
 import com.example.samples.s25.refunds.domain.RefundIds;
 import com.example.samples.s25.refunds.domain.Refunds;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
@@ -33,12 +35,24 @@ class RaiseRefundHandler implements CommandHandler<RaiseRefund, Long> {
   private final OrderFacts orders;
   private final IntegrationEvents integrationEvents;
 
+  /**
+   * The outward identity is minted here, not in the aggregate. {@code Refund.raise} used to call
+   * {@code UUID.randomUUID()} itself, which made the aggregate non-replayable and produced a v4
+   * where everything else in this codebase mints a time-ordered v7.
+   */
+  private final IdGenerator idGenerator;
+
   RaiseRefundHandler(
-      Refunds refunds, RefundIds ids, OrderFacts orders, IntegrationEvents integrationEvents) {
+      Refunds refunds,
+      RefundIds ids,
+      OrderFacts orders,
+      IntegrationEvents integrationEvents,
+      IdGenerator idGenerator) {
     this.refunds = refunds;
     this.ids = ids;
     this.orders = orders;
     this.integrationEvents = integrationEvents;
+    this.idGenerator = idGenerator;
   }
 
   @Override
@@ -57,6 +71,7 @@ class RaiseRefundHandler implements CommandHandler<RaiseRefund, Long> {
             command.orderId(),
             command.amountCents(),
             command.reason(),
+            UUID.fromString(idGenerator.newId()),
             order.cancelled(),
             order.totalCents(),
             refunds.hasOpenRefund(command.orderId()));

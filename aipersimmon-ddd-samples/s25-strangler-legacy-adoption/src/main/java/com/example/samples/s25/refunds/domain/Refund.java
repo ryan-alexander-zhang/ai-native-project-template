@@ -31,10 +31,17 @@ import java.util.UUID;
  *
  * <h2>Why {@code publicId} is here at all</h2>
  *
- * <p>Because the identity handed outward must not be the database's counter, and the aggregate is the only place
- * that can guarantee every refund has one. A row created by the old path gets one from a {@code DEFAULT}; a row
- * created by this path gets one here. Both are covered, which is what makes the external contract safe to publish
- * during the overlap rather than after it.
+ * <p>Because the identity handed outward must not be the database's counter, and every refund must have one. A row
+ * created by the old path gets one from a {@code DEFAULT}; a row created by this path gets one because {@link #raise}
+ * will not build a refund without being handed one. Both are covered, which is what makes the external contract safe
+ * to publish during the overlap rather than after it.
+ *
+ * <p>Handed in rather than minted here. It used to be a {@code UUID.randomUUID()} inside the factory, which made
+ * {@code raise} return a different aggregate on every call with the same arguments — untestable at a fixed value, and
+ * a v4 where the rest of this codebase mints time-ordered v7 through {@code IdGenerator}. Requiring it as an argument
+ * keeps the guarantee (there is no way to raise a refund without one) and moves the minting to the layer that is
+ * allowed to have a source of new values. Refused at build time by {@code
+ * DeterminismRules.domainShouldNotUseAmbientTimeOrRandomness}.
  */
 @AggregateRoot
 public final class Refund extends AbstractAggregateRoot<RefundId> {
@@ -74,6 +81,7 @@ public final class Refund extends AbstractAggregateRoot<RefundId> {
    *
    * @param id the identity the caller has already reserved from the table's sequence — see {@code RefundIds} for
    *     why it has to be reserved rather than assigned by the insert
+   * @param publicId the outward identity, minted by the caller from {@code IdGenerator}
    * @param orderCancelled whether the order is cancelled, read through the ACL
    * @param orderTotalCents the order's total, read through the ACL
    * @param openAlready whether this order already has an open refund
@@ -83,9 +91,13 @@ public final class Refund extends AbstractAggregateRoot<RefundId> {
       long orderId,
       long amountCents,
       String reason,
+      UUID publicId,
       boolean orderCancelled,
       long orderTotalCents,
       boolean openAlready) {
+    if (publicId == null) {
+      throw new IllegalArgumentException("a refund needs an outward identity");
+    }
     if (amountCents <= 0) {
       throw new IllegalArgumentException("a refund must be for a positive amount");
     }
@@ -103,8 +115,7 @@ public final class Refund extends AbstractAggregateRoot<RefundId> {
           RefundErrorCode.ALREADY_OPEN,
           "order " + orderId + " already has an open refund; the monolith never checked this");
     }
-    return new Refund(
-        id, orderId, amountCents, reason, UUID.randomUUID(), RefundState.OPEN, null);
+    return new Refund(id, orderId, amountCents, reason, publicId, RefundState.OPEN, null);
   }
 
   public static Refund reconstitute(

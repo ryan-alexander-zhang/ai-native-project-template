@@ -8,6 +8,7 @@ import com.example.samples.s25.refunds.domain.Refund;
 import com.example.samples.s25.refunds.domain.RefundErrorCode;
 import com.example.samples.s25.refunds.domain.RefundId;
 import com.example.samples.s25.refunds.domain.RefundState;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -21,8 +22,15 @@ class RefundTest {
 
   private static final RefundId ID = new RefundId(42);
 
+  /**
+   * Fixed, because the aggregate no longer mints it. That is the readable difference the change
+   * bought: the outward identity is now an input, so a test can name it instead of asserting that
+   * whatever came out was non-null.
+   */
+  private static final UUID PUBLIC_ID = UUID.fromString("0197c1e2-0a3b-7c4d-8e5f-6a7b8c9d0e1f");
+
   private static Refund raised() {
-    return Refund.raise(ID, 7L, 2_500, "damaged", false, 10_000, false);
+    return Refund.raise(ID, 7L, 2_500, "damaged", PUBLIC_ID, false, 10_000, false);
   }
 
   @Test
@@ -32,13 +40,13 @@ class RefundTest {
     assertThat(refund.orderId()).isEqualTo(7L);
     assertThat(refund.amountCents()).isEqualTo(2_500);
     assertThat(refund.reason()).contains("damaged");
-    assertThat(refund.publicId()).as("an outward identity, minted here").isNotNull();
+    assertThat(refund.publicId()).as("the outward identity it was handed").isEqualTo(PUBLIC_ID);
     assertThat(refund.approvedBy()).isEmpty();
   }
 
   @Test
   void acancelledOrderCannotBeRefunded() {
-    assertThatThrownBy(() -> Refund.raise(ID, 7L, 100, "late", true, 10_000, false))
+    assertThatThrownBy(() -> Refund.raise(ID, 7L, 100, "late", PUBLIC_ID, true, 10_000, false))
         .isInstanceOf(DomainException.class)
         .satisfies(
             e ->
@@ -48,7 +56,7 @@ class RefundTest {
 
   @Test
   void arefundCannotExceedTheOrder() {
-    assertThatThrownBy(() -> Refund.raise(ID, 7L, 10_001, "generous", false, 10_000, false))
+    assertThatThrownBy(() -> Refund.raise(ID, 7L, 10_001, "generous", PUBLIC_ID, false, 10_000, false))
         .isInstanceOf(DomainException.class)
         .hasMessageContaining("exceeds order 7's total of 10000");
   }
@@ -56,7 +64,7 @@ class RefundTest {
   /** The rule the monolith never had. */
   @Test
   void asecondOpenRefundIsRefused() {
-    assertThatThrownBy(() -> Refund.raise(ID, 7L, 100, "second", false, 10_000, true))
+    assertThatThrownBy(() -> Refund.raise(ID, 7L, 100, "second", PUBLIC_ID, false, 10_000, true))
         .isInstanceOf(DomainException.class)
         .satisfies(
             e ->
@@ -66,7 +74,7 @@ class RefundTest {
 
   @Test
   void arefundMustBeForSomething() {
-    assertThatThrownBy(() -> Refund.raise(ID, 7L, 0, "nothing", false, 10_000, false))
+    assertThatThrownBy(() -> Refund.raise(ID, 7L, 0, "nothing", PUBLIC_ID, false, 10_000, false))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("positive amount");
   }
