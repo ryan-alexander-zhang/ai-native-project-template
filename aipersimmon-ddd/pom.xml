@@ -58,6 +58,7 @@
     <pitest-maven.version>1.20.0</pitest-maven.version>
     <pitest-junit5-plugin.version>1.2.2</pitest-junit5-plugin.version>
     <maven-pmd-plugin.version>3.26.0</maven-pmd-plugin.version>
+    <maven-release-plugin.version>3.1.1</maven-release-plugin.version>
     <spotbugs-maven-plugin.version>4.8.6.6</spotbugs-maven-plugin.version>
     <!-- OpenAPI/Swagger (springdoc). NOT managed by spring-boot-dependencies, so pinned here; the
          2.8.x line is the one built against Spring Boot 3.5. Two coordinates, two audiences:
@@ -301,6 +302,30 @@
           </dependencies>
         </plugin>
 
+        <!--
+          Releases the library reactor: sets 0.1.0-SNAPSHOT to 0.1.0 across the parent, the BOM and
+          every module's parent reference, commits, tags, then opens the next development version.
+
+          tagNameFormat mirrors the branch, because tags are repo-global while branches are not. A
+          bare v0.1.0 is spendable once across the whole repository, so the first stack to release
+          would take the number out of every other stack's sequence, and a Go scaffold on lang/go/*
+          is a stated possibility. The publish workflows match the same shape
+          (tags: ['lang/java/ddd/v*']), so pushing the tag is what deploys.
+
+          release:perform is deliberately not part of the flow. It would deploy a second time, from
+          a developer's machine, outside CI and the credentials CI holds. Prepare here; publish
+          there, from the tag.
+        -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-release-plugin</artifactId>
+          <version>${maven-release-plugin.version}</version>
+          <configuration>
+            <tagNameFormat>lang/java/ddd/v@{project.version}</tagNameFormat>
+            <autoVersionSubmodules>true</autoVersionSubmodules>
+          </configuration>
+        </plugin>
+
         <!-- PMD + CPD: complexity + duplication; ruleset from aipersimmon-ddd-quality-config on the plugin classpath. report-only first (P3). -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -415,6 +440,19 @@
     (authenticated with GITHUB_ACTOR / GITHUB_TOKEN); it affects only deploy, not the
     build. Consumers reading these packages add the same GitHub Packages repository.
   -->
+  <!--
+    Required by maven-release-plugin, which reads it to know what to commit, tag and push.
+    The developerConnection is the writable one; the release runs on lang/java/ddd, the branch
+    that owns the Java stack (main is the language-agnostic template skeleton and has no
+    aipersimmon-ddd/ at all).
+  -->
+  <scm>
+    <connection>scm:git:https://github.com/ryan-alexander-zhang/ai-native-project-template.git</connection>
+    <developerConnection>scm:git:https://github.com/ryan-alexander-zhang/ai-native-project-template.git</developerConnection>
+    <url>https://github.com/ryan-alexander-zhang/ai-native-project-template</url>
+    <tag>HEAD</tag>
+  </scm>
+
   <distributionManagement>
     <repository>
       <id>github</id>
