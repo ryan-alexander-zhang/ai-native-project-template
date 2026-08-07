@@ -10,6 +10,33 @@
 #
 # dev is the default profile, so `mvn spring-boot:run` and the tests behave as they always have.
 # Production is an explicit opt-in: SPRING_PROFILES_ACTIVE=prod.
+#
+# ---------------------------------------------------------------------------------------------
+# WHAT IS TUNABLE HERE, AND WHERE IT CAME FROM
+#
+# Only the decisions this deployment actually made are written out below. The full set of keys is
+# not copied here on purpose — it would go stale against the library, and a stale commented-out
+# default is worse than none, because uncommenting it pins a value the library has since moved.
+# Instead every key carries its type, default and description in the jar: type `aipersimmon.ddd.`
+# in this file and the IDE completes the lot. The prose behind each one is in the upstream
+# CONFIGURATION.md (README's "Upstream documentation" section has the link).
+#
+# Which dependency brings which namespace — this is the index to reach for when adding a capability:
+#
+#   aipersimmon-ddd-starter              aipersimmon.ddd.cqrs, .web, .integration
+#   aipersimmon-ddd-starter-mybatis-plus  (the above, plus)
+#                                        aipersimmon.ddd.outbox, .inbox, .tenancy, .flyway,
+#                                        .operation-log, .process-manager
+#   aipersimmon-ddd-starter-messaging-kafka
+#                                        aipersimmon.ddd.messaging.kafka
+#   aipersimmon-ddd-web-store-mybatis-plus
+#                                        aipersimmon.ddd.web.idempotency/replay/rate-limit storage
+#   aipersimmon-ddd-openapi-spring-boot-starter
+#                                        aipersimmon.ddd.openapi
+#
+# The namespace is inert until its dependency is on the classpath: nothing under `aipersimmon.ddd`
+# does anything on its own, so adding a key without the starter that reads it is silently a no-op.
+# ---------------------------------------------------------------------------------------------
 
 spring:
   profiles:
@@ -151,7 +178,8 @@ aipersimmon:
         consumer:
           enabled: true
     # The transactional outbox. Two settings here are the ones the framework's production
-    # configuration checklist asks to be decided rather than inherited (see DOCS.md):
+    # configuration checklist asks to be decided rather than inherited (upstream CONFIGURATION.md,
+    # "A production checklist"; README's "Upstream documentation" section has the link):
     #
     #   - the lease: every instance polls, and each claims the rows it is about to dispatch. The
     #     lease length is therefore only "how long a killed instance's rows stay stuck" — the other
@@ -212,7 +240,8 @@ aipersimmon:
       # can read and write any tenant by changing one header — which is why the framework refuses to
       # start on the default rather than picking a side. A real service usually takes the other
       # option instead: define a TenantResolver bean that reads the verified token claim, and drop
-      # this flag. See CONFIGURATION.md, "Why the tenant header is not trusted by default".
+      # this flag. See the upstream CONFIGURATION.md, "Why the tenant header is not trusted by
+      # default" (README's "Upstream documentation" section has the link).
       trust-header: true
       missing-policy: REJECT
       # Setting this REPLACES the default, so /actuator/** has to be re-listed. /ops/** is the

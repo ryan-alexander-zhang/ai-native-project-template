@@ -17,11 +17,11 @@ import org.springframework.context.annotation.Import;
  * in-process cascade.
  *
  * <p>Both containers come from {@code aipersimmon-ddd-test-support}, which is what the library's
- * module guide points a consumer at (see {@code DOCS.md}) and which owns the image pins — so this
- * sample cannot drift from the versions the library tests against, and there is no version number
- * to maintain here at all. That is the whole content of this class, and it is the point: the
- * containers an integration test needs are a dependency, not something each application writes for
- * itself.
+ * module guide points a consumer at (the upstream CHOOSING-MODULES.md, linked from README's
+ * "Upstream documentation" section) and which owns the image pins — so this sample cannot drift
+ * from the versions the library tests against, and there is no version number to maintain here at
+ * all. That is the whole content of this class, and it is the point: the containers an integration
+ * test needs are a dependency, not something each application writes for itself.
  *
  * <p>One consequence worth knowing: these containers are Spring beans, so <em>each distinct
  * application context gets its own pair</em>. Test classes whose {@code properties} block, web

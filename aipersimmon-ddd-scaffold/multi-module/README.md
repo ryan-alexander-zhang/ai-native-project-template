@@ -16,6 +16,9 @@ Each context is split into the standard layers, one Maven module each:
 manager's policy — storage-agnostic; the store it runs on is chosen in `start`) and `start` (the
 Spring Boot composition root + architecture tests).
 
+The library's own documents are not in this tree — see
+[Upstream documentation](#upstream-documentation) at the end of this file for where they live.
+
 ## Build and run
 
 ```bash
@@ -308,8 +311,9 @@ context that has not earned it is the main way to get this scaffold wrong. When 
   satisfied by adding it later.
 - **A context that owns no tables needs almost nothing.** A pure calculation or read-side
   projection takes the bare starter: buses, in-process events, ids, the web contract — no
-  storage bundle, no Flyway components, none of the four tables. See the library's
-  CHOOSING-MODULES.md for the decision path; the four dependencies this project uses are the
+  storage bundle, no Flyway components, none of the four tables. See the upstream
+  CHOOSING-MODULES.md ([Upstream documentation](#upstream-documentation)) for the decision path;
+  the four dependencies this project uses are the
   *maximum* a service normally reaches, not the entry fee.
 - **Five modules per context is release granularity, not virtue.** The split exists so the
   ArchUnit rules can price every dependency edge and so `-api` can be versioned to other
@@ -362,3 +366,26 @@ ArchUnit gate — the rules are what keeps the claimed architecture true after m
   design choice, not a wiring exercise, so it is left out rather than guessed at.
   `OrderFulfilmentDefinition.react` still guards the `MaxLifetimeExceeded` input so enabling it
   cannot crash the definition: it rejects cleanly and the runtime suspends the instance.
+
+## Upstream documentation
+
+This project is generated from the `multi-module` archetype and ships on its own, so the AiPersimmon
+DDD library's own documents are **not** in this tree. This section is the single place that knows
+where they are: nothing else here names a file it does not have, and adopting the project means
+rewriting these four URLs and nothing else.
+
+| Document | What it answers |
+|---|---|
+| [CHOOSING-MODULES.md](https://github.com/ryan-alexander-zhang/ai-native-project-template/blob/lang/java/ddd/aipersimmon-ddd/CHOOSING-MODULES.md) | Which `aipersimmon-ddd-*` modules to declare, and what each one drags in. Start here when adding a capability (a second persistence backend, Redis edge stores, a different messaging transport). |
+| [CONFIGURATION.md](https://github.com/ryan-alexander-zhang/ai-native-project-template/blob/lang/java/ddd/aipersimmon-ddd/CONFIGURATION.md) | Every `aipersimmon.ddd.*` property, and the production checklist — the settings a deployment is expected to decide rather than inherit (outbox lease budget and cleanup, inbox retention, tenancy policy). `start/src/main/resources/application.yml` answers that checklist inline; this is where the questions come from. |
+| [ARCHITECTURE.md](https://github.com/ryan-alexander-zhang/ai-native-project-template/blob/lang/java/ddd/ARCHITECTURE.md) | The layering and dependency rules the `ArchitectureTest` in `start` enforces. Note it sits at the library repository's root, not under `aipersimmon-ddd/`. |
+| [README.md](https://github.com/ryan-alexander-zhang/ai-native-project-template/blob/lang/java/ddd/aipersimmon-ddd/README.md) (library) | What the building blocks are and how they fit together. |
+
+The library lives on the `lang/java/ddd` branch; it is not on `main`. Keep the ref when you rewrite
+these for a fork, or the links resolve to a different repository layout.
+
+**The rule these links exist to keep:** anywhere else in this tree that mentions one of these
+documents — a comment in `application.yml`, a javadoc, a bullet above — must mark it as *upstream*
+and must not write it as a local path. The section title is worth naming (it is the token you will
+search for); the bare filename is not, because in a generated project it resolves to nothing.
+`DocumentationReferenceTest` in `start` enforces this.
