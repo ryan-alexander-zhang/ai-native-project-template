@@ -282,11 +282,8 @@ __marimo__/
 #   File lock
 .idea-number.lock
 
-# maven-release-plugin scratch. release:prepare writes a backup of every pom, the
-# rewritten ones, and its resume file; release:clean removes them on a run that
-# finishes. A run that fails or is interrupted leaves all of them behind — 89 files
-# for this reactor — and none of them should ever be committed.
-*.releaseBackup
-pom.xml.tag
-pom.xml.next
-release.properties
+# versions-maven-plugin scratch. `versions:set` writes a backup beside every pom it
+# rewrites, so `versions:revert` can undo the bump; `versions:commit` deletes them.
+# A release that is abandoned half-way leaves one per module — 44 for the library
+# reactor — and none of them should ever be committed.
+*.versionsBackup
