@@ -5,23 +5,33 @@ package com.aipersimmon.ddd.archunit;
  *
  * <p>The interface layer is the only one with two accepted spellings. {@code adapter} is what the
  * archetype generates and what the multi-module scaffold uses; {@code interfaces} is at least as
- * common in the wild, is what most of this project's own samples use for their web tier, and is the
- * word the framework's own package annotation picks ({@code @InterfaceLayer}). A rules jar that
- * recognised only one of them would silently not apply to half the projects that adopt it — which
- * is not a stricter rule, it is an absent one.
+ * common in the wild and is the word the framework's own package annotation picks
+ * ({@code @InterfaceLayer}). A rules jar that recognised only one of them would silently not apply
+ * to half the projects that adopt it — which is not a stricter rule, it is an absent one.
  *
- * <p><strong>Only the newest rules read this constant.</strong> The older ones still spell {@code
- * "..adapter.."} inline, so in a project that says {@code interfaces} they match nothing: {@code
- * LayeringRules.domainShouldNotDependOnOuterLayers}, {@code
+ * <p>Every rule that names the interface layer now reads these constants. That was not always true:
+ * four rules used to spell {@code "..adapter.."} inline, so in a project laid out with {@code
+ * interfaces} they matched nothing at all — {@code domainShouldNotDependOnOuterLayers}, {@code
  * applicationShouldNotDependOnInfrastructureOrInterface}, {@code adapterShouldNotDependOnDomain}
- * and {@code EventRules.integrationEventListenersShouldResideInAdapter} are all in that state.
- * Pointing them at this constant is a separate, deliberate change — it widens what four existing
- * rules report, so it belongs in its own commit rather than riding along with new rules.
+ * and {@code integrationEventListenersShouldResideInAdapter} were each a rule a reader would
+ * reasonably assume was running. The method name {@code
+ * applicationShouldNotDependOnInfrastructureOrInterface} said "Interface" while matching only one
+ * of the two words it could mean.
  */
 final class Layers {
 
   /** The interface layer: inbound adapters and delivery mechanisms, under either accepted name. */
   static final String[] INTERFACE_LAYER = {"..adapter..", "..interfaces.."};
+
+  /** Everything the domain sits inside of, and may therefore not depend on. */
+  static final String[] OUTSIDE_THE_DOMAIN = {
+    "..application..", "..infrastructure..", "..adapter..", "..interfaces.."
+  };
+
+  /** The two outward layers the application layer must not reach into. */
+  static final String[] INFRASTRUCTURE_AND_INTERFACE = {
+    "..infrastructure..", "..adapter..", "..interfaces.."
+  };
 
   /**
    * Every layer except infrastructure — the ones that must not see a persistence detail.

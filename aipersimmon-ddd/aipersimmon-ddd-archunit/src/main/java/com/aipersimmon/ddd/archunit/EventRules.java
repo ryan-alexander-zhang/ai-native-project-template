@@ -98,7 +98,7 @@ public final class EventRules {
         .that(areEventListenersHandling(IntegrationEvent.class))
         .should()
         .beDeclaredInClassesThat()
-        .resideInAPackage("..adapter..")
+        .resideInAnyPackage(Layers.INTERFACE_LAYER)
         .as(
             "integration-event @EventListener handlers should reside in the interface/adapter layer")
         .because(

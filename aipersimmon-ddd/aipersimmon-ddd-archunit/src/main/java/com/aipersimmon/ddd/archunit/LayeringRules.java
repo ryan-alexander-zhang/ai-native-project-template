@@ -75,7 +75,7 @@ public final class LayeringRules {
         .resideInAPackage("..domain..")
         .should()
         .dependOnClassesThat()
-        .resideInAnyPackage("..application..", "..infrastructure..", "..adapter..")
+        .resideInAnyPackage(Layers.OUTSIDE_THE_DOMAIN)
         .as(
             "domain classes should not depend on the application, infrastructure, or interface layers")
         .because("the domain layer must stay independent of the layers built on top of it")
@@ -89,7 +89,7 @@ public final class LayeringRules {
         .resideInAPackage("..application..")
         .should()
         .dependOnClassesThat()
-        .resideInAnyPackage("..infrastructure..", "..adapter..")
+        .resideInAnyPackage(Layers.INFRASTRUCTURE_AND_INTERFACE)
         .as("application classes should not depend on the infrastructure or interface layers")
         .because("use-case orchestration must depend inward on the domain only")
         .allowEmptyShould(true);
@@ -202,7 +202,7 @@ public final class LayeringRules {
   public static ArchRule adapterShouldNotDependOnDomain() {
     return noClasses()
         .that()
-        .resideInAPackage("..adapter..")
+        .resideInAnyPackage(Layers.INTERFACE_LAYER)
         .should()
         .dependOnClassesThat()
         .resideInAPackage("..domain..")

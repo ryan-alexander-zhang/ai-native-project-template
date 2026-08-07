@@ -908,6 +908,64 @@ class AiPersimmonDddRulesTest {
         () -> "an endpoint answering with an aggregate should be reported: " + error.getMessage());
   }
 
+  /**
+   * The layer-name widening, measured on the rule that used to be blindest to it: a web resource
+   * under {@code ..interfaces..} reaching into the domain. While {@code
+   * adapterShouldNotDependOnDomain} spelled {@code "..adapter.."} inline, this class was outside
+   * every layer the rule knew about, so the rule reported nothing and read as though it had passed.
+   */
+  @Test
+  void adapterShouldNotDependOnDomain_seesTheInterfacesSpelling() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class, () -> LayeringRules.adapterShouldNotDependOnDomain().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadOrderResource"),
+        () ->
+            "a web resource in ..interfaces.. reaching into the domain should be reported: "
+                + error.getMessage());
+  }
+
+  /** The same widening on the domain's own layering rule. */
+  @Test
+  void domainShouldNotDependOnOuterLayers_seesTheInterfacesSpelling() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> LayeringRules.domainShouldNotDependOnOuterLayers().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadDomainDependsOnWebResource"),
+        () ->
+            "a domain class depending on ..interfaces.. should be reported: " + error.getMessage());
+  }
+
+  /** And on the rule whose name said "Interface" while matching only one of the two words. */
+  @Test
+  void applicationShouldNotDependOnInfrastructureOrInterface_seesTheInterfacesSpelling() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> LayeringRules.applicationShouldNotDependOnInfrastructureOrInterface().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadApplicationDependsOnWebResource"),
+        () ->
+            "an application class depending on ..interfaces.. should be reported: "
+                + error.getMessage());
+  }
+
+  /**
+   * The positive half, and the one a "stop being blind to it" change can miss: a correctly placed
+   * integration-event subscriber under {@code ..interfaces..} must be <em>accepted</em>. It lives
+   * in the good fixtures, so {@link AiPersimmonDddRules#all()} covers it too — but asserted here by
+   * name, because a rule that widened only its {@code that()} clause and not its {@code should()}
+   * would leave a project laid out with {@code interfaces} no placement that satisfies it.
+   */
+  @Test
+  void integrationEventListenersShouldResideInAdapter_acceptsTheInterfacesSpelling() {
+    assertDoesNotThrow(
+        () -> EventRules.integrationEventListenersShouldResideInAdapter().check(GOOD));
+  }
+
   @Test
   void all_passesForGood() {
     assertDoesNotThrow(() -> AiPersimmonDddRules.all().check(GOOD));

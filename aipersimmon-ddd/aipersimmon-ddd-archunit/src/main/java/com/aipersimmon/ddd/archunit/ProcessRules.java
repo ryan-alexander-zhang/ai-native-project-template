@@ -55,7 +55,7 @@ public final class ProcessRules {
 
   /** The outer layers of the consuming application, matched by package segment. */
   private static final DescribedPredicate<JavaClass> OUTER_LAYERS =
-      JavaClass.Predicates.resideInAnyPackage("..infrastructure..", "..adapter..");
+      JavaClass.Predicates.resideInAnyPackage(Layers.INFRASTRUCTURE_AND_INTERFACE);
 
   private ProcessRules() {}
 
