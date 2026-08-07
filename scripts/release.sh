@@ -3,7 +3,8 @@
 #
 # Both are published by GitHub Actions, and the only thing that triggers them is a tag
 # matching lang/java/ddd/v* arriving at the remote. So this script's job is to produce
-# exactly that tag, on a tree whose 44 poms carry the released version, and to stop.
+# exactly that tag, on a tree whose 44 library poms — and the three files outside that
+# reactor which name its version — carry the released version, and to stop.
 #
 # It does not push by default. Everything up to that point is local and undoable — the
 # script prints how — while a pushed tag deploys and cannot be recalled. PUSH=1 opts in,
@@ -96,12 +97,73 @@ undo_to=$(git rev-parse HEAD)
 echo "Releasing $release_version as $tag"
 echo
 
+# The version lives in four places, and only the first is a Maven version. The other three
+# are consumers of the library that sit OUTSIDE its reactor, so versions:set never sees
+# them; each one has its own way of going wrong, and all three go wrong silently.
+#
+# Only the reactor is rewritten by Maven. The other three are rewritten as TEXT, and that
+# is a correctness requirement rather than a shortcut — see the scaffold/samples note below.
+#
+# Rewrites go through a temporary file rather than `sed -i`, whose in-place flag takes a
+# mandatory backup suffix on BSD/macOS and rejects one on GNU: there is no spelling that
+# works on both, and this script runs on whichever machine cut the release.
+rewrite() {
+  file="$1"
+  script="$2"
+  rewritten=$(mktemp)
+  sed "$script" "$file" >"$rewritten"
+  mv "$rewritten" "$file"
+  grep -q "$version" "$file" || {
+    echo "rewriting $file to $version changed nothing — has its format drifted?" >&2
+    exit 1
+  }
+}
+
+set_version() {
+  version="$1"
+
+  # -DprocessAllModules is what reaches aipersimmon-ddd-bom. By default versions:set walks
+  # the reactor by PARENT link, and the BOM deliberately has none (it would leak the
+  # parent's 1600-odd managed pins to everyone importing it), so it declares its own
+  # version and the default walk steps straight past it. This is what broke 0.1.0: 43 poms
+  # took the release version, the BOM kept 0.1.0-SNAPSHOT, and because its entries all say
+  # ${project.version} the BOM then aligned consumers onto a version of every module that
+  # was never built. It took down both publish workflows — library `deploy` and archetype
+  # derivation, which cannot resolve an import BOM that is not there.
+  # BomExportsOnlyItsOwnModulesTest asserts the BOM and the parent agree.
+  mvn -B --no-transfer-progress -q -f "$REACTOR" versions:set -DnewVersion="$version" -DprocessAllModules=true
+  # Drop the .versionsBackup files: past this point the undo is git, not the plugin.
+  mvn -B --no-transfer-progress -q -f "$REACTOR" versions:commit -DprocessAllModules=true
+
+  # The scaffold and the samples IMPORT the library's BOM, so they name its version in a
+  # property rather than carrying it as their own. Left behind, they keep resolving the
+  # previous version: fine while it is still in ~/.m2 from an earlier build, which is
+  # exactly why it survives locally and fails on a clean runner.
+  #
+  # Rewritten with sed and NOT with versions:set-property, which cannot do the job here.
+  # Any Maven goal has to build the project model first, and building this one means
+  # RESOLVING the very BOM whose version is about to change. Reopening development is
+  # precisely when that import cannot resolve: the poms still name the version just
+  # released, which by definition has not been built or installed anywhere. So the plugin
+  # dies reading the file it was invoked to edit — "Non-resolvable import POM ... (absent)"
+  # — after the release commit and tag already exist. sed does not care what resolves.
+  for consumer in aipersimmon-ddd-scaffold/multi-module/pom.xml aipersimmon-ddd-samples/pom.xml; do
+    rewrite "$consumer" \
+      "s|<aipersimmon-ddd\.version>[^<]*</aipersimmon-ddd\.version>|<aipersimmon-ddd.version>$version</aipersimmon-ddd.version>|"
+  done
+
+  # Not a pom at all: the archetype derivation reads this file for the version to stamp on
+  # the archetype it publishes. The publish-archetype workflow overwrites it in the
+  # workspace at tag time, so a stale value here never fails a release — it just makes the
+  # file disagree with every other one, for the next reader to puzzle over.
+  rewrite aipersimmon-ddd-scaffold/multi-module/archetype.properties \
+    "s/^archetype\.version=.*/archetype.version=$version/"
+}
+
 # ------------------------------------------------------------------ release
 
 echo "==> setting the library reactor to $release_version"
-mvn -B --no-transfer-progress -q -f "$REACTOR" versions:set -DnewVersion="$release_version"
-# Drop the .versionsBackup files: past this point the undo is git, not the plugin.
-mvn -B --no-transfer-progress -q -f "$REACTOR" versions:commit
+set_version "$release_version"
 
 changed=$(git diff --name-only | grep -c 'pom\.xml$' || true)
 [ "$changed" -gt 0 ] || {
@@ -127,8 +189,7 @@ echo "==> committed and tagged $tag"
 
 if [ -n "$next_version" ]; then
   echo "==> reopening development at $next_version"
-  mvn -B --no-transfer-progress -q -f "$REACTOR" versions:set -DnewVersion="$next_version"
-  mvn -B --no-transfer-progress -q -f "$REACTOR" versions:commit
+  set_version "$next_version"
   git commit -q -am "back to development"
 fi
 

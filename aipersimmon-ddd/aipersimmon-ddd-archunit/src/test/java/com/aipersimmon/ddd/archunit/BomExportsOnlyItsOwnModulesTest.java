@@ -128,6 +128,53 @@ class BomExportsOnlyItsOwnModulesTest {
   }
 
   /**
+   * Having no parent means the BOM inherits no publishing target either, and a module with no
+   * {@code distributionManagement} fails {@code deploy} outright — "repository element was not
+   * specified in the POM". The BOM is the reactor's first module, so it took the whole release down
+   * before any other module had been deployed.
+   *
+   * <p>Unlike the version literals above this one never reaches consumers — an imported BOM
+   * contributes {@code dependencyManagement}, not the deploy target — so nothing about a consumer's
+   * build reveals it. Only a release does, which is the least useful moment to find out.
+   */
+  @Test
+  void theDeployTargetIsWrittenOutBecauseThereIsNoParentToInheritItFrom() throws Exception {
+    Map<String, String> fromParent = deployTargets(parse(reactorRoot.resolve("pom.xml")));
+    Map<String, String> fromBom =
+        deployTargets(parse(reactorRoot.resolve("aipersimmon-ddd-bom/pom.xml")));
+
+    assertTrue(
+        fromBom.containsKey("repository") && fromBom.containsKey("snapshotRepository"),
+        "the BOM has no parent, so it inherits no distributionManagement and `mvn deploy` fails on "
+            + "it before it reaches any other module. Copy the block from aipersimmon-ddd-parent");
+    assertEquals(
+        fromParent,
+        fromBom,
+        "having no parent means the deploy target is written twice; the BOM's has drifted from "
+            + "aipersimmon-ddd-parent's, so a release would publish the BOM somewhere other than "
+            + "the modules it aligns");
+  }
+
+  /**
+   * The {@code distributionManagement} repositories of a pom, keyed by element name ({@code
+   * repository} / {@code snapshotRepository}), each as {@code id -> url}. Empty when the pom
+   * declares none.
+   */
+  private static Map<String, String> deployTargets(Element project) {
+    Map<String, String> targets = new LinkedHashMap<>();
+    for (Element management : childrenNamed(project, "distributionManagement")) {
+      for (Element repository : childrenNamed(management, null)) {
+        targets.put(
+            repository.getTagName(),
+            text(childrenNamed(repository, "id").get(0))
+                + " -> "
+                + text(childrenNamed(repository, "url").get(0)));
+      }
+    }
+    return targets;
+  }
+
+  /**
    * Managed coordinates of the BOM, {@code groupId:artifactId} to version, as literally written.
    */
   private Map<String, String> managedByTheBom() throws Exception {
