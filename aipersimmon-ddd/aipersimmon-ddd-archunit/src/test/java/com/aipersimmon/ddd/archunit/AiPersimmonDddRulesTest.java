@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.aipersimmon.ddd.archunit.fixture.bad.ordering.domain.BadDomainDependsOnCqrs;
+import com.aipersimmon.ddd.archunit.fixture.bad.ordering.domain.BadValueObjectComparedByReference;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import org.junit.jupiter.api.Test;
@@ -578,6 +580,332 @@ class AiPersimmonDddRulesTest {
     assertThrows(
         AssertionError.class,
         () -> OperationLogRules.operationLogShouldOnlyAnnotateApplicationCommands().check(BAD));
+  }
+
+  @Test
+  void domainShouldDependOnTheFrameworkCoreOnly_passesForGood() {
+    assertDoesNotThrow(() -> LayeringRules.domainShouldDependOnTheFrameworkCoreOnly().check(GOOD));
+  }
+
+  /**
+   * Names the fixture, because the point of the rule is the case {@code
+   * domainShouldBeFrameworkFree} cannot see: a domain class holding {@code CommandContext} touches
+   * no Spring, no JPA and no Jackson, so only this rule reports it.
+   */
+  @Test
+  void domainShouldDependOnTheFrameworkCoreOnly_reportsAFrameworkModuleBeyondCore() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> LayeringRules.domainShouldDependOnTheFrameworkCoreOnly().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadDomainDependsOnCqrs"),
+        () ->
+            "a domain class depending on the CQRS module should be reported: "
+                + error.getMessage());
+    assertDoesNotThrow(
+        () ->
+            LayeringRules.domainShouldBeFrameworkFree()
+                .check(new ClassFileImporter().importClasses(BadDomainDependsOnCqrs.class)));
+  }
+
+  @Test
+  void domainShouldNotUseAmbientTimeOrRandomness_passesForGood() {
+    assertDoesNotThrow(
+        () -> DeterminismRules.domainShouldNotUseAmbientTimeOrRandomness().check(GOOD));
+  }
+
+  @Test
+  void domainShouldNotUseAmbientTimeOrRandomness_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> DeterminismRules.domainShouldNotUseAmbientTimeOrRandomness().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadSelfStampingOrder"),
+        () -> "the self-stamping aggregate should be reported: " + error.getMessage());
+  }
+
+  /**
+   * The control that keeps the ambient check from degenerating into "touches {@code java.time}" or
+   * "constructs a {@code Date}": a class in the same reported package whose every call takes its
+   * value from an argument — {@code Instant.now(clock)}, {@code new Date(millis)}, {@code new
+   * Random(seed)} — must not appear in the report.
+   */
+  @Test
+  void avalueTakenFromAnArgumentIsNotAmbient() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> DeterminismRules.domainShouldNotUseAmbientTimeOrRandomness().check(BAD));
+    assertFalse(
+        error.getMessage().contains("BadInjectedTimeOrder"),
+        () -> "injected time and seeded randomness were reported: " + error.getMessage());
+  }
+
+  @Test
+  void applicationShouldNotUseAmbientTimeOrRandomness_passesForGood() {
+    assertDoesNotThrow(
+        () -> DeterminismRules.applicationShouldNotUseAmbientTimeOrRandomness().check(GOOD));
+  }
+
+  @Test
+  void valueObjectsShouldDeclareValueEquality_passesForGood() {
+    assertDoesNotThrow(
+        () -> BuildingBlockRules.valueObjectsShouldDeclareValueEquality().check(GOOD));
+  }
+
+  /**
+   * The immutable-but-reference-compared value object is reported, and the immutability rule it
+   * satisfies is asserted alongside — which is the whole reason the new rule exists rather than
+   * being folded into the old one.
+   */
+  @Test
+  void valueObjectsShouldDeclareValueEquality_reportsAnImmutableTypeWithoutEquals() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> BuildingBlockRules.valueObjectsShouldDeclareValueEquality().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadValueObjectComparedByReference"),
+        () -> "a value object without equals should be reported: " + error.getMessage());
+    assertDoesNotThrow(
+        () ->
+            BuildingBlockRules.valueObjectsShouldBeImmutable()
+                .check(
+                    new ClassFileImporter()
+                        .importClasses(BadValueObjectComparedByReference.class)));
+  }
+
+  @Test
+  void aggregatesShouldReferenceOtherAggregatesByIdentity_passesForGood() {
+    assertDoesNotThrow(
+        () -> BuildingBlockRules.aggregatesShouldReferenceOtherAggregatesByIdentity().check(GOOD));
+  }
+
+  /**
+   * Both spellings are reported — the held root and the collection of roots — and the fixture's
+   * identifier field and its own {@code @Entity} members are not, which is what keeps the rule from
+   * collapsing into "an aggregate holds no model type".
+   */
+  @Test
+  void aggregatesShouldReferenceOtherAggregatesByIdentity_reportsHeldRootsInEveryShape() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                BuildingBlockRules.aggregatesShouldReferenceOtherAggregatesByIdentity().check(BAD));
+    assertTrue(
+        error.getMessage().contains("reservedItem"),
+        () -> "the held aggregate root should be reported: " + error.getMessage());
+    assertTrue(
+        error.getMessage().contains("relatedItems"),
+        () -> "the collection of roots should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void readModelsShouldBeProjectionShapes_passesForGood() {
+    assertDoesNotThrow(() -> CqrsRules.readModelsShouldBeProjectionShapes().check(GOOD));
+  }
+
+  @Test
+  void readModelsShouldNotHoldAggregatesOrEntities_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> CqrsRules.readModelsShouldNotHoldAggregatesOrEntities().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadOrderViewHoldingAggregate"),
+        () -> "a read model holding an aggregate should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void readModelsShouldResideInApplicationOrApi_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> CqrsRules.readModelsShouldResideInApplicationOrApi().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadReadModelInDomain"),
+        () -> "a read model in the domain layer should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void queryResultsShouldNotBeAggregatesOrEntities_passesForGood() {
+    assertDoesNotThrow(() -> CqrsRules.queryResultsShouldNotBeAggregatesOrEntities().check(GOOD));
+  }
+
+  /**
+   * The aggregate sits inside an {@code Optional}, not at the top of the result type, so this also
+   * measures that the rule reads the whole generic signature rather than only the erasure.
+   */
+  @Test
+  void queryResultsShouldNotBeAggregatesOrEntities_seesThroughAGenericWrapper() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> CqrsRules.queryResultsShouldNotBeAggregatesOrEntities().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadFindOrderAggregate"),
+        () -> "a query answering with an aggregate should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void processDefinitionsShouldBePure_passesForGood() {
+    assertDoesNotThrow(() -> ProcessRules.processDefinitionsShouldBePure().check(GOOD));
+  }
+
+  @Test
+  void processDefinitionsShouldNotPerformIo_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> ProcessRules.processDefinitionsShouldNotPerformIo().check(BAD));
+    assertTrue(
+        error.getMessage().contains("CommandBus"),
+        () -> "a definition holding the command bus should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void processDefinitionsShouldBeDeterministic_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> ProcessRules.processDefinitionsShouldBeDeterministic().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadImpureFulfilmentDefinition"),
+        () -> "a definition branching on the clock should be reported: " + error.getMessage());
+  }
+
+  /**
+   * The control for the purity rule: the compliant definition returns a {@code DispatchCommand}
+   * naming an application command, which is a dependency on the application layer and must stay
+   * allowed — a definition has to say what it wants dispatched.
+   */
+  @Test
+  void apureDefinitionMayNameTheCommandItDispatches() {
+    assertDoesNotThrow(() -> ProcessRules.processDefinitionsShouldNotPerformIo().check(GOOD));
+  }
+
+  @Test
+  void externalizedShouldOnlyAnnotateIntegrationEvents_passesForGood() {
+    assertDoesNotThrow(
+        () -> EventRules.externalizedShouldOnlyAnnotateIntegrationEvents().check(GOOD));
+  }
+
+  /**
+   * Both violation branches: the annotation on a non-event, and a real event with no destination.
+   */
+  @Test
+  void externalizedShouldOnlyAnnotateIntegrationEvents_reportsBothViolationKinds() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> EventRules.externalizedShouldOnlyAnnotateIntegrationEvents().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadExternalizedCommand"),
+        () -> "@Externalized on a non-event should be reported: " + error.getMessage());
+    assertTrue(
+        error.getMessage().contains("names no target"),
+        () -> "a blank target should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void commandsAndQueriesShouldResideInApplication_passesForGood() {
+    assertDoesNotThrow(() -> CqrsRules.commandsAndQueriesShouldResideInApplication().check(GOOD));
+  }
+
+  @Test
+  void commandsAndQueriesShouldResideInApplication_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> CqrsRules.commandsAndQueriesShouldResideInApplication().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadCommandInDomain"),
+        () -> "a command declared in the domain should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void dependenciesShouldBeConstructorInjected_passesForGood() {
+    assertDoesNotThrow(() -> InjectionRules.dependenciesShouldBeConstructorInjected().check(GOOD));
+  }
+
+  /**
+   * Both field spellings are reported — the {@code @Autowired} collaborator and the {@code @Value}
+   * configuration — while the {@code @Value} on a <em>constructor parameter</em> in the good
+   * fixtures' process definition is not, which is what keeps the rule off the sanctioned form.
+   */
+  @Test
+  void dependenciesShouldBeConstructorInjected_reportsFieldsButNotConstructorParameters() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> InjectionRules.dependenciesShouldBeConstructorInjected().check(BAD));
+    assertTrue(
+        error.getMessage().contains("placeOrder"),
+        () -> "an @Autowired field should be reported: " + error.getMessage());
+    assertTrue(
+        error.getMessage().contains("limit"),
+        () -> "a @Value field should be reported: " + error.getMessage());
+    assertDoesNotThrow(() -> InjectionRules.dependenciesShouldBeConstructorInjected().check(GOOD));
+  }
+
+  @Test
+  void persistenceMappingsShouldStayInInfrastructure_passesForGood() {
+    assertDoesNotThrow(
+        () -> PersistenceRules.persistenceMappingsShouldStayInInfrastructure().check(GOOD));
+  }
+
+  @Test
+  void nothingOutsideInfrastructureShouldDependOnMappersOrRows_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                PersistenceRules.nothingOutsideInfrastructureShouldDependOnMappersOrRows()
+                    .check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadRowReadingService"),
+        () -> "an application class holding a mapper should be reported: " + error.getMessage());
+  }
+
+  @Test
+  void portsShouldNotBeUsedByInboundAdapters_passesForGood() {
+    assertDoesNotThrow(() -> RepositoryRules.portsShouldNotBeUsedByInboundAdapters().check(GOOD));
+  }
+
+  /**
+   * The violating fixture sits in {@code ..interfaces..}, not {@code ..adapter..}, so this also
+   * measures that the rule reads both accepted spellings of the interface layer.
+   */
+  @Test
+  void portsShouldNotBeUsedByInboundAdapters_seesTheOtherSpellingOfTheInterfaceLayer() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> RepositoryRules.portsShouldNotBeUsedByInboundAdapters().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadOrderResource"),
+        () ->
+            "an endpoint in ..interfaces.. holding a repository port should be reported: "
+                + error.getMessage());
+  }
+
+  @Test
+  void controllerSignaturesShouldNotExposeTheDomain_passesForGood() {
+    assertDoesNotThrow(() -> WebRules.controllerSignaturesShouldNotExposeTheDomain().check(GOOD));
+  }
+
+  @Test
+  void controllerSignaturesShouldNotExposeTheDomain_failsForBad() {
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () -> WebRules.controllerSignaturesShouldNotExposeTheDomain().check(BAD));
+    assertTrue(
+        error.getMessage().contains("BadOrderResource"),
+        () -> "an endpoint answering with an aggregate should be reported: " + error.getMessage());
   }
 
   @Test

@@ -2,6 +2,8 @@ package com.aipersimmon.ddd.archunit;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 
 /**
@@ -44,6 +46,25 @@ public final class LayeringRules {
   private static final String[] API_DOCUMENTATION_PACKAGES = {
     "io.swagger..", "org.springdoc..",
   };
+
+  /** The framework's root package; everything it ships lives under it. */
+  private static final String FRAMEWORK_ROOT = "com.aipersimmon.ddd.";
+
+  /**
+   * The one framework package the domain may depend on — the building blocks themselves
+   * ({@code @AggregateRoot}, {@code AbstractAggregateRoot}, {@code Identifier}, {@code
+   * DomainEvent}, {@code Invariant}, {@code Transitions}, {@code ErrorCode}, {@code IdGenerator}).
+   */
+  private static final String FRAMEWORK_CORE = "com.aipersimmon.ddd.core.";
+
+  /**
+   * This rules module's own package, excluded from the "beyond core" match. Its test fixtures are
+   * deliberately laid out as a miniature application — packages named {@code ..domain..}, {@code
+   * ..application..} and so on <em>underneath</em> {@code com.aipersimmon.ddd.archunit} — so
+   * without this every fixture domain class would count as depending on a framework module simply
+   * by referring to its neighbour. No consuming project puts its domain in this package.
+   */
+  private static final String RULES_MODULE = "com.aipersimmon.ddd.archunit.";
 
   private LayeringRules() {}
 
@@ -107,6 +128,59 @@ public final class LayeringRules {
         .as("domain classes should not depend on technical frameworks")
         .because("the domain layer must be free of Spring, JPA, and other framework concerns")
         .allowEmptyShould(true);
+  }
+
+  /**
+   * The domain layer depends on no framework module other than {@code aipersimmon-ddd-core}.
+   *
+   * <p>{@link #domainShouldBeFrameworkFree()} keeps Spring, JPA and Jackson out; this keeps
+   * <em>this</em> framework out, save for the one module that exists to be depended on. Core is the
+   * building-block vocabulary — {@code @AggregateRoot}, {@code AbstractAggregateRoot}, {@code
+   * Identifier}, {@code DomainEvent}, {@code Invariant}, {@code ErrorCode}, {@code IdGenerator} —
+   * and it is framework-free by construction. Everything else the framework ships is a concern that
+   * surrounds the model rather than part of it: {@code CommandContext} and the buses are the
+   * application's dispatch machinery, {@code IntegrationEvent} and {@code EventEnvelope} are the
+   * outward contract and its wire format, {@code Inbox} / outbox / process-manager are delivery and
+   * orchestration, {@code TenantContext} is a bypass channel, and the web module is transport.
+   *
+   * <p>Written as "under the framework root but not under core" rather than as a list of module
+   * packages, so a module added to the framework tomorrow is covered without editing this rule —
+   * which a list would not be, and the omission would be silent.
+   *
+   * <p>Generalises {@link OperationLogRules#domainShouldNotDependOnOperationLog()}, which is the
+   * same statement for one component; that one stays, because it carries its own reasoning and
+   * holds for projects that adopt the rules individually. Part of {@link
+   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a domain that already touches
+   * core only.
+   */
+  public static ArchRule domainShouldDependOnTheFrameworkCoreOnly() {
+    return noClasses()
+        .that()
+        .resideInAPackage("..domain..")
+        .should()
+        .dependOnClassesThat(areFrameworkModulesBeyondCore())
+        .as("domain classes should depend on no framework module other than aipersimmon-ddd-core")
+        .because(
+            "core is the building-block vocabulary the model is written in; every other module is "
+                + "a concern that surrounds the model — dispatch, published contracts, delivery, "
+                + "orchestration, transport — and the domain must not know it is being dispatched, "
+                + "published, relayed or served")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * A framework type outside {@code aipersimmon-ddd-core}: under {@link #FRAMEWORK_ROOT}, not under
+   * {@link #FRAMEWORK_CORE}, and not part of {@linkplain #RULES_MODULE this module itself}.
+   */
+  private static DescribedPredicate<JavaClass> areFrameworkModulesBeyondCore() {
+    return DescribedPredicate.describe(
+        "framework modules other than aipersimmon-ddd-core",
+        javaClass -> {
+          String name = javaClass.getName();
+          return name.startsWith(FRAMEWORK_ROOT)
+              && !name.startsWith(FRAMEWORK_CORE)
+              && !name.startsWith(RULES_MODULE);
+        });
   }
 
   /**

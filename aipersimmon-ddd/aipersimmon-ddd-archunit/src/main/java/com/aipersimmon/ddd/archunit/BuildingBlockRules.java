@@ -8,6 +8,7 @@ import com.aipersimmon.ddd.core.annotation.Service;
 import com.aipersimmon.ddd.core.annotation.ValueObject;
 import com.aipersimmon.ddd.core.model.AbstractAggregateRoot;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
@@ -185,6 +186,150 @@ public final class BuildingBlockRules {
                 + "of a version-checked write; calling it anywhere else disarms the lock — the "
                 + "next save checks against a version the row never reached")
         .allowEmptyShould(true);
+  }
+
+  /**
+   * A value object — a type carrying {@link ValueObject @ValueObject} — is compared by its
+   * attributes: it is a {@code record} or an {@code enum}, or it declares both {@code
+   * equals(Object)} and {@code hashCode()}.
+   *
+   * <p>The companion to {@link #valueObjectsShouldBeImmutable()}, and the half that was missing.
+   * Immutability keeps the attributes from changing; <em>this</em> is what makes two objects with
+   * the same attributes the same value. A final-field class that inherits {@code Object.equals} is
+   * compared by reference — two {@code Money(10, "EUR")} are unequal, a {@code Set<Sku>} holds
+   * duplicates, {@code list.contains(sku)} answers false about a sku that is in it — which is
+   * precisely the behaviour the annotation is claiming the type does not have. A {@code record}
+   * satisfies this for free, and an {@code enum}'s reference equality <em>is</em> value equality
+   * because its instances are singletons; anything else has to write the two methods.
+   *
+   * <p>Interfaces and abstract classes carrying the annotation are skipped: they declare a value
+   * <em>role</em> and have no instances of their own, so the obligation belongs to the concrete
+   * types that implement them — which this rule checks individually.
+   *
+   * <p>Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that
+   * annotates no value objects.
+   */
+  public static ArchRule valueObjectsShouldDeclareValueEquality() {
+    return classes()
+        .that()
+        .areAnnotatedWith(ValueObject.class)
+        .should(beComparedByValue())
+        .as(
+            "@ValueObject types should be compared by value (be a record or enum, or declare "
+                + "equals and hashCode)")
+        .because(
+            "a value object is defined by its attributes; one that inherits Object.equals is "
+                + "compared by reference, so two equal values test as different and collections "
+                + "of them behave as if the type had identity")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * An aggregate refers to another aggregate by identity, never by holding it: no field of a type
+   * carrying {@link AggregateRoot @AggregateRoot} or {@link Entity @Entity} has another
+   * {@code @AggregateRoot} type anywhere in it — as the field's own type, or inside a generic
+   * argument such as {@code List<Order>}, {@code Optional<Customer>} or {@code Map<Sku, Order>}.
+   *
+   * <p>Holding the object collapses two consistency boundaries into one. The enclosing aggregate's
+   * repository now has to load, version-check and save a graph it does not own, so a write to
+   * either root contends on both; the held root's own invariants can be sidestepped by the holder;
+   * and the transaction quietly grows to whatever the graph reaches. An identifier — the {@code
+   * Identifier} value object of the other root — expresses the same association with none of that:
+   * the reference is stable, the boundary stays one root per transaction, and fetching the other
+   * side becomes a deliberate second step through its own repository.
+   *
+   * <p>A reference to the <em>same</em> aggregate type counts too (a {@code parent} link, a {@code
+   * replaces} link): another instance of the same root is still another aggregate, and a
+   * self-referencing graph is the version of this mistake that loads unboundedly.
+   *
+   * <p>Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project with
+   * no annotated aggregates. Entities are checked as well as roots, because an entity is reached
+   * through its root — a foreign aggregate held on an inner entity is the same leak, one level
+   * down.
+   */
+  public static ArchRule aggregatesShouldReferenceOtherAggregatesByIdentity() {
+    return classes()
+        .that()
+        .areAnnotatedWith(AggregateRoot.class)
+        .or()
+        .areAnnotatedWith(Entity.class)
+        .should(notHoldAnotherAggregateRoot())
+        .as("aggregates should reference other aggregates by identity, not by holding them")
+        .because(
+            "holding another root merges two consistency boundaries: one repository loads, "
+                + "version-checks and saves a graph it does not own, and the transaction grows to "
+                + "whatever that graph reaches — an Identifier field says the same thing and keeps "
+                + "one root per transaction")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * Reports a violation for a {@code @ValueObject} that is neither a record nor an enum and does
+   * not declare both {@code equals(Object)} and {@code hashCode()}. Interfaces and abstract classes
+   * are skipped — see {@link #valueObjectsShouldDeclareValueEquality()}.
+   */
+  private static ArchCondition<JavaClass> beComparedByValue() {
+    return new ArchCondition<>("be compared by value") {
+      @Override
+      public void check(JavaClass valueObject, ConditionEvents events) {
+        boolean hasNoInstancesOfItsOwn =
+            valueObject.isInterface() || valueObject.getModifiers().contains(JavaModifier.ABSTRACT);
+        if (hasNoInstancesOfItsOwn || valueObject.isRecord() || valueObject.isEnum()) {
+          return;
+        }
+        boolean declaresEquals = valueObject.tryGetMethod("equals", Object.class).isPresent();
+        boolean declaresHashCode = valueObject.tryGetMethod("hashCode").isPresent();
+        if (declaresEquals && declaresHashCode) {
+          return;
+        }
+        events.add(
+            SimpleConditionEvent.violated(
+                valueObject,
+                valueObject.getFullName()
+                    + " is a @ValueObject but is compared by reference — it declares "
+                    + whatIsMissing(declaresEquals, declaresHashCode)
+                    + "; make it a record, or declare both"));
+      }
+    };
+  }
+
+  /** Which half of the value-equality contract the type is missing, for the violation message. */
+  private static String whatIsMissing(boolean declaresEquals, boolean declaresHashCode) {
+    if (declaresEquals) {
+      return "equals without hashCode";
+    }
+    return declaresHashCode ? "hashCode without equals" : "neither equals nor hashCode";
+  }
+
+  /**
+   * Reports a violation for each field of the checked aggregate or entity whose type involves an
+   * {@code @AggregateRoot} type. {@code getAllInvolvedRawTypes()} unwraps the generic signature, so
+   * {@code List<Order>} and {@code Map<Sku, Order>} are caught along with a bare {@code Order}.
+   * Static and synthetic fields are skipped: a constant or a compiler-generated reference is not
+   * the association this rule is about.
+   */
+  private static ArchCondition<JavaClass> notHoldAnotherAggregateRoot() {
+    return new ArchCondition<>("not hold another @AggregateRoot") {
+      @Override
+      public void check(JavaClass aggregate, ConditionEvents events) {
+        aggregate.getFields().stream()
+            .filter(field -> !field.getModifiers().contains(JavaModifier.STATIC))
+            .filter(field -> !field.getModifiers().contains(JavaModifier.SYNTHETIC))
+            .forEach(
+                field ->
+                    field.getType().getAllInvolvedRawTypes().stream()
+                        .filter(involved -> involved.isAnnotatedWith(AggregateRoot.class))
+                        .forEach(
+                            heldRoot ->
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        field,
+                                        field.getDescription()
+                                            + " holds the aggregate root "
+                                            + heldRoot.getName()
+                                            + " — reference it by its Identifier instead"))));
+      }
+    };
   }
 
   private static ArchCondition<JavaClass> notCallVersionAdvanced() {

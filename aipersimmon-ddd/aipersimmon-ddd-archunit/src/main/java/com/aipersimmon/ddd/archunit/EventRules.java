@@ -6,6 +6,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import com.aipersimmon.ddd.application.DomainEventHandler;
 import com.aipersimmon.ddd.core.event.DomainEvent;
 import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.Externalized;
 import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -180,6 +181,63 @@ public final class EventRules {
             "an integration event is a fact published for other contexts, so it belongs with "
                 + "the outward contract, not in the domain, application, or adapter internals")
         .allowEmptyShould(true);
+  }
+
+  /**
+   * {@link Externalized @Externalized} sits only on an {@link IntegrationEvent}, and names a
+   * non-blank target.
+   *
+   * <p>The annotation is what promotes an event from in-process to the broker, and it is read
+   * through {@code IntegrationEvent.externalizedTarget(Class)} — a lookup keyed on the event type.
+   * On anything that is not an integration event, nothing ever performs that lookup: the annotation
+   * is inert, while reading as though the type is published. That is the failure mode worth
+   * catching at build time, because its symptom is a message that never arrives and a class that
+   * says it should.
+   *
+   * <p>The blank-target half catches the other spelling of the same nothing:
+   * {@code @Externalized("")} declares externalization and supplies no destination. A {@code
+   * ${property}} placeholder is left alone — resolution happens in the assembly layer, so an
+   * unresolvable placeholder is a configuration failure, not a contract one.
+   *
+   * <p>The mirror of {@link OperationLogRules#operationLogShouldOnlyAnnotateApplicationCommands()}:
+   * both say that additive metadata belongs only where something reads it. Part of {@link
+   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that externalizes no
+   * events.
+   */
+  public static ArchRule externalizedShouldOnlyAnnotateIntegrationEvents() {
+    return classes()
+        .that()
+        .areAnnotatedWith(Externalized.class)
+        .should()
+        .implement(IntegrationEvent.class)
+        .andShould(declareANonBlankExternalizedTarget())
+        .as("@Externalized should only annotate integration events, and name a non-blank target")
+        .because(
+            "the transport lookup is keyed on the integration-event type, so the annotation is "
+                + "inert anywhere else — and a blank target declares externalization without "
+                + "saying where to")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * Reports a violation for an {@code @Externalized} whose {@code value} is blank. A {@code
+   * ${property}} placeholder counts as named — the assembly layer resolves it.
+   */
+  private static ArchCondition<JavaClass> declareANonBlankExternalizedTarget() {
+    return new ArchCondition<>("name a non-blank target") {
+      @Override
+      public void check(JavaClass event, ConditionEvents events) {
+        String target = event.getAnnotationOfType(Externalized.class).value();
+        if (target.isBlank()) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  event,
+                  event.getFullName()
+                      + " is @Externalized but names no target, so it declares a broker delivery"
+                      + " with no destination"));
+        }
+      }
+    };
   }
 
   /**

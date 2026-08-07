@@ -1,6 +1,7 @@
 package com.aipersimmon.ddd.archunit;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.aipersimmon.ddd.core.annotation.Repository;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -12,10 +13,10 @@ import com.tngtech.archunit.lang.ArchRule;
  * outbound adapters in infrastructure, and (opt-in) those implementations carry Spring's
  * {@code @Repository} stereotype.
  *
- * <p>{@link #portsShouldBeInterfacesInDomain()} and {@link
- * #implementationsShouldResideInInfrastructure()} are bundled into {@link
- * AiPersimmonDddRules#all()}; {@link #implementationsShouldBeSpringRepositories()} is opt-in
- * because it presumes Spring.
+ * <p>{@link #portsShouldBeInterfacesInDomain()}, {@link
+ * #implementationsShouldResideInInfrastructure()} and {@link
+ * #portsShouldNotBeUsedByInboundAdapters()} are bundled into {@link AiPersimmonDddRules#all()};
+ * {@link #implementationsShouldBeSpringRepositories()} is opt-in because it presumes Spring.
  */
 public final class RepositoryRules {
 
@@ -68,6 +69,50 @@ public final class RepositoryRules {
         .because(
             "the class that fulfils a domain repository port with a concrete persistence "
                 + "technology is an outbound adapter, which belongs in infrastructure")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * No inbound adapter depends on a repository port: nothing in {@code ..adapter..} or {@code
+   * ..interfaces..} touches a type carrying the core {@link Repository @Repository}.
+   *
+   * <p>An inbound adapter's job is to turn a transport into a dispatch — parse the request, build
+   * the command or query, hand it to the bus. Loading an aggregate itself skips everything the bus
+   * was going to do around that work: the transaction never opens, so a two-step read is not
+   * consistent; validation, prechecks and the operation log never run; concurrency conflicts arrive
+   * as raw persistence exceptions instead of the translated 409; and the read has no handler, so
+   * there is nowhere for the next requirement to go except further into the controller. The
+   * endpoint that does it usually looks the tidiest of the lot, because assembling a response map
+   * from an aggregate is genuinely less code than a query, a handler and a read model — right up
+   * until the second caller needs the same answer.
+   *
+   * <p>Deliberately narrower than {@link LayeringRules#adapterShouldNotDependOnDomain()}, and
+   * adoptable where that one is not. The broad rule forbids <em>every</em> adapter→domain
+   * reference, which a project cannot take if it keeps persistence adapters beside its inbound
+   * ones, or if its controllers legitimately build a domain identifier to put in a query. This one
+   * forbids only the port, which is the reference that actually lets the boundary do the
+   * application's work.
+   *
+   * <p>Part of {@link AiPersimmonDddRules#all()}, and it earned the place by being switched on: it
+   * reported ten controllers across this project's own samples, every one of them a GET that loaded
+   * an aggregate through the port and hand-mapped it into a response map. All ten now go through
+   * the query bus, and the migration each one needed — a query, a handler and a {@code @ReadModel}
+   * — is the whole of what adopting this rule costs a project that reads the same way.
+   *
+   * <p>Matches nothing (and so passes) in a project that declares no repository ports.
+   */
+  public static ArchRule portsShouldNotBeUsedByInboundAdapters() {
+    return noClasses()
+        .that()
+        .resideInAnyPackage(Layers.INTERFACE_LAYER)
+        .should()
+        .dependOnClassesThat()
+        .areAnnotatedWith(Repository.class)
+        .as("inbound adapters should not depend on repository ports")
+        .because(
+            "an adapter that loads an aggregate itself runs outside the transaction, the "
+                + "validation, the prechecks and the conflict translation the bus would have "
+                + "wrapped around the same work, and leaves the answer with no handler to live in")
         .allowEmptyShould(true);
   }
 

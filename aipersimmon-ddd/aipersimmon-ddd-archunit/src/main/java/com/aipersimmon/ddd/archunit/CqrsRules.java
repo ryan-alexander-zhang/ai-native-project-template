@@ -2,16 +2,25 @@ package com.aipersimmon.ddd.archunit;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.aipersimmon.ddd.core.annotation.AggregateRoot;
+import com.aipersimmon.ddd.core.annotation.Entity;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandHandler;
+import com.aipersimmon.ddd.cqrs.Query;
 import com.aipersimmon.ddd.cqrs.QueryHandler;
+import com.aipersimmon.ddd.cqrs.ReadModel;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.JavaParameterizedType;
+import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.CompositeArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * CQRS and application-layer rules: how command and query handlers relate to one another and to the
@@ -144,6 +153,232 @@ public final class CqrsRules {
                 + "the handler's source can answer, and internal commands — the ones no web "
                 + "framework validates first — are exactly where declarations go missing")
         .allowEmptyShould(true);
+  }
+
+  /**
+   * A {@link Command} or {@link Query} type itself resides in the application layer, not only its
+   * handler.
+   *
+   * <p>{@link #commandAndQueryHandlersShouldResideInApplication()} pins the handler and says
+   * nothing about the message, which is the half that actually travels. A command is the
+   * application's inward contract — the one shape an HTTP adapter, an event listener and a
+   * process-manager effect all have to agree on — and where it is declared decides who may depend
+   * on it without depending on anything else. Declared in the domain it becomes part of the model,
+   * and the model starts knowing the names of its use cases; declared in an adapter it becomes that
+   * adapter's private vocabulary, and the next caller either reaches into the adapter or writes a
+   * second command that means the same thing.
+   *
+   * <p>{@link OperationLogRules#operationLogShouldOnlyAnnotateApplicationCommands()} already
+   * presumes this — it requires the annotated command to be in {@code ..application..} — so until
+   * now the convention was enforced only for commands that happened to be audited. Part of {@link
+   * AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project with no commands or
+   * queries.
+   */
+  public static ArchRule commandsAndQueriesShouldResideInApplication() {
+    return classes()
+        .that()
+        .implement(Command.class)
+        .or()
+        .implement(Query.class)
+        .should()
+        .resideInAPackage("..application..")
+        .as("command and query types should reside in the application layer")
+        .because(
+            "a command is the application's inward contract, agreed on by every caller that "
+                + "drives a use case; in the domain it makes the model aware of its use cases, and "
+                + "in an adapter it becomes that adapter's private vocabulary")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * The read side returns projections, not the write model: a {@link ReadModel @ReadModel} type
+   * resides in the application layer (or an {@code ..api..} published-contract package) and holds
+   * no {@link AggregateRoot @AggregateRoot} or {@link Entity @Entity} anywhere in its fields.
+   *
+   * <p>A read model is a shape assembled for rendering. Letting an aggregate into it drags the
+   * write model onto the read path: every row has to be rebuilt through the root's constructor,
+   * running the invariants and loading whatever the aggregate's graph reaches, none of which the
+   * answer needs. It is the reason list endpoints get slow in a way no index fixes, and it is
+   * invisible in review because the code that does it reads perfectly naturally — the repository is
+   * right there.
+   *
+   * <p>Domain <em>value objects</em> are deliberately allowed. A read model that carries a {@code
+   * Money} or an {@code OrderStatus} borrows a word from the model's vocabulary at no cost: there
+   * is no identity to load, no lifecycle to run, nothing to version-check. The line is drawn at
+   * identity, which is exactly where the expense and the consistency boundary are.
+   *
+   * <p>Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project that
+   * annotates no read models.
+   */
+  public static ArchRule readModelsShouldBeProjectionShapes() {
+    return CompositeArchRule.of(readModelsShouldResideInApplicationOrApi())
+        .and(readModelsShouldNotHoldAggregatesOrEntities())
+        .as(
+            "@ReadModel types should reside in the application layer or a published ..api.. "
+                + "package and should not hold aggregates or entities");
+  }
+
+  /**
+   * One half of {@link #readModelsShouldBeProjectionShapes()}: a {@link ReadModel @ReadModel}
+   * resides in {@code ..application..} — where the query that returns it and the projection that
+   * fills it live — or in {@code ..api..} when it is a published query contract another context
+   * reads, the same allowance {@link BuildingBlockRules#valueObjectsShouldResideInDomainOrApi()}
+   * makes. Never in the domain (it is not part of the model), infrastructure or an adapter. Exposed
+   * separately so a project can state that half on its own.
+   */
+  public static ArchRule readModelsShouldResideInApplicationOrApi() {
+    return classes()
+        .that()
+        .areAnnotatedWith(ReadModel.class)
+        .should()
+        .resideInAnyPackage("..application..", "..api..")
+        .as(
+            "@ReadModel types should reside in the application layer or a published ..api.. package")
+        .because(
+            "a read model is a projection assembled for querying, so it belongs with the query "
+                + "that returns it — or, when it is a published query contract, with the outward "
+                + "contract; it is not part of the domain model")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * The other half of {@link #readModelsShouldBeProjectionShapes()}: no field of a {@link
+   * ReadModel @ReadModel} involves an {@code @AggregateRoot} or {@code @Entity} type, generic
+   * arguments included. Exposed separately so a project can state that half on its own.
+   */
+  public static ArchRule readModelsShouldNotHoldAggregatesOrEntities() {
+    return classes()
+        .that()
+        .areAnnotatedWith(ReadModel.class)
+        .should(notHoldTheWriteModel("@ReadModel"))
+        .as("@ReadModel types should not hold aggregates or entities")
+        .because(
+            "a read model exists so a query can be answered without rebuilding the write model; "
+                + "an aggregate inside one puts the constructor, the invariants and the "
+                + "aggregate's graph back on the read path")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * A {@link Query} answers with a projection: the {@code R} in {@code Query<R>} is not an {@link
+   * AggregateRoot @AggregateRoot} or {@link Entity @Entity} type, and neither is anything inside it
+   * — {@code Query<Optional<Order>>}, {@code Query<List<Order>>} and {@code Query<Slice<Order>>}
+   * are reported as readily as {@code Query<Order>}.
+   *
+   * <p>The other end of {@link #readModelsShouldBeProjectionShapes()}, and the one that actually
+   * closes the door: that rule constrains the types a project chose to mark, while this one reads
+   * the declared result of every query whether it was marked or not. Handing an aggregate back to a
+   * caller publishes the write model as the read contract — the caller now depends on the shape of
+   * the root, so the root can no longer change without breaking it, and the caller can invoke
+   * behaviour on it outside any transaction or unit of work.
+   *
+   * <p>Loading an aggregate <em>inside</em> a query handler stays allowed, as {@link Query}'s own
+   * documentation says it may be for a single-entity read; what this rule refuses is returning it.
+   * Part of {@link AiPersimmonDddRules#all()}; matches nothing (and so passes) in a project with no
+   * queries.
+   */
+  public static ArchRule queryResultsShouldNotBeAggregatesOrEntities() {
+    return classes()
+        .that()
+        .implement(Query.class)
+        .should(declareAResultThatIsNotTheWriteModel())
+        .as("query result types should not be aggregates or entities")
+        .because(
+            "returning a root publishes the write model as the read contract: the caller depends "
+                + "on the aggregate's shape and can invoke its behaviour outside any unit of work")
+        .allowEmptyShould(true);
+  }
+
+  /**
+   * Reports a violation for each field of the checked type whose signature involves an
+   * {@code @AggregateRoot} or {@code @Entity} type, generic arguments included.
+   *
+   * @param role how to name the checked type in the message
+   */
+  private static ArchCondition<JavaClass> notHoldTheWriteModel(String role) {
+    return new ArchCondition<>("not hold an @AggregateRoot or @Entity") {
+      @Override
+      public void check(JavaClass readModel, ConditionEvents events) {
+        readModel.getFields().stream()
+            .filter(field -> !field.getModifiers().contains(JavaModifier.STATIC))
+            .filter(field -> !field.getModifiers().contains(JavaModifier.SYNTHETIC))
+            .forEach(
+                field ->
+                    field.getType().getAllInvolvedRawTypes().stream()
+                        .filter(CqrsRules::isWriteModel)
+                        .forEach(
+                            held ->
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        field,
+                                        field.getDescription()
+                                            + " puts the write model "
+                                            + held.getName()
+                                            + " inside a "
+                                            + role
+                                            + " — project the fields the answer needs instead"))));
+      }
+    };
+  }
+
+  /**
+   * Reports a violation for a {@link Query} whose declared result type involves an
+   * {@code @AggregateRoot} or {@code @Entity}. A query that does not parameterise {@code Query} at
+   * all (raw, or through a further-generic supertype) has no declared result to read and is left
+   * alone rather than guessed at.
+   */
+  private static ArchCondition<JavaClass> declareAResultThatIsNotTheWriteModel() {
+    return new ArchCondition<>("declare a result type that is not an @AggregateRoot or @Entity") {
+      @Override
+      public void check(JavaClass query, ConditionEvents events) {
+        resultTypesOf(query).stream()
+            .filter(CqrsRules::isWriteModel)
+            .forEach(
+                root ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            query,
+                            query.getFullName()
+                                + " answers with the write model "
+                                + root.getName()
+                                + " — answer with a @ReadModel projection instead")));
+      }
+    };
+  }
+
+  /**
+   * Every raw type involved in the {@code R} of {@code Query<R>} for the given query, following the
+   * interface hierarchy so a query declared through an intermediate interface ({@code interface
+   * PagedQuery<T> extends Query<Slice<T>>}) is read at the point where {@code Query} is
+   * parameterised.
+   */
+  private static Set<JavaClass> resultTypesOf(JavaClass query) {
+    Set<JavaClass> resultTypes = new LinkedHashSet<>();
+    collectResultTypes(query, resultTypes, new LinkedHashSet<>());
+    return resultTypes;
+  }
+
+  private static void collectResultTypes(
+      JavaClass type, Set<JavaClass> resultTypes, Set<String> visited) {
+    if (!visited.add(type.getName())) {
+      return;
+    }
+    for (JavaType implemented : type.getInterfaces()) {
+      if (implemented.toErasure().isEquivalentTo(Query.class)
+          && implemented instanceof JavaParameterizedType parameterized
+          && parameterized.getActualTypeArguments().size() == 1) {
+        resultTypes.addAll(parameterized.getActualTypeArguments().get(0).getAllInvolvedRawTypes());
+      }
+      collectResultTypes(implemented.toErasure(), resultTypes, visited);
+    }
+    type.getRawSuperclass()
+        .ifPresent(superclass -> collectResultTypes(superclass, resultTypes, visited));
+  }
+
+  /** A write-model type: one carrying {@code @AggregateRoot} or {@code @Entity}. */
+  private static boolean isWriteModel(JavaClass javaClass) {
+    return javaClass.isAnnotatedWith(AggregateRoot.class)
+        || javaClass.isAnnotatedWith(Entity.class);
   }
 
   private static ArchCondition<JavaClass>

@@ -143,6 +143,30 @@
       <artifactId>swagger-annotations-jakarta</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test only: fixtures carrying MyBatis / MyBatis-Plus markers, so PersistenceRules has a real
+         mapper and a real mapped row to place. The rules match both by name, so this is never a
+         compile dependency — the whole point is that the rules jar does not put a persistence
+         technology on a consumer's classpath. -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-annotation</artifactId>
+      <version>${mybatis-plus.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-core</artifactId>
+      <version>${mybatis-plus.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test only: a fixture @RestController with a mapped endpoint, so WebRules has a real
+         signature to read and a real @GetMapping to tell an endpoint from a private helper. Matched
+         by name by the rule, so never a compile dependency. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Test only: fixtures carrying Bean Validation constraints, so
          commandComponentsShouldDeclareValidationConstraints has a compliant command to accept.
          The rule itself matches the annotations by name, so this is never a compile dependency. -->
