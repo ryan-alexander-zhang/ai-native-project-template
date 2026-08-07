@@ -1,18 +1,31 @@
 # Publish the AiPersimmon DDD building-block library to GitHub Packages.
 #
-# Runs on a published GitHub release, or on demand. Only the library reactor
-# (aipersimmon-ddd/) is published — the multi-module scaffold reference project
-# is an archetype source and example, not an artifact to consume.
+# Only the library reactor (aipersimmon-ddd/) is published -- the multi-module scaffold
+# reference project is an archetype source and an example, not an artifact to consume.
 #
-# setup-java writes a settings.xml whose `github` server authenticates with
-# GITHUB_ACTOR / GITHUB_TOKEN; that id matches the distributionManagement
-# repository in aipersimmon-ddd/pom.xml.
+# setup-java writes a settings.xml whose `github` server authenticates with GITHUB_ACTOR /
+# GITHUB_TOKEN; that id matches the distributionManagement repository in
+# aipersimmon-ddd/pom.xml.
+#
+# Triggered by a tag, not by a GitHub release and not by hand, and the reason is
+# structural rather than stylistic. The `release` and `workflow_dispatch` events read
+# their workflow file from the repository's DEFAULT branch, and main here is the
+# language-agnostic template skeleton -- it has no aipersimmon-ddd/ at all. A workflow
+# sitting on main would have nothing to build. A `push` event, tags included, reads the
+# workflow from the tagged commit's own tree, so this file works exactly where the code
+# it builds lives.
+#
+# The tag mirrors the branch: lang/java/ddd -> lang/java/ddd/vX.Y.Z. Tags are repo-global
+# while branches are not, so a bare vX.Y.Z would force every future stack -- a Go scaffold
+# on lang/go/*, say -- to share one version sequence with this one.
+#
+#   git tag lang/java/ddd/v0.1.0 && git push origin lang/java/ddd/v0.1.0
+#
 name: Publish library
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  push:
+    tags: ['lang/java/ddd/v*']
 
 permissions:
   contents: read
@@ -31,6 +44,15 @@ jobs:
           distribution: temurin
           cache: maven
           server-id: github
+
+      - name: Install the shared quality config
+        # Same bootstrap the CI workflow needs, and it has to be repeated here because
+        # every job gets its own runner and its own empty ~/.m2. aipersimmon-ddd-quality-config
+        # is named inside the PMD <plugin><dependencies>, and a plugin's dependencies resolve
+        # from the repository only -- never from the reactor -- so the aggregator pom demands
+        # at position 2 a jar this build produces at position 3. -DskipTests does not help:
+        # PMD is bound to `verify`, which both `install` and `deploy` pass through.
+        run: mvn -B --no-transfer-progress -f aipersimmon-ddd/pom.xml -pl aipersimmon-ddd-quality-config install
 
       - name: Deploy to GitHub Packages
         run: mvn -B --no-transfer-progress -DskipTests -f aipersimmon-ddd/pom.xml deploy
