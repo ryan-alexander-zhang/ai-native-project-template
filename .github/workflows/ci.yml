@@ -23,6 +23,24 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Install the shared quality config
+        # Must precede the library build, and the reason is not obvious enough to leave
+        # implicit. aipersimmon-ddd-quality-config ships the PMD ruleset and the SpotBugs
+        # filter as classpath resources, and the parent declares it inside the PMD
+        # <plugin><dependencies>. A plugin's dependencies are resolved from the repository
+        # only -- Maven never satisfies them from the reactor, the way it does for ordinary
+        # module dependencies. So when the aggregator pom (reactor position 2 of 44) runs
+        # PMD, it goes looking for a jar that this very build produces at position 3, and
+        # on a runner with an empty ~/.m2 there is nothing to find:
+        #
+        #   [ERROR] Could not find artifact com.aipersimmon.ddd:aipersimmon-ddd-quality-config
+        #
+        # Building that one module first with -pl sidesteps it: -pl selects the module
+        # alone, so the aggregator's PMD execution never runs, and the jar is installed by
+        # the time the full reactor needs it. A developer's machine hides this behind a
+        # copy left in ~/.m2 by an earlier build, which is why it only ever failed here.
+        run: mvn -B --no-transfer-progress -f aipersimmon-ddd/pom.xml -pl aipersimmon-ddd-quality-config install
+
       - name: Build and install the building-block library
         run: mvn -B --no-transfer-progress -f aipersimmon-ddd/pom.xml install
 
