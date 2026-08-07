@@ -64,7 +64,7 @@ class ArchitectureTest {
   static final ArchRule redisStaysInInfrastructure =
       noClasses()
           .that()
-          .resideInAnyPackage("..application..", "..domain..", "..interfaces..")
+          .resideInAnyPackage("..application..", "..domain..", "..adapter..")
           .should()
           .dependOnClassesThat()
           .resideInAPackage("org.springframework.data.redis..")

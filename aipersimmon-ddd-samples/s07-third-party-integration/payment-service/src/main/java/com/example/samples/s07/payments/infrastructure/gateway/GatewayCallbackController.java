@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The provider's way in — and the one class in this sample that is a {@code @RestController} outside the
- * {@code interfaces} package.
+ * {@code adapter} package.
  *
  * <p><strong>Why it lives in {@code infrastructure.gateway}.</strong> A callback endpoint is not part of
  * our API; it is the return path of an outbound call. Its URL, its authentication scheme, its payload and
@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * next to the outbound client is what allows the code table
  * ({@link GatewayResultCodes}) and the wire records ({@link GatewayMessages}) to be package-private, so
  * "which classes know that {@code 51} means declined" is answered by the compiler. The alternative — the
- * controller in {@code interfaces} — forces either a duplicated code table or a dependency from the entry
+ * controller in {@code adapter} — forces either a duplicated code table or a dependency from the entry
  * layer into infrastructure, and the first of those drifts.
  *
  * <p><strong>Everything it answers is 2xx, and that is a decision.</strong> A provider redelivers until it

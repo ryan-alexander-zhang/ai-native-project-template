@@ -45,13 +45,13 @@ API docs at `localhost:18010/swagger-ui.html`.
 
 | Concern | Where | Verified by |
 | --- | --- | --- |
-| Controller translates and nothing else | `ordering/interfaces/OrderController` | `OrderHttpContractTest` |
+| Controller translates and nothing else | `ordering/adapter/OrderController` | `OrderHttpContractTest` |
 | Command with its own constraints | `ordering/application/PlaceOrder` | `OrderHttpContractTest.anInvalidBodyIsRejectedBeforeAnyCommandIsSent` |
 | Handler as a concrete class, no `@Transactional` | `ordering/application/*Handler` | `ConfirmOrderHandlerTest` |
 | Invariant refuses, transition table refuses | `ordering/domain/OrderHasLines`, `Order.TRANSITIONS` | `OrderTest` |
 | Version-checked write + event publication | `ordering/infrastructure/MyBatisOrders` | `OrderHttpContractTest` |
 | Error codes per context, category drives the family | `ordering/domain/OrderingErrorCode` | `OrderHttpContractTest.anUnknownOrderRidesItsCategoryFamily` |
-| One problem-type override | `ordering/interfaces/OrderingProblemConfig` | `OrderHttpContractTest.confirmingTwiceIsTheContextsOwnProblemType` |
+| One problem-type override | `ordering/adapter/OrderingProblemConfig` | `OrderHttpContractTest.confirmingTwiceIsTheContextsOwnProblemType` |
 | Layering and building-block rules | — | `ArchitectureTest`, `PackageInfoTest` |
 | **S14** Who performed it, from a trusted scope | `audit/CurrentActor`, `audit/ActorBindingFilter`, `audit/AuditConfiguration` | `ActorResolutionTest` |
 | **S14** Audit by annotation | `ordering/application/ConfirmOrder` | `OperationLogCaptureTest.theannotationPathTakesItFromTheInput` |

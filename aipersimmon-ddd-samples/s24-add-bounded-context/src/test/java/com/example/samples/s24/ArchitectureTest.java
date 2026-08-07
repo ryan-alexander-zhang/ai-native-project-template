@@ -82,7 +82,7 @@ class ArchitectureTest {
           .resideInAPackage("..api..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("..domain..", "..application..", "..infrastructure..", "..interfaces..")
+          .resideInAnyPackage("..domain..", "..application..", "..infrastructure..", "..adapter..")
           .as("a published contract must not depend on the model it is a contract for")
           .allowEmptyShould(true);
 

@@ -22,7 +22,7 @@ class ArchitectureTest {
    * <p>This is S7's rule. Everything that knows the provider exists — its HTTP client, its wire records,
    * its result codes, its signature scheme, its callback endpoint — lives in one package, and nothing
    * outside may name any of it. The domain and application layers are already covered by the library's
-   * layering rules; what this adds is the {@code interfaces} package, which is the one most likely to be
+   * layering rules; what this adds is the {@code adapter} package, which is the one most likely to be
    * tempted (a controller that "just" reads {@code result_code} to show the customer something).
    *
    * <p>Most of it is enforced by the compiler as well: every class in that package is package-private, so
@@ -65,7 +65,7 @@ class ArchitectureTest {
   static final ArchRule entryAdaptersDoNotTouchThePersistenceTier =
       noClasses()
           .that()
-          .resideInAPackage("..interfaces..")
+          .resideInAPackage("..adapter..")
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("..infrastructure..", "org.springframework.jdbc..", "com.baomidou..")

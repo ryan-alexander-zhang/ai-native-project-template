@@ -4,7 +4,7 @@
  * <p>The unusual member of this package is {@link
  * com.example.samples.s22.ordering.application.Quarantine}: an application service whose collaborators
  * are two framework ports rather than a domain repository. It lives here rather than in {@code
- * interfaces} because "which dead letters exist and may this one be replayed" is a decision, and a
+ * adapter} because "which dead letters exist and may this one be replayed" is a decision, and a
  * controller that talked to {@code DeadLetterStore} directly would put that decision in a place with
  * no way to state it.
  */

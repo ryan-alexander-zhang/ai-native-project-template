@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  * nothing in the push design notices. So the payment sits in {@code SUBMITTED}, the customer's money is
  * gone or is not, and the only cure is to ask.
  *
- * <p><strong>No {@code @Scheduled} here.</strong> The trigger is a separate bean in {@code interfaces},
+ * <p><strong>No {@code @Scheduled} here.</strong> The trigger is a separate bean in {@code adapter},
  * for the reason the library gives for splitting its own relay from its relay scheduler: a test, an
  * operator endpoint and a timer then all drive the same method.
  *

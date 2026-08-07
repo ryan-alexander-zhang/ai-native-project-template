@@ -48,7 +48,7 @@ class ArchitectureTest {
   static final ArchRule replayGoesThroughTheApplicationService =
       noClasses()
           .that()
-          .resideInAPackage("..ordering.interfaces..")
+          .resideInAPackage("..ordering.adapter..")
           .should()
           .dependOnClassesThat()
           .haveSimpleName("DeadLetterStore")

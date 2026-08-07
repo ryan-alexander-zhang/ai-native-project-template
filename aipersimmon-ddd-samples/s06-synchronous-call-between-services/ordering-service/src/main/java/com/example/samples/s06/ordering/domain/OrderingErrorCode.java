@@ -18,7 +18,7 @@ public enum OrderingErrorCode implements ErrorCode {
   RISK_REJECTED("ordering.risk-rejected", ErrorCategory.DOMAIN_RULE),
   /**
    * Categorised {@code UNEXPECTED} because the category enum has no "a dependency is down" member — and
-   * that default (500) is wrong for a caller, who should be told to try again. The interfaces layer
+   * that default (500) is wrong for a caller, who should be told to try again. The adapter layer
    * overrides it to 503 through a {@code ProblemCatalog}; see {@code RiskProblemCatalog}.
    */
   RISK_UNAVAILABLE("ordering.risk-unavailable", ErrorCategory.UNEXPECTED);

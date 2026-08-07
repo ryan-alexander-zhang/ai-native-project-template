@@ -28,7 +28,7 @@ class ArchitectureTest {
   static final ArchRule entryAdaptersDoNotTouchThePersistenceTier =
       noClasses()
           .that()
-          .resideInAPackage("..interfaces..")
+          .resideInAPackage("..adapter..")
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("..infrastructure..", "org.springframework.jdbc..", "com.baomidou..")

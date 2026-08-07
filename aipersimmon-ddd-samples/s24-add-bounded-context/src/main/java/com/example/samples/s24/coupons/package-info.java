@@ -9,7 +9,7 @@
  *   <li>{@code domain} — the model, which is forbidden from knowing another context exists;
  *   <li>{@code application} — the use cases, and the only layer where cross-context collaboration is allowed;
  *   <li>{@code infrastructure} — persistence, over tables prefixed {@code s24_coupons_} and no others;
- *   <li>{@code interfaces} — its own edge, if it has one.
+ *   <li>{@code adapter} — its own edge, if it has one.
  * </ol>
  *
  * <p>Plus four things that belong to day one rather than to a later tidy-up, each of which is measured:
