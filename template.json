@@ -3,7 +3,7 @@
     ".codex/",
     ".understand-anything/",
     "docs/*/[^A-Z]*",
-    "docs/reference/",
+    "docs/*/*/*",
     ".github/",
     ".template-sync.json",
     "scripts/release.sh",
