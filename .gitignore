@@ -287,3 +287,13 @@ __marimo__/
 # A release that is abandoned half-way leaves one per module — 44 for the library
 # reactor — and none of them should ever be committed.
 *.versionsBackup
+
+#   Editor and tool leftovers. `*.bak` is the one that has actually been committed here,
+#   twice, and the cause is not carelessness with a text editor: BSD sed requires a
+#   backup suffix on -i, so `sed -i.bak` on macOS writes X.java.bak beside every file it
+#   edits, and `git add -A` sweeps them up. Nothing downstream notices, because javac,
+#   PMD and SpotBugs all read *.java only — it just sits in the tree, and reaches every
+#   project generated from this template.
+*.bak
+*.orig
+*.rej
