@@ -1,37 +1,20 @@
 # Issues
 
 This directory stores development issues.
-Use `TEMPLATE.md` for front matter.
+Use `TEMPLATE.md` for front matter and section structure.
 
 ## Must Include
 
-- problem
-- context or trigger
-- root cause (first-principles analysis)
-- reproduction (a failing test written before the fix)
+- problem — observed vs expected, and the trigger
+- impact — who is affected, since when, whether it is still occurring
+- root cause (first principles), traced to `file:line`, naming the change that introduced it
+- scope — every site sharing that root cause, each marked affected or not
+- reproduction — a failing test written before the fix
 - fix or workaround
 - verification result
+- follow-through — detection gap, spec/rule verdict, residual state
 
 Add more when useful.
-
-### Root cause (first principles)
-
-Explain the defect from first principles, not surface symptoms:
-
-1. State the observed behavior and the expected behavior.
-2. Trace down to the smallest mechanism that makes them diverge (cite `file:line`).
-3. Name the true root cause, and rule out the symptoms it is not.
-
-### Reproduction (test-first)
-
-Every issue should first be reproduced by a failing test, then fixed:
-
-1. Write a test that reproduces the problem and fails for that reason.
-2. Apply the fix and make that test pass.
-3. Keep the test as the regression guard and cite it in the verification result.
-
-If a failing test is not practical, record the reason and the strongest
-verification used instead.
 
 ## Relations
 
@@ -49,6 +32,10 @@ verification used instead.
 ## Note
 
 Use this for problems found during development and how they were resolved.
+
+A root cause that explains only the reported symptom is not finished: it must
+also say which change made the defect possible, and where else that mechanism
+lives.
 
 ## Status Lifecycle
 
