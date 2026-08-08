@@ -76,7 +76,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   settle is never left as an assumption.
 - When writing the acceptance for a `spec` or a `rule`, derive the set per `ACCEPTANCE.md`.
 
-## 7. Development Workflow
+## 7. Output Discipline
+
+If one sentence answers it, answer in one sentence. Expand only when the user asks for
+detail. Keep the formatting as short as the content: prose for short answers, no headings
+or bullets over a single conclusion. This applies to documents too.
+
+## 8. Development Workflow
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
