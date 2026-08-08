@@ -1,5 +1,14 @@
 {
-  "exclude": [".codex/", ".understand-anything/", "docs/*/[^A-Z]*"],
+  "exclude": [
+    ".codex/",
+    ".understand-anything/",
+    "docs/*/[^A-Z]*",
+    ".github/",
+    ".template-sync.json",
+    "scripts/release.sh",
+    "scripts/sync-docs.sh",
+    "scripts/check-config-coverage.py"
+  ],
   "vars": {
     "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" },
     "APP_GROUP_ID": { "when_variant": "ddd", "prompt": "Application groupId", "default": "com.example" },
@@ -16,7 +25,7 @@
     { "cmd": "git config core.hooksPath .githooks" },
     {
       "when_variant": "ddd",
-      "cmd": "APP_GROUP_ID='{{APP_GROUP_ID}}' APP_ARTIFACT_ID='{{APP_ARTIFACT_ID}}' APP_VERSION='{{APP_VERSION}}' APP_PACKAGE='{{APP_PACKAGE}}' ARCHETYPE_SOURCE='{{ARCHETYPE_SOURCE}}' ARCHETYPE_VERSION='{{ARCHETYPE_VERSION}}' ARCHETYPE_REPOSITORY='{{ARCHETYPE_REPOSITORY}}' sh scripts/new-app.sh && rm -f scripts/new-app.sh"
+      "cmd": "APP_GROUP_ID='{{APP_GROUP_ID}}' APP_ARTIFACT_ID='{{APP_ARTIFACT_ID}}' APP_VERSION='{{APP_VERSION}}' APP_PACKAGE='{{APP_PACKAGE}}' ARCHETYPE_SOURCE='{{ARCHETYPE_SOURCE}}' ARCHETYPE_VERSION='{{ARCHETYPE_VERSION}}' ARCHETYPE_REPOSITORY='{{ARCHETYPE_REPOSITORY}}' sh scripts/new-app.sh && rm -f scripts/new-app.sh && { rmdir scripts 2>/dev/null || :; }"
     }
   ]
 }
