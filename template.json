@@ -4,6 +4,7 @@
     ".understand-anything/",
     "docs/*/[^A-Z]*",
     "docs/*/*/*",
+    "CONTEXT.md",
     ".github/",
     ".template-sync.json",
     "scripts/release.sh",
