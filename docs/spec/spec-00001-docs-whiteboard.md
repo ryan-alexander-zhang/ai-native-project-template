@@ -35,7 +35,8 @@ parent: prd-00001-docs-whiteboard
 | --- | --- | --- |
 | docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表、接收/澄清的含义、产品流下一步表、新文档 id 取法 |
 
-流程配置（FR-15）是这些规则的机器可读载体，不得与其冲突。
+流程配置（FR-15）承载其中的类型二分与产品流（BR-1、BR-13…BR-17）；状态流转
+表（BR-2…BR-9）由文档种类内建推导，不进配置。二者均不得与规则冲突。
 
 ## 4. System Requirements
 
@@ -327,9 +328,9 @@ parent: prd-00001-docs-whiteboard
 
 ## 5. Technical Design
 
-暂无 `design/` 文档；结构设计（服务形态、PTY/终端通道、权限传递机制、布局
-算法选型、冲突检测实现）在本 spec 促活后另立 design 文档并回链
-`informs: [spec-00001-docs-whiteboard]`。
+| Design | Doc | Covers |
+| --- | --- | --- |
+| Docs 白板 MVP | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 服务形态、模块结构、流程配置契约、终端通道、权限传递、冲突与 commit 策略 |
 
 ## 6. Out of Scope
 
@@ -352,5 +353,5 @@ parent: prd-00001-docs-whiteboard
 ## Links
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
-- Design: 待立
-- Plan: 待立
+- Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md)
+- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md)

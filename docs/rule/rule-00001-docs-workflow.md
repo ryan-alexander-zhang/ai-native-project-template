@@ -53,8 +53,9 @@ Hit policy: `UNIQUE`
 - **rule-00001-BR-11** (Definition) 澄清：文档保持 `draft`，待澄清点全部记入
   该文档的 Open Questions。
 - **rule-00001-BR-12** (Constraint) 带未决 Open Questions 的文档不得被促进出
-  `draft`。On violation: 促进被拒绝。已促进的文档新增未决问题时不回退，仅在
-  其后续促进时把关。
+  `draft`。「未决」的判定：文档存在内容非空的 Open Questions 小节（各模板
+  约定"问题全部关闭即删除该小节"，故小节存在且有条目即未决）。On violation:
+  促进被拒绝。已促进的文档新增未决问题时不回退，仅在其后续促进时把关。
 
 ### rule-00001-BR-13 … BR-17 (Decision) 产品流：某类型文档的下一步候选
 
