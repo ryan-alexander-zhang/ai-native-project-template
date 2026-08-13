@@ -1,9 +1,9 @@
-import type { FlowStep } from '../../src/config.ts'
+import type { FlowConfig, FlowStep } from '../../src/config.ts'
 import type { DocContent, DocGraph } from '../../src/docRepository.ts'
 import type { ActionResult } from '../../src/docService.ts'
 import type { SessionInfo } from '../../src/sessionManager.ts'
 
-export type { DocContent, DocGraph, FlowStep, SessionInfo }
+export type { DocContent, DocGraph, FlowConfig, FlowStep, SessionInfo }
 
 /** A refused action; `status` is what the board shows the user (409 conflict, 422 rejected). */
 export class ApiError extends Error {
@@ -31,6 +31,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   graph: () => request<DocGraph>('GET', '/api/graph'),
+  config: () => request<FlowConfig>('GET', '/api/config'),
   doc: (id: string) => request<DocContent>('GET', `/api/docs/${id}`),
   save: (id: string, content: string, baseHash: string) =>
     request<ActionResult>('PUT', `/api/docs/${id}`, { content, baseHash }),

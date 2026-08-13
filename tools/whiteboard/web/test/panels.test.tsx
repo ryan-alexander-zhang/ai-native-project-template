@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { ApiError, api } from '../src/api.ts'
 import { Editor } from '../src/Editor.tsx'
 import { Terminal } from '../src/Terminal.tsx'
@@ -16,6 +17,8 @@ afterEach(() => {
 describe('the editor', () => {
   beforeEach(() => {
     vi.spyOn(api, 'doc').mockResolvedValue({ path: 'prd/a.md', content: CONTENT, hash: 'hash-1' })
+    vi.spyOn(toast, 'success').mockImplementation(() => 'id')
+    vi.spyOn(toast, 'error').mockImplementation(() => 'id')
   })
 
   it('opens the whole file, front matter included', async () => {
@@ -34,7 +37,7 @@ describe('the editor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(save).toHaveBeenCalledWith('prd-00001-x', CONTENT, 'hash-1')
-    await waitFor(() => expect(screen.getByText('saved')).toBeTruthy())
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('saved prd-00001-x'))
     expect(onSaved).toHaveBeenCalled()
   })
 
@@ -46,7 +49,11 @@ describe('the editor', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await waitFor(() => expect(screen.getByText(/changed on disk.*reopen it/)).toBeTruthy())
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('prd-00001-x changed on disk since it was opened', {
+        description: 'reopen it to pick up the change',
+      }),
+    )
   })
 
   it('shows any other refusal as it came back', async () => {
@@ -56,7 +63,7 @@ describe('the editor', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await waitFor(() => expect(screen.getByText('disk is on fire')).toBeTruthy())
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('disk is on fire', { description: undefined }))
   })
 
   it('does not save before the document has loaded', async () => {

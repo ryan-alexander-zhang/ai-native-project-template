@@ -24,7 +24,7 @@ parent: prd-00001-docs-whiteboard
 
 | Story | Value | Delivers |
 | --- | --- | --- |
-| S1 | 作为文档负责人，我要一打开白板就看到全部文档的关系图与状态，这样无需逐个翻文件就能看清依赖链与卡点 | spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3 |
+| S1 | 作为文档负责人，我要一打开白板就看到全部文档的关系图与状态，并能快速找到其中一份，这样无需逐个翻文件就能看清依赖链与卡点 | spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3, spec-00001-FR-26, spec-00001-FR-27 |
 | S2 | 作为文档负责人，我要在白板上直接编辑并预览文档正文，这样查看与修改不用切换工具 | spec-00001-FR-4, spec-00001-FR-5, spec-00001-FR-22, spec-00001-FR-23, spec-00001-FR-24, spec-00001-FR-25 |
 | S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19 |
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
@@ -113,6 +113,11 @@ parent: prd-00001-docs-whiteboard
   文档中的原始 HTML 注入页面——原始 HTML 一律丢弃。
 - **spec-00001-FR-25** (Event) 当用户从预览切回编辑时，系统应保持缓冲区正文、
   光标位置与滚动位置不变。
+- **spec-00001-FR-26** (Event) 当用户在命令面板中输入检索词时，系统应列出 id 或
+  标题以不区分大小写的子串方式包含该词的全部文档，按图中顺序排列，不截断。异常
+  文档以其文件路径为 id（per FR-2），因此同样可被检索到。
+- **spec-00001-FR-27** (Event) 当用户在命令面板中选定一个文档时，系统应把视口
+  定位到该节点、选中它并关闭面板。
 
 **Acceptance (GWT)**
 
@@ -404,12 +409,57 @@ parent: prd-00001-docs-whiteboard
   Given 预览前编辑器中有一个光标位置
   When 切回编辑
   Then 光标仍在该位置
+- **spec-00001-AC-26.1** (spec-00001-FR-26)
+  Given 图上有一个 id 为 `idea-00001-whiteboard` 的文档
+  When 在命令面板中输入 `idea-00001`
+  Then 列表中出现该文档
+- **spec-00001-AC-26.2** (spec-00001-FR-26)
+  Given 图上有一个标题为「Docs Whiteboard PRD」的文档
+  When 在命令面板中输入 `Whiteboard PRD`
+  Then 列表中出现该文档
+- **spec-00001-AC-26.3** (spec-00001-FR-26)
+  Given 图上有一个 id 为 `idea-00001-whiteboard` 的文档
+  When 输入大小写不同的 `IDEA-00001`
+  Then 列表中出现该文档
+- **spec-00001-AC-26.4** (spec-00001-FR-26)
+  Given 图上有三个 id 以 `spec-` 开头的文档
+  When 输入 `spec-`
+  Then 三个文档全部出现在列表中
+- **spec-00001-AC-26.5** (spec-00001-FR-26)
+  Given 图上没有任何文档匹配某检索词
+  When 输入该词
+  Then 列表为空
+- **spec-00001-AC-26.6** (spec-00001-FR-26)
+  Given 同 AC-26.5
+  When 输入该词
+  Then 呈现「无匹配」
+- **spec-00001-AC-27.1** (spec-00001-FR-27)
+  Given 命令面板列出了一个文档
+  When 选定它
+  Then 该节点的浮窗工具栏出现（观察点依赖 FR-3）
+- **spec-00001-AC-27.2** (spec-00001-FR-27)
+  Given 命令面板列出了一个当前视口之外的文档
+  When 选定它
+  Then 视口移动到该节点
+- **spec-00001-AC-27.3** (spec-00001-FR-27)
+  Given 命令面板列出了一个文档
+  When 选定它
+  Then 命令面板关闭
+- **spec-00001-AC-27.4** (spec-00001-FR-27)
+  Given 命令面板的列表为空
+  When 按下回车
+  Then 不选中任何节点
+- **spec-00001-AC-27.5** (spec-00001-FR-27)
+  Given 同 AC-27.4
+  When 按下回车
+  Then 面板保持打开
 
 ## 5. Technical Design
 
 | Design | Doc | Covers |
 | --- | --- | --- |
 | Docs 白板 MVP | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 服务形态、模块结构、流程配置契约、终端通道、权限传递、冲突与 commit 策略 |
+| Docs 白板界面 | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 设计令牌、布局、控件映射、图标语言、可访问性 |
 
 ## 6. Out of Scope
 
@@ -429,13 +479,23 @@ parent: prd-00001-docs-whiteboard
 
 ## 7. Non-Functional
 
-- 图随文档规模增长仍可读：支持缩放、平移与聚焦（定位并高亮指定节点）。
-- 节点状态一眼可辨：按 status 着色或同等显著的视觉区分。
+- 图随文档规模增长仍可读：支持缩放与平移；定位到指定节点见 FR-27。
+- 节点状态一眼可辨：按 status 着色或同等显著的视觉区分，且不只靠颜色传达。
 - 内嵌终端体验接近本地终端：流式输出、可输入交互（可验证部分见 FR-12）。
 - 白板之外直接改文件后，刷新即可反映最新状态，不产生第二套数据。
+
+以下项按 [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
+§8 的裁定不写 GWT——它们没有回归保护，这是明知的取舍：
+
+- 呈现模式支持浅色、深色与跟随系统，偏好在本机保留。
+- 编辑器与终端面板的尺寸可调，尺寸在本机保留。
+- 文档检索入口可被发现（不必记住快捷键即可打开命令面板）。
+- 进行中与空结果有可见的呈现形态：保存中、空画布、异常计数为零。空画布本身
+  「无错误」由 AC-1.4 保证，此处只涉及它长什么样。
+- 焦点样式统一，不依赖浏览器默认。
 
 ## Links
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
-- Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md)
+- Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
 - Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md)

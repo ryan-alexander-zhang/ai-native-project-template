@@ -27,9 +27,15 @@ export function toFlowEdges(graph: DocGraph): Edge[] {
   }))
 }
 
-/** The document a search box query points at, by id or title. */
-export function findMatch(nodes: DocNode[], query: string): DocNode | undefined {
-  const trimmed = query.trim()
-  if (trimmed === '') return undefined
-  return nodes.find((node) => node.id.includes(trimmed) || node.title.includes(trimmed))
+/**
+ * spec-00001-FR-26: every document whose id or title contains the query as a
+ * case-insensitive substring, in graph order, uncapped. An anomalous document
+ * carries its file path as its id, so it is searchable by path.
+ */
+export function matchDocuments(nodes: DocNode[], query: string): DocNode[] {
+  const needle = query.trim().toLowerCase()
+  if (needle === '') return nodes
+  return nodes.filter(
+    (node) => node.id.toLowerCase().includes(needle) || node.title.toLowerCase().includes(needle),
+  )
 }

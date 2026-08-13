@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { api } from '../src/api.ts'
 import { Editor } from '../src/Editor.tsx'
 import { Preview } from '../src/Preview.tsx'
@@ -9,6 +10,11 @@ import { stripFrontMatter } from '../src/frontMatter.ts'
 
 const FLOWCHART = 'flowchart LR\n  A --> B'
 const FRONT_MATTER = '---\nid: prd-00001-x\ntype: prd\nstatus: draft\n---\n'
+
+beforeEach(() => {
+  vi.spyOn(toast, 'success').mockImplementation(() => 'id')
+  vi.spyOn(toast, 'error').mockImplementation(() => 'id')
+})
 
 afterEach(() => {
   cleanup()
@@ -166,7 +172,7 @@ describe('the editor preview toggle', () => {
   it('switches the panel from source to rendered markdown', async () => {
     await openEditor()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 
     expect(screen.getByRole('heading', { level: 2, name: 'Context' })).toBeTruthy()
     await waitFor(() => expect(screen.getByTestId('mermaid').innerHTML).toContain('<svg'))
@@ -176,10 +182,10 @@ describe('the editor preview toggle', () => {
   it('hides the source while previewing and brings it back on toggle', async () => {
     await openEditor()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Preview' }))
     expect(screen.getByTestId('editor-host').hidden).toBe(true)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Source' }))
     expect(screen.getByTestId('editor-host').hidden).toBe(false)
     expect(screen.queryByTestId('preview')).toBeNull()
   })
@@ -189,7 +195,7 @@ describe('the editor preview toggle', () => {
     vi.spyOn(api, 'doc').mockReturnValue(new Promise(() => {}))
     render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 
     expect(screen.getByTestId('preview').textContent).toBe('')
   })
@@ -201,8 +207,8 @@ describe('the editor preview toggle', () => {
     await userEvent.click(screen.getByTestId('editor-host').querySelector('.cm-content')!)
     await userEvent.keyboard('edited ')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Source' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(save.mock.calls[0]![1]).toContain('edited ')
@@ -215,8 +221,10 @@ describe('the editor preview toggle', () => {
     await userEvent.keyboard('X')
     const cursorBefore = document.querySelector('.cm-content')?.textContent?.indexOf('X')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Source' }))
+    // The editor takes focus back on the next frame, once the tab has had it.
+    await waitFor(() => expect(document.activeElement?.closest('.cm-editor')).toBeTruthy())
     await userEvent.keyboard('Y')
 
     // The cursor survived the round trip, so Y landed immediately after X.

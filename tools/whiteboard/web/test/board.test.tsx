@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import { NodeCard } from '../src/NodeCard.tsx'
-import { ANOMALY_COLOUR, statusColour, statusLabel } from '../src/status.ts'
+import { ANOMALY_TOKEN, statusColour, statusLabel } from '../src/status.ts'
 import { connectTerminal } from '../src/terminalSocket.ts'
 import { useBoard } from '../src/useBoard.ts'
+import { toast } from 'sonner'
 import { api } from '../src/api.ts'
 import { layoutGraph } from '../src/layout.ts'
 
@@ -40,13 +42,13 @@ describe('status colours', () => {
   })
 
   it('paints an anomalous document as a problem, whatever its status', () => {
-    expect(statusColour(node({ ok: false }))).toBe(ANOMALY_COLOUR)
+    expect(statusColour(node({ ok: false }))).toBe(ANOMALY_TOKEN)
     expect(statusLabel(node({ ok: false }))).toBe('front matter problem')
   })
 
   it('paints an unknown status as a problem', () => {
-    expect(statusColour(node({ status: 'review' }))).toBe(ANOMALY_COLOUR)
-    expect(statusColour(node({ status: undefined }))).toBe(ANOMALY_COLOUR)
+    expect(statusColour(node({ status: 'review' }))).toBe(ANOMALY_TOKEN)
+    expect(statusColour(node({ status: undefined }))).toBe(ANOMALY_TOKEN)
   })
 
   it('labels a healthy document with its status', () => {
@@ -65,10 +67,19 @@ describe('a node on the canvas', () => {
     expect(screen.getByText('draft')).toBeTruthy()
   })
 
-  // spec-00001-AC-2.1
-  it('shows the problems of an anomalous document', () => {
+  // spec-00001-AC-2.1 — problems live behind a popover so long text cannot burst the node
+  it('shows the problems of an anomalous document on request', async () => {
     render(<NodeCard node={node({ ok: false, problems: ['front matter is missing'] })} selected />)
+    expect(screen.queryByText('front matter is missing')).toBeNull()
+
+    await userEvent.click(screen.getByLabelText('Front matter problems of prd-00001-x'))
+
     expect(screen.getByText('front matter is missing')).toBeTruthy()
+  })
+
+  it('counts the problems on the node face', () => {
+    render(<NodeCard node={node({ ok: false, problems: ['a', 'b'] })} selected />)
+    expect(screen.getByLabelText('Front matter problems of prd-00001-x').textContent).toContain('2 problems')
   })
 
   it('shows a placeholder type when the front matter carries none', () => {
@@ -108,6 +119,13 @@ describe('the board state', () => {
     vi.spyOn(api, 'transitions').mockResolvedValue(['active', 'archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
     vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { prd: 'living', idea: 'living' },
+      relations: ['parent'],
+      flow: {},
+      agents: [{ name: 'claude', command: 'claude', args: [] }],
+    })
+    vi.spyOn(toast, 'error').mockImplementation(() => 'id')
   })
 
   afterEach(() => vi.restoreAllMocks())
@@ -131,15 +149,24 @@ describe('the board state', () => {
   })
 
   // spec-00001-AC-3.2
-  it('drops the selection and closes the panel on deselect', async () => {
+  it('drops the selection on deselect', async () => {
     const { result } = renderHook(() => useBoard())
     await act(() => result.current.select('prd-00001-x'))
-    act(() => result.current.setPanel({ kind: 'editor', docId: 'prd-00001-x' }))
 
     act(() => result.current.deselect())
 
     expect(result.current.selectedNode).toBeUndefined()
-    expect(result.current.panel).toEqual({ kind: 'none' })
+  })
+
+  it('keeps the editor and the terminal as independent switches', async () => {
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+
+    act(() => result.current.setEditing('prd-00001-x'))
+    act(() => result.current.setTerminalOpen(true))
+
+    expect(result.current.editing).toBe('prd-00001-x')
+    expect(result.current.terminalOpen).toBe(true)
   })
 
   it('refreshes the graph after an action', async () => {
@@ -153,20 +180,20 @@ describe('the board state', () => {
     expect(api.graph).toHaveBeenCalledTimes(2)
   })
 
-  // spec-00001-AC-7.1 as the user sees it
-  it('shows a refusal instead of throwing', async () => {
+  // spec-00001-AC-7.1 as the user sees it — the refusal reaches the user as a toast
+  it('reports a refusal instead of throwing', async () => {
     const { result } = renderHook(() => useBoard())
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     await act(() => result.current.run(() => Promise.reject(new Error('not a legal transition'))))
 
-    expect(result.current.message).toBe('not a legal transition')
+    expect(toast.error).toHaveBeenCalledWith('not a legal transition')
   })
 
   it('reports a non-error refusal as text', async () => {
     const { result } = renderHook(() => useBoard())
     await act(() => result.current.run(() => Promise.reject('nope')))
-    expect(result.current.message).toBe('nope')
+    expect(toast.error).toHaveBeenCalledWith('nope')
   })
 
   // spec-00001-AC-11.1
@@ -181,7 +208,7 @@ describe('the board state', () => {
 
     await act(() => result.current.advance('idea-00001-x', 'prd'))
 
-    expect(result.current.panel).toEqual({ kind: 'terminal' })
+    expect(result.current.terminalOpen).toBe(true)
   })
 
   it('keeps the terminal closed when the advance is refused', async () => {
@@ -190,8 +217,8 @@ describe('the board state', () => {
 
     await act(() => result.current.advance('idea-00001-x', 'prd'))
 
-    expect(result.current.panel).toEqual({ kind: 'none' })
-    expect(result.current.message).toMatch(/already running/)
+    expect(result.current.terminalOpen).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/already running/))
   })
 
   // spec-00001-AC-21.2 — the board reattaches to a session that outlived the page
@@ -201,7 +228,7 @@ describe('the board state', () => {
     })
     const { result } = renderHook(() => useBoard())
 
-    await waitFor(() => expect(result.current.panel).toEqual({ kind: 'terminal' }))
+    await waitFor(() => expect(result.current.terminalOpen).toBe(true))
   })
 
   it('leaves the terminal closed when the last session already exited', async () => {
@@ -211,7 +238,7 @@ describe('the board state', () => {
     const { result } = renderHook(() => useBoard())
 
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
-    expect(result.current.panel).toEqual({ kind: 'none' })
+    expect(result.current.terminalOpen).toBe(false)
   })
 })
 

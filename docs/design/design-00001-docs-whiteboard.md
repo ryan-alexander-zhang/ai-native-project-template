@@ -216,8 +216,9 @@ GET  /api/config                      → 生效的流程配置（只读）
 commit 信息格式：`wb(<action>): <doc-id>`，action ∈
 `edit | status | accept | clarify | advance`（spec FR-14 的"指明动作与文档 id"）。
 
-前端 Graph View 职责补充（spec NF）：节点按 status 着色；提供节点搜索/定位
-入口，命中后平移视口至该节点并高亮（"聚焦"）。
+前端的呈现与交互（着色、检索与定位、面板、控件）见
+[design-00002-whiteboard-ui](design-00002-whiteboard-ui.md)；其中检索与定位由
+spec-00001-FR-26、FR-27 承接。
 
 ## 8. 代码位置与运行
 

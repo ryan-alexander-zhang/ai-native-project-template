@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DocNode } from '../../src/docRepository.ts'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toolbar, type ToolbarProps } from '../src/Toolbar.tsx'
 
 afterEach(cleanup)
@@ -30,7 +31,11 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     onAdvance: vi.fn(),
     ...overrides,
   }
-  render(<Toolbar {...props} />)
+  render(
+    <TooltipProvider>
+      <Toolbar {...props} />
+    </TooltipProvider>,
+  )
   return props
 }
 
@@ -64,16 +69,20 @@ describe('the floating toolbar', () => {
   })
 
   // spec-00001-AC-6.1 as the user sees it
-  it('lists only the legal target statuses', () => {
+  it('lists only the legal target statuses', async () => {
     renderToolbar()
-    const options = Array.from(screen.getByLabelText<HTMLSelectElement>('Change status').options, (o) => o.value)
 
-    expect(options).toEqual(['', 'active', 'archived'])
+    await userEvent.click(screen.getByLabelText('Change status'))
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['active', 'archived'])
   })
 
   it('reports the chosen status', async () => {
     const props = renderToolbar()
-    await userEvent.selectOptions(screen.getByLabelText('Change status'), 'active')
+
+    await userEvent.click(screen.getByLabelText('Change status'))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'active' }))
+
     expect(props.onStatus).toHaveBeenCalledWith('active')
   })
 
@@ -94,7 +103,7 @@ describe('the floating toolbar', () => {
     expect(props.onClarify).toHaveBeenCalledWith(['who owns pricing?', 'when is v1?'])
   })
 
-  it('records nothing when the clarify form is left empty', async () => {
+  it('records nothing when the clarify dialog is left empty', async () => {
     const props = renderToolbar()
 
     await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
@@ -104,40 +113,47 @@ describe('the floating toolbar', () => {
     expect(screen.queryByLabelText('Open questions, one per line')).toBeNull()
   })
 
-  it('closes the clarify form when clarify is pressed again', async () => {
+  it('opens the clarify dialog only on request', async () => {
     renderToolbar()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
-
     expect(screen.queryByLabelText('Open questions, one per line')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   // spec-00001-AC-10.2
-  it('lists every next-step candidate', () => {
+  it('lists every next-step candidate', async () => {
     renderToolbar({
       nextSteps: [
         { next: 'prd', carry: 'parent' },
         { next: 'spec', carry: 'parent' },
       ],
     })
-    const options = Array.from(screen.getByLabelText<HTMLSelectElement>('Advance to the next step').options, (o) => o.text)
 
-    expect(options).toEqual(['+', 'prd', 'spec'])
+    await userEvent.click(screen.getByLabelText('Advance to the next step'))
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'prdparent',
+      'specparent',
+    ])
   })
 
   // spec-00001-AC-10.3
   it('says there is no next step and stays disabled when the flow declares none', () => {
     renderToolbar({ nextSteps: [] })
-    const select = screen.getByLabelText<HTMLSelectElement>('Advance to the next step')
+    const trigger = screen.getByLabelText<HTMLButtonElement>('Advance to the next step')
 
-    expect(select.disabled).toBe(true)
-    expect(select.options[0]!.text).toBe('no next step')
+    expect(trigger.disabled).toBe(true)
+    expect(trigger.textContent).toContain('no next step')
   })
 
   it('reports the chosen next step', async () => {
     const props = renderToolbar()
-    await userEvent.selectOptions(screen.getByLabelText('Advance to the next step'), 'spec')
+
+    await userEvent.click(screen.getByLabelText('Advance to the next step'))
+    await userEvent.click(screen.getByRole('menuitem', { name: /spec/ }))
+
     expect(props.onAdvance).toHaveBeenCalledWith('spec')
   })
 })

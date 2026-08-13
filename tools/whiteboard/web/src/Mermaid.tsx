@@ -39,7 +39,7 @@ export function Mermaid({ source }: { source: string }) {
     <div
       className="preview__diagram"
       data-testid="mermaid"
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: mermaid renders svg, sanitised by securityLevel strict
+      // The svg comes from mermaid, sanitised by its `strict` security level.
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )

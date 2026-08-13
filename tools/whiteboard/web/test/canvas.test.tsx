@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
 import { api } from '../src/api.ts'
-import { findMatch, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
+import { matchDocuments, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
 
 function node(overrides: Partial<DocNode> = {}): DocNode {
   return {
@@ -68,18 +68,47 @@ describe('toFlowEdges', () => {
   })
 })
 
-describe('findMatch', () => {
-  it('finds a document by id fragment', () => {
-    expect(findMatch(GRAPH.nodes, 'idea-00001')!.id).toBe('idea-00001-x')
+// spec-00001-FR-26
+describe('matchDocuments', () => {
+  // spec-00001-AC-26.1
+  it('matches an id fragment', () => {
+    expect(matchDocuments(GRAPH.nodes, 'idea-00001').map((n) => n.id)).toEqual(['idea-00001-x'])
   })
 
-  it('finds a document by title fragment', () => {
-    expect(findMatch(GRAPH.nodes, 'Whiteboard idea')!.id).toBe('idea-00001-x')
+  // spec-00001-AC-26.2
+  it('matches a title fragment', () => {
+    expect(matchDocuments(GRAPH.nodes, 'Whiteboard idea').map((n) => n.id)).toEqual(['idea-00001-x'])
   })
 
-  it('finds nothing for an empty or unmatched query', () => {
-    expect(findMatch(GRAPH.nodes, '   ')).toBeUndefined()
-    expect(findMatch(GRAPH.nodes, 'nothing here')).toBeUndefined()
+  // spec-00001-AC-26.3
+  it('ignores case', () => {
+    expect(matchDocuments(GRAPH.nodes, 'IDEA-00001').map((n) => n.id)).toEqual(['idea-00001-x'])
+    expect(matchDocuments(GRAPH.nodes, 'whiteboard prd').map((n) => n.id)).toEqual(['prd-00001-x'])
+  })
+
+  // spec-00001-AC-26.4 — every match, in graph order, uncapped
+  it('returns every match in graph order', () => {
+    const many = [node({ id: 'spec-00001-a' }), node({ id: 'spec-00002-b' }), node({ id: 'spec-00003-c' })]
+    expect(matchDocuments(many, 'spec-').map((n) => n.id)).toEqual([
+      'spec-00001-a',
+      'spec-00002-b',
+      'spec-00003-c',
+    ])
+  })
+
+  // spec-00001-AC-26.5
+  it('returns nothing when no document matches', () => {
+    expect(matchDocuments(GRAPH.nodes, 'nothing here')).toEqual([])
+  })
+
+  it('returns every document for an empty query', () => {
+    expect(matchDocuments(GRAPH.nodes, '   ')).toHaveLength(2)
+  })
+
+  // an anomalous document carries its path as its id, so it is searchable by path
+  it('matches an anomalous document by its file path', () => {
+    const anomalous = node({ id: 'prd/broken.md', ok: false, problems: ['front matter is missing'] })
+    expect(matchDocuments([anomalous], 'broken').map((n) => n.id)).toEqual(['prd/broken.md'])
   })
 })
 
@@ -89,6 +118,12 @@ describe('the board', () => {
     vi.spyOn(api, 'transitions').mockResolvedValue(['active', 'archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
     vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { prd: 'living', idea: 'living' },
+      relations: ['parent'],
+      flow: {},
+      agents: [{ name: 'claude', command: 'claude', args: [] }],
+    })
   })
 
   afterEach(() => vi.restoreAllMocks())
@@ -179,7 +214,8 @@ describe('the board', () => {
     fireEvent.click(screen.getByTestId('node-prd-00001-x'))
     await waitFor(() => expect(screen.getByLabelText('Change status')).toBeTruthy())
 
-    await userEvent.selectOptions(screen.getByLabelText('Change status'), 'active')
+    await userEvent.click(screen.getByLabelText('Change status'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'active' }))
 
     expect(setStatus).toHaveBeenCalledWith('prd-00001-x', 'active')
   })
@@ -222,7 +258,8 @@ describe('the board', () => {
     fireEvent.click(screen.getByTestId('node-prd-00001-x'))
     await waitFor(() => expect(screen.getByLabelText('Advance to the next step')).toBeTruthy())
 
-    await userEvent.selectOptions(screen.getByLabelText('Advance to the next step'), 'spec')
+    await userEvent.click(screen.getByLabelText('Advance to the next step'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: /spec/ }))
 
     expect(advance).toHaveBeenCalledWith('prd-00001-x', 'spec')
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
@@ -241,22 +278,49 @@ describe('the board', () => {
     await waitFor(() => expect(screen.getByLabelText('Editing prd-00001-x')).toBeTruthy())
   })
 
-  // the focus of spec-00001 §7
-  it('focuses the document named in the search box', async () => {
+  // spec-00001-AC-27.1 and AC-27.3
+  it('selects the document picked in the command palette and closes it', async () => {
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
 
-    await userEvent.type(screen.getByLabelText('Find a document'), 'idea-00001{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: /Find a document/ }))
+    await userEvent.type(screen.getByPlaceholderText('Find a document by id or title'), 'idea-00001')
+    await userEvent.click(await screen.findByRole('option', { name: /idea-00001-x/ }))
 
     await waitFor(() => expect(screen.getByRole('toolbar', { name: /idea-00001-x/ })).toBeTruthy())
+    await waitFor(() => expect(screen.queryByPlaceholderText('Find a document by id or title')).toBeNull())
   })
 
-  it('leaves the board alone when the search matches nothing', async () => {
+  // spec-00001-AC-26.6
+  it('says there is no match when nothing matches', async () => {
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
 
-    await userEvent.type(screen.getByLabelText('Find a document'), 'nothing{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: /Find a document/ }))
+    await userEvent.type(screen.getByPlaceholderText('Find a document by id or title'), 'nothing here')
+
+    expect(await screen.findByText('no match')).toBeTruthy()
+  })
+
+  // spec-00001-AC-27.4 and AC-27.5
+  it('selects nothing and stays open when the list is empty', async () => {
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
+    await userEvent.click(screen.getByRole('button', { name: /Find a document/ }))
+    await userEvent.type(screen.getByPlaceholderText('Find a document by id or title'), 'nothing here')
+
+    await userEvent.keyboard('{Enter}')
 
     expect(screen.queryByRole('toolbar')).toBeNull()
+    expect(screen.getByPlaceholderText('Find a document by id or title')).toBeTruthy()
+  })
+
+  it('opens the command palette with the keyboard', async () => {
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
+
+    await userEvent.keyboard('{Meta>}k{/Meta}')
+
+    expect(await screen.findByPlaceholderText('Find a document by id or title')).toBeTruthy()
   })
 })
