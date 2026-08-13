@@ -11,8 +11,8 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 对 [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md)
 的验收。实现位于 `tools/whiteboard/`。
 
-- 套件：`cd tools/whiteboard && npm test` → **15 个测试文件、253 个测试全部通过**
-- 覆盖率：语句 98.83%、分支 95.95%、函数 98.25%、行 99.23%（门槛 90%）
+- 套件：`cd tools/whiteboard && npm test` → **16 个测试文件、282 个测试全部通过**
+- 覆盖率：语句 98.90%、分支 95.61%、函数 97.92%、行 99.28%（门槛 90%）
 - 类型检查：`npm run typecheck` 无错误；`npm run build` 通过
 - 独立核验：由未参与实现的 subagent 按 spec 与 rule 逐条比对测试断言，其发现的
   缺口已补测（见下方「核验补测」）
@@ -79,6 +79,23 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-20.1 | reports the error and keeps the written file (t/docService) | pass | 清空 git 身份，文件保留 |
 | spec-00001-AC-21.1 | keeps writing files after the last terminal detaches (t/sessionManager) | pass | 断连后产出仍落盘 |
 | spec-00001-AC-21.2 | replays what the session already printed to a reconnecting terminal (t/server)；opens the terminal on load when a session is still running (w/board) | pass | 缓冲回放 |
+| spec-00001-AC-22.1 | renders a heading as a heading element (w/preview) | pass | h2 元素 |
+| spec-00001-AC-22.2 | renders list items as list elements (w/preview) | pass | listitem 逐条 |
+| spec-00001-AC-22.3 | renders a GFM table as a table (w/preview) | pass | table/columnheader/cell |
+| spec-00001-AC-22.4 | renders a mermaid block as a diagram rather than code (w/preview) | pass | 真 mermaid 输出 svg |
+| spec-00001-AC-22.5 | leaves a non-mermaid code block as code (w/preview) | pass | CODE 元素 |
+| spec-00001-AC-22.6 | does not render front matter as body text (w/preview) | pass | 无 hr、无字段文本 |
+| spec-00001-AC-22.7 | hides the source while previewing (w/preview) | pass | 源码视图 hidden |
+| spec-00001-AC-22.8 | renders nothing for an empty buffer / previews nothing before load (w/preview) | pass | 预览区为空 |
+| spec-00001-AC-23.1 | shows the parser reason where a broken diagram would have been (w/preview) | pass | 错误块非空 |
+| spec-00001-AC-23.2 | keeps rendering the document after a broken diagram (w/preview) | pass | 后续标题仍在 |
+| spec-00001-AC-23.3 | renders a sound diagram even when another one is broken (w/preview) | pass | 一坏不坏全部 |
+| spec-00001-AC-23.4 | renders the diagram once a broken source is corrected (w/preview) | pass | 重渲染恢复 |
+| spec-00001-AC-24.1 | does not put raw HTML from the document into the page (w/preview) | pass | 无 script、未执行 |
+| spec-00001-AC-24.2 | does not let a script inside a mermaid node label reach the page (w/preview) | pass | mermaid strict 消毒 |
+| spec-00001-AC-24.3 | keeps rendering ordinary body text around raw HTML (w/preview) | pass | 正文照常 |
+| spec-00001-AC-25.1 | keeps unsaved edits when switching back to the editor (w/preview) | pass | 保存内容含未落盘改动 |
+| spec-00001-AC-25.2 | keeps the cursor where it was before the preview (w/preview) | pass | 续打字符相邻 |
 
 ## rule-00001 验收清单
 
@@ -127,6 +144,21 @@ CLI 前必须重跑此实测**，未通过者不得进入出厂配置。
 §6 Out of Scope 明确豁免归档配对检查，白板只保证流转合法。因此
 `rule-00001-AC-19.1` 与 `AC-19.2` 无对应实现与测试，记为**按设计未实现**，非缺陷。
 若后续版本要强制该规则，需同时修订 spec §6 并补测。
+
+## 增量：Markdown 预览（FR-22 … FR-25）
+
+`plan-00001` 交付的是 FR-1…FR-21。预览与 mermaid 渲染是其后的局部增量，按
+`DEVELOPMENT.md`「小而局部的改动无需另立 plan」直接实施，验收行已并入上表。
+该增量的独立审计另有两项发现，已处置：
+
+- **缺陷（已修）**：预览把 YAML front matter 当正文渲染，输出 `<hr>` + setext
+  标题。根因是编辑器持有整文件（front matter 必须可见可改，见 AC-2.4），预览
+  直接复用同一缓冲区。修法是渲染前剥离首部 front matter 块；AC-22.6 与
+  `stripFrontMatter` 的五条用例是回归护栏。
+- **保证不闭合（已补）**：FR-24 原先只以「不启用 `rehype-raw`」论证，但 mermaid
+  产出的 SVG 经 innerHTML 注入，是该论证覆盖不到的第二条通路。已在 design 中
+  写明依赖 `securityLevel: 'strict'`，并补 AC-24.2 实测节点标签内的 `<script>`
+  不进 DOM。
 
 ## 核验补测
 

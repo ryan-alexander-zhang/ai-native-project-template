@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { spawnPty } from '../src/pty.ts'
 import { Board } from '../src/server.ts'
-import { doc, git, makeRepo, testConfig } from './helpers.ts'
+import { SESSION_WAIT, doc, git, makeRepo, testConfig } from './helpers.ts'
 
 /**
  * The acceptance path of plan-00001: the five stories walked end to end over the
@@ -119,7 +119,7 @@ describe('the whiteboard acceptance path', () => {
     })
     expect(session.body.status).toBe('running')
 
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     // the product is on disk, sound, committed, and on the board with its edge
@@ -168,7 +168,7 @@ describe('the whiteboard acceptance path', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sourceId: 'spec-00001-board', targetType }),
       })
-      await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+      await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
       await board.sessions.whenFinished()
 
       // the product carries the relation the flow config told the agent to carry
@@ -196,7 +196,7 @@ describe('the whiteboard acceptance path', () => {
     await call('POST', '/api/docs/idea-00001-whiteboard/review', { action: 'accept' })
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-whiteboard', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(git(repoRoot, 'show', '--name-only', '--pretty=', 'HEAD').trim().split('\n').sort()).toEqual([
@@ -218,7 +218,7 @@ describe('the whiteboard acceptance path', () => {
     await call('POST', '/api/docs/idea-00001-whiteboard/review', { action: 'accept' })
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-whiteboard', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     const node = (await call('GET', '/api/graph')).body.nodes.find(

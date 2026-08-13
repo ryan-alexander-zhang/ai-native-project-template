@@ -18,4 +18,19 @@ if (typeof window !== 'undefined') {
     unobserve() {}
     disconnect() {}
   }
+
+  // CodeMirror measures typed text through a Range; jsdom has no getClientRects.
+  Range.prototype.getClientRects ??= () =>
+    ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} }) as unknown as DOMRectList
+
+  // jsdom implements no SVG layout, so mermaid's measurement calls throw. Stubbing
+  // the primitives lets mermaid parse and emit real svg; only the metrics are fake.
+  const svg = SVGElement.prototype as unknown as {
+    getBBox?: () => DOMRect
+    getComputedTextLength?: () => number
+    getScreenCTM?: () => DOMMatrix | null
+  }
+  svg.getBBox ??= () => ({ x: 0, y: 0, width: 100, height: 20 }) as DOMRect
+  svg.getComputedTextLength ??= () => 100
+  svg.getScreenCTM ??= () => null
 }

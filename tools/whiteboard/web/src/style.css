@@ -172,3 +172,41 @@ body {
   padding: 6px 12px;
   font-size: 13px;
 }
+
+.preview {
+  padding: 8px 16px;
+  line-height: 1.6;
+}
+
+.preview table {
+  border-collapse: collapse;
+}
+
+.preview th,
+.preview td {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.preview pre {
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: #f1f3f4;
+}
+
+.preview code {
+  font-size: 12px;
+}
+
+.preview__diagram {
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.preview__diagram-error {
+  color: #c62828;
+  background: #fdecea;
+  white-space: pre-wrap;
+}

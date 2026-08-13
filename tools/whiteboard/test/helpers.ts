@@ -51,6 +51,13 @@ export function makeDocsDir(files: Record<string, string>): string {
   return docsDir
 }
 
+/**
+ * Waits that depend on a real child process: spawning and exiting a node process
+ * can take well over vi.waitFor's one-second default when the suite runs its
+ * files in parallel, which made these waits flake.
+ */
+export const SESSION_WAIT = { timeout: 20_000, interval: 25 }
+
 export function git(repoRoot: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' })
 }

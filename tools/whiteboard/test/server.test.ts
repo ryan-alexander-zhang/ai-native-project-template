@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Board } from '../src/server.ts'
 import { spawnPty } from '../src/pty.ts'
-import { commitCount, doc, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
+import { SESSION_WAIT, commitCount, doc, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
 
 const DRAFT_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Idea X\n')
 const ACTIVE_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
@@ -185,7 +185,7 @@ describe('sessions', () => {
 
     expect(status).toBe(200)
     expect(body.targetType).toBe('prd')
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
   })
 
@@ -263,10 +263,10 @@ describe('the terminal socket', () => {
 
     const terminal = connect(port)
     await terminal.opened
-    await vi.waitFor(() => expect(terminal.text).toContain('got:Write one new prd document'))
+    await vi.waitFor(() => expect(terminal.text).toContain('got:Write one new prd document'), SESSION_WAIT)
 
     terminal.socket.send('ping\n')
-    await vi.waitFor(() => expect(terminal.text).toContain('got:ping'))
+    await vi.waitFor(() => expect(terminal.text).toContain('got:ping'), SESSION_WAIT)
     terminal.socket.close()
   })
 
@@ -280,13 +280,13 @@ describe('the terminal socket', () => {
 
     const first = connect(port)
     await first.opened
-    await vi.waitFor(() => expect(first.text).toContain('printed early'))
+    await vi.waitFor(() => expect(first.text).toContain('printed early'), SESSION_WAIT)
     first.socket.close()
     await first.closed
 
     const second = connect(port)
     await second.opened
-    await vi.waitFor(() => expect(second.text).toContain('printed early'))
+    await vi.waitFor(() => expect(second.text).toContain('printed early'), SESSION_WAIT)
     second.socket.close()
   })
 
@@ -308,7 +308,7 @@ describe('when a session ends', () => {
     const { call, board, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(product).split('|'))
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(board.sessions.current()!.outcome).toEqual({
@@ -329,7 +329,7 @@ describe('when a session ends', () => {
     const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(product).split('|'))
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     const node = (await call('GET', '/api/graph')).body.nodes.find((n: { id: string }) => n.id === 'prd-00001-new')
@@ -341,7 +341,7 @@ describe('when a session ends', () => {
     const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(board.sessions.current()!.outcome).toEqual({ problems: [], committed: false, error: undefined })

@@ -21,6 +21,8 @@ informs: [spec-00001-docs-whiteboard]
 | 前端画布 | React + React Flow | 节点/边/浮窗交互开箱即用 |
 | 自动布局 | ELK（layered） | 分层布局贴合 docs 的阶段流方向 |
 | 编辑器 | CodeMirror 6（markdown 模式） | 纯文本可靠；编辑的是整文件原文，front matter 可见可改（异常节点靠它修复） |
+| 预览渲染 | react-markdown 10 + remark-gfm 4 | remark/rehype 生态的默认 React 渲染器；不启用 `rehype-raw` 时丢弃原始 HTML，承接 FR-24 |
+| 图表 | mermaid 11 | 与 `docs/` 里既有的 mermaid 图同源（`docs/design/README.md` 的 Guideline 即 "Prefer Mermaid"），无需第二套语法 |
 | 内嵌终端 | xterm.js ↔ WebSocket ↔ node-pty | 事实标准的 PTY 通道 |
 | front matter 解析 | gray-matter | 容错好；仅用于读——写回见 §6 |
 | git | simple-git | 只需 add/commit/log 的薄封装 |
@@ -32,7 +34,7 @@ informs: [spec-00001-docs-whiteboard]
 flowchart LR
   subgraph Browser
     GV[Graph View<br/>React Flow + ELK]
-    ED[Editor<br/>CodeMirror]
+    ED[Editor<br/>CodeMirror + Preview]
     TM[Terminal<br/>xterm.js]
   end
   subgraph Node service
@@ -62,6 +64,16 @@ flowchart LR
   服务端计算，前端从不自行判断（spec FR-6…FR-10 的载体）。流转表
   （BR-2…BR-9）由 `kind` 内建推导，不进配置；配置承载的是类型二分与产品流
   （BR-1、BR-13…BR-17）。
+- **Editor**：编辑与预览是同一份正文的两个视图——预览渲染的是编辑器**当前
+  缓冲区**而非磁盘内容，切换不落盘也不丢改动（spec FR-22）。预览时 CodeMirror
+  视图只隐藏、不卸载，光标与滚动位置因此保留（spec FR-25）。渲染前剥掉 front
+  matter：编辑器持有整文件（front matter 要可见可改），但 `---` 块作为 Markdown
+  会渲染成分隔线加 setext 标题。`mermaid` 代码块由 react-markdown 的
+  `components` 钩子截获后交给 `mermaid.render()`，每个图独立渲染，一个图失败
+  只坏一个图（spec FR-23）。FR-24 由两件事共同保证：不启用 `rehype-raw`，
+  文档中的原始 HTML 被丢弃；mermaid 以 `securityLevel: 'strict'` 初始化，它产出
+  并经 innerHTML 注入的 SVG 由它自己消毒——这条通路是 `rehype-raw` 那一半论证
+  覆盖不到的。
 - **Session Manager**：会话注册表（单例槽位，spec FR-18），生命周期与浏览器
   连接解耦（spec FR-21）；PTY 输出保留最近 1 MB 的滚动缓冲，重连时回放——
   「此前输出」的完整性以该窗口为限。

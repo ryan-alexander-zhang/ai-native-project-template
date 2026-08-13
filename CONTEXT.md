@@ -32,6 +32,10 @@ _Avoid_：状态迁移、状态变更
 沿状态流转把 `draft` 文档向前推一步（living doc 促为 `active`，work item 促为 `open`）。
 _Avoid_：升级、提升
 
+**预览（Preview）**：
+编辑器当前缓冲区的渲染视图，与编辑互斥切换；渲染的是未落盘的缓冲区正文，不含 front matter。
+_Avoid_：渲染视图、实时预览
+
 **推进（Advance）**：
 从一个节点按流程配置发起下一阶段文档的创建（如 idea → prd），由 agent 会话执行。
 _Avoid_：流转、派生

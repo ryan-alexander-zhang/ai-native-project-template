@@ -13,7 +13,8 @@ parent: prd-00001-docs-whiteboard
 ## 1. Context
 
 - canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、推进、
-  流程配置、Agent 会话、留痕。
+  流程配置、Agent 会话、留痕、预览。
+- 本 spec 的 Markdown 方言取 GFM。
 - 输入：`parent` 为 [prd-00001-docs-whiteboard](../prd/prd-00001-docs-whiteboard.md)。
 - 本 spec 收窄「文档」一词：白板上的文档指 `docs/**/*.md` 中带 id front matter
   的文件，不含各文件夹的 `README.md` 与 `TEMPLATE.md`。
@@ -24,7 +25,7 @@ parent: prd-00001-docs-whiteboard
 | Story | Value | Delivers |
 | --- | --- | --- |
 | S1 | 作为文档负责人，我要一打开白板就看到全部文档的关系图与状态，这样无需逐个翻文件就能看清依赖链与卡点 | spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3 |
-| S2 | 作为文档负责人，我要在白板上直接编辑文档正文，这样评审与修改不用切换工具 | spec-00001-FR-4, spec-00001-FR-5 |
+| S2 | 作为文档负责人，我要在白板上直接编辑并预览文档正文，这样查看与修改不用切换工具 | spec-00001-FR-4, spec-00001-FR-5, spec-00001-FR-22, spec-00001-FR-23, spec-00001-FR-24, spec-00001-FR-25 |
 | S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19 |
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
 | S5 | 作为文档负责人，我要每次变更与评审都自动留痕，这样任何结论都可追溯 | spec-00001-FR-14, spec-00001-FR-20 |
@@ -102,6 +103,16 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-FR-21** (State) 当浏览器与白板断开连接时，运行中的 agent 会话应
   在服务端存续；当白板重新打开时，用户应能回到该会话的终端（含此前输出）继续
   查看与交互。
+- **spec-00001-FR-22** (Event) 当用户在编辑器中切换到预览时，系统应把编辑器
+  当前缓冲区（未落盘的正文）按 GFM 渲染，至少包括标题、列表、表格、代码块，
+  其中 `mermaid` 代码块渲染为图形，front matter 不作为正文渲染；预览与编辑
+  互斥呈现。
+- **spec-00001-FR-23** (Unwanted) 若某个 `mermaid` 代码块无法解析，系统应在该
+  图的位置呈现错误块并含解析器给出的原因，文档其余部分（含其他图）照常渲染。
+- **spec-00001-FR-24** (Ubiquitous) 系统应不在预览中执行文档携带的脚本，也不把
+  文档中的原始 HTML 注入页面——原始 HTML 一律丢弃。
+- **spec-00001-FR-25** (Event) 当用户从预览切回编辑时，系统应保持缓冲区正文、
+  光标位置与滚动位置不变。
 
 **Acceptance (GWT)**
 
@@ -325,6 +336,74 @@ parent: prd-00001-docs-whiteboard
   Given 断开期间会话仍在运行
   When 重新打开白板并进入该会话终端
   Then 终端呈现此前输出，且可继续输入交互
+- **spec-00001-AC-22.1** (spec-00001-FR-22)
+  Given 编辑器中打开一个含二级标题的文档
+  When 切换到预览
+  Then 该标题呈现为标题元素
+- **spec-00001-AC-22.2** (spec-00001-FR-22)
+  Given 编辑器中打开一个含无序列表的文档
+  When 切换到预览
+  Then 列表项逐条呈现为列表元素
+- **spec-00001-AC-22.3** (spec-00001-FR-22)
+  Given 编辑器中的文档含一个 GFM 表格
+  When 切换到预览
+  Then 该表格呈现为表格元素
+- **spec-00001-AC-22.4** (spec-00001-FR-22)
+  Given 编辑器中的文档含一个合法的 `mermaid` 代码块
+  When 切换到预览
+  Then 该块位置呈现为图形，而非代码文本
+- **spec-00001-AC-22.5** (spec-00001-FR-22)
+  Given 编辑器中的文档含一个非 `mermaid` 的代码块
+  When 切换到预览
+  Then 该块仍呈现为代码
+- **spec-00001-AC-22.6** (spec-00001-FR-22)
+  Given 编辑器中的文档带 front matter
+  When 切换到预览
+  Then 预览中不出现 front matter 的任何字段
+- **spec-00001-AC-22.7** (spec-00001-FR-22)
+  Given 编辑器中的文档正文已渲染
+  When 切换到预览
+  Then 编辑器的源码视图不再可见（互斥呈现）
+- **spec-00001-AC-22.8** (spec-00001-FR-22)
+  Given 缓冲区为空（例如文档尚未加载完成）
+  When 切换到预览
+  Then 预览区为空
+- **spec-00001-AC-23.1** (spec-00001-FR-23)
+  Given 文档含一个语法非法的 `mermaid` 代码块
+  When 切换到预览
+  Then 该块位置呈现一个错误块，内含解析器报出的原因
+- **spec-00001-AC-23.2** (spec-00001-FR-23)
+  Given 同 AC-23.1，且文档在该块之后还有正文
+  When 切换到预览
+  Then 该块之后的正文照常渲染
+- **spec-00001-AC-23.3** (spec-00001-FR-23)
+  Given 文档含一个非法与一个合法的 `mermaid` 代码块
+  When 切换到预览
+  Then 合法的那个仍呈现为图形
+- **spec-00001-AC-23.4** (spec-00001-FR-23)
+  Given 一个非法的 `mermaid` 块已在预览中呈现为错误
+  When 把它改正后再次切换到预览
+  Then 该位置呈现为图形
+- **spec-00001-AC-24.1** (spec-00001-FR-24)
+  Given 文档正文含 `<script>` 标签
+  When 切换到预览
+  Then 预览中不存在该 script 元素
+- **spec-00001-AC-24.2** (spec-00001-FR-24)
+  Given 文档的 `mermaid` 块节点标签内含 `<script>`
+  When 切换到预览
+  Then 预览中不存在该 script 元素
+- **spec-00001-AC-24.3** (spec-00001-FR-24)
+  Given 文档含原始 HTML 与普通正文
+  When 切换到预览
+  Then 普通正文照常渲染
+- **spec-00001-AC-25.1** (spec-00001-FR-25)
+  Given 预览中的文档在编辑器里已被改动但尚未保存
+  When 切回编辑
+  Then 编辑器仍持有改动后的正文
+- **spec-00001-AC-25.2** (spec-00001-FR-25)
+  Given 预览前编辑器中有一个光标位置
+  When 切回编辑
+  Then 光标仍在该位置
 
 ## 5. Technical Design
 
@@ -342,6 +421,11 @@ parent: prd-00001-docs-whiteboard
 - commit 合并/降噪策略（FR-14 固定为最细粒度）。
 - 写权限范围的用户自定义配置（后续版本；MVP 固定默认「仅 `docs/`」）。
 - 越界写入的 git 回滚兜底（依赖 CLI 权限机制，见 FR-13）。
+- 编辑与预览分栏并实时联动（MVP 为互斥切换）。
+- GFM 之外的 Markdown 扩展；`mermaid` 之外的图表语法。
+- 预览打开期间对该文档的外部改动自动重渲染（切回编辑再切预览即取到最新缓冲区）。
+- 文档中 `javascript:` 等 URL scheme 的拦截——FR-24 只承诺不执行脚本、不注入
+  原始 HTML。
 
 ## 7. Non-Functional
 

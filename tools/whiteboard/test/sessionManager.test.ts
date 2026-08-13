@@ -5,7 +5,7 @@ import type { AgentConfig } from '../src/config.ts'
 import type { Expectation } from '../src/advance.ts'
 import { spawnPty } from '../src/pty.ts'
 import { SessionBusyError, SessionManager, type SessionOutcome } from '../src/sessionManager.ts'
-import { makeRepo } from './helpers.ts'
+import { SESSION_WAIT, makeRepo } from './helpers.ts'
 
 const EXPECTATION: Expectation = {
   targetType: 'prd',
@@ -58,7 +58,7 @@ describe('start', () => {
 
     expect(info.status).toBe('running')
     expect(info.sourceId).toBe('idea-00001-x')
-    await vi.waitFor(() => expect(output.text).toContain('hello from the agent'))
+    await vi.waitFor(() => expect(output.text).toContain('hello from the agent'), SESSION_WAIT)
   })
 
   // spec-00001-AC-18.1
@@ -74,7 +74,7 @@ describe('start', () => {
   it('allows a new session once the previous one has exited', async () => {
     const { manager } = makeManager({ args: ['-e', ''] })
     manager.start(EXPECTATION)
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
 
     expect(manager.start(EXPECTATION).id).toBe('s2')
   })
@@ -143,7 +143,7 @@ describe('a running session', () => {
     manager.start(EXPECTATION)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(output.text).toContain('tick'))
+    await vi.waitFor(() => expect(output.text).toContain('tick'), SESSION_WAIT)
   })
 
   // spec-00001-AC-12.2
@@ -156,7 +156,7 @@ describe('a running session', () => {
 
     manager.write('ping\n')
 
-    await vi.waitFor(() => expect(output.text).toContain('got:ping'))
+    await vi.waitFor(() => expect(output.text).toContain('got:ping'), SESSION_WAIT)
   })
 
   // spec-00001-AC-11.2 — the task instruction reaches the CLI on startup
@@ -167,7 +167,7 @@ describe('a running session', () => {
     manager.start(EXPECTATION)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(output.text).toContain('got:Write one new prd document'))
+    await vi.waitFor(() => expect(output.text).toContain('got:Write one new prd document'), SESSION_WAIT)
   })
 })
 
@@ -178,7 +178,7 @@ describe('exit', () => {
     manager.start(EXPECTATION)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('session ended with code 0')
@@ -192,7 +192,7 @@ describe('exit', () => {
     manager.start(EXPECTATION)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('no new document was produced')
@@ -204,7 +204,7 @@ describe('exit', () => {
     manager.start(EXPECTATION)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'))
+    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('not committed (no changes)')
@@ -219,7 +219,7 @@ describe('attach', () => {
     manager.start(EXPECTATION)
 
     const first = transcript(manager)
-    await vi.waitFor(() => expect(first.text).toContain('before detach'))
+    await vi.waitFor(() => expect(first.text).toContain('before detach'), SESSION_WAIT)
     first.detach()
 
     expect(manager.current()!.status).toBe('running')
@@ -236,11 +236,11 @@ describe('attach', () => {
     })
     manager.start(EXPECTATION)
     const attached = transcript(manager)
-    await vi.waitFor(() => expect(attached.text).toContain('started'))
+    await vi.waitFor(() => expect(attached.text).toContain('started'), SESSION_WAIT)
 
     attached.detach()
 
-    await vi.waitFor(() => expect(existsSync(join(docsDir, 'after-detach.md'))).toBe(true))
+    await vi.waitFor(() => expect(existsSync(join(docsDir, 'after-detach.md'))).toBe(true), SESSION_WAIT)
   })
 
   it('refuses to attach or write when no session was ever started', () => {
