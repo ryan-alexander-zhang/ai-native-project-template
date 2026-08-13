@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentConfig } from '../src/config.ts'
 import type { Expectation } from '../src/advance.ts'
@@ -17,7 +19,7 @@ const OUTCOME: SessionOutcome = { docId: 'prd-00002-new', problems: [], committe
 const managers: SessionManager[] = []
 
 function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUTCOME)) {
-  const { repoRoot } = makeRepo({})
+  const { repoRoot, docsDir } = makeRepo({})
   const manager = new SessionManager({
     agent: { name: 'test', command: 'node', args: [], cwd: 'docs', ...agent },
     repoRoot,
@@ -25,7 +27,7 @@ function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUT
     onExit,
   })
   managers.push(manager)
-  return { manager, onExit }
+  return { manager, onExit, docsDir }
 }
 
 /** Collect everything the session prints, from attach onward plus the replayed buffer. */
@@ -77,7 +79,7 @@ describe('start', () => {
     expect(manager.start(EXPECTATION).id).toBe('s2')
   })
 
-  // spec-00001-AC-16.1 and AC-16.2
+  // spec-00001-AC-16.1
   it('reports a CLI missing from PATH in the terminal and never runs the exit hook', async () => {
     const { manager, onExit } = makeManager({ command: 'definitely-not-an-agent-cli' })
 
@@ -92,6 +94,45 @@ describe('start', () => {
   it('reports a CLI path that is not executable', () => {
     const { manager } = makeManager({ command: './no-such-agent' })
     expect(manager.start(EXPECTATION).error).toMatch(/not executable/)
+  })
+})
+
+// spec-00001-AC-13.1
+describe('the write-scope constraint', () => {
+  it('starts the session under the working directory the flow config constrains it to', () => {
+    const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agent: { name: 'test', command: 'node', args: ['--version'], cwd: 'docs' },
+      repoRoot,
+      spawn: (command, args, cwd) => {
+        spawned.push({ command, args, cwd })
+        return { onData: () => {}, onExit: () => {}, write: () => {}, kill: () => {} }
+      },
+      onExit: async () => OUTCOME,
+    })
+
+    manager.start(EXPECTATION)
+
+    expect(spawned).toEqual([{ command: 'node', args: ['--version'], cwd: join(repoRoot, 'docs') }])
+  })
+
+  it('falls back to the repo root when the agent declares no working directory', () => {
+    const spawned: string[] = []
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agent: { name: 'test', command: 'node', args: [] },
+      repoRoot,
+      spawn: (_command, _args, cwd) => {
+        spawned.push(cwd)
+        return { onData: () => {}, onExit: () => {}, write: () => {}, kill: () => {} }
+      },
+      onExit: async () => OUTCOME,
+    })
+
+    manager.start(EXPECTATION)
+
+    expect(spawned).toEqual([join(repoRoot, '.')])
   })
 })
 
@@ -131,7 +172,7 @@ describe('a running session', () => {
 })
 
 describe('exit', () => {
-  // spec-00001-AC-12.3 and AC-12.4
+  // spec-00001-AC-12.3
   it('shows the end state and runs the exit hook once the process ends', async () => {
     const { manager, onExit } = makeManager({ args: ['-e', ''] })
     manager.start(EXPECTATION)
@@ -172,7 +213,7 @@ describe('exit', () => {
 })
 
 describe('attach', () => {
-  // spec-00001-AC-21.1 and AC-21.2
+  // spec-00001-AC-21.2
   it('keeps the session running across a detach and replays the buffer on reattach', async () => {
     const { manager } = makeManager({ args: ['-e', "console.log('before detach'); setInterval(() => {}, 1000)"] })
     manager.start(EXPECTATION)
@@ -183,6 +224,23 @@ describe('attach', () => {
 
     expect(manager.current()!.status).toBe('running')
     expect(transcript(manager).text).toContain('before detach')
+  })
+
+  // spec-00001-AC-21.1 — the session keeps working, not just running
+  it('keeps writing files after the last terminal detaches', async () => {
+    const { manager, docsDir } = makeManager({
+      args: [
+        '-e',
+        "console.log('started'); setTimeout(() => require('fs').writeFileSync('after-detach.md', 'written'), 150)",
+      ],
+    })
+    manager.start(EXPECTATION)
+    const attached = transcript(manager)
+    await vi.waitFor(() => expect(attached.text).toContain('started'))
+
+    attached.detach()
+
+    await vi.waitFor(() => expect(existsSync(join(docsDir, 'after-detach.md'))).toBe(true))
   })
 
   it('refuses to attach or write when no session was ever started', () => {

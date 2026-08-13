@@ -142,6 +142,70 @@ describe('the whiteboard acceptance path', () => {
     expect(graph.body.issues).toEqual([])
   })
 
+  // rule-00001-AC-15.2 and AC-15.3: a spec advances into docs that point back at it
+  it('advances a spec into a rule carrying informs and a plan carrying implements', async () => {
+    const spec = doc({ id: 'spec-00001-board', type: 'spec', status: 'active' }, '# Spec\n')
+    const product = (front: Record<string, string>, file: string) =>
+      `const fs = require('fs');
+       fs.mkdirSync('${front.type}', { recursive: true });
+       fs.writeFileSync('${front.type}/${file}', ${JSON.stringify(doc(front, '# Product\n'))});`
+
+    const { repoRoot, docsDir } = makeRepo({ 'idea/whiteboard.md': IDEA, 'spec/board.md': spec })
+    const config = testConfig()
+
+    for (const [targetType, front] of [
+      ['rule', { id: 'rule-00001-flow', type: 'rule', status: 'draft', informs: '[spec-00001-board]' }],
+      ['plan', { id: 'plan-00001-mvp', type: 'plan', status: 'draft', implements: '[spec-00001-board]' }],
+    ] as const) {
+      config.agents[0] = { ...config.agents[0]!, args: ['-e', product(front, 'x.md')] }
+      const board = new Board({ repoRoot, docsDir, config, spawn: spawnPty })
+      const server = board.listen(0)
+      servers.push(server)
+      const port = (server.address() as { port: number }).port
+
+      await fetch(`http://127.0.0.1:${port}/api/sessions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sourceId: 'spec-00001-board', targetType }),
+      })
+      await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+      await board.sessions.whenFinished()
+
+      // the product carries the relation the flow config told the agent to carry
+      expect(board.sessions.current()!.outcome).toMatchObject({ docId: front.id, problems: [] })
+    }
+
+    const graph = new Board({ repoRoot, docsDir, config, spawn: spawnPty }).graph()
+    expect(graph.edges).toEqual([
+      { from: 'plan-00001-mvp', to: 'spec-00001-board', relation: 'implements', ok: true },
+      { from: 'rule-00001-flow', to: 'spec-00001-board', relation: 'informs', ok: true },
+    ])
+  })
+
+  // spec-00001-AC-14.4: everything one session wrote lands in a single commit
+  it('commits every file a session touched under one advance commit', async () => {
+    const { call, board, repoRoot } = startBoard([
+      '-e',
+      `const fs = require('fs');
+       fs.mkdirSync('prd', { recursive: true });
+       fs.writeFileSync('prd/whiteboard.md', ${JSON.stringify(
+         doc({ id: 'prd-00001-whiteboard', type: 'prd', status: 'draft', parent: 'idea-00001-whiteboard' }, '# P\n'),
+       )});
+       fs.writeFileSync('prd/notes.md', 'scratch the agent also wrote');`,
+    ])
+    await call('POST', '/api/docs/idea-00001-whiteboard/review', { action: 'accept' })
+
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-whiteboard', targetType: 'prd' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'))
+    await board.sessions.whenFinished()
+
+    expect(git(repoRoot, 'show', '--name-only', '--pretty=', 'HEAD').trim().split('\n').sort()).toEqual([
+      'docs/prd/notes.md',
+      'docs/prd/whiteboard.md',
+    ])
+    expect(commitTrail(repoRoot)).toHaveLength(3)
+  })
+
   // the agent that ignores the brief leaves a marked node, not a silent one
   it('marks a product that ignores the relation it was told to carry', async () => {
     const stray = doc({ id: 'prd-00001-stray', type: 'prd', status: 'draft' }, '# Stray\n')

@@ -101,6 +101,16 @@ describe('the board', () => {
     expect(screen.getByText('no issues')).toBeTruthy()
   })
 
+  // spec-00001-AC-1.4
+  it('renders an empty canvas without error for an empty docs tree', async () => {
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [], edges: [], issues: [] })
+    const { container } = render(<Board />)
+
+    await waitFor(() => expect(screen.getByText('no issues')).toBeTruthy())
+    expect(container.querySelector('.react-flow__pane')).toBeTruthy()
+    expect(container.querySelectorAll('.node-card')).toHaveLength(0)
+  })
+
   it('counts the issues it found', async () => {
     vi.spyOn(api, 'graph').mockResolvedValue({
       ...GRAPH,

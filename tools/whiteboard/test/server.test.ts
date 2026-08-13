@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Board } from '../src/server.ts'
 import { spawnPty } from '../src/pty.ts'
-import { doc, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
+import { commitCount, doc, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
 
 const DRAFT_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Idea X\n')
 const ACTIVE_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
@@ -200,6 +200,16 @@ describe('sessions', () => {
   it('answers 422 when the request names no document', async () => {
     const { call } = boardOn({})
     expect((await call('POST', '/api/sessions', {})).status).toBe(422)
+  })
+
+  // spec-00001-AC-16.2
+  it('leaves no commit behind when the agent CLI never starts', async () => {
+    const { call, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    const before = commitCount(repoRoot)
+
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+
+    expect(commitCount(repoRoot)).toBe(before)
   })
 
   // spec-00001-AC-18.1

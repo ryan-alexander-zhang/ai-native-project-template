@@ -147,8 +147,13 @@ describe('loadFlowConfig', () => {
 describe('the config shipped with this repo', () => {
   it('loads and matches rule-00001 product flow', () => {
     const config = loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname)
+    // rule-00001-AC-1.1 and AC-1.2: the kind split the board runs on
     expect(config.types.idea).toBe('living')
+    expect(config.types.prd).toBe('living')
+    expect(config.types.spec).toBe('living')
+    expect(config.types.issue).toBe('work')
     expect(config.types.plan).toBe('work')
+    expect(config.types.task).toBe('work')
     expect(config.flow.idea?.map((step) => step.next)).toEqual(['prd', 'spec'])
     expect(config.flow.prd?.map((step) => step.next)).toEqual(['spec'])
     expect(config.flow.spec).toEqual([

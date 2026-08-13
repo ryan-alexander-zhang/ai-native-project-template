@@ -53,6 +53,7 @@ describe('the floating toolbar', () => {
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
     expect(screen.queryByLabelText('Change status')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
     expect(screen.queryByLabelText('Advance to the next step')).toBeNull()
   })
 
