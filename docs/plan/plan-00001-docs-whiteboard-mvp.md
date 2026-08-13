@@ -21,7 +21,7 @@ implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard]
 
 | # | 任务 | 交付 | 覆盖 |
 | --- | --- | --- | --- |
-| T1 | 服务骨架 + 流程配置 | Node/TS 工程、HTTP/WS 框架、配置加载与启动校验（内置默认配置） | FR-15 |
+| T1 | 服务骨架 + 流程配置 | Node/TS 工程、HTTP/WS 框架、配置加载与启动校验；仓库自带一份 `whiteboard.config.yaml`（无内置默认回退，per design §3） | FR-15 |
 | T2 | Doc Repository | 扫描/解析/图模型/异常清单，标题取法，`GET /api/graph`、`GET /api/docs/:id` | FR-1, FR-2 |
 | T3 | Workflow Engine | 流转候选、接收/澄清裁决、下一步候选、id 分配；`status`/`review`/`next-steps` 接口 | FR-6, FR-7, FR-8, FR-9, FR-10 |
 | T4 | Git Layer + 写管道 | 读盘校验→裁决→写盘→commit 管道；hash 冲突检测；按路径暂存；commit 信息格式 | FR-4, FR-5, FR-14, FR-19, FR-20 |

@@ -1,0 +1,53 @@
+# Docs whiteboard flow config — the machine-readable carrier of rule-00001-docs-workflow.
+# Carries the type split (BR-1) and the product flow (BR-13…BR-17).
+# The status transition table (BR-2…BR-9) is derived from `kind` and is not configured here.
+
+types:
+  idea: { kind: living }
+  prd: { kind: living }
+  spec: { kind: living }
+  rule: { kind: living }
+  design: { kind: living }
+  decision: { kind: living }
+  analysis: { kind: living }
+  integration: { kind: living }
+  reference: { kind: living }
+  operation: { kind: living }
+  record: { kind: living }
+  prompt: { kind: living }
+  report: { kind: living }
+  issue: { kind: work }
+  plan: { kind: work }
+  task: { kind: work }
+
+relations:
+  - parent
+  - implements
+  - informs
+  - motivated_by
+  - constrains
+  - blocks
+  - verifies
+  - supersedes
+
+flow:
+  idea:
+    - { next: prd, carry: parent }
+    - { next: spec, carry: parent }
+  prd:
+    - { next: spec, carry: parent }
+  spec:
+    - { next: rule, carry: informs }
+    - { next: design, carry: informs }
+    - { next: plan, carry: implements }
+  plan:
+    - { next: task, carry: parent }
+
+agents:
+  claude:
+    command: claude
+    # Write-scope constraint: the session runs with docs/ as its working directory.
+    # Any CLI added here must first be verified against spec-00001-AC-13.2
+    # (a write outside docs/ must not land) before it ships in this file.
+    args: []
+    cwd: docs

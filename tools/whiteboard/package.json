@@ -1,0 +1,35 @@
+{
+  "name": "docs-whiteboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Visual operations board for the docs workflow",
+  "bin": {
+    "whiteboard": "./bin/whiteboard.js"
+  },
+  "scripts": {
+    "start": "node bin/whiteboard.js",
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "express": "^5.1.0",
+    "gray-matter": "^4.0.3",
+    "node-pty": "^1.0.0",
+    "simple-git": "^3.28.0",
+    "ws": "^8.18.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.15.3",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}
