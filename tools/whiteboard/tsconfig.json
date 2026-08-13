@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
     "lib": ["ES2023", "DOM"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -11,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "test", "web/src"]
+  "include": ["src", "test", "web/src", "web/test", "*.config.ts"]
 }

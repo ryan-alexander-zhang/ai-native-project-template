@@ -57,6 +57,7 @@ export class Board {
   private buildApp(config: FlowConfig): Express {
     const app = express()
     app.use(express.json({ limit: '4mb' }))
+    app.use(express.static(new URL('../dist/web', import.meta.url).pathname))
 
     app.get('/api/graph', (_req, res) => res.json(this.graph()))
     app.get('/api/config', (_req, res) => res.json(config))
