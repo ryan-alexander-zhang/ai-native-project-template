@@ -38,7 +38,8 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 
 异常态不进 `--status-*`：它不是一个状态值，取 `--destructive`。`status.ts` 现有的
 硬编码十六进制（6 个状态色 + `ANOMALY_COLOUR`）随之退场，`statusColour()` 改为
-返回令牌类名而非色值；`statusLabel()` 不变。
+返回令牌引用（`var(--status-*)`）而非字面色值——它喂进 inline style，因此仍是
+色值位置上的表达式，只是随主题变；`statusLabel()` 不变。
 
 **主题三态的机制**（浅色 / 深色 / 跟随系统）：
 
@@ -77,8 +78,9 @@ flowchart TB
   代价有两处：两种面板形态都要实现，而不是共用一个容器；**面板状态模型也要改**
   ——现实现的 `Panel` 是 `none | editor | terminal` 三选一，编辑器与终端不能同时
   在场，而本设计要求两者并存，须改为两个独立开关。
-  两者的尺寸都由 `react-resizable-panels` 持有，经 `autoSaveId` 持久化到
-  localStorage（该持久化非默认行为，需显式声明；落地时实测确认）。
+  两者的尺寸都由 `react-resizable-panels` 持有。落地实测的结果与原设想不同：
+  v4 **没有** `autoSaveId`，持久化走 `useDefaultLayout({ id, panelIds })`——它
+  返回喂给 `Group` 的 `defaultLayout` 与 `onLayoutChanged`，默认落 localStorage。
 - 动作被拒与失败的信息从画布下方的红条改为**提示条（toast）**：它是对某次动作
   的反馈，不该占据布局、压缩画布。
 - 「找文档」从顶栏常驻输入框改为**命令面板**（⌘K / Ctrl-K），承载 spec-00001
@@ -140,8 +142,9 @@ flowchart LR
 - **种类描边**：living 与 work 用 `--kind-*` 区分。**种类当前不经 API 下发**——
   `DocNode` 没有 `kind` 字段，它只存在于流程配置。两条路径二选一：给 `DocNode`
   增加 `kind`（则 design-00001 §7 的 `GET /api/graph` 契约需同步修订），或前端读
-  `GET /api/config` 自行由 `type` 映射。本文倾向后者：它不动既有契约，且配置本就
-  是该映射的权威。落地前须择一并记入相应文档。
+  `GET /api/config` 自行由 `type` 映射。**已裁定取后者**并落地：`useBoard` 拉
+  `GET /api/config` 得到 `types`，节点按 `type` 查其 kind；`GET /api/graph` 的
+  契约不变。
 - **状态 Badge**：保持现有的「颜色 + 状态词」（`statusLabel()` 已渲染状态词），
   令牌化后颜色可随主题变，不靠颜色单独传达。
 - **异常节点**：描边转 `--destructive`，节点面只留一个 `TriangleAlert` Badge，
@@ -200,7 +203,13 @@ CodeMirror 在预览时仍只隐藏不卸载（FR-25 依赖它保住光标）。
 5. **非零异常计数的文案**（`canvas.test.tsx` 的 `1 issues`）：Badge 化后可能变化。
    为零时的 `no issues` 按 §3 保持不变，那两处断言应当继续通过。
 
-除上述五类之外查询不到的控件，才按真实的可访问性回归处理。
+落地时另有四处改写超出上述五类，均有据可依，一并记明以免日后被误读为回归：
+异常 problems 移入 `Popover` 后，节点面上查不到其文本（§4 所定）；面板状态从
+三选一拆为两个独立开关（§2 所定）；编辑器自身的保存/冲突提示也改走提示条（§3
+所定，§7 原先只点名了 `board.test` 的通路）；「再次点击 Clarify 收起」这一行为
+随对话框化消失，未保留替代覆盖。
+
+除上述之外查询不到的控件，才按真实的可访问性回归处理。
 
 **jsdom 需要补的桩**：现有 `web/test/setup.ts` 只有 `matchMedia`、
 `ResizeObserver`、`Range.getClientRects` 与三个 SVG 度量方法。Radix 的

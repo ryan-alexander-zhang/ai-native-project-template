@@ -28,22 +28,30 @@ constrains: [design-00002-whiteboard-ui, plan-00002-whiteboard-ui]
 
 采用：
 
-| 层 | 选型 | 角色 |
+| 层 | 选型（落地实测后回填的版本） | 角色 |
 | --- | --- | --- |
-| 样式 | Tailwind CSS 4（`@tailwindcss/vite`） | 原子化样式与设计令牌的唯一来源 |
-| 组件 | shadcn/ui（CLI 拷入源码） | 对话框、下拉菜单、命令面板等有可访问性要求的复合控件 |
-| 图标 | lucide-react | 文档类型、动作、状态的统一图标语言 |
+| 样式 | `tailwindcss` + `@tailwindcss/vite` 4.3.3 | 原子化样式与设计令牌的唯一来源 |
+| 组件 | shadcn/ui（源码拷入，new-york-v4 风格） | 对话框、下拉菜单、命令面板等有可访问性要求的复合控件 |
+| 图标 | `lucide-react` 1.31.0 | 文档类型、动作、状态的统一图标语言 |
 
-shadcn/ui **不是运行时依赖**：它的 CLI 把组件源码拷进仓库。被拷入的组件依赖
-Radix UI primitives、`class-variance-authority`、`clsx`、`tailwind-merge`，另按用到
-的组件引入 `cmdk`（命令面板）、`sonner`（提示条）、`react-resizable-panels`
-（可调尺寸面板）。「拷入而非安装」是本决定最重要的性质，见 §4。
+shadcn/ui **不是运行时依赖**：组件源码拷进仓库。被拷入的组件依赖
+`radix-ui` 1.6.7（**统一包**，不是逐个 `@radix-ui/react-*`）、
+`class-variance-authority` 0.7.1、`clsx` 2.1.1、`tailwind-merge` 3.6.0，另按用到
+的组件引入 `cmdk` 1.1.1（命令面板）、`sonner` 2.0.8（提示条）、
+`react-resizable-panels` 4.12.2（可调尺寸面板）；样式侧另有 `tw-animate-css`
+1.4.0 供 shadcn 的进出场动画使用。「拷入而非安装」是本决定最重要的性质，见 §4。
 
-本表的具体版本与依赖形态（含 Radix 是逐包还是统一包）**在实施第一步实测确认后
-回填**；未确认前本决定不得进入 `active`。同样待实测确认的还有：Tailwind 4 的
-CSS-first 配置与本仓 Vite 8 的兼容性、design-00002 中每一个 Lucide 图标标识符在
-所装版本中确实存在。这些都是装一次包即可判定的事实，因此是接收前的验证清单，
-不是 Open Question。
+落地时已实测确认（原为接收前的验证清单）：
+
+- Tailwind 4 的 CSS-first 配置与本仓 Vite 8.2.1 兼容 —— `vite build` 通过。
+- design-00002 §3/§4 的每一个 Lucide 标识符在 `lucide-react` 1.31.0 中存在 ——
+  逐个 import 验证，其中三个按上游改名修正为 `MessageCircleQuestionMark`、
+  `FileQuestionMark`、`FileChartColumn`。
+- `react-resizable-panels` v4 **没有** `autoSaveId`；尺寸持久化改走
+  `useDefaultLayout`（design-00002 §2 已同步修正）。
+- shadcn 的 CLI 在本环境连不上注册表，组件改为从同一注册表取源码后按
+  `components.json` 的别名重写 import —— 产物与 CLI 输出逐字节一致（核验记录见
+  record-00001）。
 
 ## 3. 考虑过的其他选项
 

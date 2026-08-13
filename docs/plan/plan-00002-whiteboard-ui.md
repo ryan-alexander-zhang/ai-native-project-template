@@ -1,7 +1,7 @@
 ---
 id: plan-00002-whiteboard-ui
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
@@ -24,12 +24,12 @@ implements: [spec-00001-docs-whiteboard, design-00002-whiteboard-ui]
 | # | 任务 | 交付 | 覆盖 |
 | --- | --- | --- | --- |
 | U1 | 基座落地 | 装依赖并**回填 decision-00001 §2 的版本与依赖形态**；Tailwind 4 + `@tailwindcss/vite` 接入并验证与 Vite 8 兼容；shadcn 初始化；逐个验证 design §4 的 Lucide 图标名；`components/ui/**` 排除进 `vitest.config.ts` 并写明边界，同时填 `CODE_QUALITY.md` §2 的 Coverage 行 | design §1、decision §4 |
-| U2 | 令牌与主题 | `--status-*`/`--kind-*` 与 shadcn 语义色；`@custom-variant dark`；三态主题（存 localStorage、system 态监听 `matchMedia`）；`statusColour()` 改返回令牌类名 | design §1、spec §7 |
-| U3 | 外壳与布局 | 顶栏（标题/搜索触发/异常计数/主题切换）；`ResizablePanel` 编辑器在右、终端在底，尺寸经 `autoSaveId` 持久化；**面板状态从三选一改为两个独立开关** | design §2、spec §7 |
+| U2 | 令牌与主题 | `--status-*`/`--kind-*` 与 shadcn 语义色；`@custom-variant dark`；三态主题（存 localStorage、system 态监听 `matchMedia`）；`statusColour()` 改返回令牌引用 | design §1、spec §7 |
+| U3 | 外壳与布局 | 顶栏（标题/搜索触发/异常计数/主题切换）；`ResizablePanel` 编辑器在右、终端在底，尺寸经 `useDefaultLayout` 持久化（v4 无 `autoSaveId`）；**面板状态从三选一改为两个独立开关** | design §2、spec §7 |
 | U4 | 节点与工具栏 | 节点用 `Card` + 类型图标 + 状态 Badge + 异常 `Popover`；浮窗工具栏贴选中节点悬浮，状态切换与推进改 `DropdownMenu`，澄清改 `Dialog` | design §3、§4；spec FR-3、AC-2.4、AC-10.3 |
 | U5 | 命令面板 | `Command` + `Dialog`，⌘K/Ctrl-K 与顶栏按钮唤起；不区分大小写子串匹配、全部列出、选定即定位并选中 | spec FR-26、FR-27 |
 | U6 | 反馈与面板内容 | 动作被拒与错误改 `Sonner`；编辑/预览改 `Tabs`；保存中态；空画布空状态；CodeMirror 与 xterm 主题接令牌 | design §3、§5；spec §7 |
-| U7 | 测试与验收 | 按 design §7 的五类改写既有断言；补 jsdom 桩；FR-26/FR-27 的 AC 全部落测；更新 `record-00001` | 全部 |
+| U7 | 测试与验收 | 按 design §7 的五类改写既有断言；补 jsdom 桩；FR-26/FR-27 的 AC 全部落测；更新 [record-00001](../record/record-00001-docs-whiteboard-acceptance.md) | 全部 |
 
 ## Detailed Acceptance Path
 

@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -57,8 +58,9 @@ export function Toolbar(props: ToolbarProps) {
     <div
       role="toolbar"
       aria-label={`Actions for ${node.id}`}
-      // `nodrag` keeps a click on the toolbar from panning the canvas underneath.
-      className="nodrag bg-popover text-popover-foreground flex items-center gap-1 rounded-lg border p-1 shadow-lg"
+      // React Flow excludes panning by `nopan` and node dragging by `nodrag`; the
+      // toolbar floats above the canvas and must drive neither (issue-00001).
+      className="nodrag nopan bg-popover text-popover-foreground flex items-center gap-1 rounded-lg border p-1 shadow-lg"
       onPointerDown={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
     >
@@ -91,10 +93,31 @@ export function Toolbar(props: ToolbarProps) {
             Accept
           </Button>
 
-          <Button variant="ghost" size="sm" onClick={() => setClarifying(true)}>
-            <MessageCircleQuestionMark className="size-4" aria-hidden />
-            Clarify
-          </Button>
+          <Dialog open={clarifying} onOpenChange={setClarifying}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MessageCircleQuestionMark className="size-4" aria-hidden />
+                Clarify
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clarify {node.id}</DialogTitle>
+                <DialogDescription>
+                  One question per line. They go to the document's Open Questions; it stays a draft.
+                </DialogDescription>
+              </DialogHeader>
+              <Textarea
+                aria-label="Open questions, one per line"
+                rows={5}
+                value={questions}
+                onChange={(event) => setQuestions(event.target.value)}
+              />
+              <DialogFooter>
+                <Button onClick={submitQuestions}>Record questions</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {nextSteps.length === 0 ? (
             <Tooltip>
@@ -129,25 +152,6 @@ export function Toolbar(props: ToolbarProps) {
         </>
       ) : null}
 
-      <Dialog open={clarifying} onOpenChange={setClarifying}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clarify {node.id}</DialogTitle>
-            <DialogDescription>
-              One question per line. They go to the document's Open Questions; it stays a draft.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            aria-label="Open questions, one per line"
-            rows={5}
-            value={questions}
-            onChange={(event) => setQuestions(event.target.value)}
-          />
-          <DialogFooter>
-            <Button onClick={submitQuestions}>Record questions</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

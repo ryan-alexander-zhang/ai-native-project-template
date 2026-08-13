@@ -11,8 +11,8 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 对 [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md)
 的验收。实现位于 `tools/whiteboard/`。
 
-- 套件：`cd tools/whiteboard && npm test` → **16 个测试文件、282 个测试全部通过**
-- 覆盖率：语句 98.90%、分支 95.61%、函数 97.92%、行 99.28%（门槛 90%）
+- 套件：`cd tools/whiteboard && npm test` → **19 个测试文件、315 个测试全部通过**，无未处理异常
+- 覆盖率：语句 98.73%、分支 94.35%、函数 97.40%、行 99.18%（门槛 90%；vendored 的 `web/src/components/ui/**` 按 decision-00001 §4 排除在外）
 - 类型检查：`npm run typecheck` 无错误；`npm run build` 通过
 - 独立核验：由未参与实现的 subagent 按 spec 与 rule 逐条比对测试断言，其发现的
   缺口已补测（见下方「核验补测」）
@@ -27,23 +27,23 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-1.1 | makes one node per document and one edge per relation field (t/docRepository) | pass | 节点与边逐一断言 |
 | spec-00001-AC-1.2 | places every node without overlapping (w/board) | pass | ELK 实跑，y 不相等 |
 | spec-00001-AC-1.3 | leaves README and TEMPLATE files out of the graph (t/docRepository) | pass | 仅 1 个节点 |
-| spec-00001-AC-1.4 | yields an empty graph for an empty docs tree (t/docRepository)；renders an empty canvas without error (w/canvas) | pass | 数据层与组件层各一 |
+| spec-00001-AC-1.4 | yields an empty graph for an empty docs tree (t/docRepository)；renders an empty canvas without error for an empty docs tree (w/canvas) | pass | 数据层与组件层各一 |
 | spec-00001-AC-1.5 | takes the node title from the first H1 (t/docRepository) | pass | 标题取自 H1 |
-| spec-00001-AC-2.1 | marks a document without front matter and labels it by path (t/docRepository) | pass | 异常节点以路径为 id，其余 ok |
-| spec-00001-AC-2.2 | marks an edge pointing at an unknown id (t/docRepository)；marks an edge pointing at an unknown document (w/canvas) | pass | 边 ok=false + issue |
+| spec-00001-AC-2.1 | marks a document without front matter and labels it by path, leaving the rest intact (t/docRepository)；shows the problems of an anomalous document on request (w/board) | pass | 异常节点以路径为 id；problems 在 Popover 中 |
+| spec-00001-AC-2.2 | marks an edge pointing at an unknown id and keeps the graph usable (t/docRepository)；marks an edge pointing at an unknown document (w/canvas) | pass | 边 ok=false + issue |
 | spec-00001-AC-2.3 | marks a document whose id does not match the id format (t/docRepository) | pass | id 格式违规 |
 | spec-00001-AC-2.4 | offers nothing for an anomalous document (t/workflow)；offers only the editor for a document with front matter problems (w/toolbar) | pass | 仅 Edit 存在 |
 | spec-00001-AC-3.1 | offers edit, status, review, and advance (w/toolbar)；opens the toolbar for the node the user clicks (w/canvas) | pass | 四类入口 |
-| spec-00001-AC-3.2 | closes the toolbar when the canvas background is clicked (w/canvas) | pass | 点空白关闭 |
+| spec-00001-AC-3.2 | closes the toolbar when the canvas background is clicked (w/canvas)；drops the selection on deselect (w/board) | pass | 点空白关闭 |
 | spec-00001-AC-4.1 | writes the edited content to disk (t/docService)；saves the edited content and commits it (t/server) | pass | 磁盘内容比对 |
-| spec-00001-AC-5.1 | rejects a save whose base no longer matches (t/docService)；answers 409 (t/server) | pass | hash CAS |
-| spec-00001-AC-5.2 | rejects a save whose base no longer matches (t/docService) | pass | 磁盘保留外部版本 |
+| spec-00001-AC-5.1 | rejects a save whose base no longer matches, keeping the external version (t/docService)；answers 409 when the file changed under the editor (t/server) | pass | hash CAS |
+| spec-00001-AC-5.2 | rejects a save whose base no longer matches, keeping the external version (t/docService) | pass | 磁盘保留外部版本 |
 | spec-00001-AC-5.3 | rejects a save whose file was deleted (t/docService) | pass | 409 |
 | spec-00001-AC-6.1 | offers active but not open or resolved for a draft living doc (t/workflow)；lists only the legal target statuses (w/toolbar) | pass | 候选集断言 |
 | spec-00001-AC-6.2 | offers open but not active for a draft work item (t/workflow) | pass | 候选集断言 |
 | spec-00001-AC-6.3 | offers archived but not resolved or open for an active living doc (t/workflow) | pass | 候选集断言 |
 | spec-00001-AC-6.4 | offers resolved and wontfix but not active for an open work item (t/workflow) | pass | 候选集断言 |
-| spec-00001-AC-7.1 | rejects an illegal transition and leaves the file untouched (t/docService)；answers 422 (t/server) | pass | 文件不变 + commit 数不变 |
+| spec-00001-AC-7.1 | rejects an illegal transition and leaves the file untouched (t/docService)；answers 422 for an illegal transition (t/server)；reports a refusal instead of throwing (w/board) | pass | 文件不变 + commit 数不变；用户端以提示条呈现 |
 | spec-00001-AC-8.1 | accepts a draft living doc into active and commits it (t/docService) | pass | status: active |
 | spec-00001-AC-8.2 | accepts a draft work item into open (t/docService) | pass | status: open |
 | spec-00001-AC-8.3 | rejects accepting a document that is already active (t/docService) | pass | 422 |
@@ -54,26 +54,26 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-9.4 | rejects clarify on a document that is not draft (t/docService) | pass | 422 |
 | spec-00001-AC-10.1 | offers exactly spec for a prd (t/workflow) | pass | 候选恰为 spec |
 | spec-00001-AC-10.2 | offers both prd and spec for an idea (t/workflow)；lists every next-step candidate (w/toolbar) | pass | 两个候选全列 |
-| spec-00001-AC-10.3 | offers nothing for a type the flow config does not carry (t/workflow)；says there is no next step and stays disabled (w/toolbar) | pass | 入口禁用 |
+| spec-00001-AC-10.3 | offers nothing for a type the flow config does not carry (t/workflow)；says there is no next step and stays disabled when the flow declares none (w/toolbar) | pass | 入口禁用 |
 | spec-00001-AC-11.1 | runs the configured command as the session (t/sessionManager)；starts an advance the flow config allows (t/server) | pass | 真实 PTY 会话 |
 | spec-00001-AC-11.2 | names the target type, the fixed id number, and the relation to the source (t/advance)；sends the task instruction as the first input (t/sessionManager) | pass | CLI 收到指令 |
-| spec-00001-AC-12.1 | streams output as it is produced (t/sessionManager)；streams session output over the socket (t/server) | pass | 无需刷新 |
+| spec-00001-AC-12.1 | streams output as it is produced, without a refresh (t/sessionManager)；streams session output and forwards what the user types (t/server) | pass | 无需刷新 |
 | spec-00001-AC-12.2 | forwards terminal input to the CLI (t/sessionManager) | pass | CLI 回显 got:ping |
-| spec-00001-AC-12.3 | shows the end state and runs the exit hook (t/sessionManager) | pass | session ended with code 0 |
+| spec-00001-AC-12.3 | shows the end state and runs the exit hook once the process ends (t/sessionManager) | pass | session ended with code 0 |
 | spec-00001-AC-12.4 | commits the product and finds nothing wrong with it (t/server) | pass | 刷新后新节点出现 |
 | spec-00001-AC-13.1 | starts the session under the working directory the flow config constrains it to (t/sessionManager) | pass | spawn 收到 cwd=<repo>/docs |
 | spec-00001-AC-13.2 | 人工实测（见下方「AC-13.2 的人工验证」） | pass | 越界写被拒，文件未改 |
-| spec-00001-AC-13.3 | advances an idea into a prd the agent writes (t/acceptance) | pass | docs 内写入落盘 |
+| spec-00001-AC-13.3 | advances an idea into a prd the agent writes, and commits it (t/acceptance) | pass | docs 内写入落盘 |
 | spec-00001-AC-14.1 | commits the edit naming the action and the document id (t/docService) | pass | wb(edit): <id> |
 | spec-00001-AC-14.2 | leaves an unrelated dirty file out of the commit (t/docService) | pass | commit 仅含目标文件 |
 | spec-00001-AC-14.3 | accepts a draft living doc into active and commits it (t/docService) | pass | wb(accept): <id> |
 | spec-00001-AC-14.4 | commits every file a session touched under one advance commit (t/acceptance) | pass | 两文件一次 commit |
-| spec-00001-AC-15.1 | refuses to start without a flow config, naming the path (t/startup) | pass | 进程 exit 1 + 路径 |
+| spec-00001-AC-15.1 | refuses to start without a flow config, naming the path it looked for (t/startup) | pass | 进程 exit 1 + 路径 |
 | spec-00001-AC-15.2 | refuses to start on an invalid flow config, naming the offending entry (t/startup) | pass | exit 1 + flow.idea[0].next |
-| spec-00001-AC-16.1 | reports a CLI missing from PATH in the terminal (t/sessionManager) | pass | 终端错误文本 |
+| spec-00001-AC-16.1 | reports a CLI missing from PATH in the terminal and never runs the exit hook (t/sessionManager) | pass | 终端错误文本 |
 | spec-00001-AC-16.2 | leaves no commit behind when the agent CLI never starts (t/server) | pass | commit 数不变 |
 | spec-00001-AC-17.1 | marks a product that does not point back at its source (t/server, t/acceptance) | pass | node.ok=false |
-| spec-00001-AC-17.2 | commits the product and finds nothing wrong with it (t/server)；advances an idea into a prd (t/acceptance) | pass | 节点正常 + parent 边 |
+| spec-00001-AC-17.2 | commits the product and finds nothing wrong with it (t/server)；advances an idea into a prd the agent writes, and commits it (t/acceptance) | pass | 节点正常 + parent 边 |
 | spec-00001-AC-18.1 | refuses a second session and leaves the running one alone (t/sessionManager)；answers 409 while a session is running (t/server) | pass | 409 + 原会话仍 running |
 | spec-00001-AC-19.1 | rejects an action on a document whose file was deleted, without committing (t/docService) | pass | 提示刷新 + 无 commit |
 | spec-00001-AC-20.1 | reports the error and keeps the written file (t/docService) | pass | 清空 git 身份，文件保留 |
@@ -85,17 +85,28 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-22.4 | renders a mermaid block as a diagram rather than code (w/preview) | pass | 真 mermaid 输出 svg |
 | spec-00001-AC-22.5 | leaves a non-mermaid code block as code (w/preview) | pass | CODE 元素 |
 | spec-00001-AC-22.6 | does not render front matter as body text (w/preview) | pass | 无 hr、无字段文本 |
-| spec-00001-AC-22.7 | hides the source while previewing (w/preview) | pass | 源码视图 hidden |
-| spec-00001-AC-22.8 | renders nothing for an empty buffer / previews nothing before load (w/preview) | pass | 预览区为空 |
+| spec-00001-AC-22.7 | hides the source while previewing and brings it back on toggle (w/preview) | pass | 源码视图 hidden |
+| spec-00001-AC-22.8 | renders nothing for an empty buffer (w/preview)；previews nothing, without error, before the document has loaded (w/preview) | pass | 预览区为空 |
 | spec-00001-AC-23.1 | shows the parser reason where a broken diagram would have been (w/preview) | pass | 错误块非空 |
 | spec-00001-AC-23.2 | keeps rendering the document after a broken diagram (w/preview) | pass | 后续标题仍在 |
-| spec-00001-AC-23.3 | renders a sound diagram even when another one is broken (w/preview) | pass | 一坏不坏全部 |
+| spec-00001-AC-23.3 | renders a sound diagram even when another one in the document is broken (w/preview) | pass | 一坏不坏全部 |
 | spec-00001-AC-23.4 | renders the diagram once a broken source is corrected (w/preview) | pass | 重渲染恢复 |
 | spec-00001-AC-24.1 | does not put raw HTML from the document into the page (w/preview) | pass | 无 script、未执行 |
 | spec-00001-AC-24.2 | does not let a script inside a mermaid node label reach the page (w/preview) | pass | mermaid strict 消毒 |
 | spec-00001-AC-24.3 | keeps rendering ordinary body text around raw HTML (w/preview) | pass | 正文照常 |
 | spec-00001-AC-25.1 | keeps unsaved edits when switching back to the editor (w/preview) | pass | 保存内容含未落盘改动 |
 | spec-00001-AC-25.2 | keeps the cursor where it was before the preview (w/preview) | pass | 续打字符相邻 |
+| spec-00001-AC-26.1 | matches an id fragment (w/canvas)；selects the document picked in the command palette and closes it (w/canvas) | pass | 单元 + 面板内实测 |
+| spec-00001-AC-26.2 | matches a title fragment (w/canvas) | pass | 标题片段命中 |
+| spec-00001-AC-26.3 | ignores case (w/canvas) | pass | 双向大小写 |
+| spec-00001-AC-26.4 | returns every match in graph order (w/canvas) | pass | 三条全出且保序 |
+| spec-00001-AC-26.5 | returns nothing when no document matches (w/canvas) | pass | 空结果 |
+| spec-00001-AC-26.6 | says there is no match when nothing matches (w/canvas) | pass | 「no match」呈现 |
+| spec-00001-AC-27.1 | selects the document picked in the command palette and closes it (w/canvas) | pass | 浮窗工具栏出现 |
+| spec-00001-AC-27.2 | moves the viewport to that node (w/focus) | pass | `setCenter` 被调用 |
+| spec-00001-AC-27.3 | selects the document picked in the command palette and closes it (w/canvas) | pass | 面板关闭 |
+| spec-00001-AC-27.4 | selects nothing and stays open when the list is empty (w/canvas) | pass | 无选中 |
+| spec-00001-AC-27.5 | selects nothing and stays open when the list is empty (w/canvas) | pass | 面板保持打开 |
 
 ## rule-00001 验收清单
 
@@ -159,6 +170,33 @@ CLI 前必须重跑此实测**，未通过者不得进入出厂配置。
   产出的 SVG 经 innerHTML 注入，是该论证覆盖不到的第二条通路。已在 design 中
   写明依赖 `securityLevel: 'strict'`，并补 AC-24.2 实测节点标签内的 `<script>`
   不进 DOM。
+
+## 增量：界面改造（plan-00002）
+
+前端改建在 Tailwind 4 + shadcn/ui + Lucide 之上，并交付 FR-26/FR-27（命令面板）。
+验收行已并入上表；`w/focus` = `web/test/focus.test.tsx`，`w/theme`、
+`w/accessibility` 同理。独立核验（未参与实现的 subagent）提出的阻塞项与处置：
+
+- **AC-27.2 原本无测试**（FR-27 相对 FR-3 的全部增量正是视口定位）→ 新增
+  `w/focus`，以模块 mock 观察 `setCenter` 被调用。
+- **design-00002 §6 的可访问性承诺大半未实测** → 新增 `w/accessibility` 10 条：
+  Esc 关闭对话框与命令面板、关闭后焦点回到触发元素、对话框内焦点不外逸、菜单的
+  方向键/Home/End/Enter、菜单关闭后焦点返还、图标按钮均有可访问名。其中「焦点
+  返还」起初不成立——澄清对话框是外挂的受控 `Dialog`，改用 `DialogTrigger` 组合
+  后才真正由 Radix 接管。
+- **decision-00001 §2 的版本与依赖形态未回填** → 已回填（含 `radix-ui` 为统一包、
+  新增 `tw-animate-css`），并把原「待实测确认」四项改写为已确认的结论。
+- **4 条未处理异常** → 根因是浮窗工具栏未带 React Flow 的 `nopan` 类，点击工具栏
+  会驱动画布平移；这是产品缺陷而非测试环境问题，按
+  [issue-00001-toolbar-pans-the-canvas](../issue/issue-00001-toolbar-pans-the-canvas.md)
+  立档后修复，异常归零。
+- **design 与实现的三处偏离** → 修正的是文档：`autoSaveId` 在 v4 不存在（改
+  `useDefaultLayout`）、节点 kind 的下发路径已裁定为读 `GET /api/config`、
+  `statusColour()` 返回令牌引用而非类名。
+
+`components/ui/**` 的 11 个文件与 shadcn 官方注册表（new-york-v4）逐字节比对
+**完全一致**（仅施加 `components.json` 别名的 import 重写，即 CLI 本身会做的那
+一步），因此 decision-00001 §4 的覆盖率排除边界成立——这些文件未经修改。
 
 ## 核验补测
 

@@ -179,6 +179,23 @@ describe('the board', () => {
     await waitFor(() => expect(screen.queryByRole('toolbar')).toBeNull())
   })
 
+  // issue-00001 — the toolbar floats above the canvas and must not drive it
+  it('does not pan the canvas when the toolbar is used', async () => {
+    const errors: string[] = []
+    const onError = (event: ErrorEvent) => errors.push(String(event.error?.message ?? event.message))
+    window.addEventListener('error', onError)
+    vi.spyOn(api, 'accept').mockResolvedValue({ committed: true, status: 'active' })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }))
+
+    window.removeEventListener('error', onError)
+    expect(errors).toEqual([])
+  })
+
   // spec-00001-AC-8.1 as the user sees it
   it('accepts a draft from the toolbar and refreshes', async () => {
     const accept = vi.spyOn(api, 'accept').mockResolvedValue({ committed: true, status: 'active' })
