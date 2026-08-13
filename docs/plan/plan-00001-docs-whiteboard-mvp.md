@@ -1,7 +1,7 @@
 ---
 id: plan-00001-docs-whiteboard-mvp
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard]
 ---
 
@@ -29,7 +29,7 @@ implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard]
 | T6 | 前端画布 | React Flow + ELK 布局、节点渲染（类型/id/标题/status 着色）、异常标记、浮窗工具栏 | FR-1, FR-2, FR-3, NF |
 | T7 | 前端编辑器 + 终端 | CodeMirror 编辑/保存/冲突呈现；xterm.js 终端接 WS、重连回放 | FR-4, FR-5, FR-12, FR-21 |
 | T8 | 推进闭环 | 「+」候选、发起会话、结束后刷新 + front matter 校验 | FR-10, FR-11, FR-12, FR-17 |
-| T9 | 验收与收尾 | 全量 GWT 验收测试跑通；`docs/record/` 验收清单 | 全部 FR/BR 的 AC |
+| T9 | 验收与收尾 | 全量 GWT 验收测试跑通；`docs/record/` 验收清单 → [record-00001-docs-whiteboard-acceptance](../record/record-00001-docs-whiteboard-acceptance.md) | 全部 FR/BR 的 AC |
 
 ## Detailed Acceptance Path
 
