@@ -278,6 +278,19 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Node
+#   Dependencies, build output, and test artifacts
+node_modules/
+.npm
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+#   Vite build output and coverage reports (the `dist/` and `coverage.*` entries
+#   above cover Python builds and Go profiles, not these paths)
+tools/*/dist/
+coverage/
+.vite/
+
 # Project
 #   File lock
 .idea-number.lock
