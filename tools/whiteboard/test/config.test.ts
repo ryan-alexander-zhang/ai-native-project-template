@@ -1,8 +1,8 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ConfigError, loadFlowConfig, parseFlowConfig } from '../src/config.ts'
+import { ConfigError, findRepoRoot, loadFlowConfig, parseFlowConfig } from '../src/config.ts'
 
 const VALID = `
 types:
@@ -141,6 +141,34 @@ describe('loadFlowConfig', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'wb-config-')), 'whiteboard.config.yaml')
     expect(() => loadFlowConfig(path)).toThrowError(ConfigError)
     expect(() => loadFlowConfig(path)).toThrowError(new RegExp(`no flow config at ${path.replace(/[/\\]/g, '\\$&')}`))
+  })
+})
+
+describe('findRepoRoot', () => {
+  it('finds the directory that owns the flow config', () => {
+    const root = mkdtempSync(join(tmpdir(), 'wb-root-'))
+    writeFileSync(join(root, 'whiteboard.config.yaml'), VALID)
+
+    expect(findRepoRoot(root)).toBe(resolve(root))
+  })
+
+  it('walks up from a subdirectory so the board starts from anywhere in the repo', () => {
+    const root = resolve(mkdtempSync(join(tmpdir(), 'wb-root-')))
+    writeFileSync(join(root, 'whiteboard.config.yaml'), VALID)
+    const nested = join(root, 'tools', 'whiteboard')
+    mkdirSync(nested, { recursive: true })
+
+    expect(findRepoRoot(nested)).toBe(root)
+  })
+
+  // spec-00001-AC-15.1 — the path it looked for is named
+  it('refuses when no directory up the tree owns a flow config', () => {
+    const orphan = mkdtempSync(join(tmpdir(), 'wb-orphan-'))
+
+    expect(() => findRepoRoot(orphan)).toThrowError(ConfigError)
+    expect(() => findRepoRoot(orphan)).toThrowError(
+      new RegExp(`${join(resolve(orphan), 'whiteboard.config.yaml').replace(/[/\\]/g, '\\$&')}.*or any parent`),
+    )
   })
 })
 

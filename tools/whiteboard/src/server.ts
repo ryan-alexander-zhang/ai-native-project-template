@@ -105,6 +105,9 @@ export class Board {
   listen(port: number): Server {
     const server = this.app.listen(port)
     const wss = new WebSocketServer({ server, path: '/api/terminal' })
+    // ws re-emits the http server's errors; the caller reports them off `server`,
+    // and this handler only keeps the re-emission from crashing the process.
+    wss.on('error', () => {})
     wss.on('connection', (socket) => {
       let attached: { buffer: string; detach: () => void }
       try {

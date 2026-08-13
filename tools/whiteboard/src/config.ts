@@ -1,5 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
+
+export const CONFIG_FILE = 'whiteboard.config.yaml'
 
 export type DocKind = 'living' | 'work'
 
@@ -132,6 +135,22 @@ export function parseFlowConfig(text: string, source: string): FlowConfig {
   const types = readTypes(root.types)
   const relations = readRelations(root.relations)
   return { types, relations, flow: readFlow(root.flow, types, relations), agents: readAgents(root.agents) }
+}
+
+/**
+ * The repo the board runs on: the nearest directory at or above `start` that owns
+ * a flow config. Walking up is what lets the board start from any subdirectory.
+ */
+export function findRepoRoot(start: string): string {
+  let dir = resolve(start)
+  for (;;) {
+    if (existsSync(join(dir, CONFIG_FILE))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) {
+      throw new ConfigError(`config: no flow config at ${join(resolve(start), CONFIG_FILE)} or any parent directory`)
+    }
+    dir = parent
+  }
 }
 
 /** Load the flow config from disk. A missing or invalid file is fatal — there is no built-in default. */

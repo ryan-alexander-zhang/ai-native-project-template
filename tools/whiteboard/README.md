@@ -14,15 +14,20 @@ Run from this directory (`tools/whiteboard`):
 | --- | --- |
 | Setup | `npm install` |
 | Build the UI | `npm run build` |
-| Run | `npm start` — from the repo root: `PORT=4173 node tools/whiteboard/bin/whiteboard.js` |
+| Run | `npm start` (honours `PORT`, default 4173) |
 | Test | `npm test` |
 | Coverage | `npm run test:coverage` |
 | Typecheck | `npm run typecheck` |
 | UI dev server | `npm run dev` (proxies `/api` to a board started with `npm start`) |
 
-The board serves the built UI from `dist/web`, so run `npm run build` once before
-`npm start`. It reads `./docs` and `./whiteboard.config.yaml` **relative to the
-directory you launch it from** — launch it from the repo root.
+The board finds its repo by walking up from wherever you launch it for the nearest
+`whiteboard.config.yaml`, so `npm start` works from any directory in the repo, and
+it reads that directory's `docs/`.
+
+`npm start` alone is enough to use the board: it serves the built UI from
+`dist/web`, so run `npm run build` once first. `npm run dev` is for working on the
+UI itself — it starts Vite with hot reload and proxies `/api` to a board that must
+already be running via `npm start` in another terminal.
 
 ## Configuration
 
