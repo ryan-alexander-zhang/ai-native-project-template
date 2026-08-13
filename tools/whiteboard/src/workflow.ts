@@ -1,7 +1,7 @@
-import type { FlowConfig, FlowStep } from './config.js'
-import type { DocGraph, DocNode } from './docRepository.js'
-import { highestNumber } from './docRepository.js'
-import { allowedTransitions, promotedStatus } from './statusRules.js'
+import type { FlowConfig, FlowStep } from './config.ts'
+import type { DocGraph, DocNode } from './docRepository.ts'
+import { highestNumber } from './docRepository.ts'
+import { allowedTransitions, promotedStatus } from './statusRules.ts'
 
 const OPEN_QUESTIONS_HEADING = /^#{1,6}\s+(?:\d+\.\s*)?open questions\s*$/i
 const ANY_HEADING = /^#{1,6}\s/

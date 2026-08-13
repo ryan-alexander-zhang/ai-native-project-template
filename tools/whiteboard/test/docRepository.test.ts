@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { contentHash, findNode, highestNumber, readDocContent, readGraph } from '../src/docRepository.js'
-import { doc, makeDocsDir, testConfig } from './helpers.js'
+import { contentHash, findNode, highestNumber, readDocContent, readGraph } from '../src/docRepository.ts'
+import { doc, makeDocsDir, testConfig } from './helpers.ts'
 
 const config = testConfig()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readGraph } from '../src/docRepository.js'
+import { readGraph } from '../src/docRepository.ts'
 import {
   WorkflowError,
   allocateNumber,
@@ -10,8 +10,8 @@ import {
   idPrefix,
   nextStepsFor,
   transitionsFor,
-} from '../src/workflow.js'
-import { doc, makeDocsDir, testConfig } from './helpers.js'
+} from '../src/workflow.ts'
+import { doc, makeDocsDir, testConfig } from './helpers.ts'
 
 const config = testConfig()
 

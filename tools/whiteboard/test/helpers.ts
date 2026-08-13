@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { type FlowConfig, parseFlowConfig } from '../src/config.js'
+import { type FlowConfig, parseFlowConfig } from '../src/config.ts'
 
 const TEST_CONFIG = `
 types:
@@ -70,7 +70,7 @@ export function makeRepo(files: Record<string, string>): { repoRoot: string; doc
     writeFileSync(target, content)
   }
   git(repoRoot, 'add', '.')
-  git(repoRoot, 'commit', '-q', '-m', 'init')
+  git(repoRoot, 'commit', '-q', '--allow-empty', '-m', 'init')
   return { repoRoot, docsDir }
 }
 

@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ConflictError, DocService } from '../src/docService.js'
-import { contentHash } from '../src/docRepository.js'
-import { WorkflowError } from '../src/workflow.js'
-import { commitCount, doc, git, lastCommitFiles, lastCommitMessage, makeRepo, testConfig } from './helpers.js'
+import { ConflictError, DocService } from '../src/docService.ts'
+import { contentHash } from '../src/docRepository.ts'
+import { WorkflowError } from '../src/workflow.ts'
+import { commitCount, doc, git, lastCommitFiles, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
 
 const config = testConfig()
 const DRAFT_PRD = doc({ id: 'prd-00001-x', type: 'prd', status: 'draft' }, '# X\n\nbody\n')

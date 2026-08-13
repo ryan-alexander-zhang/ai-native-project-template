@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import type { FlowConfig, FlowStep } from './config.js'
+import type { FlowConfig, FlowStep } from './config.ts'
 import {
   type DocContent,
   type DocGraph,
@@ -9,9 +9,9 @@ import {
   findNode,
   readDocContent,
   readGraph,
-} from './docRepository.js'
-import { type ActionKind, type CommitOutcome, GitLayer, commitMessage } from './gitLayer.js'
-import { applyAccept, applyClarify, applyStatusChange, nextStepsFor, transitionsFor } from './workflow.js'
+} from './docRepository.ts'
+import { type ActionKind, type CommitOutcome, GitLayer, commitMessage } from './gitLayer.ts'
+import { applyAccept, applyClarify, applyStatusChange, nextStepsFor, transitionsFor } from './workflow.ts'
 
 /** The document changed under the action, or is gone; the caller must refresh (spec-00001-FR-5, FR-19). */
 export class ConflictError extends Error {
@@ -35,12 +35,17 @@ export interface ReviewInput {
  * Re-reading before every write is what makes a stale action fail instead of clobber.
  */
 export class DocService {
-  constructor(
-    private readonly repoRoot: string,
-    private readonly docsDir: string,
-    private readonly config: FlowConfig,
-    private readonly git: GitLayer = new GitLayer(repoRoot),
-  ) {}
+  private readonly repoRoot: string
+  private readonly docsDir: string
+  private readonly config: FlowConfig
+  private readonly git: GitLayer
+
+  constructor(repoRoot: string, docsDir: string, config: FlowConfig, git: GitLayer = new GitLayer(repoRoot)) {
+    this.repoRoot = repoRoot
+    this.docsDir = docsDir
+    this.config = config
+    this.git = git
+  }
 
   graph(): DocGraph {
     return readGraph(this.docsDir, this.config)

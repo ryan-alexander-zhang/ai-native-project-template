@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import matter from 'gray-matter'
-import type { FlowConfig } from './config.js'
-import { isKnownStatus } from './statusRules.js'
+import type { FlowConfig } from './config.ts'
+import { isKnownStatus } from './statusRules.ts'
 
 const EXCLUDED_FILES = new Set(['README.md', 'TEMPLATE.md'])
 const ID_PATTERN = /^([a-z]+)-(\d{5})-([a-z0-9]+(?:-[a-z0-9]+)*)$/
@@ -16,6 +16,8 @@ export interface DocNode {
   type?: string
   status?: string
   title: string
+  /** Relation field -> the ids it declares, as written in the front matter. */
+  relations: Record<string, string[]>
   ok: boolean
   problems: string[]
 }
@@ -108,6 +110,9 @@ function toNode(doc: ParsedDoc, config: FlowConfig): DocNode {
     type: typeof type === 'string' ? type : undefined,
     status: typeof status === 'string' ? status : undefined,
     title: doc.title,
+    relations: Object.fromEntries(
+      config.relations.map((relation) => [relation, declaredTargets(doc.data, relation)]),
+    ),
     ok: problems.length === 0,
     problems,
   }
@@ -121,21 +126,16 @@ function declaredTargets(data: Record<string, unknown>, relation: string): strin
   return []
 }
 
-function toEdges(doc: ParsedDoc, node: DocNode, config: FlowConfig, knownIds: Set<string>): DocEdge[] {
-  return config.relations.flatMap((relation) =>
-    declaredTargets(doc.data, relation).map((to) => ({
-      from: node.id,
-      to,
-      relation,
-      ok: knownIds.has(to),
-    })),
+function toEdges(node: DocNode, knownIds: Set<string>): DocEdge[] {
+  return Object.entries(node.relations).flatMap(([relation, targets]) =>
+    targets.map((to) => ({ from: node.id, to, relation, ok: knownIds.has(to) })),
   )
 }
 
 function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
   const nodes = docs.map((doc) => toNode(doc, config))
   const knownIds = new Set(nodes.filter((node) => node.ok).map((node) => node.id))
-  const edges = docs.flatMap((doc, i) => toEdges(doc, nodes[i]!, config, knownIds))
+  const edges = nodes.flatMap((node) => toEdges(node, knownIds))
 
   const issues: GraphIssue[] = [
     ...nodes.flatMap((node) => node.problems.map((message) => ({ path: node.path, message }))),

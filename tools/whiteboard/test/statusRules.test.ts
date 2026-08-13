@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedTransitions, isKnownStatus, promotedStatus } from '../src/statusRules.js'
+import { allowedTransitions, isKnownStatus, promotedStatus } from '../src/statusRules.ts'
 
 // rule-00001-BR-2 … BR-9: the transition table, one case per row.
 describe('allowedTransitions', () => {

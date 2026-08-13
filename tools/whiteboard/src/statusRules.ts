@@ -1,4 +1,4 @@
-import type { DocKind } from './config.js'
+import type { DocKind } from './config.ts'
 
 /**
  * The status transition table of rule-00001-BR-2 … BR-9, keyed by document kind

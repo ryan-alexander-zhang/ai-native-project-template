@@ -8,6 +8,7 @@
     "whiteboard": "./bin/whiteboard.js"
   },
   "scripts": {
+    "postinstall": "node scripts/fix-pty-permissions.js",
     "start": "node bin/whiteboard.js",
     "dev": "vite",
     "build": "vite build",
