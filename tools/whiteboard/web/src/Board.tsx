@@ -17,16 +17,16 @@ import { NodeCard } from './NodeCard.tsx'
 import { Terminal } from './Terminal.tsx'
 import { ThemeMenu } from './ThemeMenu.tsx'
 import { Toolbar } from './Toolbar.tsx'
-import { toFlowEdges, toFlowNodes } from './canvasModel.ts'
+import { relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from './canvasModel.ts'
 import { onFlowError } from './flowError.ts'
 import { useTheme } from './theme.ts'
 import { useBoard } from './useBoard.ts'
 
-type DocNodeData = { node: DocNode; kind?: string }
+type DocNodeData = { node: DocNode; kind?: string; suppressed?: boolean }
 
 const nodeTypes = {
   doc: ({ data, selected }: { data: DocNodeData; selected?: boolean }) => (
-    <NodeCard node={data.node} kind={data.kind} selected={selected ?? false} />
+    <NodeCard node={data.node} kind={data.kind} selected={selected ?? false} suppressed={data.suppressed} />
   ),
 }
 
@@ -41,13 +41,20 @@ function Canvas() {
 
   const nodes = useMemo(() => {
     const laid = toFlowNodes(board.graph, board.placed, board.selected)
-    return laid.map((node) => ({
-      ...node,
-      data: { ...(node.data as DocNodeData), kind: board.kinds[(node.data as DocNodeData).node.type ?? ''] },
-    }))
+    const suppressed = suppressedNodes(board.graph, board.selected)
+    return laid.map((node) => {
+      const data = node.data as DocNodeData
+      return {
+        ...node,
+        data: { ...data, kind: board.kinds[data.node.type ?? ''], suppressed: suppressed.has(node.id) },
+      }
+    })
   }, [board.graph, board.placed, board.selected, board.kinds])
 
-  const edges = useMemo(() => toFlowEdges(board.graph, board.placed), [board.graph, board.placed])
+  const edges = useMemo(
+    () => toFlowEdges(board.graph, board.placed, board.selected),
+    [board.graph, board.placed, board.selected],
+  )
   const selected = board.selectedNode
 
   /** Centre the viewport on a node and select it (spec-00001-FR-27). */
@@ -112,6 +119,8 @@ function Canvas() {
                         node={selected}
                         transitions={board.transitions}
                         nextSteps={board.nextSteps}
+                        relations={relationsOf(board.graph, selected.id, board.relationOrder)}
+                        onPickRelation={focus}
                         onEdit={() => board.setEditing(selected.id)}
                         onStatus={(to) => void board.run(() => api.setStatus(selected.id, to))}
                         onAccept={() => void board.run(() => api.accept(selected.id))}

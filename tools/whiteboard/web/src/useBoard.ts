@@ -12,6 +12,8 @@ export function useBoard() {
   const [graph, setGraph] = useState<DocGraph>(EMPTY_GRAPH)
   const [placed, setPlaced] = useState<Placed[]>([])
   const [kinds, setKinds] = useState<Record<string, DocKind>>({})
+  // Relation field order drives the relation list's grouping (spec-00001-FR-30).
+  const [relationOrder, setRelationOrder] = useState<string[]>([])
   const [selected, setSelected] = useState<string>()
   const [transitions, setTransitions] = useState<string[]>([])
   const [nextSteps, setNextSteps] = useState<FlowStep[]>([])
@@ -30,12 +32,23 @@ export function useBoard() {
     return next
   }, [])
 
-  const select = useCallback(async (id: string) => {
-    setSelected(id)
-    const [nextTransitions, steps] = await Promise.all([api.transitions(id), api.nextSteps(id)])
-    setTransitions(nextTransitions)
-    setNextSteps(steps)
-  }, [])
+  const select = useCallback(
+    async (id: string) => {
+      // Selecting is only meaningful for a document that is on the board. The
+      // relation list can offer a broken link's target, which is not
+      // (issue-00005) — refuse here, where the invariant belongs, rather than
+      // at each call site.
+      if (!graph.nodes.some((node) => node.id === id)) {
+        toast.error(`no document ${id} on the board`)
+        return
+      }
+      setSelected(id)
+      const [nextTransitions, steps] = await Promise.all([api.transitions(id), api.nextSteps(id)])
+      setTransitions(nextTransitions)
+      setNextSteps(steps)
+    },
+    [graph],
+  )
 
   const deselect = useCallback(() => setSelected(undefined), [])
 
@@ -71,6 +84,7 @@ export function useBoard() {
         const config = await api.config()
         typeOrder.current = Object.keys(config.types)
         setKinds(config.types)
+        setRelationOrder(config.relations)
       } catch (error) {
         // A board with no column order still beats no board: the graph is the
         // thing the user came for, so draw it and say why it looks odd.
@@ -88,6 +102,7 @@ export function useBoard() {
     graph,
     placed,
     kinds,
+    relationOrder,
     selected,
     selectedNode: graph.nodes.find((node) => node.id === selected),
     transitions,

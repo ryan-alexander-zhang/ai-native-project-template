@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MarkerType } from '@xyflow/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
 import { api } from '../src/api.ts'
-import { matchDocuments, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
+import { matchDocuments, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
 import { onFlowError } from '../src/flowError.ts'
 
 function node(overrides: Partial<DocNode> = {}): DocNode {
@@ -63,14 +63,86 @@ describe('toFlowEdges', () => {
     { id: 'prd-00001-x', x: 336, y: 0 },
   ]
 
-  it('carries the relation as the edge label', () => {
+  // spec-00001-AC-28.1 — with nothing selected an edge is dim and unlabelled.
+  // (Before FR-28 this test asserted the label was always present; the label is
+  // now the emphasised state's job — design-00002 §7 round 3.)
+  it('draws an unselected edge dim and unlabelled', () => {
     expect(toFlowEdges(GRAPH, COLUMNS)[0]).toMatchObject({
       id: 'e0',
       source: 'prd-00001-x',
       target: 'idea-00001-x',
-      label: 'parent',
-      className: undefined,
+      label: undefined,
+      className: 'edge--dim',
     })
+  })
+
+  // spec-00001-AC-29.1
+  it('emphasises and labels the edges of the selected node', () => {
+    const edge = toFlowEdges(GRAPH, COLUMNS, 'prd-00001-x')[0]!
+
+    expect(edge.className).toBe('edge--emphasis')
+    expect(edge.label).toBe('parent')
+    expect(edge.zIndex).toBeGreaterThan(0)
+  })
+
+  // spec-00001-AC-29.2
+  it('suppresses the edges that have nothing to do with the selection', () => {
+    const graph: DocGraph = {
+      ...GRAPH,
+      edges: [...GRAPH.edges, { from: 'other-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true }],
+    }
+
+    const [connected, unrelated] = toFlowEdges(graph, COLUMNS, 'prd-00001-x')
+
+    expect(connected!.className).toBe('edge--emphasis')
+    expect(unrelated!.className).toBe('edge--suppressed')
+    expect(unrelated!.label).toBeUndefined()
+  })
+
+  // spec-00001-AC-29.4 — changing the selection moves the emphasis with it
+  it('emphasises only the newly selected node edges', () => {
+    const graph: DocGraph = {
+      ...GRAPH,
+      edges: [...GRAPH.edges, { from: 'other-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true }],
+    }
+
+    const after = toFlowEdges(graph, COLUMNS, 'other-00001-x')
+
+    expect(after[0]!.className).toBe('edge--suppressed')
+    expect(after[1]!.className).toBe('edge--emphasis')
+  })
+
+  // spec-00001-AC-28.4 — one path can only carry one line
+  it('merges two relations declared between the same pair', () => {
+    const graph: DocGraph = {
+      ...GRAPH,
+      edges: [
+        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true },
+        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true },
+      ],
+    }
+
+    const edges = toFlowEdges(graph, COLUMNS, 'prd-00001-x')
+
+    expect(edges).toHaveLength(1)
+    expect(edges[0]!.label).toBe('parent · informs')
+  })
+
+  it('keeps a merged pair marked when one of its relations is broken', () => {
+    const graph: DocGraph = {
+      ...GRAPH,
+      edges: [
+        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true },
+        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'informs', ok: false },
+      ],
+    }
+
+    expect(toFlowEdges(graph, COLUMNS)[0]!.className).toBe('edge--dim edge--broken')
+  })
+
+  // spec-00001-AC-28.3
+  it('draws nothing when no document declares a relation', () => {
+    expect(toFlowEdges({ ...GRAPH, edges: [] }, COLUMNS)).toEqual([])
   })
 
   // spec-00001-AC-1.10 — the arrow lands on the referenced document
@@ -150,10 +222,112 @@ describe('toFlowEdges', () => {
     const graph = { ...GRAPH, edges: [{ from: 'prd-00001-x', to: 'ghost', relation: 'parent', ok: false }] }
     const edge = toFlowEdges(graph, COLUMNS)[0]!
 
-    expect(edge.className).toBe('edge--broken')
+    expect(edge.className).toBe('edge--dim edge--broken')
     // The ghost has no position; the edge still gets usable anchors.
     expect(edge.sourceHandle).toBe('source-right')
     expect(edge.targetHandle).toBe('target-left')
+  })
+
+  // spec-00001-AC-29.8 — anomaly and emphasis stack, they do not replace each other
+  it('keeps an emphasised edge marked when it points at a ghost', () => {
+    const graph = { ...GRAPH, edges: [{ from: 'prd-00001-x', to: 'ghost', relation: 'parent', ok: false }] }
+    const edge = toFlowEdges(graph, COLUMNS, 'prd-00001-x')[0]!
+
+    expect(edge.className).toBe('edge--emphasis edge--broken')
+    expect(edge.label).toBe('parent')
+  })
+})
+
+describe('suppressedNodes', () => {
+  // spec-00001-AC-29.2 — the node half
+  it('suppresses every node that does not share an edge with the selection', () => {
+    const graph: DocGraph = {
+      nodes: [node(), IDEA, node({ id: 'far-00001-x', path: 'far/a.md' })],
+      edges: GRAPH.edges,
+      issues: [],
+    }
+
+    expect(suppressedNodes(graph, 'prd-00001-x')).toEqual(new Set(['far-00001-x']))
+  })
+
+  // spec-00001-AC-29.3 — deselecting restores everything
+  it('suppresses nothing when there is no selection', () => {
+    expect(suppressedNodes(GRAPH, undefined)).toEqual(new Set())
+  })
+})
+
+// spec-00001-FR-30
+describe('relationsOf', () => {
+  const ORDER = ['parent', 'implements', 'informs']
+  const graph: DocGraph = {
+    nodes: [],
+    edges: [
+      { from: 'plan-00001-x', to: 'spec-00001-x', relation: 'implements', ok: true },
+      { from: 'spec-00001-x', to: 'prd-00001-x', relation: 'parent', ok: true },
+      { from: 'rule-00001-x', to: 'spec-00001-x', relation: 'informs', ok: true },
+      { from: 'spec-00001-x', to: 'ghost', relation: 'informs', ok: false },
+    ],
+    issues: [],
+  }
+
+  // spec-00001-AC-30.1 and AC-30.2
+  it('lists every relation with the field, the direction, and the other end', () => {
+    expect(relationsOf(graph, 'spec-00001-x', ORDER)).toEqual([
+      { field: 'parent', direction: 'out', otherId: 'prd-00001-x', ok: true },
+      { field: 'informs', direction: 'out', otherId: 'ghost', ok: false },
+      { field: 'implements', direction: 'in', otherId: 'plan-00001-x', ok: true },
+      { field: 'informs', direction: 'in', otherId: 'rule-00001-x', ok: true },
+    ])
+  })
+
+  // Direction is "whose front matter declares it", not "who depends on whom" —
+  // the latter differs per field in this taxonomy (docs/README.md).
+  it('calls a relation outgoing when this document declares it', () => {
+    const list = relationsOf(graph, 'spec-00001-x', ORDER)
+
+    expect(list.filter((item) => item.direction === 'out').map((item) => item.field)).toEqual(['parent', 'informs'])
+    expect(list.filter((item) => item.direction === 'in').map((item) => item.otherId)).toEqual([
+      'plan-00001-x',
+      'rule-00001-x',
+    ])
+  })
+
+  // spec-00001-AC-30.5
+  it('lists a relation whose target does not exist, and marks it', () => {
+    expect(relationsOf(graph, 'spec-00001-x', ORDER).find((item) => item.otherId === 'ghost')?.ok).toBe(false)
+  })
+
+  // spec-00001-AC-30.4
+  it('returns nothing for a document with no relations at all', () => {
+    expect(relationsOf(graph, 'lonely-00001-x', ORDER)).toEqual([])
+  })
+
+  // FR-30's third ordering rule: same direction, same field, then id ascending
+  it('orders two relations of the same field by the other id', () => {
+    const same: DocGraph = {
+      nodes: [],
+      edges: [
+        { from: 'plan-00001-x', to: 'spec-00002-b', relation: 'implements', ok: true },
+        { from: 'plan-00001-x', to: 'spec-00001-a', relation: 'implements', ok: true },
+      ],
+      issues: [],
+    }
+    expect(relationsOf(same, 'plan-00001-x', ORDER).map((item) => item.otherId)).toEqual([
+      'spec-00001-a',
+      'spec-00002-b',
+    ])
+  })
+
+  it('puts an unknown field after every declared one', () => {
+    const extra: DocGraph = {
+      nodes: [],
+      edges: [
+        { from: 'a-00001-x', to: 'z-00001-x', relation: 'mystery', ok: true },
+        { from: 'a-00001-x', to: 'b-00001-x', relation: 'parent', ok: true },
+      ],
+      issues: [],
+    }
+    expect(relationsOf(extra, 'a-00001-x', ORDER).map((item) => item.field)).toEqual(['parent', 'mystery'])
   })
 })
 
@@ -275,6 +449,150 @@ describe('the board', () => {
     expect(container.querySelector('.react-flow__edge')!.getAttribute('aria-label')).toBe(
       'Edge from prd-00001-x to idea-00001-x',
     )
+  })
+
+  // spec-00001-AC-28.1 in the DOM: every edge is drawn, none carries a label
+  it('shows no edge label until a node is selected', async () => {
+    const { container } = render(<Board />)
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge')).toHaveLength(1))
+
+    expect(container.querySelectorAll('.react-flow__edge.edge--dim')).toHaveLength(1)
+    expect(container.querySelectorAll('.react-flow__edge-text')).toHaveLength(0)
+  })
+
+  // spec-00001-AC-29.1 and AC-29.3 as the user sees them
+  it('labels the selected node edges and drops the labels again on deselect', async () => {
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge.edge--emphasis')).toHaveLength(1))
+    expect(screen.getByText('parent')).toBeTruthy()
+
+    fireEvent.click(container.querySelector('.react-flow__pane')!)
+
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge.edge--dim')).toHaveLength(1))
+    expect(screen.queryByText('parent')).toBeNull()
+  })
+
+  // spec-00001-AC-29.6 — a refresh must not silently drop the emphasis
+  it('keeps the emphasis through a refresh', async () => {
+    vi.spyOn(api, 'accept').mockResolvedValue({ committed: true, status: 'active' })
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }))
+    await waitFor(() => expect(api.graph).toHaveBeenCalledTimes(2))
+
+    expect(container.querySelectorAll('.react-flow__edge.edge--emphasis')).toHaveLength(1)
+  })
+
+  // spec-00001-AC-30.1 … AC-30.3 as the user sees them
+  it('lists the relations of the selected node and jumps to the one picked', async () => {
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+    await waitFor(() => expect(screen.getByLabelText('Relations')).toBeTruthy())
+
+    await userEvent.click(screen.getByLabelText('Relations'))
+
+    // The label is on the canvas edge too now, so scope the query to the list.
+    const list = await screen.findByRole('list', { name: 'Relations of prd-00001-x' })
+    expect(within(list).getByText('parent')).toBeTruthy()
+    await userEvent.click(within(list).getByText('idea-00001-x'))
+
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /idea-00001-x/ })).toBeTruthy())
+  })
+
+  // issue-00005 — the list offers broken links on purpose; going to one is a
+  // different matter, and it used to take the toolbar down with it.
+  it('refuses to jump to a relation whose document does not exist', async () => {
+    const rejections: unknown[] = []
+    const onRejection = (event: PromiseRejectionEvent) => rejections.push(event.reason)
+    window.addEventListener('unhandledrejection', onRejection)
+    vi.spyOn(api, 'graph').mockResolvedValue({
+      nodes: [node()],
+      edges: [{ from: 'prd-00001-x', to: 'idea-09999-ghost', relation: 'parent', ok: false }],
+      issues: [],
+    })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+    await waitFor(() => expect(screen.getByLabelText('Relations')).toBeTruthy())
+    await userEvent.click(screen.getByLabelText('Relations'))
+    const list = await screen.findByRole('list', { name: /Relations of/ })
+
+    // Listed and marked, but not something you can travel to.
+    expect(within(list).getByText('idea-09999-ghost')).toBeTruthy()
+    expect(within(list).queryByRole('button', { name: /idea-09999-ghost/ })).toBeNull()
+
+    window.removeEventListener('unhandledrejection', onRejection)
+    expect(screen.getByRole('toolbar', { name: /prd-00001-x/ })).toBeTruthy()
+    expect(rejections).toEqual([])
+  })
+
+  // spec-00001-AC-29.2 through the board, not just the model: an unrelated node
+  // must actually receive the class. (With the two-node fixture nothing is ever
+  // unrelated, so this needs a third document.)
+  it('recedes the nodes that have nothing to do with the selection', async () => {
+    vi.spyOn(api, 'graph').mockResolvedValue({
+      ...GRAPH,
+      nodes: [...GRAPH.nodes, node({ id: 'rule-00001-x', type: 'rule', title: 'Rule', path: 'rule/a.md' })],
+    })
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-rule-00001-x')).toBeTruthy())
+    expect(container.querySelectorAll('.node--suppressed')).toHaveLength(0)
+
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+
+    await waitFor(() => expect(container.querySelectorAll('.node--suppressed')).toHaveLength(1))
+    expect(screen.getByTestId('node-rule-00001-x').className).toContain('node--suppressed')
+  })
+
+  // spec-00001-AC-28.1 with more than one edge — the AC says "若干相互引用的文档"
+  it('draws every edge dim and unlabelled on a graph with several', async () => {
+    vi.spyOn(api, 'graph').mockResolvedValue({
+      ...GRAPH,
+      nodes: [...GRAPH.nodes, node({ id: 'rule-00001-x', type: 'rule', title: 'Rule', path: 'rule/a.md' })],
+      edges: [
+        ...GRAPH.edges,
+        { from: 'rule-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true },
+      ],
+    })
+    const { container } = render(<Board />)
+
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge.edge--dim')).toHaveLength(2))
+    expect(container.querySelectorAll('.react-flow__edge-text')).toHaveLength(0)
+  })
+
+  // spec-00001-AC-29.5 — a node with no edges at all
+  it('emphasises nothing when the selected document has no relations', async () => {
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [node()], edges: [], issues: [] })
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /prd-00001-x/ })).toBeTruthy())
+    expect(container.querySelectorAll('.react-flow__edge')).toHaveLength(0)
+    expect(container.querySelectorAll('.react-flow__edge-text')).toHaveLength(0)
+  })
+
+  // spec-00001-AC-29.7 — emphasis follows the selection, wherever it came from
+  it('emphasises the edges of a document chosen in the command palette', async () => {
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
+    expect(container.querySelectorAll('.react-flow__edge.edge--dim')).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('button', { name: /Find a document/ }))
+    await userEvent.type(screen.getByPlaceholderText('Find a document by id or title'), 'idea-00001')
+    await userEvent.click(await screen.findByRole('option', { name: /idea-00001-x/ }))
+
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge.edge--emphasis')).toHaveLength(1))
+    expect(screen.getByText('parent')).toBeTruthy()
   })
 
   // spec-00001-AC-1.14

@@ -11,17 +11,19 @@ export interface NodeCardProps {
   node: DocNode
   selected: boolean
   kind?: string
+  /** Recedes while another node holds the focus (spec-00001-AC-29.2). */
+  suppressed?: boolean
 }
 
 /** A document on the canvas: type, status, title, id, and any anomaly. */
-export function NodeCard({ node, selected, kind }: NodeCardProps) {
+export function NodeCard({ node, selected, kind, suppressed = false }: NodeCardProps) {
   const Icon = typeIcon(node.type)
   return (
     <div
       data-testid={`node-${node.id}`}
       className={`bg-card text-card-foreground flex h-[92px] w-[240px] flex-col gap-1 overflow-hidden rounded-xl border-2 px-3 py-2 shadow-sm transition-shadow ${
         selected ? 'ring-ring/50 shadow-md ring-2' : ''
-      }`}
+      } ${suppressed ? 'node--suppressed' : ''}`}
       style={{ borderColor: node.ok ? kindColour(kind) : 'var(--destructive)' }}
     >
       {/*

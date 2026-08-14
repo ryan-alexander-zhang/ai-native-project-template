@@ -127,6 +127,7 @@ row3                                                                            
 | 澄清 | 工具栏内联 textarea | `Dialog` + `Textarea` + 提交按钮 | `MessageCircleQuestionMark` |
 | 推进 | `<select>` | `DropdownMenu`，逐项列出下一步类型；**无候选时按钮 disabled，并在 `Tooltip` 与菜单内呈现「no next step」**（spec-00001-AC-10.3） | `Plus` |
 | 编辑 | `<button>` | `Button`（ghost 变体） | `Pencil` |
+| 关系列表 | 无 | `Popover` + 按关系字段分组的列表，每项一行「字段名 · 方向 · 对端 id」，点击即定位并选中对端（`spec-00001-FR-30`）；无关系时呈现「no relations」 | `Waypoints` |
 | 编辑/预览切换 | 两态按钮 | `Tabs`（Source / Preview） | `Code` `Eye` |
 | 保存 | `<button>` | `Button`，保存中为 disabled + spinner | `Save` `Loader` |
 | 关闭面板 | `<button>` | `Button`（ghost, icon） | `X` |
@@ -135,8 +136,9 @@ row3                                                                            
 | 终端面板 | 底部固定 45vh | 底部 `ResizablePanel` + `Card` 头 + 会话状态 `Badge`（running/exited/failed），高度可调 | `Terminal` |
 | 空画布 | 空白 | 空状态：图标 + 一句说明 | `FileQuestionMark` |
 
-**异常节点的工具栏只保留「编辑」一项**（spec-00001-AC-2.4），其余控件不渲染——
-上表描述的是正常节点的完整形态。
+**异常节点的工具栏只保留「编辑」与「关系列表」两项**（spec-00001-AC-2.4，本轮
+随 FR-30 修订）：前者用于修复 front matter，后者用于读出断链指向了谁——两者都不
+改动任何文档。状态切换、评审、推进仍不渲染。上表描述的是正常节点的完整形态。
 
 **用下拉菜单而不是 `<select>`**：状态切换与推进都是「执行一个动作」，不是「选定
 一个值」——现有实现要把 `<select>` 的 value 强行复位成空串才能重复触发同一动作，
@@ -178,8 +180,27 @@ flowchart LR
   文本会撑破布局。
 - **选中态**：`--ring` 描边，与 React Flow 自身的选中样式统一。
 
-边沿用 React Flow 的默认边型：标签为关系字段名，`ok: false` 的边用 destructive
-虚线。另有三条规则：
+**边有三个呈现态**，各有一个类名——`spec-00001-AC-28.x`/`AC-29.x` 的断言落在
+类名上，不落在「更淡」这种无法观察的比较级上（承载 `spec-00001-FR-28`/`FR-29`，
+取舍见 `decision-00003-whiteboard-edge-emphasis`）：
+
+| 态 | 类名 | 何时 | 样式 |
+| --- | --- | --- | --- |
+| 弱化 | `edge--dim` | 未选中任何节点时的全部边 | `--muted-foreground`，`opacity: .28`，1px，**无标签**，位于节点之下 |
+| 强调 | `edge--emphasis` | 与当前选中节点相连的边 | `--foreground`，`opacity: 1`，2px，**显示关系字段名**，`zIndex` 抬到节点之上 |
+| 压弱 | `edge--suppressed` | 选中某节点时，与它无关的边 | 同弱化色，`opacity: .08`，仍无标签 |
+
+节点同样有一个压弱态 `node--suppressed`（`opacity: .4`）：选中时与选中项无关的
+节点用它。**这三个不透明度是起点，不是承诺**——落地后按真实图看一眼再定，改动
+不需要回到本文档以外的任何地方。
+
+`zIndex` 能把边抬到节点之上，已实测确认：`@xyflow/react/dist/style.css` 中
+`.react-flow__edges svg` 是 `position: absolute`，故其 `z-index` 对节点层有效。
+
+`ok: false` 的边在三态下都保持 destructive 虚线——异常不因为没被选中而消失；
+异常与强调可以叠加（`spec-00001-AC-29.8`）。
+
+边沿用 React Flow 的默认边型。另有三条规则：
 
 - **箭头指向被引用的那份文档**。边的方向就是 front matter 的声明方向——`prd`
   写 `parent: idea`，箭头就落在 `idea` 一端。不做任何反推：`docs/README.md`
@@ -284,7 +305,20 @@ decision-00002 所致）：
    `canvas.test.tsx:39,49,53,59,66`、`web/src/useBoard.ts:26`、
    `web/src/Board.tsx:49`。
 
-以上两轮之外查询不到的控件、或断言不成立的行为，才按真实回归处理。
+**第三轮（边的强弱与关系列表）**又有两处必然失败，同样不是回归：
+
+9. **`canvas.test.tsx::carries the relation as the edge label`**：它断言
+   `label: 'parent'`，而 FR-28 规定弱化态不带标签。按 design §4 的三态改写观察点。
+   （§7 第 7 项曾点名过同一条用例，但那是为了 `sourceHandle`/`markerEnd` 的整
+   对象相等——那次已改为 `toMatchObject` 并通过，该项的理由到此为止。）
+10. **`toFlowEdges()` 再加一个参数**（当前选中项），§7 第 8 项列出的调用点随之
+    再动一次：`canvas.test.tsx:39,49,53,59,66`、`useBoard.ts:26`、`Board.tsx:50`。
+
+**不受影响、不要去「修」它**：`canvas.test.tsx` 里断言
+`aria-label === 'Edge from prd-00001-x to idea-00001-x'` 的那条——该属性由 React
+Flow 从两端 id 生成，与标签无关，弱化态下照样成立。
+
+以上三轮之外查询不到的控件、或断言不成立的行为，才按真实回归处理。
 
 **jsdom 需要补的桩**（本段两次落地后的实际清单）：`web/test/setup.ts` 目前有
 `matchMedia`、空实现的 `ResizeObserver`、`localStorage`、三个 pointer-capture
@@ -313,6 +347,8 @@ FR-26/FR-27 及其 AC 需要新的验收行。
 | 命令面板的检索与跳转 | `spec-00001-FR-26`、`FR-27` 及其 AC |
 | 动作被拒与错误的提示条 | 不新增 FR——凡承诺拒绝或错误呈现的 FR（FR-5、FR-7…FR-9、FR-16、FR-18…FR-20）本已承诺该行为，改的只是呈现载体，其 AC 的观察点随之更新 |
 | 主题三态、面板布局与尺寸记忆、保存中态、空状态、异常计数呈现 | `spec-00001` §7 非功能项，不写 GWT |
+| 边的三个呈现态与选中时的节点压弱 | `spec-00001-FR-28`、`FR-29` 及其 AC；断言落在 §4 的类名上，不落在不透明度的具体数值上——那三个数是可调的起点 |
+| 工具栏的关系列表 | `spec-00001-FR-30` 及其 AC |
 
 不写 GWT 的项没有回归保护，这是明知的取舍。两处例外：空画布「无错误」由 AC-1.4
 保证（§7 只涉及它长什么样），异常计数为零时的 `no issues` 文案有现存断言守着。

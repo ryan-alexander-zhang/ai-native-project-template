@@ -29,6 +29,8 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     node: NODE,
     transitions: ['active', 'archived'],
     nextSteps: [{ next: 'spec', carry: 'parent' }],
+    relations: [],
+    onPickRelation: vi.fn(),
     onEdit: vi.fn(),
     onStatus: vi.fn(),
     onAccept: vi.fn(),

@@ -32,7 +32,7 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-2.1 | marks a document without front matter and labels it by path, leaving the rest intact (t/docRepository)；shows the problems of an anomalous document on request (w/board) | pass | 异常节点以路径为 id；problems 在 Popover 中 |
 | spec-00001-AC-2.2 | marks an edge pointing at an unknown id and keeps the graph usable (t/docRepository)；marks an edge pointing at an unknown document (w/canvas) | pass | 边 ok=false + issue；该边此前同样未渲染，DOM 级证据见 record-00002 |
 | spec-00001-AC-2.3 | marks a document whose id does not match the id format (t/docRepository) | pass | id 格式违规 |
-| spec-00001-AC-2.4 | offers nothing for an anomalous document (t/workflow)；offers only the editor for a document with front matter problems (w/toolbar) | pass | 仅 Edit 存在 |
+| spec-00001-AC-2.4 | offers nothing for an anomalous document (t/workflow)；offers only the editor and the relation list for a document with front matter problems (w/toolbar) | pass | **该 AC 已随 FR-30 修订**：异常节点的工具栏现为「编辑 + 关系列表」，二者都只读；证据见 record-00003 |
 | spec-00001-AC-3.1 | offers edit, status, review, and advance (w/toolbar)；opens the toolbar for the node the user clicks (w/canvas) | pass | 四类入口 |
 | spec-00001-AC-3.2 | closes the toolbar when the canvas background is clicked (w/canvas)；drops the selection on deselect (w/board) | pass | 点空白关闭 |
 | spec-00001-AC-4.1 | writes the edited content to disk (t/docService)；saves the edited content and commits it (t/server) | pass | 磁盘内容比对 |

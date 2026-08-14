@@ -24,7 +24,7 @@ parent: prd-00001-docs-whiteboard
 
 | Story | Value | Delivers |
 | --- | --- | --- |
-| S1 | 作为文档负责人，我要一打开白板就看到全部文档的关系图与状态，并能快速找到其中一份，这样无需逐个翻文件就能看清依赖链与卡点 | spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3, spec-00001-FR-26, spec-00001-FR-27 |
+| S1 | 作为文档负责人，我要一打开白板就看到全部文档的关系图与状态，并能快速找到其中一份，这样无需逐个翻文件就能看清依赖链与卡点 | spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3, spec-00001-FR-26, spec-00001-FR-27, spec-00001-FR-28, spec-00001-FR-29, spec-00001-FR-30 |
 | S2 | 作为文档负责人，我要在白板上直接编辑并预览文档正文，这样查看与修改不用切换工具 | spec-00001-FR-4, spec-00001-FR-5, spec-00001-FR-22, spec-00001-FR-23, spec-00001-FR-24, spec-00001-FR-25 |
 | S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19 |
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
@@ -125,13 +125,36 @@ parent: prd-00001-docs-whiteboard
   文档以其文件路径为 id（per FR-2），因此同样可被检索到。
 - **spec-00001-FR-27** (Event) 当用户在命令面板中选定一个文档时，系统应把视口
   定位到该节点、选中它并关闭面板。
+- **spec-00001-FR-28** (State) 当未选中任何节点时，系统应把全部关系边以**弱化态**
+  呈现：低对比、细线、不显示关系名标签。图的疏密与孤立节点因此仍一眼可见，而
+  边不与节点争夺注意力。（进入与离开该状态的行为见 FR-29。）
+  同一对文档之间若**同方向**声明了多个关系字段，系统应合并为**一条**边，其标签
+  列出全部字段名——两条几何完全重合的边无法分辨，等于把一条画了两次。这条改变了
+  边的条数，`AC-1.1` 因此随之修订：不变量是「每个关系字段都出现在图上」，不是
+  「每个字段各占一条边」。反方向的一对（`A→B` 与 `B→A`）不合并——箭头相反，
+  是两件不同的事。
+- **spec-00001-FR-29** (Event) 当用户选中一个节点时，系统应把与该节点相连的
+  全部边转为**强调态**（高对比、显示关系名标签、绘制于节点之上），并把其余边与
+  与之无关的节点一并压弱；取消选中时全部边回到弱化态、节点回到常态。
+- **spec-00001-FR-30** (Event) 当用户选中一个节点时，系统应在其浮窗工具栏中按
+  关系字段分组列出该节点的全部关系，每项含字段名、对端文档 id 与**方向**；点击
+  其中一项即定位并选中该对端文档。这是中枢节点唯一可读的出路——它的边可以多到
+  几何手段无法分辨（见 `decision-00003-whiteboard-edge-emphasis`）。
+  三点约定：**方向**取「该关系声明在谁的 front matter 里」——本文档声明的为出向，
+  他人声明指向本文档的为入向；这是可直接核对的事实，不涉及「谁依赖谁」的语义
+  判断（那在本文档体系里逐字段不同，见 `docs/README.md`）。**顺序**为：先出向后
+  入向，组内按流程配置的关系字段声明顺序，同组内按对端 id 升序。**异常节点同样
+  提供该列表**——它恰恰是修复断链所需要的信息；这构成对 `AC-2.4` 的修订，见该条。
+  **指向不存在文档的关系项照常列出并标记，但不可点击**：没有可去之处的项不该
+  呈现为可以去（issue-00005）。
 
 **Acceptance (GWT)**
 
 - **spec-00001-AC-1.1** (spec-00001-FR-1)
   Given `docs/` 下有若干带合法 front matter 且相互引用的文档
   When 打开白板
-  Then 每个文档呈现为一个节点，每个关系字段呈现为一条边
+  Then 每个文档呈现为一个节点，每个关系字段都出现在图上——同一对文档之间同方向的
+  多个字段合并为一条边并在其标签上并列（per FR-28），其余各自成边
 - **spec-00001-AC-1.2** (spec-00001-FR-1)
   Given 同上
   When 打开白板
@@ -199,7 +222,8 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-2.4** (spec-00001-FR-2)
   Given 一个异常节点
   When 点击该节点
-  Then 浮窗只含编辑入口，无状态切换、评审、推进
+  Then 浮窗只含编辑入口与关系列表（FR-30），无状态切换、评审、推进——列出关系是
+  修复断链所必需的读取动作，不改变任何文档
 - **spec-00001-AC-3.1** (spec-00001-FR-3)
   Given 图上有一个正常节点
   When 点击该节点
@@ -496,6 +520,80 @@ parent: prd-00001-docs-whiteboard
   Given 同 AC-27.4
   When 按下回车
   Then 面板保持打开
+- **spec-00001-AC-28.1** (spec-00001-FR-28)
+  Given `docs/` 下有若干相互引用的文档，且未选中任何节点
+  When 打开白板
+  Then 每条关系边都画出来，且没有任何一条显示关系名标签
+- **spec-00001-AC-28.2** (spec-00001-FR-28)
+  Given 整张图只有一条关系边
+  When 打开白板
+  Then 该边同样是弱化态——不因为图上只有它一条就被强调
+- **spec-00001-AC-29.1** (spec-00001-FR-29)
+  Given 一个连着多条关系边的节点
+  When 选中该节点
+  Then 与它相连的每一条边都转为强调态并显示关系名标签
+- **spec-00001-AC-29.2** (spec-00001-FR-29)
+  Given 同上
+  When 选中该节点
+  Then 与它无关的边转为压弱态，与它无关的节点同样转为压弱态
+  （三态各有一个名字，见 design-00002 §4；断言落在状态名上，不落在「更弱」这种
+  无法观察的比较级上）
+- **spec-00001-AC-29.3** (spec-00001-FR-29)
+  Given 已选中某节点
+  When 点击画布空白处取消选中
+  Then 全部边回到弱化态，标签全部消失
+- **spec-00001-AC-29.4** (spec-00001-FR-29)
+  Given 已选中节点 A
+  When 改选节点 B
+  Then 只有 B 的边处于强调态，A 的边不再强调
+- **spec-00001-AC-29.5** (spec-00001-FR-29)
+  Given 一个不声明任何关系、也无人引用的节点
+  When 选中该节点
+  Then 没有任何边被强调，图上不出现标签
+- **spec-00001-AC-30.1** (spec-00001-FR-30)
+  Given 一个既引用他人、也被他人引用的节点
+  When 选中该节点
+  Then 工具栏按关系字段分组列出它的每一条关系，每项含对端文档 id
+- **spec-00001-AC-30.2** (spec-00001-FR-30)
+  Given 同上
+  When 选中该节点
+  Then 每一项标明方向：本文档指向对方，或对方指向本文档
+- **spec-00001-AC-30.3** (spec-00001-FR-30)
+  Given 已选中的节点在列表中有一项指向 `idea-00001`
+  When 点击该项
+  Then 视口定位到 `idea-00001` 并选中它
+- **spec-00001-AC-30.4** (spec-00001-FR-30)
+  Given 一个不声明任何关系、也无人引用的节点
+  When 选中该节点
+  Then 列表呈现「无关系」而不是空白
+- **spec-00001-AC-30.5** (spec-00001-FR-30)
+  Given 选中节点的某个关系指向一个不存在的 id
+  When 查看列表
+  Then 该项照常列出并标记为异常——断链正是需要读到的信息
+- **spec-00001-AC-30.6** (spec-00001-FR-30)
+  Given 同上
+  When 试图点击该项
+  Then 它不是可点击的控件，当前选中与工具栏都不受影响
+- **spec-00001-AC-28.3** (spec-00001-FR-28)
+  Given 若干文档，但没有任何一份声明关系字段
+  When 打开白板
+  Then 画布上没有任何边，且不出错
+- **spec-00001-AC-28.4** (spec-00001-FR-28)
+  Given 两份文档之间声明了两个不同的关系字段
+  When 打开白板
+  Then 画布上只有一条边，其标签同时含这两个字段名
+- **spec-00001-AC-29.6** (spec-00001-FR-29)
+  Given 已选中某节点
+  When 图刷新（文档在磁盘上变化后重新加载）
+  Then 该节点仍被选中，其边仍处于强调态
+- **spec-00001-AC-29.7** (spec-00001-FR-29)
+  Given 用户经命令面板选定一个文档（FR-27）
+  When 面板关闭
+  Then 该文档的边同样进入强调态——强调跟随选中，与选中从哪里发起无关
+- **spec-00001-AC-29.8** (spec-00001-FR-29)
+  Given 选中节点的某条边是异常边（指向不存在的文档）
+  When 选中该节点
+  Then 该边同时是强调态与异常态：显示标签、绘于节点之上，且保持异常样式
 
 ## 5. Technical Design
 
@@ -545,5 +643,5 @@ parent: prd-00001-docs-whiteboard
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
-- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md)
-- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（后者持有 FR-1 的完整布局规则）
+- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md)
+- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）

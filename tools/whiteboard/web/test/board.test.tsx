@@ -98,6 +98,17 @@ describe('a node on the canvas', () => {
     renderCard({ node: node({ type: undefined }), selected: false })
     expect(screen.getByText('—')).toBeTruthy()
   })
+
+  // spec-00001-AC-29.2 — the node recedes while another node holds the focus
+  it('recedes when suppressed', () => {
+    const { container } = renderCard({ node: node(), selected: false, suppressed: true })
+    expect(container.querySelector('.node--suppressed')).toBeTruthy()
+  })
+
+  it('stays at full strength when nothing is suppressed', () => {
+    const { container } = renderCard({ node: node(), selected: false })
+    expect(container.querySelector('.node--suppressed')).toBeNull()
+  })
 })
 
 // spec-00001-AC-1.1, AC-1.2 and AC-1.6 … AC-1.9 (decision-00002 §2)

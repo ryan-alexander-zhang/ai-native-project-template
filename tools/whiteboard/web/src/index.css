@@ -128,9 +128,35 @@
   --xy-controls-button-border-color: var(--border);
 }
 
+/*
+  The three edge states (design-00002 §4). Every relation is always drawn; only
+  the weight changes, so the shape of the graph stays readable while the detail
+  waits to be asked for. The opacities are a starting point, not a promise.
+*/
+.edge--dim path {
+  opacity: 0.28;
+  stroke-width: 1;
+}
+
+.edge--suppressed path {
+  opacity: 0.08;
+  stroke-width: 1;
+}
+
+.edge--emphasis path {
+  opacity: 1;
+  stroke-width: 2;
+  stroke: var(--foreground);
+}
+
 .edge--broken path {
   stroke: var(--destructive);
   stroke-dasharray: 4 3;
+}
+
+/* A suppressed node recedes so an emphasised edge stays readable across it. */
+.node--suppressed {
+  opacity: 0.4;
 }
 
 /* Markdown preview typography — a small local layer instead of a plugin. */

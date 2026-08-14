@@ -24,6 +24,8 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     node: NODE,
     transitions: ['active', 'archived'],
     nextSteps: [{ next: 'spec', carry: 'parent' }],
+    relations: [],
+    onPickRelation: vi.fn(),
     onEdit: vi.fn(),
     onStatus: vi.fn(),
     onAccept: vi.fn(),
@@ -51,15 +53,65 @@ describe('the floating toolbar', () => {
     expect(screen.getByLabelText('Advance to the next step')).toBeTruthy()
   })
 
-  // spec-00001-AC-2.4
-  it('offers only the editor for a document with front matter problems', () => {
+  // spec-00001-AC-2.4 — amended with FR-30: the anomalous node keeps the two
+  // read-only entries it needs to be repaired, and nothing that mutates it.
+  it('offers only the editor and the relation list for a document with front matter problems', () => {
     renderToolbar({ node: { ...NODE, ok: false, problems: ['front matter is missing'] } })
 
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
+    expect(screen.getByLabelText('Relations')).toBeTruthy()
     expect(screen.queryByLabelText('Change status')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
     expect(screen.queryByLabelText('Advance to the next step')).toBeNull()
+  })
+
+  // spec-00001-AC-30.4
+  it('says there are no relations rather than showing an empty list', async () => {
+    renderToolbar({ relations: [] })
+
+    await userEvent.click(screen.getByLabelText('Relations'))
+
+    expect(await screen.findByText('no relations')).toBeTruthy()
+  })
+
+  // spec-00001-AC-30.5 — a broken relation is exactly what the reader needs
+  it('marks a relation whose target does not exist', async () => {
+    renderToolbar({
+      relations: [{ field: 'parent', direction: 'out', otherId: 'idea-09999-ghost', ok: false }],
+    })
+
+    await userEvent.click(screen.getByLabelText('Relations'))
+
+    expect(await screen.findByText('missing')).toBeTruthy()
+    expect(screen.getByText('idea-09999-ghost')).toBeTruthy()
+  })
+
+  // spec-00001-AC-30.2 — direction is stated, not left to be inferred
+  it('states which end declared each relation', async () => {
+    renderToolbar({
+      relations: [
+        { field: 'parent', direction: 'out', otherId: 'idea-00001-x', ok: true },
+        { field: 'implements', direction: 'in', otherId: 'plan-00001-x', ok: true },
+      ],
+    })
+
+    await userEvent.click(screen.getByLabelText('Relations'))
+
+    expect(await screen.findByText('declared here, points at')).toBeTruthy()
+    expect(screen.getByText('declared by')).toBeTruthy()
+  })
+
+  // spec-00001-AC-30.3
+  it('hands back the document picked from the list', async () => {
+    const props = renderToolbar({
+      relations: [{ field: 'parent', direction: 'out', otherId: 'idea-00001-x', ok: true }],
+    })
+
+    await userEvent.click(screen.getByLabelText('Relations'))
+    await userEvent.click(await screen.findByText('idea-00001-x'))
+
+    expect(props.onPickRelation).toHaveBeenCalledWith('idea-00001-x')
   })
 
   it('opens the editor when edit is pressed', async () => {
