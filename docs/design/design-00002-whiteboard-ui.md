@@ -12,8 +12,10 @@ informs: [spec-00001-docs-whiteboard]
 > 定下（Tailwind 4 + shadcn/ui + Lucide）。
 
 本文只管界面。数据模型、API、会话与 git 由
-[design-00001-docs-whiteboard](design-00001-docs-whiteboard.md) 持有；本次唯一
-触及它的是节点种类的下发方式（§4）。
+[design-00001-docs-whiteboard](design-00001-docs-whiteboard.md) 持有。两处触及
+它：节点种类的下发方式（§4），以及画布布局——布局选型属 design-00001 §1，其
+规则由 [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)
+持有，本文 §2 只画出它的样子、§4 只定锚点与边的呈现。
 
 **本文取代 design-00001 §7 末段的「前端 Graph View 职责补充」**（着色与搜索/
 定位）——那一段与本文 §2、§4 是同一主题，两份活文档不能同时持有；其中的搜索/
@@ -87,6 +89,29 @@ flowchart TB
   FR-26 与 FR-27 的检索与跳转。**代价是可发现性净损失**：搜索入口从常驻输入框
   退为一次点击或一个快捷键；补偿是顶栏保留触发按钮，让快捷键可被看见。
 
+**画布内部**是一张类型分列的网格。**规则本身由
+`decision-00002-whiteboard-layout` §2 持有**，此处不复述，只画出它的样子——
+下面是本设计落地时本仓文档的一次快照（17 份、用到 9 个类型），不是活的清单：
+
+```
+        idea         prd          spec         rule       decision       design        plan        issue       record
+row0   idea-00001  prd-00001   spec-00001  rule-00001  decision-00001  design-00001  plan-00001  issue-00001  record-00001
+row1                                                   decision-00002  design-00002  plan-00002  issue-00002  record-00002
+row2                                                                                 plan-00003  issue-00003
+row3                                                                                             issue-00004
+```
+
+读法：横向是阶段，纵向是同一类型内的序号。图宽等于**实际用到的类型数**（此处 9）
+而非配置里声明的 16——没有文档的类型不占列。
+
+这套规则是同步纯函数，不需要布局引擎；它换掉的 ELK 与所接受的代价（无交叉
+最小化、纵向无界、列序由 YAML 声明顺序承载）见 decision-00002 §4。
+
+**布局与配置的到位次序**：列序来自 `GET /api/config`，而当前 `useBoard` 是
+把它与 `GET /api/graph` 各自独立地取的（`web/src/useBoard.ts:63-66`），首屏
+因此可能没有列序。本设计要求**两者都到位后才落位**，而不是先按无序布局画一遍
+再重排——后者会让节点在首屏跳一次，直接违背 decision-00002「位置可预期」的立论。
+
 ## 3. 控件映射
 
 | 界面位置 | 现在 | 改为 | 图标（Lucide） |
@@ -153,8 +178,43 @@ flowchart LR
   文本会撑破布局。
 - **选中态**：`--ring` 描边，与 React Flow 自身的选中样式统一。
 
-边沿用 React Flow：正常边为默认样式，`ok: false` 的边用 destructive 虚线，
-标签为关系字段名。
+边沿用 React Flow 的默认边型：标签为关系字段名，`ok: false` 的边用 destructive
+虚线。另有三条规则：
+
+- **箭头指向被引用的那份文档**。边的方向就是 front matter 的声明方向——`prd`
+  写 `parent: idea`，箭头就落在 `idea` 一端。不做任何反推：`docs/README.md`
+  规定每条边只在依赖方声明一次，画成别的方向就是在图上改写声明。已由产品负责人
+  裁定采用此方向。
+  **一条边在图上朝左还是朝右，取决于两端类型的列位，而不取决于关系字段名**：
+  同一个字段两次出现可以指向相反的方向（`rule informs spec` 朝左，
+  `design informs plan` 朝右）。因此不存在「某几个字段一律朝左」的规律，图上
+  两个方向都会出现。**落地实测**（本仓 17 份文档、34 条边）：26 条朝左、8 条
+  朝右、0 条同列。朝左占多数，但那是这批文档的类型分布所致，不是字段名的规律。
+- **节点必须自带锚点**：四个方位（上/下/左/右）各一对 source/target，共 8 个。
+  自定义节点接管渲染就接管了连接契约，缺锚点的节点会让 React Flow 丢弃它的
+  每一条边——这正是 `issue-00002` 的根因。取 8 个而不是 4 个是为了不依赖
+  `connectionMode="loose"` 的回退语义（Loose 只让 target 侧回退到 source 锚点，
+  source 侧仍要求 `type="source"`），从而避免为此改动 `<ReactFlow>` 的全局 prop。
+- **锚点不可见，但必须仍被布局与测量**。`display: none` 会让 React Flow 量不到
+  锚点位置，等于重新制造 `issue-00002`；隐藏只能用不影响盒模型的方式
+  （如 `opacity: 0`）。
+- **手工连线必须显式关闭，且要关在锚点上**。React Flow 的 `nodesConnectable`
+  默认为 `true`，所以锚点一旦落地，每个节点就多出四处可拖拽连线的交互——而白板
+  的边只能来自 front matter。本条的写法被落地实测**推翻了两次**，两次都记在
+  这里，因为它们是同一类错的两个层次：
+  1. 只在 `<ReactFlow nodesConnectable={false}>` 上设不够——该 prop 只把
+     `isConnectable` 传给**节点组件**，自定义节点不转发就等于没关。
+  2. 每个 `<Handle>` 加 `isConnectable={false}` 仍然不够——`Handle` 的
+     `isConnectableStart` / `isConnectableEnd` 是**各自独立**默认为 `true` 的，
+     而 pointer-down 的守卫读的是 `isConnectableStart`。只设 `isConnectable`
+     等于只摘掉了 CSS 类，拖拽通路照旧武装着。
+  故三个标志全设。由 `spec-00001-AC-1.14` 守着，且该 AC 的断言必须落在
+  `connectablestart` 上——只断言 `connectable` 类，等于断言那个不起作用的属性。
+- **锚点按几何选**：两端不同列时走左右侧（起点出靠向对端的那一侧，终点从其对侧
+  入）；同列时走上下（上方节点的下锚点 ↔ 下方节点的上锚点）；两端为同一节点时
+  （文档引用了自己，`docRepository` 视其为正常边）走该节点的上下锚点成自环。
+  同列的边是竖线；跨列的边只有在两端同行时才是横线，行不同即为斜线——本仓多数
+  跨列边正是斜线。
 
 ## 5. 面板
 
@@ -209,10 +269,32 @@ CodeMirror 在预览时仍只隐藏不卸载（FR-25 依赖它保住光标）。
 所定，§7 原先只点名了 `board.test` 的通路）；「再次点击 Clarify 收起」这一行为
 随对话框化消失，未保留替代覆盖。
 
-除上述之外查询不到的控件，才按真实的可访问性回归处理。
+**第二轮（布局与边）另有三处必然失败，同样不是回归**（§2、§4 与
+decision-00002 所致）：
 
-**jsdom 需要补的桩**：现有 `web/test/setup.ts` 只有 `matchMedia`、
-`ResizeObserver`、`Range.getClientRects` 与三个 SVG 度量方法。Radix 的
+6. **`board.test.tsx::places every node without overlapping`**：它的取样是
+   `prd-00001-x` 与 `idea-00001-x`——两个**不同类型**，新布局下二者在同一行
+   的两列，`expect(placed[0]!.y).not.toBe(placed[1]!.y)` 因此必失败。它同时是
+   `record-00001` 中 `spec-00001-AC-1.2` 的唯一证据行，须一并换掉。
+7. **`canvas.test.tsx::carries the relation as the edge label`**：整对象相等
+   断言，`toFlowEdges()` 增加 `sourceHandle`/`targetHandle`/`markerEnd` 后必失败。
+8. **两个函数的签名要加参数**：`layoutGraph(graph)` 与 `toFlowEdges(graph)` 现为
+   单参（`web/src/layout.ts:19`、`web/src/canvasModel.ts:20`），前者需要列序、
+   后者需要两端位置。受影响的调用点：`board.test.tsx:94,102,107`、
+   `canvas.test.tsx:39,49,53,59,66`、`web/src/useBoard.ts:26`、
+   `web/src/Board.tsx:49`。
+
+以上两轮之外查询不到的控件、或断言不成立的行为，才按真实回归处理。
+
+**jsdom 需要补的桩**（本段两次落地后的实际清单）：`web/test/setup.ts` 目前有
+`matchMedia`、空实现的 `ResizeObserver`、`localStorage`、三个 pointer-capture
+方法与 `scrollIntoView`、`Range.getClientRects`、三个 SVG 度量方法。画布要画出
+边还缺两个：**会上报尺寸的 `ResizeObserver`**（React Flow 只在两端节点被测量后
+才画边；entry 必须带 `borderBoxSize`，否则 `react-resizable-panels` 会读到
+undefined）与 **`DOMMatrixReadOnly`**。下一段是首次落地时写下的判断，其中对现有
+桩清单的描述已被上面这份取代：
+
+Radix 的
 `DropdownMenu` / `Dialog` / `Popover` 在 jsdom 下通常还需
 `Element.prototype.hasPointerCapture`、`releasePointerCapture`、`scrollIntoView`
 与 `PointerEvent`。现有 `matchMedia` 桩恒返回 `matches: false`，须改为可按用例

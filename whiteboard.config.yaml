@@ -2,23 +2,26 @@
 # Carries the type split (BR-1) and the product flow (BR-13…BR-17).
 # The status transition table (BR-2…BR-9) is derived from `kind` and is not configured here.
 
+# The declaration order below IS the whiteboard's column order, left to right
+# (decision-00002-whiteboard-layout §2). Reordering these lines reorders the
+# board; add a new type at the position you want its column to appear.
 types:
   idea: { kind: living }
   prd: { kind: living }
+  analysis: { kind: living }
+  reference: { kind: living }
+  integration: { kind: living }
   spec: { kind: living }
   rule: { kind: living }
-  design: { kind: living }
   decision: { kind: living }
-  analysis: { kind: living }
-  integration: { kind: living }
-  reference: { kind: living }
-  operation: { kind: living }
-  record: { kind: living }
-  prompt: { kind: living }
-  report: { kind: living }
-  issue: { kind: work }
+  design: { kind: living }
   plan: { kind: work }
   task: { kind: work }
+  issue: { kind: work }
+  record: { kind: living }
+  report: { kind: living }
+  operation: { kind: living }
+  prompt: { kind: living }
 
 relations:
   - parent

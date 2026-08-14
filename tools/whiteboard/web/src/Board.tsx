@@ -18,6 +18,7 @@ import { Terminal } from './Terminal.tsx'
 import { ThemeMenu } from './ThemeMenu.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { toFlowEdges, toFlowNodes } from './canvasModel.ts'
+import { onFlowError } from './flowError.ts'
 import { useTheme } from './theme.ts'
 import { useBoard } from './useBoard.ts'
 
@@ -46,7 +47,7 @@ function Canvas() {
     }))
   }, [board.graph, board.placed, board.selected, board.kinds])
 
-  const edges = useMemo(() => toFlowEdges(board.graph), [board.graph])
+  const edges = useMemo(() => toFlowEdges(board.graph, board.placed), [board.graph, board.placed])
   const selected = board.selectedNode
 
   /** Centre the viewport on a node and select it (spec-00001-FR-27). */
@@ -97,6 +98,10 @@ function Canvas() {
                   nodeTypes={nodeTypes}
                   onNodeClick={(_event, node) => void board.select(node.id)}
                   onPaneClick={board.deselect}
+                  // Handles exist to anchor edges, not to draw them: every edge
+                  // comes from front matter (spec-00001-AC-1.14).
+                  nodesConnectable={false}
+                  onError={onFlowError}
                   fitView
                 >
                   <Background />

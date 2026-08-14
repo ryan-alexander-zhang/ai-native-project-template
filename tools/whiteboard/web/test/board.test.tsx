@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { ReactFlowProvider } from '@xyflow/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
@@ -9,7 +10,8 @@ import { connectTerminal } from '../src/terminalSocket.ts'
 import { useBoard } from '../src/useBoard.ts'
 import { toast } from 'sonner'
 import { api } from '../src/api.ts'
-import { layoutGraph } from '../src/layout.ts'
+import { COLUMN_GAP, NODE_HEIGHT, NODE_WIDTH, ROW_GAP, layoutGraph } from '../src/layout.ts'
+import { toFlowEdges } from '../src/canvasModel.ts'
 
 function node(overrides: Partial<DocNode> = {}): DocNode {
   return {
@@ -58,8 +60,18 @@ describe('status colours', () => {
 })
 
 describe('a node on the canvas', () => {
+  // A handle reads the React Flow store, so the node only renders inside a
+  // provider now — the cost of owning the connection contract (issue-00002).
+  function renderCard(props: Parameters<typeof NodeCard>[0]) {
+    return render(
+      <ReactFlowProvider>
+        <NodeCard {...props} />
+      </ReactFlowProvider>,
+    )
+  }
+
   it('shows the type, title, id, and status', () => {
-    render(<NodeCard node={node()} selected={false} />)
+    renderCard({ node: node(), selected: false })
 
     expect(screen.getByText('prd')).toBeTruthy()
     expect(screen.getByText('X')).toBeTruthy()
@@ -69,7 +81,7 @@ describe('a node on the canvas', () => {
 
   // spec-00001-AC-2.1 — problems live behind a popover so long text cannot burst the node
   it('shows the problems of an anomalous document on request', async () => {
-    render(<NodeCard node={node({ ok: false, problems: ['front matter is missing'] })} selected />)
+    renderCard({ node: node({ ok: false, problems: ['front matter is missing'] }), selected: true })
     expect(screen.queryByText('front matter is missing')).toBeNull()
 
     await userEvent.click(screen.getByLabelText('Front matter problems of prd-00001-x'))
@@ -78,37 +90,146 @@ describe('a node on the canvas', () => {
   })
 
   it('counts the problems on the node face', () => {
-    render(<NodeCard node={node({ ok: false, problems: ['a', 'b'] })} selected />)
+    renderCard({ node: node({ ok: false, problems: ['a', 'b'] }), selected: true })
     expect(screen.getByLabelText('Front matter problems of prd-00001-x').textContent).toContain('2 problems')
   })
 
   it('shows a placeholder type when the front matter carries none', () => {
-    render(<NodeCard node={node({ type: undefined })} selected={false} />)
+    renderCard({ node: node({ type: undefined }), selected: false })
     expect(screen.getByText('—')).toBeTruthy()
   })
 })
 
-// spec-00001-AC-1.1 and AC-1.2
+// spec-00001-AC-1.1, AC-1.2 and AC-1.6 … AC-1.9 (decision-00002 §2)
 describe('the layout', () => {
-  it('places every node without overlapping', async () => {
-    const placed = await layoutGraph(GRAPH)
+  const ORDER = ['idea', 'prd', 'spec', 'rule']
 
-    expect(placed.map((item) => item.id).sort()).toEqual(['idea-00001-x', 'prd-00001-x'])
-    expect(placed[0]!.y).not.toBe(placed[1]!.y)
+  function graphOf(...nodes: DocNode[]): DocGraph {
+    return { nodes, edges: [], issues: [] }
+  }
+
+  function at(placed: { id: string; x: number; y: number }[], id: string) {
+    return placed.find((item) => item.id === id)!
+  }
+
+  // spec-00001-AC-1.6
+  it('places each type in its own column, left to right', () => {
+    const placed = layoutGraph(
+      graphOf(
+        node({ id: 'spec-00001-x', type: 'spec', path: 'spec/a.md' }),
+        node({ id: 'idea-00001-x', type: 'idea', path: 'idea/a.md' }),
+        node(),
+      ),
+      ORDER,
+    )
+
+    expect(at(placed, 'idea-00001-x').x).toBeLessThan(at(placed, 'prd-00001-x').x)
+    expect(at(placed, 'prd-00001-x').x).toBeLessThan(at(placed, 'spec-00001-x').x)
+    expect(new Set(placed.map((item) => item.y))).toEqual(new Set([0]))
+  })
+
+  // spec-00001-AC-1.7
+  it('stacks documents of the same type in one column, by id', () => {
+    const placed = layoutGraph(
+      graphOf(
+        node({ id: 'spec-00002-b', type: 'spec', path: 'spec/b.md' }),
+        node({ id: 'spec-00001-a', type: 'spec', path: 'spec/a.md' }),
+      ),
+      ORDER,
+    )
+
+    expect(at(placed, 'spec-00001-a').x).toBe(at(placed, 'spec-00002-b').x)
+    expect(at(placed, 'spec-00001-a').y).toBeLessThan(at(placed, 'spec-00002-b').y)
+  })
+
+  // spec-00001-AC-1.8 — `prd` is declared between them but has no document
+  it('leaves no empty column for a type with no documents', () => {
+    const placed = layoutGraph(
+      graphOf(
+        node({ id: 'idea-00001-x', type: 'idea', path: 'idea/a.md' }),
+        node({ id: 'spec-00001-x', type: 'spec', path: 'spec/a.md' }),
+      ),
+      ORDER,
+    )
+
+    const gap = at(placed, 'spec-00001-x').x - at(placed, 'idea-00001-x').x
+    expect(gap).toBe(NODE_WIDTH + COLUMN_GAP)
+  })
+
+  // spec-00001-AC-1.9
+  it('puts an undeclared type after every declared one', () => {
+    const placed = layoutGraph(
+      graphOf(node({ id: 'weird-00001-x', type: 'weird', path: 'weird/a.md' }), node()),
+      ORDER,
+    )
+
+    expect(at(placed, 'weird-00001-x').x).toBeGreaterThan(at(placed, 'prd-00001-x').x)
+  })
+
+  it('puts a document with no type last of all', () => {
+    const placed = layoutGraph(
+      graphOf(
+        node({ id: 'docs/broken.md', type: undefined, path: 'docs/broken.md', ok: false }),
+        node({ id: 'weird-00001-x', type: 'weird', path: 'weird/a.md' }),
+        node(),
+      ),
+      ORDER,
+    )
+
+    expect(at(placed, 'docs/broken.md').x).toBeGreaterThan(at(placed, 'weird-00001-x').x)
+  })
+
+  // issue-00004 is still open: an empty `type:` must not become a column of its
+  // own, sorting ahead of the genuinely named unknown types.
+  it('treats an empty type as a missing one', () => {
+    const placed = layoutGraph(
+      graphOf(
+        node({ id: 'empty-00001-x', type: '', path: 'empty/a.md' }),
+        node({ id: 'weird-00001-x', type: 'weird', path: 'weird/a.md' }),
+        node(),
+      ),
+      ORDER,
+    )
+
+    expect(at(placed, 'empty-00001-x').x).toBeGreaterThan(at(placed, 'weird-00001-x').x)
+  })
+
+  // Two documents may share an id (issue-00004); the row order stays total, so
+  // the layout function itself never returns two identical coordinates.
+  it('breaks an id tie with the file path', () => {
+    const placed = layoutGraph(
+      graphOf(node({ path: 'prd/b.md' }), node({ path: 'prd/a.md' })),
+      ORDER,
+    )
+
+    expect(placed.map((item) => item.y)).toEqual([0, NODE_HEIGHT + ROW_GAP])
+  })
+
+  // spec-00001-AC-1.13 — the lone document still lands in its own type column,
+  // so the fixture needs a neighbour of another type to make that observable.
+  it('places a document that declares no relations, with no edge on it', () => {
+    const graph = graphOf(node(), node({ id: 'idea-00001-x', type: 'idea', path: 'idea/a.md' }))
+    const placed = layoutGraph(graph, ORDER)
+
+    expect(at(placed, 'prd-00001-x')).toEqual({ id: 'prd-00001-x', x: NODE_WIDTH + COLUMN_GAP, y: 0 })
+    expect(toFlowEdges(graph, placed)).toEqual([])
   })
 
   // spec-00001-AC-1.4
-  it('places nothing for an empty graph', async () => {
-    expect(await layoutGraph({ nodes: [], edges: [], issues: [] })).toEqual([])
+  it('places nothing for an empty graph', () => {
+    expect(layoutGraph({ nodes: [], edges: [], issues: [] }, ORDER)).toEqual([])
   })
 
   // spec-00001-AC-2.2 — a broken edge must not drag its ghost target into the layout
-  it('ignores edges pointing at an unknown document', async () => {
-    const placed = await layoutGraph({
-      nodes: [node()],
-      edges: [{ from: 'prd-00001-x', to: 'idea-09999-ghost', relation: 'parent', ok: false }],
-      issues: [],
-    })
+  it('ignores edges pointing at an unknown document', () => {
+    const placed = layoutGraph(
+      {
+        nodes: [node()],
+        edges: [{ from: 'prd-00001-x', to: 'idea-09999-ghost', relation: 'parent', ok: false }],
+        issues: [],
+      },
+      ORDER,
+    )
     expect(placed).toHaveLength(1)
   })
 })
@@ -135,6 +256,39 @@ describe('the board state', () => {
 
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     expect(result.current.placed).toHaveLength(2)
+  })
+
+  // The column order arrives from GET /api/config; laying out before it lands
+  // would put every node in the unknown-type bucket (design-00002 §2).
+  it('lays out with the column order the config declares', async () => {
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.placed).toHaveLength(2))
+
+    const idea = result.current.placed.find((item) => item.id === 'idea-00001-x')!
+    const prd = result.current.placed.find((item) => item.id === 'prd-00001-x')!
+    // The config above declares prd first, then idea — so prd is the left column.
+    expect(prd.x).toBeLessThan(idea.x)
+  })
+
+  // The column order is a nicety; the graph is the point. Losing the config
+  // must not cost the user the board (verifier finding on plan-00003).
+  it('still draws the graph when the config cannot be read', async () => {
+    vi.spyOn(api, 'config').mockRejectedValue(new Error('config: no flow config at whiteboard.config.yaml'))
+    const { result } = renderHook(() => useBoard())
+
+    await waitFor(() => expect(result.current.placed).toHaveLength(2))
+    expect(toast.error).toHaveBeenCalledWith('config: no flow config at whiteboard.config.yaml')
+  })
+
+  // spec-00001-AC-1.12
+  it('puts every node back where it was after a refresh', async () => {
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.placed).toHaveLength(2))
+    const before = result.current.placed
+
+    await act(() => result.current.refresh().then(() => undefined))
+
+    expect(result.current.placed).toEqual(before)
   })
 
   it('selects a node and loads what it may do', async () => {

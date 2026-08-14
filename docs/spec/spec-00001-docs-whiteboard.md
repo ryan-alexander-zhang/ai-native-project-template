@@ -43,7 +43,14 @@ parent: prd-00001-docs-whiteboard
 
 - **spec-00001-FR-1** (Event) 当白板加载或用户刷新时，系统应解析全部文档的
   front matter，按每文档一节点、每关系字段一边（关系字段集来自流程配置）渲染
-  节点图，并自动布局；节点上展示类型、id、标题与 status。
+  节点图，并自动布局；节点上展示类型、id、标题与 status。布局为：**列即文档的
+  front matter `type`**（不取 id 前缀），列序取流程配置中类型的声明顺序，没有
+  文档的类型不占列，`type` 缺失或不在配置内者排在全部已声明类型之后，方向
+  左→右；**行为同列内的 id 升序**；每条边按 front matter 的声明方向连接两个
+  节点，箭头指向被引用的那份文档；节点不提供手工连线。同一次加载内布局与配置
+  同时到位后才落位，且同一组文档在刷新前后位置不变。完整的布局规则（含间距、
+  同 id 的次级排序与异常桶内的排序）由 `decision-00002-whiteboard-layout` 持有，
+  本要求只承载其可验收的部分。
 - **spec-00001-FR-2** (Unwanted) 若文档的 front matter 缺失或非法（含 id 不合
   `<type>-<五位数>-<slug>` 格式、type 不在流程配置的类型集内），或关系字段指向
   不存在的文档 id，系统应将该节点或边标记为异常并保持其余图可用，不得整体失败；
@@ -141,6 +148,42 @@ parent: prd-00001-docs-whiteboard
   Given 一个正文首个 H1 为「Docs 白板 PRD」的文档
   When 打开白板
   Then 该节点标题为「Docs 白板 PRD」
+- **spec-00001-AC-1.6** (spec-00001-FR-1)
+  Given `idea`、`prd`、`spec` 各一份，且按流程配置的声明顺序位列前三
+  When 打开白板
+  Then 三者各占一列，x 依该顺序递增
+- **spec-00001-AC-1.7** (spec-00001-FR-1)
+  Given 同类型的 `spec-00001` 与 `spec-00002`
+  When 打开白板
+  Then 二者 x 相同，且 `spec-00001` 在 `spec-00002` 上方
+- **spec-00001-AC-1.8** (spec-00001-FR-1)
+  Given 配置中 `prd` 位于 `idea` 与 `spec` 之间，而 `docs/` 下没有任何 `prd`
+  When 打开白板
+  Then `idea` 与 `spec` 相邻成列，中间不留空列
+- **spec-00001-AC-1.9** (spec-00001-FR-1)
+  Given 一份 type 不在流程配置类型集内的文档与若干正常文档
+  When 打开白板
+  Then 该节点位于全部已声明类型的列之后
+- **spec-00001-AC-1.10** (spec-00001-FR-1)
+  Given `prd-00001` 的 front matter 声明 `parent: idea-00001`
+  When 打开白板
+  Then 该边的箭头落在 `idea-00001` 一端
+- **spec-00001-AC-1.11** (spec-00001-FR-1)
+  Given `spec-00002` 声明 `supersedes: [spec-00001]`，且 `spec-00001` 在其上方
+  When 打开白板
+  Then 该边自 `spec-00002` 的上锚点连到 `spec-00001` 的下锚点
+- **spec-00001-AC-1.12** (spec-00001-FR-1)
+  Given 一组文档已在白板上落位
+  When 用户刷新
+  Then 每个节点的位置与刷新前相同
+- **spec-00001-AC-1.13** (spec-00001-FR-1)
+  Given 一份不声明任何关系字段的文档
+  When 打开白板
+  Then 该节点仍按其类型落在对应列，且没有边连到它
+- **spec-00001-AC-1.14** (spec-00001-FR-1)
+  Given 任一节点
+  When 用户在其锚点上拖拽
+  Then 不产生任何边——锚点只用于定位既有的关系边
 - **spec-00001-AC-2.1** (spec-00001-FR-2)
   Given 一个缺失 front matter 的文档与若干正常文档
   When 打开白板
@@ -469,6 +512,10 @@ parent: prd-00001-docs-whiteboard
 - `active → archived` 的归档配对自动化——MVP 只保证合法流转可选，不强制
   `rule-00001-BR-19` 的 `supersedes` 配对检查。
 - commit 合并/降噪策略（FR-14 固定为最细粒度）。
+- **id 唯一性校验**。FR-2 的异常清单不含「两份文档撞 id」，因此撞 id 时其中一份
+  在白板上不可见、且动作会落到另一份上——已知缺陷，见
+  [issue-00004](../issue/issue-00004-duplicate-ids-hide-a-document.md)；纳入
+  FR-2 需要一次呈现方式的裁定。
 - 写权限范围的用户自定义配置（后续版本；MVP 固定默认「仅 `docs/`」）。
 - 越界写入的 git 回滚兜底（依赖 CLI 权限机制，见 FR-13）。
 - 编辑与预览分栏并实时联动（MVP 为互斥切换）。
@@ -498,4 +545,5 @@ parent: prd-00001-docs-whiteboard
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
-- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md)
+- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md)
+- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（后者持有 FR-1 的完整布局规则）

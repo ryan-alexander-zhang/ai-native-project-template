@@ -19,7 +19,7 @@ informs: [spec-00001-docs-whiteboard]
 | --- | --- | --- |
 | 服务端 | Node.js + TypeScript | PTY（node-pty）与前端同栈；单进程即可承载 MVP |
 | 前端画布 | React + React Flow | 节点/边/浮窗交互开箱即用 |
-| 自动布局 | ELK（layered） | 分层布局贴合 docs 的阶段流方向 |
+| 自动布局 | 自有的类型分列布局（同步纯函数） | 列＝类型、行＝id 序，位置可预期；从关系边推导层次的算法（ELK/dagre）做不到这件事，且会把阶段流画反——取舍见 `decision-00002-whiteboard-layout` |
 | 编辑器 | CodeMirror 6（markdown 模式） | 纯文本可靠；编辑的是整文件原文，front matter 可见可改（异常节点靠它修复） |
 | 预览渲染 | react-markdown 10 + remark-gfm 4 | remark/rehype 生态的默认 React 渲染器；不启用 `rehype-raw` 时丢弃原始 HTML，承接 FR-24 |
 | 图表 | mermaid 11 | 与 `docs/` 里既有的 mermaid 图同源（`docs/design/README.md` 的 Guideline 即 "Prefer Mermaid"），无需第二套语法 |
@@ -33,7 +33,7 @@ informs: [spec-00001-docs-whiteboard]
 ```mermaid
 flowchart LR
   subgraph Browser
-    GV[Graph View<br/>React Flow + ELK]
+    GV[Graph View<br/>React Flow + 类型分列布局]
     ED[Editor<br/>CodeMirror + Preview]
     TM[Terminal<br/>xterm.js]
   end

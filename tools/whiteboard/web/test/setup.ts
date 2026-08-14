@@ -32,11 +32,59 @@ if (typeof window !== 'undefined') {
     })
   }
 
+  // React Flow only draws an edge once both endpoints have been measured, and
+  // measurement arrives through this observer. A no-op stub silently costs you
+  // every edge (issue-00002), so report a size instead. `borderBoxSize` is not
+  // optional: react-resizable-panels reads it.
   globalThis.ResizeObserver ??= class {
-    observe() {}
+    private readonly callback: ResizeObserverCallback
+
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback
+    }
+
+    observe(target: Element) {
+      const width = (target as HTMLElement).dataset.width ?? '240'
+      const height = (target as HTMLElement).dataset.height ?? '92'
+      const box = { inlineSize: Number(width), blockSize: Number(height) }
+      const rect = {
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: box.inlineSize,
+        bottom: box.blockSize,
+        width: box.inlineSize,
+        height: box.blockSize,
+        toJSON: () => ({}),
+      }
+      Object.defineProperties(target, {
+        offsetWidth: { configurable: true, value: box.inlineSize },
+        offsetHeight: { configurable: true, value: box.blockSize },
+      })
+      const entry = {
+        target,
+        contentRect: rect,
+        borderBoxSize: [box],
+        contentBoxSize: [box],
+        devicePixelContentBoxSize: [box],
+      } as unknown as ResizeObserverEntry
+      // Asynchronously, like the real one: observing inside a layout effect
+      // must not re-enter React's commit.
+      queueMicrotask(() => this.callback([entry], this as unknown as ResizeObserver))
+    }
+
     unobserve() {}
     disconnect() {}
   }
+
+  // React Flow reads the canvas transform through it; jsdom has no CSSOM view.
+  globalThis.DOMMatrixReadOnly ??= class {
+    m22 = 1
+    m41 = 0
+    m42 = 0
+    constructor(_transform?: string) {}
+  } as unknown as typeof DOMMatrixReadOnly
 
   // user-event builds mouse events without a `view`; d3-drag (inside React Flow)
   // reads `event.view.document` and throws. Fall back to the window.

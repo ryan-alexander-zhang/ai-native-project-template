@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
@@ -20,10 +20,13 @@ export function useBoard() {
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [session, setSession] = useState<SessionInfo | null>(null)
 
+  // Column order comes from the config; the layout is meaningless without it.
+  const typeOrder = useRef<string[]>([])
+
   const refresh = useCallback(async () => {
     const next = await api.graph()
     setGraph(next)
-    setPlaced(await layoutGraph(next))
+    setPlaced(layoutGraph(next, typeOrder.current))
     return next
   }, [])
 
@@ -61,8 +64,20 @@ export function useBoard() {
 
   // A session outlives the browser, so a board opening fresh reattaches to it.
   useEffect(() => {
-    void refresh()
-    void api.config().then((config) => setKinds(config.types))
+    // Config first: laying out before the column order lands would place every
+    // node in the unknown-type bucket and then move it (spec-00001-AC-1.12).
+    void (async () => {
+      try {
+        const config = await api.config()
+        typeOrder.current = Object.keys(config.types)
+        setKinds(config.types)
+      } catch (error) {
+        // A board with no column order still beats no board: the graph is the
+        // thing the user came for, so draw it and say why it looks odd.
+        toast.error(error instanceof Error ? error.message : String(error))
+      }
+      await refresh()
+    })()
     void api.session().then(({ current }) => {
       setSession(current)
       if (current?.status === 'running') setTerminalOpen(true)

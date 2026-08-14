@@ -24,13 +24,13 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 
 | GWT id | 测试 | 结果 | 证据 |
 | --- | --- | --- | --- |
-| spec-00001-AC-1.1 | makes one node per document and one edge per relation field (t/docRepository) | pass | 节点与边逐一断言 |
-| spec-00001-AC-1.2 | places every node without overlapping (w/board) | pass | ELK 实跑，y 不相等 |
+| spec-00001-AC-1.1 | makes one node per document and one edge per relation field (t/docRepository)；draws an edge for each declared relation (w/canvas) | pass | 数据层逐一断言；**DOM 级证据由 plan-00003 补上**（此前边从未真正渲染，见 issue-00002），见 record-00002 |
+| spec-00001-AC-1.2 | places each type in its own column, left to right (w/board) | pass | **证据已换**：原「ELK 实跑，y 不相等」随 issue-00003 的修复失效，现为类型分列布局实跑，见 record-00002 |
 | spec-00001-AC-1.3 | leaves README and TEMPLATE files out of the graph (t/docRepository) | pass | 仅 1 个节点 |
 | spec-00001-AC-1.4 | yields an empty graph for an empty docs tree (t/docRepository)；renders an empty canvas without error for an empty docs tree (w/canvas) | pass | 数据层与组件层各一 |
 | spec-00001-AC-1.5 | takes the node title from the first H1 (t/docRepository) | pass | 标题取自 H1 |
 | spec-00001-AC-2.1 | marks a document without front matter and labels it by path, leaving the rest intact (t/docRepository)；shows the problems of an anomalous document on request (w/board) | pass | 异常节点以路径为 id；problems 在 Popover 中 |
-| spec-00001-AC-2.2 | marks an edge pointing at an unknown id and keeps the graph usable (t/docRepository)；marks an edge pointing at an unknown document (w/canvas) | pass | 边 ok=false + issue |
+| spec-00001-AC-2.2 | marks an edge pointing at an unknown id and keeps the graph usable (t/docRepository)；marks an edge pointing at an unknown document (w/canvas) | pass | 边 ok=false + issue；该边此前同样未渲染，DOM 级证据见 record-00002 |
 | spec-00001-AC-2.3 | marks a document whose id does not match the id format (t/docRepository) | pass | id 格式违规 |
 | spec-00001-AC-2.4 | offers nothing for an anomalous document (t/workflow)；offers only the editor for a document with front matter problems (w/toolbar) | pass | 仅 Edit 存在 |
 | spec-00001-AC-3.1 | offers edit, status, review, and advance (w/toolbar)；opens the toolbar for the node the user clicks (w/canvas) | pass | 四类入口 |

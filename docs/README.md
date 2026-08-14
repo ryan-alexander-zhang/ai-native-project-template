@@ -38,9 +38,13 @@ Write the document description or comment after the front matter.
   - A field the document's type does not carry must not appear at all.
   - **Declare each edge once**, on the document that depends on the other. Do not
     write the inverse edge on the far end; derive it by reading or by script.
-  - `constrains` is the exception that proves the rule: it points downstream, so it
-    only lists documents that are bound by the choice but do not point back at it.
-    When a doc already declares `implements: [<the decision>]`, that edge exists —
+  - Three fields are the exception, because they point **downstream** and are
+    therefore declared on the upstream doc: `informs`, `constrains`, and `blocks`.
+    A `design` carries `informs: [<the spec it feeds>]`; an `issue` carries
+    `blocks: [<the plan it holds up>]`; a `decision` carries `constrains: [...]`.
+    Each still declares its edge once — just from the other end.
+  - `constrains` additionally lists only documents that do not point back at it:
+    when a doc already declares `implements: [<the decision>]`, that edge exists —
     do not repeat it in the decision's `constrains`.
   - Every listed id is a **full** `<type>-<nnnnn>-<slug>` id of a document that
     exists. Never a bare `plan-00007`.

@@ -192,4 +192,32 @@ describe('the config shipped with this repo', () => {
     expect(config.flow.plan).toEqual([{ next: 'task', carry: 'parent' }])
     expect(config.flow.record).toBeUndefined()
   })
+
+  /**
+   * The declaration order of `types` is the board's column order
+   * (decision-00002 §2). Nothing else in the code depends on it, so without
+   * this test a tidy-up reorder would silently rearrange the whiteboard.
+   */
+  it('declares the types in the column order the board reads left to right', () => {
+    const config = loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname)
+
+    expect(Object.keys(config.types)).toEqual([
+      'idea',
+      'prd',
+      'analysis',
+      'reference',
+      'integration',
+      'spec',
+      'rule',
+      'decision',
+      'design',
+      'plan',
+      'task',
+      'issue',
+      'record',
+      'report',
+      'operation',
+      'prompt',
+    ])
+  })
 })

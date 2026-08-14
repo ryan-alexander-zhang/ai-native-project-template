@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MarkerType } from '@xyflow/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
 import { api } from '../src/api.ts'
 import { matchDocuments, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
+import { onFlowError } from '../src/flowError.ts'
 
 function node(overrides: Partial<DocNode> = {}): DocNode {
   return {
@@ -55,16 +57,103 @@ describe('toFlowNodes', () => {
 })
 
 describe('toFlowEdges', () => {
+  // The layout in these cases: prd is to the right of idea, one row each.
+  const COLUMNS = [
+    { id: 'idea-00001-x', x: 0, y: 0 },
+    { id: 'prd-00001-x', x: 336, y: 0 },
+  ]
+
   it('carries the relation as the edge label', () => {
-    expect(toFlowEdges(GRAPH)).toEqual([
-      { id: 'e0', source: 'prd-00001-x', target: 'idea-00001-x', label: 'parent', className: undefined },
-    ])
+    expect(toFlowEdges(GRAPH, COLUMNS)[0]).toMatchObject({
+      id: 'e0',
+      source: 'prd-00001-x',
+      target: 'idea-00001-x',
+      label: 'parent',
+      className: undefined,
+    })
+  })
+
+  // spec-00001-AC-1.10 — the arrow lands on the referenced document
+  it('points the arrow at the document being referenced', () => {
+    const edge = toFlowEdges(GRAPH, COLUMNS)[0]!
+
+    expect(edge.target).toBe('idea-00001-x')
+    expect(edge.markerEnd).toEqual({ type: MarkerType.ArrowClosed })
+  })
+
+  it('anchors a cross-column edge on the sides that face each other', () => {
+    const edge = toFlowEdges(GRAPH, COLUMNS)[0]!
+
+    // prd sits right of idea, so the edge leaves prd's left and enters idea's right.
+    expect(edge.sourceHandle).toBe('source-left')
+    expect(edge.targetHandle).toBe('target-right')
+  })
+
+  it('anchors the other way round when the source is the left-hand node', () => {
+    const graph = { ...GRAPH, edges: [{ from: 'idea-00001-x', to: 'prd-00001-x', relation: 'informs', ok: true }] }
+    const edge = toFlowEdges(graph, COLUMNS)[0]!
+
+    expect(edge.sourceHandle).toBe('source-right')
+    expect(edge.targetHandle).toBe('target-left')
+  })
+
+  // spec-00001-AC-1.11
+  it('anchors a same-column edge top to bottom', () => {
+    const graph: DocGraph = {
+      nodes: [],
+      edges: [{ from: 'spec-00002-b', to: 'spec-00001-a', relation: 'supersedes', ok: true }],
+      issues: [],
+    }
+    const placed = [
+      { id: 'spec-00001-a', x: 0, y: 0 },
+      { id: 'spec-00002-b', x: 0, y: 140 },
+    ]
+
+    const edge = toFlowEdges(graph, placed)[0]!
+
+    // spec-00002 is below, so it leaves its top and arrives at the other's bottom.
+    expect(edge.sourceHandle).toBe('source-top')
+    expect(edge.targetHandle).toBe('target-bottom')
+  })
+
+  it('anchors a same-column edge the other way when the source is above', () => {
+    const graph: DocGraph = {
+      nodes: [],
+      edges: [{ from: 'spec-00001-a', to: 'spec-00002-b', relation: 'informs', ok: true }],
+      issues: [],
+    }
+    const placed = [
+      { id: 'spec-00001-a', x: 0, y: 0 },
+      { id: 'spec-00002-b', x: 0, y: 140 },
+    ]
+
+    const edge = toFlowEdges(graph, placed)[0]!
+
+    expect(edge.sourceHandle).toBe('source-bottom')
+    expect(edge.targetHandle).toBe('target-top')
+  })
+
+  it('loops a document that references itself', () => {
+    const graph: DocGraph = {
+      nodes: [],
+      edges: [{ from: 'spec-00001-a', to: 'spec-00001-a', relation: 'supersedes', ok: true }],
+      issues: [],
+    }
+    const edge = toFlowEdges(graph, [{ id: 'spec-00001-a', x: 0, y: 0 }])[0]!
+
+    expect(edge.sourceHandle).toBe('source-top')
+    expect(edge.targetHandle).toBe('target-bottom')
   })
 
   // spec-00001-AC-2.2
   it('marks an edge pointing at an unknown document', () => {
     const graph = { ...GRAPH, edges: [{ from: 'prd-00001-x', to: 'ghost', relation: 'parent', ok: false }] }
-    expect(toFlowEdges(graph)[0]!.className).toBe('edge--broken')
+    const edge = toFlowEdges(graph, COLUMNS)[0]!
+
+    expect(edge.className).toBe('edge--broken')
+    // The ghost has no position; the edge still gets usable anchors.
+    expect(edge.sourceHandle).toBe('source-right')
+    expect(edge.targetHandle).toBe('target-left')
   })
 })
 
@@ -134,6 +223,71 @@ describe('the board', () => {
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
     expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy()
     expect(screen.getByText('no issues')).toBeTruthy()
+  })
+
+  // issue-00002 / spec-00001-AC-1.1 — asserted on the DOM, not on the model:
+  // toFlowEdges() was right all along while the canvas stayed empty.
+  it('draws an edge for each declared relation', async () => {
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+
+    await waitFor(() =>
+      expect(container.querySelectorAll('.react-flow__edge')).toHaveLength(GRAPH.edges.length),
+    )
+    expect(container.querySelectorAll('.react-flow__edge-path').length).toBeGreaterThan(0)
+  })
+
+  // issue-00002 §5 — an edge count alone cannot tell "no handle" from "not yet
+  // measured": both drop the edge, so only the error id distinguishes them.
+  // React Flow's own channel is silent outside a dev build, which is why the
+  // board wires `onError` (flowError.ts) — without it this assertion is vacuous.
+  it('reports no error through the react flow channel while drawing the graph', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { container } = render(<Board />)
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge')).toHaveLength(1))
+
+    // `004` (container has no width/height) is a jsdom artifact — the canvas is
+    // unsized here and would not be in a browser. `008` is the one that matters.
+    const reported = warn.mock.calls.map((call) => String(call[0])).filter((m) => m.includes('react-flow'))
+    expect(reported.filter((m) => m.includes('008'))).toEqual([])
+    expect(reported.length).toBeGreaterThan(0) // the channel is live, not silent
+  })
+
+  // ...and the guard above only means something if that channel can speak:
+  it('routes a react flow error to the console', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    onFlowError('008', "Couldn't create edge for source handle id: some-handle")
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('react-flow 008'))
+  })
+
+  // spec-00001-AC-1.10 in the DOM: an arrow head at the referenced end, and
+  // none at the declaring end — the model assertion alone would pass with both.
+  it('draws the arrow head only at the referenced end', async () => {
+    const { container } = render(<Board />)
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge-path')).toHaveLength(1))
+
+    const path = container.querySelector('.react-flow__edge-path')!
+    expect(path.getAttribute('marker-end')).toContain('arrowclosed')
+    expect(path.getAttribute('marker-start')).toBeNull()
+    expect(container.querySelector('.react-flow__edge')!.getAttribute('aria-label')).toBe(
+      'Edge from prd-00001-x to idea-00001-x',
+    )
+  })
+
+  // spec-00001-AC-1.14
+  it('offers no handle to drag a new edge from', async () => {
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+
+    // `connectable` is only the CSS class; `connectablestart` is the one the
+    // pointer-down guard reads, so it is the one that must be gone.
+    expect(container.querySelectorAll('.react-flow__handle').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('.react-flow__handle.connectable')).toHaveLength(0)
+    expect(container.querySelectorAll('.react-flow__handle.connectablestart')).toHaveLength(0)
+    expect(container.querySelectorAll('.react-flow__handle.connectableend')).toHaveLength(0)
   })
 
   // spec-00001-AC-1.4

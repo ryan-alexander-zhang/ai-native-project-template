@@ -1,6 +1,22 @@
-import type { Edge, Node } from '@xyflow/react'
+import { type Edge, MarkerType, type Node, Position } from '@xyflow/react'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import type { Placed } from './layout.ts'
+
+/** The four sides a relation edge can leave from or arrive at. */
+export const SIDES = ['top', 'right', 'bottom', 'left'] as const
+export type Side = (typeof SIDES)[number]
+
+export const SIDE_POSITION: Record<Side, Position> = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+}
+
+/** A custom node owns its handles; the ids are the contract between it and the edges. */
+export function handleId(kind: 'source' | 'target', side: Side): string {
+  return `${kind}-${side}`
+}
 
 /** Graph plus layout as React Flow nodes; an unplaced node still lands on the canvas. */
 export function toFlowNodes(graph: DocGraph, placed: Placed[], selected?: string): Node[] {
@@ -16,15 +32,40 @@ export function toFlowNodes(graph: DocGraph, placed: Placed[], selected?: string
   })
 }
 
-/** One edge per declared relation; a broken one is drawn but marked (spec-00001-AC-2.2). */
-export function toFlowEdges(graph: DocGraph): Edge[] {
-  return graph.edges.map((edge, index) => ({
-    id: `e${index}`,
-    source: edge.from,
-    target: edge.to,
-    label: edge.relation,
-    className: edge.ok ? undefined : 'edge--broken',
-  }))
+/**
+ * Which sides an edge leaves from and arrives at, so the two ends face each
+ * other: left/right across columns, top/bottom within one
+ * (design-00002 §4). A document referencing itself gets a loop.
+ */
+function sides(from: Placed | undefined, to: Placed | undefined): [Side, Side] {
+  if (!from || !to) return ['right', 'left']
+  if (from.x < to.x) return ['right', 'left']
+  if (from.x > to.x) return ['left', 'right']
+  return from.y < to.y ? ['bottom', 'top'] : ['top', 'bottom']
+}
+
+/**
+ * One edge per declared relation, drawn in the direction the front matter
+ * declares it: the arrow lands on the referenced document (spec-00001-AC-1.10).
+ * A broken one is drawn but marked (spec-00001-AC-2.2).
+ */
+export function toFlowEdges(graph: DocGraph, placed: Placed[]): Edge[] {
+  return graph.edges.map((edge, index) => {
+    const [from, to] = sides(
+      placed.find((position) => position.id === edge.from),
+      placed.find((position) => position.id === edge.to),
+    )
+    return {
+      id: `e${index}`,
+      source: edge.from,
+      target: edge.to,
+      sourceHandle: handleId('source', from),
+      targetHandle: handleId('target', to),
+      label: edge.relation,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      className: edge.ok ? undefined : 'edge--broken',
+    }
+  })
 }
 
 /**
