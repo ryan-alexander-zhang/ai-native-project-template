@@ -3,7 +3,14 @@ import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { SIDE_POSITION, handleId } from './canvasModel.ts'
 import { COVERAGE } from './coverageMarks.ts'
-import type { AcceptanceRowNodeData, CriterionNodeData, ItemNodeData } from './subCanvas.ts'
+import { InlineMarkdown } from './InlineMarkdown.tsx'
+import {
+  SUB_COLUMN_WIDTH,
+  SUB_NODE_HEIGHT,
+  type AcceptanceRowNodeData,
+  type CriterionNodeData,
+  type ItemNodeData,
+} from './subCanvas.ts'
 
 /**
  * The three node shapes of the sub-canvas (design-00002 §9). They are read, not
@@ -13,7 +20,8 @@ import type { AcceptanceRowNodeData, CriterionNodeData, ItemNodeData } from './s
 
 interface ShellProps {
   testId: string
-  className: string
+  /** The column whose fixed size this node takes — the same one the layout placed it by. */
+  column: 0 | 1 | 2
   children: ReactNode
 }
 
@@ -22,11 +30,12 @@ interface ShellProps {
  * card owns: without them React Flow drops every edge that touches the node
  * (issue-00002), and they are hidden by opacity so they stay measurable.
  */
-function Shell({ testId, className, children }: ShellProps) {
+function Shell({ testId, column, children }: ShellProps) {
   return (
     <div
       data-testid={testId}
-      className={`bg-card text-card-foreground flex flex-col justify-center overflow-hidden rounded-lg border px-3 py-2 shadow-sm ${className}`}
+      style={{ width: SUB_COLUMN_WIDTH[column], height: SUB_NODE_HEIGHT[column] }}
+      className="bg-card text-card-foreground flex flex-col justify-center overflow-hidden rounded-lg border px-3 py-2 shadow-sm"
     >
       <Handle
         type="target"
@@ -56,12 +65,14 @@ export function ItemNode({ data }: { data: ItemNodeData }) {
   const { item } = data
   const { Icon, label, token } = COVERAGE[item.coverage]
   return (
-    <Shell testId={`sub-item-${item.id}`} className="h-[76px] w-[240px]">
+    <Shell testId={`sub-item-${item.id}`} column={0}>
       <div className="flex items-center gap-2">
         <Icon role="img" aria-label={label} className="size-3.5 shrink-0" style={{ color: token }} />
         <span className="truncate font-mono text-xs">{item.id}</span>
       </div>
-      <p className="text-muted-foreground mt-1 line-clamp-2 text-[11px]">{item.text}</p>
+      <p className="text-muted-foreground mt-1 line-clamp-2 text-[11px]">
+        <InlineMarkdown text={item.text} />
+      </p>
     </Shell>
   )
 }
@@ -70,9 +81,11 @@ export function ItemNode({ data }: { data: ItemNodeData }) {
 export function CriterionNode({ data }: { data: CriterionNodeData }) {
   const { criterion } = data
   return (
-    <Shell testId={`sub-ac-${criterion.id}`} className="h-[60px] w-[200px]">
+    <Shell testId={`sub-ac-${criterion.id}`} column={1}>
       <span className="truncate font-mono text-[11px]">{criterion.id}</span>
-      <p className="text-muted-foreground line-clamp-1 text-[11px]">{criterion.text.replace(/\n[^]*$/, '')}</p>
+      <p className="text-muted-foreground line-clamp-1 text-[11px]">
+        <InlineMarkdown text={criterion.text.replace(/\n[^]*$/, '')} />
+      </p>
     </Shell>
   )
 }
@@ -81,14 +94,16 @@ export function CriterionNode({ data }: { data: CriterionNodeData }) {
 export function AcceptanceRowNode({ data }: { data: AcceptanceRowNodeData }) {
   const { row } = data
   return (
-    <Shell testId={`sub-row-${row.recordId}-${row.targetId}`} className="h-[60px] w-[220px]">
+    <Shell testId={`sub-row-${row.recordId}-${row.targetId}`} column={2}>
       <div className="flex items-center gap-2">
         <span className="truncate font-mono text-[11px]">{row.recordId}</span>
         <Badge variant="secondary" className="ml-auto shrink-0 text-[10px]">
           {row.result}
         </Badge>
       </div>
-      <p className="text-muted-foreground truncate text-[11px]">{row.test}</p>
+      <p className="text-muted-foreground truncate text-[11px]">
+        <InlineMarkdown text={row.test} />
+      </p>
     </Shell>
   )
 }

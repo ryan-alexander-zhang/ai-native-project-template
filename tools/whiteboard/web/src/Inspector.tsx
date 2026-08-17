@@ -1,8 +1,10 @@
 import { Maximize2, PanelRight } from 'lucide-react'
-import type { ItemsView } from '../../src/requirements.ts'
+import { useState } from 'react'
+import type { ItemsView, RequirementItem } from '../../src/requirements.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { COVERAGE } from './coverageMarks.ts'
+import { InlineMarkdown } from './InlineMarkdown.tsx'
 
 export interface InspectorProps {
   docId: string
@@ -20,6 +22,11 @@ export interface InspectorProps {
  * verdict is never recomputed here (design-00001 §2).
  */
 export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) {
+  // An accordion, one row at a time (spec-00001-FR-38). The id is what is held,
+  // not the item, so a graph refresh brings the same row back open.
+  const [expanded, setExpanded] = useState<string>()
+  const toggle = (itemId: string) => setExpanded((open) => (open === itemId ? undefined : itemId))
+
   return (
     <section aria-label={`Requirements of ${docId}`} className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b px-3 py-2">
@@ -50,15 +57,24 @@ export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) 
               return (
                 // Hover and keyboard focus are one path: FR-34 gives them equal
                 // standing, so the row is focusable and both events lead here.
+                // Click and Enter are the other path — reading, not linking
+                // (spec-00001-FR-38); the two gestures do not collide.
                 <li
                   key={item.id}
                   data-testid={`item-${item.id}`}
                   tabIndex={0}
+                  aria-expanded={expanded === item.id}
                   onMouseEnter={() => onInspect(item.id)}
                   onMouseLeave={() => onInspect(undefined)}
                   onFocus={() => onInspect(item.id)}
                   onBlur={() => onInspect(undefined)}
-                  className="hover:bg-accent focus:bg-accent border-b px-3 py-2 outline-none"
+                  onClick={() => toggle(item.id)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return
+                    event.preventDefault()
+                    toggle(item.id)
+                  }}
+                  className="hover:bg-accent focus:bg-accent cursor-pointer border-b px-3 py-2 outline-none"
                 >
                   <div className="flex items-center gap-2">
                     <Icon role="img" aria-label={label} className="size-3.5 shrink-0" style={{ color: token }} />
@@ -67,9 +83,15 @@ export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) 
                       {item.criteria.length} AC
                     </Badge>
                   </div>
-                  {/* Two lines and no more; the full text is read in the editor
-                      or the sub-canvas, not in a tooltip (design-00002 §9). */}
-                  <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{item.text}</p>
+                  {/* Two lines and no more until the row is opened; the clamp
+                      falls on the rendered text, never on the source
+                      (spec-00001-FR-39, design-00002 §9). */}
+                  <p
+                    className={`text-muted-foreground mt-1 text-xs ${expanded === item.id ? '' : 'line-clamp-2'}`}
+                  >
+                    <InlineMarkdown text={item.text} />
+                  </p>
+                  {expanded === item.id ? <Expansion item={item} /> : null}
                 </li>
               )
             })}
@@ -103,5 +125,29 @@ export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) 
         )}
       </div>
     </section>
+  )
+}
+
+/**
+ * The opened row (spec-00001-FR-38): every criterion in full, because the panel
+ * has no AC node to click — that is the sub-canvas's job (design-00002 §9). An
+ * item with no criteria says so rather than opening onto nothing.
+ */
+function Expansion({ item }: { item: RequirementItem }) {
+  return (
+    <div aria-label={`Expanded ${item.id}`} className="mt-2 space-y-2 border-l pl-3">
+      {item.criteria.length === 0 ? (
+        <p className="text-muted-foreground text-xs">no AC</p>
+      ) : (
+        item.criteria.map((criterion) => (
+          <div key={criterion.id}>
+            <p className="font-mono text-[11px]">{criterion.id}</p>
+            <p className="text-muted-foreground text-xs">
+              <InlineMarkdown text={criterion.text} />
+            </p>
+          </div>
+        ))
+      )}
+    </div>
   )
 }

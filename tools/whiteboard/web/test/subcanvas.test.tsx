@@ -223,6 +223,41 @@ describe('the sub-canvas', () => {
     expect(screen.getByText('docs whiteboard')).toBeTruthy()
   })
 
+  // spec-00001-AC-35.7 — a spec of dozens of items opens showing all of them
+  it('fits every node of a tall sub-canvas into the first viewport', async () => {
+    const many = view({
+      items: Array.from({ length: 30 }, (_, index) =>
+        item(`spec-00001-FR-${index + 1}`, {
+          coverage: 'verified',
+          criteria: [
+            criterion(`spec-00001-AC-${index + 1}.1`, [row(`spec-00001-AC-${index + 1}.1`)]),
+            criterion(`spec-00001-AC-${index + 1}.2`, [row(`spec-00001-AC-${index + 1}.2`)]),
+          ],
+        }),
+      ),
+    })
+    vi.spyOn(api, 'items').mockResolvedValue(many)
+    const { container } = await openPanel()
+
+    await userEvent.click(expandButton())
+    await waitFor(() => expect(screen.getByTestId('sub-item-spec-00001-FR-30')).toBeTruthy())
+
+    const canvas = container.querySelector('.react-flow__renderer') as HTMLElement
+    const transform = (container.querySelector('.react-flow__viewport') as HTMLElement).style.transform
+    const [, x, y, zoom] = /translate\((-?[\d.]+)px,(-?[\d.]+)px\) scale\(([\d.]+)\)/.exec(transform)!
+    const [panX, panY, scale] = [Number(x), Number(y), Number(zoom)]
+
+    // React Flow's own floor is 0.5; a chain this tall cannot fit above it, so
+    // the assertion below only holds because the board lowers it.
+    expect(scale).toBeLessThan(0.5)
+    for (const node of subCanvas(many).nodes) {
+      expect(node.position.x * scale + panX).toBeGreaterThanOrEqual(-0.5)
+      expect(node.position.y * scale + panY).toBeGreaterThanOrEqual(-0.5)
+      expect((node.position.x + node.width!) * scale + panX).toBeLessThanOrEqual(canvas.offsetWidth + 0.5)
+      expect((node.position.y + node.height!) * scale + panY).toBeLessThanOrEqual(canvas.offsetHeight + 0.5)
+    }
+  })
+
   // spec-00001-AC-36.1
   it('returns to the board on the document, selected and in view', async () => {
     const { container } = await openSubCanvas()

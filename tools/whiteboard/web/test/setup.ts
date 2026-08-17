@@ -36,46 +36,80 @@ if (typeof window !== 'undefined') {
   // measurement arrives through this observer. A no-op stub silently costs you
   // every edge (issue-00002), so report a size instead. `borderBoxSize` is not
   // optional: react-resizable-panels reads it.
+  //
+  // The size an element reports comes from its `data-width` / `data-height`,
+  // unless a test overrides it by selector through `resizeSizes`. A test that
+  // needs an element to *change* size — a panel taking half the canvas, say —
+  // sets `resizeSizes` again and calls `reportResize()`; the observers report
+  // afresh, as the browser's would (issue-00006).
+  const observers = new Set<{ report: () => void }>()
+  type StubSize = { selector: string; width: number; height: number }
+  const drive = globalThis as { resizeSizes?: StubSize[]; reportResize?: () => void }
+
+  function entryFor(target: Element): ResizeObserverEntry {
+    const forced = drive.resizeSizes?.find((size) => target.matches(size.selector))
+    const element = target as HTMLElement
+    const box = {
+      inlineSize: forced?.width ?? Number(element.dataset.width ?? '240'),
+      blockSize: forced?.height ?? Number(element.dataset.height ?? '92'),
+    }
+    const rect = {
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: box.inlineSize,
+      bottom: box.blockSize,
+      width: box.inlineSize,
+      height: box.blockSize,
+      toJSON: () => ({}),
+    }
+    Object.defineProperties(target, {
+      offsetWidth: { configurable: true, value: box.inlineSize },
+      offsetHeight: { configurable: true, value: box.blockSize },
+    })
+    return {
+      target,
+      contentRect: rect,
+      borderBoxSize: [box],
+      contentBoxSize: [box],
+      devicePixelContentBoxSize: [box],
+    } as unknown as ResizeObserverEntry
+  }
+
   globalThis.ResizeObserver ??= class {
     private readonly callback: ResizeObserverCallback
+    private readonly targets = new Set<Element>()
 
     constructor(callback: ResizeObserverCallback) {
       this.callback = callback
+      observers.add(this)
     }
 
     observe(target: Element) {
-      const width = (target as HTMLElement).dataset.width ?? '240'
-      const height = (target as HTMLElement).dataset.height ?? '92'
-      const box = { inlineSize: Number(width), blockSize: Number(height) }
-      const rect = {
-        x: 0,
-        y: 0,
-        top: 0,
-        left: 0,
-        right: box.inlineSize,
-        bottom: box.blockSize,
-        width: box.inlineSize,
-        height: box.blockSize,
-        toJSON: () => ({}),
-      }
-      Object.defineProperties(target, {
-        offsetWidth: { configurable: true, value: box.inlineSize },
-        offsetHeight: { configurable: true, value: box.blockSize },
-      })
-      const entry = {
-        target,
-        contentRect: rect,
-        borderBoxSize: [box],
-        contentBoxSize: [box],
-        devicePixelContentBoxSize: [box],
-      } as unknown as ResizeObserverEntry
+      this.targets.add(target)
       // Asynchronously, like the real one: observing inside a layout effect
       // must not re-enter React's commit.
-      queueMicrotask(() => this.callback([entry], this as unknown as ResizeObserver))
+      queueMicrotask(() => this.report())
     }
 
-    unobserve() {}
-    disconnect() {}
+    unobserve(target: Element) {
+      this.targets.delete(target)
+    }
+
+    disconnect() {
+      this.targets.clear()
+      observers.delete(this)
+    }
+
+    report() {
+      const entries = [...this.targets].map(entryFor)
+      if (entries.length > 0) this.callback(entries, this as unknown as ResizeObserver)
+    }
+  }
+
+  drive.reportResize = () => {
+    for (const observer of observers) observer.report()
   }
 
   // React Flow reads the canvas transform through it; jsdom has no CSSOM view.

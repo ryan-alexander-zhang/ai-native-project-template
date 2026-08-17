@@ -427,6 +427,186 @@ describe('hovering an item in the panel', () => {
     expect(container.querySelectorAll('.react-flow__edge.edge--emphasis')).toHaveLength(2)
     expect(screen.getByText('spec-00001-AC-1.2')).toBeTruthy()
   })
+
+  /** One item whose criteria are verified by the records named, in order. */
+  function citedBy(records: string[]) {
+    return view({
+      items: [
+        item('spec-00001-FR-1', {
+          coverage: 'verified',
+          criteria: records.map((recordId, index) =>
+            criterion(`spec-00001-AC-1.${index + 1}`, [row(recordId, `spec-00001-AC-1.${index + 1}`)]),
+          ),
+        }),
+      ],
+    })
+  }
+
+  // spec-00001-AC-34.7 — three is still inside the threshold
+  it('lists all three cited AC ids on the label', async () => {
+    vi.spyOn(api, 'items').mockResolvedValue(citedBy(['record-00001-x', 'record-00001-x', 'record-00001-x']))
+    await openPanel()
+
+    await userEvent.hover(screen.getByTestId('item-spec-00001-FR-1'))
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('spec-00001-AC-1.1 · spec-00001-AC-1.2 · spec-00001-AC-1.3'),
+      ).toBeTruthy(),
+    )
+  })
+
+  // spec-00001-AC-34.8 — one past the threshold and the label folds
+  it('folds a fourth cited AC id into «first +3»', async () => {
+    vi.spyOn(api, 'items').mockResolvedValue(
+      citedBy(['record-00001-x', 'record-00001-x', 'record-00001-x', 'record-00001-x']),
+    )
+    await openPanel()
+
+    await userEvent.hover(screen.getByTestId('item-spec-00001-FR-1'))
+
+    await waitFor(() => expect(screen.getByText('spec-00001-AC-1.1 +3')).toBeTruthy())
+    // The other three are read in the panel, not on the edge.
+    expect(screen.queryByText(/spec-00001-AC-1\.4/)).toBeNull()
+  })
+
+  // spec-00001-AC-34.9 — the threshold counts per edge, not per item
+  it('keeps both labels itemised when four cited AC ids split across two edges', async () => {
+    vi.spyOn(api, 'items').mockResolvedValue(
+      citedBy(['record-00001-x', 'record-00001-x', 'record-00002-x', 'record-00002-x']),
+    )
+    const { container } = await openPanel()
+
+    await userEvent.hover(screen.getByTestId('item-spec-00001-FR-1'))
+
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge.edge--emphasis')).toHaveLength(2))
+    expect(screen.getByText('spec-00001-AC-1.1 · spec-00001-AC-1.2')).toBeTruthy()
+    expect(screen.getByText('spec-00001-AC-1.3 · spec-00001-AC-1.4')).toBeTruthy()
+    expect(screen.queryByText(/\+\d/)).toBeNull()
+  })
+})
+
+describe('expanding an item row', () => {
+  const FIRST = item('spec-00001-FR-1', {
+    coverage: 'verified',
+    criteria: [
+      criterion('spec-00001-AC-1.1', [row('record-00001-x', 'spec-00001-AC-1.1')]),
+      criterion('spec-00001-AC-1.2', [row('record-00001-x', 'spec-00001-AC-1.2')]),
+    ],
+  })
+  const SECOND = item('spec-00001-FR-2', { criteria: [criterion('spec-00001-AC-2.1')] })
+  const BARE = item('spec-00001-FR-3')
+
+  beforeEach(() => {
+    // A fresh object per call, so a refresh really is a new graph downstream.
+    vi.spyOn(api, 'graph').mockImplementation(async () => ({ ...GRAPH }))
+    vi.spyOn(api, 'transitions').mockResolvedValue(['archived'])
+    vi.spyOn(api, 'nextSteps').mockResolvedValue([])
+    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'items').mockResolvedValue(view({ items: [FIRST, SECOND, BARE] }))
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
+      relations: ['verifies'],
+      flow: {},
+      agents: [{ name: 'claude', command: 'claude', args: [] }],
+    })
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  async function openPanel() {
+    const rendered = await selectNode('spec-00001-x')
+    await waitFor(() => expect(screen.getByTestId('item-spec-00001-FR-1')).toBeTruthy())
+    return rendered
+  }
+
+  const rowOf = (id: string) => screen.getByTestId(`item-${id}`)
+  const expansionOf = (id: string) => screen.queryByLabelText(`Expanded ${id}`)
+
+  // spec-00001-AC-38.1
+  it('opens the row in place, with the whole text and every AC in full', async () => {
+    await openPanel()
+
+    await userEvent.click(rowOf('spec-00001-FR-1'))
+
+    const expansion = expansionOf('spec-00001-FR-1')!
+    expect(expansion).toBeTruthy()
+    expect(within(expansion).getByText('spec-00001-AC-1.1')).toBeTruthy()
+    expect(within(expansion).getByText('spec-00001-AC-1.2')).toBeTruthy()
+    expect(within(expansion).getAllByText('Given a board When it loads Then it works')).toHaveLength(2)
+    // The row's own text is no longer clamped while it is open.
+    expect(rowOf('spec-00001-FR-1').querySelector('.line-clamp-2')).toBeNull()
+    expect(rowOf('spec-00001-FR-1').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  // spec-00001-AC-38.2
+  it('closes the row on a second click, back to the clamped text', async () => {
+    await openPanel()
+    await userEvent.click(rowOf('spec-00001-FR-1'))
+
+    await userEvent.click(rowOf('spec-00001-FR-1'))
+
+    expect(expansionOf('spec-00001-FR-1')).toBeNull()
+    expect(rowOf('spec-00001-FR-1').querySelector('.line-clamp-2')).toBeTruthy()
+  })
+
+  // spec-00001-AC-38.3 — an accordion: opening B closes A
+  it('keeps at most one row open', async () => {
+    await openPanel()
+    await userEvent.click(rowOf('spec-00001-FR-1'))
+
+    await userEvent.click(rowOf('spec-00001-FR-2'))
+
+    expect(expansionOf('spec-00001-FR-2')).toBeTruthy()
+    expect(expansionOf('spec-00001-FR-1')).toBeNull()
+  })
+
+  // spec-00001-AC-38.4 — click is reading, hover is still linking
+  it('emphasises the edge on hover while the row is open', async () => {
+    const { container } = await openPanel()
+    await userEvent.click(rowOf('spec-00001-FR-1'))
+    await userEvent.unhover(rowOf('spec-00001-FR-1'))
+
+    await userEvent.hover(rowOf('spec-00001-FR-1'))
+
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge.edge--emphasis')).toHaveLength(1))
+    expect(screen.getByText('spec-00001-AC-1.1 · spec-00001-AC-1.2')).toBeTruthy()
+    expect(expansionOf('spec-00001-FR-1')).toBeTruthy()
+  })
+
+  // spec-00001-AC-38.5 — the same reason AC-29.6 gives: a refresh is not an act
+  it('keeps the row open through a graph refresh', async () => {
+    vi.spyOn(api, 'accept').mockResolvedValue({ committed: true, status: 'active' })
+    await openPanel()
+    await userEvent.click(rowOf('spec-00001-FR-1'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }))
+
+    await waitFor(() => expect(api.graph).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(api.items).toHaveBeenCalledTimes(2))
+    expect(expansionOf('spec-00001-FR-1')).toBeTruthy()
+  })
+
+  // spec-00001-AC-38.6
+  it('says «no AC» rather than opening onto nothing', async () => {
+    await openPanel()
+
+    await userEvent.click(rowOf('spec-00001-FR-3'))
+
+    const expansion = expansionOf('spec-00001-FR-3')!
+    expect(within(expansion).getByText('no AC')).toBeTruthy()
+    expect(rowOf('spec-00001-FR-3').textContent).toContain('what spec-00001-FR-3 asks of the system')
+  })
+
+  // spec-00001-AC-38.7 — Enter on the focused row does what the click does
+  it('opens the row from the keyboard', async () => {
+    await openPanel()
+    rowOf('spec-00001-FR-2').focus()
+
+    await userEvent.keyboard('{Enter}')
+
+    expect(expansionOf('spec-00001-FR-2')).toBeTruthy()
+  })
 })
 
 describe('the evidence of an item', () => {

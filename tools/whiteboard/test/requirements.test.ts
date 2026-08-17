@@ -119,7 +119,9 @@ describe('reading acceptance rows', () => {
     ])
   })
 
-  it('reads a checklist with an evidence column just the same', () => {
+  // An Evidence column neither adds nor removes a row (FR-32); what it does add
+  // is the field the detail panel reads (design-00001 §7, spec-00001-FR-37).
+  it('reads a checklist with an evidence column just the same, and carries the evidence', () => {
     const rows = acceptanceRows({
       id: 'record-00001-x',
       body: [
@@ -130,8 +132,30 @@ describe('reading acceptance rows', () => {
     })
 
     expect(rows).toEqual([
-      { recordId: 'record-00001-x', targetId: 'spec-00001-AC-1.1', test: 'draws a node', result: 'pass' },
+      {
+        recordId: 'record-00001-x',
+        targetId: 'spec-00001-AC-1.1',
+        test: 'draws a node',
+        result: 'pass',
+        evidence: 'screenshot',
+      },
     ])
+  })
+
+  // Absent, not empty: nothing to show is not a field showing nothing.
+  it('leaves the evidence out when the column is empty, and when there is none', () => {
+    const [empty] = acceptanceRows({
+      id: 'record-00001-x',
+      body: [
+        '| GWT id | Test | Result | Evidence |',
+        '| --- | --- | --- | --- |',
+        '| spec-00001-AC-1.1 | draws a node | pass |  |',
+      ].join('\n'),
+    })
+    const [none] = acceptanceRows(checklist('record-00001-x', [['spec-00001-AC-1.1', 'draws a node', 'pass']]))
+
+    expect(empty).not.toHaveProperty('evidence')
+    expect(none).not.toHaveProperty('evidence')
   })
 
   // the amendment table of a record: ids and prose, no test and no result column

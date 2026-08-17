@@ -1,4 +1,14 @@
-import { Background, Controls, NodeToolbar, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react'
+import {
+  Background,
+  Controls,
+  type Node as FlowNode,
+  NodeToolbar,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+  useStore,
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { FileQuestionMark, LayoutDashboard, Search, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -19,6 +29,7 @@ import { useDefaultLayout } from 'react-resizable-panels'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from './api.ts'
 import { CommandPalette } from './CommandPalette.tsx'
+import { Details } from './Details.tsx'
 import { Editor } from './Editor.tsx'
 import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
@@ -29,7 +40,7 @@ import { ThemeMenu } from './ThemeMenu.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { evidenceOf, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from './canvasModel.ts'
 import { onFlowError } from './flowError.ts'
-import { subCanvas } from './subCanvas.ts'
+import { detailTarget, subCanvas } from './subCanvas.ts'
 import { useTheme } from './theme.ts'
 import { useBoard } from './useBoard.ts'
 
@@ -44,6 +55,25 @@ const nodeTypes = {
   acceptanceRow: AcceptanceRowNode,
 }
 
+/** React Flow's own floor, which is what the top-level graph wants. */
+const DEFAULT_MIN_ZOOM = 0.5
+
+/**
+ * `fitView` clamps to `minZoom`, and a sub-canvas is as tall as the document
+ * has acceptance rows: under the default floor, fitting a few dozen items is
+ * arithmetically impossible and the view opens clamped mid-chain
+ * (spec-00001-AC-35.7, record-00004 observation 3). So the floor drops to half
+ * of what *this* sub-canvas needs — low enough that the floor never decides the
+ * fit, and no lower. The top-level graph keeps the default: a floor below it
+ * buys nothing there and lets the whole board be zoomed down to a grey smudge.
+ */
+function minZoomFor(sub: { nodes: FlowNode[] }, width: number, height: number): number {
+  if (sub.nodes.length === 0 || width === 0 || height === 0) return DEFAULT_MIN_ZOOM
+  const right = Math.max(...sub.nodes.map((node) => node.position.x + (node.width ?? 0)))
+  const bottom = Math.max(...sub.nodes.map((node) => node.position.y + (node.height ?? 0)))
+  return Math.min(DEFAULT_MIN_ZOOM, Math.min(width / right, height / bottom) / 2)
+}
+
 function Canvas() {
   const board = useBoard()
   const theme = useTheme()
@@ -53,6 +83,19 @@ function Canvas() {
   // The document whose sub-canvas has taken the canvas over (spec-00001-FR-35);
   // `undefined` is the top-level board.
   const [drilled, setDrilled] = useState<string>()
+  // The sub-canvas node whose detail is open (spec-00001-FR-37), held by id so
+  // a graph refresh keeps the same node's detail open.
+  const [detail, setDetail] = useState<string>()
+  // A document the board was told to go to, carried with the canvas width that
+  // was current when it was asked for: the slot has settled once React Flow
+  // reports a different one (issue-00006).
+  const [pendingFocus, setPendingFocus] = useState<{ id: string; width: number }>()
+  // React Flow's own measurement of the canvas, which is the width `setCenter`
+  // and `fitView` divide by. It lands a frame after the panel mounts, so it —
+  // not the commit that mounted the panel — is the signal that the layout is
+  // done (issue-00006).
+  const canvasWidth = useStore((state) => state.width)
+  const canvasHeight = useStore((state) => state.height)
   // v4 has no autoSaveId; this hook is the persistence path (localStorage by default).
   const rows = useDefaultLayout({ id: 'whiteboard-rows', panelIds: ['work', 'terminal'] })
   const columns = useDefaultLayout({ id: 'whiteboard-columns', panelIds: ['canvas', 'editor'] })
@@ -61,6 +104,12 @@ function Canvas() {
   const inspectorColumns = useDefaultLayout({
     id: 'whiteboard-inspector-columns',
     panelIds: ['canvas', 'inspector'],
+  })
+  // The detail panel is a third occupant of the slot, and its width is its own
+  // (design-00002 §9).
+  const detailColumns = useDefaultLayout({
+    id: 'whiteboard-detail-columns',
+    panelIds: ['canvas', 'detail'],
   })
 
   const nodes = useMemo(() => {
@@ -93,26 +142,90 @@ function Canvas() {
     () => (drilled !== undefined && board.items !== undefined ? subCanvas(board.items) : undefined),
     [drilled, board.items],
   )
+  // The floor follows the dataset: loose enough for the sub-canvas on show,
+  // React Flow's default on the top-level board.
+  const minZoom = useMemo(
+    () => (sub === undefined ? DEFAULT_MIN_ZOOM : minZoomFor(sub, canvasWidth, canvasHeight)),
+    [sub, canvasWidth, canvasHeight],
+  )
   // Editor first: the panel follows the selection, but a deliberate act of
   // editing is not interrupted by one click on the canvas (spec-00001-FR-31).
   // The sub-canvas is the panel's own expansion, so it takes the whole width.
   const inspector =
     board.editing === undefined && selected !== undefined && sub === undefined ? board.items : undefined
+  // Resolved from the current payload, so a refresh keeps it by id and the
+  // disappearance of what it pointed at closes it (plan-00006 U2).
+  const shown = useMemo(() => {
+    if (sub === undefined || board.items === undefined || detail === undefined) return undefined
+    return detailTarget(board.items, detail)
+  }, [sub, board.items, detail])
 
   // A new dataset lands under the old viewport, which may be nowhere near it.
+  // React Flow fits the nodes it has *measured*, and a dataset swapped in this
+  // tick has none — the fit then lands on whatever was left over. The
+  // sub-canvas fixes every node's geometry itself, so we tell React Flow to fit
+  // from the declared sizes instead of the measured ones (spec-00001-AC-35.7).
   useEffect(() => {
-    if (drilled !== undefined) void fitView()
+    if (drilled !== undefined) void fitView({ includeHiddenNodes: true })
   }, [drilled, fitView])
+
+  // The document the sub-canvas was drawn from can leave the board under us;
+  // there is nothing to be inside of, so we come back up (plan-00006 U2).
+  useEffect(() => {
+    if (drilled !== undefined && !board.graph.nodes.some((node) => node.id === drilled)) setDrilled(undefined)
+  }, [board.graph, drilled])
+
+  // Esc closes the detail and leaves the sub-canvas standing (spec-00001-AC-37.7).
+  useEffect(() => {
+    if (shown === undefined) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDetail(undefined)
+    }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [shown])
+
+  function centre(id: string) {
+    const at = board.placed.find((position) => position.id === id)
+    if (at) setCenter(at.x + NODE_WIDTH / 2, at.y + NODE_HEIGHT / 2, { zoom: 1, duration: 300 })
+  }
+
+  // The centring above ran against the full canvas; the inspector then takes a
+  // third of it, which leaves the node — and the right end of its floating
+  // toolbar — under the panel's edge. Centre again once the canvas has actually
+  // narrowed: the panel's mount and React Flow's new width are different
+  // frames, and only the second is a settled layout — waiting on the first
+  // divides by the width the panel has already taken away (issue-00006,
+  // design-00002 §9, record-00004 observation 4). A selection that leaves the
+  // width alone never gets here, so the viewport only moves when the slot moved.
+  useEffect(() => {
+    if (pendingFocus === undefined || selected?.id !== pendingFocus.id) return
+    if (canvasWidth === pendingFocus.width) return
+    centre(pendingFocus.id)
+    setPendingFocus(undefined)
+  }, [pendingFocus, canvasWidth, selected, board.placed])
 
   /**
    * Centre the viewport on a document node and select it (spec-00001-FR-27).
-   * Going to a document is a top-level act, so it also leaves any sub-canvas —
-   * which is what the breadcrumb's «Board» does (spec-00001-FR-36).
+   * Going to a document is a top-level act, so it also leaves any sub-canvas
+   * and its detail — which is what the breadcrumb's «Board» does
+   * (spec-00001-FR-36, spec-00001-AC-37.9).
    */
   function focus(id: string) {
     setDrilled(undefined)
-    const at = board.placed.find((position) => position.id === id)
-    if (at) setCenter(at.x + NODE_WIDTH / 2, at.y + NODE_HEIGHT / 2, { zoom: 1, duration: 300 })
+    setDetail(undefined)
+    centre(id)
+    setPendingFocus({ id, width: canvasWidth })
+    void board.select(id)
+  }
+
+  /**
+   * Selecting on the top-level canvas. The panel it may open takes the right
+   * third, so the same wait applies: a click that changes the canvas width ends
+   * with the node back in the middle of what is left (issue-00006).
+   */
+  function select(id: string) {
+    setPendingFocus({ id, width: canvasWidth })
     void board.select(id)
   }
 
@@ -170,8 +283,11 @@ function Canvas() {
 
       <ResizablePanelGroup orientation="vertical" {...rows} className="min-h-0 flex-1">
         <ResizablePanel id="work" defaultSize={65} minSize={25}>
-          <ResizablePanelGroup orientation="horizontal" {...(inspector ? inspectorColumns : columns)}>
-            <ResizablePanel id="canvas" defaultSize={board.editing || inspector ? 62 : 100} minSize={30}>
+          <ResizablePanelGroup
+            orientation="horizontal"
+            {...(inspector ? inspectorColumns : shown ? detailColumns : columns)}
+          >
+            <ResizablePanel id="canvas" defaultSize={board.editing || inspector || shown ? 62 : 100} minSize={30}>
               <div className="relative h-full">
                 <ReactFlow
                   nodes={sub ? sub.nodes : nodes}
@@ -180,12 +296,15 @@ function Canvas() {
                   // A sub-canvas node is not a document: selecting is the top
                   // level's act, and so is dropping the selection — losing it
                   // here would take the items the sub-canvas is drawn from.
-                  onNodeClick={sub ? undefined : (_event, node) => void board.select(node.id)}
-                  onPaneClick={sub ? undefined : board.deselect}
+                  // In the sub-canvas a click opens the node's detail instead
+                  // (spec-00001-FR-37), and the blank closes it (AC-37.4).
+                  onNodeClick={sub ? (_event, node) => setDetail(node.id) : (_event, node) => select(node.id)}
+                  onPaneClick={sub ? () => setDetail(undefined) : board.deselect}
                   // Handles exist to anchor edges, not to draw them: every edge
                   // comes from front matter (spec-00001-AC-1.14).
                   nodesConnectable={false}
                   onError={onFlowError}
+                  minZoom={minZoom}
                   fitView
                 >
                   <Background />
@@ -240,6 +359,13 @@ function Canvas() {
                     onInspect={setInspecting}
                     onExpand={() => setDrilled(selected.id)}
                   />
+                </ResizablePanel>
+              </>
+            ) : shown ? (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel id="detail" defaultSize={38} minSize={20}>
+                  <Details target={shown} onGoToRecord={focus} />
                 </ResizablePanel>
               </>
             ) : null}

@@ -4,6 +4,12 @@ import { handleId } from './canvasModel.ts'
 
 /** Column widths, left to right: item | AC | acceptance row (design-00002 §9). */
 export const SUB_COLUMN_WIDTH = [240, 200, 220] as const
+/**
+ * And their heights — the item card is the tall one. Declaring the size React
+ * Flow would otherwise have to measure is what lets it know when the dataset is
+ * ready, which is what «fit on entry» waits for (spec-00001-AC-35.7).
+ */
+export const SUB_NODE_HEIGHT = [76, 60, 60] as const
 export const SUB_COLUMN_GAP = 80
 /** One row of the grid; every node of a row shares its top edge. */
 export const SUB_ROW_PITCH = 88
@@ -19,9 +25,41 @@ export type ItemNodeData = { item: RequirementItem }
 export type CriterionNodeData = { criterion: Criterion }
 export type AcceptanceRowNodeData = { row: AcceptanceRow }
 
+/** What a clicked sub-canvas node stands for, which is what its detail panel reads (spec-00001-FR-37). */
+export type DetailTarget =
+  | { kind: 'item'; id: string; item: RequirementItem }
+  | { kind: 'criterion'; id: string; criterion: Criterion }
+  | { kind: 'row'; id: string; row: AcceptanceRow }
+
+/**
+ * The node id resolved against the current payload. Looking it up afresh on
+ * every render is what makes the detail survive a graph refresh by id, and what
+ * closes it when the thing it pointed at is gone (plan-00006 U2).
+ */
+export function detailTarget(view: ItemsView, nodeId: string): DetailTarget | undefined {
+  for (const item of view.items) {
+    if (item.id === nodeId) return { kind: 'item', id: nodeId, item }
+    for (const criterion of item.criteria) {
+      if (criterion.id === nodeId) return { kind: 'criterion', id: nodeId, criterion }
+      const row = criterion.rows.find((_, index) => acceptanceRowId(criterion.id, index) === nodeId)
+      if (row) return { kind: 'row', id: nodeId, row }
+    }
+  }
+  return undefined
+}
+
 /** A record's acceptance row has no id of its own, so the citing AC and its ordinal make one. */
 export function acceptanceRowId(criterionId: string, index: number): string {
   return `${criterionId}@${index}`
+}
+
+/** Where a node of `column` sits on `row`, at the size its column fixes. */
+function place(column: number, row: number) {
+  return {
+    position: { x: columnX(column), y: row * SUB_ROW_PITCH },
+    width: SUB_COLUMN_WIDTH[column]!,
+    height: SUB_NODE_HEIGHT[column]!,
+  }
 }
 
 function edge(source: string, target: string): Edge {
@@ -55,7 +93,7 @@ export function subCanvas(view: ItemsView): { nodes: Node[]; edges: Edge[] } {
     nodes.push({
       id: item.id,
       type: 'item',
-      position: { x: columnX(0), y: row * SUB_ROW_PITCH },
+      ...place(0, row),
       data: { item } satisfies ItemNodeData,
     })
 
@@ -63,7 +101,7 @@ export function subCanvas(view: ItemsView): { nodes: Node[]; edges: Edge[] } {
       nodes.push({
         id: criterion.id,
         type: 'criterion',
-        position: { x: columnX(1), y: row * SUB_ROW_PITCH },
+        ...place(1, row),
         data: { criterion } satisfies CriterionNodeData,
       })
       edges.push(edge(item.id, criterion.id))
@@ -73,7 +111,7 @@ export function subCanvas(view: ItemsView): { nodes: Node[]; edges: Edge[] } {
         nodes.push({
           id,
           type: 'acceptanceRow',
-          position: { x: columnX(2), y: row * SUB_ROW_PITCH },
+          ...place(2, row),
           data: { row: entry } satisfies AcceptanceRowNodeData,
         })
         edges.push(edge(criterion.id, id))

@@ -21,6 +21,7 @@ const CONTINUATION = /^[ \t]+\S/
 const ATTRIBUTION = /^\(([^)]+)\)[ \t]*/
 const TEST_COLUMN = /test|测试/i
 const RESULT_COLUMN = /result|结果/i
+const EVIDENCE_COLUMN = /evidence|证据/i
 const PASS = 'pass'
 
 /** Only spec and rule declare requirement items; other types are out of scope (spec-00001 §6). */
@@ -34,6 +35,8 @@ export interface AcceptanceRow {
   targetId: string
   test: string
   result: string
+  /** What the row offers as proof; absent when the checklist has no Evidence column (design-00001 §7). */
+  evidence?: string
 }
 
 export interface Criterion {
@@ -157,7 +160,7 @@ function verifyingRows(records: DocBody[], prefix: string): AcceptanceRow[] {
 export function acceptanceRows(record: DocBody): AcceptanceRow[] {
   const lines = record.body.split('\n')
   const rows: AcceptanceRow[] = []
-  let columns: { test: number; result: number } | undefined
+  let columns: VerificationColumns | undefined
 
   lines.forEach((line, index) => {
     if (!line.trimStart().startsWith('|')) {
@@ -173,21 +176,33 @@ export function acceptanceRows(record: DocBody): AcceptanceRow[] {
     // A split always yields a first cell, and only the first cell says what the row verifies.
     const targetId = cells[0]!
     if (!columns || !DECLARED_ID.test(targetId)) return
+    const evidence = columns.evidence === undefined ? '' : (cells[columns.evidence] ?? '')
     rows.push({
       recordId: record.id,
       targetId,
       test: cells[columns.test] ?? '',
       result: cells[columns.result] ?? '',
+      // Left out rather than left empty: a checklist with no Evidence column has
+      // no such field to show (design-00001 §7, spec-00001-AC-37.8).
+      ...(evidence === '' ? {} : { evidence }),
     })
   })
   return rows
 }
 
+interface VerificationColumns {
+  test: number
+  result: number
+  /** Optional by contract: an Evidence column neither adds nor removes a row (spec-00001-FR-32). */
+  evidence?: number
+}
+
 /** A checklist header carries a test and a result column, neither of them the id column. */
-function verificationColumns(header: string[]): { test: number; result: number } | undefined {
+function verificationColumns(header: string[]): VerificationColumns | undefined {
   const test = header.findIndex((cell) => TEST_COLUMN.test(cell))
   const result = header.findIndex((cell) => RESULT_COLUMN.test(cell))
-  return test > 0 && result > 0 ? { test, result } : undefined
+  const evidence = header.findIndex((cell) => EVIDENCE_COLUMN.test(cell))
+  return test > 0 && result > 0 ? { test, result, ...(evidence > 0 ? { evidence } : {}) } : undefined
 }
 
 function isDivider(line: string): boolean {

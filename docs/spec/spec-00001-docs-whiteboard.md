@@ -29,7 +29,7 @@ parent: prd-00001-docs-whiteboard
 | S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19 |
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
 | S5 | 作为文档负责人，我要每次变更与评审都自动留痕，这样任何结论都可追溯 | spec-00001-FR-14, spec-00001-FR-20 |
-| S6 | 作为文档负责人，我要选中一份 spec 或 rule 就看到它的需求条目与验收覆盖，并能下钻到条目级的验收链路，这样验收缺口不靠脚本就能看见 | spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36 |
+| S6 | 作为文档负责人，我要选中一份 spec 或 rule 就看到它的需求条目与验收覆盖，并能下钻到条目级的验收链路、读到任何一条的全文，这样验收缺口不靠脚本就能看见 | spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36, spec-00001-FR-37, spec-00001-FR-38, spec-00001-FR-39 |
 
 ## 3. Business Rules
 
@@ -184,17 +184,41 @@ parent: prd-00001-docs-whiteboard
   正文内的断裂不使文档节点降格为异常节点。
 - **spec-00001-FR-34** (Event) 当用户悬停或键盘聚焦检视面板中的某条需求条目时，
   系统应把选中文档与「验收行引用了该条目 AC 的 record 文档」之间的**既有**关系
-  边转为强调态、标签替换为被引用的 AC id（多条时并列），其余边一并压弱；离开该条目时回到
+  边转为强调态、标签替换为被引用的 AC id——阈值按**单条边**的标签项数计：不多
+  于 3 条时逐项并列，多于 3 条时折叠为「首个 id +N」，N 为该边其余被引 AC 的
+  条数（完整清单在检视面板或详情面板中读，标签只指路。阈值 3 与此形态由域主在
+  本轮裁定；decision-00003 §5 预留的「密度阈值」概念由此落定，该决定已同步记
+  一笔），其余边一并压弱；离开该条目时回到
   FR-29 所定的选中态呈现。条目未覆盖、或该 record 与选中文档之间不存在关系边
   时，不强调任何边且不出错。
 - **spec-00001-FR-35** (Event) 当用户在检视面板点击「展开为子画布」时，系统应把
   画布切换为该文档的**子画布**：需求条目、各条目的 AC、以及引用这些 AC 的验收
   行呈现为节点（验收行节点含 record id、测试名与结果），边为条目→AC 与 AC→
   验收行；条目的覆盖状态沿用 FR-32 的呈现；顶栏呈现面包屑「Board / <文档 id>」。
-  面包屑只在子画布中出现；无条目的文档不提供该入口。
+  面包屑只在子画布中出现；无条目的文档不提供该入口。进入子画布时视口应容纳
+  全部节点（fit），无需手动缩放即可见全貌。
 - **spec-00001-FR-36** (Event) 当用户点击面包屑中的「Board」时，系统应回到顶层
   白板并把该文档节点置为选中态（视口定位到它）——返回即选中，检视面板与边的
   强调随选中态照常出现（FR-29、FR-31）。
+- **spec-00001-FR-37** (Event) 当用户在子画布中单击一个节点时，系统应在右侧
+  槽位打开只读**详情面板**：AC 节点呈现完整的 Given/When/Then 全文；条目节点
+  呈现完整正文与其全部 AC 的列表；验收行节点呈现 record id、测试、结果与
+  Evidence（清单表无 Evidence 列时不呈现该字段），并含一个跳转入口——点击即
+  返回顶层白板并选中该 record（与 FR-36 同构）。单击另一节点时详情随之切换；
+  点击子画布空白或按 Esc 时关闭；经面包屑返回顶层时详情一并关闭，右槽交还检视
+  面板（FR-36）。详情面板不提供任何写入口，子画布只读（FR-35）的约束照旧。
+- **spec-00001-FR-38** (Event) 当用户单击检视面板中的一条条目行（或在其键盘
+  焦点上按 Enter，二者同权）时，系统应就地展开该行，呈现完整正文与其每条 AC
+  的全文（无 AC 的条目呈现「无 AC」空态）；再次单击收起；同一时刻至多一行处于
+  展开态——展开 B 即收起 A；图刷新后展开态按条目 id 保持（与 AC-29.6 的选中态
+  同理）。展开与收起不改变 FR-34 的悬停联动：单击归阅读，悬停归联动。
+- **spec-00001-FR-39** (Ubiquitous) 需求条目、AC 与验收行的文本在白板中的一切
+  呈现处（检视面板的截断行与展开态、子画布节点、详情面板）应按**行内
+  Markdown** 渲染：行内代码、加粗、斜体呈现为对应样式，原始标记不可见；块级
+  语法不产生块级元素，按纯文本呈现；链接与图片同样降级——不产出可导航的链接
+  元素、不产出图片元素与任何外部请求，链接文字与图片替代文本按纯文本呈现；
+  不执行脚本、不注入原始 HTML（FR-24 的口径）。截断作用于渲染后的文本，不作用
+  于原始源码。
 
 **Acceptance (GWT)**
 
@@ -748,7 +772,8 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-34.1** (spec-00001-FR-34)
   Given 选中的 spec 有一条已验证条目，其验收行来自与该 spec 存在关系边的 record
   When 悬停面板中的该条目
-  Then 两者之间的边转为强调态，标签为被引用的 AC id（多条时并列）
+  Then 两者之间的边转为强调态，标签为被引用的 AC id（不多于 3 条时逐项并列——
+  阈值见 AC-34.7/34.8）
 - **spec-00001-AC-34.2** (spec-00001-FR-34)
   Given 同 AC-34.1
   When 悬停离开该条目
@@ -770,6 +795,19 @@ parent: prd-00001-docs-whiteboard
   关系边
   When 悬停该条目
   Then 两条边都转为强调态
+- **spec-00001-AC-34.7** (spec-00001-FR-34)
+  Given 某条目的被引 AC 恰为 3 条
+  When 悬停该条目
+  Then 标签逐项列出全部 3 条 AC id
+- **spec-00001-AC-34.8** (spec-00001-FR-34)
+  Given 某条目在同一条边上的被引 AC 恰为 4 条
+  When 悬停该条目
+  Then 标签呈现首个 AC id 与「+3」，不逐项并列——边界外侧一格即折叠，N 为其余
+  条数
+- **spec-00001-AC-34.9** (spec-00001-FR-34)
+  Given 某条目的 4 条被引 AC 分属两份 record（各 2 条，两份都与选中文档有边）
+  When 悬停该条目
+  Then 两条边的标签各自逐项列出 2 条 AC id——阈值按边计，不按条目总数计
 - **spec-00001-AC-35.1** (spec-00001-FR-35)
   Given 已选中一份含条目的 spec
   When 点击「展开为子画布」
@@ -795,6 +833,10 @@ parent: prd-00001-docs-whiteboard
   Given 顶层白板
   When 查看顶栏
   Then 不呈现面包屑
+- **spec-00001-AC-35.7** (spec-00001-FR-35)
+  Given 一份含数十条条目的 spec
+  When 展开为子画布
+  Then 初始视口容纳全部节点，无需手动缩放即可见三列全貌
 - **spec-00001-AC-36.1** (spec-00001-FR-36)
   Given 某文档的子画布已打开
   When 点击面包屑中的「Board」
@@ -803,6 +845,95 @@ parent: prd-00001-docs-whiteboard
   Given 同 AC-36.1
   When 返回顶层后查看界面
   Then 检视面板呈现该文档的条目——与直接选中它时一致
+- **spec-00001-AC-37.1** (spec-00001-FR-37)
+  Given 子画布中一个 AC 节点
+  When 单击它
+  Then 右侧详情面板呈现该 AC 完整的 Given/When/Then 全文
+- **spec-00001-AC-37.2** (spec-00001-FR-37)
+  Given 子画布中一个条目节点
+  When 单击它
+  Then 详情面板呈现其完整正文与全部 AC 的列表
+- **spec-00001-AC-37.3** (spec-00001-FR-37)
+  Given 子画布中一个验收行节点
+  When 单击它
+  Then 详情面板呈现 record id、测试、结果与 Evidence，且含指向该 record 的跳转
+  入口
+- **spec-00001-AC-37.4** (spec-00001-FR-37)
+  Given 详情面板已打开
+  When 点击子画布空白处
+  Then 详情面板关闭
+- **spec-00001-AC-37.5** (spec-00001-FR-37)
+  Given 详情面板正呈现节点 A
+  When 单击节点 B
+  Then 详情切换为 B 的内容
+- **spec-00001-AC-37.6** (spec-00001-FR-37)
+  Given 一个验收行节点的详情已打开
+  When 点击其中指向 record 的跳转入口
+  Then 回到顶层白板且该 record 节点被选中
+- **spec-00001-AC-37.7** (spec-00001-FR-37)
+  Given 详情面板已打开
+  When 按 Esc
+  Then 详情面板关闭，子画布仍在
+- **spec-00001-AC-37.8** (spec-00001-FR-37)
+  Given 一个来自无 Evidence 列清单表的验收行节点
+  When 单击它
+  Then 详情呈现 record id、测试与结果，不呈现 Evidence 字段
+- **spec-00001-AC-37.9** (spec-00001-FR-37)
+  Given 详情面板已打开
+  When 点击面包屑中的「Board」
+  Then 回到顶层白板，详情面板关闭，检视面板呈现该文档的条目
+- **spec-00001-AC-38.1** (spec-00001-FR-38)
+  Given 检视面板中一条截断呈现的条目行
+  When 单击它
+  Then 该行就地展开，呈现完整正文与其每条 AC 的全文
+- **spec-00001-AC-38.2** (spec-00001-FR-38)
+  Given 一条已展开的条目行
+  When 再次单击它
+  Then 该行收起，回到截断呈现
+- **spec-00001-AC-38.3** (spec-00001-FR-38)
+  Given 条目行 A 已展开
+  When 单击条目行 B
+  Then B 展开且 A 收起——同一时刻至多一行展开
+- **spec-00001-AC-38.4** (spec-00001-FR-38)
+  Given 一条已展开且已验证的条目行
+  When 悬停它
+  Then FR-34 的边强调照常发生——展开态不改变悬停联动
+- **spec-00001-AC-38.5** (spec-00001-FR-38)
+  Given 条目行 A 已展开
+  When 图刷新（文档在磁盘上变化后重新加载）
+  Then A 仍处于展开态
+- **spec-00001-AC-38.6** (spec-00001-FR-38)
+  Given 一条没有任何 AC 的条目行
+  When 展开它
+  Then 呈现完整正文与「无 AC」空态，而不是空白
+- **spec-00001-AC-38.7** (spec-00001-FR-38)
+  Given 键盘焦点在一条条目行上
+  When 按 Enter
+  Then 该行展开——与单击一致
+- **spec-00001-AC-39.1** (spec-00001-FR-39)
+  Given 一条正文含 `**加粗**` 与反引号行内代码的条目
+  When 查看检视面板中它的截断行
+  Then 呈现为加粗与代码样式，原始标记字符不可见
+- **spec-00001-AC-39.2** (spec-00001-FR-39)
+  Given 同 AC-39.1
+  When 查看其展开态、子画布节点与详情面板
+  Then 同样按行内 Markdown 渲染
+- **spec-00001-AC-39.3** (spec-00001-FR-39)
+  Given 条目文本含 `<script>` 标签
+  When 查看任一呈现处
+  Then 页面中不存在该 script 元素
+- **spec-00001-AC-39.4** (spec-00001-FR-39)
+  Given 条目文本含会解析为块级的语法（行首 `#` 标题或围栏代码块）
+  When 查看任一行内呈现处
+  Then 不存在标题、代码块等块级元素，且原文字符仍出现在文本中
+- **spec-00001-AC-39.5** (spec-00001-FR-39)
+  Given 一条文本为空的条目
+  When 查看其在面板行、子画布节点与详情面板中的呈现
+  Then 各处不出错，该条目仍以其 id 可辨
+- **spec-00001-AC-39.6** (spec-00001-FR-39)
+  Given 条目文本含 `[链接](https://example.com)` 与 `![图](https://example.com/x.png)`
+  When 查看任一行内呈现处
+  Then 不存在可导航的链接元素与图片元素，链接文字与图片替代文本仍可读
 
 ## 5. Technical Design
 
@@ -841,6 +972,8 @@ parent: prd-00001-docs-whiteboard
 - 子画布打开期间对磁盘变化（图刷新、文档被删）的专门处置——MVP 未定义，落地
   plan 时裁定。
 - 「无法归属」区在子画布中的呈现——它只在检视面板中列出（FR-33）。
+- 从详情面板或面板展开态直接定位到编辑器中的对应行。
+- 行内呈现处的块级 Markdown 完整渲染（FR-39 明确降级为纯文本）。
 
 ## 7. Non-Functional
 
@@ -863,5 +996,5 @@ parent: prd-00001-docs-whiteboard
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
-- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md)
+- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md)
 - Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）

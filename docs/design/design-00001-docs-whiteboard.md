@@ -224,8 +224,9 @@ GET  /api/docs/:id/items              → {items, unattributed}       # 需求�
 ```
 
 `/items` 的载荷字段是 T1 与后续任务并行时的共同事实：验收行对象至少含
-`{recordId, targetId, test, result}`（FR-34 按它找引用条目 AC 的 record，
-FR-35 的验收行节点由它构造）；`unattributed` 行含 `{recordId, declaredId}`
+`{recordId, targetId, test, result, evidence?}`（FR-34 按它找引用条目 AC 的
+record，FR-35 的验收行节点由它构造，FR-37 的详情面板读 `evidence`——清单表
+无 Evidence 列时缺省）；`unattributed` 行含 `{recordId, declaredId}`
 （FR-33 的「无法归属」区）。
 
 `GET /api/graph` 的 edge 随 FR-2 修订增加 `declaredTargets`——front matter 所
