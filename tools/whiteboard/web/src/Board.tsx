@@ -330,11 +330,14 @@ function Canvas() {
                         transitions={board.transitions}
                         nextSteps={board.nextSteps}
                         relations={relationsOf(board.graph, selected.id, board.relationOrder)}
+                        clarifiable={board.clarifiable.includes(selected.type ?? '')}
+                        sessionRunning={board.session?.status === 'running'}
                         onPickRelation={focus}
                         onEdit={() => board.setEditing(selected.id)}
                         onStatus={(to) => void board.run(() => api.setStatus(selected.id, to))}
                         onAccept={() => void board.run(() => api.accept(selected.id))}
-                        onClarify={(questions) => void board.run(() => api.clarify(selected.id, questions))}
+                        onClarify={() => void board.startSession(() => api.clarify(selected.id))}
+                        onAsk={() => void board.startSession(() => api.ask(selected.id))}
                         onAdvance={(targetType) => void board.advance(selected.id, targetType)}
                       />
                     </NodeToolbar>

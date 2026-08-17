@@ -30,11 +30,14 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     transitions: ['active', 'archived'],
     nextSteps: [{ next: 'spec', carry: 'parent' }],
     relations: [],
+    clarifiable: true,
+    sessionRunning: false,
     onPickRelation: vi.fn(),
     onEdit: vi.fn(),
     onStatus: vi.fn(),
     onAccept: vi.fn(),
     onClarify: vi.fn(),
+    onAsk: vi.fn(),
     onAdvance: vi.fn(),
     ...overrides,
   }
@@ -48,30 +51,11 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
 
 afterEach(cleanup)
 
+// The clarify dialog is gone — clarify is one press now (design-00002 §3, round
+// 8) — so the command palette is the board's one dialog, and it carries these.
 describe('dialogs', () => {
-  it('closes the clarify dialog on Escape', async () => {
-    renderToolbar()
-    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
-    expect(screen.getByRole('dialog')).toBeTruthy()
-
-    await userEvent.keyboard('{Escape}')
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
-
-  it('returns focus to the trigger after closing', async () => {
-    renderToolbar()
-    const trigger = screen.getByRole('button', { name: 'Clarify' })
-    await userEvent.click(trigger)
-
-    await userEvent.keyboard('{Escape}')
-
-    await waitFor(() => expect(document.activeElement).toBe(trigger))
-  })
-
   it('keeps focus inside the open dialog', async () => {
-    renderToolbar()
-    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
+    render(<CommandPalette nodes={[NODE]} open onOpenChange={vi.fn()} onPick={vi.fn()} />)
 
     await userEvent.tab()
     await userEvent.tab()

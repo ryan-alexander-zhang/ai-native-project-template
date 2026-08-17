@@ -23,6 +23,20 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
   }
 }
 
+/** The terminal opens a socket the moment it mounts; a session case only needs one that answers. */
+function stubWebSocket() {
+  vi.stubGlobal(
+    'WebSocket',
+    class {
+      static readonly OPEN = 1
+      readyState = 1
+      addEventListener() {}
+      send() {}
+      close() {}
+    },
+  )
+}
+
 /** A plain document-to-document relation: what it declares is the document it lands on. */
 function relationEdge(from: string, to: string, relation: string, ok = true, declaredTargets = [to]): DocEdge {
   return { from, to, relation, ok, declaredTargets }
@@ -424,11 +438,13 @@ describe('the board', () => {
     // Selecting a spec or a rule reads its items for the inspector panel
     // (spec-00001-FR-31); the cases below that reach one do not care what it says.
     vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
+    // The focus block is where the board reads which types may be clarified
+    // (spec-00001-FR-48): prd may, idea is left out of it on purpose.
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
       flow: {},
-      focus: {},
+      focus: { prd: 'roles, scope, and the value trade-offs' },
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })
@@ -812,33 +828,83 @@ describe('the board', () => {
     expect(setStatus).toHaveBeenCalledWith('prd-00001-x', 'active')
   })
 
-  // spec-00001-AC-9.1 as the user sees it
-  it('records clarify questions from the toolbar', async () => {
-    const clarify = vi.spyOn(api, 'clarify').mockResolvedValue({ committed: true, status: 'draft' })
+  // spec-00001-AC-9.1 as the user sees it: one press, and the questioning happens
+  // in the terminal.
+  it('starts a clarify session from the toolbar and opens the terminal', async () => {
+    stubWebSocket()
+    const clarify = vi.spyOn(api, 'clarify').mockResolvedValue({
+      id: 's1',
+      kind: 'clarify',
+      sourceId: 'prd-00001-x',
+      status: 'running',
+    })
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
     fireEvent.click(screen.getByTestId('node-prd-00001-x'))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy())
 
     await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
-    await userEvent.type(screen.getByLabelText('Open questions, one per line'), 'who owns this?')
-    await userEvent.click(screen.getByRole('button', { name: 'Record questions' }))
 
-    expect(clarify).toHaveBeenCalledWith('prd-00001-x', ['who owns this?'])
+    expect(clarify).toHaveBeenCalledWith('prd-00001-x')
+    await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
+    vi.unstubAllGlobals()
+  })
+
+  // spec-00001-AC-9.3 as the user sees it — idea carries no focus line in the
+  // config above, so the entry is not on its toolbar at all.
+  it('offers no clarify entry for a type the config gives no focus line', async () => {
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('node-idea-00001-x'))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
+  })
+
+  // spec-00001-AC-47.1 as the user sees it — any type, any status
+  it('starts an ask session from the toolbar and opens the terminal', async () => {
+    stubWebSocket()
+    const ask = vi.spyOn(api, 'ask').mockResolvedValue({
+      id: 's1',
+      kind: 'ask',
+      sourceId: 'idea-00001-x',
+      status: 'running',
+    })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-idea-00001-x'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+
+    expect(ask).toHaveBeenCalledWith('idea-00001-x')
+    await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
+    vi.unstubAllGlobals()
+  })
+
+  // spec-00001-AC-18.2 at the board: the session the board reattached to holds
+  // the one slot, so no entry offers to start another.
+  it('disables the three session entries while a session is running', async () => {
+    stubWebSocket()
+    vi.spyOn(api, 'session').mockResolvedValue({
+      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy())
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
+    vi.unstubAllGlobals()
   })
 
   // spec-00001-AC-11.1 as the user sees it
   it('starts an advance from the toolbar and opens the terminal', async () => {
-    vi.stubGlobal(
-      'WebSocket',
-      class {
-        static readonly OPEN = 1
-        readyState = 1
-        addEventListener() {}
-        send() {}
-        close() {}
-      },
-    )
+    stubWebSocket()
     const advance = vi.spyOn(api, 'advance').mockResolvedValue({
       id: 's1',
       kind: 'advance',

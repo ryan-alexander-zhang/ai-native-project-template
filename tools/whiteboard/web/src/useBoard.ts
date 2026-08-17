@@ -16,6 +16,10 @@ export function useBoard() {
   const [kinds, setKinds] = useState<Record<string, DocKind>>({})
   // Relation field order drives the relation list's grouping (spec-00001-FR-30).
   const [relationOrder, setRelationOrder] = useState<string[]>([])
+  // Which types may be clarified is the config's answer, never the board's: the
+  // types carrying a focus line are exactly the clarifiable ones on show
+  // (spec-00001-FR-48).
+  const [clarifiable, setClarifiable] = useState<string[]>([])
   const [selected, setSelected] = useState<string>()
   // Carried with the document it was read for, so a panel never shows the
   // previous selection's items while the next ones are in flight.
@@ -83,14 +87,26 @@ export function useBoard() {
     [refresh],
   )
 
-  const advance = useCallback(
-    async (sourceId: string, targetType: string) => {
+  /**
+   * The one way a session opens, whichever kind it is (spec-00001-FR-18): the
+   * started session takes the single slot and the terminal comes up with it. A
+   * refusal — the slot is taken, the document is gone — leaves both alone.
+   */
+  const startSession = useCallback(
+    async (start: () => Promise<SessionInfo>) => {
       await run(async () => {
-        setSession(await api.advance(sourceId, targetType))
+        setSession(await start())
         setTerminalOpen(true)
       })
     },
     [run],
+  )
+
+  const advance = useCallback(
+    async (sourceId: string, targetType: string) => {
+      await startSession(() => api.advance(sourceId, targetType))
+    },
+    [startSession],
   )
 
   // Only a spec or a rule declares requirement items, and only for those does
@@ -128,6 +144,7 @@ export function useBoard() {
         typeOrder.current = Object.keys(config.types)
         setKinds(config.types)
         setRelationOrder(config.relations)
+        setClarifiable(Object.keys(config.focus))
       } catch (error) {
         // A board with no column order still beats no board: the graph is the
         // thing the user came for, so draw it and say why it looks odd.
@@ -155,6 +172,7 @@ export function useBoard() {
     placed,
     kinds,
     relationOrder,
+    clarifiable,
     selected,
     selectedNode: graph.nodes.find((node) => node.id === selected),
     items: items !== undefined && items.docId === selected ? items.view : undefined,
@@ -169,6 +187,7 @@ export function useBoard() {
     select,
     deselect,
     run,
+    startSession,
     advance,
   }
 }

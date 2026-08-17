@@ -1,18 +1,18 @@
-import { Check, ChevronDown, GitBranch, MessageCircleQuestionMark, Pencil, Plus, Waypoints } from 'lucide-react'
-import { createElement, useState } from 'react'
+import {
+  Check,
+  ChevronDown,
+  CircleHelp,
+  GitBranch,
+  MessageCircleQuestionMark,
+  Pencil,
+  Plus,
+  Waypoints,
+} from 'lucide-react'
+import { createElement } from 'react'
 import type { FlowStep } from '../../src/config.ts'
 import type { DocNode } from '../../src/docRepository.ts'
 import type { RelationItem } from './canvasModel.ts'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export interface ToolbarProps {
@@ -28,11 +27,16 @@ export interface ToolbarProps {
   transitions: string[]
   nextSteps: FlowStep[]
   relations: RelationItem[]
+  /** Whether this document's type may be clarified — the config's answer, not the toolbar's (spec-00001-FR-48). */
+  clarifiable: boolean
+  /** A session of any kind holds the one slot, so no entry may start another (spec-00001-FR-18). */
+  sessionRunning: boolean
   onPickRelation: (id: string) => void
   onEdit: () => void
   onStatus: (to: string) => void
   onAccept: () => void
-  onClarify: (questions: string[]) => void
+  onClarify: () => void
+  onAsk: () => void
   onAdvance: (targetType: string) => void
 }
 
@@ -45,20 +49,8 @@ export interface ToolbarProps {
  * same one can be picked twice running.
  */
 export function Toolbar(props: ToolbarProps) {
-  const { node, transitions, nextSteps, relations, onPickRelation } = props
-  const { onEdit, onStatus, onAccept, onClarify, onAdvance } = props
-  const [clarifying, setClarifying] = useState(false)
-  const [questions, setQuestions] = useState('')
-
-  function submitQuestions() {
-    const list = questions
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-    if (list.length > 0) onClarify(list)
-    setQuestions('')
-    setClarifying(false)
-  }
+  const { node, transitions, nextSteps, relations, clarifiable, sessionRunning, onPickRelation } = props
+  const { onEdit, onStatus, onAccept, onClarify, onAsk, onAdvance } = props
 
   return (
     <div
@@ -156,31 +148,26 @@ export function Toolbar(props: ToolbarProps) {
             Accept
           </Button>
 
-          <Dialog open={clarifying} onOpenChange={setClarifying}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MessageCircleQuestionMark className="size-4" aria-hidden />
-                Clarify
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Clarify {node.id}</DialogTitle>
-                <DialogDescription>
-                  One question per line. They go to the document's Open Questions; it stays a draft.
-                </DialogDescription>
-              </DialogHeader>
-              <Textarea
-                aria-label="Open questions, one per line"
-                rows={5}
-                value={questions}
-                onChange={(event) => setQuestions(event.target.value)}
-              />
-              <DialogFooter>
-                <Button onClick={submitQuestions}>Record questions</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {/*
+            Clarify sits inside the review group beside accept and is shown for a
+            clarifiable type whatever the status: a document is either the kind of
+            thing that gets questioned or it is not, and hiding the entry on
+            anything but the type would leave the user guessing why it comes and
+            goes. A clarify of a non-`draft` document is refused where the ruling
+            belongs, on the server (spec-00001-FR-9).
+          */}
+          {clarifiable ? (
+            <Button variant="ghost" size="sm" onClick={onClarify} disabled={sessionRunning}>
+              <MessageCircleQuestionMark className="size-4" aria-hidden />
+              Clarify
+            </Button>
+          ) : null}
+
+          {/* Asking is not a review action: any status, any type (spec-00001-FR-47). */}
+          <Button variant="ghost" size="sm" onClick={onAsk} disabled={sessionRunning}>
+            <CircleHelp className="size-4" aria-hidden />
+            Ask
+          </Button>
 
           {nextSteps.length === 0 ? (
             <Tooltip>
@@ -197,7 +184,7 @@ export function Toolbar(props: ToolbarProps) {
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Advance to the next step">
+                <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled={sessionRunning}>
                   <Plus className="size-4" aria-hidden />
                   Advance
                 </Button>

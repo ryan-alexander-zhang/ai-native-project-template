@@ -372,6 +372,36 @@ describe('the board state', () => {
     expect(toast.error).toHaveBeenCalledWith('nope')
   })
 
+  // spec-00001-FR-48 — the clarifiable types are the config's answer, read off
+  // the focus block; the board holds no type list of its own.
+  it('takes the clarifiable types from the config focus block', async () => {
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { prd: 'living', idea: 'living' },
+      relations: ['parent'],
+      flow: {},
+      focus: { prd: 'roles, scope, and the value trade-offs' },
+      agents: [{ name: 'claude', command: 'claude', args: [] }],
+    })
+    const { result } = renderHook(() => useBoard())
+
+    await waitFor(() => expect(result.current.clarifiable).toEqual(['prd']))
+  })
+
+  // spec-00001-AC-18.2 — a refused start leaves the running session alone
+  it('keeps the session it has when a second start is refused', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue({
+      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    })
+    vi.spyOn(api, 'ask').mockRejectedValue(new Error('an agent session is already running'))
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.session?.id).toBe('s1'))
+
+    await act(() => result.current.startSession(() => api.ask('idea-00001-x')))
+
+    expect(result.current.session).toMatchObject({ id: 's1', status: 'running' })
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/already running/))
+  })
+
   // spec-00001-AC-11.1
   it('opens the terminal when an advance starts', async () => {
     vi.spyOn(api, 'advance').mockResolvedValue({

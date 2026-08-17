@@ -25,11 +25,14 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     transitions: ['active', 'archived'],
     nextSteps: [{ next: 'spec', carry: 'parent' }],
     relations: [],
+    clarifiable: true,
+    sessionRunning: false,
     onPickRelation: vi.fn(),
     onEdit: vi.fn(),
     onStatus: vi.fn(),
     onAccept: vi.fn(),
     onClarify: vi.fn(),
+    onAsk: vi.fn(),
     onAdvance: vi.fn(),
     ...overrides,
   }
@@ -43,18 +46,21 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
 
 // spec-00001-AC-3.1
 describe('the floating toolbar', () => {
-  it('offers edit, status, review, and advance', () => {
+  it('offers edit, status, review, ask, and advance', () => {
     renderToolbar()
 
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
     expect(screen.getByLabelText('Change status')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
     expect(screen.getByLabelText('Advance to the next step')).toBeTruthy()
   })
 
-  // spec-00001-AC-2.4 — amended with FR-30: the anomalous node keeps the two
-  // read-only entries it needs to be repaired, and nothing that mutates it.
+  // spec-00001-AC-2.4 and AC-47.4 — amended with FR-30: the anomalous node keeps
+  // the two read-only entries it needs to be repaired, and nothing else. Ask is
+  // among the ones it does not get, though it changes no status of its own: the
+  // session would be told to read a document whose front matter cannot be read.
   it('offers only the editor and the relation list for a document with front matter problems', () => {
     renderToolbar({ node: { ...NODE, ok: false, problems: ['front matter is missing'] } })
 
@@ -63,6 +69,7 @@ describe('the floating toolbar', () => {
     expect(screen.queryByLabelText('Change status')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
     expect(screen.queryByLabelText('Advance to the next step')).toBeNull()
   })
 
@@ -165,34 +172,56 @@ describe('the floating toolbar', () => {
     expect(props.onAccept).toHaveBeenCalled()
   })
 
-  // spec-00001-AC-9.3 as the user sees it
-  it('records every question typed, one per line', async () => {
+  // spec-00001-AC-9.1 as the user sees it: one press starts the session, and the
+  // questions come from the agent in the terminal, not from a form here.
+  it('starts a clarify session on one press', async () => {
     const props = renderToolbar()
 
     await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
-    await userEvent.type(screen.getByLabelText('Open questions, one per line'), 'who owns pricing?\nwhen is v1?')
-    await userEvent.click(screen.getByRole('button', { name: 'Record questions' }))
 
-    expect(props.onClarify).toHaveBeenCalledWith(['who owns pricing?', 'when is v1?'])
+    expect(props.onClarify).toHaveBeenCalledTimes(1)
   })
 
-  it('records nothing when the clarify dialog is left empty', async () => {
-    const props = renderToolbar()
+  // spec-00001-AC-9.3 — a record is not a clarifiable type, so the entry is not
+  // there at all. Accept and ask are, so this is the entry going, not the group.
+  it('leaves clarify out for a type the config gives no focus line', () => {
+    renderToolbar({ node: { ...NODE, id: 'record-00001-x', type: 'record' }, clarifiable: false })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Record questions' }))
-
-    expect(props.onClarify).not.toHaveBeenCalled()
-    expect(screen.queryByLabelText('Open questions, one per line')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
   })
 
-  it('opens the clarify dialog only on request', async () => {
-    renderToolbar()
-    expect(screen.queryByLabelText('Open questions, one per line')).toBeNull()
+  // spec-00001-FR-9: the entry follows the type, never the status — a clarify of
+  // a non-`draft` document is refused by the server, not hidden here.
+  it('shows clarify whatever the status of a clarifiable type', () => {
+    renderToolbar({ node: { ...NODE, status: 'active' } })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
+    expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy()
+  })
 
-    expect(screen.getByRole('dialog')).toBeTruthy()
+  // spec-00001-AC-47.1 as the user sees it — any type, any status
+  it('starts an ask session from an active record node', async () => {
+    const props = renderToolbar({
+      node: { ...NODE, id: 'record-00001-x', type: 'record', status: 'active' },
+      clarifiable: false,
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+
+    expect(props.onAsk).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00001-AC-18.2 at the entry: one session runs, so none of the three
+  // starting points can begin another.
+  it('disables advance, clarify, and ask while a session is running', () => {
+    renderToolbar({ sessionRunning: true })
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
+    // Accept writes nothing to the session slot, so it stays available.
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Accept' }).disabled).toBe(false)
   })
 
   // spec-00001-AC-10.2

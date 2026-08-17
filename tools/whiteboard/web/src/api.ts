@@ -40,10 +40,12 @@ export const api = {
   transitions: (id: string) => request<string[]>('GET', `/api/docs/${id}/transitions`),
   setStatus: (id: string, to: string) => request<ActionResult>('POST', `/api/docs/${id}/status`, { to }),
   accept: (id: string) => request<ActionResult>('POST', `/api/docs/${id}/review`, { action: 'accept' }),
-  clarify: (id: string, questions: string[]) =>
-    request<ActionResult>('POST', `/api/docs/${id}/review`, { action: 'clarify', questions }),
   nextSteps: (id: string) => request<FlowStep[]>('GET', `/api/docs/${id}/next-steps`),
   session: () => request<{ current: SessionInfo | null }>('GET', '/api/sessions'),
   advance: (sourceId: string, targetType: string) =>
     request<SessionInfo>('POST', '/api/sessions', { sourceId, targetType }),
+  // Clarify and ask are sessions, not writes: the agent does the questioning in
+  // the terminal (spec-00001-FR-9, FR-47).
+  clarify: (docId: string) => request<SessionInfo>('POST', '/api/sessions/clarify', { docId }),
+  ask: (docId: string) => request<SessionInfo>('POST', '/api/sessions/ask', { docId }),
 }

@@ -40,13 +40,25 @@ describe('the api client', () => {
     )
   })
 
-  it('sends the review action and its questions', async () => {
-    const fetchMock = mockFetch(200, { committed: true })
-    await api.clarify('prd-00001-x', ['who?'])
+  // spec-00001-FR-9 — clarify starts a session; it is no longer a review write
+  it('starts a clarify session for the document', async () => {
+    const fetchMock = mockFetch(200, { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' })
 
+    expect(await api.clarify('prd-00001-x')).toMatchObject({ kind: 'clarify' })
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/docs/prd-00001-x/review',
-      expect.objectContaining({ body: JSON.stringify({ action: 'clarify', questions: ['who?'] }) }),
+      '/api/sessions/clarify',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ docId: 'prd-00001-x' }) }),
+    )
+  })
+
+  // spec-00001-FR-47
+  it('starts an ask session for the document', async () => {
+    const fetchMock = mockFetch(200, { id: 's1', kind: 'ask', sourceId: 'record-00001-x', status: 'running' })
+
+    expect(await api.ask('record-00001-x')).toMatchObject({ kind: 'ask' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/ask',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ docId: 'record-00001-x' }) }),
     )
   })
 
