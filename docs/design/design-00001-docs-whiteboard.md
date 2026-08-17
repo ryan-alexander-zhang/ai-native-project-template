@@ -41,12 +41,15 @@ flowchart LR
     API[HTTP/WS API]
     DR[Doc Repository<br/>解析 docs/**·图模型]
     WE[Workflow Engine<br/>rule-00001 的执行者]
-    SM[Session Manager<br/>node-pty 会话注册表]
-    GL[Git Layer<br/>暂存目标路径·commit]
+    SM[Session Manager<br/>node-pty 会话注册表·持有会话前快照]
+    GL[Git Layer<br/>暂存目标路径·快照与差集·commit]
     CFG[Flow Config<br/>启动时加载校验]
+    WA[Watcher<br/>chokidar·去抖·广播]
   end
   GV & ED --> API
   TM <--WS--> SM
+  GV <--WS 事件--> WA
+  WA --> FS
   API --> DR & WE & SM & GL
   WE --> CFG
   DR --> CFG
@@ -93,7 +96,13 @@ flowchart LR
   「此前输出」的完整性以该窗口为限。
 - **Git Layer**：每个动作 `git add <涉及路径>` 后 commit，从不 `add -A`
   （spec FR-14 的"只暂存本次动作涉及的文件"）。commit 失败不回滚已写盘内容
-  （spec FR-20），失败信息沿 API 返回给前端呈现。
+  （spec FR-20），失败信息沿 API 返回给前端呈现。**快照与差集的能力归它**
+  （取快照、按内容求差，见 §4）；**快照的生命周期归 Session Manager**——它在
+  启动会话时取一次并随会话状态保存，结束时交回 Git Layer 求差集。分工的理由：
+  git 语义不外泄，会话期状态不进 git 层。
+- **Watcher**：chokidar 监听 `docs/**`，去抖后经 WS 向每个已连接的白板广播
+  「图已变」信号（spec FR-42/FR-43 的载体，链路见 §6）。它只读文件系统事件，
+  不解析文档、不持有图——解析仍归 Doc Repository。
 
 ## 3. 流程配置契约
 
@@ -179,9 +188,19 @@ sequenceDiagram
   "会话感知校验"，不合规进 `issues` 标异常。找不到前缀匹配文件时视为无产出，
   commit 信息退化为 `wb(advance): <sourceId>`。
 - **advance 的暂存范围**：commit 时暂存 `docs/` 下自会话启动以来的全部变动
-  路径（`git status -- docs/` 相对会话前快照）。边界声明：会话期间外部对
-  `docs/` 的改动无法与会话产出区分，单人单会话前提下接受；会话启动**之前**
-  已存在的脏文件不会被暂存（spec AC-14.2 由此成立）。
+  路径。**「相对会话前快照」是实现约束，不是修辞**：会话启动时必须取一次
+  `docs/` 的快照，结束时以差集为暂存集——只按前缀过滤当前 `git status` 会把
+  会话前就脏的文件一并卷入（`issue-00008` 即此缺陷，由 `AC-14.5`/`AC-14.6`
+  守住）。
+  **差集按内容算，不按路径集算**（这是唯一能让 FR-14、`AC-14.4`、`AC-14.5`
+  同时成立的读法，故写在设计里而非留给实现）：快照记录每个当时已脏的 `docs/`
+  路径**及其内容摘要**；结束时对当前脏路径分三种处置——快照里没有的（会话新建
+  或新改的）**暂存**；快照里有且摘要不变的（会话没碰）**排除**；快照里有而摘要
+  已变的（会话在别人的脏文件上继续改的）**暂存**。若只按路径集求差，第三种会被
+  误排除，agent 对一份本来就脏的文档所做的修订将永远提交不进去——而「在既有
+  草稿上继续写」正是本仓最常见的推进形态。
+  边界声明：会话期间外部对 `docs/` 的改动无法与会话产出区分，单人单会话前提
+  下接受。
 - 会话正常退出但 `docs/` 无任何变动时跳过 commit。
 
 ## 5. 会话生命周期
@@ -211,7 +230,28 @@ stateDiagram-v2
   不命中才在文末创建，不会重复建节。
 - **commit 失败语义（FR-20）**：写盘成功而 commit 失败时，API 返回
   `200 { committed: false, error }`——文件保留，前端据此呈现错误。
-- chokidar 监听 `docs/**` → WS 推送前端刷新（NF「外部修改刷新可见」）。
+- **变更推送**（`spec-00001-FR-42`…`FR-44`，第七轮由 `issue-00007` 落地——
+  此前本段只是承诺，服务端从不监听、前端从不订阅）：chokidar 监听 `docs/**`
+  → 合并窗口内的连续事件（去抖 ~100ms；上界由 `FR-42` 的「1 秒内可见」约束，
+  在其下自由取值）→ 经 WS 广播一个「图已变」信号（**不带载荷**：前端收到即
+  重取，避免推送与请求两条路径各自维护一份图）→ 前端按 id 保持呈现状态
+  （`FR-44`）。
+  **一次刷新重取的范围**：`GET /api/graph`，**以及当前选中或下钻文档的
+  `GET /api/docs/:id/items`**——覆盖状态、诊断、展开行与详情目标都活在 items
+  载荷里，只重取 graph 则条目侧的变化不可见（`AC-42.2`、`AC-44.1`…`AC-44.7`
+  依赖这一半）。无选中且未下钻时只取 graph。
+  连接未建立或中断时白板照常可用、自动重连（间隔递增，起始 1s、上限 30s），
+  连接建立或重建即刷新一次补回断连期间的变化（`FR-43`）；不轮询。白板自身动作
+  与会话结束后的刷新通路照旧，三者共用同一个「重取 + 保持呈现状态」实现。
+  **推送不自激**：白板自身写盘同样会触发监听，但收到信号后只做只读重取，
+  不再写盘，故不形成回环；「变化→删除→再建」一类序列由「无载荷 + 全量重取」
+  自然收敛到磁盘现状，无需事件排序。
+  **零订阅者不是错误**（`AC-42.8`），多个白板各自收到同一信号（`AC-42.9`；
+  多人协作仍在 spec §6 范围外——这里只是同机多标签页）。
+  **与会话的关系**：会话期间 agent 的写入照常触发推送（`AC-42.7`），FR-12 的
+  「会话退出时刷新」因此从「唯一的可见时机」退为「最后一次刷新」——两者不冲突，
+  只是前者不再是唯一入口；半成品文档的异常/诊断态是过程态，FR-17 的结束校验
+  仍是权威判定（取舍写在 `FR-42` 正文）。
   会话运行期间白板自身的写动作不加锁——由上述 compare-and-swap 兜底。
 
 ## 7. API 契约
@@ -226,7 +266,8 @@ POST /api/docs/:id/review             {action: accept|clarify, questions?} → 2
 GET  /api/docs/:id/next-steps         → [{type, carry}]
 GET  /api/sessions                    → {current: {id, status} | null}   # 重连发现（FR-21）
 POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话
-WS   /api/sessions/:id/term           双向：stdin/stdout 帧 + exit 事件
+WS   /api/terminal                    双向：stdin/stdout 帧 + exit 事件（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正）
+WS   /api/events                      服务端→前端：docs/ 变更信号（无载荷，收到即重取 graph + 当前 items；FR-42/FR-43）
 GET  /api/config                      → 生效的流程配置（只读）
 GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
 ```

@@ -37,9 +37,12 @@ export interface InspectorProps {
  */
 export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) {
   // An accordion, one row at a time (spec-00001-FR-38). The id is what is held,
-  // not the item, so a graph refresh brings the same row back open.
-  const [expanded, setExpanded] = useState<string>()
-  const toggle = (itemId: string) => setExpanded((open) => (open === itemId ? undefined : itemId))
+  // not the item, so a refresh brings the same row back open — and resolving it
+  // against the payload on every render is what closes the row when the item it
+  // named has left the document (spec-00001-AC-38.5, AC-44.7).
+  const [open, setOpen] = useState<string>()
+  const expanded = view.items.some((item) => item.id === open) ? open : undefined
+  const toggle = (itemId: string) => setOpen((current) => (current === itemId ? undefined : itemId))
 
   return (
     <section aria-label={`Requirements of ${docId}`} className="flex h-full min-h-0 flex-col">

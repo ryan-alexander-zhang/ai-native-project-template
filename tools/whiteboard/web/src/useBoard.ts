@@ -4,6 +4,7 @@ import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
 import { type SessionInfo, api } from './api.ts'
+import { connectEvents } from './eventSocket.ts'
 import { type Placed, layoutGraph } from './layout.ts'
 
 const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [] }
@@ -29,10 +30,23 @@ export function useBoard() {
   // Column order comes from the config; the layout is meaningless without it.
   const typeOrder = useRef<string[]>([])
 
+  /**
+   * The one way the board takes the docs in again (spec-00001-FR-44): all three
+   * triggers — a push, an action of the board's own, the end of a session — come
+   * through here, so what is kept and what is let go of cannot differ between
+   * them (design-00002 §10). The items of the document on show follow the graph
+   * through the effect below.
+   */
   const refresh = useCallback(async () => {
     const next = await api.graph()
     setGraph(next)
     setPlaced(layoutGraph(next, typeOrder.current))
+    // The selection is held by id, never by position: a document still on the
+    // board keeps it, and one that has left the disk takes it with it, closing
+    // its toolbar (spec-00001-AC-44.6).
+    setSelected((current) =>
+      current !== undefined && next.nodes.some((node) => node.id === current) ? current : undefined,
+    )
     return next
   }, [])
 
@@ -125,6 +139,15 @@ export function useBoard() {
       setSession(current)
       if (current?.status === 'running') setTerminalOpen(true)
     })
+  }, [refresh])
+
+  // docs/ moves under the board more often than the board moves it — an agent
+  // or an editor elsewhere — so the change is pushed and the board re-reads
+  // (spec-00001-FR-42). No channel means no push, which costs the board nothing
+  // else (spec-00001-FR-43).
+  useEffect(() => {
+    const link = connectEvents(() => void refresh())
+    return () => link.close()
   }, [refresh])
 
   return {

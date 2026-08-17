@@ -6,6 +6,7 @@ import type { FlowConfig } from './config.ts'
 import { ConflictError, DocService } from './docService.ts'
 import { SessionBusyError, SessionManager, type SessionOutcome, type SpawnPty } from './sessionManager.ts'
 import { spawnPty } from './pty.ts'
+import { DocsWatcher } from './watcher.ts'
 import { WorkflowError, allocateNumber, idPrefix } from './workflow.ts'
 
 export interface BoardOptions {
@@ -20,16 +21,20 @@ export class Board {
   readonly app: Express
   readonly docs: DocService
   readonly sessions: SessionManager
+  /** Live only while the board is listening: a board nobody can connect to has nobody to tell. */
+  readonly watcher: DocsWatcher
   /** Findings from the last advance, folded into the graph until the next one. */
   private lastFinding?: { docId: string; problems: string[] }
 
   constructor(options: BoardOptions) {
     const { repoRoot, docsDir, config, spawn = spawnPty } = options
     this.docs = new DocService(repoRoot, docsDir, config)
+    this.watcher = new DocsWatcher(docsDir)
     this.sessions = new SessionManager({
       agent: config.agents[0]!,
       repoRoot,
       spawn,
+      snapshot: () => this.docs.snapshotDocs(),
       onExit: (expectation) => this.finishSession(expectation),
     })
     this.app = this.buildApp(config)
@@ -42,15 +47,18 @@ export class Board {
 
   /** Commit what the session wrote, then check it against what was asked for (spec-00001-FR-17). */
   private async finishSession(expectation: Expectation): Promise<SessionOutcome> {
+    // What the session inherited, taken when it started: only what moved since
+    // is its own to commit (spec-00001-AC-14.5).
+    const before = this.sessions.baseline()
     const product = findProduct(this.docs.graph(), expectation.idPrefix)
     if (!product) {
       this.lastFinding = undefined
-      const outcome = await this.docs.commitSessionChanges(expectation.sourceId)
+      const outcome = await this.docs.commitSessionChanges(expectation.sourceId, before)
       return { problems: [], committed: outcome.committed, error: outcome.error }
     }
     const problems = productProblems(product, expectation)
     this.lastFinding = problems.length > 0 ? { docId: product.id, problems } : undefined
-    const outcome = await this.docs.commitSessionChanges(product.id)
+    const outcome = await this.docs.commitSessionChanges(product.id, before)
     return { docId: product.id, problems, committed: outcome.committed, error: outcome.error }
   }
 
@@ -102,14 +110,28 @@ export class Board {
     })
   }
 
-  /** Bind the terminal socket: replay the buffer, then stream both ways. */
+  /**
+   * Serve, and open the two sockets: the session terminal, and the docs-change
+   * signal every board follows (spec-00001-FR-42). Each socket server takes the
+   * upgrade handed to it by the one router below — two of them bound to the same
+   * http server would each abort the other's handshakes.
+   */
   listen(port: number): Server {
     const server = this.app.listen(port)
-    const wss = new WebSocketServer({ server, path: '/api/terminal' })
-    // ws re-emits the http server's errors; the caller reports them off `server`,
-    // and this handler only keeps the re-emission from crashing the process.
-    wss.on('error', () => {})
-    wss.on('connection', (socket) => {
+    const terminals = new WebSocketServer({ noServer: true })
+    const events = new WebSocketServer({ noServer: true })
+    const routes: Record<string, WebSocketServer> = { '/api/terminal': terminals, '/api/events': events }
+
+    server.on('upgrade', (request, socket, head) => {
+      const route = routes[new URL(request.url ?? '/', 'http://board').pathname]
+      if (!route) {
+        socket.destroy()
+        return
+      }
+      route.handleUpgrade(request, socket, head, (connection) => route.emit('connection', connection, request))
+    })
+
+    terminals.on('connection', (socket) => {
       let attached: { buffer: string; detach: () => void }
       try {
         attached = this.sessions.attach((data) => socket.send(data))
@@ -121,6 +143,18 @@ export class Board {
       socket.on('message', (data) => this.sessions.write(data.toString()))
       socket.on('close', () => attached.detach())
     })
+
+    // The frame is the whole message: a board that gets one re-reads the graph
+    // and the items it is showing (design-00001 §6).
+    events.on('connection', (socket) => {
+      const unsubscribe = this.watcher.subscribe(() => {
+        if (socket.readyState === socket.OPEN) socket.send('')
+      })
+      socket.on('close', unsubscribe)
+    })
+
+    this.watcher.start()
+    server.on('close', () => void this.watcher.close())
     return server
   }
 }

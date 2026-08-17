@@ -4,11 +4,27 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Board } from '../src/server.ts'
 import { spawnPty } from '../src/pty.ts'
-import { SESSION_WAIT, commitCount, doc, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
+import {
+  SESSION_WAIT,
+  armWatch,
+  commitCount,
+  doc,
+  lastCommitFiles,
+  lastCommitMessage,
+  makeRepo,
+  testConfig,
+} from './helpers.ts'
+
+// The waits in this file are bounded by things outside it — a spawned agent
+// process (SESSION_WAIT) and a file watch crossing the OS (SIGNAL_WAIT) — and
+// under a suite running its files side by side both outlast the default five
+// seconds, which would cut the wait off before its own timeout is reached.
+vi.setConfig({ testTimeout: 30_000 })
 
 const DRAFT_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Idea X\n')
 const ACTIVE_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
 const servers: Server[] = []
+const watching: Board[] = []
 
 /** Start a board on an ephemeral port and give back a fetch bound to it. */
 function boardOn(files: Record<string, string>, agentArgs = ['-e', '']) {
@@ -18,6 +34,10 @@ function boardOn(files: Record<string, string>, agentArgs = ['-e', '']) {
   const board = new Board({ repoRoot, docsDir, config, spawn: spawnPty })
   const server = board.listen(0)
   servers.push(server)
+  // The http server only announces its close once every socket has gone, and a
+  // test may leave one open; letting go of the file watches here keeps a suite
+  // of several dozen boards from running the process out of descriptors.
+  watching.push(board)
   const port = (server.address() as { port: number }).port
 
   const call = async (method: string, path: string, body?: unknown) => {
@@ -31,8 +51,9 @@ function boardOn(files: Record<string, string>, agentArgs = ['-e', '']) {
   return { board, repoRoot, docsDir, port, call }
 }
 
-afterEach(() => {
+afterEach(async () => {
   for (const server of servers.splice(0)) server.close()
+  await Promise.all(watching.splice(0).map((board) => board.watcher.close()))
 })
 
 describe('GET /api/graph', () => {
@@ -377,6 +398,173 @@ describe('the terminal socket', () => {
   })
 })
 
+/**
+ * spec-00001-FR-42: the board is told about a change instead of being asked to
+ * look for one. What the user sees of it is the front end's half (web/test);
+ * this half is «a write under docs/ becomes one signal on the wire».
+ */
+describe('the docs-change socket', () => {
+  const OTHER_IDEA = doc({ id: 'idea-00002-y', type: 'idea', status: 'draft' }, '# Idea Y\n')
+  /** Longer than the debounce window, so «nothing arrived» has had its chance to. */
+  const SETTLE = 400
+  /**
+   * A signal crosses a file watch, a debounce and a socket; a whole suite of
+   * boards running at once stretches all three, and none of them is what any of
+   * these tests is measuring.
+   */
+  const SIGNAL_WAIT = { timeout: 10_000, interval: 25 }
+
+  /** A board whose watch is demonstrably delivering, so no write below can be missed. */
+  async function watchingBoard(files: Record<string, string> = { 'idea/a.md': ACTIVE_IDEA }, agentArgs?: string[]) {
+    const open = agentArgs ? boardOn(files, agentArgs) : boardOn(files)
+    await armWatch(open.board.watcher, open.docsDir)
+    return open
+  }
+
+  /**
+   * A board's end of the channel: every frame counts as one signal, whatever it
+   * carries. Connected means «the server is following it»: the handshake is
+   * answered a moment before the server subscribes, and a write into that gap
+   * would go unheard — a board reconnecting into it re-reads anyway
+   * (spec-00001-FR-43), so it is the test, not the board, that must not race.
+   */
+  async function subscribe(open: { port: number; board: Board }) {
+    const socket = new WebSocket(`ws://127.0.0.1:${open.port}/api/events`)
+    let signals = 0
+    socket.addEventListener('message', () => {
+      signals += 1
+    })
+    sockets.push(socket)
+    const followers = open.board.watcher.followers + 1
+    await new Promise<void>((resolve) => socket.addEventListener('open', () => resolve()))
+    await vi.waitFor(() => expect(open.board.watcher.followers).toBe(followers), SIGNAL_WAIT)
+    return {
+      socket,
+      get signals() {
+        return signals
+      },
+    }
+  }
+
+  const sockets: WebSocket[] = []
+  afterEach(() => {
+    for (const socket of sockets.splice(0)) socket.close()
+  })
+
+  // spec-00001-AC-42.1 on the wire, and AC-42.3 for the other direction
+  it('signals a document written under docs, and one deleted', async () => {
+    const open = await watchingBoard()
+    const { docsDir, call } = open
+    const board = await subscribe(open)
+
+    writeFileSync(join(docsDir, 'idea/b.md'), OTHER_IDEA)
+
+    await vi.waitFor(() => expect(board.signals).toBe(1), SIGNAL_WAIT)
+    expect((await call('GET', '/api/graph')).body.nodes).toHaveLength(2)
+
+    rmSync(join(docsDir, 'idea/b.md'))
+
+    await vi.waitFor(() => expect(board.signals).toBe(2), SIGNAL_WAIT)
+    expect((await call('GET', '/api/graph')).body.nodes).toHaveLength(1)
+  })
+
+  // spec-00001-AC-42.4 — a burst is one signal, and the graph is the disk's
+  it('folds a burst of writes into a single signal', async () => {
+    const open = await watchingBoard()
+    const { docsDir, call } = open
+    const board = await subscribe(open)
+
+    for (const name of ['b', 'c', 'd']) {
+      writeFileSync(join(docsDir, `idea/${name}.md`), OTHER_IDEA.replace('00002', `0000${name.charCodeAt(0) - 95}`))
+    }
+
+    await vi.waitFor(() => expect(board.signals).toBe(1), SIGNAL_WAIT)
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+    expect(board.signals).toBe(1)
+    expect((await call('GET', '/api/graph')).body.nodes).toHaveLength(4)
+  })
+
+  // spec-00001-AC-42.5
+  it('says nothing about a file outside docs', async () => {
+    const open = await watchingBoard()
+    const { repoRoot, docsDir } = open
+    const board = await subscribe(open)
+
+    writeFileSync(join(repoRoot, 'tools-notes.md'), 'not a document')
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+
+    expect(board.signals).toBe(0)
+    // …and the channel was live the whole time, which is what makes the silence mean something.
+    writeFileSync(join(docsDir, 'idea/b.md'), OTHER_IDEA)
+    await vi.waitFor(() => expect(board.signals).toBe(1), SIGNAL_WAIT)
+  })
+
+  // spec-00001-AC-42.7 — no quiet period while an agent is at work
+  it('signals what a running session writes, before it ends', async () => {
+    const open = await watchingBoard({ 'idea/a.md': ACTIVE_IDEA }, [
+      '-e',
+      `require('fs').mkdirSync('prd',{recursive:true});
+       setTimeout(() => require('fs').writeFileSync('prd/half-written.md', '# half\\n'), 50);
+       setTimeout(() => {}, 5000)`,
+    ])
+    const { port, board } = open
+    const watching = await subscribe(open)
+
+    await fetch(`http://127.0.0.1:${port}/api/sessions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sourceId: 'idea-00001-x', targetType: 'prd' }),
+    })
+
+    await vi.waitFor(() => expect(watching.signals).toBeGreaterThanOrEqual(1), SESSION_WAIT)
+    expect(board.sessions.current()!.status).toBe('running')
+  })
+
+  // spec-00001-AC-42.8 — nobody listening is not a failure
+  it('carries on with no board connected at all', async () => {
+    const { docsDir, call } = await watchingBoard()
+
+    writeFileSync(join(docsDir, 'idea/b.md'), OTHER_IDEA)
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+
+    const { status, body } = await call('GET', '/api/graph')
+    expect(status).toBe(200)
+    expect(body.nodes).toHaveLength(2)
+  })
+
+  // spec-00001-AC-42.9
+  it('signals every connected board', async () => {
+    const open = await watchingBoard()
+    const first = await subscribe(open)
+    const second = await subscribe(open)
+
+    writeFileSync(join(open.docsDir, 'idea/b.md'), OTHER_IDEA)
+
+    await vi.waitFor(() => expect([first.signals, second.signals]).toEqual([1, 1]), SIGNAL_WAIT)
+  })
+
+  it('drops a board that has gone away and keeps signalling the rest', async () => {
+    const open = await watchingBoard()
+    const staying = await subscribe(open)
+    const leaving = await subscribe(open)
+    leaving.socket.close()
+    await vi.waitFor(() => expect(open.board.watcher.followers).toBe(1), SIGNAL_WAIT)
+
+    writeFileSync(join(open.docsDir, 'idea/b.md'), OTHER_IDEA)
+
+    await vi.waitFor(() => expect(staying.signals).toBe(1), SIGNAL_WAIT)
+    expect(leaving.signals).toBe(0)
+  })
+
+  it('refuses an upgrade on any other path', async () => {
+    const { port } = await watchingBoard()
+    const stray = new WebSocket(`ws://127.0.0.1:${port}/api/nothing-here`)
+    stray.addEventListener('error', () => {})
+
+    await new Promise<void>((resolve) => stray.addEventListener('close', () => resolve()))
+  })
+})
+
 describe('when a session ends', () => {
   const writeProduct = (content: string) =>
     `-e|require('fs').mkdirSync('prd',{recursive:true});require('fs').writeFileSync('prd/new.md',${JSON.stringify(content)})`
@@ -424,6 +612,38 @@ describe('when a session ends', () => {
     await board.sessions.whenFinished()
 
     expect(board.sessions.current()!.outcome).toEqual({ problems: [], committed: false, error: undefined })
+  })
+
+  // spec-00001-AC-14.5 through the whole lifecycle: the snapshot is only worth
+  // anything if it is taken before the agent runs, and this is what says so
+  // (issue-00008).
+  it('commits the product and leaves the dirt the session started from behind', async () => {
+    const product = doc({ id: 'prd-00001-new', type: 'prd', status: 'draft', parent: 'idea-00001-x' }, '# New\n')
+    const { call, board, docsDir, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(product).split('|'))
+    const dirty = `${ACTIVE_IDEA}an edit nobody committed\n`
+    writeFileSync(join(docsDir, 'idea/a.md'), dirty)
+
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/new.md'])
+    expect(readFileSync(join(docsDir, 'idea/a.md'), 'utf8')).toBe(dirty)
+  })
+
+  // spec-00001-AC-14.6 — a session that wrote nothing leaves the history alone,
+  // however dirty the tree it ran on was.
+  it('makes no commit when a session on a dirty tree produces nothing', async () => {
+    const { call, board, docsDir, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    writeFileSync(join(docsDir, 'idea/a.md'), `${ACTIVE_IDEA}an edit nobody committed\n`)
+    const commits = commitCount(repoRoot)
+
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(board.sessions.current()!.outcome!.committed).toBe(false)
   })
 })
 

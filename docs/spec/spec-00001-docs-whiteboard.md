@@ -31,6 +31,7 @@ parent: prd-00001-docs-whiteboard
 | S5 | 作为文档负责人，我要每次变更与评审都自动留痕，这样任何结论都可追溯 | spec-00001-FR-14, spec-00001-FR-20 |
 | S6 | 作为文档负责人，我要选中一份 spec 或 rule 就看到它的需求条目与验收覆盖，并能下钻到条目级的验收链路、读到任何一条的全文，这样验收缺口不靠脚本就能看见 | spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36, spec-00001-FR-37, spec-00001-FR-38, spec-00001-FR-39 |
 | S7 | 作为文档负责人，我要白板和 agent 被同一份条目文法约束、写法漂移当场报警，这样解析不会无声漏读 | spec-00001-FR-40, spec-00001-FR-41 |
+| S8 | 作为文档负责人，我要白板自己跟上磁盘上的变化并保住我当前的位置，这样人与 agent 并行改文档时既不用手动刷新，也不丢正在读的上下文 | spec-00001-FR-42, spec-00001-FR-43, spec-00001-FR-44 |
 
 ## 3. Business Rules
 
@@ -235,6 +236,27 @@ parent: prd-00001-docs-whiteboard
   文法时不含该段。当会话结束、白板刷新时，FR-17 的产出校验扩展到正文：产出
   文档的解析诊断按 FR-40 呈现，不阻塞 commit——与 FR-17 对 front matter 的
   处置同权（标记，不回滚）。
+- **spec-00001-FR-42** (Event) 当 `docs/` 下的文档在白板之外被创建、修改或
+  删除时，系统应把该变化推送给每个已打开的白板，白板据此**刷新**（重取节点图，
+  以及当前选中或下钻文档的条目数据）——**无需任何用户动作**，且改动应在 1 秒内
+  可见。短时间内的连续变化应合并为一次刷新（合并窗口由 design-00001 §6 持有）。
+  刷新只重取服务端数据，**不触碰编辑器缓冲区**：用户未保存的正文原样保留，
+  外部改动仍按 FR-5 在保存时呈现为冲突。**会话运行期间照常推送**——半成品文档
+  因此可能短暂呈现为异常节点或带解析诊断，这是明知的取舍（换来的是一条通路、
+  无模式开关，且能看见 agent 正在产出什么）；FR-17 的会话结束校验仍是权威判定。
+- **spec-00001-FR-43** (Complex) 若推送连接尚未建立或已中断，系统应保持白板
+  当前内容可用、不以错误阻断任何操作，并自动重连（间隔递增，上限由
+  design-00001 §6 持有）；当连接建立或重新建立时，系统应刷新一次，以补回此前
+  未收到推送的那段时间里发生的变化。
+- **spec-00001-FR-44** (Complex) 当节点图刷新时（推送触发、动作触发或会话结束
+  触发皆同一通路），系统应按 id 保持呈现状态：当前选中的文档、下钻所在的文档、
+  检视面板的展开行、详情面板的目标；**若其所指对象在刷新后的数据中已不存在，
+  则就近关闭该一级**——详情目标消失则关闭详情，下钻文档消失则退回顶层白板，
+  展开的条目消失则收起该行，选中的文档消失则取消选中。多级同时失效时逐级各自
+  生效（如下钻的文档被删，既退回顶层也取消选中）。
+  本条**承接**既有口径而非取代：选中跨刷新保持由 `AC-29.6` 覆盖、展开行跨刷新
+  保持由 `AC-38.5` 覆盖，二者不重复立 AC；本条新增下钻与详情两级的保持，以及
+  四级的就近关闭。
 
 **Acceptance (GWT)**
 
@@ -460,6 +482,14 @@ parent: prd-00001-docs-whiteboard
   Given 一次推进会话结束且产生了 docs/ 变更
   When 查看 git 历史
   Then 存在一次含该会话全部变更的 commit，信息指明「推进」与新文档 id
+- **spec-00001-AC-14.5** (spec-00001-FR-14)
+  Given 推进会话启动**之前** `docs/` 下已存在一个与本次推进无关的脏文件
+  When 会话结束并提交
+  Then 该脏文件不在这次 commit 中——只暂存会话自身的产出（issue-00008）
+- **spec-00001-AC-14.6** (spec-00001-FR-14)
+  Given 同 AC-14.5，且会话自身没有产生任何 `docs/` 变更
+  When 会话结束
+  Then 不产生任何 commit
 - **spec-00001-AC-15.1** (spec-00001-FR-15)
   Given 流程配置文件不存在
   When 启动白板服务
@@ -1004,12 +1034,92 @@ parent: prd-00001-docs-whiteboard
   Given 推进会话产出的 spec 条目全部合式
   When 会话结束、白板刷新
   Then 不新增任何解析诊断，该节点为正常节点
+- **spec-00001-AC-42.1** (spec-00001-FR-42)
+  Given 白板已打开
+  When `docs/` 下新增一份文档（白板之外写入）
+  Then 该节点出现在图上，用户未做任何操作
+- **spec-00001-AC-42.2** (spec-00001-FR-42)
+  Given 白板已打开，图上有一个 `draft` 文档
+  When 该文档在白板之外被改为 `active`
+  Then 该节点呈现 `active`，用户未做任何操作
+- **spec-00001-AC-42.3** (spec-00001-FR-42)
+  Given 白板已打开
+  When 图上某文档在白板之外被删除
+  Then 该节点从图上消失
+- **spec-00001-AC-42.4** (spec-00001-FR-42)
+  Given 白板已打开
+  When 短时间内连续发生多次 `docs/` 变化
+  Then 刷新次数少于变化次数，且最终图与磁盘一致
+- **spec-00001-AC-42.5** (spec-00001-FR-42)
+  Given 白板已打开
+  When `docs/` 之外的文件（如 `tools/`）发生变化
+  Then 不触发刷新
+- **spec-00001-AC-42.6** (spec-00001-FR-42)
+  Given 编辑器打开着某文档且有未保存的改动
+  When 该文档在白板之外被改动并触发刷新
+  Then 编辑器中的正文与光标位置不变——刷新不重载缓冲区
+- **spec-00001-AC-42.7** (spec-00001-FR-42)
+  Given 一个 agent 会话正在运行并写入 `docs/`
+  When 会话尚未结束
+  Then 图已随其产出刷新——会话期间不静默推送
+- **spec-00001-AC-42.8** (spec-00001-FR-42)
+  Given 没有任何白板连着服务
+  When `docs/` 发生变化
+  Then 服务照常运行、不报错——无订阅者不是错误
+- **spec-00001-AC-42.9** (spec-00001-FR-42)
+  Given 两个白板同时连着服务
+  When `docs/` 发生一次变化
+  Then 两者都刷新
+- **spec-00001-AC-43.1** (spec-00001-FR-43)
+  Given 推送连接中断
+  When 查看白板
+  Then 当前图仍完整呈现，操作不被错误阻断
+- **spec-00001-AC-43.2** (spec-00001-FR-43)
+  Given 推送连接中断期间 `docs/` 发生了变化
+  When 连接重新建立
+  Then 白板刷新一次，该变化出现在图上
+- **spec-00001-AC-43.3** (spec-00001-FR-43)
+  Given 推送连接从未建立成功（服务的事件通道不可用）
+  When 打开白板
+  Then 图照常呈现、无错误阻断
+- **spec-00001-AC-43.4** (spec-00001-FR-43)
+  Given 连接已断开并重连过一次
+  When 再次断开并重连
+  Then 同样刷新一次——重连的响应可重复发生
+- **spec-00001-AC-44.1** (spec-00001-FR-44)
+  Given 已下钻进某文档的子画布
+  When 推送触发刷新且该文档仍在
+  Then 仍停留在该子画布，面包屑不变
+- **spec-00001-AC-44.2** (spec-00001-FR-44)
+  Given 详情面板正呈现某节点
+  When 推送触发刷新且该节点对应的条目仍在文档中
+  Then 详情仍呈现同一目标
+- **spec-00001-AC-44.3** (spec-00001-FR-44)
+  Given 已下钻进某文档的子画布
+  When 由白板自身的动作触发一次刷新
+  Then 仍停留在该子画布——保持与触发来源无关
+- **spec-00001-AC-44.4** (spec-00001-FR-44)
+  Given 已下钻进某文档的子画布
+  When 该文档在磁盘上被删除并触发刷新
+  Then 退回顶层白板，面包屑消失
+- **spec-00001-AC-44.5** (spec-00001-FR-44)
+  Given 详情面板正呈现某验收行
+  When 该行在磁盘上被删掉并触发刷新
+  Then 详情面板关闭，子画布仍在
+- **spec-00001-AC-44.6** (spec-00001-FR-44)
+  Given 已选中某文档
+  When 该文档在磁盘上被删除并触发刷新
+  Then 取消选中，其浮窗工具栏关闭
+- **spec-00001-AC-44.7** (spec-00001-FR-44)
+  Given 检视面板中某条目行已展开
+  When 该条目在磁盘上被删掉并触发刷新
+  Then 该行收起，面板仍呈现其余条目
 
 ## 5. Technical Design
 
 | Design | Doc | Covers |
 | --- | --- | --- |
-| Docs 白板 MVP | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 服务形态、模块结构、流程配置契约、终端通道、权限传递、冲突与 commit 策略、条目与验收行的解析及覆盖推导 |
+| Docs 白板 MVP | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 服务形态、模块结构、流程配置契约、终端通道、权限传递、冲突与 commit 策略、条目与验收行的解析及覆盖推导、变更推送链路与会话前快照 |
 | Docs 白板界面 | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 设计令牌、布局、控件映射、图标语言、可访问性 |
 
 ## 6. Out of Scope
@@ -1039,8 +1149,8 @@ parent: prd-00001-docs-whiteboard
 - 引用不存在**文档**的验收行的归属呈现——FR-33 只处理「文档存在而条目不存在」；
   被引文档本身不存在的行没有可展示它的面板。
 - record 状态对证据效力的区分（当前一律参与，见 FR-32 与 decision-00004 §5）。
-- 子画布打开期间对磁盘变化（图刷新、文档被删）的专门处置——MVP 未定义，落地
-  plan 时裁定。
+- ~~子画布打开期间对磁盘变化的专门处置~~——第七轮已由 FR-44 定义并写了 GWT，
+  不再是范围外事项。
 - 「无法归属」区在子画布中的呈现——它只在检视面板中列出（FR-33）。
 - 从详情面板或面板展开态直接定位到编辑器中的对应行。
 - 行内呈现处的块级 Markdown 完整渲染（FR-39 明确降级为纯文本）。
@@ -1050,7 +1160,8 @@ parent: prd-00001-docs-whiteboard
 - 图随文档规模增长仍可读：支持缩放与平移；定位到指定节点见 FR-27。
 - 节点状态一眼可辨：按 status 着色或同等显著的视觉区分，且不只靠颜色传达。
 - 内嵌终端体验接近本地终端：流式输出、可输入交互（可验证部分见 FR-12）。
-- 白板之外直接改文件后，刷新即可反映最新状态，不产生第二套数据。
+- 白板之外直接改文件后无需手动刷新即可反映最新状态，不产生第二套数据
+  （原为不写 GWT 的非功能项，第七轮升格为 FR-42…FR-44，见 issue-00007）。
 
 以下项按 [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
 §8 的裁定不写 GWT——它们没有回归保护，这是明知的取舍：
@@ -1066,5 +1177,5 @@ parent: prd-00001-docs-whiteboard
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
-- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md) · [plan-00007-whiteboard-parsing-contract](../plan/plan-00007-whiteboard-parsing-contract.md)
+- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md) · [plan-00007-whiteboard-parsing-contract](../plan/plan-00007-whiteboard-parsing-contract.md) · [plan-00008-whiteboard-refresh-and-commit-scope](../plan/plan-00008-whiteboard-refresh-and-commit-scope.md)
 - Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）· [decision-00005-whiteboard-parsing-contract](../decision/decision-00005-whiteboard-parsing-contract.md)（持有 FR-40/FR-41 与条目文法的取舍）

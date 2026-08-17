@@ -1,7 +1,7 @@
 ---
 id: issue-00008-advance-commits-unrelated-dirty-docs
 type: issue
-status: open
+status: resolved
 blocks: [spec-00001-docs-whiteboard]
 ---
 
@@ -54,22 +54,56 @@ blocks: [spec-00001-docs-whiteboard]
    commit **只含**会话产出——现实现下该测试以「脏文件也在 commit 里」失败。
 2. 修复方向：会话启动时记录 `git status -- docs/` 快照，结束时取差集（即
    design-00001 §4 的原话落地）。
-- Failing test: 待修复轮按上式落地。
+- Failing test（先于修复跑红，输出即本 issue 的现场）：
+  `test/docService.test.ts` 的
+  `commitSessionChanges > leaves a file that was dirty before the session out of the commit`
+
+  ```
+  AssertionError: expected [ 'docs/prd/a.md', 'docs/spec/new.md' ]
+                  to deeply equal [ 'docs/spec/new.md' ]
+  ```
 
 ## 6. Fix
 
-- Change: 待修复轮（快照 + 差集）。
-- 顺带修检测缺口：`AC-14.2` 的 Given 是「与本次动作无关的脏文件」，但现有测试
-  夹具只用了 docs/ **之外**的脏文件，恰好绕开本缺陷——补 docs/ 之内的用例。
+- Change（plan-00008 W1）：`GitLayer.snapshot(dir)` 取快照（已脏 `docs/` 路径
+  + sha256 摘要），`GitLayer.changedSince(dir, before)` 以
+  `before.get(path) !== digest(path)` 一次比较落 design-00001 §4 的三种处置；
+  差集为空则不 commit。快照的生命周期归 Session Manager：**在 spawn 之前
+  同步取**——异步取会与 agent 的写盘赛跑，把会话自己的产出误记为「本来就脏」
+  而排除掉。
+- Why this addresses the root cause and not the symptom: 缺陷是「没有会话前的
+  参照系」，本修复给出参照系并按内容比较；不是给暂存集再加一层过滤规则。
+- 按内容而非按路径集求差的理由见 design-00001 §4：路径集差会把「会话在一份
+  本来就脏的草稿上继续改」的产出误排除，而那正是本仓最常见的推进形态。
+- 检测缺口的更正：初稿写「`AC-14.2` 的夹具只用了 docs/ 之外的脏文件」——**这是
+  错的**，实查 `test/docService.test.ts` 的脏文件是 `docs/idea/b.md`，本就在
+  docs/ 之内；AC-14.2 之所以绿，是因为编辑动作走显式路径暂存、根本不经过
+  `changedPaths`。真正的缺口是：**advance 这条路径上从来没有过「会话启动前已有
+  脏文件」的用例**——`AC-14.5`/`AC-14.6` 补的正是它。
+- 检测缺口的更正：初稿写「`AC-14.2` 的夹具只用了 docs/ 之外的脏文件」——**这是
+  错的**，实查 `test/docService.test.ts` 的脏文件是 `docs/idea/b.md`，本就在
+  docs/ 之内；AC-14.2 之所以绿，是因为编辑动作走显式路径暂存、根本不经过
+  `changedPaths`。真正的缺口是：**advance 这条路径上从来没有过「会话启动前已有
+  脏文件」的用例**——`AC-14.5`/`AC-14.6` 补的正是它。
 
 ## 7. Verification
 
-- 待填。
+- §5 的回归测试通过；另有 `AC-14.5`/`AC-14.6` 各两条（单元 + 完整会话生命
+  周期）、以及「会话在别人的脏草稿上继续改 → 该文件**应当**被暂存」一条守住
+  差集的第三支。全套 557 测试绿，`test/acceptance.test.ts` **一字未改仍通过**
+  ——它正是「快照取在会话启动时」的证据。
+- 现场复验（plan-00008 实测 (d)，`record-00007` 存档）：在有 6 份脏 `docs/`
+  文件的工作树上发起推进并立即终止会话 → **无 commit**、HEAD 未动、暂存区空、
+  6 份脏文件 sha256 逐一不变。且服务端在找不到产出时**仍会调用**
+  `commitSessionChanges`，故本次确实走到了暂存范围这段逻辑，是差集把它们全数
+  排除，而非跳过了提交路径。
 
 ## 8. Follow-through
 
-- Detection gap: AC-14.2 的测试夹具口径窄于 AC 文本（docs 外 vs docs 内），
-  绿灯掩盖了缺陷两个多轮次；修复轮补 docs 内夹具即回归守卫。
+- Detection gap: advance 的 commit 范围从来只被「会话产出都在 commit 里」
+  （AC-14.4）这一侧覆盖，没有任何用例问过「不该在里面的东西是否被排除」——
+  一个只测正向、不测反向的验收面。AC-14.5/AC-14.6 即补上的反向守卫。
+  （初稿把缺口误记为 AC-14.2 的夹具窄，见 §6 的更正。）
 - Doc verdict: **code was non-conformant**——FR-14 与 design-00001 §4 的文本
   无误且互相一致。
 - Residual state: 本次误提交已当场 `git reset` 还原，工作树逐行核对与基线

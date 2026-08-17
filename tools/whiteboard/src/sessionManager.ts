@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import type { AgentConfig } from './config.ts'
 import { type Expectation, taskInstruction } from './advance.ts'
+import type { DirtySnapshot } from './gitLayer.ts'
 
 /** Rolling window of session output replayed on reconnect (spec-00001-AC-21.2). */
 const BUFFER_LIMIT = 1024 * 1024
@@ -45,6 +46,8 @@ export class SessionBusyError extends Error {
 interface Session {
   info: SessionInfo
   expectation: Expectation
+  /** The docs/ dirt this session inherited; the exit hook scopes its commit against it. */
+  baseline: DirtySnapshot
   buffer: string
   pty?: PtyProcess
   listeners: Set<(data: string) => void>
@@ -55,6 +58,13 @@ export interface SessionManagerOptions {
   agent: AgentConfig
   repoRoot: string
   spawn: SpawnPty
+  /**
+   * The docs/ dirt as it stands, read once per session before the agent can
+   * write (design-00001 §4). A manager given none scopes nothing — every
+   * dirty path counts as the session's, which is what a caller with no git
+   * layer behind it means.
+   */
+  snapshot?: () => DirtySnapshot
   /** Runs when the process exits: commits and validates what the session produced. */
   onExit: (expectation: Expectation) => Promise<SessionOutcome>
 }
@@ -84,7 +94,17 @@ export class SessionManager {
       targetType: expectation.targetType,
       status: 'running',
     }
-    const session: Session = { info, expectation, buffer: '', listeners: new Set(), finished: Promise.resolve() }
+    // Before the spawn, never after: from here on anything under docs/ that
+    // moves is the session's doing (spec-00001-AC-14.5).
+    const baseline = this.options.snapshot?.() ?? new Map<string, string>()
+    const session: Session = {
+      info,
+      expectation,
+      baseline,
+      buffer: '',
+      listeners: new Set(),
+      finished: Promise.resolve(),
+    }
     this.session = session
 
     try {
@@ -112,6 +132,11 @@ export class SessionManager {
 
   current(): SessionInfo | null {
     return this.session?.info ?? null
+  }
+
+  /** The dirt the current session started from, for the exit hook to scope its commit by. */
+  baseline(): DirtySnapshot {
+    return this.session?.baseline ?? new Map<string, string>()
   }
 
   /** Resolves once the exit hook (commit + directed validation) has run. */

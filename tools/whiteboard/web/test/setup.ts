@@ -112,6 +112,22 @@ if (typeof window !== 'undefined') {
     for (const observer of observers) observer.report()
   }
 
+  // The board opens the docs-change channel on mount (spec-00001-FR-42), and
+  // jsdom's own WebSocket would answer that by dialling a localhost server no
+  // test is running. This one never opens and never signals, which is the
+  // «connection not available» case FR-43 says costs the board nothing — the
+  // tests that drive the channel stub their own socket over it.
+  class SilentSocket {
+    static readonly OPEN = 1
+    readyState = 0
+    constructor(readonly url: string) {}
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  }
+  Object.defineProperty(globalThis, 'WebSocket', { configurable: true, writable: true, value: SilentSocket })
+
   // React Flow reads the canvas transform through it; jsdom has no CSSOM view.
   globalThis.DOMMatrixReadOnly ??= class {
     m22 = 1

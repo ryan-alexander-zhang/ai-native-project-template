@@ -11,7 +11,7 @@ import {
   readDocContent,
   readGraph,
 } from './docRepository.ts'
-import { type ActionKind, type CommitOutcome, GitLayer, commitMessage } from './gitLayer.ts'
+import { type ActionKind, type CommitOutcome, type DirtySnapshot, GitLayer, commitMessage } from './gitLayer.ts'
 import { type ItemsView, declaresItems, requirementView } from './requirements.ts'
 import { applyAccept, applyClarify, applyStatusChange, nextStepsFor, transitionsFor } from './workflow.ts'
 
@@ -110,11 +110,26 @@ export class DocService {
     return { ...(await this.write(node, clarified, 'clarify')), status: node.status }
   }
 
-  /** Commit whatever an agent session left under docs/ (spec-00001-FR-14, advance). */
-  async commitSessionChanges(docId: string): Promise<ActionResult> {
-    const dir = relative(this.repoRoot, this.docsDir).split(/[\\/]/).join('/')
-    const paths = await this.git.changedPaths(dir)
+  /**
+   * What docs/ already held in dirt, to be taken before an agent session starts:
+   * the baseline its commit is scoped against (spec-00001-AC-14.5, issue-00008).
+   */
+  snapshotDocs(): DirtySnapshot {
+    return this.git.snapshot(this.docsPath())
+  }
+
+  /**
+   * Commit what an agent session left under docs/ (spec-00001-FR-14, advance):
+   * the content that moved since `before`, never the dirt the session inherited.
+   * Nothing moved, nothing committed (spec-00001-AC-14.6).
+   */
+  async commitSessionChanges(docId: string, before: DirtySnapshot): Promise<ActionResult> {
+    const paths = await this.git.changedSince(this.docsPath(), before)
     return this.git.commit(paths, commitMessage('advance', docId))
+  }
+
+  private docsPath(): string {
+    return relative(this.repoRoot, this.docsDir).split(/[\\/]/).join('/')
   }
 
   private require(id: string, graph: DocGraph = this.graph()): DocNode {

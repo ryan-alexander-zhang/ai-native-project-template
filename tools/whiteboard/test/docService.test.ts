@@ -215,10 +215,11 @@ describe('commitSessionChanges', () => {
   // spec-00001-AC-14.4
   it('commits everything the session left under docs', async () => {
     const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    const before = service.snapshotDocs()
     mkdirSync(join(docsDir, 'spec'))
     writeFileSync(join(docsDir, 'spec/new.md'), doc({ id: 'spec-00001-z', type: 'spec', status: 'draft' }))
 
-    const result = await service.commitSessionChanges('spec-00001-z')
+    const result = await service.commitSessionChanges('spec-00001-z', before)
 
     expect(result.committed).toBe(true)
     expect(lastCommitMessage(repoRoot)).toBe('wb(advance): spec-00001-z')
@@ -227,10 +228,64 @@ describe('commitSessionChanges', () => {
 
   it('skips the commit when the session changed nothing', async () => {
     const { repoRoot, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
-    const before = commitCount(repoRoot)
+    const commits = commitCount(repoRoot)
+    const before = service.snapshotDocs()
 
-    expect(await service.commitSessionChanges('prd-00001-x')).toEqual({ committed: false })
-    expect(commitCount(repoRoot)).toBe(before)
+    expect(await service.commitSessionChanges('prd-00001-x', before)).toEqual({ committed: false })
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // spec-00001-AC-14.5 — the file that was already dirty is nobody's product (issue-00008)
+  it('leaves a file that was dirty before the session out of the commit', async () => {
+    const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    writeFileSync(join(docsDir, 'prd/a.md'), `${DRAFT_PRD}dirty before the session ever started\n`)
+    const before = service.snapshotDocs()
+    mkdirSync(join(docsDir, 'spec'))
+    writeFileSync(join(docsDir, 'spec/new.md'), doc({ id: 'spec-00001-z', type: 'spec', status: 'draft' }))
+
+    const result = await service.commitSessionChanges('spec-00001-z', before)
+
+    expect(result.committed).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/new.md'])
+  })
+
+  // spec-00001-AC-14.6 — the dirty tree it inherited is not a change of its own
+  it('makes no commit when only the inherited dirt is there', async () => {
+    const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    writeFileSync(join(docsDir, 'prd/a.md'), `${DRAFT_PRD}dirty before the session ever started\n`)
+    const commits = commitCount(repoRoot)
+    const before = service.snapshotDocs()
+
+    expect(await service.commitSessionChanges('prd-00001-x', before)).toEqual({ committed: false })
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // A rename staged before the session is dirt at both ends, and neither end is
+  // the session's (design-00001 §4).
+  it('leaves a rename staged before the session out of the commit', async () => {
+    const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    git(repoRoot, 'mv', 'docs/prd/a.md', 'docs/prd/moved.md')
+    const before = service.snapshotDocs()
+    mkdirSync(join(docsDir, 'spec'))
+    writeFileSync(join(docsDir, 'spec/new.md'), doc({ id: 'spec-00001-z', type: 'spec', status: 'draft' }))
+
+    await service.commitSessionChanges('spec-00001-z', before)
+
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/new.md'])
+  })
+
+  // design-00001 §4, the third disposition: writing into someone else's dirty
+  // draft is the commonest advance there is, and it must not be read as dirt.
+  it('commits a file the session went on writing into after it was already dirty', async () => {
+    const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    writeFileSync(join(docsDir, 'prd/a.md'), `${DRAFT_PRD}an unfinished draft\n`)
+    const before = service.snapshotDocs()
+    writeFileSync(join(docsDir, 'prd/a.md'), `${DRAFT_PRD}an unfinished draft\nand what the agent added\n`)
+
+    const result = await service.commitSessionChanges('prd-00001-x', before)
+
+    expect(result.committed).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
   })
 })
 

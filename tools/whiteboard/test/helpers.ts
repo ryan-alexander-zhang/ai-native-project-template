@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { expect, vi } from 'vitest'
 import { type FlowConfig, parseFlowConfig } from '../src/config.ts'
 import type { DocEdge } from '../src/docRepository.ts'
+import { DEBOUNCE_MS, type DocsWatcher } from '../src/watcher.ts'
 
 const TEST_CONFIG = `
 types:
@@ -58,6 +60,35 @@ export function makeDocsDir(files: Record<string, string>): string {
  * files in parallel, which made these waits flake.
  */
 export const SESSION_WAIT = { timeout: 20_000, interval: 25 }
+
+/**
+ * Wait until a watch is not merely set up but delivering. The OS arms a watch
+ * some way after the scan chokidar reports as ready, and a write into that
+ * window is never seen at all; a probe file rewritten until it comes back as a
+ * signal is the only honest way to know. It is written before any board
+ * subscribes, and its removal is given the debounce window to fold away, so
+ * nobody downstream hears the probe itself.
+ */
+export async function armWatch(watcher: DocsWatcher, docsDir: string): Promise<void> {
+  await watcher.ready()
+  let seen = 0
+  const stop = watcher.subscribe(() => {
+    seen += 1
+  })
+  const probe = join(docsDir, 'probe.tmp')
+  await vi.waitFor(
+    () => {
+      writeFileSync(probe, String(seen))
+      expect(seen).toBeGreaterThan(0)
+    },
+    // Slower than the debounce window: a probe rewritten faster than the window
+    // closes keeps pushing the signal it waits for out of reach.
+    { timeout: 10_000, interval: 3 * DEBOUNCE_MS },
+  )
+  stop()
+  rmSync(probe)
+  await new Promise((resolve) => setTimeout(resolve, 4 * DEBOUNCE_MS))
+}
 
 export function git(repoRoot: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' })
