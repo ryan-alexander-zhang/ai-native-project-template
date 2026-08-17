@@ -130,6 +130,9 @@ row3                                                                            
 | 接收 | `<button>` | `Button`（default 变体） | `Check` |
 | 澄清 | 工具栏内联 textarea | `Button`，点击即发起澄清会话（终端内逐题提问；第八轮由 decision-00006 改写，原 `Dialog` + `Textarea` 废弃）；仅可澄清类型的节点呈现 | `MessageCircleQuestionMark` |
 | 答疑 | 无 | `Button`（ghost 变体），点击即发起答疑会话（终端内多轮讨论，`spec-00001-FR-47`） | `CircleHelp` |
+| 终止会话 | 无 | 终端面板头部 `Button`（destructive 变体），仅会话 running 时可用，点击即终止（`spec-00001-FR-49`，issue-00010） | `Square` |
+| 发起入口禁用说明 | 无 | 推进/澄清/答疑因会话运行禁用期间，悬停/聚焦呈现 `Tooltip`「session running」；与「no next step」并存时后者优先（它不随会话结束消失，`AC-49.5`） | — |
+| 顶栏会话入口 | 无 | 会话 running 且终端面板已收起时，顶栏呈现会话状态 `Badge`/`Button`，点击重开终端面板——终止因此始终可达（`AC-49.8`） | `Terminal` |
 | 推进 | `<select>` | `DropdownMenu`，逐项列出下一步类型；**无候选时按钮 disabled，并在 `Tooltip` 与菜单内呈现「no next step」**（spec-00001-AC-10.3） | `Plus` |
 | 编辑 | `<button>` | `Button`（ghost 变体） | `Pencil` |
 | 关系列表 | 无 | `Popover` + 按关系字段分组的列表，每项一行「字段名 · 方向 · 对端 id」，点击即定位并选中对端（`spec-00001-FR-30`）；无关系时呈现「no relations」 | `Waypoints` |
@@ -364,6 +367,8 @@ FR-26/FR-27 及其 AC 需要新的验收行。
 | 悬停标签密度阈值 | `spec-00001-FR-34` 修订（`AC-34.7`/`34.8`） |
 | 工具栏避让右槽 | 实测验收，不写 GWT（§9 视口修正） |
 | 解析诊断区与顶栏诊断计数 | `spec-00001-FR-40` 及其 AC |
+| 终端尺寸随面板同步 | `spec-00001-FR-12` 修订（`AC-12.5`…`AC-12.7`） |
+| 终止会话按钮、禁用原因 tooltip、顶栏会话入口 | `spec-00001-FR-49` 及其 AC |
 | 推进指令的文法段与产出校验 | `spec-00001-FR-41` 及其 AC |
 | 磁盘变更自动刷新与断连时的沉默 | `spec-00001-FR-42`、`FR-43` 及其 AC |
 | 刷新后呈现状态按 id 保持与就近关闭 | `spec-00001-FR-44` 及其 AC |
