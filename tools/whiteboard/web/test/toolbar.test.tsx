@@ -224,6 +224,37 @@ describe('the floating toolbar', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Accept' }).disabled).toBe(false)
   })
 
+  /**
+   * spec-00001-AC-49.5 — a disabled entry that says nothing leaves the user with
+   * no way to tell a locked board from a broken one (issue-00010). The reason is
+   * read the way the «no next step» one is: focus the entry, and it is announced.
+   */
+  it.each(['Clarify', 'Ask', 'Advance to the next step'])(
+    'says why %s is disabled while a session runs',
+    async (name) => {
+      renderToolbar({ sessionRunning: true })
+
+      // The disabled button takes no pointer events, so the reason hangs on the
+      // wrapper — which is also what makes it reachable by keyboard.
+      await userEvent.hover(screen.getByRole('button', { name }).parentElement!)
+
+      expect((await screen.findByRole('tooltip')).textContent).toContain('session running')
+    },
+  )
+
+  /**
+   * spec-00001-FR-49 and design-00002 §3: when both reasons hold, «no next step»
+   * is the one shown — it outlives the session, so telling the user only about
+   * the session would promise an entry that never arrives.
+   */
+  it('prefers no next step over session running when both hold', async () => {
+    renderToolbar({ nextSteps: [], sessionRunning: true })
+
+    await userEvent.hover(screen.getByLabelText('Advance to the next step').parentElement!)
+
+    expect((await screen.findByRole('tooltip')).textContent).toContain('no next step')
+  })
+
   // spec-00001-AC-10.2
   it('lists every next-step candidate', async () => {
     renderToolbar({

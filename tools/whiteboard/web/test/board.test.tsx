@@ -438,6 +438,37 @@ describe('the board state', () => {
     await waitFor(() => expect(result.current.terminalOpen).toBe(true))
   })
 
+  // spec-00001-AC-49.3 — stopping the session hands the three entries back
+  it('takes the stopped session out of the way of the next one', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue({
+      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    })
+    const stop = vi
+      .spyOn(api, 'stopSession')
+      .mockResolvedValue({ id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'exited' })
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.session?.status).toBe('running'))
+
+    await act(() => result.current.stopSession())
+
+    expect(stop).toHaveBeenCalled()
+    expect(result.current.session?.status).toBe('exited')
+  })
+
+  it('keeps the session it has when the stop is refused', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue({
+      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    })
+    vi.spyOn(api, 'stopSession').mockRejectedValue(new Error('there is no running agent session to stop'))
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.session?.status).toBe('running'))
+
+    await act(() => result.current.stopSession())
+
+    expect(result.current.session?.status).toBe('running')
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no running agent session/))
+  })
+
   it('leaves the terminal closed when the last session already exited', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
       current: { id: 's1', kind: 'advance', sourceId: 'idea-00001-x', targetType: 'prd', status: 'exited' },
@@ -454,7 +485,7 @@ describe('the terminal socket', () => {
     static last: FakeSocket
     static readonly OPEN = 1
     readyState = 1
-    sent: string[] = []
+    sent: unknown[] = []
     closed = false
     private listeners: Record<string, (event: { data: string }) => void> = {}
 
@@ -470,13 +501,25 @@ describe('the terminal socket', () => {
       this.listeners.message?.({ data })
     }
 
-    send(data: string) {
+    /** The handshake completing, as the browser reports it. */
+    open() {
+      this.readyState = 1
+      this.listeners.open?.({ data: '' })
+    }
+
+    send(data: unknown) {
       this.sent.push(data)
     }
 
     close() {
       this.closed = true
     }
+  }
+
+  /** A size frame read back as the pair it carries. */
+  function sizeIn(frame: unknown): unknown {
+    expect(typeof frame).not.toBe('string')
+    return JSON.parse(new TextDecoder().decode(frame as Uint8Array))
   }
 
   beforeEach(() => vi.stubGlobal('WebSocket', FakeSocket))
@@ -510,5 +553,35 @@ describe('the terminal socket', () => {
   it('closes the socket on request', () => {
     connectTerminal(() => {}).close()
     expect(FakeSocket.last.closed).toBe(true)
+  })
+
+  // spec-00001-AC-12.5 — a size travels as its own kind of frame, so no keystroke
+  // can be read as a size and no size typed at the agent (issue-00009)
+  it('sends the size as a binary frame, apart from the stdin stream', () => {
+    const link = connectTerminal(() => {})
+
+    link.resize(100, 40)
+
+    expect(FakeSocket.last.sent).toHaveLength(1)
+    expect(sizeIn(FakeSocket.last.sent[0])).toEqual({ cols: 100, rows: 40 })
+  })
+
+  it('holds a size measured before the socket opened, and sends it on open', () => {
+    const link = connectTerminal(() => {})
+    FakeSocket.last.readyState = 0
+
+    link.resize(100, 40)
+    expect(FakeSocket.last.sent).toEqual([])
+
+    FakeSocket.last.open()
+
+    expect(sizeIn(FakeSocket.last.sent[0])).toEqual({ cols: 100, rows: 40 })
+  })
+
+  it('sends nothing on open when no size was measured yet', () => {
+    connectTerminal(() => {})
+    FakeSocket.last.open()
+
+    expect(FakeSocket.last.sent).toEqual([])
   })
 })

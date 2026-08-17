@@ -25,6 +25,8 @@ function requireExecutable(command: string): void {
 
 export const spawnPty: SpawnPty = (command, args, cwd): PtyProcess => {
   requireExecutable(command)
+  // A size to start on, not the size it stays: the terminal that attaches
+  // reports its own and the session is resized to it (spec-00001-FR-12).
   const pty = spawn(command, args, { name: 'xterm-color', cols: 120, rows: 30, cwd })
   return {
     onData: (listener) => {
@@ -34,6 +36,7 @@ export const spawnPty: SpawnPty = (command, args, cwd): PtyProcess => {
       pty.onExit(({ exitCode }) => listener({ exitCode }))
     },
     write: (data) => pty.write(data),
+    resize: (cols, rows) => pty.resize(cols, rows),
     kill: () => pty.kill(),
   }
 }

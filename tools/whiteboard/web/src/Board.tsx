@@ -10,7 +10,14 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { FileQuestionMark, FileWarning, LayoutDashboard, Search, TriangleAlert } from 'lucide-react'
+import {
+  FileQuestionMark,
+  FileWarning,
+  LayoutDashboard,
+  Search,
+  Terminal as TerminalIcon,
+  TriangleAlert,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
 import type { DocNode } from '../../src/docRepository.ts'
@@ -269,6 +276,24 @@ function Canvas() {
         </Button>
 
         <div className="ml-auto flex items-center gap-2">
+          {/*
+            The stop lives in the terminal panel, so the panel itself must never
+            become unreachable: while a session runs with the panel put away, the
+            top bar carries the way back to it — which is the way back to the stop
+            (spec-00001-AC-49.8, design-00002 §3).
+          */}
+          {board.session?.status === 'running' && !board.terminalOpen ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              aria-label="Reopen the agent session"
+              onClick={() => board.setTerminalOpen(true)}
+            >
+              <TerminalIcon className="size-4" aria-hidden />
+              session running
+            </Button>
+          ) : null}
           {board.graph.issues.length === 0 ? (
             <span className="text-muted-foreground text-xs">no issues</span>
           ) : (
@@ -391,7 +416,12 @@ function Canvas() {
           <>
             <ResizableHandle withHandle />
             <ResizablePanel id="terminal" defaultSize={35} minSize={15}>
-              <Terminal session={board.session} dark={theme.isDark} onClose={() => board.setTerminalOpen(false)} />
+              <Terminal
+                session={board.session}
+                dark={theme.isDark}
+                onClose={() => board.setTerminalOpen(false)}
+                onStop={() => void board.stopSession()}
+              />
             </ResizablePanel>
           </>
         ) : null}

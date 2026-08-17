@@ -902,6 +902,69 @@ describe('the board', () => {
     vi.unstubAllGlobals()
   })
 
+  /**
+   * spec-00001-AC-49.8: the stop lives in the terminal panel, so a panel that has
+   * been put away must be gettable back — otherwise closing it strands the user
+   * with a locked board and no way to unlock it (issue-00010, design-00002 §3).
+   */
+  it('offers the session in the top bar once the terminal panel is put away', async () => {
+    stubWebSocket()
+    vi.spyOn(api, 'session').mockResolvedValue({
+      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Reopen the agent session' })).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+    const entry = await screen.findByRole('button', { name: 'Reopen the agent session' })
+    await userEvent.click(entry)
+
+    await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Reopen the agent session' })).toBeNull()
+    vi.unstubAllGlobals()
+  })
+
+  it('offers no top-bar session entry when no session is running', async () => {
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+
+    expect(screen.queryByRole('button', { name: 'Reopen the agent session' })).toBeNull()
+  })
+
+  /**
+   * spec-00001-AC-49.3 as the user sees it: the whole way out of a stuck board —
+   * stop it in the terminal panel, and the entry that was locked comes back
+   * (issue-00010).
+   */
+  it('stops the session from the terminal panel and hands the entries back', async () => {
+    stubWebSocket()
+    vi.spyOn(api, 'session').mockResolvedValue({
+      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    })
+    const stop = vi.spyOn(api, 'stopSession').mockResolvedValue({
+      id: 's1',
+      kind: 'clarify',
+      sourceId: 'prd-00001-x',
+      status: 'exited',
+    })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true),
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Stop the agent session' }))
+
+    expect(stop).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(false),
+    )
+    vi.unstubAllGlobals()
+  })
+
   // spec-00001-AC-11.1 as the user sees it
   it('starts an advance from the toolbar and opens the terminal', async () => {
     stubWebSocket()

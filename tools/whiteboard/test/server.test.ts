@@ -52,6 +52,9 @@ function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?
   return { board, repoRoot, docsDir, port, call }
 }
 
+/** The request function `boardOn` hands back, for helpers that take one. */
+type BoardCall = ReturnType<typeof boardOn>['call']
+
 afterEach(async () => {
   for (const server of servers.splice(0)) server.close()
   await Promise.all(watching.splice(0).map((board) => board.watcher.close()))
@@ -492,6 +495,211 @@ describe('clarify and ask sessions', () => {
     expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
     expect(commitCount(repoRoot)).toBe(commits)
     expect(board.sessions.current()!.outcome!.committed).toBe(false)
+  })
+})
+
+/**
+ * spec-00001-FR-49 (issue-00010): the one way out of a session that will not end
+ * by itself. The exit wrap-up is the ordinary one — end state, the kind's commit,
+ * a refreshed board — so what is new here is only the way in.
+ */
+describe('DELETE /api/sessions', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+  /** A clarify agent that revises the document it was started on, then hangs. */
+  const REVISE_AND_HOLD = [
+    '-e',
+    "require('fs').appendFileSync('spec/b.md', '\\nrevised\\n'); setTimeout(() => {}, 5000)",
+  ]
+
+  /** A clarify session on the draft spec, held until it has actually written. */
+  async function clarifyThatWrote(call: BoardCall, docsDir: string) {
+    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+    await vi.waitFor(
+      () => expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toContain('revised'),
+      SESSION_WAIT,
+    )
+  }
+
+  // spec-00001-AC-49.1
+  it('ends the running process and leaves the end state in the terminal', async () => {
+    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+
+    const { status, body } = await call('DELETE', '/api/sessions')
+
+    expect(status).toBe(200)
+    expect(body.status).toBe('exited')
+    expect(board.sessions.current()!.status).toBe('exited')
+    expect(board.sessions.attach(() => {}).buffer).toContain('session ended with code')
+  })
+
+  // spec-00001-AC-49.2 — a stopped session's writings are committed under its kind
+  it('commits what the stopped session wrote, named by its kind', async () => {
+    const { call, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC }, REVISE_AND_HOLD)
+    await clarifyThatWrote(call, docsDir)
+
+    await call('DELETE', '/api/sessions')
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/b.md'])
+  })
+
+  // spec-00001-AC-49.3 — the slot is free again, which is the point of stopping
+  it('lets a new session start once the stuck one has been stopped', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+
+    await call('DELETE', '/api/sessions')
+
+    expect((await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })).status).toBe(200)
+  })
+
+  // spec-00001-AC-49.6 — stopping is not an action that can be taken twice: the
+  // second attempt must not put a second commit on the same wrap-up.
+  it('refuses a second stop of the same session and commits nothing again', async () => {
+    const { call, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC }, REVISE_AND_HOLD)
+    await clarifyThatWrote(call, docsDir)
+    await call('DELETE', '/api/sessions')
+    const commits = commitCount(repoRoot)
+
+    const { status, body } = await call('DELETE', '/api/sessions')
+
+    expect(status).toBe(404)
+    expect(body.error).toMatch(/no running agent session/)
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // spec-00001-AC-49.9 — the progress a clarify made outlives the stop; only an
+  // accept clears the state file (spec-00001-FR-46).
+  it('leaves the clarify state file in place when the session is stopped', async () => {
+    const { call, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC }, REVISE_AND_HOLD)
+    const statePath = join(repoRoot, clarifyStatePath('spec-00001-b'))
+    mkdirSync(join(repoRoot, '.whiteboard/clarify'), { recursive: true })
+    writeFileSync(statePath, '{"answered":1}')
+    await clarifyThatWrote(call, docsDir)
+
+    await call('DELETE', '/api/sessions')
+
+    expect(existsSync(statePath)).toBe(true)
+    expect(readFileSync(statePath, 'utf8')).toBe('{"answered":1}')
+  })
+
+  // spec-00001-AC-49.4
+  it('answers 404 when no session is running', async () => {
+    const { call } = boardOn({})
+
+    const { status, body } = await call('DELETE', '/api/sessions')
+
+    expect(status).toBe(404)
+    expect(body.error).toMatch(/no running agent session/)
+  })
+
+  // spec-00001-AC-49.4 — a session that already ended is not one to stop either
+  it('answers 404 for a session that has already exited', async () => {
+    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect((await call('DELETE', '/api/sessions')).status).toBe(404)
+  })
+})
+
+/**
+ * spec-00001-FR-12's size half (issue-00009). The protocol keeps the two kinds of
+ * message apart by frame type: every text frame is stdin verbatim, and a binary
+ * frame carries `{cols, rows}` — so no keystroke can be read as a size and no
+ * size as a keystroke.
+ */
+describe('terminal size frames', () => {
+  /** A board whose pty is a stand-in recording what it was told to become. */
+  function boardWithRecordingPty() {
+    const { repoRoot, docsDir } = makeRepo({ 'idea/a.md': ACTIVE_IDEA })
+    const sizes: Array<{ cols: number; rows: number }> = []
+    const typed: string[] = []
+    const board = new Board({
+      repoRoot,
+      docsDir,
+      config: testConfig(),
+      spawn: () => ({
+        onData: () => {},
+        onExit: () => {},
+        write: (data: string) => void typed.push(data),
+        kill: () => {},
+        resize: (cols: number, rows: number) => void sizes.push({ cols, rows }),
+      }),
+    })
+    const server = board.listen(0)
+    servers.push(server)
+    watching.push(board)
+    board.sessions.start({ kind: 'ask', sourceId: 'idea-00001-x', instruction: 'answer this' })
+    return { board, sizes, typed, port: (server.address() as { port: number }).port }
+  }
+
+  /** An open terminal socket on that board. */
+  async function attach(port: number) {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal`)
+    await new Promise<void>((resolve) => socket.addEventListener('open', () => resolve()))
+    return socket
+  }
+
+  /** The size frame as the front end sends it: binary, holding the JSON pair. */
+  function sizeFrame(cols: number, rows: number): Buffer {
+    return Buffer.from(JSON.stringify({ cols, rows }))
+  }
+
+  // spec-00001-AC-12.5
+  it('resizes the session pty to the size the attached terminal reports', async () => {
+    const { sizes, port } = boardWithRecordingPty()
+    const socket = await attach(port)
+
+    socket.send(sizeFrame(100, 40))
+
+    await vi.waitFor(() => expect(sizes).toEqual([{ cols: 100, rows: 40 }]))
+    socket.close()
+  })
+
+  // spec-00001-AC-12.6 — the panel moved, so the size the pty holds moves with it
+  it('resizes the pty again for every later size frame', async () => {
+    const { sizes, port } = boardWithRecordingPty()
+    const socket = await attach(port)
+
+    socket.send(sizeFrame(100, 40))
+    socket.send(sizeFrame(80, 24))
+
+    await vi.waitFor(() =>
+      expect(sizes).toEqual([
+        { cols: 100, rows: 40 },
+        { cols: 80, rows: 24 },
+      ]),
+    )
+    socket.close()
+  })
+
+  it('keeps a size frame out of stdin, and a keystroke out of the size', async () => {
+    const { sizes, typed, port } = boardWithRecordingPty()
+    const socket = await attach(port)
+
+    socket.send(sizeFrame(100, 40))
+    socket.send('{"cols":9,"rows":9}')
+
+    await vi.waitFor(() => expect(typed).toEqual(['answer this\n', '{"cols":9,"rows":9}']))
+    expect(sizes).toEqual([{ cols: 100, rows: 40 }])
+    socket.close()
+  })
+
+  it('drops a control frame it cannot read as a size, and carries on', async () => {
+    const { sizes, typed, port } = boardWithRecordingPty()
+    const socket = await attach(port)
+
+    socket.send(Buffer.from('not json at all'))
+    socket.send(Buffer.from(JSON.stringify({ cols: 'wide', rows: null })))
+    socket.send(sizeFrame(100, 40))
+
+    await vi.waitFor(() => expect(sizes).toEqual([{ cols: 100, rows: 40 }]))
+    expect(typed).toEqual(['answer this\n'])
+    socket.close()
   })
 })
 

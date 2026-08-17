@@ -102,6 +102,17 @@ export function useBoard() {
     [run],
   )
 
+  /**
+   * The one way a session ends on the user's word (spec-00001-FR-49). The board
+   * takes the finished session back from the server rather than assuming it: the
+   * three entries come back with it, and the graph is re-read like any action's.
+   */
+  const stopSession = useCallback(async () => {
+    await run(async () => {
+      setSession(await api.stopSession())
+    })
+  }, [run])
+
   const advance = useCallback(
     async (sourceId: string, targetType: string) => {
       await startSession(() => api.advance(sourceId, targetType))
@@ -188,6 +199,7 @@ export function useBoard() {
     deselect,
     run,
     startSession,
+    stopSession,
     advance,
   }
 }

@@ -48,4 +48,7 @@ export const api = {
   // the terminal (spec-00001-FR-9, FR-47).
   clarify: (docId: string) => request<SessionInfo>('POST', '/api/sessions/clarify', { docId }),
   ask: (docId: string) => request<SessionInfo>('POST', '/api/sessions/ask', { docId }),
+  // The way out of a session that will not end by itself; what comes back is the
+  // session as it finished (spec-00001-FR-49).
+  stopSession: () => request<SessionInfo>('DELETE', '/api/sessions'),
 }

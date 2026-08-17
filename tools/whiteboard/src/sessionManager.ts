@@ -51,6 +51,8 @@ export interface PtyProcess {
   onData(listener: (data: string) => void): void
   onExit(listener: (event: { exitCode: number }) => void): void
   write(data: string): void
+  /** The size the process believes it is drawing into (spec-00001-FR-12). */
+  resize(cols: number, rows: number): void
   kill(): void
 }
 
@@ -64,6 +66,14 @@ export class SessionBusyError extends Error {
   }
 }
 
+/** Asked to stop a session when none is running (spec-00001-FR-49). */
+export class NoSessionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NoSessionError'
+  }
+}
+
 interface Session {
   info: SessionInfo
   plan: SessionPlan
@@ -73,6 +83,9 @@ interface Session {
   pty?: PtyProcess
   listeners: Set<(data: string) => void>
   finished: Promise<void>
+  /** Resolves once the process has exited and the exit hook has run; a stop waits on it. */
+  ended: Promise<void>
+  announceEnd: () => void
 }
 
 export interface SessionManagerOptions {
@@ -119,6 +132,10 @@ export class SessionManager {
     // Before the spawn, never after: from here on anything under docs/ that
     // moves is the session's doing (spec-00001-AC-14.5).
     const baseline = this.options.snapshot?.() ?? new Map<string, string>()
+    let announceEnd!: () => void
+    const ended = new Promise<void>((resolve) => {
+      announceEnd = resolve
+    })
     const session: Session = {
       info,
       plan,
@@ -126,6 +143,8 @@ export class SessionManager {
       buffer: '',
       listeners: new Set(),
       finished: Promise.resolve(),
+      ended,
+      announceEnd,
     }
     this.session = session
 
@@ -152,6 +171,17 @@ export class SessionManager {
     this.requireSession().pty?.write(data)
   }
 
+  /**
+   * spec-00001-FR-12: the terminal's own size reaches the process, which is what
+   * a full-screen TUI draws by (issue-00009). A size that lands when nothing is
+   * running — the window between an exit and a terminal noticing — has nothing
+   * to resize, and refusing it would break the reconnect rather than the frame.
+   */
+  resize(cols: number, rows: number): void {
+    if (this.session?.info.status !== 'running') return
+    this.session.pty?.resize(cols, rows)
+  }
+
   current(): SessionInfo | null {
     return this.session?.info ?? null
   }
@@ -168,6 +198,22 @@ export class SessionManager {
 
   stop(): void {
     this.session?.pty?.kill()
+  }
+
+  /**
+   * spec-00001-FR-49: end the running session on the user's word. The wrap-up is
+   * the ordinary exit path — end state, the kind's commit, a refreshed board — and
+   * the caller waits for it, so what comes back is the session as it finished
+   * rather than as it was asked to stop (issue-00010).
+   */
+  async terminate(): Promise<SessionInfo> {
+    const session = this.session
+    if (session?.info.status !== 'running') {
+      throw new NoSessionError('there is no running agent session to stop')
+    }
+    this.stop()
+    await session.ended
+    return session.info
   }
 
   private requireSession(): Session {
@@ -191,10 +237,13 @@ export class SessionManager {
     session.info.status = 'exited'
     session.info.exitCode = exitCode
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)
-    session.finished = this.options.onExit(session.plan).then((outcome) => {
-      session.info.outcome = outcome
-      this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
-    })
+    session.finished = this.options
+      .onExit(session.plan)
+      .then((outcome) => {
+        session.info.outcome = outcome
+        this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
+      })
+      .finally(session.announceEnd)
   }
 }
 

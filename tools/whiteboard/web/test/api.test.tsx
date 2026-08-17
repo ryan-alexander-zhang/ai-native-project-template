@@ -97,6 +97,14 @@ describe('the api client', () => {
     ])
   })
 
+  // spec-00001-FR-49 — the one way out of a session that will not end (issue-00010)
+  it('stops the running session', async () => {
+    const fetchMock = mockFetch(200, { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'exited' })
+
+    expect(await api.stopSession()).toMatchObject({ status: 'exited' })
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.objectContaining({ method: 'DELETE' }))
+  })
+
   it('raises the refusal the board reports, with its status', async () => {
     mockFetch(409, { error: 'prd-00001-x changed on disk since it was opened' })
 

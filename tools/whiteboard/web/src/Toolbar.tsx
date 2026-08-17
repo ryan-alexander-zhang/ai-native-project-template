@@ -8,7 +8,7 @@ import {
   Plus,
   Waypoints,
 } from 'lucide-react'
-import { createElement } from 'react'
+import { type ReactElement, createElement } from 'react'
 import type { FlowStep } from '../../src/config.ts'
 import type { DocNode } from '../../src/docRepository.ts'
 import type { RelationItem } from './canvasModel.ts'
@@ -41,6 +41,26 @@ export interface ToolbarProps {
 }
 
 /**
+ * An entry that is disabled has to say why it is (spec-00001-AC-10.3, AC-49.5):
+ * a board that has locked its three starting points and given no reason cannot be
+ * told from a broken one (issue-00010). No reason, no wrapper — the tooltip
+ * belongs to the disabled state, not to the entry. The reason hangs on a span
+ * because a disabled control takes no pointer events, and the span carries
+ * `tabIndex` so the reason is reachable by keyboard too.
+ */
+function Disabled({ reason, children }: { reason?: string; children: ReactElement }): ReactElement {
+  if (reason === undefined) return children
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0}>{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
  * The floating toolbar of spec-00001-FR-3. A document with front matter problems
  * offers the editor — the way to repair it — and the relation list, which is how
  * you find out what its broken link pointed at (spec-00001-AC-2.4).
@@ -51,6 +71,8 @@ export interface ToolbarProps {
 export function Toolbar(props: ToolbarProps) {
   const { node, transitions, nextSteps, relations, clarifiable, sessionRunning, onPickRelation } = props
   const { onEdit, onStatus, onAccept, onClarify, onAsk, onAdvance } = props
+  // The one reason all three starting points share (spec-00001-FR-18).
+  const busy = sessionRunning ? 'session running' : undefined
 
   return (
     <div
@@ -157,47 +179,48 @@ export function Toolbar(props: ToolbarProps) {
             belongs, on the server (spec-00001-FR-9).
           */}
           {clarifiable ? (
-            <Button variant="ghost" size="sm" onClick={onClarify} disabled={sessionRunning}>
-              <MessageCircleQuestionMark className="size-4" aria-hidden />
-              Clarify
-            </Button>
+            <Disabled reason={busy}>
+              <Button variant="ghost" size="sm" onClick={onClarify} disabled={sessionRunning}>
+                <MessageCircleQuestionMark className="size-4" aria-hidden />
+                Clarify
+              </Button>
+            </Disabled>
           ) : null}
 
           {/* Asking is not a review action: any status, any type (spec-00001-FR-47). */}
-          <Button variant="ghost" size="sm" onClick={onAsk} disabled={sessionRunning}>
-            <CircleHelp className="size-4" aria-hidden />
-            Ask
-          </Button>
+          <Disabled reason={busy}>
+            <Button variant="ghost" size="sm" onClick={onAsk} disabled={sessionRunning}>
+              <CircleHelp className="size-4" aria-hidden />
+              Ask
+            </Button>
+          </Disabled>
 
           {nextSteps.length === 0 ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled>
-                    <Plus className="size-4" aria-hidden />
-                    no next step
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>no next step</TooltipContent>
-            </Tooltip>
+            <Disabled reason="no next step">
+              <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled>
+                <Plus className="size-4" aria-hidden />
+                no next step
+              </Button>
+            </Disabled>
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled={sessionRunning}>
-                  <Plus className="size-4" aria-hidden />
-                  Advance
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {nextSteps.map((step) => (
-                  <DropdownMenuItem key={step.next} onSelect={() => onAdvance(step.next)}>
-                    {step.next}
-                    <span className="text-muted-foreground ml-auto text-xs">{step.carry}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Disabled reason={busy}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled={sessionRunning}>
+                    <Plus className="size-4" aria-hidden />
+                    Advance
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {nextSteps.map((step) => (
+                    <DropdownMenuItem key={step.next} onSelect={() => onAdvance(step.next)}>
+                      {step.next}
+                      <span className="text-muted-foreground ml-auto text-xs">{step.carry}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Disabled>
           )}
         </>
       ) : null}

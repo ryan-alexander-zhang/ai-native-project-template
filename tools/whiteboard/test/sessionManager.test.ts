@@ -147,7 +147,7 @@ describe('the write-scope constraint', () => {
       repoRoot,
       spawn: (command, args, cwd) => {
         spawned.push({ command, args, cwd })
-        return { onData: () => {}, onExit: () => {}, write: () => {}, kill: () => {} }
+        return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
       },
       onExit: async () => OUTCOME,
     })
@@ -165,7 +165,7 @@ describe('the write-scope constraint', () => {
       repoRoot,
       spawn: (_command, _args, cwd) => {
         spawned.push(cwd)
-        return { onData: () => {}, onExit: () => {}, write: () => {}, kill: () => {} }
+        return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
       },
       onExit: async () => OUTCOME,
     })
@@ -197,6 +197,24 @@ describe('a running session', () => {
     manager.write('ping\n')
 
     await vi.waitFor(() => expect(output.text).toContain('got:ping'), SESSION_WAIT)
+  })
+
+  // spec-00001-AC-12.5 — the size the terminal reports reaches the process itself,
+  // which is what lets a full-screen TUI draw at the size it is being watched at
+  // (issue-00009).
+  it('resizes the session pty so the CLI sees the terminal size', async () => {
+    // The CLI reads the size off its own tty, and it is a process that has to
+    // boot before it can read anything — so it keeps saying what it sees rather
+    // than reporting the one moment the signal happened to arrive.
+    const { manager } = makeManager({
+      args: ['-e', "setInterval(() => console.log(process.stdout.columns + 'x' + process.stdout.rows), 50)"],
+    })
+    manager.start(ADVANCE)
+    const output = transcript(manager)
+
+    manager.resize(100, 40)
+
+    await vi.waitFor(() => expect(output.text).toContain('100x40'), SESSION_WAIT)
   })
 
   // spec-00001-AC-11.2 — the task instruction reaches the CLI on startup
@@ -287,6 +305,24 @@ describe('attach', () => {
     const { manager } = makeManager({})
     expect(() => manager.attach(() => {})).toThrowError(SessionBusyError)
     expect(() => manager.write('x')).toThrowError(SessionBusyError)
+  })
+
+  /**
+   * A size frame is not an instruction to anyone: one that lands with nothing
+   * running — the window between a session ending and a terminal noticing — has
+   * nothing to resize, and saying so as an error would only break the reconnect.
+   */
+  it('ignores a resize with no session behind it', () => {
+    const { manager } = makeManager({})
+    expect(() => manager.resize(100, 40)).not.toThrow()
+  })
+
+  it('ignores a resize that arrives after the session has exited', async () => {
+    const { manager } = makeManager({ args: ['-e', ''] })
+    manager.start(ADVANCE)
+    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+
+    expect(() => manager.resize(100, 40)).not.toThrow()
   })
 
   it('reports no current session before the first start', () => {

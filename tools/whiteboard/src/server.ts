@@ -6,6 +6,7 @@ import type { FlowConfig } from './config.ts'
 import { ConflictError, DocService } from './docService.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
 import {
+  NoSessionError,
   SessionBusyError,
   SessionManager,
   type SessionOutcome,
@@ -113,6 +114,11 @@ export class Board {
     app.post('/api/sessions/ask', (req, res) => {
       res.json(this.sessions.start(this.docs.askPlan(docIdOf(req.body))))
     })
+    // The way out of a session that will not end by itself (spec-00001-FR-49);
+    // the wrap-up it answers with has already run.
+    app.delete('/api/sessions', async (_req, res) => {
+      res.json(await this.sessions.terminate())
+    })
 
     app.use(errorHandler)
     return app
@@ -167,7 +173,17 @@ export class Board {
         return
       }
       socket.send(attached.buffer)
-      socket.on('message', (data) => this.sessions.write(data.toString()))
+      // The two kinds of message the terminal sends are told apart by frame
+      // type, never by their bytes: a text frame is stdin as it was typed, and a
+      // binary frame is the terminal's size (design-00001 §7, issue-00009).
+      socket.on('message', (data, isBinary) => {
+        if (!isBinary) {
+          this.sessions.write(data.toString())
+          return
+        }
+        const size = parseSize(data.toString())
+        if (size) this.sessions.resize(size.cols, size.rows)
+      })
       socket.on('close', () => attached.detach())
     })
 
@@ -194,9 +210,27 @@ function docIdOf(body: { docId?: string }): string {
   return body.docId
 }
 
+const isTerminalSize = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0
+
+/**
+ * A terminal size control frame: the columns and rows the embedded terminal is
+ * drawing into. A frame that carries no readable pair is dropped — it is not
+ * stdin either, and the session keeps the size it had.
+ */
+function parseSize(frame: string): { cols: number; rows: number } | undefined {
+  try {
+    const { cols, rows } = JSON.parse(frame) as { cols?: unknown; rows?: unknown }
+    return isTerminalSize(cols) && isTerminalSize(rows) ? { cols, rows } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [
   [ConflictError, 409],
   [SessionBusyError, 409],
+  [NoSessionError, 404],
   [WorkflowError, 422],
 ]
 
