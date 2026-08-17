@@ -8,12 +8,12 @@ parent: prd-00001-docs-whiteboard
 # Spec: Docs 白板 MVP
 
 > 本地单人白板：把 `docs/` 可视化为节点图，支持编辑、状态切换、评审（接收/澄清）、
-> 按流程配置推进下一步并调起受限的 agent 会话，全部变更自动留痕。
+> 答疑、按流程配置推进下一步并调起受限的 agent 会话，全部变更自动留痕。
 
 ## 1. Context
 
-- canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、推进、
-  流程配置、Agent 会话、留痕、预览。
+- canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、可澄清
+  类型、答疑、焦点行、澄清状态文件、推进、流程配置、Agent 会话、留痕、预览。
 - 本 spec 的 Markdown 方言取 GFM。
 - 输入：`parent` 为 [prd-00001-docs-whiteboard](../prd/prd-00001-docs-whiteboard.md)。
 - 本 spec 收窄「文档」一词：白板上的文档指 `docs/**/*.md` 中带 id front matter
@@ -26,21 +26,23 @@ parent: prd-00001-docs-whiteboard
 | --- | --- | --- |
 | S1 | 作为文档负责人，我要一打开白板就看到全部文档的关系图与状态，并能快速找到其中一份，这样无需逐个翻文件就能看清依赖链与卡点 | spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3, spec-00001-FR-26, spec-00001-FR-27, spec-00001-FR-28, spec-00001-FR-29, spec-00001-FR-30 |
 | S2 | 作为文档负责人，我要在白板上直接编辑并预览文档正文，这样查看与修改不用切换工具 | spec-00001-FR-4, spec-00001-FR-5, spec-00001-FR-22, spec-00001-FR-23, spec-00001-FR-24, spec-00001-FR-25 |
-| S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19 |
+| S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清——澄清由 agent 带着上下文逐题问我、断了还能接着问，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19, spec-00001-FR-45, spec-00001-FR-46, spec-00001-FR-48 |
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
 | S5 | 作为文档负责人，我要每次变更与评审都自动留痕，这样任何结论都可追溯 | spec-00001-FR-14, spec-00001-FR-20 |
 | S6 | 作为文档负责人，我要选中一份 spec 或 rule 就看到它的需求条目与验收覆盖，并能下钻到条目级的验收链路、读到任何一条的全文，这样验收缺口不靠脚本就能看见 | spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36, spec-00001-FR-37, spec-00001-FR-38, spec-00001-FR-39 |
 | S7 | 作为文档负责人，我要白板和 agent 被同一份条目文法约束、写法漂移当场报警，这样解析不会无声漏读 | spec-00001-FR-40, spec-00001-FR-41 |
 | S8 | 作为文档负责人，我要白板自己跟上磁盘上的变化并保住我当前的位置，这样人与 agent 并行改文档时既不用手动刷新，也不丢正在读的上下文 | spec-00001-FR-42, spec-00001-FR-43, spec-00001-FR-44 |
+| S9 | 作为文档负责人，我要在任何节点上向 agent 提问并多轮讨论，看不懂的地方问明白、该改的地方按结论改进文档，这样理解文档不用离开白板 | spec-00001-FR-47 |
 
 ## 3. Business Rules
 
 | Rule set | Doc | Covers |
 | --- | --- | --- |
-| docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表、接收/澄清的含义、产品流下一步表、新文档 id 取法 |
+| docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表、接收/澄清的含义、澄清适用类型、答疑的含义、产品流下一步表、新文档 id 取法 |
 
-流程配置（FR-15）承载其中的类型二分与产品流（BR-1、BR-13…BR-17）；状态流转
-表（BR-2…BR-9）由文档种类内建推导，不进配置。二者均不得与规则冲突。
+流程配置（FR-15）承载其中的类型二分与产品流（BR-1、BR-13…BR-17），并为每个
+可澄清类型持有焦点行（FR-48）；状态流转表（BR-2…BR-9）与可澄清类型集
+（BR-20）由代码内建，不进配置。均不得与规则冲突。
 
 ## 4. System Requirements
 
@@ -58,13 +60,14 @@ parent: prd-00001-docs-whiteboard
   `<type>-<五位数>-<slug>` 格式、type 不在流程配置的类型集内），或关系字段指向
   **无法解析的 id**，系统应将该节点或边标记为异常并保持其余图可用，不得整体失败；
   无 id 的节点以文件路径为标签，异常节点的浮窗只提供编辑入口（用于修复），不
-  提供状态切换、评审与推进。关系字段指向**存在的需求条目或 AC id**（如
+  提供状态切换、评审、答疑与推进。关系字段指向**存在的需求条目或 AC id**（如
   `verifies: [spec-00001-FR-28]`——`docs/record/README.md` 允许的细粒度写法）
   **不是异常**：该边落到条目所在的文档，关系列表（FR-30）照常列出所声明的细粒度
   id。「无法解析」即：既不是存在的文档 id，也不是存在的条目或 AC id。（本段修订
   由 decision-00004 §5 的裁定产生。）
 - **spec-00001-FR-3** (Event) 当用户点击节点时，系统应弹出浮窗工具栏，提供
-  编辑、状态切换、评审（接收/澄清）与推进入口；点击画布空白处时工具栏关闭。
+  编辑、状态切换、评审（接收/澄清）、答疑与推进入口；点击画布空白处时工具栏
+  关闭。
 - **spec-00001-FR-4** (Event) 当用户在 Markdown 编辑器中保存时，系统应把内容
   写回对应文档文件。
 - **spec-00001-FR-5** (Unwanted) 若文档文件在编辑器打开后已在磁盘上被修改或
@@ -78,10 +81,14 @@ parent: prd-00001-docs-whiteboard
   `rule-00001-BR-10` 促进状态：living doc 促为 `active`，work item 促为
   `open`；对非 `draft` 文档、或带未决 Open Questions 的文档（per
   `rule-00001-BR-12`）执行接收应被拒绝。
-- **spec-00001-FR-9** (Event) 当用户对 `draft` 文档执行澄清并给出一条或多条
-  待澄清点时，系统应按 `rule-00001-BR-11` 把全部待澄清点追加到该文档的
-  Open Questions 小节（小节不存在时创建），status 保持 `draft`；对非 `draft`
-  文档执行澄清应被拒绝。（MVP 中回灌 agent 由用户手动再次推进，不自动发起。）
+- **spec-00001-FR-9** (Event) 当用户对 `draft` 的可澄清类型文档（per
+  `rule-00001-BR-20`，类型集由代码内建，见 FR-48）执行澄清时，系统应启动
+  澄清的 agent 会话（与 FR-11 同一会话通道与终端）。澄清入口在评审入口内、
+  与接收并列，只对可澄清类型的节点呈现，且不按 status 条件化——非 `draft`
+  时照常呈现、执行被拒；对非 `draft` 文档执行澄清、或对非可澄清类型经接口
+  请求澄清，应被拒绝且不发起会话。（第八轮修订：澄清由手动填写待澄清点改为
+  agent 逐题提问，per `rule-00001-BR-11`；「追加进 Open Questions」的收尾
+  语义移入 FR-45 的任务指令契约；取舍见 decision-00006。）
 - **spec-00001-FR-10** (Event) 当用户点击节点右侧「+」时，系统应按流程配置
   （承载 `rule-00001-BR-13` … `rule-00001-BR-17`）列出该文档类型的全部下一步
   候选类型；无候选时呈现"无下一步"且不发起任何会话。
@@ -96,22 +103,23 @@ parent: prd-00001-docs-whiteboard
   的写权限约束传递给会话（MVP 默认约束为「仅 `docs/` 可写」）；越界写入由所选
   CLI 的权限机制拒绝，白板不做 git 回滚兜底。
 - **spec-00001-FR-14** (Ubiquitous) 系统应把白板发起的每次变更落为 git commit，
-  且只暂存本次动作涉及的文件：编辑、状态切换、接收、澄清为一动作一 commit，
-  推进为一会话一 commit；commit 信息指明动作种类与文档 id。（本条裁决 PRD
+  且只暂存本次动作涉及的文件：编辑、状态切换、接收为一动作一 commit，推进、
+  澄清、答疑为一会话一 commit；commit 信息指明动作种类与文档 id。（本条裁决 PRD
   风险项「自动 commit 的噪音」：MVP 取最细粒度，合并策略留待后续版本。）
 - **spec-00001-FR-15** (Unwanted) 系统应在启动时读取并校验流程配置（文档类型、
-  关系字段、下一步映射、agent 命令与写权限约束）；若配置缺失或非法，系统应
-  拒绝启动并给出指明问题所在的错误信息。
+  关系字段、下一步映射、焦点行（FR-48）、agent 命令与写权限约束）；若配置缺失
+  或非法，系统应拒绝启动并给出指明问题所在的错误信息。
 - **spec-00001-FR-16** (Unwanted) 若 agent CLI 不存在或启动失败，系统应在内嵌
   终端呈现错误，且不产生任何 commit。
 - **spec-00001-FR-17** (Event) 当推进会话结束、白板刷新时，系统应校验会话产出
   的新文档 front matter（id 取法按 `rule-00001-BR-18`、关系按
   `rule-00001-BR-13` … `rule-00001-BR-16` 指向来源文档）；不合规的按 FR-2
   标记为异常。
-- **spec-00001-FR-18** (Unwanted) 若已有 agent 会话在运行，再次发起推进应被
-  拒绝，且不影响运行中的会话（MVP 同时仅一个会话）。
-- **spec-00001-FR-19** (Unwanted) 若动作（状态切换、评审、推进）的目标文档在
-  磁盘上已不存在，系统应拒绝该动作、提示刷新，且不产生 commit。
+- **spec-00001-FR-18** (Unwanted) 若已有 agent 会话在运行，再次发起推进、
+  澄清或答疑应被拒绝，且不影响运行中的会话（MVP 同时仅一个会话，三种会话
+  共用该约束）。
+- **spec-00001-FR-19** (Unwanted) 若动作（状态切换、评审、答疑、推进）的目标
+  文档在磁盘上已不存在，系统应拒绝该动作、提示刷新，且不产生 commit。
 - **spec-00001-FR-20** (Unwanted) 若 git commit 失败（如仓库缺失、提交身份未
   配置），系统应呈现错误；已落盘的文件变更保留在工作区，不回滚。
 - **spec-00001-FR-21** (State) 当浏览器与白板断开连接时，运行中的 agent 会话应
@@ -257,6 +265,42 @@ parent: prd-00001-docs-whiteboard
   本条**承接**既有口径而非取代：选中跨刷新保持由 `AC-29.6` 覆盖、展开行跨刷新
   保持由 `AC-38.5` 覆盖，二者不重复立 AC；本条新增下钻与详情两级的保持，以及
   四级的就近关闭。
+- **spec-00001-FR-45** (Event) 当澄清会话启动时，任务指令应包含：目标文档
+  路径与其全部关系文档（front matter 关系字段两个方向的对端）的路径作为上下
+  文——关系目标按 FR-2 的两段解析取路径（细粒度条目 id 取其所在文档的路径），
+  无法解析的对端不入上下文，无关系文档时不含关系文档段；上下文只给路径、不
+  内联正文，正文由会话自行按需读取，关系文档数不设上限；共享提问骨架——一次只问一题，每题给至多
+  4 个既定选项、推荐项排在首位并标注「推荐」、另附自由输入，能从文档或仓库
+  自答的问题不问用户；该类型的焦点行（FR-48）；澄清状态文件契约（FR-46）；
+  以及收尾要求——把确认的未决点追加进该文档的 Open Questions 小节（小节不
+  存在时创建），status 保持 `draft`，答案已给出既定结论的直接修订正文（per
+  `rule-00001-BR-11`）。
+- **spec-00001-FR-46** (Complex) 澄清会话的任务指令应指定澄清状态文件为
+  `.whiteboard/clarify/<文档 id>.json`（相对仓库根），并要求每答完一题即把
+  提问进度（已问已答、待问）写入该文件、全部结论落盘后删除它；当对同一文档
+  再次发起澄清且该状态文件存在且可解析时，任务指令应包含其内容并要求从中
+  恢复、不重问已答的题；状态文件不存在、或存在但不是合法 JSON 时，任务指令
+  不含恢复段（损坏视同不存在，会话照常逐题提问并覆盖写）。恢复不校验两次
+  澄清之间文档正文是否变更——会话恢复时照常读取最新正文，已答结论与正文的
+  冲突由会话处理。当接收（FR-8）成功时，系统应删除该文档遗留的澄清状态文件
+  （若存在）——接收即该轮澄清的终点。`.whiteboard/` 不在 `docs/` 内且由
+  仓库根 `.gitignore` 排除；FR-14 的显式暂存另行保证它不出现在任何 commit
+  中。
+- **spec-00001-FR-47** (Event) 当用户对任意状态的文档节点执行答疑时，系统应
+  启动答疑的 agent 会话（与 FR-11 同一会话通道与终端），任务指令给定目标
+  文档路径与其全部关系文档的路径作为上下文，并说明会话性质：回答用户就该
+  文档提出的问题、多轮讨论，按用户要求或对话结论修订 `docs/` 下的文档（per
+  `rule-00001-BR-21`）；答疑不改变文档 status——status 只经状态切换与评审
+  动作变更；写权限约束同 FR-13。异常节点不提供答疑入口（其浮窗内容由 FR-2
+  持有），对异常文档经接口直接请求答疑应同样被拒绝且不发起会话。
+- **spec-00001-FR-48** (Ubiquitous) 可澄清类型集由代码内建（承载
+  `rule-00001-BR-20`，如同状态流转表内建承载 BR-2…BR-9）；流程配置应为其中
+  **每个**类型持有一行焦点行（该类型澄清提问的重心）。FR-15 的启动校验扩展：
+  可澄清类型缺焦点行、焦点行出现在可澄清类型之外、或焦点行为空（含仅空白）、
+  非字符串、含换行，均拒绝启动并指明所在类型。澄清任务指令的提问重心 = 代码
+  持有的共享骨架 + 该类型的焦点行。（所选 CLI 不具备内建提问机制时，骨架
+  文字仍约束其以纯文本按同一形态逐题提问——选择题的终端原生渲染不是硬保证，
+  见 decision-00006 §4。）
 
 **Acceptance (GWT)**
 
@@ -332,8 +376,8 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-2.4** (spec-00001-FR-2)
   Given 一个异常节点
   When 点击该节点
-  Then 浮窗只含编辑入口与关系列表（FR-30），无状态切换、评审、推进——列出关系是
-  修复断链所必需的读取动作，不改变任何文档
+  Then 浮窗只含编辑入口与关系列表（FR-30），无状态切换、评审、答疑、推进——
+  列出关系是修复断链所必需的读取动作，不改变任何文档
 - **spec-00001-AC-2.5** (spec-00001-FR-2)
   Given 一份 record 声明 `verifies: [spec-00001-FR-28]`，且该条目存在于 spec-00001
   When 打开白板
@@ -345,7 +389,7 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-3.1** (spec-00001-FR-3)
   Given 图上有一个正常节点
   When 点击该节点
-  Then 弹出浮窗工具栏，含编辑、状态切换、评审、推进四个入口
+  Then 弹出浮窗工具栏，含编辑、状态切换、评审、答疑、推进五个入口
 - **spec-00001-AC-3.2** (spec-00001-FR-3)
   Given 浮窗工具栏已打开
   When 点击画布空白处
@@ -403,21 +447,21 @@ parent: prd-00001-docs-whiteboard
   When 执行接收
   Then 动作被拒绝且文件不变
 - **spec-00001-AC-9.1** (spec-00001-FR-9)
-  Given 一个含 Open Questions 小节的 `draft` 文档与一条待澄清点
+  Given 一个 `draft` 的 spec 节点（可澄清类型）
   When 执行澄清
-  Then 待澄清点出现在该小节，status 仍为 `draft`
+  Then 内嵌终端中出现澄清的 agent 会话
 - **spec-00001-AC-9.2** (spec-00001-FR-9)
-  Given 一个无 Open Questions 小节的 `draft` 文档
-  When 执行澄清
-  Then 该小节被创建并含给出的待澄清点
-- **spec-00001-AC-9.3** (spec-00001-FR-9)
-  Given 一个 `draft` 文档与三条待澄清点
-  When 执行澄清
-  Then 三条全部出现在 Open Questions 小节
-- **spec-00001-AC-9.4** (spec-00001-FR-9)
   Given 一个 `active` 文档
   When 执行澄清
-  Then 动作被拒绝且文件不变
+  Then 动作被拒绝且不发起会话
+- **spec-00001-AC-9.3** (spec-00001-FR-9)
+  Given 一个 `draft` 的 record 节点（非可澄清类型）
+  When 打开其浮窗工具栏
+  Then 澄清入口不呈现
+- **spec-00001-AC-9.4** (spec-00001-FR-9)
+  Given 同 AC-9.3
+  When 通过接口直接请求澄清
+  Then 请求被拒绝且不发起会话
 - **spec-00001-AC-10.1** (spec-00001-FR-10)
   Given 流程配置定义 prd 的下一步为 spec
   When 点击某 prd 节点的「+」
@@ -490,6 +534,14 @@ parent: prd-00001-docs-whiteboard
   Given 同 AC-14.5，且会话自身没有产生任何 `docs/` 变更
   When 会话结束
   Then 不产生任何 commit
+- **spec-00001-AC-14.7** (spec-00001-FR-14)
+  Given 一次答疑会话结束且产生了 `docs/` 变更
+  When 查看 git 历史
+  Then 存在一次含该会话全部变更的 commit，信息指明「答疑」与文档 id
+- **spec-00001-AC-14.8** (spec-00001-FR-14)
+  Given 一次澄清会话结束且产生了 `docs/` 变更
+  When 查看 git 历史
+  Then 存在一次含该会话全部变更的 commit，信息指明「澄清」与文档 id
 - **spec-00001-AC-15.1** (spec-00001-FR-15)
   Given 流程配置文件不存在
   When 启动白板服务
@@ -506,6 +558,14 @@ parent: prd-00001-docs-whiteboard
   Given 同 AC-16.1
   When 查看 git 历史
   Then 本次推进未产生任何 commit
+- **spec-00001-AC-16.3** (spec-00001-FR-16)
+  Given 流程配置指定的 agent CLI 在本机不存在
+  When 发起澄清
+  Then 内嵌终端呈现启动失败的错误
+- **spec-00001-AC-16.4** (spec-00001-FR-16)
+  Given 同 AC-16.3
+  When 查看仓库
+  Then 无 commit 产生，且 `.whiteboard/clarify/` 下没有该文档的状态文件
 - **spec-00001-AC-17.1** (spec-00001-FR-17)
   Given 推进会话产出的新文档缺失 `parent`
   When 会话结束、白板刷新
@@ -518,10 +578,18 @@ parent: prd-00001-docs-whiteboard
   Given 一个运行中的 agent 会话
   When 在另一节点发起推进
   Then 发起被拒绝，运行中的会话不受影响
+- **spec-00001-AC-18.2** (spec-00001-FR-18)
+  Given 一个运行中的澄清会话
+  When 在另一节点发起答疑
+  Then 发起被拒绝，运行中的会话不受影响
 - **spec-00001-AC-19.1** (spec-00001-FR-19)
   Given 某节点对应的文件已在磁盘上被删除
   When 对该节点执行接收
   Then 动作被拒绝并提示刷新，且无 commit 产生
+- **spec-00001-AC-19.2** (spec-00001-FR-19)
+  Given 某节点对应的文件已在磁盘上被删除
+  When 对该节点执行答疑
+  Then 动作被拒绝并提示刷新，且不发起会话
 - **spec-00001-AC-20.1** (spec-00001-FR-20)
   Given git 提交身份未配置
   When 一次编辑器保存触发 commit
@@ -1114,6 +1182,98 @@ parent: prd-00001-docs-whiteboard
   Given 检视面板中某条目行已展开
   When 该条目在磁盘上被删掉并触发刷新
   Then 该行收起，面板仍呈现其余条目
+- **spec-00001-AC-45.1** (spec-00001-FR-45)
+  Given 一个 `draft` 的 spec，与另两份文档互有 front matter 引用
+  When 澄清会话启动
+  Then 任务指令包含该 spec 的路径与那两份关系文档的路径
+- **spec-00001-AC-45.2** (spec-00001-FR-45)
+  Given 一个不声明任何关系、也无人引用的 `draft` idea
+  When 澄清会话启动
+  Then 任务指令只含目标文档路径，不含关系文档段
+- **spec-00001-AC-45.3** (spec-00001-FR-45)
+  Given 任一澄清会话
+  When 会话启动
+  Then 任务指令包含逐题提问要求：一次只问一题、每题至多 4 个既定选项、推荐项
+  排在首位并标注「推荐」、另附自由输入
+- **spec-00001-AC-45.4** (spec-00001-FR-45)
+  Given 任一澄清会话
+  When 会话启动
+  Then 任务指令包含「能从文档或仓库自答的问题不问用户」的要求
+- **spec-00001-AC-45.5** (spec-00001-FR-45)
+  Given 任一澄清会话
+  When 会话启动
+  Then 任务指令包含收尾要求：确认的未决点追加进 Open Questions 小节（不存在
+  时创建）、status 保持 `draft`、既定结论直接修订正文
+- **spec-00001-AC-46.1** (spec-00001-FR-46)
+  Given 对文档 `spec-00002-x` 发起澄清
+  When 会话启动
+  Then 任务指令指定状态文件 `.whiteboard/clarify/spec-00002-x.json`，并含
+  「每答完一题即写入、全部结论落盘后删除」的要求
+- **spec-00001-AC-46.2** (spec-00001-FR-46)
+  Given 某文档的澄清状态文件已存在（含两条已答问答）
+  When 对该文档再次发起澄清
+  Then 任务指令包含这两条已答问答并要求从中恢复、不重问
+- **spec-00001-AC-46.3** (spec-00001-FR-46)
+  Given 某文档没有澄清状态文件
+  When 对它发起澄清
+  Then 任务指令不含恢复段
+- **spec-00001-AC-46.5** (spec-00001-FR-46)
+  Given 某文档的澄清状态文件存在但内容不是合法 JSON
+  When 对该文档再次发起澄清
+  Then 任务指令不含恢复段——损坏的状态文件视同不存在
+- **spec-00001-AC-46.6** (spec-00001-FR-46)
+  Given 一个带澄清状态文件的 `draft` 文档
+  When 执行接收且促进成功
+  Then `.whiteboard/clarify/` 下该文档的状态文件被删除
+- **spec-00001-AC-46.4** (spec-00001-FR-46)
+  Given 一次澄清会话结束，`.whiteboard/clarify/` 下存在状态文件且 `docs/`
+  有变更
+  When 查看该次 commit
+  Then commit 只含 `docs/` 的变更，`.whiteboard/` 下的文件不在其中
+- **spec-00001-AC-47.1** (spec-00001-FR-47)
+  Given 一个 `active` 的 record 节点
+  When 执行答疑
+  Then 内嵌终端中出现答疑的 agent 会话——答疑不限类型与状态
+- **spec-00001-AC-47.2** (spec-00001-FR-47)
+  Given 一个 `draft` 文档的答疑会话
+  When 会话结束且对话未要求任何修改
+  Then 该文档 status 仍为 `draft` 且无 commit 产生
+- **spec-00001-AC-47.3** (spec-00001-FR-47)
+  Given 一个与两份文档互有引用的节点
+  When 答疑会话启动
+  Then 任务指令包含目标文档路径与那两份关系文档的路径
+- **spec-00001-AC-47.4** (spec-00001-FR-47)
+  Given 一个异常节点
+  When 打开其浮窗
+  Then 不呈现答疑入口——浮窗内容仍按 FR-2 只有编辑与关系列表
+- **spec-00001-AC-47.5** (spec-00001-FR-47)
+  Given 一个异常节点对应的文档
+  When 通过接口直接请求答疑
+  Then 请求被拒绝且不发起会话
+- **spec-00001-AC-48.1** (spec-00001-FR-48)
+  Given 流程配置中 spec 与 idea 的焦点行内容不同
+  When 对某 spec 发起澄清
+  Then 任务指令含 spec 的焦点行且不含 idea 的焦点行
+- **spec-00001-AC-48.2** (spec-00001-FR-48)
+  Given 流程配置中 spec 的焦点行为空字符串
+  When 启动白板服务
+  Then 启动失败，错误信息指明 spec 的焦点行
+- **spec-00001-AC-48.3** (spec-00001-FR-48)
+  Given 全部可澄清类型都带合法焦点行的流程配置
+  When 启动白板服务
+  Then 启动成功，可澄清类型的节点浮窗呈现澄清入口
+- **spec-00001-AC-48.4** (spec-00001-FR-48)
+  Given 流程配置缺 idea 的焦点行
+  When 启动白板服务
+  Then 启动失败，错误信息指明 idea
+- **spec-00001-AC-48.5** (spec-00001-FR-48)
+  Given 流程配置给 record（非可澄清类型）配了焦点行
+  When 启动白板服务
+  Then 启动失败，错误信息指明 record
+- **spec-00001-AC-48.6** (spec-00001-FR-48)
+  Given 流程配置中 spec 的焦点行含换行
+  When 启动白板服务
+  Then 启动失败，错误信息指明 spec
 
 ## 5. Technical Design
 
@@ -1126,6 +1286,14 @@ parent: prd-00001-docs-whiteboard
 
 - 多人协作、远程部署、账号体系（见 PRD）。
 - 「拒绝」评审动作。
+- 手动填写待澄清点的澄清入口（第八轮废弃——待澄清点一律经澄清会话产生；
+  取舍见 decision-00006）。
+- 多会话并行——推进、澄清、答疑共用 FR-18 的单会话约束。
+- 澄清会话中选择题的白板自建表单——选择题交互由所选 CLI 自带的提问机制在
+  终端内承载，白板不另建 UI。
+- 异常节点的答疑与澄清（浮窗内容由 FR-2 持有）。
+- 文档在磁盘上被删除后遗留的澄清状态文件的清理——gitignore 内的无害孤儿，
+  不处置（接收路径的清理由 FR-46 持有，域主裁定）。
 - 在白板内编辑 `docs/` 之外的文件。
 - `active → archived` 的归档配对自动化——MVP 只保证合法流转可选，不强制
   `rule-00001-BR-19` 的 `supersedes` 配对检查。
@@ -1178,4 +1346,4 @@ parent: prd-00001-docs-whiteboard
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
 - Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md) · [plan-00007-whiteboard-parsing-contract](../plan/plan-00007-whiteboard-parsing-contract.md) · [plan-00008-whiteboard-refresh-and-commit-scope](../plan/plan-00008-whiteboard-refresh-and-commit-scope.md)
-- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）· [decision-00005-whiteboard-parsing-contract](../decision/decision-00005-whiteboard-parsing-contract.md)（持有 FR-40/FR-41 与条目文法的取舍）
+- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）· [decision-00005-whiteboard-parsing-contract](../decision/decision-00005-whiteboard-parsing-contract.md)（持有 FR-40/FR-41 与条目文法的取舍）· [decision-00006-whiteboard-ask-clarify](../decision/decision-00006-whiteboard-ask-clarify.md)（持有 FR-9 改写与 FR-45…FR-48 的取舍）

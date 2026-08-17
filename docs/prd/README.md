@@ -12,6 +12,7 @@ Use `TEMPLATE.md` for front matter.
 - functional requirements (what the product must do)
 - user experience expectations
 - risks and dependencies
+- open questions — what is still undecided
 
 Add more when useful.
 

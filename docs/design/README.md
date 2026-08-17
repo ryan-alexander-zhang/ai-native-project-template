@@ -7,6 +7,7 @@ Use `TEMPLATE.md` for front matter.
 
 - the design for the `spec` / `plan` docs that link it — any size, reusable or
   one-off. Design is never inlined in a `spec` or a `plan`.
+- open questions — what is still undecided
 
 Add more when useful.
 

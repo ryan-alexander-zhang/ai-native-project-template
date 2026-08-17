@@ -68,8 +68,9 @@ flowchart TB
   Work --- TP[Terminal panel<br/>高度可调]
 ```
 
-浮于其上的四者不占布局：**浮窗工具栏**贴选中节点悬浮于画布；**命令面板**与
-**澄清对话框**是覆盖全屏的对话框；**提示条**堆叠在画布一角。
+浮于其上的三者不占布局：**浮窗工具栏**贴选中节点悬浮于画布；**命令面板**是
+覆盖全屏的对话框；**提示条**堆叠在画布一角。（澄清对话框第八轮废弃——澄清
+改为发起会话，见 decision-00006。）
 
 与当前实现的结构差异，以及每项的代价：
 
@@ -127,7 +128,8 @@ row3                                                                            
 | 浮窗工具栏 | 浮动 div + 原生控件 | `Card` 容器 + `Tooltip` 包裹的 `Button` | 见下 |
 | 状态切换 | `<select>` | `DropdownMenu`，逐项列出合法目标状态 | `GitBranch` |
 | 接收 | `<button>` | `Button`（default 变体） | `Check` |
-| 澄清 | 工具栏内联 textarea | `Dialog` + `Textarea` + 提交按钮 | `MessageCircleQuestionMark` |
+| 澄清 | 工具栏内联 textarea | `Button`，点击即发起澄清会话（终端内逐题提问；第八轮由 decision-00006 改写，原 `Dialog` + `Textarea` 废弃）；仅可澄清类型的节点呈现 | `MessageCircleQuestionMark` |
+| 答疑 | 无 | `Button`（ghost 变体），点击即发起答疑会话（终端内多轮讨论，`spec-00001-FR-47`） | `CircleHelp` |
 | 推进 | `<select>` | `DropdownMenu`，逐项列出下一步类型；**无候选时按钮 disabled，并在 `Tooltip` 与菜单内呈现「no next step」**（spec-00001-AC-10.3） | `Plus` |
 | 编辑 | `<button>` | `Button`（ghost 变体） | `Pencil` |
 | 关系列表 | 无 | `Popover` + 按关系字段分组的列表，每项一行「字段名 · 方向 · 对端 id」，点击即定位并选中对端（`spec-00001-FR-30`）；无关系时呈现「no relations」 | `Waypoints` |
@@ -257,7 +259,7 @@ CodeMirror 在预览时仍只隐藏不卸载（FR-25 依赖它保住光标）。
 
 以下是 **Radix 承诺的行为**，不是本项目从零实现的：
 
-- 对话框（澄清、命令面板）有焦点陷阱，Esc 关闭，关闭后焦点回到触发元素。
+- 对话框（命令面板）有焦点陷阱，Esc 关闭，关闭后焦点回到触发元素。
 - 下拉菜单支持方向键、Home/End、首字母跳转；菜单项是 `menuitem` 角色。
 
 以下是**本设计自己的约定**：

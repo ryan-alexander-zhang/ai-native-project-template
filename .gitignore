@@ -294,3 +294,6 @@ coverage/
 # Project
 #   File lock
 .idea-number.lock
+
+#   Whiteboard clarify session state (spec-00001-FR-46)
+.whiteboard/

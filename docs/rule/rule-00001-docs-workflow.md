@@ -7,8 +7,8 @@ informs: [spec-00001-docs-whiteboard]
 
 # Rule: docs 工作流
 
-> 一个 docs 文档在什么种类下允许哪些状态流转、评审动作意味着什么、每个阶段的
-> 下一步是什么、新文档的 id 如何取——与任何软件无关的流程规则。
+> 一个 docs 文档在什么种类下允许哪些状态流转、评审动作与答疑意味着什么、每个
+> 阶段的下一步是什么、新文档的 id 如何取——与任何软件无关的流程规则。
 
 ## 1. Applicability
 
@@ -50,8 +50,9 @@ Hit policy: `UNIQUE`
 
 - **rule-00001-BR-10** (Definition) 接收：对 `draft` 文档的促进——living doc
   促为 `active`，work item 促为 `open`。
-- **rule-00001-BR-11** (Definition) 澄清：文档保持 `draft`，待澄清点全部记入
-  该文档的 Open Questions。
+- **rule-00001-BR-11** (Definition) 澄清：对 `draft` 文档发起的逐题提问——一次
+  只问一题，每题附提问方的推荐答案；确认的未决点全部记入该文档的
+  Open Questions，答案已给出既定结论的直接修订文档正文；文档保持 `draft`。
 - **rule-00001-BR-12** (Constraint) 带未决 Open Questions 的文档不得被促进出
   `draft`。「未决」的判定：文档存在内容非空的 Open Questions 小节（各模板
   约定"问题全部关闭即删除该小节"，故小节存在且有条目即未决）。On violation:
@@ -75,6 +76,12 @@ Hit policy: `UNIQUE`
 - **rule-00001-BR-19** (Constraint) 文档得处于 `archived` 的前提是仓库中存在
   以 `supersedes` 列出其 id 的替代文档（`archived` 意为「被替代」，不是
   「被否决」或「做完」）。On violation: 归档被拒绝。
+- **rule-00001-BR-20** (Constraint) 澄清只适用于 `idea`、`prd`、`spec`、
+  `rule`、`design` 五种类型——承载意图与决策的文档才有业务问题可问；其余类型
+  承载事实、结果或执行，不适用。On violation: 澄清被拒绝。
+- **rule-00001-BR-21** (Definition) 答疑：就一份文档发起的多轮讨论，用于理解
+  其内容并按对话结论修订文档；不是评审动作，适用于任意类型与任意状态，不改变
+  文档状态。
 
 ## 4. Acceptance (GWT)
 
@@ -131,9 +138,13 @@ Hit policy: `UNIQUE`
   When 执行接收
   Then 其状态为 `open`
 - **rule-00001-AC-11.1** (rule-00001-BR-11)
-  Given 一个 `draft` 文档与两条待澄清点
-  When 执行澄清
+  Given 一个 `draft` 文档的澄清确认了两条未决点
+  When 澄清收尾
   Then 两条均在该文档的 Open Questions 中，状态仍为 `draft`
+- **rule-00001-AC-11.2** (rule-00001-BR-11)
+  Given 澄清中某题的答案给出了既定结论
+  When 澄清收尾
+  Then 该结论体现在文档正文中，不作为未决点进入 Open Questions
 - **rule-00001-AC-12.1** (rule-00001-BR-12)
   Given 一个无未决 Open Questions 的 `draft` 文档
   When 执行接收
@@ -186,6 +197,26 @@ Hit policy: `UNIQUE`
   Given 仓库中没有任何文档 `supersedes` 文档 A
   When 将 A 置为 `archived`
   Then 归档被拒绝
+- **rule-00001-AC-20.1** (rule-00001-BR-20)
+  Given 一个 `draft` 的 `prd` 文档
+  When 发起澄清
+  Then 澄清成立
+- **rule-00001-AC-20.2** (rule-00001-BR-20)
+  Given 一个 `draft` 的 `record` 文档
+  When 发起澄清
+  Then 澄清被拒绝
+- **rule-00001-AC-21.1** (rule-00001-BR-21)
+  Given 一个 `active` 的 `record` 文档
+  When 发起答疑
+  Then 答疑成立
+- **rule-00001-AC-21.2** (rule-00001-BR-21)
+  Given 同 AC-21.1
+  When 答疑结束
+  Then 该文档状态仍为 `active`
+- **rule-00001-AC-21.3** (rule-00001-BR-21)
+  Given 答疑的对话得出一条修订结论
+  When 答疑收尾
+  Then 该结论体现在文档正文中
 
 ## Links
 
