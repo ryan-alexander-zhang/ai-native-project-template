@@ -53,8 +53,23 @@ export class Board {
     return this.lastFinding ? markProduct(graph, this.lastFinding.docId, this.lastFinding.problems) : graph
   }
 
-  /** Commit what the session wrote, then check it against what was asked for (spec-00001-FR-17). */
+  /**
+   * The end of a session, whatever it left behind. The wrap-up is told to every
+   * connected board unconditionally: a session that wrote nothing has no commit
+   * and no file event to be noticed by, and a board that hears nothing goes on
+   * showing a session the server has already finished with (spec-00001-AC-12.8,
+   * issue-00013).
+   */
   private async finishSession(plan: SessionPlan): Promise<SessionOutcome> {
+    try {
+      return await this.wrapUpSession(plan)
+    } finally {
+      this.watcher.signal()
+    }
+  }
+
+  /** Commit what the session wrote, then check it against what was asked for (spec-00001-FR-17). */
+  private async wrapUpSession(plan: SessionPlan): Promise<SessionOutcome> {
     // What the session inherited, taken when it started: only what moved since
     // is its own to commit (spec-00001-AC-14.5).
     const before = this.sessions.baseline()

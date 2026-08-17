@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import type { AcceptanceRow, Criterion, ItemsView, RequirementItem } from '../../src/requirements.ts'
-import { api } from '../src/api.ts'
+import { type SessionInfo, api } from '../src/api.ts'
 import { Board } from '../src/Board.tsx'
 import { type EventLink, FIRST_RETRY_MS, MAX_RETRY_MS, connectEvents } from '../src/eventSocket.ts'
 
@@ -465,6 +465,61 @@ describe('a board whose channel is down', () => {
 
       await waitFor(() => expect(screen.getByTestId(`node-${id}`)).toBeTruthy(), SETTLED)
     }
+  })
+})
+
+/**
+ * spec-00001-AC-12.8 (issue-00013): a session that ends without touching `docs/`
+ * has no commit to ride on, so the end itself is signalled — and a refresh has to
+ * re-read the session state, or the board keeps showing a session the server has
+ * already forgotten.
+ */
+describe('a session that ends with no docs change', () => {
+  const RUNNING: SessionInfo = { id: 's1', kind: 'ask', sourceId: 'spec-00001-x', status: 'running' }
+
+  /** The one socket that carries the signal; the terminal opens one of its own. */
+  const channel = () => ChannelSocket.opened.find((socket) => socket.url.endsWith('/api/events'))!
+
+  const clarify = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' })
+  const ask = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' })
+  const advance = () => screen.getByLabelText<HTMLButtonElement>('Advance to the next step')
+
+  beforeEach(() => {
+    serve()
+    // The three entries only exist where the config puts them: clarify needs a
+    // focus line for the type, advance a flow step out of it.
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
+      relations: ['verifies'],
+      flow: { spec: [{ next: 'plan', carry: 'implements' }] },
+      focus: { spec: 'the boundaries of each FR and the gaps in its acceptance' },
+      agents: [{ name: 'claude', command: 'claude', args: [] }],
+    })
+    vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'plan', carry: 'implements' }])
+  })
+
+  it('shows the end state, hands the entries back and takes the stop away', async () => {
+    let current: SessionInfo | null = RUNNING
+    vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy(), SETTLED)
+    fireEvent.click(screen.getByTestId('node-spec-00001-x'))
+    await waitFor(() => expect(clarify()).toBeTruthy(), SETTLED)
+    const terminal = screen.getByLabelText('Agent session')
+    expect(within(terminal).getByText('running')).toBeTruthy()
+    expect(clarify().disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Stop the agent session' })).toBeTruthy()
+
+    // The session ends by itself — `/exit`, nothing written — and the server says so.
+    current = { ...RUNNING, status: 'exited', exitCode: 0 }
+    await act(async () => channel().signal())
+    await settle()
+
+    await waitFor(() => expect(within(terminal).getByText('exited')).toBeTruthy(), SETTLED)
+    expect(clarify().disabled).toBe(false)
+    expect(ask().disabled).toBe(false)
+    expect(advance().disabled).toBe(false)
+    expect(screen.queryByRole('button', { name: 'Stop the agent session' })).toBeNull()
   })
 })
 

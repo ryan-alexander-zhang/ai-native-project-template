@@ -277,7 +277,7 @@ POST /api/sessions/clarify            {docId}                      → {sessionI
 POST /api/sessions/ask                {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 异常文档   # 答疑会话（FR-47，第八轮）
 DELETE /api/sessions                  → 200 | 404 无运行中会话（从未有，或已 exited/failed——重复终止同 404，不二次 commit）   # 终止会话（FR-49，issue-00010）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
 WS   /api/terminal                    双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正）
-WS   /api/events                      服务端→前端：docs/ 变更信号（无载荷，收到即重取 graph + 当前 items；FR-42/FR-43）
+WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。两个来源：docs/ 变更（watcher），以及会话收尾——**无论有无 commit**（FR-12/issue-00013，三触发源由此真正共用一条通路）
 GET  /api/config                      → 生效的流程配置（只读）
 GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
 ```

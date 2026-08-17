@@ -52,6 +52,17 @@ export class DocsWatcher {
     return this.listeners.size
   }
 
+  /**
+   * Signal without a file having moved. The end of a session is a refresh
+   * trigger of its own, and a session that wrote nothing leaves no file event to
+   * carry it (spec-00001-AC-12.8, issue-00013); the three triggers share this
+   * one channel (design-00001 §6). It goes through the same window, so a
+   * commit's own writes and the session's end fold into one refresh.
+   */
+  signal(): void {
+    this.schedule()
+  }
+
   /** Follow the signal until the returned function is called. */
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)

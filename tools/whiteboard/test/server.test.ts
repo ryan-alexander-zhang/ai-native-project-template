@@ -955,6 +955,30 @@ describe('the docs-change socket', () => {
     expect(board.sessions.current()!.status).toBe('running')
   })
 
+  /**
+   * spec-00001-AC-12.8 — the end of a session is a refresh trigger of its own
+   * (issue-00013). A session that wrote nothing leaves no file event for the
+   * board to ride on, so without this the board never hears that the slot is
+   * free. One signal, not two: the wrap-up rides the same debounce window.
+   */
+  it('signals the end of a session that changed nothing', async () => {
+    const open = await watchingBoard({ 'idea/a.md': ACTIVE_IDEA }, ['-e', ''])
+    const { port, board } = open
+    const watching = await subscribe(open)
+
+    await fetch(`http://127.0.0.1:${port}/api/sessions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sourceId: 'idea-00001-x', targetType: 'prd' }),
+    })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    await vi.waitFor(() => expect(watching.signals).toBe(1), SIGNAL_WAIT)
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+    expect(watching.signals).toBe(1)
+  })
+
   // spec-00001-AC-42.8 — nobody listening is not a failure
   it('carries on with no board connected at all', async () => {
     const { docsDir, call } = await watchingBoard()

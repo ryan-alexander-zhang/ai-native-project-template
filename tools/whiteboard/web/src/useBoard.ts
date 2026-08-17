@@ -40,11 +40,16 @@ export function useBoard() {
    * through here, so what is kept and what is let go of cannot differ between
    * them (design-00002 §10). The items of the document on show follow the graph
    * through the effect below.
+   *
+   * The session state is re-read with the graph, not just at load: a session that
+   * ended is exactly what a refresh may have been sent to tell us about, and the
+   * badge, the three entries and the stop all hang off it (issue-00013).
    */
   const refresh = useCallback(async () => {
-    const next = await api.graph()
+    const [next, { current }] = await Promise.all([api.graph(), api.session()])
     setGraph(next)
     setPlaced(layoutGraph(next, typeOrder.current))
+    setSession(current)
     // The selection is held by id, never by position: a document still on the
     // board keeps it, and one that has left the disk takes it with it, closing
     // its toolbar (spec-00001-AC-44.6).

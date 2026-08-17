@@ -9,7 +9,7 @@ import { ANOMALY_TOKEN, statusColour, statusLabel } from '../src/status.ts'
 import { connectTerminal } from '../src/terminalSocket.ts'
 import { useBoard } from '../src/useBoard.ts'
 import { toast } from 'sonner'
-import { api } from '../src/api.ts'
+import { type SessionInfo, api } from '../src/api.ts'
 import { COLUMN_GAP, NODE_HEIGHT, NODE_WIDTH, ROW_GAP, layoutGraph } from '../src/layout.ts'
 import { toFlowEdges } from '../src/canvasModel.ts'
 
@@ -440,12 +440,16 @@ describe('the board state', () => {
 
   // spec-00001-AC-49.3 — stopping the session hands the three entries back
   it('takes the stopped session out of the way of the next one', async () => {
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+    // The server is the one authority on the session, and the refresh that
+    // follows the stop reads it again (issue-00013) — so the stand-in has to end
+    // the session too, not go on reporting the one it was asked to stop.
+    const stopped = { id: 's1', kind: 'clarify' as const, sourceId: 'prd-00001-x', status: 'exited' as const }
+    let current: SessionInfo = { ...stopped, status: 'running' }
+    vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
+    const stop = vi.spyOn(api, 'stopSession').mockImplementation(async () => {
+      current = stopped
+      return stopped
     })
-    const stop = vi
-      .spyOn(api, 'stopSession')
-      .mockResolvedValue({ id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'exited' })
     const { result } = renderHook(() => useBoard())
     await waitFor(() => expect(result.current.session?.status).toBe('running'))
 

@@ -5,7 +5,7 @@ import { MarkerType } from '@xyflow/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocEdge, DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
-import { api } from '../src/api.ts'
+import { type SessionInfo, api } from '../src/api.ts'
 import { matchDocuments, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
 import { onFlowError } from '../src/flowError.ts'
 
@@ -940,14 +940,15 @@ describe('the board', () => {
    */
   it('stops the session from the terminal panel and hands the entries back', async () => {
     stubWebSocket()
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
-    })
-    const stop = vi.spyOn(api, 'stopSession').mockResolvedValue({
-      id: 's1',
-      kind: 'clarify',
-      sourceId: 'prd-00001-x',
-      status: 'exited',
+    // The stop is followed by a refresh, which reads the session again
+    // (issue-00013): a stand-in that kept answering «running» would put the
+    // session the user just ended straight back on the board.
+    const stopped = { id: 's1', kind: 'clarify' as const, sourceId: 'prd-00001-x', status: 'exited' as const }
+    let current: SessionInfo = { ...stopped, status: 'running' }
+    vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
+    const stop = vi.spyOn(api, 'stopSession').mockImplementation(async () => {
+      current = stopped
+      return stopped
     })
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
