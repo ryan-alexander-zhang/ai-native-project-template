@@ -1,7 +1,7 @@
 ---
 id: issue-00013-the-board-never-hears-a-changeless-session-end
 type: issue
-status: open
+status: resolved
 blocks: [spec-00001-docs-whiteboard]
 ---
 
@@ -82,8 +82,8 @@ blocks: [spec-00001-docs-whiteboard]
   （有 commit 的会话通常两次刷新，刷新幂等，接受）；`refresh()` 并行重取
   graph 与会话状态。两处冻结会话状态的测试桩按"服务端才是权威"改为随
   动作翻转。套件 664 测试全绿、覆盖率四项不降、契约常绿。
-- **待回填**：实测 `/exit` 后徽章即转 `exited`、入口恢复、Stop 消失
-  （域主执行），确认前保持 `open`。
+- **实测收口（域主确认）**：`/exit` 后徽章即转 `exited`、发起入口恢复、
+  Stop 消失，无 404 报错。
 
 ## 8. Follow-through
 
