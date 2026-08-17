@@ -272,10 +272,10 @@ POST /api/docs/:id/status             {to}                         → 200 {comm
 POST /api/docs/:id/review             {action: accept}             → 200 {committed, error?} | 422   # clarify 分支第八轮移除（decision-00006），非 accept 一律 422
 GET  /api/docs/:id/next-steps         → [{type, carry}]
 GET  /api/sessions                    → {current: {id, status} | null}   # 重连发现（FR-21）
-POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话   # 推进会话
+POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话   # 推进会话；任务指令以 CR（\r）收尾提交——TUI 输入框把 LF 当框内换行（issue-00011）
 POST /api/sessions/clarify            {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可澄清类型   # 澄清会话（FR-9，第八轮）
 POST /api/sessions/ask                {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 异常文档   # 答疑会话（FR-47，第八轮）
-DELETE /api/sessions                  → 200 | 404 无运行中会话（从未有，或已 exited/failed——重复终止同 404，不二次 commit）   # 终止会话（FR-49，issue-00010）；退出收尾照常、恰一次
+DELETE /api/sessions                  → 200 | 404 无运行中会话（从未有，或已 exited/failed——重复终止同 404，不二次 commit）   # 终止会话（FR-49，issue-00010）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
 WS   /api/terminal                    双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正）
 WS   /api/events                      服务端→前端：docs/ 变更信号（无载荷，收到即重取 graph + 当前 items；FR-42/FR-43）
 GET  /api/config                      → 生效的流程配置（只读）

@@ -1340,6 +1340,10 @@ parent: prd-00001-docs-whiteboard
   Given 一个刚被终止的澄清会话，其澄清状态文件存在
   When 查看 `.whiteboard/clarify/`
   Then 该状态文件仍在——终止不作废进度
+- **spec-00001-AC-49.10** (spec-00001-FR-49)
+  Given 一个忽略终止信号的运行中会话进程
+  When 执行终止
+  Then 宽限期后该进程仍被结束，终端呈现结束状态（issue-00012）
 
 ## 5. Technical Design
 

@@ -40,6 +40,7 @@ FR-49（AC-49.1…49.9）的验收行。本轮无 plan——bugfix 尺寸，issu
 | spec-00001-AC-49.7 | offers no stop for a session that has already ended (w/panels)；offers no stop when there is no session at all (w/panels) | pass |
 | spec-00001-AC-49.8 | offers the session in the top bar once the terminal panel is put away (w/canvas)——收起后呈现、点击重开、重开后消失；offers no top-bar session entry when no session is running (w/canvas) | pass |
 | spec-00001-AC-49.9 | leaves the clarify state file in place when the session is stopped (t/server)——文件与内容俱在 | pass |
+| spec-00001-AC-49.10 | ends a session whose process ignores the polite signal (t/server，真 PTY + `trap '' HUP`，宽限后 SIGKILL；issue-00012) | pass |
 
 ## 协议与实现要点（非 AC 的护栏测试）
 
@@ -61,9 +62,12 @@ FR-49（AC-49.1…49.9）的验收行。本轮无 plan——bugfix 尺寸，issu
 1. **真实 claude CLI 的 TUI 渲染实测待域主回填**（issue-00009 §7）——自动
    测试证明尺寸到达了会话进程，渲染质量只能真跑确认；确认前 issue-00009
    保持 `open`。
-2. `DELETE /api/sessions` 等待退出收尾后返回最终 `SessionInfo`（不是裸
-   200）；`pty.kill()` 只发 SIGHUP，不升级 SIGKILL——无视信号的进程会挂住
-   该请求，留待真实需要时再加宽限升级。
+2. ~~`pty.kill()` 只发 SIGHUP，不升级 SIGKILL~~——真实使用第一天即踩中
+   （`/exit` 场景），已由 issue-00012 落地升级：SIGHUP → 3s 宽限 →
+   SIGKILL，AC-49.10 承载；DELETE 仍等待收尾后返回最终 `SessionInfo`，
+   等待因升级而有界。同轮 issue-00011 把任务指令的结尾字节 `\n` 改为
+   `\r`（TUI 的提交键），指令自此即发即答。残留：SIGKILL 只达直接子进程
+   （见 issue-00012 §7）。
 3. 服务停机路径不杀会话进程（issue-00010 §4 观察行），本轮未动。
 
 ## 结论
