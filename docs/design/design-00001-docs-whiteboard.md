@@ -265,10 +265,12 @@ GET  /api/docs/:id                    → {content, hash}            # 整文件
 PUT  /api/docs/:id                    {content, baseHash}          → 200 {committed, error?} | 409 冲突
 GET  /api/docs/:id/transitions        → [status]                   # 合法目标状态（FR-6）
 POST /api/docs/:id/status             {to}                         → 200 {committed, error?} | 422 非法流转
-POST /api/docs/:id/review             {action: accept|clarify, questions?} → 200 {committed, error?} | 422
+POST /api/docs/:id/review             {action: accept}             → 200 {committed, error?} | 422   # clarify 分支第八轮移除（decision-00006），非 accept 一律 422
 GET  /api/docs/:id/next-steps         → [{type, carry}]
 GET  /api/sessions                    → {current: {id, status} | null}   # 重连发现（FR-21）
-POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话
+POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话   # 推进会话
+POST /api/sessions/clarify            {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可澄清类型   # 澄清会话（FR-9，第八轮）
+POST /api/sessions/ask                {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 异常文档   # 答疑会话（FR-47，第八轮）
 WS   /api/terminal                    双向：stdin/stdout 帧 + exit 事件（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正）
 WS   /api/events                      服务端→前端：docs/ 变更信号（无载荷，收到即重取 graph + 当前 items；FR-42/FR-43）
 GET  /api/config                      → 生效的流程配置（只读）
@@ -288,7 +290,9 @@ line?, text?}`——无法归属（原 `unattributed`，FR-33）与文法诊断�
 （FR-30）按 `declaredTargets` 逐项展开。
 
 commit 信息格式：`wb(<action>): <doc-id>`，action ∈
-`edit | status | accept | clarify | advance`（spec FR-14 的"指明动作与文档 id"）。
+`edit | status | accept | clarify | advance | ask`（spec FR-14 的"指明动作与
+文档 id"——AC-14.x 的中文动作词「澄清/答疑」由这些英文 key 承载，与既有
+「接收=accept」同一约定；`clarify` 第八轮起是会话 commit，不再是评审写回）。
 
 前端的呈现与交互（着色、检索与定位、面板、控件）见
 [design-00002-whiteboard-ui](design-00002-whiteboard-ui.md)；其中检索与定位由
