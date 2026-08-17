@@ -33,7 +33,7 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-2.2 | marks an edge pointing at an unknown id and keeps the graph usable (t/docRepository)；marks an edge pointing at an unknown document (w/canvas) | pass | 边 ok=false + issue；该边此前同样未渲染，DOM 级证据见 record-00002 |
 | spec-00001-AC-2.3 | marks a document whose id does not match the id format (t/docRepository) | pass | id 格式违规 |
 | spec-00001-AC-2.4 | offers nothing for an anomalous document (t/workflow)；offers only the editor and the relation list for a document with front matter problems (w/toolbar) | pass | **该 AC 已随 FR-30 修订**：异常节点的工具栏现为「编辑 + 关系列表」，二者都只读；证据见 record-00003 |
-| spec-00001-AC-3.1 | offers edit, status, review, and advance (w/toolbar)；opens the toolbar for the node the user clicks (w/canvas) | n/a | **第八轮改写**（decision-00006）：AC 现要求含答疑的五入口，旧证据只验四入口，待重验 |
+| spec-00001-AC-3.1 | offers edit, status, review, ask, and advance (w/toolbar)；opens the toolbar for the node the user clicks (w/canvas) | pass | **第八轮改写后重验**（decision-00006，record-00008）：五入口 |
 | spec-00001-AC-3.2 | closes the toolbar when the canvas background is clicked (w/canvas)；drops the selection on deselect (w/board) | pass | 点空白关闭 |
 | spec-00001-AC-4.1 | writes the edited content to disk (t/docService)；saves the edited content and commits it (t/server) | pass | 磁盘内容比对 |
 | spec-00001-AC-5.1 | rejects a save whose base no longer matches, keeping the external version (t/docService)；answers 409 when the file changed under the editor (t/server) | pass | hash CAS |
@@ -48,10 +48,10 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-8.2 | accepts a draft work item into open (t/docService) | pass | status: open |
 | spec-00001-AC-8.3 | rejects accepting a document that is already active (t/docService) | pass | 422 |
 | spec-00001-AC-8.4 | rejects accepting a draft that carries unresolved open questions (t/docService) | pass | 文件仍 draft |
-| spec-00001-AC-9.1 | writes clarify questions and keeps the document draft (t/docService) | n/a | **第八轮改写**（decision-00006）：澄清改为 agent 会话，旧证据验的是已废弃的手动填写语义，待重验 |
-| spec-00001-AC-9.2 | creates the section when the document has none (t/workflow) | n/a | 同 AC-9.1，AC 已重写为「active 文档执行澄清被拒」，待重验 |
-| spec-00001-AC-9.3 | writes every question given (t/docService) | n/a | 同 AC-9.1，AC 已重写为「非可澄清类型不呈现澄清入口」，待重验 |
-| spec-00001-AC-9.4 | rejects clarify on a document that is not draft (t/docService) | n/a | 同 AC-9.1，AC 已重写为「接口直请非可澄清类型被拒」，待重验 |
+| spec-00001-AC-9.1 | starts a clarify session on a draft of a clarifiable type (t/server)；starts a clarify session on one press (w/toolbar) | pass | **第八轮改写后重验**（decision-00006，record-00008）：澄清即发起会话 |
+| spec-00001-AC-9.2 | answers 422 and starts nothing for a document that is not draft (t/server) | pass | 第八轮改写后重验（record-00008） |
+| spec-00001-AC-9.3 | leaves clarify out for a type the config gives no focus line (w/toolbar)；offers no clarify entry for a type the config gives no focus line (w/canvas) | pass | 第八轮改写后重验（record-00008） |
+| spec-00001-AC-9.4 | rejects a draft of a type that is not clarifiable (t/workflow)；refuses a draft of a type that is not clarifiable (t/docService) | pass | 第八轮改写后重验（record-00008）：接口直请被拒 |
 | spec-00001-AC-10.1 | offers exactly spec for a prd (t/workflow) | pass | 候选恰为 spec |
 | spec-00001-AC-10.2 | offers both prd and spec for an idea (t/workflow)；lists every next-step candidate (w/toolbar) | pass | 两个候选全列 |
 | spec-00001-AC-10.3 | offers nothing for a type the flow config does not carry (t/workflow)；says there is no next step and stays disabled when the flow declares none (w/toolbar) | pass | 入口禁用 |

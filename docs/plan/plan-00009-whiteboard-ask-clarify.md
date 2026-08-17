@@ -1,7 +1,7 @@
 ---
 id: plan-00009-whiteboard-ask-clarify
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
