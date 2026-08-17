@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { taskInstruction } from '../src/advance.ts'
 import { Board } from '../src/server.ts'
 import { ptySpawner, spawnPty } from '../src/pty.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
@@ -22,6 +23,20 @@ import {
 // under a suite running its files side by side both outlast the default five
 // seconds, which would cut the wait off before its own timeout is reached.
 vi.setConfig({ testTimeout: 30_000 })
+
+/**
+ * What a line-reading stand-in prints once the advance instruction has been
+ * *submitted*: its last line stays in the terminal's line buffer until the Enter
+ * that follows the CLI's first output arrives (issue-00011).
+ */
+const SUBMITTED_TAIL = `got:${taskInstruction({
+  targetType: 'prd',
+  idPrefix: 'prd-00001-',
+  carry: 'parent',
+  sourceId: 'idea-00001-x',
+})
+  .split('\n')
+  .at(-1)}`
 
 const DRAFT_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Idea X\n')
 const ACTIVE_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
@@ -728,9 +743,11 @@ describe('terminal size frames', () => {
     socket.send(sizeFrame(100, 40))
     socket.send('{"cols":9,"rows":9}')
 
-    // The instruction is the session's own first write, submitted with CR
-    // (issue-00011); the keystroke frame is forwarded exactly as it arrived.
-    await vi.waitFor(() => expect(typed).toEqual(['answer this\r', '{"cols":9,"rows":9}']))
+    // The instruction is the session's own first write, and it carries no submit
+    // byte: the Enter is a later press this silent stand-in never triggers, since
+    // it prints nothing to say it is ready (issue-00011). The keystroke frame is
+    // forwarded exactly as it arrived.
+    await vi.waitFor(() => expect(typed).toEqual(['answer this', '{"cols":9,"rows":9}']))
     expect(sizes).toEqual([{ cols: 100, rows: 40 }])
     socket.close()
   })
@@ -744,7 +761,7 @@ describe('terminal size frames', () => {
     socket.send(sizeFrame(100, 40))
 
     await vi.waitFor(() => expect(sizes).toEqual([{ cols: 100, rows: 40 }]))
-    expect(typed).toEqual(['answer this\r'])
+    expect(typed).toEqual(['answer this'])
     socket.close()
   })
 })
@@ -778,6 +795,10 @@ describe('the terminal socket', () => {
     const terminal = connect(port)
     await terminal.opened
     await vi.waitFor(() => expect(terminal.text).toContain('got:Write one new prd document'), SESSION_WAIT)
+    // The line-reading stand-in completes the instruction's last line only once
+    // the submit has landed; typing before that would lengthen that line rather
+    // than start one of its own (issue-00011).
+    await vi.waitFor(() => expect(terminal.text).toContain(SUBMITTED_TAIL), SESSION_WAIT)
 
     terminal.socket.send('ping\n')
     await vi.waitFor(() => expect(terminal.text).toContain('got:ping'), SESSION_WAIT)

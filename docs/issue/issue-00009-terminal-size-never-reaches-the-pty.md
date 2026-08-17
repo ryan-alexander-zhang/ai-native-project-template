@@ -1,7 +1,7 @@
 ---
 id: issue-00009-terminal-size-never-reaches-the-pty
 type: issue
-status: open
+status: resolved
 blocks: [spec-00001-docs-whiteboard]
 ---
 
@@ -93,8 +93,9 @@ blocks: [spec-00001-docs-whiteboard]
 - 顺带修复：`web/src/Terminal.tsx` 的 `convertEol: true` 被确认有害移除——
   pty 行规程已做 ONLCR，它是第二重 CR 注入，恰好破坏全屏 TUI 行中 LF 的
   语义。
-- **待回填**：真实 claude CLI 会话的 TUI 渲染实测（由域主重启服务后确认），
-  确认前本 issue 保持 `open`。
+- **真 CLI 实测**：域主重启后的截图确认 TUI 完整渲染——横幅、输入框、
+  状态栏、auto mode 提示全部按面板真实宽度绘制（修复前只有一行错位碎片）；
+  issue-00011 的克隆实测中同一渲染路径再次复现正常。据此收口。
 
 ## 8. Follow-through
 

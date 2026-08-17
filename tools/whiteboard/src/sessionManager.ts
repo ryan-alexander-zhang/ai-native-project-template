@@ -6,6 +6,17 @@ import type { DirtySnapshot } from './gitLayer.ts'
 /** Rolling window of session output replayed on reconnect (spec-00001-AC-21.2). */
 const BUFFER_LIMIT = 1024 * 1024
 
+/**
+ * How long after the CLI's first output the instruction is submitted, and how
+ * long again before the submit is repeated (spec-00001-AC-11.2, issue-00011).
+ * Long enough for a TUI that has just printed its frame to have its input box
+ * listening, short enough that the agent looks like it started by itself.
+ */
+const SUBMIT_DELAY_MS = 400
+
+/** The submit keypress itself: Enter as the terminal sends it. */
+const SUBMIT = '\r'
+
 export type SessionStatus = 'running' | 'exited' | 'failed'
 
 /**
@@ -86,6 +97,8 @@ interface Session {
   /** Resolves once the process has exited and the exit hook has run; a stop waits on it. */
   ended: Promise<void>
   announceEnd: () => void
+  /** The pending submit keypresses; a session that ends first is never typed into. */
+  submits: NodeJS.Timeout[]
 }
 
 export interface SessionManagerOptions {
@@ -99,6 +112,8 @@ export interface SessionManagerOptions {
    * layer behind it means.
    */
   snapshot?: () => DirtySnapshot
+  /** Overrides `SUBMIT_DELAY_MS`, so a test need not wait out the real one. */
+  submitDelayMs?: number
   /** Runs when the process exits: commits and validates what the session produced. */
   onExit: (plan: SessionPlan) => Promise<SessionOutcome>
 }
@@ -145,6 +160,7 @@ export class SessionManager {
       finished: Promise.resolve(),
       ended,
       announceEnd,
+      submits: [],
     }
     this.session = session
 
@@ -153,14 +169,34 @@ export class SessionManager {
     } catch (cause) {
       return this.fail(session, (cause as Error).message)
     }
-    session.pty.onData((data) => this.publish(session, data))
+    session.pty.onData((data) => {
+      this.publish(session, data)
+      this.armSubmit(session)
+    })
     session.pty.onExit((event) => this.exit(session, event.exitCode))
-    // CR, not LF: the CLI's input box reads a line feed as a newline inside the
-    // box and only a carriage return as the Enter that submits it, so an
-    // instruction ended with LF would sit there unsent (issue-00011). The
-    // instruction's own newlines stay LF — those are meant as newlines.
-    session.pty.write(`${plan.instruction}\r`)
+    // The text alone, ending on whatever it ends on: a submit byte in this same
+    // burst is swallowed by the terminal's cooked mode or read as the tail of a
+    // paste, and either way never sends (issue-00011). Its own newlines stay LF,
+    // which is what a newline inside the input box is.
+    session.pty.write(plan.instruction)
     return info
+  }
+
+  /**
+   * Press Enter on the instruction, once the session has printed anything at
+   * all — the nearest thing to "the CLI is up and its input box is listening"
+   * that a pty offers. Twice, spaced the same way: the first press is the one
+   * that should land, the second costs nothing if it did, since Enter on an
+   * empty input box does nothing (issue-00011). Armed on the first output only;
+   * later output is the session talking, not a new prompt to answer — and a pty
+   * may still emit output after the exit, which is nothing to answer either.
+   */
+  private armSubmit(session: Session): void {
+    if (session.submits.length > 0 || session.info.status !== 'running') return
+    const delay = this.options.submitDelayMs ?? SUBMIT_DELAY_MS
+    for (const press of [1, 2]) {
+      session.submits.push(setTimeout(() => session.pty?.write(SUBMIT), press * delay).unref())
+    }
   }
 
   /** Replay what the session has printed so far and follow it from there. */
@@ -238,6 +274,8 @@ export class SessionManager {
   }
 
   private exit(session: Session, exitCode: number): void {
+    // Nothing is typed into a session that has ended, and no timer outlives it.
+    for (const submit of session.submits.splice(0)) clearTimeout(submit)
     session.info.status = 'exited'
     session.info.exitCode = exitCode
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)

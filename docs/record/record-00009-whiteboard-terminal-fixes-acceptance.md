@@ -59,9 +59,10 @@ FR-49（AC-49.1…49.9）的验收行。本轮无 plan——bugfix 尺寸，issu
 
 ## 观察项（不阻塞）
 
-1. **真实 claude CLI 的 TUI 渲染实测待域主回填**（issue-00009 §7）——自动
-   测试证明尺寸到达了会话进程，渲染质量只能真跑确认；确认前 issue-00009
-   保持 `open`。
+1. ~~真实 claude CLI 的 TUI 渲染实测待域主回填~~——已收口：域主截图确认
+   TUI 完整渲染，克隆实测复现正常；issue-00009/00011/00012 均 `resolved`
+   （真 CLI 实测证据见各 issue §7：指令 4.5s 自动提交并开工、忙碌会话
+   1.8s 内被终止且重复终止 404）。
 2. ~~`pty.kill()` 只发 SIGHUP，不升级 SIGKILL~~——真实使用第一天即踩中
    （`/exit` 场景），已由 issue-00012 落地升级：SIGHUP → 3s 宽限 →
    SIGKILL，AC-49.10 承载；DELETE 仍等待收尾后返回最终 `SessionInfo`，

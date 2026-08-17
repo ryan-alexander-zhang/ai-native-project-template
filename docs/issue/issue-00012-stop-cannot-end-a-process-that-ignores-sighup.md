@@ -1,7 +1,7 @@
 ---
 id: issue-00012-stop-cannot-end-a-process-that-ignores-sighup
 type: issue
-status: open
+status: resolved
 blocks: [spec-00001-docs-whiteboard]
 ---
 
@@ -76,8 +76,11 @@ blocks: [spec-00001-docs-whiteboard]
   到 Stop 仍像个按钮；升级定时器一次性布防、进程退出即清、`unref` 不吊住
   进程；重复 kill 不重置时钟。恰一次收尾（AC-49.6）的既有测试未回归。
   套件 660 测试全绿、连跑无 flake、覆盖率四项不降反升。
-- **待回填**：实测「卡死会话 → Stop → 宽限后解锁」（域主执行），确认前
-  保持 `open`。
+- **真 CLI 实测（克隆上执行）**：对正在执行澄清任务（工作指示已出现 3s）
+  的真实 claude 会话 DELETE——**1796ms** 返回 200、`status: exited`、
+  终端见 `session ended with code 129`、无变更故无 commit；再次 DELETE
+  → 404（AC-49.6 现场复验）。此例中 SIGHUP 即够，升级路径是等待有界的
+  保证而非常走之路，符合"先礼后兵"的设计。
 - 已知同形残留（非本轮范围）：SIGKILL 只达会话直接子进程，CLI 再往下
   spawn 的孙进程可能幸存——与 issue-00010 §4 停机孤儿同形，需要时另立
   issue。

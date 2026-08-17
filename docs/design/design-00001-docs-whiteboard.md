@@ -272,7 +272,7 @@ POST /api/docs/:id/status             {to}                         → 200 {comm
 POST /api/docs/:id/review             {action: accept}             → 200 {committed, error?} | 422   # clarify 分支第八轮移除（decision-00006），非 accept 一律 422
 GET  /api/docs/:id/next-steps         → [{type, carry}]
 GET  /api/sessions                    → {current: {id, status} | null}   # 重连发现（FR-21）
-POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话   # 推进会话；任务指令以 CR（\r）收尾提交——TUI 输入框把 LF 当框内换行（issue-00011）
+POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话   # 推进会话；任务指令正文单独写入（不带提交字节），提交键为会话首批输出后延迟发出的独立 `\r`（再延迟补发一次；空输入框回车幂等）——同一突发里的 `\r` 会被 cooked 模式的 ICRNL 翻回 LF 或被粘贴检测吞掉（issue-00011）
 POST /api/sessions/clarify            {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可澄清类型   # 澄清会话（FR-9，第八轮）
 POST /api/sessions/ask                {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 异常文档   # 答疑会话（FR-47，第八轮）
 DELETE /api/sessions                  → 200 | 404 无运行中会话（从未有，或已 exited/failed——重复终止同 404，不二次 commit）   # 终止会话（FR-49，issue-00010）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentConfig } from '../src/config.ts'
 import { type Expectation, taskInstruction } from '../src/advance.ts'
 import { spawnPty } from '../src/pty.ts'
@@ -24,6 +24,13 @@ const ADVANCE: SessionPlan = {
 
 const OUTCOME: SessionOutcome = { docId: 'prd-00002-new', problems: [], committed: true }
 
+/**
+ * What a line-reading stand-in prints once the instruction has been *submitted*:
+ * its last line stays in the terminal's line buffer until the Enter that follows
+ * the CLI's first output arrives (issue-00011).
+ */
+const SUBMITTED_TAIL = `got:${ADVANCE.instruction.split('\n').at(-1)}`
+
 const managers: SessionManager[] = []
 
 function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUTCOME)) {
@@ -32,6 +39,9 @@ function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUT
     agent: { name: 'test', command: 'node', args: [], cwd: 'docs', ...agent },
     repoRoot,
     spawn: spawnPty,
+    // A real process is slow enough already; the submit's own wait is the one
+    // part of it a test can shorten without changing what it proves.
+    submitDelayMs: 50,
     onExit,
   })
   managers.push(manager)
@@ -193,6 +203,10 @@ describe('a running session', () => {
     })
     manager.start(ADVANCE)
     const output = transcript(manager)
+    // The instruction has to be submitted before what the user types is a line
+    // of its own; typing into its unsubmitted tail would only lengthen that
+    // line (issue-00011).
+    await vi.waitFor(() => expect(output.text).toContain(SUBMITTED_TAIL), SESSION_WAIT)
 
     manager.write('ping\n')
 
@@ -217,33 +231,9 @@ describe('a running session', () => {
     await vi.waitFor(() => expect(output.text).toContain('100x40'), SESSION_WAIT)
   })
 
-  /**
-   * spec-00001-AC-11.2 — sending it is submitting it. The CLI's input box reads
-   * LF as a line break inside the box and only CR as the Enter that submits, so
-   * the instruction's own newlines stay LF and the last byte is CR (issue-00011).
-   */
-  it('ends the instruction with the carriage return that submits it', () => {
-    const written: string[] = []
-    const { repoRoot } = makeRepo({})
-    const manager = new SessionManager({
-      agent: { name: 'test', command: 'node', args: [] },
-      repoRoot,
-      spawn: () => ({
-        onData: () => {},
-        onExit: () => {},
-        write: (data) => void written.push(data),
-        resize: () => {},
-        kill: () => {},
-      }),
-      onExit: async () => OUTCOME,
-    })
-
-    manager.start({ kind: 'clarify', sourceId: 'spec-00001-x', instruction: 'first line\nsecond line' })
-
-    expect(written).toEqual(['first line\nsecond line\r'])
-  })
-
-  // spec-00001-AC-11.2 — the task instruction reaches the CLI on startup
+  // spec-00001-AC-11.2 — the task instruction reaches the CLI on startup, whole
+  // and submitted: a stand-in that reads by line sees the last line only once
+  // the Enter has landed (issue-00011).
   it('sends the task instruction as the first input', async () => {
     const { manager } = makeManager({
       args: ['-e', "process.stdin.on('data', (d) => console.log('got:' + d.toString()))"],
@@ -252,6 +242,93 @@ describe('a running session', () => {
     const output = transcript(manager)
 
     await vi.waitFor(() => expect(output.text).toContain('got:Write one new prd document'), SESSION_WAIT)
+    await vi.waitFor(() => expect(output.text).toContain(SUBMITTED_TAIL), SESSION_WAIT)
+  })
+})
+
+/**
+ * spec-00001-AC-11.2, issue-00011 — sending the instruction means submitting it,
+ * and the submit is a keypress of its own, not a byte on the end of the text.
+ * Two mechanisms sit between the write and the input box: at spawn the terminal
+ * is still in the kernel's cooked mode, where ICRNL turns a trailing CR back
+ * into the LF that only breaks the line; and a CR arriving inside the same burst
+ * as the text is read by the CLI as the tail of a paste, which by design does
+ * not send. So the text goes in alone, and the Enter follows once the CLI has
+ * spoken — twice, because Enter on an empty box is a no-op and the insurance is
+ * free.
+ */
+describe('submitting the instruction', () => {
+  const INSTRUCTION = 'first line\nsecond line'
+  const DELAY = 100
+
+  /** A manager on a stand-in pty: what it was written, and the hooks it holds. */
+  function stubManager() {
+    const written: string[] = []
+    const hooks: { data?: (data: string) => void; exit?: (event: { exitCode: number }) => void } = {}
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agent: { name: 'test', command: 'node', args: [] },
+      repoRoot,
+      submitDelayMs: DELAY,
+      spawn: () => ({
+        onData: (listener) => void (hooks.data = listener),
+        onExit: (listener) => void (hooks.exit = listener),
+        write: (data) => void written.push(data),
+        resize: () => {},
+        kill: () => {},
+      }),
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    manager.start({ kind: 'clarify', sourceId: 'spec-00001-x', instruction: INSTRUCTION })
+    return { manager, written, hooks }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('writes the instruction with no submit byte of its own, and waits for the CLI', () => {
+    const { written } = stubManager()
+
+    expect(written).toEqual([INSTRUCTION])
+
+    // No CLI output yet means no CLI to submit to: time alone presses nothing.
+    vi.advanceTimersByTime(100 * DELAY)
+    expect(written).toEqual([INSTRUCTION])
+  })
+
+  it('presses Enter once the CLI has spoken, and once more as insurance', () => {
+    const { written, hooks } = stubManager()
+
+    hooks.data!('welcome to the cli')
+
+    expect(written).toEqual([INSTRUCTION])
+    vi.advanceTimersByTime(DELAY)
+    expect(written).toEqual([INSTRUCTION, '\r'])
+    vi.advanceTimersByTime(DELAY)
+    expect(written).toEqual([INSTRUCTION, '\r', '\r'])
+
+    // Everything the session says after that is output, not another prompt.
+    hooks.data!('thinking…')
+    vi.advanceTimersByTime(100 * DELAY)
+    expect(written).toEqual([INSTRUCTION, '\r', '\r'])
+  })
+
+  it('presses nothing into a session that has already ended', () => {
+    const { written, hooks } = stubManager()
+    hooks.data!('welcome to the cli')
+
+    hooks.exit!({ exitCode: 0 })
+    // A pty can print its last words after the exit; they are not a prompt.
+    hooks.data!('goodbye')
+    vi.advanceTimersByTime(100 * DELAY)
+
+    expect(written).toEqual([INSTRUCTION])
   })
 })
 
