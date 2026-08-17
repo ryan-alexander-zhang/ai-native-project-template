@@ -33,6 +33,7 @@ const GRAPH: DocGraph = {
   nodes: [node(), IDEA],
   edges: [relationEdge('prd-00001-x', 'idea-00001-x', 'parent')],
   issues: [],
+  diagnostics: [],
 }
 const PLACED = [
   { id: 'prd-00001-x', x: 10, y: 200 },
@@ -180,6 +181,7 @@ describe('toFlowEdges', () => {
       nodes: [],
       edges: [relationEdge('spec-00002-b', 'spec-00001-a', 'supersedes')],
       issues: [],
+      diagnostics: [],
     }
     const placed = [
       { id: 'spec-00001-a', x: 0, y: 0 },
@@ -198,6 +200,7 @@ describe('toFlowEdges', () => {
       nodes: [],
       edges: [relationEdge('spec-00001-a', 'spec-00002-b', 'informs')],
       issues: [],
+      diagnostics: [],
     }
     const placed = [
       { id: 'spec-00001-a', x: 0, y: 0 },
@@ -215,6 +218,7 @@ describe('toFlowEdges', () => {
       nodes: [],
       edges: [relationEdge('spec-00001-a', 'spec-00001-a', 'supersedes')],
       issues: [],
+      diagnostics: [],
     }
     const edge = toFlowEdges(graph, [{ id: 'spec-00001-a', x: 0, y: 0 }])[0]!
 
@@ -250,6 +254,7 @@ describe('suppressedNodes', () => {
       nodes: [node(), IDEA, node({ id: 'far-00001-x', path: 'far/a.md' })],
       edges: GRAPH.edges,
       issues: [],
+      diagnostics: [],
     }
 
     expect(suppressedNodes(graph, 'prd-00001-x')).toEqual(new Set(['far-00001-x']))
@@ -273,6 +278,7 @@ describe('relationsOf', () => {
       relationEdge('spec-00001-x', 'ghost', 'informs', false),
     ],
     issues: [],
+    diagnostics: [],
   }
 
   // spec-00001-AC-30.1 and AC-30.2
@@ -315,6 +321,7 @@ describe('relationsOf', () => {
         ]),
       ],
       issues: [],
+      diagnostics: [],
     }
 
     expect(relationsOf(merged, 'record-00003-x', ORDER)).toEqual([
@@ -342,6 +349,7 @@ describe('relationsOf', () => {
         relationEdge('plan-00001-x', 'spec-00001-a', 'implements'),
       ],
       issues: [],
+      diagnostics: [],
     }
     expect(relationsOf(same, 'plan-00001-x', ORDER).map((item) => item.otherId)).toEqual([
       'spec-00001-a',
@@ -357,6 +365,7 @@ describe('relationsOf', () => {
         relationEdge('a-00001-x', 'b-00001-x', 'parent'),
       ],
       issues: [],
+      diagnostics: [],
     }
     expect(relationsOf(extra, 'a-00001-x', ORDER).map((item) => item.field)).toEqual(['parent', 'mystery'])
   })
@@ -414,7 +423,7 @@ describe('the board', () => {
     vi.spyOn(api, 'session').mockResolvedValue({ current: null })
     // Selecting a spec or a rule reads its items for the inspector panel
     // (spec-00001-FR-31); the cases below that reach one do not care what it says.
-    vi.spyOn(api, 'items').mockResolvedValue({ items: [], unattributed: [] })
+    vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
@@ -552,6 +561,7 @@ describe('the board', () => {
         relationEdge('record-00003-x', 'spec-00001-x', 'verifies', true, ['spec-00001-FR-28', 'spec-00001-FR-29']),
       ],
       issues: [],
+      diagnostics: [],
     })
     const { container } = render(<Board />)
     await waitFor(() => expect(container.querySelectorAll('.react-flow__edge')).toHaveLength(1))
@@ -580,6 +590,7 @@ describe('the board', () => {
       nodes: [node()],
       edges: [relationEdge('prd-00001-x', 'idea-09999-ghost', 'parent', false)],
       issues: [],
+      diagnostics: [],
     })
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
@@ -633,7 +644,7 @@ describe('the board', () => {
 
   // spec-00001-AC-29.5 — a node with no edges at all
   it('emphasises nothing when the selected document has no relations', async () => {
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [node()], edges: [], issues: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [node()], edges: [], issues: [], diagnostics: [] })
     const { container } = render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
 
@@ -673,7 +684,7 @@ describe('the board', () => {
 
   // spec-00001-AC-1.4
   it('renders an empty canvas without error for an empty docs tree', async () => {
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [], edges: [], issues: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [], edges: [], issues: [], diagnostics: [] })
     const { container } = render(<Board />)
 
     await waitFor(() => expect(screen.getByText('no issues')).toBeTruthy())
@@ -685,10 +696,38 @@ describe('the board', () => {
     vi.spyOn(api, 'graph').mockResolvedValue({
       ...GRAPH,
       issues: [{ path: 'prd/a.md', message: 'front matter is missing' }],
+      diagnostics: [],
     })
     render(<Board />)
 
     await waitFor(() => expect(screen.getByText('1 issues')).toBeTruthy())
+  })
+
+  // spec-00001-AC-40.3 — two counts side by side, neither folded into the other
+  it('counts the parse diagnostics apart from the anomalies', async () => {
+    vi.spyOn(api, 'graph').mockResolvedValue({
+      ...GRAPH,
+      issues: [{ path: 'prd/a.md', message: 'front matter is missing' }],
+      diagnostics: [
+        { docId: 'spec-00001-x', kind: 'item-shape', line: 4, text: '**spec-00001-FR-2** drifted' },
+        { docId: 'spec-00001-x', kind: 'checklist-row', recordId: 'record-00001-x', line: 9, text: '| a … b |' },
+      ],
+    })
+    render(<Board />)
+
+    await waitFor(() => expect(screen.getByText('2 diagnostics')).toBeTruthy())
+    expect(screen.getByText('1 issues')).toBeTruthy()
+  })
+
+  // spec-00001-AC-40.4 and AC-40.5 — a diagnostic marks no node, and zero shows nothing
+  it('renders no diagnostics badge and no anomalous node when the tree follows the grammar', async () => {
+    vi.spyOn(api, 'graph').mockResolvedValue({ ...GRAPH, issues: [], diagnostics: [] })
+    render(<Board />)
+
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    expect(screen.getByText('no issues')).toBeTruthy()
+    expect(screen.queryByText(/diagnostics/)).toBeNull()
+    expect(screen.queryByLabelText(/^Front matter problems of/)).toBeNull()
   })
 
   // spec-00001-AC-3.1

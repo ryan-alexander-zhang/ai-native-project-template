@@ -31,6 +31,7 @@ const GRAPH: DocGraph = {
     { from: 'record-00001-x', to: 'spec-00001-x', relation: 'verifies', ok: true, declaredTargets: ['spec-00001-x'] },
   ],
   issues: [],
+  diagnostics: [],
 }
 
 function row(targetId: string): AcceptanceRow {
@@ -56,7 +57,7 @@ const ITEMS: ItemsView = {
     }),
     item('spec-00001-FR-2', { text: '' }),
   ],
-  unattributed: [],
+  diagnostics: [],
 }
 
 afterEach(cleanup)

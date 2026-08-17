@@ -6,7 +6,7 @@ import { type ItemsView, declaresItems } from '../../src/requirements.ts'
 import { type SessionInfo, api } from './api.ts'
 import { type Placed, layoutGraph } from './layout.ts'
 
-const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [] }
+const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [] }
 
 /** Board state: what is on the canvas, what is selected, and which panels are open. */
 export function useBoard() {

@@ -65,7 +65,7 @@ export class DocService {
   items(id: string): ItemsView {
     const graph = this.graph()
     const node = this.require(id, graph)
-    if (!declaresItems(node.type)) return { items: [], unattributed: [] }
+    if (!declaresItems(node.type)) return { items: [], diagnostics: [] }
     const records = graph.nodes
       .filter((candidate) => candidate.type === 'record')
       .map((record) => ({ id: record.id, body: readDocBody(this.docsDir, record) }))

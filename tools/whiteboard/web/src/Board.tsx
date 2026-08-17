@@ -10,7 +10,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { FileQuestionMark, LayoutDashboard, Search, TriangleAlert } from 'lucide-react'
+import { FileQuestionMark, FileWarning, LayoutDashboard, Search, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
 import type { DocNode } from '../../src/docRepository.ts'
@@ -275,6 +275,18 @@ function Canvas() {
             <Badge variant="destructive" className="gap-1 text-xs">
               <TriangleAlert className="size-3" aria-hidden />
               {board.graph.issues.length} issues
+            </Badge>
+          )}
+          {/*
+            A count of its own, next to the anomaly count and never folded into
+            it: a diagnostic is a reading that drifted, not a broken document,
+            so it takes the outline variant and disappears at zero
+            (spec-00001-FR-40, AC-40.3/AC-40.5; design-00002 §9).
+          */}
+          {board.graph.diagnostics.length === 0 ? null : (
+            <Badge variant="outline" className="gap-1 text-xs">
+              <FileWarning className="size-3" aria-hidden />
+              {board.graph.diagnostics.length} diagnostics
             </Badge>
           )}
           <ThemeMenu theme={theme.theme} onChoose={theme.choose} />

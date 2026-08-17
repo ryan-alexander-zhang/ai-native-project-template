@@ -127,7 +127,7 @@ describe('GET /api/docs/:id/items', () => {
     ])
     // spec-00001-AC-32.1 and AC-32.2 as the panel will read them
     expect(body.items.map((found: { coverage: string }) => found.coverage)).toEqual(['verified', 'uncovered'])
-    expect(body.unattributed).toEqual([])
+    expect(body.diagnostics).toEqual([])
   })
 
   // spec-00001-AC-32.5 — a record's own status says nothing about the evidence
@@ -143,7 +143,7 @@ describe('GET /api/docs/:id/items', () => {
   })
 
   // spec-00001-AC-33.1
-  it('serves a row that verifies a criterion this document does not have as unattributed', async () => {
+  it('serves a row that verifies a criterion this document does not have as a diagnostic', async () => {
     const { call } = boardOn({
       'spec/a.md': SPEC,
       'record/r.md': record('active', ['| spec-00001-AC-99.1 | a stale test | pass |']),
@@ -151,13 +151,15 @@ describe('GET /api/docs/:id/items', () => {
 
     const { body } = await call('GET', '/api/docs/spec-00001-x/items')
 
-    expect(body.unattributed).toEqual([{ recordId: 'record-00001-x', declaredId: 'spec-00001-AC-99.1' }])
+    expect(body.diagnostics).toMatchObject([
+      { kind: 'unattributable', recordId: 'record-00001-x', declaredId: 'spec-00001-AC-99.1' },
+    ])
     expect(body.items[0].criteria).toHaveLength(1)
   })
 
   it('serves no items for a type that declares none', async () => {
     const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
-    expect((await call('GET', '/api/docs/idea-00001-x/items')).body).toEqual({ items: [], unattributed: [] })
+    expect((await call('GET', '/api/docs/idea-00001-x/items')).body).toEqual({ items: [], diagnostics: [] })
   })
 
   it('answers 409 for a document that is not there', async () => {
@@ -422,5 +424,67 @@ describe('when a session ends', () => {
     await board.sessions.whenFinished()
 
     expect(board.sessions.current()!.outcome).toEqual({ problems: [], committed: false, error: undefined })
+  })
+})
+
+/**
+ * spec-00001-FR-41, the second half: what a session produced is read against the
+ * item grammar too, and what drifts is shown the way FR-40 shows everything else
+ * — a diagnostic, never a refusal to commit.
+ */
+describe('what a session produced, read against the item grammar', () => {
+  const writeSpec = (body: string) =>
+    [
+      '-e',
+      `require('fs').mkdirSync('spec',{recursive:true});require('fs').writeFileSync('spec/new.md',${JSON.stringify(
+        doc({ id: 'spec-00001-new', type: 'spec', status: 'draft', parent: 'idea-00001-x' }, body),
+      )})`,
+    ]
+
+  const WELL_FORMED = [
+    '# New spec',
+    '',
+    '- **spec-00001-FR-1** (Event) the requirement',
+    '',
+    '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+    '  Given a board When it loads Then it works',
+    '',
+  ].join('\n')
+
+  const DRIFTED = WELL_FORMED.replace(
+    '- **spec-00001-FR-1** (Event) the requirement',
+    '**spec-00001-FR-1** (Event) the requirement',
+  )
+
+  async function advanceInto(body: string) {
+    const board = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeSpec(body))
+    await board.call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'spec' })
+    await vi.waitFor(() => expect(board.board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.board.sessions.whenFinished()
+    return board
+  }
+
+  // spec-00001-AC-41.3 — reported on refresh, and the commit happens all the same
+  it('reports a drifted declaration and commits the document anyway', async () => {
+    const { call, repoRoot } = await advanceInto(DRIFTED)
+
+    const { body } = await call('GET', '/api/graph')
+    // The declaration lost its shape, so the criterion attributed to it has
+    // lost its owner too — one drift, both readings reported.
+    expect(body.diagnostics).toMatchObject([
+      { docId: 'spec-00001-new', kind: 'item-shape', declaredId: 'spec-00001-FR-1' },
+      { docId: 'spec-00001-new', kind: 'unattributable', declaredId: 'spec-00001-AC-1.1' },
+    ])
+    expect(lastCommitMessage(repoRoot)).toBe('wb(advance): spec-00001-new')
+    expect(commitCount(repoRoot)).toBe(2)
+  })
+
+  // spec-00001-AC-41.4
+  it('adds no diagnostic and leaves the node sound when the body follows the grammar', async () => {
+    const { call } = await advanceInto(WELL_FORMED)
+
+    const { body } = await call('GET', '/api/graph')
+    expect(body.diagnostics).toEqual([])
+    expect(body.nodes.find((n: { id: string }) => n.id === 'spec-00001-new').ok).toBe(true)
   })
 })

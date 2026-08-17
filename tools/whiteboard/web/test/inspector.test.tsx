@@ -39,6 +39,7 @@ const GRAPH: DocGraph = {
   nodes: [SPEC, RECORD_ONE, RECORD_TWO, RECORD_THREE, PLAN],
   edges: [verifies('record-00001-x'), verifies('record-00002-x')],
   issues: [],
+  diagnostics: [],
 }
 
 function row(recordId: string, targetId: string, result = 'pass'): AcceptanceRow {
@@ -54,7 +55,7 @@ function item(id: string, overrides: Partial<RequirementItem> = {}): Requirement
 }
 
 function view(overrides: Partial<ItemsView> = {}): ItemsView {
-  return { items: [], unattributed: [], ...overrides }
+  return { items: [], diagnostics: [], ...overrides }
 }
 
 /** Open the board, wait for it, and select `id`. */
@@ -115,7 +116,7 @@ describe('the inspector panel', () => {
   // declaration shapes, so the panel is exercised over the real thing.
   it('lists an item declared in a decision table beside one declared as a list entry', async () => {
     const rule = node({ id: 'rule-00001-x', type: 'rule', title: 'Workflow rule', path: 'rule/a.md' })
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [rule], edges: [], issues: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [rule], edges: [], issues: [], diagnostics: [] })
     vi.spyOn(api, 'items').mockResolvedValue(
       requirementView(
         {
@@ -197,6 +198,7 @@ describe('the inspector panel', () => {
       nodes: [node({ status: undefined, ok: false, problems: ['front matter has no status'] })],
       edges: [],
       issues: [],
+      diagnostics: [],
     })
     vi.spyOn(api, 'items').mockResolvedValue(view({ items: [item('spec-00001-FR-1')] }))
     await selectNode('spec-00001-x')
@@ -262,12 +264,12 @@ describe('the inspector panel', () => {
     vi.spyOn(api, 'items').mockResolvedValue(
       view({
         items: [item('spec-00001-FR-1', { criteria: [criterion('spec-00001-AC-1.1')] })],
-        unattributed: [{ recordId: 'record-00001-x', declaredId: 'spec-00001-AC-99.1' }],
+        diagnostics: [{ kind: 'unattributable', recordId: 'record-00001-x', declaredId: 'spec-00001-AC-99.1' }],
       }),
     )
     await selectNode('spec-00001-x')
 
-    const unattributed = await screen.findByLabelText('Unattributable entries of spec-00001-x')
+    const unattributed = await screen.findByLabelText('Parse diagnostics of spec-00001-x')
     expect(within(unattributed).getByText('record-00001-x')).toBeTruthy()
     expect(within(unattributed).getByText('spec-00001-AC-99.1')).toBeTruthy()
   })
@@ -277,16 +279,85 @@ describe('the inspector panel', () => {
     vi.spyOn(api, 'items').mockResolvedValue(
       view({
         items: [item('spec-00001-FR-1', { criteria: [criterion('spec-00001-AC-1.1')] })],
-        unattributed: [{ declaredId: 'spec-00001-AC-99.1', attributedTo: 'spec-00001-FR-99' }],
+        diagnostics: [
+          { kind: 'unattributable', declaredId: 'spec-00001-AC-99.1', attributedTo: 'spec-00001-FR-99' },
+        ],
       }),
     )
     await selectNode('spec-00001-x')
 
-    const unattributed = await screen.findByLabelText('Unattributable entries of spec-00001-x')
+    const unattributed = await screen.findByLabelText('Parse diagnostics of spec-00001-x')
     expect(within(unattributed).getByText('spec-00001-AC-99.1')).toBeTruthy()
     expect(within(unattributed).getByText(/spec-00001-FR-99/)).toBeTruthy()
     const list = screen.getByRole('list', { name: 'Requirement items of spec-00001-x' })
     expect(within(list).getByTestId('item-spec-00001-FR-1').textContent).toContain('1 AC')
+  })
+
+  // spec-00001-AC-40.1 — the record it came from, and the line as it was written
+  it('lists a malformed checklist row with its record and its source line', async () => {
+    vi.spyOn(api, 'items').mockResolvedValue(
+      view({
+        items: [item('spec-00001-FR-1')],
+        diagnostics: [
+          {
+            kind: 'checklist-row',
+            recordId: 'record-00001-x',
+            line: 42,
+            text: '| spec-00001-AC-2.1 … AC-9.2 | nine tests | pass |',
+          },
+        ],
+      }),
+    )
+    await selectNode('spec-00001-x')
+
+    const region = await screen.findByLabelText('Parse diagnostics of spec-00001-x')
+    expect(within(region).getByText('record-00001-x')).toBeTruthy()
+    expect(within(region).getByText('checklist row')).toBeTruthy()
+    expect(within(region).getByText(/spec-00001-AC-2.1 … AC-9.2/)).toBeTruthy()
+  })
+
+  // spec-00001-AC-40.2 — a shape diagnostic belongs to the document itself
+  it('lists a shape diagnostic under the document that holds the line', async () => {
+    vi.spyOn(api, 'items').mockResolvedValue(
+      view({
+        items: [item('spec-00001-FR-1')],
+        diagnostics: [
+          {
+            kind: 'item-shape',
+            declaredId: 'spec-00001-FR-2',
+            line: 12,
+            text: '**spec-00001-FR-2** (Event) 掉了列表符号。',
+          },
+        ],
+      }),
+    )
+    await selectNode('spec-00001-x')
+
+    const region = await screen.findByLabelText('Parse diagnostics of spec-00001-x')
+    expect(within(region).getByText('spec-00001-x')).toBeTruthy()
+    expect(within(region).getByText('shape')).toBeTruthy()
+    expect(within(region).getByText(/掉了列表符号/)).toBeTruthy()
+  })
+
+  // spec-00001-AC-40.5 — nothing to report, nothing to show
+  it('does not render the region at all when there is no diagnostic', async () => {
+    vi.spyOn(api, 'items').mockResolvedValue(view({ items: [item('spec-00001-FR-1')] }))
+    await selectNode('spec-00001-x')
+
+    await screen.findByLabelText('Requirement items of spec-00001-x')
+    expect(screen.queryByLabelText('Parse diagnostics of spec-00001-x')).toBeNull()
+  })
+
+  // A source line is evidence, not reading matter (design-00002 §9)
+  it('truncates a long source line', async () => {
+    const long = `| spec-00001-AC-2.1 … AC-9.2 | ${'x'.repeat(200)} | pass |`
+    vi.spyOn(api, 'items').mockResolvedValue(
+      view({ items: [item('spec-00001-FR-1')], diagnostics: [{ kind: 'checklist-row', line: 1, text: long }] }),
+    )
+    await selectNode('spec-00001-x')
+
+    const region = await screen.findByLabelText('Parse diagnostics of spec-00001-x')
+    expect(within(region).getByText(/…$/).textContent!.length).toBeLessThan(long.length)
   })
 })
 

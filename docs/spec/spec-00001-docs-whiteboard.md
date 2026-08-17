@@ -30,6 +30,7 @@ parent: prd-00001-docs-whiteboard
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
 | S5 | 作为文档负责人，我要每次变更与评审都自动留痕，这样任何结论都可追溯 | spec-00001-FR-14, spec-00001-FR-20 |
 | S6 | 作为文档负责人，我要选中一份 spec 或 rule 就看到它的需求条目与验收覆盖，并能下钻到条目级的验收链路、读到任何一条的全文，这样验收缺口不靠脚本就能看见 | spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36, spec-00001-FR-37, spec-00001-FR-38, spec-00001-FR-39 |
+| S7 | 作为文档负责人，我要白板和 agent 被同一份条目文法约束、写法漂移当场报警，这样解析不会无声漏读 | spec-00001-FR-40, spec-00001-FR-41 |
 
 ## 3. Business Rules
 
@@ -219,6 +220,21 @@ parent: prd-00001-docs-whiteboard
   元素、不产出图片元素与任何外部请求，链接文字与图片替代文本按纯文本呈现；
   不执行脚本、不注入原始 HTML（FR-24 的口径）。截断作用于渲染后的文本，不作用
   于原始源码。
+- **spec-00001-FR-40** (Event) 当白板加载或刷新时，系统应按**条目文法**（各
+  文件夹 README 的「机器可读形态」小节持有）校验每份 spec/rule 的正文与每份
+  record 的验收清单，产出**解析诊断**：疑似条目声明而不合形态（整行以粗体条目
+  id 起头却不匹配列表项或决策表行两种形态）、验收清单表中不合式的行（首列为
+  **条目/AC id 的全匹配语法**——文档 id 不算——而不是恰一个合法 id，含区间
+  与一格多 id 写法）、以及既有的「无法归属」两类（含缺归属标注的 AC；FR-33
+  的呈现由此并入解析诊断区，语义不变）。诊断在检视面板的解析诊断
+  区列出（含来源文档 id 与原文行），顶栏以独立于 FR-2 异常计数的计数呈现；
+  诊断不改变 FR-2 的节点异常判定，不合式的行照旧不参与覆盖推导。全部文档合
+  文法时诊断计数为零。（取舍见 `decision-00005-whiteboard-parsing-contract`。）
+- **spec-00001-FR-41** (Event) 当推进会话启动、且目标文档类型有条目文法
+  （spec/rule/record）时，任务指令应包含该类型的条目文法要求；目标类型无条目
+  文法时不含该段。当会话结束、白板刷新时，FR-17 的产出校验扩展到正文：产出
+  文档的解析诊断按 FR-40 呈现，不阻塞 commit——与 FR-17 对 front matter 的
+  处置同权（标记，不回滚）。
 
 **Acceptance (GWT)**
 
@@ -760,7 +776,8 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-33.1** (spec-00001-FR-33)
   Given 一份 record 的验收行引用 `spec-00001-AC-99.1`（该条目不存在）
   When 选中 spec-00001
-  Then 该行出现在面板的「无法归属」区，含其 record id 与被引 id
+  Then 该行出现在面板的解析诊断区（无法归属类），含其 record id 与被引 id
+  （区名随 FR-40 由「无法归属」并入解析诊断，断言语义不变）
 - **spec-00001-AC-33.2** (spec-00001-FR-33)
   Given 同 AC-33.1
   When 查看面板与白板
@@ -768,7 +785,7 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-33.3** (spec-00001-FR-33)
   Given 某条 AC 的归属标注指向不存在的条目（如 `(spec-00001-FR-99)`）
   When 选中该文档
-  Then 该 AC 出现在「无法归属」区，不计入任何条目的 AC 计数
+  Then 该 AC 出现在解析诊断区（无法归属类），不计入任何条目的 AC 计数
 - **spec-00001-AC-34.1** (spec-00001-FR-34)
   Given 选中的 spec 有一条已验证条目，其验收行来自与该 spec 存在关系边的 record
   When 悬停面板中的该条目
@@ -934,6 +951,59 @@ parent: prd-00001-docs-whiteboard
   Given 条目文本含 `[链接](https://example.com)` 与 `![图](https://example.com/x.png)`
   When 查看任一行内呈现处
   Then 不存在可导航的链接元素与图片元素，链接文字与图片替代文本仍可读
+- **spec-00001-AC-40.1** (spec-00001-FR-40)
+  Given 一份 record 的验收清单含区间行（首列为 `rule-00001-AC-2.1 … AC-9.2`）
+  When 打开白板并选中被验文档
+  Then 该行出现在解析诊断区（含 record id 与原文行），且不参与覆盖推导
+- **spec-00001-AC-40.2** (spec-00001-FR-40)
+  Given 一份 spec 的正文有一行以粗体条目 id 起头、但既不是列表项也不是决策表行
+  （如置于普通段落中）
+  When 选中该 spec
+  Then 该行出现在解析诊断区
+- **spec-00001-AC-40.3** (spec-00001-FR-40)
+  Given 存在若干条解析诊断
+  When 查看顶栏
+  Then 呈现诊断计数，且与 FR-2 的异常计数各自独立
+- **spec-00001-AC-40.4** (spec-00001-FR-40)
+  Given 一份含解析诊断的 spec
+  When 查看白板
+  Then 该节点不因诊断转为异常节点，其余条目的覆盖状态照常
+- **spec-00001-AC-40.5** (spec-00001-FR-40)
+  Given 全部文档合文法
+  When 打开白板
+  Then 诊断计数为零且诊断区不呈现
+- **spec-00001-AC-40.6** (spec-00001-FR-40)
+  Given 一条区间行被展开为逐条合式行
+  When 刷新
+  Then 对应诊断消失，覆盖推导吸收这些行
+- **spec-00001-AC-40.7** (spec-00001-FR-40)
+  Given 一份 record 的验收行首列一格含两个 AC id
+  When 打开白板
+  Then 该行出现在解析诊断区，且不参与覆盖推导
+- **spec-00001-AC-40.8** (spec-00001-FR-40)
+  Given 一份 rule 的正文有一行以粗体 BR id 起头、但形态残缺（如仅一个表格单元格）
+  When 选中该 rule
+  Then 该行出现在解析诊断区
+- **spec-00001-AC-40.9** (spec-00001-FR-40)
+  Given 一条 AC 声明缺归属标注
+  When 选中该文档
+  Then 该 AC 出现在解析诊断区（无法归属类），不计入任何条目的 AC 计数
+- **spec-00001-AC-41.1** (spec-00001-FR-41)
+  Given 在某节点选定下一步类型为 spec
+  When 会话启动
+  Then 任务指令包含条目文法要求（两种声明形态与 AC 归属标注）
+- **spec-00001-AC-41.2** (spec-00001-FR-41)
+  Given 选定的下一步类型为 idea（无条目文法）
+  When 会话启动
+  Then 任务指令不含条目文法段
+- **spec-00001-AC-41.3** (spec-00001-FR-41)
+  Given 推进会话产出的 spec 含一行形态残缺的条目声明
+  When 会话结束、白板刷新
+  Then 该行出现在解析诊断区，且本次 commit 照常产生
+- **spec-00001-AC-41.4** (spec-00001-FR-41)
+  Given 推进会话产出的 spec 条目全部合式
+  When 会话结束、白板刷新
+  Then 不新增任何解析诊断，该节点为正常节点
 
 ## 5. Technical Design
 
@@ -996,5 +1066,5 @@ parent: prd-00001-docs-whiteboard
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
-- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md)
-- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）
+- Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md) · [plan-00007-whiteboard-parsing-contract](../plan/plan-00007-whiteboard-parsing-contract.md)
+- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）· [decision-00005-whiteboard-parsing-contract](../decision/decision-00005-whiteboard-parsing-contract.md)（持有 FR-40/FR-41 与条目文法的取舍）

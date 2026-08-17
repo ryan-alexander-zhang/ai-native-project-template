@@ -75,6 +75,7 @@ const GRAPH: DocGraph = {
   nodes: [node(), node({ id: 'record-00001-x', type: 'record', title: 'First record', path: 'record/a.md' })],
   edges: [],
   issues: [],
+  diagnostics: [],
 }
 
 function row(targetId: string): AcceptanceRow {
@@ -94,7 +95,7 @@ const ITEMS: ItemsView = {
     item('spec-00001-FR-1', { criteria: [criterion('spec-00001-AC-1.1', [row('spec-00001-AC-1.1')])] }),
     item('spec-00001-FR-2', { criteria: [criterion('spec-00001-AC-2.1')] }),
   ],
-  unattributed: [],
+  diagnostics: [],
 }
 
 /** Tall enough that no fit of it clears React Flow's own floor of 0.5. */
@@ -107,7 +108,7 @@ const MANY_ITEMS: ItemsView = {
       ],
     }),
   ),
-  unattributed: [],
+  diagnostics: [],
 }
 
 /** Open the board on a full-width canvas, with nothing selected. */

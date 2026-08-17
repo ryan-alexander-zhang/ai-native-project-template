@@ -31,6 +31,7 @@ const GRAPH: DocGraph = {
     { from: 'record-00001-x', to: 'spec-00001-x', relation: 'verifies', ok: true, declaredTargets: ['spec-00001-x'] },
   ],
   issues: [],
+  diagnostics: [],
 }
 
 function row(targetId: string, overrides: Partial<AcceptanceRow> = {}): AcceptanceRow {
@@ -46,7 +47,7 @@ function item(id: string, overrides: Partial<RequirementItem> = {}): Requirement
 }
 
 function view(overrides: Partial<ItemsView> = {}): ItemsView {
-  return { items: [], unattributed: [], ...overrides }
+  return { items: [], diagnostics: [], ...overrides }
 }
 
 /**

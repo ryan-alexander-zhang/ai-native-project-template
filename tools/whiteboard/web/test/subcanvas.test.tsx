@@ -40,6 +40,7 @@ const GRAPH: DocGraph = {
     { from: 'record-00001-x', to: 'spec-00001-x', relation: 'verifies', ok: true, declaredTargets: ['spec-00001-x'] },
   ],
   issues: [],
+  diagnostics: [],
 }
 
 function row(targetId: string, test = 'canvas.test.tsx › draws the edges', result = 'pass'): AcceptanceRow {
@@ -55,7 +56,7 @@ function item(id: string, overrides: Partial<RequirementItem> = {}): Requirement
 }
 
 function view(overrides: Partial<ItemsView> = {}): ItemsView {
-  return { items: [], unattributed: [], ...overrides }
+  return { items: [], diagnostics: [], ...overrides }
 }
 
 /** One verified item with two criteria, one uncovered item, one item with no criteria at all. */

@@ -32,6 +32,45 @@ describe('taskInstruction', () => {
     expect(instruction).toContain('prd/README.md')
     expect(instruction).toContain('status: draft')
   })
+
+  /** spec-00001-FR-41: the item grammar travels with the brief, or not at all. */
+  function instructionFor(targetType: string): string {
+    return taskInstruction({ ...EXPECTATION, targetType, idPrefix: `${targetType}-00002-` })
+  }
+
+  // spec-00001-AC-41.1
+  it('carries the item grammar of a spec: both declaration shapes and the AC attribution', () => {
+    const instruction = instructionFor('spec')
+
+    expect(instruction).toContain('spec/README.md')
+    expect(instruction).toContain('- **spec-<n>-FR-<i>**')
+    expect(instruction).toContain('| **spec-<n>-FR-<i>**')
+    expect(instruction).toContain('- **spec-<n>-AC-<i>.<k>** (spec-<n>-FR-<i>)')
+    expect(instruction).toMatch(/attribution in\s+parentheses is required/)
+  })
+
+  it('carries the same two shapes for a rule, in the rule`s own ids', () => {
+    const instruction = instructionFor('rule')
+
+    expect(instruction).toContain('- **rule-<n>-BR-<i>**')
+    expect(instruction).toContain('| **rule-<n>-BR-<i>**')
+    expect(instruction).toContain('- **rule-<n>-AC-<i>.<k>** (rule-<n>-BR-<i>)')
+  })
+
+  it('carries the checklist grammar for a record: one id a row, no ranges', () => {
+    const instruction = instructionFor('record')
+
+    expect(instruction).toContain('exactly one requirement or AC id')
+    expect(instruction).toContain('No ranges')
+  })
+
+  // spec-00001-AC-41.2 — idea has no item grammar, so the section is absent
+  it('says nothing about an item grammar for a type that has none', () => {
+    for (const targetType of ['idea', 'prd', 'design', 'plan']) {
+      expect(instructionFor(targetType)).not.toContain('机器可读形态')
+      expect(instructionFor(targetType)).not.toContain('item grammar')
+    }
+  })
 })
 
 describe('findProduct', () => {

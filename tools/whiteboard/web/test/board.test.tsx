@@ -31,6 +31,7 @@ const GRAPH: DocGraph = {
   nodes: [node(), node({ id: 'idea-00001-x', type: 'idea', status: 'active', path: 'idea/a.md' })],
   edges: [{ from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true, declaredTargets: ['idea-00001-x'] }],
   issues: [],
+  diagnostics: [],
 }
 
 afterEach(cleanup)
@@ -116,7 +117,7 @@ describe('the layout', () => {
   const ORDER = ['idea', 'prd', 'spec', 'rule']
 
   function graphOf(...nodes: DocNode[]): DocGraph {
-    return { nodes, edges: [], issues: [] }
+    return { nodes, edges: [], issues: [], diagnostics: [] }
   }
 
   function at(placed: { id: string; x: number; y: number }[], id: string) {
@@ -228,7 +229,7 @@ describe('the layout', () => {
 
   // spec-00001-AC-1.4
   it('places nothing for an empty graph', () => {
-    expect(layoutGraph({ nodes: [], edges: [], issues: [] }, ORDER)).toEqual([])
+    expect(layoutGraph({ nodes: [], edges: [], issues: [], diagnostics: [] }, ORDER)).toEqual([])
   })
 
   // spec-00001-AC-2.2 — a broken edge must not drag its ghost target into the layout
@@ -246,6 +247,7 @@ describe('the layout', () => {
           },
         ],
         issues: [],
+        diagnostics: [],
       },
       ORDER,
     )

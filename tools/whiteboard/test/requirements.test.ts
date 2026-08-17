@@ -104,7 +104,7 @@ describe('parsing requirement items', () => {
     expect(declaredIds({ id: 'spec/broken.md', body: specBody([item('spec-00001-FR-1')]) })).toEqual([])
     expect(requirementView({ id: 'spec/broken.md', body: specBody([item('spec-00001-FR-1')]) }, [])).toEqual({
       items: [],
-      unattributed: [],
+      diagnostics: [],
     })
   })
 })
@@ -197,6 +197,30 @@ describe('reading acceptance rows', () => {
     expect(rows[0]).toMatchObject({ test: 'a test', result: '' })
   })
 
+  // A row that stops before the evidence column has offered no evidence at all
+  it('reads a row that stops before its evidence column', () => {
+    const rows = acceptanceRows({
+      id: 'record-00001-x',
+      body: [
+        '| GWT id | Test | Result | Evidence |',
+        '| --- | --- | --- | --- |',
+        '| spec-00001-AC-1.1 | a test | pass |',
+      ].join('\n'),
+    })
+
+    expect(rows[0]).not.toHaveProperty('evidence')
+    expect(rows[0]).toMatchObject({ test: 'a test', result: 'pass' })
+  })
+
+  it('reads a row that stops at its id as an empty test and an empty result', () => {
+    const rows = acceptanceRows({
+      id: 'record-00001-x',
+      body: ['| GWT id | 测试 | 结果 |', '| --- | --- | --- |', '| spec-00001-AC-1.1 |'].join('\n'),
+    })
+
+    expect(rows[0]).toMatchObject({ targetId: 'spec-00001-AC-1.1', test: '', result: '' })
+  })
+
   it('strips the decoration a row may carry around its cells', () => {
     const rows = acceptanceRows(checklist('record-00001-x', [['`spec-00001-AC-1.1`', '`a test`', '**pass**']]))
 
@@ -277,7 +301,7 @@ describe('coverage', () => {
 
     expect(view.items[0]!.coverage).toBe('failing')
     expect(view.items[0]!.rows.map((row) => row.targetId)).toEqual(['spec-00001-FR-1'])
-    expect(view.unattributed).toEqual([])
+    expect(view.diagnostics).toEqual([])
   })
 
   // spec-00001-AC-32.10 — an item-level pass is not per-criterion coverage
@@ -305,7 +329,7 @@ describe('coverage', () => {
     const view = viewOf(ONE_CRITERION, [checklist('record-00001-x', [['rule-00001-AC-1.1', 'a test', 'fail']])])
 
     expect(view.items[0]!.coverage).toBe('uncovered')
-    expect(view.unattributed).toEqual([])
+    expect(view.diagnostics).toEqual([])
   })
 })
 
@@ -321,7 +345,15 @@ describe('what cannot be attributed', () => {
       ]),
     ])
 
-    expect(view.unattributed).toEqual([{ recordId: 'record-00001-x', declaredId: 'spec-00001-AC-99.1' }])
+    expect(view.diagnostics).toEqual([
+      {
+        kind: 'unattributable',
+        recordId: 'record-00001-x',
+        declaredId: 'spec-00001-AC-99.1',
+        line: 6,
+        text: '| spec-00001-AC-99.1 | a stale test | pass |',
+      },
+    ])
   })
 
   // spec-00001-AC-33.2 — the stray row changes neither the coverage nor the count
@@ -346,13 +378,194 @@ describe('what cannot be attributed', () => {
       ),
     )
 
-    expect(view.unattributed).toEqual([{ declaredId: 'spec-00001-AC-9.1', attributedTo: 'spec-00001-FR-99' }])
+    expect(view.diagnostics).toEqual([
+      {
+        kind: 'unattributable',
+        declaredId: 'spec-00001-AC-9.1',
+        attributedTo: 'spec-00001-FR-99',
+        line: 11,
+        text: '- **spec-00001-AC-9.1** (spec-00001-FR-99)',
+      },
+    ])
     expect(view.items[0]!.criteria.map((found) => found.id)).toEqual(['spec-00001-AC-1.1'])
   })
 
-  it('lists a criterion that names no item at all', () => {
+  // spec-00001-AC-40.9 — the attribution is not optional, so its absence is reported
+  it('lists a criterion that names no item at all, and leaves it uncounted', () => {
     const view = viewOf(specBody([item('spec-00001-FR-1')], ['- **spec-00001-AC-1.1** Given a board']))
 
-    expect(view.unattributed).toEqual([{ declaredId: 'spec-00001-AC-1.1', attributedTo: undefined }])
+    expect(view.items[0]!.criteria).toEqual([])
+
+    expect(view.diagnostics).toEqual([
+      {
+        kind: 'unattributable',
+        declaredId: 'spec-00001-AC-1.1',
+        attributedTo: undefined,
+        line: 7,
+        text: '- **spec-00001-AC-1.1** Given a board',
+      },
+    ])
+  })
+})
+
+/**
+ * spec-00001-FR-40: what the item grammar of the folder READMEs rejects. The
+ * heuristics are deliberately narrow — a line has to open with a bold id of
+ * this document's own to be suspected at all — because a false positive costs
+ * more than the drift it would catch (decision-00005 §4).
+ */
+describe('parse diagnostics', () => {
+  const ONE_CRITERION = specBody([item('spec-00001-FR-1')], [criterion('spec-00001-AC-1.1', 'spec-00001-FR-1')])
+
+  function ruleView(body: string) {
+    return requirementView({ id: 'rule-00001-docs-workflow', body }, [])
+  }
+
+  // spec-00001-AC-40.1 — the range row that cost record-00001 eight false reports
+  it('reports a checklist row written as a range, and keeps it out of coverage', () => {
+    const view = requirementView(
+      { id: 'rule-00001-docs-workflow', body: '- **rule-00001-BR-2** (Definition) a rule\n' },
+      [checklist('record-00001-x', [['rule-00001-AC-2.1 … AC-9.2', 'nine tests', 'pass']])],
+    )
+
+    expect(view.diagnostics).toEqual([
+      {
+        kind: 'checklist-row',
+        recordId: 'record-00001-x',
+        line: 5,
+        text: '| rule-00001-AC-2.1 … AC-9.2 | nine tests | pass |',
+      },
+    ])
+    expect(view.items[0]!.rows).toEqual([])
+    expect(view.items[0]!.coverage).toBe('uncovered')
+  })
+
+  // spec-00001-AC-40.7
+  it('reports a checklist row holding two ids in one cell, and keeps it out of coverage', () => {
+    const view = viewOf(ONE_CRITERION, [
+      checklist('record-00001-x', [['spec-00001-AC-1.1, spec-00001-AC-1.2', 'one test', 'pass']]),
+    ])
+
+    expect(view.diagnostics.map((found) => found.kind)).toEqual(['checklist-row'])
+    expect(view.items[0]!.criteria[0]!.rows).toEqual([])
+    expect(view.items[0]!.coverage).toBe('uncovered')
+  })
+
+  // spec-00001-AC-40.6 — the same rows, written out one per line
+  it('drops the diagnostic and takes the rows once the range is expanded', () => {
+    const view = viewOf(ONE_CRITERION, [
+      checklist('record-00001-x', [['spec-00001-AC-1.1', 'the one test', 'pass']]),
+    ])
+
+    expect(view.diagnostics).toEqual([])
+    expect(view.items[0]!.coverage).toBe('verified')
+  })
+
+  // The verified document is what the row was reaching for, so that is where it is reported.
+  it('reports a malformed row against the document its ids belong to, not the others', () => {
+    const records = [checklist('record-00001-x', [['rule-00001-AC-2.1 … AC-9.2', 'nine tests', 'pass']])]
+
+    expect(viewOf(ONE_CRITERION, records).diagnostics).toEqual([])
+    expect(ruleView('- **rule-00001-BR-2** (Definition) a rule\n').diagnostics).toHaveLength(0)
+  })
+
+  // A first cell of document ids is a different table; the amendment tables rely on it
+  it('says nothing about a checklist row whose first cell names no item id', () => {
+    const view = viewOf(ONE_CRITERION, [checklist('record-00001-x', [['issue-00002', 'a fix', 'fixed']])])
+
+    expect(view.diagnostics).toEqual([])
+  })
+
+  // spec-00001-AC-40.2
+  it('reports a line opening with a bold item id that is neither declaration shape', () => {
+    const view = viewOf(
+      ['## 4. System Requirements', '', item('spec-00001-FR-1'), '', '**spec-00001-FR-2** (Event) 掉了列表符号。'].join(
+        '\n',
+      ),
+    )
+
+    expect(view.diagnostics).toEqual([
+      {
+        kind: 'item-shape',
+        declaredId: 'spec-00001-FR-2',
+        line: 5,
+        text: '**spec-00001-FR-2** (Event) 掉了列表符号。',
+      },
+    ])
+    expect(view.items.map((found) => found.id)).toEqual(['spec-00001-FR-1'])
+  })
+
+  // spec-00001-AC-40.8 — a table row that never became a table
+  it('reports a bold rule id left in a single table cell', () => {
+    const view = ruleView(['| **rule-00001-BR-2** |', '', '- **rule-00001-BR-3** (Definition) a whole rule'].join('\n'))
+
+    expect(view.diagnostics).toEqual([
+      { kind: 'item-shape', declaredId: 'rule-00001-BR-2', line: 1, text: '| **rule-00001-BR-2** |' },
+    ])
+    expect(view.items.map((found) => found.id)).toEqual(['rule-00001-BR-3'])
+  })
+
+  // 「整行起头」 is the grammar's word and the heuristic's limit: an indented
+  // line starts nothing, so a nested item declares nothing and is not suspected
+  // either — the narrow reading, which keeps prose out of the diagnostics.
+  it('neither declares nor reports a bold id nested under another list item', () => {
+    const view = viewOf(['- some heading of a list', '  - **spec-00001-FR-1** (Event) 缩进了一级。'].join('\n'))
+
+    expect(view.items).toEqual([])
+    expect(view.diagnostics).toEqual([])
+  })
+
+  // Markdown lets a block hang three spaces in; 「整行起头」 does not
+  it('takes an indented list or table as neither a declaration nor a diagnostic', () => {
+    const indentedList = viewOf(['   - **spec-00001-FR-1** (Event) 缩进了三格。', ''].join('\n'))
+    const indentedTable = ruleView(
+      ['   | # | 目标 |', '   | --- | --- |', '   | **rule-00001-BR-2** | `active` |', ''].join('\n'),
+    )
+
+    expect(indentedList).toEqual({ items: [], diagnostics: [] })
+    expect(indentedTable).toEqual({ items: [], diagnostics: [] })
+  })
+
+  it('takes a list item that opens with something other than a paragraph as no declaration', () => {
+    const view = viewOf('- - **spec-00001-FR-1** (Event) 嵌在另一个列表项里。\n')
+
+    expect(view).toEqual({ items: [], diagnostics: [] })
+  })
+
+  it('says nothing about either declaration shape when it is well formed', () => {
+    expect(viewOf(specBody([item('spec-00001-FR-1')])).diagnostics).toEqual([])
+    expect(
+      ruleView(
+        [
+          '| # | 种类 | 目标 |',
+          '| --- | --- | --- |',
+          '| **rule-00001-BR-2** | living doc | `active` |',
+        ].join('\n'),
+      ).diagnostics,
+    ).toEqual([])
+  })
+
+  // The grammar says a whole-line quotation of another document declares nothing
+  it('says nothing about a well-formed line declaring another document`s id', () => {
+    const view = viewOf(specBody([item('spec-00001-FR-1'), item('rule-00001-BR-1')]))
+
+    expect(view.diagnostics).toEqual([])
+  })
+
+  it('says nothing about an id quoted in prose or inside a fenced block', () => {
+    const view = viewOf(
+      [
+        item('spec-00001-FR-1'),
+        '',
+        'The `spec-00001-FR-2` id is quoted here, and **bold prose** is just bold prose.',
+        '',
+        '```markdown',
+        '- **spec-00001-FR-3** (Event) an example of the shape',
+        '**spec-00001-FR-4** (Event) and an example of what it must not be',
+        '```',
+      ].join('\n'),
+    )
+
+    expect(view.diagnostics).toEqual([])
   })
 })

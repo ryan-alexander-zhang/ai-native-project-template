@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import matter from 'gray-matter'
 import type { FlowConfig } from './config.ts'
-import { declaredIds, declaresItems } from './requirements.ts'
+import { type GraphDiagnostic, declaredIds, declaresItems, requirementViewFrom, scanRecords } from './requirements.ts'
 import { isKnownStatus } from './statusRules.ts'
 
 const EXCLUDED_FILES = new Set(['README.md', 'TEMPLATE.md'])
@@ -42,6 +42,8 @@ export interface DocGraph {
   nodes: DocNode[]
   edges: DocEdge[]
   issues: GraphIssue[]
+  /** What drifted from the item grammar (spec-00001-FR-40); never an issue — a node stays sound. */
+  diagnostics: GraphDiagnostic[]
 }
 
 interface ParsedDoc {
@@ -172,6 +174,24 @@ function itemOwners(docs: ParsedDoc[], nodes: DocNode[]): Map<string, string> {
   return owners
 }
 
+/**
+ * The parse diagnostics of the whole tree (spec-00001-FR-40): every record is
+ * scanned once, then each spec and rule is read against that scan — the same
+ * derivation `/items` serves for one document, so the count in the top bar and
+ * the rows in the panel can never disagree.
+ */
+function graphDiagnostics(docs: ParsedDoc[], nodes: DocNode[]): GraphDiagnostic[] {
+  const body = (index: number) => docs[index]!.body
+  const scan = scanRecords(
+    nodes.flatMap((node, index) => (node.type === 'record' ? [{ id: node.id, body: body(index) }] : [])),
+  )
+  return nodes.flatMap((node, index) => {
+    if (!node.ok || !declaresItems(node.type)) return []
+    const view = requirementViewFrom({ id: node.id, body: body(index) }, scan)
+    return view.diagnostics.map((diagnostic) => ({ docId: node.id, ...diagnostic }))
+  })
+}
+
 function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
   const nodes = docs.map((doc) => toNode(doc, config))
   const knownIds = new Set(nodes.filter((node) => node.ok).map((node) => node.id))
@@ -187,7 +207,7 @@ function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
         message: `${edge.relation} points at unknown document ${JSON.stringify(edge.to)}`,
       })),
   ]
-  return { nodes, edges, issues }
+  return { nodes, edges, issues, diagnostics: graphDiagnostics(docs, nodes) }
 }
 
 /** Scan `docsDir` and build the node graph. An unreadable or empty directory yields an empty graph. */

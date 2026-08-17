@@ -68,6 +68,11 @@ flowchart LR
   先按文档 id，再按需求条目/AC id 落到其**所属文档**（边保留所声明的原始 id），
   二者皆不中才是异常。（BR-18 保证「类型+编号」唯一，文档 id 与条目 id 语法上
   也不同形，两段不会同时命中——次序只是防御性规定。）
+  **第六轮起（decision-00005）**：正文解析由行级正则升级为 **remark AST** 遍历，
+  行为契约不变（既有测试为回归护栏），AST 的位置信息供诊断定位到行；解析同时
+  按各文件夹 README 的「机器可读形态」小节校验，产出**解析诊断**（疑似条目而
+  不合形态、验收清单的不合式行、无法归属——spec FR-40 的载体），随图与
+  `/items` 下发。
 - **Workflow Engine**：唯一的裁决点。状态流转候选、接收/澄清裁决、下一步
   候选、新文档 id 中「类型 + 编号」的分配（BR-18；slug 由 agent 自取）全部在
   服务端计算，前端从不自行判断（spec FR-6…FR-10 的载体）。流转表
@@ -165,7 +170,10 @@ sequenceDiagram
 - 任务指令模板（作为会话的初始输入经 PTY 写给 CLI——各 CLI 都支持交互式
   stdin，免去命令行转义差异）：目标类型、指定的 `<type>-<编号>-<slug>` id
   格式（编号已定，slug 自取）、按 flow `carry` 应携带的关系与来源 id、对应
-  文件夹 `TEMPLATE.md` 与 `README.md` 的路径、「status 保持 draft」约束。
+  文件夹 `TEMPLATE.md` 与 `README.md` 的路径、「status 保持 draft」约束；
+  目标类型有条目文法时（spec/rule/record）另附该类型的「机器可读形态」要求
+  （spec FR-41，decision-00005）。会话结束的产出校验相应扩展到正文文法，
+  诊断按 FR-40 呈现、不阻塞 commit。
 - **会话结束处理**：按会话记录的期望 `{targetType, 编号, carry, sourceId}`
   定向校验产出文档（id 前缀匹配、carry 关系指向来源）——这就是 FR-17 的
   "会话感知校验"，不合规进 `issues` 标异常。找不到前缀匹配文件时视为无产出，
@@ -209,7 +217,7 @@ stateDiagram-v2
 ## 7. API 契约
 
 ```
-GET  /api/graph                       → {nodes, edges, issues}
+GET  /api/graph                       → {nodes, edges, issues, diagnostics}   # diagnostics: 解析诊断（FR-40），行含 {docId, kind, line?, text}
 GET  /api/docs/:id                    → {content, hash}            # 整文件原文，front matter 可改
 PUT  /api/docs/:id                    {content, baseHash}          → 200 {committed, error?} | 409 冲突
 GET  /api/docs/:id/transitions        → [status]                   # 合法目标状态（FR-6）
@@ -220,14 +228,15 @@ GET  /api/sessions                    → {current: {id, status} | null}   # 重
 POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话
 WS   /api/sessions/:id/term           双向：stdin/stdout 帧 + exit 事件
 GET  /api/config                      → 生效的流程配置（只读）
-GET  /api/docs/:id/items              → {items, unattributed}       # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；子画布同源复用（FR-35），无第二个端点
+GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
 ```
 
 `/items` 的载荷字段是 T1 与后续任务并行时的共同事实：验收行对象至少含
 `{recordId, targetId, test, result, evidence?}`（FR-34 按它找引用条目 AC 的
 record，FR-35 的验收行节点由它构造，FR-37 的详情面板读 `evidence`——清单表
-无 Evidence 列时缺省）；`unattributed` 行含 `{recordId, declaredId}`
-（FR-33 的「无法归属」区）。
+无 Evidence 列时缺省）；`diagnostics` 行含 `{kind, recordId?, declaredId?,
+line?, text?}`——无法归属（原 `unattributed`，FR-33）与文法诊断（FR-40）
+共用此形。
 
 `GET /api/graph` 的 edge 随 FR-2 修订增加 `declaredTargets`——front matter 所
 声明的原始 id **列表**；细粒度引用时它们与 `target`（所属文档）不同。同一字段

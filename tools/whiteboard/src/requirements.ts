@@ -1,22 +1,33 @@
 /**
  * Requirement items, their acceptance criteria, and the record rows that verify
  * them — spec-00001-FR-31 … FR-33, whose coverage verdict is derived here and
- * never in the browser (design-00001 §2).
+ * never in the browser (design-00001 §2) — together with the parse diagnostics
+ * of spec-00001-FR-40.
  *
- * The parsing is deliberately literal: the id syntax and the two declaration
- * shapes are what the folder READMEs already define, so a body that drifts from
- * them stops parsing instead of guessing (decision-00004 §4).
+ * The grammar is the one the folder READMEs publish ("机器可读形态"): two
+ * declaration shapes, an attribution on every criterion, one id per checklist
+ * row. The reader is a remark AST rather than a line scanner (decision-00005
+ * §2 第 4 条), so what drifts from the grammar is reported with its line
+ * instead of being silently skipped.
  */
+
+import type { ListItem, Nodes, Root, TableCell, TableRow } from 'mdast'
+import remarkGfm from 'remark-gfm'
+import remarkParse from 'remark-parse'
+import { unified } from 'unified'
 
 /** `spec-00001-FR-3`, `rule-00001-BR-2`, `spec-00001-AC-1.10`. */
 const DECLARED_ID = /^([a-z]+-\d{5})-(FR|BR|AC)-(\d+)(?:\.(\d+))?$/
 const DOC_PREFIX = /^([a-z]+-\d{5})-/
-/** A list item: `- **spec-00001-FR-1** (Event) …`. */
-const LIST_DECLARATION = /^-[ \t]+\*\*([^*]+)\*\*[ \t]*(.*)$/
-/** A decision-table row: `| **rule-00001-BR-2** | living doc | … |`. */
-const ROW_DECLARATION = /^\|[ \t]*\*\*([^*]+)\*\*[ \t]*\|(.*)$/
-/** An indented line continues the declaration above it. */
-const CONTINUATION = /^[ \t]+\S/
+/** The same id, hunted inside a cell that holds more than one — or part of one. */
+const ITEM_ID = /[a-z]+-\d{5}-(?:FR|BR|AC)-\d+(?:\.\d+)?/g
+/**
+ * A line opening with a bold id, allowing for the list marker or the leading
+ * pipe a declaration would carry. Bold is the declaration form and prose quotes
+ * ids in backticks (decision-00005 §4), so such a line that is not one of the
+ * two shapes is a declaration that lost its shape.
+ */
+const SUSPECT_LINE = /^(?:[-*+][ \t]+|\d+[.)][ \t]+|\|[ \t]*)?\*\*([^*]+)\*\*/
 /** The `(spec-00001-FR-1)` an acceptance criterion carries to say what it verifies. */
 const ATTRIBUTION = /^\(([^)]+)\)[ \t]*/
 const TEST_COLUMN = /test|测试/i
@@ -26,6 +37,8 @@ const PASS = 'pass'
 
 /** Only spec and rule declare requirement items; other types are out of scope (spec-00001 §6). */
 const ITEM_TYPES = new Set(['spec', 'rule'])
+
+const markdown = unified().use(remarkParse).use(remarkGfm)
 
 export type Coverage = 'verified' | 'failing' | 'uncovered'
 
@@ -54,18 +67,37 @@ export interface RequirementItem {
   coverage: Coverage
 }
 
-/** A row or criterion with nowhere to belong (spec-00001-FR-33). */
-export interface UnattributedEntry {
-  declaredId: string
-  /** The record the row came from; absent when the entry is a criterion of the document itself. */
+/**
+ * The three kinds of spec-00001-FR-40:
+ * - `item-shape` — a line opening with a bold item id in neither declaration shape;
+ * - `checklist-row` — a checklist row whose first cell is not exactly one id
+ *   (a range, or several ids in one cell);
+ * - `unattributable` — a row or a criterion with nowhere to belong (FR-33).
+ */
+export type DiagnosticKind = 'item-shape' | 'checklist-row' | 'unattributable'
+
+export interface Diagnostic {
+  kind: DiagnosticKind
+  /** The record the offending row came from; absent when the line is the document's own. */
   recordId?: string
+  /** The id the line or row named. */
+  declaredId?: string
   /** The item a criterion claimed to verify, when no such item exists. */
   attributedTo?: string
+  /** 1-based line of the offending line, counted in the body — front matter excluded. */
+  line?: number
+  /** The source line itself, for the panel to show (design-00002 §9). */
+  text?: string
+}
+
+/** A diagnostic as the graph carries it: the same row, told which document it belongs to. */
+export interface GraphDiagnostic extends Diagnostic {
+  docId: string
 }
 
 export interface ItemsView {
   items: RequirementItem[]
-  unattributed: UnattributedEntry[]
+  diagnostics: Diagnostic[]
 }
 
 export interface DocBody {
@@ -73,13 +105,39 @@ export interface DocBody {
   body: string
 }
 
+/** Every record read once: the rows it offers and the rows that lost their shape. */
+export interface RecordScan {
+  rows: ScannedRow[]
+  malformed: MalformedRow[]
+}
+
+interface ScannedRow {
+  row: AcceptanceRow
+  line: number
+  text: string
+}
+
+interface MalformedRow {
+  recordId: string
+  /** The document the row was trying to verify, taken from the first id it names. */
+  prefix: string
+  line: number
+  text: string
+}
+
 type ItemDraft = Omit<RequirementItem, 'coverage'>
 
 interface Declaration {
   id: string
   text: string
+  line: number
   /** `[prefix, kind, number, sub]` when the id is a requirement id. */
   parts: RegExpExecArray | null
+}
+
+interface BodyParse {
+  root: Root
+  declarations: Declaration[]
 }
 
 export function declaresItems(type: string | undefined): boolean {
@@ -95,18 +153,37 @@ export function declaredIds(doc: DocBody): string[] {
   return ownDeclarations(doc).map((declaration) => declaration.id)
 }
 
-/** The items of one spec or rule, with their criteria, verifying rows, and coverage. */
+/** Read every record once, so a graph-wide pass does not re-parse them per document. */
+export function scanRecords(records: DocBody[]): RecordScan {
+  const scan: RecordScan = { rows: [], malformed: [] }
+  for (const record of records) scanRecord(record, scan)
+  return scan
+}
+
+/** The items of one spec or rule, with their criteria, verifying rows, coverage, and diagnostics. */
 export function requirementView(doc: DocBody, records: DocBody[]): ItemsView {
+  return requirementViewFrom(doc, scanRecords(records))
+}
+
+/** The same view, over records that were already scanned. */
+export function requirementViewFrom(doc: DocBody, scan: RecordScan): ItemsView {
   const prefix = DOC_PREFIX.exec(doc.id)?.[1]
-  if (prefix === undefined) return { items: [], unattributed: [] }
+  if (prefix === undefined) return { items: [], diagnostics: [] }
 
-  const declarations = ownDeclarations(doc)
+  const parsed = parseBody(doc.body)
+  const declarations = parsed.declarations.filter((declaration) => declaration.parts?.[1] === prefix)
   const items = declarations.filter(isItem).sort(byNumber).map(toDraft)
-  const unattributed: UnattributedEntry[] = []
-  attachCriteria(items, declarations.filter(isCriterion).sort(byNumber), unattributed)
-  attachRows(items, verifyingRows(records, prefix), unattributed)
+  const lines = doc.body.split('\n')
+  const diagnostics: Diagnostic[] = [
+    ...shapeDiagnostics(parsed, lines, prefix),
+    ...scan.malformed
+      .filter((row) => row.prefix === prefix)
+      .map(({ recordId, line, text }) => ({ kind: 'checklist-row' as const, recordId, line, text })),
+  ]
+  attachCriteria(items, declarations.filter(isCriterion).sort(byNumber), lines, diagnostics)
+  attachRows(items, ownRows(scan.rows, prefix), diagnostics)
 
-  return { items: items.map((item) => ({ ...item, coverage: coverageOf(item) })), unattributed }
+  return { items: items.map((item) => ({ ...item, coverage: coverageOf(item) })), diagnostics }
 }
 
 /**
@@ -122,33 +199,49 @@ function coverageOf(item: ItemDraft): Coverage {
   return item.criteria.some((criterion) => criterion.rows.length === 0) ? 'uncovered' : 'verified'
 }
 
-function attachCriteria(items: ItemDraft[], criteria: Declaration[], unattributed: UnattributedEntry[]): void {
+function attachCriteria(
+  items: ItemDraft[],
+  criteria: Declaration[],
+  lines: string[],
+  diagnostics: Diagnostic[],
+): void {
   for (const criterion of criteria) {
     const attributedTo = ATTRIBUTION.exec(criterion.text)?.[1]
     const owner = items.find((item) => item.id === attributedTo)
     if (!owner) {
-      unattributed.push({ declaredId: criterion.id, attributedTo })
+      diagnostics.push({
+        kind: 'unattributable',
+        declaredId: criterion.id,
+        attributedTo,
+        line: criterion.line,
+        text: lines[criterion.line - 1]!.trim(),
+      })
       continue
     }
     owner.criteria.push({ id: criterion.id, text: criterion.text.replace(ATTRIBUTION, ''), rows: [] })
   }
 }
 
-function attachRows(items: ItemDraft[], rows: AcceptanceRow[], unattributed: UnattributedEntry[]): void {
+function attachRows(items: ItemDraft[], scanned: ScannedRow[], diagnostics: Diagnostic[]): void {
   const criteria = items.flatMap((item) => item.criteria)
-  for (const row of rows) {
+  for (const { row, line, text } of scanned) {
     const target =
       items.find((item) => item.id === row.targetId) ?? criteria.find((criterion) => criterion.id === row.targetId)
     if (target) target.rows.push(row)
-    else unattributed.push({ recordId: row.recordId, declaredId: row.targetId })
+    else
+      diagnostics.push({
+        kind: 'unattributable',
+        recordId: row.recordId,
+        declaredId: row.targetId,
+        line,
+        text,
+      })
   }
 }
 
-/** The acceptance rows, across every record, that name something belonging to `prefix`. */
-function verifyingRows(records: DocBody[], prefix: string): AcceptanceRow[] {
-  return records
-    .flatMap((record) => acceptanceRows(record))
-    .filter((row) => DECLARED_ID.exec(row.targetId)?.[1] === prefix)
+/** The scanned rows, across every record, that name something belonging to `prefix`. */
+function ownRows(rows: ScannedRow[], prefix: string): ScannedRow[] {
+  return rows.filter((scanned) => DECLARED_ID.exec(scanned.row.targetId)?.[1] === prefix)
 }
 
 /**
@@ -158,36 +251,51 @@ function verifyingRows(records: DocBody[], prefix: string): AcceptanceRow[] {
  * neither adds nor removes anything (spec-00001-FR-32).
  */
 export function acceptanceRows(record: DocBody): AcceptanceRow[] {
-  const lines = record.body.split('\n')
-  const rows: AcceptanceRow[] = []
-  let columns: VerificationColumns | undefined
+  const scan: RecordScan = { rows: [], malformed: [] }
+  scanRecord(record, scan)
+  return scan.rows.map((scanned) => scanned.row)
+}
 
-  lines.forEach((line, index) => {
-    if (!line.trimStart().startsWith('|')) {
-      columns = undefined
-      return
-    }
-    if (isDivider(line)) return
-    const cells = tableCells(line)
-    if (isDivider(lines[index + 1] ?? '')) {
-      columns = verificationColumns(cells)
-      return
-    }
-    // A split always yields a first cell, and only the first cell says what the row verifies.
-    const targetId = cells[0]!
-    if (!columns || !DECLARED_ID.test(targetId)) return
-    const evidence = columns.evidence === undefined ? '' : (cells[columns.evidence] ?? '')
-    rows.push({
-      recordId: record.id,
-      targetId,
-      test: cells[columns.test] ?? '',
-      result: cells[columns.result] ?? '',
-      // Left out rather than left empty: a checklist with no Evidence column has
-      // no such field to show (design-00001 §7, spec-00001-AC-37.8).
-      ...(evidence === '' ? {} : { evidence }),
-    })
+function scanRecord(record: DocBody, scan: RecordScan): void {
+  walk(markdown.parse(record.body), (node) => {
+    if (node.type !== 'table') return
+    // A GFM table exists only where a delimiter row followed a header row.
+    const header = node.children[0]!
+    const columns = verificationColumns(header.children.map((cell) => cellText(record.body, cell)))
+    if (columns === undefined) return
+    for (const row of node.children.slice(1)) readChecklistRow(record, row, columns, scan)
   })
-  return rows
+}
+
+function readChecklistRow(record: DocBody, row: TableRow, columns: VerificationColumns, scan: RecordScan): void {
+  const cells = row.children.map((cell) => cellText(record.body, cell))
+  // A table row always has a first cell, and only the first cell says what the row verifies.
+  const targetId = cells[0]!
+  const line = row.position!.start.line
+  const text = slice(record.body, row).trim()
+  if (DECLARED_ID.test(targetId)) {
+    scan.rows.push({ row: toRow(record.id, targetId, cells, columns), line, text })
+    return
+  }
+  // Not one id, but id-shaped all the same: a range or a cell holding several
+  // (`docs/record/README.md` forbids both). A first cell of document ids is a
+  // different table and stays silent.
+  const prefix = DOC_PREFIX.exec(targetId.match(ITEM_ID)?.[0] ?? '')?.[1]
+  if (prefix === undefined) return
+  scan.malformed.push({ recordId: record.id, prefix, line, text })
+}
+
+function toRow(recordId: string, targetId: string, cells: string[], columns: VerificationColumns): AcceptanceRow {
+  const evidence = columns.evidence === undefined ? '' : (cells[columns.evidence] ?? '')
+  return {
+    recordId,
+    targetId,
+    test: cells[columns.test] ?? '',
+    result: cells[columns.result] ?? '',
+    // Left out rather than left empty: a checklist with no Evidence column has
+    // no such field to show (design-00001 §7, spec-00001-AC-37.8).
+    ...(evidence === '' ? {} : { evidence }),
+  }
 }
 
 interface VerificationColumns {
@@ -205,47 +313,123 @@ function verificationColumns(header: string[]): VerificationColumns | undefined 
   return test > 0 && result > 0 ? { test, result, ...(evidence > 0 ? { evidence } : {}) } : undefined
 }
 
-function isDivider(line: string): boolean {
-  return /^\|[\s:|-]+\|$/.test(line.trim()) && line.includes('-')
+/**
+ * Lines that open with a bold id of this document and are neither declaration
+ * shape (spec-00001-AC-40.2, AC-40.8). Code and raw HTML are quoted, not
+ * declared, so they are left alone.
+ */
+function shapeDiagnostics(parsed: BodyParse, lines: string[], prefix: string): Diagnostic[] {
+  const declared = new Set(parsed.declarations.map((declaration) => declaration.line))
+  const quoted = literalLines(parsed.root)
+  const found: Diagnostic[] = []
+  lines.forEach((text, index) => {
+    const line = index + 1
+    if (declared.has(line) || quoted.has(line)) return
+    const id = SUSPECT_LINE.exec(text)?.[1]?.trim()
+    if (id === undefined || DECLARED_ID.exec(id)?.[1] !== prefix) return
+    found.push({ kind: 'item-shape', declaredId: id, line, text: text.trim() })
+  })
+  return found
 }
 
-/** The cells of a GFM table row, stripped of the outer pipes and of markdown decoration. */
-function tableCells(line: string): string[] {
-  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(clean)
-}
-
-function clean(text: string): string {
-  return text.replace(/[*`]/g, '').trim()
+function literalLines(root: Root): Set<number> {
+  const lines = new Set<number>()
+  walk(root, (node) => {
+    if (node.type !== 'code' && node.type !== 'html') return
+    for (let line = node.position!.start.line; line <= node.position!.end.line; line++) lines.add(line)
+  })
+  return lines
 }
 
 /** Declarations whose id belongs to this document — anything else is somebody's quotation. */
 function ownDeclarations(doc: DocBody): Declaration[] {
   const prefix = DOC_PREFIX.exec(doc.id)?.[1]
   if (prefix === undefined) return []
-  return declarations(doc.body).filter((declaration) => declaration.parts?.[1] === prefix)
+  return parseBody(doc.body).declarations.filter((declaration) => declaration.parts?.[1] === prefix)
 }
 
-/** Both declaration shapes, with an indented run of lines folded into the one above. */
-function declarations(body: string): Declaration[] {
-  const found: { id: string; text: string }[] = []
-  let open: { id: string; text: string } | undefined
+function parseBody(body: string): BodyParse {
+  const root = markdown.parse(body)
+  return { root, declarations: declarationsOf(root, body) }
+}
 
-  for (const line of body.split('\n')) {
-    const list = LIST_DECLARATION.exec(line)
-    const row = ROW_DECLARATION.exec(line)
-    if (list) {
-      open = { id: list[1]!.trim(), text: list[2]! }
-      found.push(open)
-    } else if (row) {
-      open = undefined
-      found.push({ id: row[1]!.trim(), text: tableCells(`|${row[2]!}`).join(' | ') })
-    } else if (open && CONTINUATION.test(line)) {
-      open.text += ` ${line.trim()}`
-    } else {
-      open = undefined
+/**
+ * Both declaration shapes, taken from the AST: an unordered list item opening
+ * with a bold id, or a decision-table row whose first cell is that bold id and
+ * nothing else. Both must start the line — a nested item is somebody's detail,
+ * not a declaration (`docs/spec/README.md`, 「整行起头」).
+ */
+function declarationsOf(root: Root, body: string): Declaration[] {
+  const found: Declaration[] = []
+  for (const node of root.children) {
+    if (node.type === 'list' && !node.ordered) {
+      for (const item of node.children) {
+        const declaration = item.position!.start.column === 1 ? listDeclaration(item, body) : undefined
+        if (declaration) found.push(declaration)
+      }
+    } else if (node.type === 'table') {
+      for (const row of node.children.slice(1)) {
+        const declaration = row.position!.start.column === 1 ? rowDeclaration(row, body) : undefined
+        if (declaration) found.push(declaration)
+      }
     }
   }
-  return found.map(({ id, text }) => ({ id, text: text.replace(/\s+/g, ' ').trim(), parts: DECLARED_ID.exec(id) }))
+  return found
+}
+
+/** `- **spec-00001-FR-1** (Event) …`, its paragraph carrying the continuation lines. */
+function listDeclaration(item: ListItem, body: string): Declaration | undefined {
+  const paragraph = item.children[0]
+  if (paragraph?.type !== 'paragraph') return undefined
+  const strong = paragraph.children[0]
+  if (strong?.type !== 'strong') return undefined
+  return declaration(
+    boldText(body, strong.position!.start.offset!, strong.position!.end.offset!),
+    body.slice(strong.position!.end.offset!, paragraph.position!.end.offset!),
+    paragraph.position!.start.line,
+  )
+}
+
+/** `| **rule-00001-BR-2** | living doc | … |`, the remaining cells as its text. */
+function rowDeclaration(row: TableRow, body: string): Declaration | undefined {
+  const first = row.children[0]
+  const strong = first?.children[0]
+  if (first === undefined || first.children.length !== 1 || strong?.type !== 'strong') return undefined
+  return declaration(
+    boldText(body, strong.position!.start.offset!, strong.position!.end.offset!),
+    row.children
+      .slice(1)
+      .map((cell) => cellText(body, cell))
+      .join(' | '),
+    row.position!.start.line,
+  )
+}
+
+/** What stands between the `**` markers, as written — an id is plain text or it is no id. */
+function boldText(body: string, start: number, end: number): string {
+  return body.slice(start + 2, end - 2).trim()
+}
+
+function declaration(id: string, text: string, line: number): Declaration {
+  return { id, text: text.replace(/\s+/g, ' ').trim(), line, parts: DECLARED_ID.exec(id) }
+}
+
+/** A cell's own text: mdast spans a cell from its opening pipe to the next one, so both go. */
+function cellText(body: string, cell: TableCell): string {
+  return clean(slice(body, cell).replace(/^\|/, '').replace(/\|$/, ''))
+}
+
+function slice(body: string, node: Nodes): string {
+  return body.slice(node.position!.start.offset!, node.position!.end.offset!)
+}
+
+function clean(text: string): string {
+  return text.replace(/[*`]/g, '').trim()
+}
+
+function walk(node: Nodes, visitor: (node: Nodes) => void): void {
+  visitor(node)
+  if ('children' in node) for (const child of node.children) walk(child, visitor)
 }
 
 function isItem(declaration: Declaration): boolean {

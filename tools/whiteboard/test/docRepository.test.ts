@@ -80,11 +80,11 @@ describe('readGraph', () => {
 
   // spec-00001-AC-1.4
   it('yields an empty graph for an empty docs tree', () => {
-    expect(graphOf({})).toEqual({ nodes: [], edges: [], issues: [] })
+    expect(graphOf({})).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [] })
   })
 
   it('yields an empty graph when the docs directory does not exist', () => {
-    expect(readGraph('/nonexistent/docs', config)).toEqual({ nodes: [], edges: [], issues: [] })
+    expect(readGraph('/nonexistent/docs', config)).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [] })
   })
 
   // spec-00001-AC-1.5

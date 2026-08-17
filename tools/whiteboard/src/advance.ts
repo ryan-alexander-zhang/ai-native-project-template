@@ -9,9 +9,48 @@ export interface Expectation {
   sourceId: string
 }
 
+/**
+ * The item grammar, restated for the agent that is about to write one of these
+ * documents (spec-00001-FR-41). It is the「机器可读形态」section of the folder's
+ * own README, said in the instruction rather than only linked, because the
+ * board parses the body against it and reports what drifts (FR-40). A type
+ * with no item grammar has no entry, and the instruction says nothing.
+ */
+const ITEM_GRAMMAR: Record<string, string[]> = {
+  spec: [
+    'Requirement items take one of two shapes, each starting its own line:',
+    '  a list item `- **spec-<n>-FR-<i>** (<EARS type>) <text>`, its continuation lines indented; or',
+    '  a decision-table row `| **spec-<n>-FR-<i>** | <cell> | … |`.',
+    'Every acceptance criterion is a list item `- **spec-<n>-AC-<i>.<k>** (spec-<n>-FR-<i>)`,',
+    '  with Given / When / Then on indented continuation lines. The attribution in',
+    '  parentheses is required: a criterion without it belongs nowhere.',
+    'Bold is the declaration form. Quote any id in prose — and every id belonging to',
+    '  another document — in backticks, never in bold.',
+  ],
+  rule: [
+    'Rules take one of two shapes, each starting its own line:',
+    '  a list item `- **rule-<n>-BR-<i>** (<Kind>) <text>`, its continuation lines indented; or',
+    '  a decision-table row `| **rule-<n>-BR-<i>** | <cell> | … |`.',
+    'Every acceptance criterion is a list item `- **rule-<n>-AC-<i>.<k>** (rule-<n>-BR-<i>)`,',
+    '  with Given / When / Then on indented continuation lines. The attribution in',
+    '  parentheses is required: a criterion without it belongs nowhere.',
+    'Bold is the declaration form. Quote any id in prose — and every id belonging to',
+    '  another document — in backticks, never in bold.',
+  ],
+  record: [
+    'The acceptance checklist is a table whose header names a test column and a result',
+    '  column (Test/测试, Result/结果), neither of them the first column; an Evidence/证据',
+    '  column is optional.',
+    'The first cell of a checklist row is exactly one requirement or AC id. No ranges',
+    '  (`AC-2.1 … AC-9.2`) and no two ids in one cell — one row, one id, so every row',
+    '  can be checked on its own.',
+  ],
+}
+
 /** The initial input handed to the agent CLI; its working directory is the docs tree. */
 export function taskInstruction(expectation: Expectation): string {
   const { targetType, idPrefix, carry, sourceId } = expectation
+  const grammar = ITEM_GRAMMAR[targetType]
   return [
     `Write one new ${targetType} document under ${targetType}/ in your working directory (the docs tree).`,
     `Give it the id ${idPrefix}<slug>: keep the number, choose the slug.`,
@@ -19,6 +58,9 @@ export function taskInstruction(expectation: Expectation): string {
     `Follow ${targetType}/TEMPLATE.md for front matter and ${targetType}/README.md for what belongs in it.`,
     'Leave status: draft — a human promotes it from the board.',
     'Change nothing outside the docs tree.',
+    ...(grammar === undefined
+      ? []
+      : [`Its body must follow the item grammar of ${targetType}/README.md (「机器可读形态」):`, ...grammar]),
   ].join('\n')
 }
 

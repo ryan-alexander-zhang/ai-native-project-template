@@ -1,10 +1,24 @@
 import { Maximize2, PanelRight } from 'lucide-react'
 import { useState } from 'react'
-import type { ItemsView, RequirementItem } from '../../src/requirements.ts'
+import type { DiagnosticKind, ItemsView, RequirementItem } from '../../src/requirements.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { COVERAGE } from './coverageMarks.ts'
 import { InlineMarkdown } from './InlineMarkdown.tsx'
+
+/** What each diagnostic is, in the panel's own words (spec-00001-FR-40). */
+const DIAGNOSTIC_LABEL: Record<DiagnosticKind, string> = {
+  'item-shape': 'shape',
+  'checklist-row': 'checklist row',
+  unattributable: 'unattributable',
+}
+
+/** The source line is evidence, not reading matter: enough of it to recognise the line. */
+const LINE_LIMIT = 80
+
+function truncate(text: string): string {
+  return text.length > LINE_LIMIT ? `${text.slice(0, LINE_LIMIT)}…` : text
+}
 
 export interface InspectorProps {
   docId: string
@@ -100,23 +114,31 @@ export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) 
 
         {/*
           Data that broke rather than data that is uncovered, so it sits after
-          the list and takes --destructive, not a coverage token
-          (spec-00001-FR-33).
+          the list and takes --destructive, not a coverage token. The region
+          took in the grammar diagnostics in the sixth round, which is all the
+          rename says (spec-00001-FR-33, FR-40; design-00002 §9).
         */}
-        {view.unattributed.length === 0 ? null : (
-          <section aria-label={`Unattributable entries of ${docId}`} className="border-t p-3">
-            <h3 className="text-destructive text-xs font-medium">unattributable</h3>
+        {view.diagnostics.length === 0 ? null : (
+          <section aria-label={`Parse diagnostics of ${docId}`} className="border-t p-3">
+            <h3 className="text-destructive text-xs font-medium">parse diagnostics</h3>
             <ul className="mt-1 space-y-1">
-              {view.unattributed.map((entry) => (
+              {view.diagnostics.map((entry, index) => (
                 <li
-                  key={`${entry.recordId ?? docId}-${entry.declaredId}`}
+                  // Two rows can name the same id from the same record, so the
+                  // position in the list is the only thing that tells them apart.
+                  key={`${entry.kind}-${entry.recordId ?? docId}-${entry.declaredId ?? index}-${index}`}
                   className="text-destructive flex items-baseline gap-2 font-mono text-[11px]"
                 >
-                  <span className="truncate">{entry.recordId ?? docId}</span>
+                  <span className="shrink-0 truncate">{entry.recordId ?? docId}</span>
                   <span aria-hidden>·</span>
-                  <span className="truncate">{entry.declaredId}</span>
+                  <span className="shrink-0">{DIAGNOSTIC_LABEL[entry.kind]}</span>
+                  <span aria-hidden>·</span>
+                  {entry.declaredId === undefined ? null : <span className="truncate">{entry.declaredId}</span>}
                   {entry.attributedTo === undefined ? null : (
                     <span className="truncate">→ {entry.attributedTo}</span>
+                  )}
+                  {entry.text === undefined ? null : (
+                    <span className="text-muted-foreground truncate">{truncate(entry.text)}</span>
                   )}
                 </li>
               ))}
