@@ -1,8 +1,9 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ConflictError, DocService } from '../src/docService.ts'
 import { contentHash } from '../src/docRepository.ts'
+import { clarifyStatePath } from '../src/sessionTasks.ts'
 import { WorkflowError } from '../src/workflow.ts'
 import { commitCount, doc, git, lastCommitFiles, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
 
@@ -133,38 +134,37 @@ describe('review', () => {
     expect(onDisk(docsDir, 'prd/a.md')).toContain('status: draft')
   })
 
-  // spec-00001-AC-9.1
-  it('writes clarify questions and keeps the document draft', async () => {
-    const { docsDir, repoRoot, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
-
-    const result = await service.review('prd-00001-x', { action: 'clarify', questions: ['who owns pricing?'] })
-
-    expect(result.status).toBe('draft')
-    expect(onDisk(docsDir, 'prd/a.md')).toContain('- who owns pricing?')
-    expect(onDisk(docsDir, 'prd/a.md')).toContain('status: draft')
-    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): prd-00001-x')
-  })
-
-  // spec-00001-AC-9.3
-  it('writes every question given', async () => {
+  /**
+   * Clarify is a session now, so the write path knows one review action only
+   * (spec-00001-FR-9 as amended by decision-00006). An action it does not know
+   * is refused rather than read as an accept.
+   */
+  it('rejects a review action it does not know', async () => {
     const { docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
 
-    await service.review('prd-00001-x', { action: 'clarify', questions: ['one', 'two', 'three'] })
-
-    expect(onDisk(docsDir, 'prd/a.md')).toContain('- one\n- two\n- three')
-  })
-
-  // spec-00001-AC-9.4
-  it('rejects clarify on a document that is not draft', async () => {
-    const { service } = serviceOn({ 'prd/a.md': doc({ id: 'prd-00001-x', type: 'prd', status: 'active' }) })
-    await expect(service.review('prd-00001-x', { action: 'clarify', questions: ['q'] })).rejects.toThrowError(
-      /applies to a draft/,
+    await expect(service.review('prd-00001-x', { action: 'clarify' } as never)).rejects.toThrowError(
+      /is not a review action/,
     )
+    expect(onDisk(docsDir, 'prd/a.md')).toBe(DRAFT_PRD)
   })
 
-  it('rejects clarify with no questions', async () => {
-    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
-    await expect(service.review('prd-00001-x', { action: 'clarify' })).rejects.toThrowError(/at least one question/)
+  // spec-00001-AC-46.6 — the accept is the end of that round of clarify
+  it('drops the clarify state file the document was left with', async () => {
+    const { repoRoot, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    mkdirSync(join(repoRoot, '.whiteboard/clarify'), { recursive: true })
+    const statePath = join(repoRoot, clarifyStatePath('prd-00001-x'))
+    writeFileSync(statePath, '{"answered":2}')
+
+    await service.review('prd-00001-x', { action: 'accept' })
+
+    expect(existsSync(statePath)).toBe(false)
+  })
+
+  it('accepts a document that has no clarify state file to drop', async () => {
+    const { repoRoot, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+
+    expect((await service.review('prd-00001-x', { action: 'accept' })).status).toBe('active')
+    expect(existsSync(join(repoRoot, clarifyStatePath('prd-00001-x')))).toBe(false)
   })
 
   // spec-00001-AC-19.1
@@ -224,6 +224,22 @@ describe('commitSessionChanges', () => {
     expect(result.committed).toBe(true)
     expect(lastCommitMessage(repoRoot)).toBe('wb(advance): spec-00001-z')
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/new.md'])
+  })
+
+  // spec-00001-AC-14.7 and AC-14.8 at the commit boundary: one commit per session,
+  // named after the kind of session it was.
+  it('names the commit after the session kind', async () => {
+    for (const [kind, message] of [
+      ['clarify', 'wb(clarify): prd-00001-x'],
+      ['ask', 'wb(ask): prd-00001-x'],
+    ] as const) {
+      const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+      const before = service.snapshotDocs()
+      writeFileSync(join(docsDir, 'prd/a.md'), `${DRAFT_PRD}\n## Open Questions\n\n- who owns pricing?\n`)
+
+      expect((await service.commitSessionChanges('prd-00001-x', before, kind)).committed).toBe(true)
+      expect(lastCommitMessage(repoRoot)).toBe(message)
+    }
   })
 
   it('skips the commit when the session changed nothing', async () => {
@@ -286,6 +302,91 @@ describe('commitSessionChanges', () => {
 
     expect(result.committed).toBe(true)
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+})
+
+/**
+ * The two rulings a session start rests on (spec-00001-FR-9 and FR-47): the
+ * document is re-read from disk first, so a stale action fails instead of
+ * starting a session about a document that is gone (FR-19).
+ */
+describe('clarifyPlan', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft', parent: 'prd-00001-x' }, '# Spec\n')
+
+  // spec-00001-AC-9.1, and the focus line of the type per AC-48.1
+  it('plans a clarify session carrying the document, its context, and its type focus line', () => {
+    const { service } = serviceOn({ 'spec/b.md': DRAFT_SPEC, 'prd/a.md': DRAFT_PRD })
+
+    const plan = service.clarifyPlan('spec-00001-b')
+
+    expect(plan.kind).toBe('clarify')
+    expect(plan.sourceId).toBe('spec-00001-b')
+    expect(plan.expectation).toBeUndefined()
+    expect(plan.instruction).toContain('spec/b.md')
+    expect(plan.instruction).toContain('prd/a.md')
+    expect(plan.instruction).toContain(config.focus.spec!)
+    expect(plan.instruction).not.toContain(config.focus.idea!)
+  })
+
+  it('carries the progress an earlier session left, and asks that it not be asked again', () => {
+    const { repoRoot, service } = serviceOn({ 'spec/b.md': DRAFT_SPEC })
+    mkdirSync(join(repoRoot, '.whiteboard/clarify'), { recursive: true })
+    writeFileSync(join(repoRoot, clarifyStatePath('spec-00001-b')), '{"answered":["who owns pricing?"]}')
+
+    expect(service.clarifyPlan('spec-00001-b').instruction).toContain('who owns pricing?')
+  })
+
+  // spec-00001-AC-9.2
+  it('refuses a document that is not draft', () => {
+    const { service } = serviceOn({ 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }) })
+    expect(() => service.clarifyPlan('spec-00001-b')).toThrowError(/applies to a draft/)
+  })
+
+  // spec-00001-AC-9.4
+  it('refuses a draft of a type that is not clarifiable', () => {
+    const { service } = serviceOn({ 'record/r.md': doc({ id: 'record-00001-r', type: 'record', status: 'draft' }) })
+    expect(() => service.clarifyPlan('record-00001-r')).toThrowError(/does not apply to a record/)
+  })
+
+  // spec-00001-AC-19.2 for clarify's half of «the target is gone»
+  it('refuses a document that is no longer on disk, telling the caller to refresh', () => {
+    const { docsDir, service } = serviceOn({ 'spec/b.md': DRAFT_SPEC })
+    rmSync(join(docsDir, 'spec/b.md'))
+
+    expect(() => service.clarifyPlan('spec-00001-b')).toThrowError(ConflictError)
+    expect(() => service.clarifyPlan('spec-00001-b')).toThrowError(/refresh the board/)
+  })
+})
+
+describe('askPlan', () => {
+  // spec-00001-AC-47.1 and AC-47.3
+  it('plans an ask session about a document of any type and status, with its context', () => {
+    const { service } = serviceOn({
+      'record/r.md': doc({ id: 'record-00001-r', type: 'record', status: 'active', verifies: '[prd-00001-x]' }),
+      'prd/a.md': DRAFT_PRD,
+    })
+
+    const plan = service.askPlan('record-00001-r')
+
+    expect(plan.kind).toBe('ask')
+    expect(plan.sourceId).toBe('record-00001-r')
+    expect(plan.expectation).toBeUndefined()
+    expect(plan.instruction).toContain('record/r.md')
+    expect(plan.instruction).toContain('prd/a.md')
+  })
+
+  // spec-00001-AC-47.5
+  it('refuses an anomalous document', () => {
+    const { service } = serviceOn({ 'prd/broken.md': doc({ id: 'nope', type: 'prd', status: 'draft' }) })
+    expect(() => service.askPlan('nope')).toThrowError(/front matter problems/)
+  })
+
+  // spec-00001-AC-19.2
+  it('refuses a document that is no longer on disk, telling the caller to refresh', () => {
+    const { docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    rmSync(join(docsDir, 'prd/a.md'))
+
+    expect(() => service.askPlan('prd-00001-x')).toThrowError(/refresh the board/)
   })
 })
 

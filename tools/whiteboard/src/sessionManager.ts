@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { AgentConfig } from './config.ts'
-import { type Expectation, taskInstruction } from './advance.ts'
+import type { Expectation } from './advance.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
 
 /** Rolling window of session output replayed on reconnect (spec-00001-AC-21.2). */
@@ -8,10 +8,31 @@ const BUFFER_LIMIT = 1024 * 1024
 
 export type SessionStatus = 'running' | 'exited' | 'failed'
 
+/**
+ * The three kinds of agent session, sharing one channel, one terminal and one
+ * slot (spec-00001-FR-18): the board advances the flow, clarify has the agent
+ * question the owner, ask has the owner question the agent. The kind is what
+ * names the session's commit (spec-00001-FR-14).
+ */
+export type SessionKind = 'advance' | 'clarify' | 'ask'
+
+/** One session's whole input: what kind it is, what it is about, what it is told. */
+export interface SessionPlan {
+  kind: SessionKind
+  /** The document the session was started from — the source of an advance, the subject of the other two. */
+  sourceId: string
+  /** The first input written to the CLI; each kind builds its own (advance.ts, sessionTasks.ts). */
+  instruction: string
+  /** An advance alone expects a product to check on exit (spec-00001-FR-17). */
+  expectation?: Expectation
+}
+
 export interface SessionInfo {
   id: string
+  kind: SessionKind
   sourceId: string
-  targetType: string
+  /** The type an advance was asked to produce; the other kinds produce no new document. */
+  targetType?: string
   status: SessionStatus
   exitCode?: number
   error?: string
@@ -35,7 +56,7 @@ export interface PtyProcess {
 
 export type SpawnPty = (command: string, args: string[], cwd: string) => PtyProcess
 
-/** A second advance while one is running is refused (spec-00001-FR-18). */
+/** A second session of any kind while one is running is refused (spec-00001-FR-18). */
 export class SessionBusyError extends Error {
   constructor(message: string) {
     super(message)
@@ -45,7 +66,7 @@ export class SessionBusyError extends Error {
 
 interface Session {
   info: SessionInfo
-  expectation: Expectation
+  plan: SessionPlan
   /** The docs/ dirt this session inherited; the exit hook scopes its commit against it. */
   baseline: DirtySnapshot
   buffer: string
@@ -66,7 +87,7 @@ export interface SessionManagerOptions {
    */
   snapshot?: () => DirtySnapshot
   /** Runs when the process exits: commits and validates what the session produced. */
-  onExit: (expectation: Expectation) => Promise<SessionOutcome>
+  onExit: (plan: SessionPlan) => Promise<SessionOutcome>
 }
 
 /**
@@ -82,16 +103,17 @@ export class SessionManager {
     this.options = options
   }
 
-  /** spec-00001-FR-11; a spawn failure yields a failed session carrying the error (FR-16). */
-  start(expectation: Expectation): SessionInfo {
+  /** spec-00001-FR-11, FR-9 and FR-47; a spawn failure yields a failed session carrying the error (FR-16). */
+  start(plan: SessionPlan): SessionInfo {
     if (this.session?.info.status === 'running') {
       throw new SessionBusyError('an agent session is already running; wait for it to finish')
     }
     const { agent, repoRoot } = this.options
     const info: SessionInfo = {
       id: `s${++this.counter}`,
-      sourceId: expectation.sourceId,
-      targetType: expectation.targetType,
+      kind: plan.kind,
+      sourceId: plan.sourceId,
+      targetType: plan.expectation?.targetType,
       status: 'running',
     }
     // Before the spawn, never after: from here on anything under docs/ that
@@ -99,7 +121,7 @@ export class SessionManager {
     const baseline = this.options.snapshot?.() ?? new Map<string, string>()
     const session: Session = {
       info,
-      expectation,
+      plan,
       baseline,
       buffer: '',
       listeners: new Set(),
@@ -114,7 +136,7 @@ export class SessionManager {
     }
     session.pty.onData((data) => this.publish(session, data))
     session.pty.onExit((event) => this.exit(session, event.exitCode))
-    session.pty.write(`${taskInstruction(expectation)}\n`)
+    session.pty.write(`${plan.instruction}\n`)
     return info
   }
 
@@ -169,7 +191,7 @@ export class SessionManager {
     session.info.status = 'exited'
     session.info.exitCode = exitCode
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)
-    session.finished = this.options.onExit(session.expectation).then((outcome) => {
+    session.finished = this.options.onExit(session.plan).then((outcome) => {
       session.info.outcome = outcome
       this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
     })

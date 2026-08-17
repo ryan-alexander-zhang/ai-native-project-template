@@ -144,6 +144,7 @@ beforeEach(() => {
     types: { spec: 'living', record: 'work' },
     relations: ['verifies'],
     flow: {},
+    focus: {},
     agents: [{ name: 'claude', command: 'claude', args: [] }],
   })
 })

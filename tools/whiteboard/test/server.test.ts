@@ -1,9 +1,10 @@
 import type { Server } from 'node:http'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Board } from '../src/server.ts'
 import { spawnPty } from '../src/pty.ts'
+import { clarifyStatePath } from '../src/sessionTasks.ts'
 import {
   SESSION_WAIT,
   armWatch,
@@ -27,10 +28,10 @@ const servers: Server[] = []
 const watching: Board[] = []
 
 /** Start a board on an ephemeral port and give back a fetch bound to it. */
-function boardOn(files: Record<string, string>, agentArgs = ['-e', '']) {
+function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?: string) {
   const { repoRoot, docsDir } = makeRepo(files)
   const config = testConfig()
-  config.agents[0] = { ...config.agents[0]!, args: agentArgs }
+  config.agents[0] = { ...config.agents[0]!, args: agentArgs, ...(command ? { command } : {}) }
   const board = new Board({ repoRoot, docsDir, config, spawn: spawnPty })
   const server = board.listen(0)
   servers.push(server)
@@ -243,17 +244,19 @@ describe('POST /api/docs/:id/review', () => {
     expect((await call('POST', '/api/docs/idea-00001-x/review', { action: 'accept' })).body.status).toBe('active')
   })
 
-  // spec-00001-AC-9.1
-  it('records clarify questions and keeps the draft', async () => {
+  // Clarify left this endpoint with the eighth round (decision-00006): it is a
+  // session, started at /api/sessions/clarify, and nothing here writes for it.
+  it('answers 422 for the clarify action the review endpoint no longer carries', async () => {
     const { call, docsDir } = boardOn({ 'idea/a.md': DRAFT_IDEA })
 
-    const { body } = await call('POST', '/api/docs/idea-00001-x/review', {
+    const { status, body } = await call('POST', '/api/docs/idea-00001-x/review', {
       action: 'clarify',
       questions: ['who owns this?'],
     })
 
-    expect(body.status).toBe('draft')
-    expect(readFileSync(join(docsDir, 'idea/a.md'), 'utf8')).toContain('- who owns this?')
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/is not a review action/)
+    expect(readFileSync(join(docsDir, 'idea/a.md'), 'utf8')).toBe(DRAFT_IDEA)
   })
 
   // spec-00001-AC-8.3
@@ -332,6 +335,163 @@ describe('sessions', () => {
 
     expect(body.current.status).toBe('running')
     expect(body.current.sourceId).toBe('idea-00001-x')
+  })
+})
+
+/**
+ * The other two session kinds over the wire (spec-00001-FR-9 and FR-47): the same
+ * channel, the same one slot, each with its own ruling. Nothing here writes a
+ * document — the session's agent does, and the board commits what it left.
+ */
+describe('clarify and ask sessions', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const BROKEN = doc({ id: 'nope', type: 'spec', status: 'draft' }, '# Broken\n')
+  const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+  /** An agent that revises the document it was started on, then exits. */
+  const REVISE = (path: string) => ['-e', `require('fs').appendFileSync('${path}', '\\nrevised\\n')`]
+
+  // spec-00001-AC-9.1
+  it('starts a clarify session on a draft of a clarifiable type', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
+
+    const { status, body } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    expect(status).toBe(200)
+    expect(body.kind).toBe('clarify')
+    expect(body.status).toBe('running')
+    expect(board.sessions.current()!.sourceId).toBe('spec-00001-b')
+  })
+
+  // spec-00001-AC-9.2
+  it('answers 422 and starts nothing for a document that is not draft', async () => {
+    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+
+    const { status, body } = await call('POST', '/api/sessions/clarify', { docId: 'idea-00001-x' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/applies to a draft/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-9.4
+  it('answers 422 and starts nothing for a draft of a type that is not clarifiable', async () => {
+    const { call, board } = boardOn({
+      'record/r.md': doc({ id: 'record-00001-r', type: 'record', status: 'draft' }, '# Record\n'),
+    })
+
+    const { status, body } = await call('POST', '/api/sessions/clarify', { docId: 'record-00001-r' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/does not apply to a record/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-47.1 — ask is not a review action: any type, any status
+  it('starts an ask session on an active record', async () => {
+    const { call, board } = boardOn({ 'record/r.md': ACTIVE_RECORD }, HOLD)
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
+
+    expect(status).toBe(200)
+    expect(body.kind).toBe('ask')
+    expect(board.sessions.current()!.status).toBe('running')
+  })
+
+  // spec-00001-AC-47.5
+  it('answers 422 and starts nothing for an anomalous document', async () => {
+    const { call, board } = boardOn({ 'spec/broken.md': BROKEN })
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'nope' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/front matter problems/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-19.2
+  it('answers 409 and starts nothing when the target document was deleted', async () => {
+    const { call, board, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC })
+    rmSync(join(docsDir, 'spec/b.md'))
+
+    for (const path of ['/api/sessions/ask', '/api/sessions/clarify']) {
+      const { status, body } = await call('POST', path, { docId: 'spec-00001-b' })
+
+      expect(status).toBe(409)
+      expect(body.error).toMatch(/refresh the board/)
+    }
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-18.2 — one slot for all three kinds
+  it('answers 409 for an ask while a clarify session is running, leaving it alone', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, HOLD)
+    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
+
+    expect(status).toBe(409)
+    expect(body.error).toMatch(/already running/)
+    expect(board.sessions.current()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
+  })
+
+  it('answers 422 when the request names no document', async () => {
+    const { call } = boardOn({ 'spec/b.md': DRAFT_SPEC })
+    expect((await call('POST', '/api/sessions/clarify', {})).status).toBe(422)
+    expect((await call('POST', '/api/sessions/ask', {})).status).toBe(422)
+  })
+
+  // spec-00001-AC-16.3 and AC-16.4
+  it('reports a missing agent CLI in the terminal, with no commit and no state file', async () => {
+    const { call, board, repoRoot } = boardOn({ 'spec/b.md': DRAFT_SPEC }, ['-e', ''], 'definitely-not-an-agent-cli')
+    const commits = commitCount(repoRoot)
+
+    const { body } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    expect(body.status).toBe('failed')
+    expect(body.error).toMatch(/not found on PATH/)
+    expect(board.sessions.attach(() => {}).buffer).toContain('could not start the agent')
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(existsSync(join(repoRoot, clarifyStatePath('spec-00001-b')))).toBe(false)
+  })
+
+  // spec-00001-AC-14.8, and AC-46.4 for what stays out of that commit
+  it('commits what a clarify session wrote under docs, and nothing outside it', async () => {
+    const { call, board, repoRoot } = boardOn({ 'spec/b.md': DRAFT_SPEC }, REVISE('spec/b.md'))
+    mkdirSync(join(repoRoot, '.whiteboard/clarify'), { recursive: true })
+    writeFileSync(join(repoRoot, clarifyStatePath('spec-00001-b')), '{"answered":1}')
+
+    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/b.md'])
+  })
+
+  // spec-00001-AC-14.7
+  it('commits what an ask session wrote under docs', async () => {
+    const { call, board, repoRoot } = boardOn({ 'record/r.md': ACTIVE_RECORD }, REVISE('record/r.md'))
+
+    await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(ask): record-00001-r')
+  })
+
+  // spec-00001-AC-47.2 — a discussion that concluded nothing changes nothing
+  it('leaves the document and the history alone when an ask session wrote nothing', async () => {
+    const { call, board, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC })
+    const commits = commitCount(repoRoot)
+
+    await call('POST', '/api/sessions/ask', { docId: 'spec-00001-b' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(board.sessions.current()!.outcome!.committed).toBe(false)
   })
 })
 

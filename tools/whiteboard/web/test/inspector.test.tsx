@@ -83,6 +83,7 @@ describe('the inspector panel', () => {
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
       relations: ['verifies'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })
@@ -381,6 +382,7 @@ describe('hovering an item in the panel', () => {
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
       relations: ['verifies'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })
@@ -579,6 +581,7 @@ describe('expanding an item row', () => {
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
       relations: ['verifies'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })

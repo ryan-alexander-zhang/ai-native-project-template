@@ -46,6 +46,7 @@ beforeEach(() => {
     types: { prd: 'living', idea: 'living' },
     relations: ['parent'],
     flow: {},
+    focus: {},
     agents: [{ name: 'claude', command: 'claude', args: [] }],
   })
 })

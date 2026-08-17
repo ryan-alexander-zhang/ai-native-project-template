@@ -140,6 +140,7 @@ describe('requirement text wherever it is shown', () => {
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
       relations: ['verifies'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })

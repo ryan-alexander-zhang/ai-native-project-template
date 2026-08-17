@@ -428,6 +428,7 @@ describe('the board', () => {
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })
@@ -840,6 +841,7 @@ describe('the board', () => {
     )
     const advance = vi.spyOn(api, 'advance').mockResolvedValue({
       id: 's1',
+      kind: 'advance',
       sourceId: 'prd-00001-x',
       targetType: 'spec',
       status: 'running',

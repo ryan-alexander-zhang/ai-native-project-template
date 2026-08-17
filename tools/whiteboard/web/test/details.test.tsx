@@ -99,6 +99,7 @@ describe('the detail panel', () => {
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
       relations: ['verifies'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
   })

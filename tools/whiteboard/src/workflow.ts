@@ -1,3 +1,4 @@
+import { isClarifiable } from './clarifyRules.ts'
 import type { FlowConfig, FlowStep } from './config.ts'
 import type { DocGraph, DocNode } from './docRepository.ts'
 import { highestNumber } from './docRepository.ts'
@@ -16,11 +17,16 @@ export class WorkflowError extends Error {
   }
 }
 
-function kindOf(node: DocNode, config: FlowConfig) {
+/** An anomalous document takes no workflow action at all (spec-00001-AC-2.4). */
+function requireSound(node: DocNode): void {
   if (!node.ok || node.type === undefined || node.status === undefined) {
     throw new WorkflowError(`${node.id} has front matter problems and takes no workflow action`)
   }
-  return config.types[node.type]!
+}
+
+function kindOf(node: DocNode, config: FlowConfig) {
+  requireSound(node)
+  return config.types[node.type!]!
 }
 
 /** Target statuses the user may pick (spec-00001-FR-6); empty for an anomalous document. */
@@ -67,16 +73,28 @@ export function applyAccept(content: string, node: DocNode, config: FlowConfig):
   return { content: replaceStatus(content, to), to }
 }
 
-/** spec-00001-FR-9 with rule-00001-BR-11: the document stays draft. */
-export function applyClarify(content: string, node: DocNode, config: FlowConfig, questions: string[]): string {
+/**
+ * spec-00001-FR-9 with rule-00001-BR-11 and BR-20: clarify starts a session, so
+ * the ruling is all there is to decide here — a draft of a clarifiable type, and
+ * nothing else. The type set is built in (clarifyRules.ts), not configured.
+ */
+export function assertClarifiable(node: DocNode, config: FlowConfig): void {
   kindOf(node, config)
+  if (!isClarifiable(node.type)) {
+    throw new WorkflowError(`clarify does not apply to a ${node.type} document; ${node.id} takes no clarify`)
+  }
   if (node.status !== 'draft') {
     throw new WorkflowError(`clarify applies to a draft document; ${node.id} is ${node.status}`)
   }
-  if (questions.length === 0) {
-    throw new WorkflowError('clarify needs at least one question')
-  }
-  return appendOpenQuestions(content, questions)
+}
+
+/**
+ * spec-00001-FR-47 with rule-00001-BR-21: ask is not a review action — any type
+ * in any status may be asked about. Only an anomalous document may not: its
+ * front matter has to be fixed first (spec-00001-AC-47.5).
+ */
+export function assertAskable(node: DocNode): void {
+  requireSound(node)
 }
 
 interface Section {
@@ -102,19 +120,6 @@ export function hasOpenQuestions(content: string): boolean {
   const section = findOpenQuestions(lines)
   if (!section) return false
   return lines.slice(section.heading + 1, section.end).some((line) => LIST_ITEM.test(line))
-}
-
-function appendOpenQuestions(content: string, questions: string[]): string {
-  const items = questions.map((question) => `- ${question}`)
-  const lines = content.split('\n')
-  const section = findOpenQuestions(lines)
-  if (!section) {
-    return `${content.replace(/\s*$/, '')}\n\n## Open Questions\n\n${items.join('\n')}\n`
-  }
-  let at = section.end
-  while (at > section.heading + 1 && lines[at - 1]!.trim() === '') at--
-  lines.splice(at, 0, ...items)
-  return lines.join('\n')
 }
 
 /** rule-00001-BR-18: the number a new document of `type` takes. */

@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { type SimpleGit, simpleGit } from 'simple-git'
 
-export type ActionKind = 'edit' | 'status' | 'accept' | 'clarify' | 'advance'
+/**
+ * The action a commit names (spec-00001-FR-14, format per design-00001 §7). The
+ * last three are the session kinds: one commit per session, named by the kind it
+ * was (spec-00001-AC-14.4, AC-14.7, AC-14.8).
+ */
+export type ActionKind = 'edit' | 'status' | 'accept' | 'advance' | 'clarify' | 'ask'
 
 /**
  * What the dirty files under a directory held at one moment: repo-relative path

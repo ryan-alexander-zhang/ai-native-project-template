@@ -31,6 +31,12 @@ flow:
     - { next: plan, carry: implements }
   plan:
     - { next: task, carry: parent }
+focus:
+  idea: is it worth doing, and for whom
+  prd: roles, scope, and what the value is traded against
+  spec: the boundaries of each FR and the gaps in its acceptance
+  rule: the branches the decision table leaves out, and the boundary values
+  design: the structural trade-offs and the failure modes
 agents:
   claude:
     command: node

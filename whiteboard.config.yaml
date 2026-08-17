@@ -46,6 +46,19 @@ flow:
   plan:
     - { next: task, carry: parent }
 
+# Focus lines (spec-00001-FR-48): one line per clarifiable type, the questioning
+# weight a clarify session leans on. The clarifiable set — idea, prd, spec, rule,
+# design (rule-00001-BR-20) — is built into the code, and the shared questioning
+# skeleton with it; this file owns only the one line per type, so the weight is
+# yours to retune at any time. A clarifiable type with no line here, or a line
+# given to any other type, refuses to start the board.
+focus:
+  idea: 值不值得做，给谁做——问清痛点的真实性、受影响的人与不做的代价。
+  prd: 角色、范围与价值取舍——问清为谁解决、这一版要与不要什么、凭什么先做它。
+  spec: FR 的边界与验收缺口——问清异常路径、边界输入与每条 FR 的可观察判据。
+  rule: 决策表未覆盖的分支与边界值——问清各维度取值的组合、缺省行与冲突时谁赢。
+  design: 结构取舍与失败模式——问清被否决的方案、模块边界与出错时系统怎么表现。
+
 agents:
   claude:
     command: claude

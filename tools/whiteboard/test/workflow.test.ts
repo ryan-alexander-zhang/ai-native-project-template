@@ -4,8 +4,9 @@ import {
   WorkflowError,
   allocateNumber,
   applyAccept,
-  applyClarify,
   applyStatusChange,
+  assertAskable,
+  assertClarifiable,
   hasOpenQuestions,
   idPrefix,
   nextStepsFor,
@@ -144,43 +145,53 @@ describe('hasOpenQuestions', () => {
   })
 })
 
-describe('applyClarify', () => {
-  // spec-00001-AC-9.1
-  it('appends to an existing section and keeps the document draft', () => {
-    const { node, content } = single(
-      { id: 'prd-00001-x', type: 'prd', status: 'draft' },
-      '# X\n\n## Open Questions\n\n- first\n\n## Links\n\n- a\n',
-    )
-    const updated = applyClarify(content, node, config, ['second'])
-
-    expect(updated).toContain('- first\n- second\n')
-    expect(updated).toContain('status: draft')
+/** spec-00001-FR-9 with rule-00001-BR-11 and BR-20: who may be clarified at all. */
+describe('assertClarifiable', () => {
+  // rule-00001-AC-20.1 — the five clarifiable types, each as its own draft
+  it('allows a draft of every clarifiable type', () => {
+    for (const type of ['idea', 'prd', 'spec', 'rule', 'design']) {
+      const { node } = single({ id: `${type}-00001-x`, type, status: 'draft' }, '# X\n')
+      expect(() => assertClarifiable(node, config)).not.toThrow()
+    }
   })
 
   // spec-00001-AC-9.2
-  it('creates the section when the document has none', () => {
-    const { node, content } = draftPrd()
-    expect(applyClarify(content, node, config, ['who owns this?'])).toMatch(
-      /## Open Questions\n\n- who owns this\?\n$/,
-    )
-  })
-
-  // spec-00001-AC-9.3
-  it('appends every question given', () => {
-    const { node, content } = draftPrd()
-    const updated = applyClarify(content, node, config, ['one', 'two', 'three'])
-    expect(updated).toContain('- one\n- two\n- three')
-  })
-
-  // spec-00001-AC-9.4
   it('rejects a document that is not draft', () => {
-    const { node, content } = single({ id: 'prd-00001-x', type: 'prd', status: 'active' })
-    expect(() => applyClarify(content, node, config, ['q'])).toThrowError(/applies to a draft document/)
+    const { node } = single({ id: 'prd-00001-x', type: 'prd', status: 'active' })
+    expect(() => assertClarifiable(node, config)).toThrowError(WorkflowError)
+    expect(() => assertClarifiable(node, config)).toThrowError(/applies to a draft document/)
   })
 
-  it('rejects an empty question list', () => {
-    const { node, content } = draftPrd()
-    expect(() => applyClarify(content, node, config, [])).toThrowError(/at least one question/)
+  // spec-00001-AC-9.4 with rule-00001-AC-20.2 — record carries no business question to ask
+  it('rejects a draft of a type that is not clarifiable', () => {
+    const { node } = single({ id: 'record-00001-x', type: 'record', status: 'draft' })
+    expect(() => assertClarifiable(node, config)).toThrowError(/does not apply to a record document/)
+  })
+
+  it('rejects an anomalous document', () => {
+    const { node } = single({ id: 'nope', type: 'prd', status: 'draft' })
+    expect(() => assertClarifiable(node, config)).toThrowError(/front matter problems/)
+  })
+})
+
+/** spec-00001-FR-47 with rule-00001-BR-21: ask is not a review action. */
+describe('assertAskable', () => {
+  // spec-00001-AC-47.1 with rule-00001-AC-21.1 — any type, any status
+  it('allows a document of any type in any status', () => {
+    for (const front of [
+      { id: 'record-00001-x', type: 'record', status: 'active' },
+      { id: 'prd-00001-x', type: 'prd', status: 'draft' },
+      { id: 'plan-00001-x', type: 'plan', status: 'resolved' },
+    ]) {
+      expect(() => assertAskable(single(front).node)).not.toThrow()
+    }
+  })
+
+  // spec-00001-AC-47.5
+  it('rejects an anomalous document', () => {
+    const { node } = single({ id: 'nope', type: 'prd', status: 'draft' })
+    expect(() => assertAskable(node)).toThrowError(WorkflowError)
+    expect(() => assertAskable(node)).toThrowError(/front matter problems/)
   })
 })
 

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
+import { clarifiableTypes, isClarifiable } from './clarifyRules.ts'
 
 export const CONFIG_FILE = 'whiteboard.config.yaml'
 
@@ -22,6 +23,8 @@ export interface FlowConfig {
   types: Record<string, DocKind>
   relations: string[]
   flow: Record<string, FlowStep[]>
+  /** Clarifiable type -> its focus line (spec-00001-FR-48). */
+  focus: Record<string, string>
   agents: AgentConfig[]
 }
 
@@ -94,6 +97,37 @@ function readFlow(raw: unknown, types: Record<string, DocKind>, relations: strin
   return flow
 }
 
+/**
+ * The focus lines of spec-00001-FR-48: the questioning weight of each clarifiable
+ * type, and the only part of the clarify instruction the config owns (the shared
+ * skeleton is code). The clarifiable set is built in (rule-00001-BR-20), so this
+ * mapping is checked against it in both directions — every clarifiable type the
+ * config declares must carry a line, and a line may name no other type. A line
+ * is one non-empty line: blank, non-string or multi-line is refused, naming the
+ * type it belongs to.
+ */
+function readFocus(raw: unknown, types: Record<string, DocKind>): Record<string, string> {
+  // No `focus` key at all is the same reading as an empty one: each clarifiable
+  // type it fails to carry is then reported by name (spec-00001-AC-48.4).
+  const entries = Object.entries(raw === undefined || raw === null ? {} : asRecord(raw, 'focus'))
+  const focus: Record<string, string> = {}
+  for (const [type, value] of entries) {
+    if (!isClarifiable(type)) {
+      throw new ConfigError(`config: \`focus.${type}\` gives a focus line to ${type}, which is not a clarifiable type`)
+    }
+    if (typeof value !== 'string' || value.trim() === '' || /[\r\n]/.test(value)) {
+      throw new ConfigError(`config: \`focus.${type}\` must be one non-empty line, got ${JSON.stringify(value)}`)
+    }
+    focus[type] = value
+  }
+  for (const type of clarifiableTypes()) {
+    if (type in types && !(type in focus)) {
+      throw new ConfigError(`config: \`focus.${type}\` is missing; every clarifiable type needs a focus line`)
+    }
+  }
+  return focus
+}
+
 function readAgentCwd(value: unknown, at: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || (value !== 'docs' && !value.startsWith('docs/')) || value.includes('..')) {
@@ -134,7 +168,13 @@ export function parseFlowConfig(text: string, source: string): FlowConfig {
   const root = asRecord(raw, 'config root')
   const types = readTypes(root.types)
   const relations = readRelations(root.relations)
-  return { types, relations, flow: readFlow(root.flow, types, relations), agents: readAgents(root.agents) }
+  return {
+    types,
+    relations,
+    flow: readFlow(root.flow, types, relations),
+    focus: readFocus(root.focus, types),
+    agents: readAgents(root.agents),
+  }
 }
 
 /**

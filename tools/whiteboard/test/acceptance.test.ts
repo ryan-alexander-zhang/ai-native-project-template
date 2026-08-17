@@ -59,9 +59,17 @@ afterEach(() => {
 })
 
 describe('the whiteboard acceptance path', () => {
-  // S1 -> S2 -> S3: see the board, edit a document, review it
+  /**
+   * S1 -> S2 -> S3: see the board, edit a document, review it. Clarify is a
+   * session as of the eighth round (decision-00006), so the questions arrive in
+   * the document from inside a session — walked here as the clarify session's
+   * agent writing them, which is the state the accept gate then reads.
+   */
   it('walks a draft idea from the board through clarify to accept', async () => {
-    const { call, repoRoot, docsDir } = startBoard(['-e', ''])
+    const { call, board, repoRoot, docsDir } = startBoard([
+      '-e',
+      `require('fs').appendFileSync('idea/whiteboard.md', '\\n## Open Questions\\n\\n- who owns the flow config?\\n')`,
+    ])
 
     // S1: the board shows the docs tree with no issues
     const graph = await call('GET', '/api/graph')
@@ -75,11 +83,17 @@ describe('the whiteboard acceptance path', () => {
     expect((await call('PUT', '/api/docs/idea-00001-whiteboard', { content: edited, baseHash: opened.body.hash })).body)
       .toEqual({ committed: true })
 
-    // S3: clarify first — the document stays draft and accept is refused while questions stand
-    await call('POST', '/api/docs/idea-00001-whiteboard/review', {
-      action: 'clarify',
-      questions: ['who owns the flow config?'],
-    })
+    // S3: clarify first — a session, and its agent leaves the question behind;
+    // the document stays draft and accept is refused while the question stands
+    const session = await call('POST', '/api/sessions/clarify', { docId: 'idea-00001-whiteboard' })
+    expect(session.body.kind).toBe('clarify')
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    const clarified = await call('GET', '/api/docs/idea-00001-whiteboard')
+    expect(clarified.body.content).toContain('- who owns the flow config?')
+    expect(clarified.body.content).toContain('status: draft')
+
     const refused = await call('POST', '/api/docs/idea-00001-whiteboard/review', { action: 'accept' })
     expect(refused.status).toBe(422)
     expect(refused.body.error).toMatch(/unresolved open questions/)

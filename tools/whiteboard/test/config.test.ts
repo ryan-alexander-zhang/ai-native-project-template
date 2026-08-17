@@ -17,6 +17,10 @@ flow:
     - { next: spec, carry: parent }
   spec:
     - { next: plan, carry: implements }
+focus:
+  idea: is it worth doing, and for whom
+  prd: roles, scope, and the value trade-off
+  spec: FR boundaries and acceptance gaps
 agents:
   claude:
     command: claude
@@ -128,6 +132,69 @@ describe('parseFlowConfig', () => {
   })
 })
 
+/**
+ * spec-00001-FR-48: the flow config carries one focus line per clarifiable type,
+ * and the clarifiable set it is checked against is built into the code
+ * (rule-00001-BR-20). Every refusal below names the type it is about — that name
+ * is the whole point of the check.
+ */
+describe('the focus lines', () => {
+  it('reads a focus line for every clarifiable type the config declares', () => {
+    expect(parse(VALID).focus).toEqual({
+      idea: 'is it worth doing, and for whom',
+      prd: 'roles, scope, and the value trade-off',
+      spec: 'FR boundaries and acceptance gaps',
+    })
+  })
+
+  // spec-00001-AC-48.2
+  it('rejects an empty focus line, naming the type', () => {
+    expectConfigError(VALID.replace('  spec: FR boundaries and acceptance gaps', '  spec: ""'), /focus\.spec/)
+  })
+
+  it('rejects a focus line of nothing but whitespace, naming the type', () => {
+    expectConfigError(VALID.replace('  spec: FR boundaries and acceptance gaps', '  spec: "   "'), /focus\.spec/)
+  })
+
+  // spec-00001-AC-48.6
+  it('rejects a focus line carrying a newline, naming the type', () => {
+    expectConfigError(
+      VALID.replace('  spec: FR boundaries and acceptance gaps', '  spec: "boundaries\\nand gaps"'),
+      /focus\.spec.*one non-empty line/,
+    )
+  })
+
+  it('rejects a focus line that is not a string, naming the type', () => {
+    expectConfigError(VALID.replace('  spec: FR boundaries and acceptance gaps', '  spec: 3'), /focus\.spec.*got 3/)
+  })
+
+  // spec-00001-AC-48.4
+  it('rejects a config missing the focus line of a clarifiable type, naming it', () => {
+    expectConfigError(VALID.replace('  idea: is it worth doing, and for whom\n', ''), /focus\.idea.*is missing/)
+  })
+
+  it('rejects a config with no focus lines at all, naming the first type it wants one for', () => {
+    expectConfigError(VALID.replace(/focus:\n(  \w+: [^\n]+\n)+/, ''), /focus\.idea.*is missing/)
+  })
+
+  // spec-00001-AC-48.5
+  it('rejects a focus line given to a type that is not clarifiable, naming that type', () => {
+    expectConfigError(
+      VALID.replace('focus:\n', 'focus:\n  record: what the evidence was\n'),
+      /focus\.record.*not a clarifiable type/,
+    )
+  })
+
+  it('rejects focus that is not a mapping', () => {
+    expectConfigError(VALID.replace(/focus:\n(  \w+: [^\n]+\n)+/, 'focus: [idea]\n'), /`focus` must be a mapping/)
+  })
+
+  it('wants no focus line for a clarifiable type the config does not declare', () => {
+    // rule and design are clarifiable, and this config declares neither.
+    expect(Object.keys(parse(VALID).focus)).toEqual(['idea', 'prd', 'spec'])
+  })
+})
+
 describe('loadFlowConfig', () => {
   it('loads a config file from disk', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wb-config-'))
@@ -191,6 +258,19 @@ describe('the config shipped with this repo', () => {
     ])
     expect(config.flow.plan).toEqual([{ next: 'task', carry: 'parent' }])
     expect(config.flow.record).toBeUndefined()
+  })
+
+  /**
+   * spec-00001-AC-48.3 at the config level, and the fixture AC-48.1 needs: every
+   * clarifiable type carries its own line, and no two of them say the same thing
+   * — a focus line that is not about its own type buys nothing.
+   */
+  it('carries one distinct focus line for each of the five clarifiable types', () => {
+    const config = loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname)
+
+    expect(Object.keys(config.focus)).toEqual(['idea', 'prd', 'spec', 'rule', 'design'])
+    expect(new Set(Object.values(config.focus)).size).toBe(5)
+    for (const line of Object.values(config.focus)) expect(line.trim()).toBe(line)
   })
 
   /**

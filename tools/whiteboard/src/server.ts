@@ -1,10 +1,17 @@
 import type { Server } from 'node:http'
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
 import { WebSocketServer } from 'ws'
-import { type Expectation, findProduct, markProduct, productProblems } from './advance.ts'
+import { type Expectation, findProduct, markProduct, productProblems, taskInstruction } from './advance.ts'
 import type { FlowConfig } from './config.ts'
 import { ConflictError, DocService } from './docService.ts'
-import { SessionBusyError, SessionManager, type SessionOutcome, type SpawnPty } from './sessionManager.ts'
+import type { DirtySnapshot } from './gitLayer.ts'
+import {
+  SessionBusyError,
+  SessionManager,
+  type SessionOutcome,
+  type SessionPlan,
+  type SpawnPty,
+} from './sessionManager.ts'
 import { spawnPty } from './pty.ts'
 import { DocsWatcher } from './watcher.ts'
 import { WorkflowError, allocateNumber, idPrefix } from './workflow.ts'
@@ -35,7 +42,7 @@ export class Board {
       repoRoot,
       spawn,
       snapshot: () => this.docs.snapshotDocs(),
-      onExit: (expectation) => this.finishSession(expectation),
+      onExit: (plan) => this.finishSession(plan),
     })
     this.app = this.buildApp(config)
   }
@@ -46,10 +53,21 @@ export class Board {
   }
 
   /** Commit what the session wrote, then check it against what was asked for (spec-00001-FR-17). */
-  private async finishSession(expectation: Expectation): Promise<SessionOutcome> {
+  private async finishSession(plan: SessionPlan): Promise<SessionOutcome> {
     // What the session inherited, taken when it started: only what moved since
     // is its own to commit (spec-00001-AC-14.5).
     const before = this.sessions.baseline()
+    // Clarify and ask were asked for no new document, so there is nothing to
+    // check: their commit is named by the kind and carries the document they
+    // were about (spec-00001-AC-14.7, AC-14.8).
+    if (plan.expectation === undefined) {
+      const outcome = await this.docs.commitSessionChanges(plan.sourceId, before, plan.kind)
+      return { docId: plan.sourceId, problems: [], committed: outcome.committed, error: outcome.error }
+    }
+    return this.finishAdvance(plan.expectation, before)
+  }
+
+  private async finishAdvance(expectation: Expectation, before: DirtySnapshot): Promise<SessionOutcome> {
     const product = findProduct(this.docs.graph(), expectation.idPrefix)
     if (!product) {
       this.lastFinding = undefined
@@ -87,6 +105,14 @@ export class Board {
 
     app.get('/api/sessions', (_req, res) => res.json({ current: this.sessions.current() }))
     app.post('/api/sessions', (req, res) => res.json(this.startSession(req.body)))
+    // The other two session kinds: same channel, same one slot (spec-00001-FR-18),
+    // each with its own ruling (FR-9, FR-47) made in the doc service.
+    app.post('/api/sessions/clarify', (req, res) => {
+      res.json(this.sessions.start(this.docs.clarifyPlan(docIdOf(req.body))))
+    })
+    app.post('/api/sessions/ask', (req, res) => {
+      res.json(this.sessions.start(this.docs.askPlan(docIdOf(req.body))))
+    })
 
     app.use(errorHandler)
     return app
@@ -102,12 +128,13 @@ export class Board {
     if (!step) {
       throw new WorkflowError(`${targetType} is not a next step of ${sourceId}`)
     }
-    return this.sessions.start({
+    const expectation: Expectation = {
       targetType,
       idPrefix: idPrefix(targetType, allocateNumber(this.docs.graph(), targetType)),
       carry: step.carry,
       sourceId,
-    })
+    }
+    return this.sessions.start({ kind: 'advance', sourceId, instruction: taskInstruction(expectation), expectation })
   }
 
   /**
@@ -157,6 +184,14 @@ export class Board {
     server.on('close', () => void this.watcher.close())
     return server
   }
+}
+
+/** A clarify or ask request names the one document it is about. */
+function docIdOf(body: { docId?: string }): string {
+  if (typeof body.docId !== 'string') {
+    throw new WorkflowError('a clarify or ask session needs a docId')
+  }
+  return body.docId
 }
 
 const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [

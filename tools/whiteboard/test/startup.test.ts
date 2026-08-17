@@ -21,6 +21,8 @@ const MINIMAL_CONFIG = `types:
   idea: { kind: living }
 relations: [parent]
 flow: {}
+focus:
+  idea: is it worth doing, and for whom
 agents:
   claude: { command: claude }
 `
@@ -70,6 +72,44 @@ agents:
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('flow.idea[0].next')
     expect(result.stderr).toContain('"memo"')
+  })
+
+  // spec-00001-AC-48.4 at the boundary the criterion is written at: booting
+  it('refuses to start when a clarifiable type carries no focus line, naming the type', () => {
+    const { repoRoot } = makeRepo({})
+    writeFileSync(join(repoRoot, 'whiteboard.config.yaml'), MINIMAL_CONFIG.replace(/focus:\n  idea: [^\n]+\n/, ''))
+
+    const result = boot(repoRoot)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('focus.idea')
+  })
+
+  // spec-00001-AC-48.2 and AC-48.6, same boundary: the type is named either way
+  it('refuses to start on a blank or multi-line focus line, naming the type', () => {
+    for (const line of ['  idea: ""\n', '  idea: "worth doing\\nfor whom"\n']) {
+      const { repoRoot } = makeRepo({})
+      writeFileSync(
+        join(repoRoot, 'whiteboard.config.yaml'),
+        MINIMAL_CONFIG.replace(/  idea: is it worth doing, and for whom\n/, line),
+      )
+
+      const result = boot(repoRoot)
+
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('focus.idea')
+    }
+  })
+
+  // spec-00001-AC-48.5
+  it('refuses to start when a type that is not clarifiable carries a focus line, naming it', () => {
+    const { repoRoot } = makeRepo({})
+    writeFileSync(join(repoRoot, 'whiteboard.config.yaml'), MINIMAL_CONFIG.replace('focus:\n', 'focus:\n  record: x\n'))
+
+    const result = boot(repoRoot)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('focus.record')
   })
 
   it('reports a port it cannot listen on instead of crashing', () => {

@@ -2,9 +2,9 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentConfig } from '../src/config.ts'
-import type { Expectation } from '../src/advance.ts'
+import { type Expectation, taskInstruction } from '../src/advance.ts'
 import { spawnPty } from '../src/pty.ts'
-import { SessionBusyError, SessionManager, type SessionOutcome } from '../src/sessionManager.ts'
+import { SessionBusyError, SessionManager, type SessionOutcome, type SessionPlan } from '../src/sessionManager.ts'
 import { SESSION_WAIT, makeRepo } from './helpers.ts'
 
 const EXPECTATION: Expectation = {
@@ -12,6 +12,14 @@ const EXPECTATION: Expectation = {
   idPrefix: 'prd-00002-',
   carry: 'parent',
   sourceId: 'idea-00001-x',
+}
+
+/** An advance session's plan: the instruction is built by its caller, not by the manager. */
+const ADVANCE: SessionPlan = {
+  kind: 'advance',
+  sourceId: EXPECTATION.sourceId,
+  instruction: taskInstruction(EXPECTATION),
+  expectation: EXPECTATION,
 }
 
 const OUTCOME: SessionOutcome = { docId: 'prd-00002-new', problems: [], committed: true }
@@ -53,7 +61,7 @@ describe('start', () => {
   it('runs the configured command as the session', async () => {
     const { manager } = makeManager({ args: ['-e', "console.log('hello from the agent')"] })
 
-    const info = manager.start(EXPECTATION)
+    const info = manager.start(ADVANCE)
     const output = transcript(manager)
 
     expect(info.status).toBe('running')
@@ -64,26 +72,26 @@ describe('start', () => {
   // spec-00001-AC-18.1
   it('refuses a second session and leaves the running one alone', async () => {
     const { manager } = makeManager({ args: ['-e', 'setTimeout(() => {}, 5000)'] })
-    const first = manager.start(EXPECTATION)
+    const first = manager.start(ADVANCE)
 
-    expect(() => manager.start(EXPECTATION)).toThrowError(SessionBusyError)
+    expect(() => manager.start(ADVANCE)).toThrowError(SessionBusyError)
     expect(manager.current()).toEqual(first)
     expect(manager.current()!.status).toBe('running')
   })
 
   it('allows a new session once the previous one has exited', async () => {
     const { manager } = makeManager({ args: ['-e', ''] })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
 
-    expect(manager.start(EXPECTATION).id).toBe('s2')
+    expect(manager.start(ADVANCE).id).toBe('s2')
   })
 
   // spec-00001-AC-16.1
   it('reports a CLI missing from PATH in the terminal and never runs the exit hook', async () => {
     const { manager, onExit } = makeManager({ command: 'definitely-not-an-agent-cli' })
 
-    const info = manager.start(EXPECTATION)
+    const info = manager.start(ADVANCE)
 
     expect(info.status).toBe('failed')
     expect(info.error).toMatch(/not found on PATH/)
@@ -93,7 +101,39 @@ describe('start', () => {
 
   it('reports a CLI path that is not executable', () => {
     const { manager } = makeManager({ command: './no-such-agent' })
-    expect(manager.start(EXPECTATION).error).toMatch(/not executable/)
+    expect(manager.start(ADVANCE).error).toMatch(/not executable/)
+  })
+
+  /**
+   * The three kinds share this one manager, this one slot and this one terminal
+   * (spec-00001-FR-18); what tells them apart is the kind on the session and the
+   * instruction its caller built. Only an advance expects a target type.
+   */
+  it('carries the kind and the instruction of a clarify or ask session', async () => {
+    const { manager } = makeManager({
+      args: ['-e', "process.stdin.on('data', (d) => console.log('got:' + d.toString()))"],
+    })
+
+    const info = manager.start({ kind: 'clarify', sourceId: 'spec-00001-x', instruction: 'clarify this' })
+    const output = transcript(manager)
+
+    expect(info.kind).toBe('clarify')
+    expect(info.sourceId).toBe('spec-00001-x')
+    expect(info.targetType).toBeUndefined()
+    await vi.waitFor(() => expect(output.text).toContain('got:clarify this'), SESSION_WAIT)
+  })
+
+  // The exit hook is handed the plan, so it can tell an advance's product check
+  // from a clarify or ask that was asked for no new document.
+  it('hands the exit hook the plan the session ran on', async () => {
+    const plan = { kind: 'ask' as const, sourceId: 'record-00001-x', instruction: 'answer this' }
+    const { manager, onExit } = makeManager({ args: ['-e', ''] })
+
+    manager.start(plan)
+    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await manager.whenFinished()
+
+    expect(onExit).toHaveBeenCalledWith(plan)
   })
 })
 
@@ -112,7 +152,7 @@ describe('the write-scope constraint', () => {
       onExit: async () => OUTCOME,
     })
 
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
 
     expect(spawned).toEqual([{ command: 'node', args: ['--version'], cwd: join(repoRoot, 'docs') }])
   })
@@ -130,7 +170,7 @@ describe('the write-scope constraint', () => {
       onExit: async () => OUTCOME,
     })
 
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
 
     expect(spawned).toEqual([join(repoRoot, '.')])
   })
@@ -140,7 +180,7 @@ describe('a running session', () => {
   // spec-00001-AC-12.1
   it('streams output as it is produced, without a refresh', async () => {
     const { manager } = makeManager({ args: ['-e', "setInterval(() => console.log('tick'), 20)"] })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const output = transcript(manager)
 
     await vi.waitFor(() => expect(output.text).toContain('tick'), SESSION_WAIT)
@@ -151,7 +191,7 @@ describe('a running session', () => {
     const { manager } = makeManager({
       args: ['-e', "process.stdin.on('data', (d) => console.log('got:' + d.toString().trim()))"],
     })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const output = transcript(manager)
 
     manager.write('ping\n')
@@ -164,7 +204,7 @@ describe('a running session', () => {
     const { manager } = makeManager({
       args: ['-e', "process.stdin.on('data', (d) => console.log('got:' + d.toString()))"],
     })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const output = transcript(manager)
 
     await vi.waitFor(() => expect(output.text).toContain('got:Write one new prd document'), SESSION_WAIT)
@@ -175,21 +215,21 @@ describe('exit', () => {
   // spec-00001-AC-12.3
   it('shows the end state and runs the exit hook once the process ends', async () => {
     const { manager, onExit } = makeManager({ args: ['-e', ''] })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const output = transcript(manager)
 
     await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('session ended with code 0')
-    expect(onExit).toHaveBeenCalledWith(EXPECTATION)
+    expect(onExit).toHaveBeenCalledWith(ADVANCE)
     expect(manager.current()!.outcome).toEqual(OUTCOME)
     expect(output.text).toContain('prd-00002-new committed')
   })
 
   it('reports a session that produced nothing', async () => {
     const { manager } = makeManager({ args: ['-e', ''] }, vi.fn(async () => ({ problems: [], committed: false })))
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const output = transcript(manager)
 
     await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
@@ -201,7 +241,7 @@ describe('exit', () => {
   it('reports an uncommitted product with its problems', async () => {
     const outcome = { docId: 'prd-00002-new', problems: ['parent does not point at idea-00001-x'], committed: false }
     const { manager } = makeManager({ args: ['-e', ''] }, vi.fn(async () => outcome))
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const output = transcript(manager)
 
     await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
@@ -216,7 +256,7 @@ describe('attach', () => {
   // spec-00001-AC-21.2
   it('keeps the session running across a detach and replays the buffer on reattach', async () => {
     const { manager } = makeManager({ args: ['-e', "console.log('before detach'); setInterval(() => {}, 1000)"] })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
 
     const first = transcript(manager)
     await vi.waitFor(() => expect(first.text).toContain('before detach'), SESSION_WAIT)
@@ -234,7 +274,7 @@ describe('attach', () => {
         "console.log('started'); setTimeout(() => require('fs').writeFileSync('after-detach.md', 'written'), 150)",
       ],
     })
-    manager.start(EXPECTATION)
+    manager.start(ADVANCE)
     const attached = transcript(manager)
     await vi.waitFor(() => expect(attached.text).toContain('started'), SESSION_WAIT)
 

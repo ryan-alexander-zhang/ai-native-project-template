@@ -265,6 +265,7 @@ describe('the board state', () => {
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
       flow: {},
+      focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
     })
     vi.spyOn(toast, 'error').mockImplementation(() => 'id')
@@ -375,6 +376,7 @@ describe('the board state', () => {
   it('opens the terminal when an advance starts', async () => {
     vi.spyOn(api, 'advance').mockResolvedValue({
       id: 's1',
+      kind: 'advance',
       sourceId: 'idea-00001-x',
       targetType: 'prd',
       status: 'running',
@@ -399,7 +401,7 @@ describe('the board state', () => {
   // spec-00001-AC-21.2 — the board reattaches to a session that outlived the page
   it('opens the terminal on load when a session is still running', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', sourceId: 'idea-00001-x', targetType: 'prd', status: 'running' },
+      current: { id: 's1', kind: 'advance', sourceId: 'idea-00001-x', targetType: 'prd', status: 'running' },
     })
     const { result } = renderHook(() => useBoard())
 
@@ -408,7 +410,7 @@ describe('the board state', () => {
 
   it('leaves the terminal closed when the last session already exited', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', sourceId: 'idea-00001-x', targetType: 'prd', status: 'exited' },
+      current: { id: 's1', kind: 'advance', sourceId: 'idea-00001-x', targetType: 'prd', status: 'exited' },
     })
     const { result } = renderHook(() => useBoard())
 
