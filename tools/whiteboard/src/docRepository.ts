@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import matter from 'gray-matter'
 import type { FlowConfig } from './config.ts'
+import { declaredIds, declaresItems } from './requirements.ts'
 import { isKnownStatus } from './statusRules.ts'
 
 const EXCLUDED_FILES = new Set(['README.md', 'TEMPLATE.md'])
@@ -24,9 +25,12 @@ export interface DocNode {
 
 export interface DocEdge {
   from: string
+  /** The document the edge lands on — the one holding the item, for a fine-grained reference. */
   to: string
   relation: string
   ok: boolean
+  /** The ids the front matter actually declared; several of them share one edge (spec-00001-AC-28.5). */
+  declaredTargets: string[]
 }
 
 export interface GraphIssue {
@@ -43,6 +47,8 @@ export interface DocGraph {
 interface ParsedDoc {
   path: string
   title: string
+  /** The body without front matter — where the requirement items are declared. */
+  body: string
   data: Record<string, unknown>
   parseError?: string
 }
@@ -65,9 +71,15 @@ function parseDoc(docsDir: string, relPath: string): ParsedDoc {
   const raw = readFileSync(join(docsDir, relPath), 'utf8')
   try {
     const parsed = matter(raw)
-    return { path: relPath, title: readTitle(parsed.content, relPath), data: parsed.data as Record<string, unknown> }
+    return {
+      path: relPath,
+      title: readTitle(parsed.content, relPath),
+      body: parsed.content,
+      data: parsed.data as Record<string, unknown>,
+    }
   } catch (cause) {
-    return { path: relPath, title: readTitle(raw, relPath), data: {}, parseError: (cause as Error).message }
+    const parseError = (cause as Error).message
+    return { path: relPath, title: readTitle(raw, relPath), body: raw, data: {}, parseError }
   }
 }
 
@@ -126,16 +138,45 @@ function declaredTargets(data: Record<string, unknown>, relation: string): strin
   return []
 }
 
-function toEdges(node: DocNode, knownIds: Set<string>): DocEdge[] {
-  return Object.entries(node.relations).flatMap(([relation, targets]) =>
-    targets.map((to) => ({ from: node.id, to, relation, ok: knownIds.has(to) })),
-  )
+/**
+ * Relation targets resolve in two stages (spec-00001-FR-2 as amended by
+ * decision-00004 §5): a document id first, then a requirement item or criterion
+ * id, which lands the edge on the document holding it. Only an id that is
+ * neither is broken.
+ *
+ * Several declared ids of one field landing on one document share a single edge
+ * — three lines drawn along one path are three lines nobody can tell apart
+ * (spec-00001-AC-28.5); each declared id still appears in the relation list.
+ */
+function toEdges(node: DocNode, knownIds: Set<string>, itemOwners: Map<string, string>): DocEdge[] {
+  return Object.entries(node.relations).flatMap(([relation, targets]) => {
+    const groups = new Map<string, { ok: boolean; declaredTargets: string[] }>()
+    for (const declared of targets) {
+      const owner = knownIds.has(declared) ? declared : itemOwners.get(declared)
+      const group = groups.get(owner ?? declared) ?? { ok: owner !== undefined, declaredTargets: [] }
+      group.declaredTargets.push(declared)
+      groups.set(owner ?? declared, group)
+    }
+    return [...groups].map(([to, group]) => ({ from: node.id, to, relation, ...group }))
+  })
+}
+
+/** Which document each requirement item and acceptance criterion id belongs to. */
+function itemOwners(docs: ParsedDoc[], nodes: DocNode[]): Map<string, string> {
+  const owners = new Map<string, string>()
+  // `nodes` is `docs` mapped one for one, so the index pairs a node with its body.
+  nodes.forEach((node, index) => {
+    if (!node.ok || !declaresItems(node.type)) return
+    for (const id of declaredIds({ id: node.id, body: docs[index]!.body })) owners.set(id, node.id)
+  })
+  return owners
 }
 
 function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
   const nodes = docs.map((doc) => toNode(doc, config))
   const knownIds = new Set(nodes.filter((node) => node.ok).map((node) => node.id))
-  const edges = nodes.flatMap((node) => toEdges(node, knownIds))
+  const owners = itemOwners(docs, nodes)
+  const edges = nodes.flatMap((node) => toEdges(node, knownIds, owners))
 
   const issues: GraphIssue[] = [
     ...nodes.flatMap((node) => node.problems.map((message) => ({ path: node.path, message }))),
@@ -171,6 +212,11 @@ export interface DocContent {
 export function readDocContent(docsDir: string, node: DocNode): DocContent {
   const content = readFileSync(join(docsDir, node.path), 'utf8')
   return { path: node.path, content, hash: contentHash(content) }
+}
+
+/** A document's body without its front matter — what the item parser reads. */
+export function readDocBody(docsDir: string, node: DocNode): string {
+  return parseDoc(docsDir, node.path).body
 }
 
 export function findNode(graph: DocGraph, id: string): DocNode | undefined {

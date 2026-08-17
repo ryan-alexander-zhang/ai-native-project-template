@@ -63,6 +63,7 @@ export class Board {
     app.get('/api/config', (_req, res) => res.json(config))
 
     app.get('/api/docs/:id', (req, res) => res.json(this.docs.read(req.params.id)))
+    app.get('/api/docs/:id/items', (req, res) => res.json(this.docs.items(req.params.id)))
     app.get('/api/docs/:id/transitions', (req, res) => res.json(this.docs.transitions(req.params.id)))
     app.get('/api/docs/:id/next-steps', (req, res) => res.json(this.docs.nextSteps(req.params.id)))
 

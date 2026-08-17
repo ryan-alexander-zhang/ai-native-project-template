@@ -37,6 +37,7 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 | --- | --- | --- |
 | `--status-*` | `draft` `active` `open` `resolved` `wontfix` `archived` | 文档状态，每个状态一组前景/背景对 |
 | `--kind-*` | `living` `work` | 文档种类，用于节点的类型标记 |
+| `--coverage-*` | `verified` `failing` `uncovered` | 需求条目的覆盖状态（§9），每态一组前景/背景对；不复用 `--status-*`——覆盖与文档状态是两套词汇 |
 
 异常态不进 `--status-*`：它不是一个状态值，取 `--destructive`。`status.ts` 现有的
 硬编码十六进制（6 个状态色 + `ANOMALY_COLOUR`）随之退场，`statusColour()` 改为
@@ -79,7 +80,9 @@ flowchart TB
   约 180 列。默认宽度与字号落地时定，此处只作定性依据。）
   代价有两处：两种面板形态都要实现，而不是共用一个容器；**面板状态模型也要改**
   ——现实现的 `Panel` 是 `none | editor | terminal` 三选一，编辑器与终端不能同时
-  在场，而本设计要求两者并存，须改为两个独立开关。
+  在场，而本设计要求两者并存，须改为两个独立轴：**右槽**（无 / 编辑器 / 检视
+  面板，三值——检视面板系第四轮引入，占用规则见 §9）与**终端**（开 / 关）。
+  （本段初版写的是「两个独立开关」，§9 引入检视面板后右槽变为三值，已随之修订。）
   两者的尺寸都由 `react-resizable-panels` 持有。落地实测的结果与原设想不同：
   v4 **没有** `autoSaveId`，持久化走 `useDefaultLayout({ id, panelIds })`——它
   返回喂给 `Group` 的 `defaultLayout` 与 `onLayoutChanged`，默认落 localStorage。
@@ -135,6 +138,8 @@ row3                                                                            
 | 编辑器面板 | 底部固定 45vh | 右侧 `ResizablePanel`，宽度可调并持久化 | — |
 | 终端面板 | 底部固定 45vh | 底部 `ResizablePanel` + `Card` 头 + 会话状态 `Badge`（running/exited/failed），高度可调 | `Terminal` |
 | 空画布 | 空白 | 空状态：图标 + 一句说明 | `FileQuestionMark` |
+| 检视面板 | 无 | 右侧 `ResizablePanel`，选中 spec/rule 节点时可见，与编辑器互斥占用右槽（§9）；条目行含 id、正文、AC 计数与覆盖图标（`spec-00001-FR-31`…`FR-33`） | `PanelRight` `CircleCheck` `CircleX` `CircleDashed` |
+| 子画布面包屑 | 无 | shadcn `Breadcrumb`，仅子画布中出现，「Board」项可点返回（`spec-00001-FR-35`/`FR-36`） | `ChevronRight` |
 
 **异常节点的工具栏只保留「编辑」与「关系列表」两项**（spec-00001-AC-2.4，本轮
 随 FR-30 修订）：前者用于修复 front matter，后者用于读出断链指向了谁——两者都不
@@ -349,6 +354,56 @@ FR-26/FR-27 及其 AC 需要新的验收行。
 | 主题三态、面板布局与尺寸记忆、保存中态、空状态、异常计数呈现 | `spec-00001` §7 非功能项，不写 GWT |
 | 边的三个呈现态与选中时的节点压弱 | `spec-00001-FR-28`、`FR-29` 及其 AC；断言落在 §4 的类名上，不落在不透明度的具体数值上——那三个数是可调的起点 |
 | 工具栏的关系列表 | `spec-00001-FR-30` 及其 AC |
+| 检视面板的条目列表、覆盖状态与「无法归属」区 | `spec-00001-FR-31`…`FR-33` 及其 AC（右槽的编辑器优先规则由 AC-31.8/31.9 承载） |
+| 面板条目与画布边的悬停联动 | `spec-00001-FR-34` 及其 AC；强调复用 §4 的 `edge--emphasis` 类，断言落在类名与标签内容上 |
+| 子画布与面包屑返回 | `spec-00001-FR-35`、`FR-36` 及其 AC |
+| 面板宽度记忆、覆盖图标的具体样式 | §7 非功能项路线，不写 GWT |
 
 不写 GWT 的项没有回归保护，这是明知的取舍。两处例外：空画布「无错误」由 AC-1.4
 保证（§7 只涉及它长什么样），异常计数为零时的 `no issues` 文案有现存断言守着。
+
+## 9. 检视面板与子画布（第四轮）
+
+承载 `spec-00001-FR-31`…`FR-36`，取舍由
+[decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)
+持有。数据侧（条目与验收行的解析、API 契约）归 design-00001，落地的 plan 一并
+修订它；本节只管界面。
+
+**停靠与互斥**：检视面板是右侧的 `ResizablePanel`，与编辑器互斥占用同一槽位，
+规则是**编辑器优先**（`spec-00001-FR-31`，AC-31.8/31.9 守着）：面板随选中
+spec/rule 节点出现，但编辑器打开期间不夺槽——编辑是显式动作，不该被一次点选
+打断；编辑器关闭时，若选中仍是 spec/rule，面板随即呈现。两者的宽度各自持久化
+（沿用 §2 的 `useDefaultLayout`，不同 `id`）。代价在 decision-00004 §4 明写：
+无法边看条目边改正文；先付互斥的代价，真实使用证明需要并排再拆双槽。面板自身
+滚动，30 条条目是设计目标规模（本仓 spec-00001 的实测值）。
+
+**条目行的构造**（自上而下即视觉主次）：
+
+1. 覆盖图标 + 条目 id（等宽字）+ AC 计数徽标；
+2. 条目正文，两行截断，完整正文进 `Tooltip` 不可取（键盘/触摸不可达，§4 已有
+   先例）——展开读全文走子画布或编辑器。
+
+覆盖三态的呈现，图标与令牌成对，不只靠颜色（`spec-00001-AC-32.6`）：
+
+| 态 | 图标（Lucide） | 令牌 |
+| --- | --- | --- |
+| 已验证 | `CircleCheck` | `--coverage-verified` |
+| 未通过 | `CircleX` | `--coverage-failing` |
+| 未覆盖 | `CircleDashed` | `--coverage-uncovered` |
+
+「无法归属」区（`FR-33`）固定在条目列表之后，每行「来源 record id · 被引 id」，
+取 `--destructive` 前景——它是数据断裂，不是覆盖状态。
+
+**悬停联动**（`FR-34`）：面板行的 hover 与键盘 focus 走同一通路（`FR-34` 对二者
+同权），强调复用 §4 的 `edge--emphasis` 类、压弱复用 `edge--suppressed`——不新增
+边呈现态，唯一的差别是标签内容换成被引用的 AC id 列表。测试断言因此落在既有
+类名与标签文本上。
+
+**子画布**（`FR-35`/`FR-36`）：同一个 React Flow 实例切换数据集，不是路由页——
+顶层图的实例状态（缩放习惯、交互配置）原样保留。布局沿用 decision-00002 的
+列网格思路，列即层级：条目 | AC | 验收行，行按条目编号升序，AC 与验收行各自
+对齐到其条目行。节点形态：条目节点复用 `Card` 的缩小版（覆盖图标 + id + 正文
+两行截断）；AC 节点更小（id + GWT 首行）；验收行节点含 record id、测试名与
+结果 `Badge`。面包屑用 shadcn `Breadcrumb` 放在顶栏原标题位置，「Board」可点
+（`FR-36`），当前文档 id 为不可点的尾项；顶层白板不渲染面包屑
+（`spec-00001-AC-35.6`）。

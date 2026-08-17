@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event'
 import { MarkerType } from '@xyflow/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DocGraph, DocNode } from '../../src/docRepository.ts'
+import type { DocEdge, DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
 import { api } from '../src/api.ts'
 import { matchDocuments, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
@@ -23,10 +23,15 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
   }
 }
 
+/** A plain document-to-document relation: what it declares is the document it lands on. */
+function relationEdge(from: string, to: string, relation: string, ok = true, declaredTargets = [to]): DocEdge {
+  return { from, to, relation, ok, declaredTargets }
+}
+
 const IDEA = node({ id: 'idea-00001-x', type: 'idea', status: 'active', title: 'Whiteboard idea', path: 'idea/a.md' })
 const GRAPH: DocGraph = {
   nodes: [node(), IDEA],
-  edges: [{ from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true }],
+  edges: [relationEdge('prd-00001-x', 'idea-00001-x', 'parent')],
   issues: [],
 }
 const PLACED = [
@@ -89,7 +94,7 @@ describe('toFlowEdges', () => {
   it('suppresses the edges that have nothing to do with the selection', () => {
     const graph: DocGraph = {
       ...GRAPH,
-      edges: [...GRAPH.edges, { from: 'other-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true }],
+      edges: [...GRAPH.edges, relationEdge('other-00001-x', 'idea-00001-x', 'informs')],
     }
 
     const [connected, unrelated] = toFlowEdges(graph, COLUMNS, 'prd-00001-x')
@@ -103,7 +108,7 @@ describe('toFlowEdges', () => {
   it('emphasises only the newly selected node edges', () => {
     const graph: DocGraph = {
       ...GRAPH,
-      edges: [...GRAPH.edges, { from: 'other-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true }],
+      edges: [...GRAPH.edges, relationEdge('other-00001-x', 'idea-00001-x', 'informs')],
     }
 
     const after = toFlowEdges(graph, COLUMNS, 'other-00001-x')
@@ -117,8 +122,8 @@ describe('toFlowEdges', () => {
     const graph: DocGraph = {
       ...GRAPH,
       edges: [
-        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true },
-        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true },
+        relationEdge('prd-00001-x', 'idea-00001-x', 'parent'),
+        relationEdge('prd-00001-x', 'idea-00001-x', 'informs'),
       ],
     }
 
@@ -132,8 +137,8 @@ describe('toFlowEdges', () => {
     const graph: DocGraph = {
       ...GRAPH,
       edges: [
-        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true },
-        { from: 'prd-00001-x', to: 'idea-00001-x', relation: 'informs', ok: false },
+        relationEdge('prd-00001-x', 'idea-00001-x', 'parent'),
+        relationEdge('prd-00001-x', 'idea-00001-x', 'informs', false),
       ],
     }
 
@@ -162,7 +167,7 @@ describe('toFlowEdges', () => {
   })
 
   it('anchors the other way round when the source is the left-hand node', () => {
-    const graph = { ...GRAPH, edges: [{ from: 'idea-00001-x', to: 'prd-00001-x', relation: 'informs', ok: true }] }
+    const graph = { ...GRAPH, edges: [relationEdge('idea-00001-x', 'prd-00001-x', 'informs')] }
     const edge = toFlowEdges(graph, COLUMNS)[0]!
 
     expect(edge.sourceHandle).toBe('source-right')
@@ -173,7 +178,7 @@ describe('toFlowEdges', () => {
   it('anchors a same-column edge top to bottom', () => {
     const graph: DocGraph = {
       nodes: [],
-      edges: [{ from: 'spec-00002-b', to: 'spec-00001-a', relation: 'supersedes', ok: true }],
+      edges: [relationEdge('spec-00002-b', 'spec-00001-a', 'supersedes')],
       issues: [],
     }
     const placed = [
@@ -191,7 +196,7 @@ describe('toFlowEdges', () => {
   it('anchors a same-column edge the other way when the source is above', () => {
     const graph: DocGraph = {
       nodes: [],
-      edges: [{ from: 'spec-00001-a', to: 'spec-00002-b', relation: 'informs', ok: true }],
+      edges: [relationEdge('spec-00001-a', 'spec-00002-b', 'informs')],
       issues: [],
     }
     const placed = [
@@ -208,7 +213,7 @@ describe('toFlowEdges', () => {
   it('loops a document that references itself', () => {
     const graph: DocGraph = {
       nodes: [],
-      edges: [{ from: 'spec-00001-a', to: 'spec-00001-a', relation: 'supersedes', ok: true }],
+      edges: [relationEdge('spec-00001-a', 'spec-00001-a', 'supersedes')],
       issues: [],
     }
     const edge = toFlowEdges(graph, [{ id: 'spec-00001-a', x: 0, y: 0 }])[0]!
@@ -219,7 +224,7 @@ describe('toFlowEdges', () => {
 
   // spec-00001-AC-2.2
   it('marks an edge pointing at an unknown document', () => {
-    const graph = { ...GRAPH, edges: [{ from: 'prd-00001-x', to: 'ghost', relation: 'parent', ok: false }] }
+    const graph = { ...GRAPH, edges: [relationEdge('prd-00001-x', 'ghost', 'parent', false)] }
     const edge = toFlowEdges(graph, COLUMNS)[0]!
 
     expect(edge.className).toBe('edge--dim edge--broken')
@@ -230,7 +235,7 @@ describe('toFlowEdges', () => {
 
   // spec-00001-AC-29.8 — anomaly and emphasis stack, they do not replace each other
   it('keeps an emphasised edge marked when it points at a ghost', () => {
-    const graph = { ...GRAPH, edges: [{ from: 'prd-00001-x', to: 'ghost', relation: 'parent', ok: false }] }
+    const graph = { ...GRAPH, edges: [relationEdge('prd-00001-x', 'ghost', 'parent', false)] }
     const edge = toFlowEdges(graph, COLUMNS, 'prd-00001-x')[0]!
 
     expect(edge.className).toBe('edge--emphasis edge--broken')
@@ -262,10 +267,10 @@ describe('relationsOf', () => {
   const graph: DocGraph = {
     nodes: [],
     edges: [
-      { from: 'plan-00001-x', to: 'spec-00001-x', relation: 'implements', ok: true },
-      { from: 'spec-00001-x', to: 'prd-00001-x', relation: 'parent', ok: true },
-      { from: 'rule-00001-x', to: 'spec-00001-x', relation: 'informs', ok: true },
-      { from: 'spec-00001-x', to: 'ghost', relation: 'informs', ok: false },
+      relationEdge('plan-00001-x', 'spec-00001-x', 'implements'),
+      relationEdge('spec-00001-x', 'prd-00001-x', 'parent'),
+      relationEdge('rule-00001-x', 'spec-00001-x', 'informs'),
+      relationEdge('spec-00001-x', 'ghost', 'informs', false),
     ],
     issues: [],
   }
@@ -273,10 +278,10 @@ describe('relationsOf', () => {
   // spec-00001-AC-30.1 and AC-30.2
   it('lists every relation with the field, the direction, and the other end', () => {
     expect(relationsOf(graph, 'spec-00001-x', ORDER)).toEqual([
-      { field: 'parent', direction: 'out', otherId: 'prd-00001-x', ok: true },
-      { field: 'informs', direction: 'out', otherId: 'ghost', ok: false },
-      { field: 'implements', direction: 'in', otherId: 'plan-00001-x', ok: true },
-      { field: 'informs', direction: 'in', otherId: 'rule-00001-x', ok: true },
+      { field: 'parent', direction: 'out', otherId: 'prd-00001-x', targetId: 'prd-00001-x', ok: true },
+      { field: 'informs', direction: 'out', otherId: 'ghost', targetId: 'ghost', ok: false },
+      { field: 'implements', direction: 'in', otherId: 'plan-00001-x', targetId: 'plan-00001-x', ok: true },
+      { field: 'informs', direction: 'in', otherId: 'rule-00001-x', targetId: 'rule-00001-x', ok: true },
     ])
   })
 
@@ -297,6 +302,32 @@ describe('relationsOf', () => {
     expect(relationsOf(graph, 'spec-00001-x', ORDER).find((item) => item.otherId === 'ghost')?.ok).toBe(false)
   })
 
+  // spec-00001-AC-28.5 — one edge, but every id it was declared with is listed,
+  // and each one leads to the document holding the item (spec-00001-AC-2.5).
+  it('lists each declared item id of a merged edge, pointing at the document holding it', () => {
+    const merged: DocGraph = {
+      nodes: [],
+      edges: [
+        relationEdge('record-00003-x', 'spec-00001-x', 'verifies', true, [
+          'spec-00001-FR-28',
+          'spec-00001-FR-29',
+          'spec-00001-FR-30',
+        ]),
+      ],
+      issues: [],
+    }
+
+    expect(relationsOf(merged, 'record-00003-x', ORDER)).toEqual([
+      { field: 'verifies', direction: 'out', otherId: 'spec-00001-FR-28', targetId: 'spec-00001-x', ok: true },
+      { field: 'verifies', direction: 'out', otherId: 'spec-00001-FR-29', targetId: 'spec-00001-x', ok: true },
+      { field: 'verifies', direction: 'out', otherId: 'spec-00001-FR-30', targetId: 'spec-00001-x', ok: true },
+    ])
+    // …and the spec's own list still reads as one relation from that record.
+    expect(relationsOf(merged, 'spec-00001-x', ORDER)).toEqual([
+      { field: 'verifies', direction: 'in', otherId: 'record-00003-x', targetId: 'record-00003-x', ok: true },
+    ])
+  })
+
   // spec-00001-AC-30.4
   it('returns nothing for a document with no relations at all', () => {
     expect(relationsOf(graph, 'lonely-00001-x', ORDER)).toEqual([])
@@ -307,8 +338,8 @@ describe('relationsOf', () => {
     const same: DocGraph = {
       nodes: [],
       edges: [
-        { from: 'plan-00001-x', to: 'spec-00002-b', relation: 'implements', ok: true },
-        { from: 'plan-00001-x', to: 'spec-00001-a', relation: 'implements', ok: true },
+        relationEdge('plan-00001-x', 'spec-00002-b', 'implements'),
+        relationEdge('plan-00001-x', 'spec-00001-a', 'implements'),
       ],
       issues: [],
     }
@@ -322,8 +353,8 @@ describe('relationsOf', () => {
     const extra: DocGraph = {
       nodes: [],
       edges: [
-        { from: 'a-00001-x', to: 'z-00001-x', relation: 'mystery', ok: true },
-        { from: 'a-00001-x', to: 'b-00001-x', relation: 'parent', ok: true },
+        relationEdge('a-00001-x', 'z-00001-x', 'mystery'),
+        relationEdge('a-00001-x', 'b-00001-x', 'parent'),
       ],
       issues: [],
     }
@@ -381,6 +412,9 @@ describe('the board', () => {
     vi.spyOn(api, 'transitions').mockResolvedValue(['active', 'archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
     vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    // Selecting a spec or a rule reads its items for the inspector panel
+    // (spec-00001-FR-31); the cases below that reach one do not care what it says.
+    vi.spyOn(api, 'items').mockResolvedValue({ items: [], unattributed: [] })
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
@@ -507,6 +541,35 @@ describe('the board', () => {
     await waitFor(() => expect(screen.getByRole('toolbar', { name: /idea-00001-x/ })).toBeTruthy())
   })
 
+  // spec-00001-AC-2.5 — the fine-grained reference lands on the document holding
+  // the item, drawn as an ordinary edge; picking it in the list goes there.
+  it('draws an edge naming requirement items to the document holding them, unmarked', async () => {
+    const spec = node({ id: 'spec-00001-x', type: 'spec', title: 'Spec', path: 'spec/a.md' })
+    const record = node({ id: 'record-00003-x', type: 'record', title: 'Record', path: 'record/a.md' })
+    vi.spyOn(api, 'graph').mockResolvedValue({
+      nodes: [spec, record],
+      edges: [
+        relationEdge('record-00003-x', 'spec-00001-x', 'verifies', true, ['spec-00001-FR-28', 'spec-00001-FR-29']),
+      ],
+      issues: [],
+    })
+    const { container } = render(<Board />)
+    await waitFor(() => expect(container.querySelectorAll('.react-flow__edge')).toHaveLength(1))
+
+    const drawn = container.querySelector('.react-flow__edge')!
+    expect(drawn.getAttribute('aria-label')).toBe('Edge from record-00003-x to spec-00001-x')
+    expect(drawn.getAttribute('class')).not.toContain('edge--broken')
+
+    fireEvent.click(screen.getByTestId('node-record-00003-x'))
+    await waitFor(() => expect(screen.getByLabelText('Relations')).toBeTruthy())
+    await userEvent.click(screen.getByLabelText('Relations'))
+    const list = await screen.findByRole('list', { name: 'Relations of record-00003-x' })
+    expect(within(list).getByText('spec-00001-FR-28')).toBeTruthy()
+
+    await userEvent.click(within(list).getByText('spec-00001-FR-29'))
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /spec-00001-x/ })).toBeTruthy())
+  })
+
   // issue-00005 — the list offers broken links on purpose; going to one is a
   // different matter, and it used to take the toolbar down with it.
   it('refuses to jump to a relation whose document does not exist', async () => {
@@ -515,7 +578,7 @@ describe('the board', () => {
     window.addEventListener('unhandledrejection', onRejection)
     vi.spyOn(api, 'graph').mockResolvedValue({
       nodes: [node()],
-      edges: [{ from: 'prd-00001-x', to: 'idea-09999-ghost', relation: 'parent', ok: false }],
+      edges: [relationEdge('prd-00001-x', 'idea-09999-ghost', 'parent', false)],
       issues: [],
     })
     render(<Board />)
@@ -559,7 +622,7 @@ describe('the board', () => {
       nodes: [...GRAPH.nodes, node({ id: 'rule-00001-x', type: 'rule', title: 'Rule', path: 'rule/a.md' })],
       edges: [
         ...GRAPH.edges,
-        { from: 'rule-00001-x', to: 'idea-00001-x', relation: 'informs', ok: true },
+        relationEdge('rule-00001-x', 'idea-00001-x', 'informs'),
       ],
     })
     const { container } = render(<Board />)

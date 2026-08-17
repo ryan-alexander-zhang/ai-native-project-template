@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { type FlowConfig, parseFlowConfig } from '../src/config.ts'
+import type { DocEdge } from '../src/docRepository.ts'
 
 const TEST_CONFIG = `
 types:
@@ -15,7 +16,7 @@ types:
   plan: { kind: work }
   issue: { kind: work }
   task: { kind: work }
-relations: [parent, implements, informs, supersedes]
+relations: [parent, implements, informs, supersedes, verifies]
 flow:
   idea:
     - { next: prd, carry: parent }
@@ -91,6 +92,11 @@ export function lastCommitFiles(repoRoot: string): string[] {
 
 export function commitCount(repoRoot: string): number {
   return Number(git(repoRoot, 'rev-list', '--count', 'HEAD').trim())
+}
+
+/** A plain document-to-document edge: the id it declares is the document it lands on. */
+export function relationEdge(from: string, to: string, relation: string, ok = true, declaredTargets = [to]): DocEdge {
+  return { from, to, relation, ok, declaredTargets }
 }
 
 export function doc(frontMatter: Record<string, string>, body = ''): string {

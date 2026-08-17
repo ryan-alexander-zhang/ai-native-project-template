@@ -45,6 +45,15 @@
   /* Document kind — living docs versus work items. */
   --kind-living: oklch(0.809 0.105 251.813);
   --kind-work: oklch(0.828 0.111 84.429);
+
+  /* Requirement coverage — one pair per state of the inspector panel (design-00002 §9).
+     Deliberately not the --status-* set: coverage and document status are two vocabularies. */
+  --coverage-verified: oklch(0.527 0.154 150.069);
+  --coverage-verified-foreground: oklch(0.985 0 0);
+  --coverage-failing: oklch(0.577 0.245 27.325);
+  --coverage-failing-foreground: oklch(0.985 0 0);
+  --coverage-uncovered: oklch(0.552 0.016 285.938);
+  --coverage-uncovered-foreground: oklch(0.985 0 0);
 }
 
 :root:has(.dark),
@@ -78,6 +87,10 @@
 
   --kind-living: oklch(0.623 0.188 259.813);
   --kind-work: oklch(0.769 0.188 70.08);
+
+  --coverage-verified: oklch(0.696 0.17 162.48);
+  --coverage-failing: oklch(0.704 0.191 22.216);
+  --coverage-uncovered: oklch(0.705 0.015 286.067);
 }
 
 @theme inline {

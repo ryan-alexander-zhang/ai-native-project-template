@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
+import { type ItemsView, declaresItems } from '../../src/requirements.ts'
 import { type SessionInfo, api } from './api.ts'
 import { type Placed, layoutGraph } from './layout.ts'
 
@@ -15,6 +16,9 @@ export function useBoard() {
   // Relation field order drives the relation list's grouping (spec-00001-FR-30).
   const [relationOrder, setRelationOrder] = useState<string[]>([])
   const [selected, setSelected] = useState<string>()
+  // Carried with the document it was read for, so a panel never shows the
+  // previous selection's items while the next ones are in flight.
+  const [items, setItems] = useState<{ docId: string; view: ItemsView }>()
   const [transitions, setTransitions] = useState<string[]>([])
   const [nextSteps, setNextSteps] = useState<FlowStep[]>([])
   // Editor and terminal are independent: an agent can work while a document is open.
@@ -75,6 +79,31 @@ export function useBoard() {
     [run],
   )
 
+  // Only a spec or a rule declares requirement items, and only for those does
+  // the inspector panel exist at all (spec-00001-FR-31). A document whose front
+  // matter is broken still gets read: its body is what the panel is for.
+  useEffect(() => {
+    const node = graph.nodes.find((candidate) => candidate.id === selected)
+    if (!node || !declaresItems(node.type)) {
+      setItems(undefined)
+      return
+    }
+    let live = true
+    void api
+      .items(node.id)
+      .then((view) => {
+        if (live) setItems({ docId: node.id, view })
+      })
+      .catch((error) => {
+        if (!live) return
+        setItems(undefined)
+        toast.error(error instanceof Error ? error.message : String(error))
+      })
+    return () => {
+      live = false
+    }
+  }, [graph, selected])
+
   // A session outlives the browser, so a board opening fresh reattaches to it.
   useEffect(() => {
     // Config first: laying out before the column order lands would place every
@@ -105,6 +134,7 @@ export function useBoard() {
     relationOrder,
     selected,
     selectedNode: graph.nodes.find((node) => node.id === selected),
+    items: items !== undefined && items.docId === selected ? items.view : undefined,
     transitions,
     nextSteps,
     editing,

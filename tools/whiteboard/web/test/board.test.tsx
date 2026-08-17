@@ -29,7 +29,7 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
 
 const GRAPH: DocGraph = {
   nodes: [node(), node({ id: 'idea-00001-x', type: 'idea', status: 'active', path: 'idea/a.md' })],
-  edges: [{ from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true }],
+  edges: [{ from: 'prd-00001-x', to: 'idea-00001-x', relation: 'parent', ok: true, declaredTargets: ['idea-00001-x'] }],
   issues: [],
 }
 
@@ -236,7 +236,15 @@ describe('the layout', () => {
     const placed = layoutGraph(
       {
         nodes: [node()],
-        edges: [{ from: 'prd-00001-x', to: 'idea-09999-ghost', relation: 'parent', ok: false }],
+        edges: [
+          {
+            from: 'prd-00001-x',
+            to: 'idea-09999-ghost',
+            relation: 'parent',
+            ok: false,
+            declaredTargets: ['idea-09999-ghost'],
+          },
+        ],
         issues: [],
       },
       ORDER,

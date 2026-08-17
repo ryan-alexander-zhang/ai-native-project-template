@@ -109,3 +109,8 @@ blocks: [spec-00001-docs-whiteboard, plan-00004-whiteboard-edge-emphasis]
   把每个关系目标都当作**文档 id**，于是它们成了断链。这不是本 issue 的根因，而是
   白板与文档约定之间的一处真实冲突，需单独裁定：要么白板识别 requirement id，
   要么 record 只写文档 id。在裁定之前，白板会一直显示「3 issues」。
+  **已消除**（plan-00005 落地时）：裁定取前者——
+  `decision-00004-whiteboard-requirement-panel` §5 裁定一修订了 `spec-00001-FR-2`，
+  指向存在条目的引用落到其所属文档、不算异常；这三条引用现合并为一条 `ok` 的
+  `verifies` 边（`spec-00001-AC-2.5`/`AC-28.5`），白板显示 0 issues。验收见
+  `record-00004`。

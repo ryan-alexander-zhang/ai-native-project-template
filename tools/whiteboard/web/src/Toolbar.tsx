@@ -105,7 +105,7 @@ export function Toolbar(props: ToolbarProps) {
                     relation.ok ? 'button' : 'div',
                     {
                       ...(relation.ok
-                        ? { type: 'button', onClick: () => onPickRelation(relation.otherId) }
+                        ? { type: 'button', onClick: () => onPickRelation(relation.targetId) }
                         : {}),
                       className: `flex w-full items-baseline gap-2 px-3 py-1.5 text-left text-xs ${
                         relation.ok ? 'hover:bg-accent' : ''

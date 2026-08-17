@@ -88,6 +88,83 @@ describe('document reads', () => {
   })
 })
 
+// spec-00001-FR-31 … FR-33 over the wire; the payload contract is design-00001 §7.
+describe('GET /api/docs/:id/items', () => {
+  const SPEC = doc(
+    { id: 'spec-00001-x', type: 'spec', status: 'active' },
+    [
+      '# Spec\n',
+      '- **spec-00001-FR-1** (Event) the board loads the graph.',
+      '- **spec-00001-FR-2** (Unwanted) a broken document is marked.\n',
+      '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+      '  Given docs',
+      '  When the board loads',
+      '  Then a node per document',
+      '- **spec-00001-AC-2.1** (spec-00001-FR-2)',
+      '  Given a broken document',
+      '  When the board loads',
+      '  Then the node is marked\n',
+    ].join('\n'),
+  )
+  const record = (status: string, rows: string[]) =>
+    doc(
+      { id: 'record-00001-x', type: 'record', status },
+      ['# Record\n', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', ...rows, ''].join('\n'),
+    )
+
+  it('serves the items with their criteria, rows, and coverage', async () => {
+    const { call } = boardOn({
+      'spec/a.md': SPEC,
+      'record/r.md': record('active', ['| spec-00001-AC-1.1 | draws a node | pass |']),
+    })
+
+    const { status, body } = await call('GET', '/api/docs/spec-00001-x/items')
+
+    expect(status).toBe(200)
+    expect(body.items.map((found: { id: string }) => found.id)).toEqual(['spec-00001-FR-1', 'spec-00001-FR-2'])
+    expect(body.items[0].criteria[0].rows).toEqual([
+      { recordId: 'record-00001-x', targetId: 'spec-00001-AC-1.1', test: 'draws a node', result: 'pass' },
+    ])
+    // spec-00001-AC-32.1 and AC-32.2 as the panel will read them
+    expect(body.items.map((found: { coverage: string }) => found.coverage)).toEqual(['verified', 'uncovered'])
+    expect(body.unattributed).toEqual([])
+  })
+
+  // spec-00001-AC-32.5 — a record's own status says nothing about the evidence
+  it('counts a row from a draft record', async () => {
+    const { call } = boardOn({
+      'spec/a.md': SPEC,
+      'record/r.md': record('draft', ['| spec-00001-AC-1.1 | draws a node | pass |']),
+    })
+
+    const { body } = await call('GET', '/api/docs/spec-00001-x/items')
+
+    expect(body.items[0].coverage).toBe('verified')
+  })
+
+  // spec-00001-AC-33.1
+  it('serves a row that verifies a criterion this document does not have as unattributed', async () => {
+    const { call } = boardOn({
+      'spec/a.md': SPEC,
+      'record/r.md': record('active', ['| spec-00001-AC-99.1 | a stale test | pass |']),
+    })
+
+    const { body } = await call('GET', '/api/docs/spec-00001-x/items')
+
+    expect(body.unattributed).toEqual([{ recordId: 'record-00001-x', declaredId: 'spec-00001-AC-99.1' }])
+    expect(body.items[0].criteria).toHaveLength(1)
+  })
+
+  it('serves no items for a type that declares none', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    expect((await call('GET', '/api/docs/idea-00001-x/items')).body).toEqual({ items: [], unattributed: [] })
+  })
+
+  it('answers 409 for a document that is not there', async () => {
+    expect((await boardOn({}).call('GET', '/api/docs/spec-09999-ghost/items')).status).toBe(409)
+  })
+})
+
 describe('PUT /api/docs/:id', () => {
   // spec-00001-AC-4.1 and AC-14.1
   it('saves the edited content and commits it', async () => {

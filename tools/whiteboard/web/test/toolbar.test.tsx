@@ -78,7 +78,9 @@ describe('the floating toolbar', () => {
   // spec-00001-AC-30.5 — a broken relation is exactly what the reader needs
   it('marks a relation whose target does not exist', async () => {
     renderToolbar({
-      relations: [{ field: 'parent', direction: 'out', otherId: 'idea-09999-ghost', ok: false }],
+      relations: [
+        { field: 'parent', direction: 'out', otherId: 'idea-09999-ghost', targetId: 'idea-09999-ghost', ok: false },
+      ],
     })
 
     await userEvent.click(screen.getByLabelText('Relations'))
@@ -91,8 +93,8 @@ describe('the floating toolbar', () => {
   it('states which end declared each relation', async () => {
     renderToolbar({
       relations: [
-        { field: 'parent', direction: 'out', otherId: 'idea-00001-x', ok: true },
-        { field: 'implements', direction: 'in', otherId: 'plan-00001-x', ok: true },
+        { field: 'parent', direction: 'out', otherId: 'idea-00001-x', targetId: 'idea-00001-x', ok: true },
+        { field: 'implements', direction: 'in', otherId: 'plan-00001-x', targetId: 'plan-00001-x', ok: true },
       ],
     })
 
@@ -105,13 +107,32 @@ describe('the floating toolbar', () => {
   // spec-00001-AC-30.3
   it('hands back the document picked from the list', async () => {
     const props = renderToolbar({
-      relations: [{ field: 'parent', direction: 'out', otherId: 'idea-00001-x', ok: true }],
+      relations: [{ field: 'parent', direction: 'out', otherId: 'idea-00001-x', targetId: 'idea-00001-x', ok: true }],
     })
 
     await userEvent.click(screen.getByLabelText('Relations'))
     await userEvent.click(await screen.findByText('idea-00001-x'))
 
     expect(props.onPickRelation).toHaveBeenCalledWith('idea-00001-x')
+  })
+
+  // spec-00001-AC-2.6 and AC-28.5 — a fine-grained reference is listed as it was
+  // declared, and going to it goes to the document that holds the item.
+  it('lists each declared item id and jumps to the document holding it', async () => {
+    const props = renderToolbar({
+      relations: [
+        { field: 'verifies', direction: 'out', otherId: 'spec-00001-FR-28', targetId: 'spec-00001-board', ok: true },
+        { field: 'verifies', direction: 'out', otherId: 'spec-00001-FR-29', targetId: 'spec-00001-board', ok: true },
+      ],
+    })
+
+    await userEvent.click(screen.getByLabelText('Relations'))
+
+    expect(await screen.findByText('spec-00001-FR-28')).toBeTruthy()
+    expect(screen.getByText('spec-00001-FR-29')).toBeTruthy()
+    await userEvent.click(screen.getByText('spec-00001-FR-28'))
+
+    expect(props.onPickRelation).toHaveBeenCalledWith('spec-00001-board')
   })
 
   it('opens the editor when edit is pressed', async () => {

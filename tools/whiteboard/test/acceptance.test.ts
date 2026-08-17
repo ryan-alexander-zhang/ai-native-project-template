@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { spawnPty } from '../src/pty.ts'
 import { Board } from '../src/server.ts'
-import { SESSION_WAIT, doc, git, makeRepo, testConfig } from './helpers.ts'
+import { SESSION_WAIT, doc, git, makeRepo, relationEdge, testConfig } from './helpers.ts'
 
 /**
  * The acceptance path of plan-00001: the five stories walked end to end over the
@@ -137,7 +137,7 @@ describe('the whiteboard acceptance path', () => {
       'prd-00001-whiteboard',
     ])
     expect(graph.body.edges).toEqual([
-      { from: 'prd-00001-whiteboard', to: 'idea-00001-whiteboard', relation: 'parent', ok: true },
+      relationEdge('prd-00001-whiteboard', 'idea-00001-whiteboard', 'parent'),
     ])
     expect(graph.body.issues).toEqual([])
   })
@@ -177,8 +177,8 @@ describe('the whiteboard acceptance path', () => {
 
     const graph = new Board({ repoRoot, docsDir, config, spawn: spawnPty }).graph()
     expect(graph.edges).toEqual([
-      { from: 'plan-00001-mvp', to: 'spec-00001-board', relation: 'implements', ok: true },
-      { from: 'rule-00001-flow', to: 'spec-00001-board', relation: 'informs', ok: true },
+      relationEdge('plan-00001-mvp', 'spec-00001-board', 'implements'),
+      relationEdge('rule-00001-flow', 'spec-00001-board', 'informs'),
     ])
   })
 

@@ -57,8 +57,17 @@ flowchart LR
 
 - **Doc Repository**：扫描 `docs/**/*.md`（排除 `README.md`、`TEMPLATE.md`），
   产出图模型 `{nodes, edges, issues}`；类型集与关系字段集取自流程配置，front
-  matter 缺失/非法、断链进 `issues` 并在节点/边上打异常标记（spec
-  FR-1/FR-2 的载体）。节点标题取正文首个 H1，缺失取文件名。
+  matter 缺失/非法、断链（无法解析的引用——可解析的细粒度引用不算，见下）进
+  `issues` 并在节点/边上打异常标记（spec FR-1/FR-2 的载体）。节点标题取正文
+  首个 H1，缺失取文件名。
+  **第四轮起它还解析文档正文的需求条目**：spec 的 `FR`、rule 的 `BR` 及各自的
+  AC——列表项与决策表行两种声明形态都认，AC 按其标注的「(所验条目 id)」归属；
+  并从 record 解析**验收行**（验收清单表格中首列为被验 id、含测试与结果列的
+  行），在服务端推导覆盖三态（spec FR-31…FR-33 的载体，口径见
+  decision-00004 §5）——前端不自行推导。关系目标的解析随 FR-2 的修订变为两段：
+  先按文档 id，再按需求条目/AC id 落到其**所属文档**（边保留所声明的原始 id），
+  二者皆不中才是异常。（BR-18 保证「类型+编号」唯一，文档 id 与条目 id 语法上
+  也不同形，两段不会同时命中——次序只是防御性规定。）
 - **Workflow Engine**：唯一的裁决点。状态流转候选、接收/澄清裁决、下一步
   候选、新文档 id 中「类型 + 编号」的分配（BR-18；slug 由 agent 自取）全部在
   服务端计算，前端从不自行判断（spec FR-6…FR-10 的载体）。流转表
@@ -211,7 +220,18 @@ GET  /api/sessions                    → {current: {id, status} | null}   # 重
 POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话
 WS   /api/sessions/:id/term           双向：stdin/stdout 帧 + exit 事件
 GET  /api/config                      → 生效的流程配置（只读）
+GET  /api/docs/:id/items              → {items, unattributed}       # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；子画布同源复用（FR-35），无第二个端点
 ```
+
+`/items` 的载荷字段是 T1 与后续任务并行时的共同事实：验收行对象至少含
+`{recordId, targetId, test, result}`（FR-34 按它找引用条目 AC 的 record，
+FR-35 的验收行节点由它构造）；`unattributed` 行含 `{recordId, declaredId}`
+（FR-33 的「无法归属」区）。
+
+`GET /api/graph` 的 edge 随 FR-2 修订增加 `declaredTargets`——front matter 所
+声明的原始 id **列表**；细粒度引用时它们与 `target`（所属文档）不同。同一字段
+的多个值落到同一文档时合并为一条边（FR-28 合并规则的延伸，AC-28.5），关系列表
+（FR-30）按 `declaredTargets` 逐项展开。
 
 commit 信息格式：`wb(<action>): <doc-id>`，action ∈
 `edit | status | accept | clarify | advance`（spec FR-14 的"指明动作与文档 id"）。

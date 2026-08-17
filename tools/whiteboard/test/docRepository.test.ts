@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { contentHash, findNode, highestNumber, readDocContent, readGraph } from '../src/docRepository.ts'
-import { doc, makeDocsDir, testConfig } from './helpers.ts'
+import { doc, makeDocsDir, relationEdge, testConfig } from './helpers.ts'
 
 const config = testConfig()
 
@@ -13,6 +13,22 @@ const SPEC = doc(
   { id: 'spec-00001-whiteboard', type: 'spec', status: 'active', parent: 'prd-00001-whiteboard' },
   '# Spec: Whiteboard\n',
 )
+
+/** A spec body carrying requirement items — what a fine-grained relation can point at. */
+const SPEC_ITEMS = [
+  '# Spec: Whiteboard',
+  '',
+  '- **spec-00001-FR-1** (Event) the board loads the graph.',
+  '- **spec-00001-FR-2** (Unwanted) a broken document is marked.',
+  '',
+  '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+  '  Given docs',
+  '  When the board loads',
+  '  Then a node per document',
+  '',
+].join('\n')
+const ITEMISED_SPEC = doc({ id: 'spec-00001-whiteboard', type: 'spec', status: 'active' }, SPEC_ITEMS)
+const STALE_ROW = '| spec-00001-AC-99.1 | a stale test | pass |'
 
 function graphOf(files: Record<string, string>) {
   return readGraph(makeDocsDir(files), config)
@@ -29,8 +45,8 @@ describe('readGraph', () => {
       'spec-00001-whiteboard',
     ])
     expect(graph.edges).toEqual([
-      { from: 'prd-00001-whiteboard', to: 'idea-00001-whiteboard', relation: 'parent', ok: true },
-      { from: 'spec-00001-whiteboard', to: 'prd-00001-whiteboard', relation: 'parent', ok: true },
+      relationEdge('prd-00001-whiteboard', 'idea-00001-whiteboard', 'parent'),
+      relationEdge('spec-00001-whiteboard', 'prd-00001-whiteboard', 'parent'),
     ])
     expect(graph.issues).toEqual([])
   })
@@ -46,8 +62,8 @@ describe('readGraph', () => {
     const graph = graphOf({ 'spec/c.md': SPEC, 'design/d.md': design, 'plan/p.md': plan })
 
     expect(graph.edges.filter((edge) => edge.relation === 'implements')).toEqual([
-      { from: 'plan-00001-mvp', to: 'spec-00001-whiteboard', relation: 'implements', ok: true },
-      { from: 'plan-00001-mvp', to: 'design-00001-whiteboard', relation: 'implements', ok: true },
+      relationEdge('plan-00001-mvp', 'spec-00001-whiteboard', 'implements'),
+      relationEdge('plan-00001-mvp', 'design-00001-whiteboard', 'implements'),
     ])
   })
 
@@ -105,7 +121,7 @@ describe('readGraph', () => {
     const graph = graphOf({ 'idea/a.md': IDEA, 'prd/b.md': doc({ ...frontMatterOf(PRD), parent: 'idea-09999-ghost' }) })
 
     expect(graph.edges).toEqual([
-      { from: 'prd-00001-whiteboard', to: 'idea-09999-ghost', relation: 'parent', ok: false },
+      relationEdge('prd-00001-whiteboard', 'idea-09999-ghost', 'parent', false),
     ])
     expect(graph.issues).toEqual([
       { path: 'prd/b.md', message: 'parent points at unknown document "idea-09999-ghost"' },
@@ -151,6 +167,105 @@ describe('readGraph', () => {
   it('marks a document with no status', () => {
     const graph = graphOf({ 'idea/a.md': doc({ id: 'idea-00001-x', type: 'idea' }) })
     expect(graph.nodes[0]!.problems).toEqual(['status undefined is not a status of a living document'])
+  })
+
+  // spec-00001-AC-2.5 — a fine-grained reference is not a break: it lands on the
+  // document holding the item (decision-00004 §5 裁定一).
+  it('lands a relation naming a requirement item on the document that declares it', () => {
+    const graph = graphOf({
+      'spec/c.md': ITEMISED_SPEC,
+      'record/r.md': doc(
+        { id: 'record-00001-acceptance', type: 'record', status: 'active', verifies: '[spec-00001-FR-1]' },
+        '# Record\n',
+      ),
+    })
+
+    expect(graph.edges).toEqual([
+      relationEdge('record-00001-acceptance', 'spec-00001-whiteboard', 'verifies', true, ['spec-00001-FR-1']),
+    ])
+    expect(graph.issues).toEqual([])
+  })
+
+  it('lands a relation naming an acceptance criterion on the same document', () => {
+    const graph = graphOf({
+      'spec/c.md': ITEMISED_SPEC,
+      'record/r.md': doc(
+        { id: 'record-00001-acceptance', type: 'record', status: 'active', verifies: '[spec-00001-AC-1.1]' },
+        '# Record\n',
+      ),
+    })
+
+    expect(graph.edges).toEqual([
+      relationEdge('record-00001-acceptance', 'spec-00001-whiteboard', 'verifies', true, ['spec-00001-AC-1.1']),
+    ])
+  })
+
+  // spec-00001-AC-2.6 — the document exists, the item does not
+  it('marks a relation naming an item that does not exist', () => {
+    const graph = graphOf({
+      'spec/c.md': ITEMISED_SPEC,
+      'record/r.md': doc(
+        { id: 'record-00001-acceptance', type: 'record', status: 'active', verifies: '[spec-00001-FR-999]' },
+        '# Record\n',
+      ),
+    })
+
+    expect(graph.edges).toEqual([
+      relationEdge('record-00001-acceptance', 'spec-00001-FR-999', 'verifies', false, ['spec-00001-FR-999']),
+    ])
+    expect(graph.issues).toEqual([
+      { path: 'record/r.md', message: 'verifies points at unknown document "spec-00001-FR-999"' },
+    ])
+  })
+
+  // spec-00001-AC-28.5 — three ids along one path are one line, and it carries all three
+  it('merges the ids of one field that land on the same document into a single edge', () => {
+    const graph = graphOf({
+      'spec/c.md': ITEMISED_SPEC,
+      'record/r.md': doc(
+        {
+          id: 'record-00001-acceptance',
+          type: 'record',
+          status: 'active',
+          verifies: '[spec-00001-FR-1, spec-00001-FR-2, spec-00001-AC-1.1]',
+        },
+        '# Record\n',
+      ),
+    })
+
+    expect(graph.edges).toEqual([
+      relationEdge('record-00001-acceptance', 'spec-00001-whiteboard', 'verifies', true, [
+        'spec-00001-FR-1',
+        'spec-00001-FR-2',
+        'spec-00001-AC-1.1',
+      ]),
+    ])
+  })
+
+  // spec-00001-AC-33.2 — a break inside the body is not a break of the node
+  it('keeps a document sound when a record verifies a criterion it does not have', () => {
+    const graph = graphOf({
+      'spec/c.md': ITEMISED_SPEC,
+      'record/r.md': doc(
+        { id: 'record-00001-acceptance', type: 'record', status: 'active' },
+        ['# Record', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', STALE_ROW, ''].join('\n'),
+      ),
+    })
+
+    expect(graph.nodes.every((node) => node.ok)).toBe(true)
+    expect(graph.issues).toEqual([])
+  })
+
+  it('resolves no item of a document whose own front matter is broken', () => {
+    const graph = graphOf({
+      'spec/c.md': doc({ id: 'spec-00001-whiteboard', type: 'spec' }, SPEC_ITEMS),
+      'record/r.md': doc(
+        { id: 'record-00001-acceptance', type: 'record', status: 'active', verifies: '[spec-00001-FR-1]' },
+        '# Record\n',
+      ),
+    })
+
+    expect(graph.edges[0]!.ok).toBe(false)
   })
 
   it('ignores relation values that are neither string nor list of strings', () => {

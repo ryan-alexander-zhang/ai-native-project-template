@@ -22,6 +22,14 @@ describe('the api client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/graph', expect.objectContaining({ method: 'GET' }))
   })
 
+  // the requirement panel and the sub-canvas share this one payload (design-00001 §7)
+  it('reads the requirement items of a document', async () => {
+    const fetchMock = mockFetch(200, { items: [], unattributed: [] })
+
+    expect(await api.items('spec-00001-x')).toEqual({ items: [], unattributed: [] })
+    expect(fetchMock).toHaveBeenCalledWith('/api/docs/spec-00001-x/items', expect.objectContaining({ method: 'GET' }))
+  })
+
   it('sends an edit with its base hash', async () => {
     const fetchMock = mockFetch(200, { committed: true })
     await api.save('prd-00001-x', 'body', 'abc')

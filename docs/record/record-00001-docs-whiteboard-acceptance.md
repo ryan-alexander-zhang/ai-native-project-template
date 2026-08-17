@@ -114,7 +114,15 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | --- | --- | --- | --- |
 | rule-00001-AC-1.1 | the config shipped with this repo (t/config) | pass | idea/prd/spec = living |
 | rule-00001-AC-1.2 | the config shipped with this repo (t/config) | pass | issue/plan/task = work |
-| rule-00001-AC-2.1 … AC-9.2 | allowedTransitions 的十条用例 (t/statusRules) | pass | 流转表逐行 + otherwise |
+| rule-00001-AC-2.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 流转表逐行 + otherwise（本行起九行原为一条区间行「AC-2.1 … AC-9.2」，为使每行可被逐条核对而展开，证据不变） |
+| rule-00001-AC-3.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-4.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-5.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-6.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-7.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-8.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-9.1 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
+| rule-00001-AC-9.2 | allowedTransitions 的十条用例 (t/statusRules) | pass | 同上 |
 | rule-00001-AC-10.1 | promotes a living doc to active (t/statusRules)；accepts a draft living doc into active (t/docService) | pass | draft → active |
 | rule-00001-AC-10.2 | promotes a work item to open (t/statusRules)；accepts a draft work item into open (t/docService) | pass | draft → open |
 | rule-00001-AC-11.1 | writes clarify questions and keeps the document draft / writes every question given (t/docService) | pass | 多条写入 + 仍 draft |

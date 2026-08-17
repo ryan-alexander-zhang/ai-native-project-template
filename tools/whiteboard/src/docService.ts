@@ -7,10 +7,12 @@ import {
   type DocNode,
   contentHash,
   findNode,
+  readDocBody,
   readDocContent,
   readGraph,
 } from './docRepository.ts'
 import { type ActionKind, type CommitOutcome, GitLayer, commitMessage } from './gitLayer.ts'
+import { type ItemsView, declaresItems, requirementView } from './requirements.ts'
 import { applyAccept, applyClarify, applyStatusChange, nextStepsFor, transitionsFor } from './workflow.ts'
 
 /** The document changed under the action, or is gone; the caller must refresh (spec-00001-FR-5, FR-19). */
@@ -53,6 +55,21 @@ export class DocService {
 
   read(id: string): DocContent {
     return readDocContent(this.docsDir, this.require(id))
+  }
+
+  /**
+   * The document's requirement items with their coverage (spec-00001-FR-31 …
+   * FR-33). Every record in the repo is evidence, whatever its own status
+   * (decision-00004 §5 裁定二); a type that declares no items yields none.
+   */
+  items(id: string): ItemsView {
+    const graph = this.graph()
+    const node = this.require(id, graph)
+    if (!declaresItems(node.type)) return { items: [], unattributed: [] }
+    const records = graph.nodes
+      .filter((candidate) => candidate.type === 'record')
+      .map((record) => ({ id: record.id, body: readDocBody(this.docsDir, record) }))
+    return requirementView({ id: node.id, body: readDocBody(this.docsDir, node) }, records)
   }
 
   transitions(id: string): string[] {
@@ -100,8 +117,8 @@ export class DocService {
     return this.git.commit(paths, commitMessage('advance', docId))
   }
 
-  private require(id: string): DocNode {
-    const node = findNode(this.graph(), id)
+  private require(id: string, graph: DocGraph = this.graph()): DocNode {
+    const node = findNode(graph, id)
     if (!node) throw new ConflictError(`${id} is not a document in this repo; refresh the board`)
     return node
   }

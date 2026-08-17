@@ -29,6 +29,7 @@ parent: prd-00001-docs-whiteboard
 | S3 | 作为文档负责人，我要在节点上合法地切换状态并做接收/澄清，这样把关动作由工具保证合规且显式 | spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-19 |
 | S4 | 作为文档负责人，我要从节点一键推进下一步并看着 agent 实时写文档，这样流程知识不靠记忆 | spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-21 |
 | S5 | 作为文档负责人，我要每次变更与评审都自动留痕，这样任何结论都可追溯 | spec-00001-FR-14, spec-00001-FR-20 |
+| S6 | 作为文档负责人，我要选中一份 spec 或 rule 就看到它的需求条目与验收覆盖，并能下钻到条目级的验收链路，这样验收缺口不靠脚本就能看见 | spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36 |
 
 ## 3. Business Rules
 
@@ -53,9 +54,13 @@ parent: prd-00001-docs-whiteboard
   本要求只承载其可验收的部分。
 - **spec-00001-FR-2** (Unwanted) 若文档的 front matter 缺失或非法（含 id 不合
   `<type>-<五位数>-<slug>` 格式、type 不在流程配置的类型集内），或关系字段指向
-  不存在的文档 id，系统应将该节点或边标记为异常并保持其余图可用，不得整体失败；
+  **无法解析的 id**，系统应将该节点或边标记为异常并保持其余图可用，不得整体失败；
   无 id 的节点以文件路径为标签，异常节点的浮窗只提供编辑入口（用于修复），不
-  提供状态切换、评审与推进。
+  提供状态切换、评审与推进。关系字段指向**存在的需求条目或 AC id**（如
+  `verifies: [spec-00001-FR-28]`——`docs/record/README.md` 允许的细粒度写法）
+  **不是异常**：该边落到条目所在的文档，关系列表（FR-30）照常列出所声明的细粒度
+  id。「无法解析」即：既不是存在的文档 id，也不是存在的条目或 AC id。（本段修订
+  由 decision-00004 §5 的裁定产生。）
 - **spec-00001-FR-3** (Event) 当用户点击节点时，系统应弹出浮窗工具栏，提供
   编辑、状态切换、评审（接收/澄清）与推进入口；点击画布空白处时工具栏关闭。
 - **spec-00001-FR-4** (Event) 当用户在 Markdown 编辑器中保存时，系统应把内容
@@ -132,7 +137,10 @@ parent: prd-00001-docs-whiteboard
   列出全部字段名——两条几何完全重合的边无法分辨，等于把一条画了两次。这条改变了
   边的条数，`AC-1.1` 因此随之修订：不变量是「每个关系字段都出现在图上」，不是
   「每个字段各占一条边」。反方向的一对（`A→B` 与 `B→A`）不合并——箭头相反，
-  是两件不同的事。
+  是两件不同的事。同理，**同一字段的多个值解析到同一份文档**（FR-2 修订后细粒度
+  引用会造成这种形态，如一个 `verifies` 列出同一 spec 的三个条目 id）也合并为
+  一条边——三条几何重合的边同样无法分辨；每个被声明的 id 仍逐项出现在关系列表
+  （FR-30）里，FR-34 的标签取被引的 AC id 亦不受合并影响。
 - **spec-00001-FR-29** (Event) 当用户选中一个节点时，系统应把与该节点相连的
   全部边转为**强调态**（高对比、显示关系名标签、绘制于节点之上），并把其余边与
   与之无关的节点一并压弱；取消选中时全部边回到弱化态、节点回到常态。
@@ -147,6 +155,46 @@ parent: prd-00001-docs-whiteboard
   提供该列表**——它恰恰是修复断链所需要的信息；这构成对 `AC-2.4` 的修订，见该条。
   **指向不存在文档的关系项照常列出并标记，但不可点击**：没有可去之处的项不该
   呈现为可以去（issue-00005）。
+- **spec-00001-FR-31** (Event) 当用户选中一个 spec 或 rule 节点时，系统应在
+  **检视面板**列出该文档的全部**需求条目**（spec 为 `spec-<n>-FR-<i>`，rule 为
+  `rule-<n>-BR-<i>`），按编号升序，每条含条目 id、正文与 AC 计数；条目的两种
+  声明形态——列表项与决策表行（rule-00001 的 BR-2…BR-9 即后者）——都应解析，
+  AC 按其标注的「(所验条目 id)」归属到条目。条目只出现在检视面板与子画布
+  （FR-35），**不成为顶层白板的节点或边**。选中其他类型的文档时检视面板不出现；
+  取消选中时面板关闭。front matter 异常但正文可解析的 spec/rule 节点**同样提供
+  检视面板**——读条目是审查与修复所需的读取动作，与 FR-30 对异常节点的处理同理。
+  编辑器占用右侧槽位期间面板不出现（**编辑器优先**）；编辑器关闭时，若当前选中
+  仍是 spec/rule 节点，面板随即呈现（右槽占用规则见 design-00002 §9）。
+  （取舍见 `decision-00004-whiteboard-requirement-panel`。）
+- **spec-00001-FR-32** (Ubiquitous) 检视面板中的每条需求条目应携带**覆盖状态**，
+  由全部 record 文档的**验收行**推导，不区分 record 的 status（decision-00004
+  §5 裁定二）。验收行的识别：record 中验收清单表格的行——首列为被验 id（AC id
+  或条目 id，二者都是 `docs/record/README.md` 允许的写法），且表格含测试与结果
+  列；仅含 id 与说明的其他表格（如修订对照表）不是验收行，Evidence 列有无不影响
+  识别。三态按序判定，先命中先出：**未通过**——存在结果非 `pass` 的引用行
+  （`fail`、`n/a` 一律入此态；引用其 AC 的行与直接引用条目 id 的行同权）；
+  **未覆盖**——该条目没有任何 AC，或存在没有任何引用行的 AC（覆盖按 AC 逐条
+  要求；直接引用条目 id 的 `pass` 行不能替代逐 AC 引用，decision-00004 §5
+  裁定三）；**已验证**——其余。覆盖状态以带可访问名的图标或文字承载，不只靠
+  颜色传达。
+- **spec-00001-FR-33** (Unwanted) 若验收行引用的 AC id 在其所属文档中不存在，
+  或某条 AC 的归属标注指向不存在的条目，系统应把该行或该 AC 列入检视面板的
+  「无法归属」区（含来源 record id 与被引 id），不参与覆盖推导与 AC 计数；
+  其余条目、验收行与白板整体保持可用，且 FR-2 的节点异常判定不因此改变——
+  正文内的断裂不使文档节点降格为异常节点。
+- **spec-00001-FR-34** (Event) 当用户悬停或键盘聚焦检视面板中的某条需求条目时，
+  系统应把选中文档与「验收行引用了该条目 AC 的 record 文档」之间的**既有**关系
+  边转为强调态、标签替换为被引用的 AC id（多条时并列），其余边一并压弱；离开该条目时回到
+  FR-29 所定的选中态呈现。条目未覆盖、或该 record 与选中文档之间不存在关系边
+  时，不强调任何边且不出错。
+- **spec-00001-FR-35** (Event) 当用户在检视面板点击「展开为子画布」时，系统应把
+  画布切换为该文档的**子画布**：需求条目、各条目的 AC、以及引用这些 AC 的验收
+  行呈现为节点（验收行节点含 record id、测试名与结果），边为条目→AC 与 AC→
+  验收行；条目的覆盖状态沿用 FR-32 的呈现；顶栏呈现面包屑「Board / <文档 id>」。
+  面包屑只在子画布中出现；无条目的文档不提供该入口。
+- **spec-00001-FR-36** (Event) 当用户点击面包屑中的「Board」时，系统应回到顶层
+  白板并把该文档节点置为选中态（视口定位到它）——返回即选中，检视面板与边的
+  强调随选中态照常出现（FR-29、FR-31）。
 
 **Acceptance (GWT)**
 
@@ -224,6 +272,14 @@ parent: prd-00001-docs-whiteboard
   When 点击该节点
   Then 浮窗只含编辑入口与关系列表（FR-30），无状态切换、评审、推进——列出关系是
   修复断链所必需的读取动作，不改变任何文档
+- **spec-00001-AC-2.5** (spec-00001-FR-2)
+  Given 一份 record 声明 `verifies: [spec-00001-FR-28]`，且该条目存在于 spec-00001
+  When 打开白板
+  Then 该边连到 `spec-00001` 的节点，且不带异常标记
+- **spec-00001-AC-2.6** (spec-00001-FR-2)
+  Given 一份文档的关系字段指向 `spec-00001-FR-999`（文档存在，条目不存在）
+  When 打开白板
+  Then 该边带异常标记，图整体仍可用
 - **spec-00001-AC-3.1** (spec-00001-FR-3)
   Given 图上有一个正常节点
   When 点击该节点
@@ -582,6 +638,11 @@ parent: prd-00001-docs-whiteboard
   Given 两份文档之间声明了两个不同的关系字段
   When 打开白板
   Then 画布上只有一条边，其标签同时含这两个字段名
+- **spec-00001-AC-28.5** (spec-00001-FR-28)
+  Given 一份 record 的 `verifies` 字段列出同一 spec 的三个需求条目 id
+  When 打开白板
+  Then 该 record 与该 spec 之间只有一条边，而关系列表（FR-30）仍逐项列出三个
+  被声明的 id
 - **spec-00001-AC-29.6** (spec-00001-FR-29)
   Given 已选中某节点
   When 图刷新（文档在磁盘上变化后重新加载）
@@ -594,12 +655,160 @@ parent: prd-00001-docs-whiteboard
   Given 选中节点的某条边是异常边（指向不存在的文档）
   When 选中该节点
   Then 该边同时是强调态与异常态：显示标签、绘于节点之上，且保持异常样式
+- **spec-00001-AC-31.1** (spec-00001-FR-31)
+  Given 一份以列表项声明 FR 与 AC 的 spec（本仓 spec-00001 的形态）
+  When 选中该节点
+  Then 检视面板按编号升序列出其全部 FR 条目，每条含条目 id、正文与 AC 计数
+- **spec-00001-AC-31.2** (spec-00001-FR-31)
+  Given 一份把部分 BR 声明在决策表行内的 rule（本仓 rule-00001 的 BR-2…BR-9 形态）
+  When 选中该节点
+  Then 决策表行里的条目与列表项条目同样出现在面板中，无一缺失
+- **spec-00001-AC-31.3** (spec-00001-FR-31)
+  Given 图上有一个 plan 节点
+  When 选中它
+  Then 检视面板不出现
+- **spec-00001-AC-31.4** (spec-00001-FR-31)
+  Given 一份不含任何需求条目的 spec
+  When 选中该节点
+  Then 面板呈现「无条目」而不是空白
+- **spec-00001-AC-31.5** (spec-00001-FR-31)
+  Given 一份含若干 FR 与 AC 的 spec
+  When 打开白板且未选中任何节点
+  Then 顶层图的节点数等于文档数——没有任何条目出现为节点
+- **spec-00001-AC-31.6** (spec-00001-FR-31)
+  Given 检视面板已打开
+  When 点击画布空白处取消选中
+  Then 面板关闭
+- **spec-00001-AC-31.7** (spec-00001-FR-31)
+  Given 一份 front matter 异常（如缺 status）但正文含条目的 spec
+  When 选中该节点
+  Then 检视面板照常列出其条目
+- **spec-00001-AC-31.8** (spec-00001-FR-31)
+  Given 编辑器已打开
+  When 选中一个 spec 节点
+  Then 编辑器保持可见，检视面板不出现
+- **spec-00001-AC-31.9** (spec-00001-FR-31)
+  Given 编辑器已打开，且当前选中的是一个 spec 节点
+  When 关闭编辑器
+  Then 检视面板呈现该 spec 的条目
+- **spec-00001-AC-32.1** (spec-00001-FR-32)
+  Given 某条目的每一条 AC 都被结果为 `pass` 的验收行引用
+  When 查看检视面板中的该条目
+  Then 其覆盖状态为「已验证」
+- **spec-00001-AC-32.2** (spec-00001-FR-32)
+  Given 某条目的任何 AC 都没有被任何验收行引用
+  When 查看该条目
+  Then 其覆盖状态为「未覆盖」
+- **spec-00001-AC-32.3** (spec-00001-FR-32)
+  Given 某条目有两条 AC，一条被 `pass` 行引用、另一条没有任何引用行
+  When 查看该条目
+  Then 其覆盖状态为「未覆盖」——覆盖按 AC 逐条要求
+- **spec-00001-AC-32.4** (spec-00001-FR-32)
+  Given 某条目的全部 AC 都有 `pass` 行，另有一行结果为 `n/a` 的引用行
+  When 查看该条目
+  Then 其覆盖状态为「未通过」——非 `pass` 行的存在优先于其余判定
+- **spec-00001-AC-32.5** (spec-00001-FR-32)
+  Given 某条目的验收行全部 `pass`，其中一行来自 status 为 `draft` 的 record
+  When 查看该条目
+  Then 其覆盖状态为「已验证」——record 状态不影响证据效力（decision-00004 §5
+  裁定二）
+- **spec-00001-AC-32.6** (spec-00001-FR-32)
+  Given 任一携带覆盖状态的条目
+  When 查看检视面板
+  Then 该状态呈现为一个带可访问名（如「已验证」）的图标或文字元素，可按可访问名
+  查询到，不是仅有颜色差异
+- **spec-00001-AC-32.7** (spec-00001-FR-32)
+  Given 一个没有任何 AC 的条目
+  When 查看该条目
+  Then 其覆盖状态为「未覆盖」——零 AC 是最该暴露的缺口，不得落进「已验证」
+- **spec-00001-AC-32.8** (spec-00001-FR-32)
+  Given 某条目有一行结果为 `fail` 的引用行，同时它还有一条没有任何引用行的 AC
+  When 查看该条目
+  Then 其覆盖状态为「未通过」——非 `pass` 行优先于未覆盖判定
+- **spec-00001-AC-32.9** (spec-00001-FR-32)
+  Given 某条目的每条 AC 都有 `pass` 行，另有一行直接引用条目 id、结果为 `n/a`
+  When 查看该条目
+  Then 其覆盖状态为「未通过」——条目级行的报警与 AC 级行同权
+- **spec-00001-AC-32.10** (spec-00001-FR-32)
+  Given 某条目有一行直接引用条目 id 的 `pass` 行，但它的一条 AC 没有任何引用行
+  When 查看该条目
+  Then 其覆盖状态为「未覆盖」——条目级 `pass` 不构成逐 AC 覆盖
+- **spec-00001-AC-33.1** (spec-00001-FR-33)
+  Given 一份 record 的验收行引用 `spec-00001-AC-99.1`（该条目不存在）
+  When 选中 spec-00001
+  Then 该行出现在面板的「无法归属」区，含其 record id 与被引 id
+- **spec-00001-AC-33.2** (spec-00001-FR-33)
+  Given 同 AC-33.1
+  When 查看面板与白板
+  Then 各条目的覆盖状态与 AC 计数不受该行影响，节点不因此带异常标记，白板整体可用
+- **spec-00001-AC-33.3** (spec-00001-FR-33)
+  Given 某条 AC 的归属标注指向不存在的条目（如 `(spec-00001-FR-99)`）
+  When 选中该文档
+  Then 该 AC 出现在「无法归属」区，不计入任何条目的 AC 计数
+- **spec-00001-AC-34.1** (spec-00001-FR-34)
+  Given 选中的 spec 有一条已验证条目，其验收行来自与该 spec 存在关系边的 record
+  When 悬停面板中的该条目
+  Then 两者之间的边转为强调态，标签为被引用的 AC id（多条时并列）
+- **spec-00001-AC-34.2** (spec-00001-FR-34)
+  Given 同 AC-34.1
+  When 悬停离开该条目
+  Then 该边回到 FR-29 所定的选中态呈现，标签回到关系字段名
+- **spec-00001-AC-34.3** (spec-00001-FR-34)
+  Given 一条未覆盖的条目
+  When 悬停它
+  Then 没有任何边转为强调态，亦无错误
+- **spec-00001-AC-34.4** (spec-00001-FR-34)
+  Given 同 AC-34.1 的前提
+  When 用键盘把焦点移到该条目
+  Then 出现与悬停一致的强调
+- **spec-00001-AC-34.5** (spec-00001-FR-34)
+  Given 某条目的验收行所在 record 与选中文档之间没有关系边
+  When 悬停该条目
+  Then 不强调任何边且不出错
+- **spec-00001-AC-34.6** (spec-00001-FR-34)
+  Given 某条目的 AC 被两份 record 的验收行引用，且两份 record 都与选中文档存在
+  关系边
+  When 悬停该条目
+  Then 两条边都转为强调态
+- **spec-00001-AC-35.1** (spec-00001-FR-35)
+  Given 已选中一份含条目的 spec
+  When 点击「展开为子画布」
+  Then 画布呈现其条目、AC 与验收行节点，顶层的文档节点不再可见
+- **spec-00001-AC-35.2** (spec-00001-FR-35)
+  Given 子画布中某条目有一条 AC，且该 AC 被某 record 的验收行引用
+  When 查看子画布
+  Then 存在条目→该 AC 的边，与该 AC→该验收行节点的边；验收行节点含 record id、
+  测试名与结果
+- **spec-00001-AC-35.3** (spec-00001-FR-35)
+  Given 子画布中有一条未覆盖的条目
+  When 查看子画布
+  Then 该条目节点带未覆盖标记
+- **spec-00001-AC-35.4** (spec-00001-FR-35)
+  Given 子画布已打开
+  When 查看顶栏
+  Then 面包屑呈现「Board / <该文档 id>」
+- **spec-00001-AC-35.5** (spec-00001-FR-35)
+  Given 一份不含任何条目的 spec
+  When 查看其检视面板
+  Then 「展开为子画布」不可用
+- **spec-00001-AC-35.6** (spec-00001-FR-35)
+  Given 顶层白板
+  When 查看顶栏
+  Then 不呈现面包屑
+- **spec-00001-AC-36.1** (spec-00001-FR-36)
+  Given 某文档的子画布已打开
+  When 点击面包屑中的「Board」
+  Then 顶层白板呈现，该文档节点处于选中态且在视口内
+- **spec-00001-AC-36.2** (spec-00001-FR-36)
+  Given 同 AC-36.1
+  When 返回顶层后查看界面
+  Then 检视面板呈现该文档的条目——与直接选中它时一致
 
 ## 5. Technical Design
 
 | Design | Doc | Covers |
 | --- | --- | --- |
-| Docs 白板 MVP | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 服务形态、模块结构、流程配置契约、终端通道、权限传递、冲突与 commit 策略 |
+| Docs 白板 MVP | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 服务形态、模块结构、流程配置契约、终端通道、权限传递、冲突与 commit 策略、条目与验收行的解析及覆盖推导 |
 | Docs 白板界面 | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 设计令牌、布局、控件映射、图标语言、可访问性 |
 
 ## 6. Out of Scope
@@ -621,6 +830,17 @@ parent: prd-00001-docs-whiteboard
 - 预览打开期间对该文档的外部改动自动重渲染（切回编辑再切预览即取到最新缓冲区）。
 - 文档中 `javascript:` 等 URL scheme 的拦截——FR-24 只承诺不执行脚本、不注入
   原始 HTML。
+- 覆盖状态的执法（据缺口阻止状态流转或推进）——白板只呈现缺口，resolve 门禁仍由
+  流程文档约束（decision-00004 §3）。
+- 画布→面板的反向联动（点击边或 record 节点定位到条目行）。
+- 子画布内的编辑、评审与推进——子画布是只读视图。
+- spec 与 rule 之外类型的条目解析。
+- 引用不存在**文档**的验收行的归属呈现——FR-33 只处理「文档存在而条目不存在」；
+  被引文档本身不存在的行没有可展示它的面板。
+- record 状态对证据效力的区分（当前一律参与，见 FR-32 与 decision-00004 §5）。
+- 子画布打开期间对磁盘变化（图刷新、文档被删）的专门处置——MVP 未定义，落地
+  plan 时裁定。
+- 「无法归属」区在子画布中的呈现——它只在检视面板中列出（FR-33）。
 
 ## 7. Non-Functional
 
@@ -644,4 +864,4 @@ parent: prd-00001-docs-whiteboard
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
 - Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md)
-- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）
+- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）
