@@ -217,6 +217,32 @@ describe('a running session', () => {
     await vi.waitFor(() => expect(output.text).toContain('100x40'), SESSION_WAIT)
   })
 
+  /**
+   * spec-00001-AC-11.2 — sending it is submitting it. The CLI's input box reads
+   * LF as a line break inside the box and only CR as the Enter that submits, so
+   * the instruction's own newlines stay LF and the last byte is CR (issue-00011).
+   */
+  it('ends the instruction with the carriage return that submits it', () => {
+    const written: string[] = []
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agent: { name: 'test', command: 'node', args: [] },
+      repoRoot,
+      spawn: () => ({
+        onData: () => {},
+        onExit: () => {},
+        write: (data) => void written.push(data),
+        resize: () => {},
+        kill: () => {},
+      }),
+      onExit: async () => OUTCOME,
+    })
+
+    manager.start({ kind: 'clarify', sourceId: 'spec-00001-x', instruction: 'first line\nsecond line' })
+
+    expect(written).toEqual(['first line\nsecond line\r'])
+  })
+
   // spec-00001-AC-11.2 — the task instruction reaches the CLI on startup
   it('sends the task instruction as the first input', async () => {
     const { manager } = makeManager({

@@ -1,9 +1,10 @@
 import type { Server } from 'node:http'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Board } from '../src/server.ts'
-import { spawnPty } from '../src/pty.ts'
+import { ptySpawner, spawnPty } from '../src/pty.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import {
   SESSION_WAIT,
@@ -28,11 +29,11 @@ const servers: Server[] = []
 const watching: Board[] = []
 
 /** Start a board on an ephemeral port and give back a fetch bound to it. */
-function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?: string) {
+function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?: string, spawn = spawnPty) {
   const { repoRoot, docsDir } = makeRepo(files)
   const config = testConfig()
   config.agents[0] = { ...config.agents[0]!, args: agentArgs, ...(command ? { command } : {}) }
-  const board = new Board({ repoRoot, docsDir, config, spawn: spawnPty })
+  const board = new Board({ repoRoot, docsDir, config, spawn })
   const server = board.listen(0)
   servers.push(server)
   // The http server only announces its close once every socket has gone, and a
@@ -506,6 +507,27 @@ describe('clarify and ask sessions', () => {
 describe('DELETE /api/sessions', () => {
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
   const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+  /**
+   * A session process that ignores SIGHUP and then sleeps past any test, so the
+   * only thing that can end it is the escalation (issue-00012). It reports its
+   * own pid before sleeping: the file appearing is how the test knows the
+   * ignore is in place, and the pid in it is what it asks the OS about later.
+   */
+  const PID_FILE = join(tmpdir(), `whiteboard-deaf-to-hup-${process.pid}.pid`)
+  const DEAF_TO_HUP = ['-c', `trap '' HUP; echo $$ > ${PID_FILE}; sleep 60`]
+  /** The grace this test waits out; production holds seconds (KILL_GRACE_MS). */
+  const TEST_GRACE_MS = 200
+
+  /** Whether that process is still around; a signal of 0 only asks. */
+  function isRunning(pid: number): boolean {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   /** A clarify agent that revises the document it was started on, then hangs. */
   const REVISE_AND_HOLD = [
     '-e',
@@ -583,6 +605,28 @@ describe('DELETE /api/sessions', () => {
 
     expect(existsSync(statePath)).toBe(true)
     expect(readFileSync(statePath, 'utf8')).toBe('{"answered":1}')
+  })
+
+  /**
+   * spec-00001-AC-49.10 — the reason Stop exists is a session that will not
+   * listen, so the polite signal alone is not an end (issue-00012): the wait has
+   * to be bounded by an escalation rather than by the process's manners.
+   */
+  it('ends a session whose process ignores the polite signal', async () => {
+    rmSync(PID_FILE, { force: true })
+    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, DEAF_TO_HUP, 'bash', ptySpawner(TEST_GRACE_MS))
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await vi.waitFor(() => expect(existsSync(PID_FILE)).toBe(true), SESSION_WAIT)
+    const pid = Number(readFileSync(PID_FILE, 'utf8').trim())
+    expect(isRunning(pid)).toBe(true)
+
+    const { status, body } = await call('DELETE', '/api/sessions')
+
+    expect(status).toBe(200)
+    expect(body.status).toBe('exited')
+    expect(board.sessions.attach(() => {}).buffer).toContain('session ended with code')
+    expect(isRunning(pid)).toBe(false)
+    rmSync(PID_FILE, { force: true })
   })
 
   // spec-00001-AC-49.4
@@ -684,7 +728,9 @@ describe('terminal size frames', () => {
     socket.send(sizeFrame(100, 40))
     socket.send('{"cols":9,"rows":9}')
 
-    await vi.waitFor(() => expect(typed).toEqual(['answer this\n', '{"cols":9,"rows":9}']))
+    // The instruction is the session's own first write, submitted with CR
+    // (issue-00011); the keystroke frame is forwarded exactly as it arrived.
+    await vi.waitFor(() => expect(typed).toEqual(['answer this\r', '{"cols":9,"rows":9}']))
     expect(sizes).toEqual([{ cols: 100, rows: 40 }])
     socket.close()
   })
@@ -698,7 +744,7 @@ describe('terminal size frames', () => {
     socket.send(sizeFrame(100, 40))
 
     await vi.waitFor(() => expect(sizes).toEqual([{ cols: 100, rows: 40 }]))
-    expect(typed).toEqual(['answer this\n'])
+    expect(typed).toEqual(['answer this\r'])
     socket.close()
   })
 })

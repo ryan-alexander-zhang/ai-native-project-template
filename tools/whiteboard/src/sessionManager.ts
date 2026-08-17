@@ -155,7 +155,11 @@ export class SessionManager {
     }
     session.pty.onData((data) => this.publish(session, data))
     session.pty.onExit((event) => this.exit(session, event.exitCode))
-    session.pty.write(`${plan.instruction}\n`)
+    // CR, not LF: the CLI's input box reads a line feed as a newline inside the
+    // box and only a carriage return as the Enter that submits it, so an
+    // instruction ended with LF would sit there unsent (issue-00011). The
+    // instruction's own newlines stay LF — those are meant as newlines.
+    session.pty.write(`${plan.instruction}\r`)
     return info
   }
 
