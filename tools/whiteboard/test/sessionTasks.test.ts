@@ -65,7 +65,7 @@ describe('clarifyInstruction', () => {
 
     expect(instruction).toContain('Ask one question per turn')
     expect(instruction).toContain('at most 4 ready-made options')
-    expect(instruction).toContain('the one you recommend first and marked 「推荐」')
+    expect(instruction).toContain('the one you recommend first and marked "Recommended"')
     expect(instruction).toContain('free-form answer')
   })
 

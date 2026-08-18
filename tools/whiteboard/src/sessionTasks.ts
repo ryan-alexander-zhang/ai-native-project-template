@@ -44,7 +44,7 @@ function contextLines(docPath: string, relatedPaths: string[]): string[] {
  */
 const SKELETON = [
   'Ask one question per turn — never a batch, never two questions in one.',
-  'Give each question at most 4 ready-made options, the one you recommend first and marked 「推荐」,',
+  'Give each question at most 4 ready-made options, the one you recommend first and marked "Recommended",',
   '  and always leave a free-form answer open.',
   'Whatever you can answer from the documents or the repository, answer yourself; ask only what',
   '  the owner alone can settle.',
@@ -86,7 +86,7 @@ function stateFileLines(statePath: string, state: string | undefined): string[] 
 export function clarifyInstruction(task: ClarifyTask): string {
   const { docPath, relatedPaths, focus, statePath, state } = task
   return [
-    'This is a clarify session (澄清): you question the owner of one document, one question at a time,',
+    'This is a clarify session: you question the owner of one document, one question at a time,',
     'and land what you learn back in that document.',
     ...contextLines(docPath, relatedPaths),
     ...SKELETON,
@@ -100,7 +100,7 @@ export function clarifyInstruction(task: ClarifyTask): string {
 export function askInstruction(task: AskTask): string {
   const { docPath, relatedPaths } = task
   return [
-    'This is an ask session (答疑): the owner of one document asks you about it and discusses it with you',
+    'This is an ask session: the owner of one document asks you about it and discusses it with you',
     'over as many turns as they need.',
     ...contextLines(docPath, relatedPaths),
     'Answer what they ask about this document. Revise documents under the docs tree when they ask you to,',
