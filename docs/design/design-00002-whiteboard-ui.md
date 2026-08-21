@@ -130,8 +130,10 @@ row3                                                                            
 | 接收 | `<button>` | `Button`（default 变体） | `Check` |
 | 澄清 | 工具栏内联 textarea | `Button`，点击即发起澄清会话（终端内逐题提问；第八轮由 decision-00006 改写，原 `Dialog` + `Textarea` 废弃）；仅可澄清类型的节点呈现 | `MessageCircleQuestionMark` |
 | 答疑 | 无 | `Button`（ghost 变体），点击即发起答疑会话（终端内多轮讨论，`spec-00001-FR-47`） | `CircleHelp` |
+| 审计 | 无 | `Button`（outline 变体），点击即发起审计会话（终端内对照 README 审查，`spec-00001-FR-50`，第十轮）；仅 `draft` 的可审计类型（spec/rule/design）节点呈现（`spec-00001-FR-51`）；因会话运行禁用时同澄清/答疑呈现「session running」 | `ShieldCheck` |
 | 终止会话 | 无 | 终端面板头部 `Button`（destructive 变体），仅会话 running 时可用，点击即终止（`spec-00001-FR-49`，issue-00010） | `Square` |
-| 发起入口禁用说明 | 无 | 推进/澄清/答疑因会话运行禁用期间，悬停/聚焦呈现 `Tooltip`「session running」；与「no next step」并存时后者优先（它不随会话结束消失，`AC-49.5`） | — |
+| 发起入口禁用说明 | 无 | 推进/澄清/答疑/审计因会话运行禁用期间，悬停/聚焦呈现 `Tooltip`「session running」；与「no next step」并存时后者优先（它不随会话结束消失，`AC-49.5`） | — |
+| resolved 门拒绝 | 无 | `toast.error` 呈现「N 个条目未验证」计数 + 缺口 id 列表（过长时截断并保留计数；`spec-00001-FR-52` 的逐条点名由 API 的 `gaps` 承载，toast 是它的呈现）。注意检视面板的覆盖取全部 record 口径，与门的证据集不同，不可互替（第十轮） | `TriangleAlert` |
 | 顶栏会话入口 | 无 | 会话 running 且终端面板已收起时，顶栏呈现会话状态 `Badge`/`Button`，点击重开终端面板——终止因此始终可达（`AC-49.8`） | `Terminal` |
 | 推进 | `<select>` | `DropdownMenu`，逐项列出下一步类型；**无候选时按钮 disabled，并在 `Tooltip` 与菜单内呈现「no next step」**（spec-00001-AC-10.3） | `Plus` |
 | 编辑 | `<button>` | `Button`（ghost 变体） | `Pencil` |

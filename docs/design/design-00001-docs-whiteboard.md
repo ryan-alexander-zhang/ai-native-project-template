@@ -78,11 +78,16 @@ flowchart LR
   `/items` 下发。
 - **Workflow Engine**：唯一的裁决点。状态流转候选、接收裁决、澄清与答疑的
   发起裁决（status、可澄清类型、单会话约束——第八轮起澄清是会话不是写回，
-  decision-00006）、下一步候选、新文档 id 中「类型 + 编号」的分配（BR-18；
-  slug 由 agent 自取）全部在服务端计算，前端从不自行判断（spec FR-6…FR-10
-  的载体）。流转表（BR-2…BR-9）与可澄清类型集（BR-20）由代码内建，不进
-  配置；配置承载的是类型二分、产品流（BR-1、BR-13…BR-17）与每个可澄清类型
-  的焦点行（spec FR-48）。
+  decision-00006）、审计的发起裁决（status 为 `draft` 且类型可审计——第十轮，
+  decision-00007）、plan 的 **resolved 门**（第十轮，spec FR-52：按 BR-24 从
+  `implements` 解析交付范围，把证据限定为 `parent` 指向该 plan 的 record 后，
+  复用 Doc Repository 的**同一**覆盖推导判定每个条目——推导函数以 record 集
+  为入参，门只是换了证据集，口径与 `/items` 永不相异）、下一步候选、新文档
+  id 中「类型 + 编号」的分配（BR-18；slug 由 agent 自取）全部在服务端计算，
+  前端从不自行判断（spec FR-6…FR-10 的载体）。流转表（BR-2…BR-9）、可澄清
+  类型集（BR-20）、可审计类型集（BR-23）与 resolved 门（BR-24、BR-25）由
+  代码内建，不进配置；配置承载的是类型二分、产品流（BR-1、BR-13…BR-17，
+  第十轮起含 `plan → issue/record`）与每个可澄清类型的焦点行（spec FR-48）。
 - **Editor**：编辑与预览是同一份正文的两个视图——预览渲染的是编辑器**当前
   缓冲区**而非磁盘内容，切换不落盘也不丢改动（spec FR-22）。预览时 CodeMirror
   视图只隐藏、不卸载，光标与滚动位置因此保留（spec FR-25）。渲染前剥掉 front
@@ -268,13 +273,14 @@ GET  /api/graph                       → {nodes, edges, issues, diagnostics}   
 GET  /api/docs/:id                    → {content, hash}            # 整文件原文，front matter 可改
 PUT  /api/docs/:id                    {content, baseHash}          → 200 {committed, error?} | 409 冲突
 GET  /api/docs/:id/transitions        → [status]                   # 合法目标状态（FR-6）
-POST /api/docs/:id/status             {to}                         → 200 {committed, error?} | 422 非法流转
+POST /api/docs/:id/status             {to}                         → 200 {committed, error?} | 422 {error, gaps?: [<item-id | unresolved-id>]} 非法流转/resolved 门拒绝（FR-52：plan open→resolved 时按交付范围守门，缺口以 gaps 逐条点名，文件不变；非门拒绝无 gaps 字段）
 POST /api/docs/:id/review             {action: accept}             → 200 {committed, error?} | 422   # clarify 分支第八轮移除（decision-00006），非 accept 一律 422
 GET  /api/docs/:id/next-steps         → [{type, carry}]
 GET  /api/sessions                    → {current: {id, status} | null}   # 重连发现（FR-21）
 POST /api/sessions                    {sourceId, targetType}       → {sessionId} | 409 已有会话   # 推进会话；任务指令正文单独写入（不带提交字节），提交键为会话首批输出后延迟发出的独立 `\r`（再延迟补发一次；空输入框回车幂等）——同一突发里的 `\r` 会被 cooked 模式的 ICRNL 翻回 LF 或被粘贴检测吞掉（issue-00011）
 POST /api/sessions/clarify            {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可澄清类型   # 澄清会话（FR-9，第八轮）
 POST /api/sessions/ask                {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 异常文档   # 答疑会话（FR-47，第八轮）
+POST /api/sessions/audit              {docId}                      → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可审计类型/异常文档   # 审计会话（FR-50/FR-51，第十轮）
 DELETE /api/sessions                  → 200 | 404 无运行中会话（从未有，或已 exited/failed——重复终止同 404，不二次 commit）   # 终止会话（FR-49，issue-00010）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
 WS   /api/terminal                    双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正）
 WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。两个来源：docs/ 变更（watcher），以及会话收尾——**无论有无 commit**（FR-12/issue-00013，三触发源由此真正共用一条通路）
@@ -295,9 +301,10 @@ line?, text?}`——无法归属（原 `unattributed`，FR-33）与文法诊断�
 （FR-30）按 `declaredTargets` 逐项展开。
 
 commit 信息格式：`wb(<action>): <doc-id>`，action ∈
-`edit | status | accept | clarify | advance | ask`（spec FR-14 的"指明动作与
-文档 id"——AC-14.x 的中文动作词「澄清/答疑」由这些英文 key 承载，与既有
-「接收=accept」同一约定；`clarify` 第八轮起是会话 commit，不再是评审写回）。
+`edit | status | accept | clarify | advance | ask | audit`（spec FR-14 的"指明
+动作与文档 id"——AC-14.x 的中文动作词「澄清/答疑」由这些英文 key 承载，
+与既有「接收=accept」同一约定；`clarify` 第八轮起是会话 commit，不再是评审
+写回；`audit` 第十轮加入，其 commit 由 spec AC-50.3 承载）。
 
 前端的呈现与交互（着色、检索与定位、面板、控件）见
 [design-00002-whiteboard-ui](design-00002-whiteboard-ui.md)；其中检索与定位由

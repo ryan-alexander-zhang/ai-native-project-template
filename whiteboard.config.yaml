@@ -1,6 +1,8 @@
 # Docs whiteboard flow config — the machine-readable carrier of rule-00001-docs-workflow.
 # Carries the type split (BR-1) and the product flow (BR-13…BR-17).
-# The status transition table (BR-2…BR-9) is derived from `kind` and is not configured here.
+# The status transition table (BR-2…BR-9), the clarifiable set (BR-20), the
+# auditable set (BR-23), and the resolved gate (BR-24, BR-25) are built into the
+# code and are not configured here.
 
 # The declaration order below IS the whiteboard's column order, left to right
 # (decision-00002-whiteboard-layout §2). Reordering these lines reorders the
@@ -45,6 +47,8 @@ flow:
     - { next: plan, carry: implements }
   plan:
     - { next: task, carry: parent }
+    - { next: issue, carry: blocks }
+    - { next: record, carry: parent }
 
 # Focus lines (spec-00001-FR-48): one line per clarifiable type, the questioning
 # weight a clarify session leans on. The clarifiable set — idea, prd, spec, rule,

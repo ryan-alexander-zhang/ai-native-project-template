@@ -42,6 +42,18 @@ _Avoid_：测试行、清单行
 由验收行推导出的需求条目验证情况，三态：已验证、未通过、未覆盖。
 _Avoid_：测试状态、通过率
 
+**交付范围（Delivery Scope）**：
+一个 plan 经 `implements` 声明的、其完成所须验证的需求条目集合：条目 id 按
+条目计入，AC id 将其所属条目计入，整份 spec/rule 文档 id 将其全部条目计入，
+其他类型目标不计入，由 `rule-00001-BR-24` 持有。
+_Avoid_：范围、scope（泛指时）
+
+**resolved 门（Resolved Gate）**：
+plan 从 `open` 促为 `resolved` 时的守门判定：以 `parent` 指向该 plan 的
+record 为证据，交付范围内每个条目的覆盖状态须为已验证，否则拒绝流转，由
+`rule-00001-BR-25` 持有。
+_Avoid_：验收门、执法（泛指时）
+
 **检视面板（Inspector Panel）**：
 选中 spec/rule 节点后停靠右侧、列出其需求条目与覆盖状态的面板；与编辑器互斥占用右侧槽位。
 _Avoid_：属性面板、详情栏
@@ -91,7 +103,7 @@ _Avoid_：接口、连接桩
 _Avoid_：分组、泳道、层
 
 **评审动作（Review Action）**：
-文档负责人在节点上做出的把关动作，只有两种：接收、澄清。
+文档负责人在节点上做出的把关动作，只有三种：接收、澄清、审计。
 _Avoid_：审批、审核操作
 
 **接收（Accept）**：
@@ -103,6 +115,16 @@ _Avoid_：通过、批准
 逐题向负责人提问，确认的未决点记入 Open Questions、既定结论直接修订文档，
 文档保持 `draft`。
 _Avoid_：打回、驳回
+
+**审计（Audit）**：
+对 `draft` 的可审计类型文档发起的评审动作：agent 会话对照该类型文件夹的
+README 先审结构与文法、再审内容本身，未决发现记入该文档的 Open Questions、
+既定结论直接修订正文，文档保持 `draft`，由 `rule-00001-BR-22` 持有。
+_Avoid_：检查、复核、review
+
+**可审计类型（Auditable Type）**：
+允许发起审计的文档类型，恰为 spec、rule、design 三种，由 `rule-00001-BR-23`
+持有；白板以代码内建该集合（同可澄清类型集）。
 
 **可澄清类型（Clarifiable Type）**：
 允许发起澄清的文档类型，恰为 idea、prd、spec、rule、design 五种，由
@@ -137,7 +159,7 @@ _Avoid_：升级、提升
 _Avoid_：渲染视图、实时预览
 
 **动作被拒（Refusal）**：
-系统对一次不合法动作的拒绝及其反馈（非法流转、冲突、文档已不存在等）；反馈以提示条呈现。
+系统对一次不合法动作的拒绝及其反馈（非法流转、resolved 门拒绝、冲突、文档已不存在等）；反馈以提示条呈现。
 _Avoid_：拒绝（该词专指白板不提供的评审动作）、驳回
 
 **命令面板（Command Palette）**：
@@ -162,11 +184,11 @@ _Avoid_：流转、派生
 _Avoid_：流程图、工作流定义
 
 **Agent 会话（Agent Session）**：
-白板通过本地 CLI（Claude Code / Codex 等）发起的一次代理过程——推进的文档代写、澄清的逐题提问或答疑的多轮讨论——在内嵌终端中实时交互；写权限按流程配置约束（MVP 默认仅 `docs/`），浏览器断开后会话在服务端存续。
+白板通过本地 CLI（Claude Code / Codex 等）发起的一次代理过程——推进的文档代写、澄清的逐题提问、答疑的多轮讨论或审计的对照 README 审查——在内嵌终端中实时交互；写权限按流程配置约束（MVP 默认仅 `docs/`），浏览器断开后会话在服务端存续。
 _Avoid_：AI 任务、机器人
 
 **留痕（Audit Trail）**：
-白板发起的每次文件变更都落为一次 git commit，commit 信息指明动作与文档 id。
+白板发起的每次文件变更都落为一次 git commit，commit 信息指明动作与文档 id。（英文 Audit Trail 与评审动作「审计（Audit）」无关——后者是对文档内容的审查，前者是变更历史。）
 _Avoid_：日志、历史记录
 
 ## Example Dialogue

@@ -47,7 +47,14 @@ Write the document description or comment after the front matter.
     when a doc already declares `implements: [<the decision>]`, that edge exists —
     do not repeat it in the decision's `constrains`.
   - Every listed id is a **full** `<type>-<nnnnn>-<slug>` id of a document that
-    exists. Never a bare `plan-00007`.
+    exists. Never a bare `plan-00007`. Two fields may additionally name
+    **requirement-item ids** (`spec-<nnnnn>-FR-<i>`, `rule-<nnnnn>-BR-<i>`, or
+    an `AC-<i>.<j>`) of items that exist: a `record`'s `verifies` (what it
+    checked), and a `plan`'s `implements` — item ids there declare the plan's
+    **delivery scope** (`rule-00001-BR-24`): the items whose acceptance must be
+    verified by that plan's records before the plan may turn `resolved`
+    (`rule-00001-BR-25`). An AC id in `implements` puts its owning item in
+    scope; a whole spec/rule doc id puts every item of that doc in scope.
 
 ## Relations
 

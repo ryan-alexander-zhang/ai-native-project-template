@@ -2,13 +2,18 @@
 id: plan-00004-whiteboard-edge-emphasis
 type: plan
 status: open
-implements: [spec-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-29, spec-00001-FR-30, design-00002-whiteboard-ui]
 ---
 
 # Plan: 边的弱化/强调与关系列表
 
 > 让默认视图从「34 条线 + 34 个标签」变成一层可读的淡背景，选中节点时它的关系
 > 才成为主角；中枢节点另给一份可读的关系列表。
+>
+> （第十轮按 `rule-00001-BR-24` 把 `implements` 从整文档回填为条目粒度：本轮
+> 交付 FR-28…FR-30 的行为，但 FR-28 的 AC-28.5 属第四轮、由 plan-00005 的
+> record 验收，故交付范围只声明 FR-29、FR-30——FR-28 的验收证据见
+> record-00003，其条目收口归 plan-00005。）
 
 ## Design
 

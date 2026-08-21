@@ -7,14 +7,14 @@ parent: prd-00001-docs-whiteboard
 
 # Spec: Docs 白板 MVP
 
-> 本地单人白板：把 `docs/` 可视化为节点图，支持编辑、状态切换、评审（接收/澄清）、
+> 本地单人白板：把 `docs/` 可视化为节点图，支持编辑、状态切换、评审（接收/澄清/审计）、
 > 答疑、按流程配置推进下一步并调起受限的 agent 会话，全部变更自动留痕。
 
 ## 1. Context
 
-- canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、可澄清
-  类型、答疑、焦点行、澄清状态文件、推进、终止、流程配置、Agent 会话、留痕、
-  预览。
+- canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、审计、
+  可审计类型、交付范围、resolved 门、可澄清类型、答疑、焦点行、澄清状态
+  文件、推进、终止、流程配置、Agent 会话、留痕、预览。
 - 本 spec 的 Markdown 方言取 GFM。
 - 输入：`parent` 为 [prd-00001-docs-whiteboard](../prd/prd-00001-docs-whiteboard.md)。
 - 本 spec 收窄「文档」一词：白板上的文档指 `docs/**/*.md` 中带 id front matter
@@ -34,16 +34,19 @@ parent: prd-00001-docs-whiteboard
 | S7 | 作为文档负责人，我要白板和 agent 被同一份条目文法约束、写法漂移当场报警，这样解析不会无声漏读 | spec-00001-FR-40, spec-00001-FR-41 |
 | S8 | 作为文档负责人，我要白板自己跟上磁盘上的变化并保住我当前的位置，这样人与 agent 并行改文档时既不用手动刷新，也不丢正在读的上下文 | spec-00001-FR-42, spec-00001-FR-43, spec-00001-FR-44 |
 | S9 | 作为文档负责人，我要在任何节点上向 agent 提问并多轮讨论，看不懂的地方问明白、该改的地方按结论改进文档，这样理解文档不用离开白板 | spec-00001-FR-47 |
+| S10 | 作为文档负责人，我要对 `draft` 的 spec/rule/design 一键发起审计——由没写过它的 agent 对照文件夹 README 拷问结构与内容缺口、发现直接落进文档本身，这样评审前的把关由工具承载而不靠自觉 | spec-00001-FR-50, spec-00001-FR-51 |
+| S11 | 作为文档负责人，我要 plan 的 `resolved` 被验收覆盖守住、实现期的 issue 与 record 也能从 plan 一键推进，这样「做完」由证据定义而不是由记忆定义 | spec-00001-FR-10, spec-00001-FR-52 |
 
 ## 3. Business Rules
 
 | Rule set | Doc | Covers |
 | --- | --- | --- |
-| docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表、接收/澄清的含义、澄清适用类型、答疑的含义、产品流下一步表、新文档 id 取法 |
+| docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表、接收/澄清/审计的含义、澄清与审计的适用类型、答疑的含义、产品流下一步表、新文档 id 取法、plan 交付范围与 resolved 门 |
 
 流程配置（FR-15）承载其中的类型二分与产品流（BR-1、BR-13…BR-17），并为每个
-可澄清类型持有焦点行（FR-48）；状态流转表（BR-2…BR-9）与可澄清类型集
-（BR-20）由代码内建，不进配置。均不得与规则冲突。
+可澄清类型持有焦点行（FR-48）；状态流转表（BR-2…BR-9）、可澄清类型集
+（BR-20）、可审计类型集（BR-23）与 plan 的 resolved 门（BR-24、BR-25）由
+代码内建，不进配置。均不得与规则冲突。
 
 ## 4. System Requirements
 
@@ -67,8 +70,8 @@ parent: prd-00001-docs-whiteboard
   id。「无法解析」即：既不是存在的文档 id，也不是存在的条目或 AC id。（本段修订
   由 decision-00004 §5 的裁定产生。）
 - **spec-00001-FR-3** (Event) 当用户点击节点时，系统应弹出浮窗工具栏，提供
-  编辑、状态切换、评审（接收/澄清）、答疑与推进入口；点击画布空白处时工具栏
-  关闭。
+  编辑、状态切换、评审（接收/澄清/审计）、答疑与推进入口；点击画布空白处
+  时工具栏关闭。
 - **spec-00001-FR-4** (Event) 当用户在 Markdown 编辑器中保存时，系统应把内容
   写回对应文档文件。
 - **spec-00001-FR-5** (Unwanted) 若文档文件在编辑器打开后已在磁盘上被修改或
@@ -110,7 +113,7 @@ parent: prd-00001-docs-whiteboard
   CLI 的权限机制拒绝，白板不做 git 回滚兜底。
 - **spec-00001-FR-14** (Ubiquitous) 系统应把白板发起的每次变更落为 git commit，
   且只暂存本次动作涉及的文件：编辑、状态切换、接收为一动作一 commit，推进、
-  澄清、答疑为一会话一 commit；commit 信息指明动作种类与文档 id。（本条裁决 PRD
+  澄清、答疑、审计为一会话一 commit；commit 信息指明动作种类与文档 id。（本条裁决 PRD
   风险项「自动 commit 的噪音」：MVP 取最细粒度，合并策略留待后续版本。）
 - **spec-00001-FR-15** (Unwanted) 系统应在启动时读取并校验流程配置（文档类型、
   关系字段、下一步映射、焦点行（FR-48）、agent 命令与写权限约束）；若配置缺失
@@ -122,8 +125,8 @@ parent: prd-00001-docs-whiteboard
   `rule-00001-BR-13` … `rule-00001-BR-16` 指向来源文档）；不合规的按 FR-2
   标记为异常。
 - **spec-00001-FR-18** (Unwanted) 若已有 agent 会话在运行，再次发起推进、
-  澄清或答疑应被拒绝，且不影响运行中的会话（MVP 同时仅一个会话，三种会话
-  共用该约束）。
+  澄清、答疑或审计应被拒绝，且不影响运行中的会话（MVP 同时仅一个会话，四种
+  会话共用该约束）。
 - **spec-00001-FR-19** (Unwanted) 若动作（状态切换、评审、答疑、推进）的目标
   文档在磁盘上已不存在，系统应拒绝该动作、提示刷新，且不产生 commit。
 - **spec-00001-FR-20** (Unwanted) 若 git commit 失败（如仓库缺失、提交身份未
@@ -183,8 +186,9 @@ parent: prd-00001-docs-whiteboard
   仍是 spec/rule 节点，面板随即呈现（右槽占用规则见 design-00002 §9）。
   （取舍见 `decision-00004-whiteboard-requirement-panel`。）
 - **spec-00001-FR-32** (Ubiquitous) 检视面板中的每条需求条目应携带**覆盖状态**，
-  由全部 record 文档的**验收行**推导，不区分 record 的 status（decision-00004
-  §5 裁定二）。验收行的识别：record 中验收清单表格的行——首列为被验 id（AC id
+  由给定 record 集的**验收行**推导——检视面板的 record 集为全部 record 文档
+  （FR-52 的门以另限的证据集复用同一判定），不区分 record 的 status
+  （decision-00004 §5 裁定二）。验收行的识别：record 中验收清单表格的行——首列为被验 id（AC id
   或条目 id，二者都是 `docs/record/README.md` 允许的写法），且表格含测试与结果
   列；仅含 id 与说明的其他表格（如修订对照表）不是验收行，Evidence 列有无不影响
   识别。三态按序判定，先命中先出：**未通过**——存在结果非 `pass` 的引用行
@@ -313,7 +317,7 @@ parent: prd-00001-docs-whiteboard
   立即结束该会话进程，其后走既有的退出收尾且**恰执行一次**（终止与自然退出
   竞态时先到者定）：终端呈现结束状态、按 FR-14 的一会话一 commit 处置会话
   已写入的变更（无变更则无 commit；半成品文档由 FR-17/FR-40 的异常与诊断
-  体系承接，commit 信息不区分终止与自然结束）、白板刷新，三个发起入口随
+  体系承接，commit 信息不区分终止与自然结束）、白板刷新，四个发起入口随
   会话结束恢复可用；终止澄清会话**不删除**其澄清状态文件——进度保留供下次
   恢复（FR-46 的删除时机不变）。无运行中会话时终止请求应被拒绝，已
   `exited`/`failed` 的会话视同无运行中会话——重复终止同样被拒绝，且不产生
@@ -322,8 +326,32 @@ parent: prd-00001-docs-whiteboard
   发起入口因会话运行而禁用期间，悬停或聚焦时应呈现原因说明（与「无下一步」
   说明并存时后者优先——它不随会话结束消失）。（issue-00010 的规格缺口
   补齐。）
-
-**Acceptance (GWT)**
+- **spec-00001-FR-50** (Event) 当用户对 `draft` 的可审计类型文档执行**审计**
+  时，系统应启动审计的 agent 会话（与 FR-11 同一会话通道与终端；单会话约束
+  同 FR-18；终止同 FR-49；按 FR-14 一会话一 commit，信息指明「审计」与文档
+  id）。任务指令应包含：目标文档路径；该类型文件夹 README 的路径；会话性质
+  ——以未撰写者的立场（不为已有措辞辩护）先对照 README 审结构与文法，再审
+  内容本身，逐条列出缺失的规则、用例与 GWT、未经确认的读数、无法确认的值
+  （per `rule-00001-BR-22`）；发现的落点契约——未决发现记入该文档的
+  Open Questions 小节（小节不存在时创建），先读现有 Open Questions、已在列
+  的发现不重复追加，已有既定结论的直接修订正文；不得改动文档 status——
+  status 只经状态切换与评审动作里的接收变更；写权限约束同 FR-13。审计无
+  状态：不落进度文件、不跨会话恢复（澄清的 FR-46 机制不适用），重复把关
+  依赖上述不重复追加的指令契约。可审计类型集（`spec`、`rule`、`design`，
+  承载 `rule-00001-BR-23`）由代码内建，如同可澄清类型集内建承载 BR-20。
+- **spec-00001-FR-51** (Unwanted) 若审计请求的目标不是可审计类型、或其状态
+  不是 `draft`、或目标为异常节点，系统应拒绝该请求且不启动会话；浮窗仅对
+  `draft` 的可审计类型节点提供审计入口（异常节点的浮窗内容由 FR-2 持有）。
+- **spec-00001-FR-52** (Event) 当状态变更请求把 `plan` 从 `open` 促为
+  `resolved` 时，系统应按 `rule-00001-BR-24` 解析该 plan 的交付范围（其
+  `implements` 中指向 spec/rule 文档或其条目的 id），复用 FR-32 的覆盖三态
+  判定、把证据集**另限**为 `parent` 指向该 plan 的 record（record 的 status
+  仍不参与判定，与 FR-32/`decision-00004` §5 裁定二同一口径），判定范围内
+  每个条目；范围内存在覆盖判定非「已验证」的条目、或范围含无法解析的 id
+  时，系统应拒绝该流转且不修改文件（per `rule-00001-BR-25`），拒绝消息逐条
+  点名缺口（条目 id 或无法解析的 id）；交付范围为空时不守门，流转照常。
+  plan 之外的类型与其余目标状态的流转（含 `open → wontfix`）不经本门（仍由
+  FR-6/FR-7 持有）。
 
 - **spec-00001-AC-1.1** (spec-00001-FR-1)
   Given `docs/` 下有若干带合法 front matter 且相互引用的文档
@@ -619,6 +647,10 @@ parent: prd-00001-docs-whiteboard
 - **spec-00001-AC-18.2** (spec-00001-FR-18)
   Given 一个运行中的澄清会话
   When 在另一节点发起答疑
+  Then 发起被拒绝，运行中的会话不受影响
+- **spec-00001-AC-18.3** (spec-00001-FR-18)
+  Given 一个运行中的 agent 会话
+  When 在另一节点发起审计
   Then 发起被拒绝，运行中的会话不受影响
 - **spec-00001-AC-19.1** (spec-00001-FR-19)
   Given 某节点对应的文件已在磁盘上被删除
@@ -1352,6 +1384,81 @@ parent: prd-00001-docs-whiteboard
   Given 一个忽略终止信号的运行中会话进程
   When 执行终止
   Then 宽限期后该进程仍被结束，终端呈现结束状态（issue-00012）
+- **spec-00001-AC-50.1** (spec-00001-FR-50)
+  Given 一个 `draft` 的 spec 节点
+  When 打开浮窗并执行审计
+  Then 审计会话启动，终端呈现流式输出
+- **spec-00001-AC-50.2** (spec-00001-FR-50)
+  Given 一个 `draft` 的 design 节点的审计会话启动
+  When 查看任务指令
+  Then 含目标文档路径、design 文件夹 README 路径、「未决发现记入
+  Open Questions（小节不存在时创建）、已在列的发现不重复追加、既定结论直接
+  修订正文」的落点契约与「不得改动 status」约束
+- **spec-00001-AC-50.3** (spec-00001-FR-50)
+  Given 一个已在 `docs/` 写入变更的审计会话
+  When 会话结束
+  Then 存在一次含该变更的 commit，信息指明「审计」与文档 id
+- **spec-00001-AC-50.4** (spec-00001-FR-50)
+  Given 一次未在 `docs/` 产生任何变更的审计会话
+  When 会话结束
+  Then 不产生 commit，白板刷新且审计入口恢复可用
+- **spec-00001-AC-51.1** (spec-00001-FR-51)
+  Given 一个 `draft` 的 prd 节点
+  When 经接口请求审计
+  Then 请求被拒绝且不发起会话
+- **spec-00001-AC-51.2** (spec-00001-FR-51)
+  Given 一个 `active` 的 spec 节点
+  When 打开浮窗
+  Then 无审计入口，且经接口直接请求审计被拒绝
+- **spec-00001-AC-51.3** (spec-00001-FR-51)
+  Given 一个异常节点
+  When 经接口请求审计
+  Then 请求被拒绝且不发起会话
+- **spec-00001-AC-52.1** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其 `implements` 所列条目的全部 AC 各有一条通过
+  的验收行，行来自 `parent` 指向该 plan 的 record
+  When 促进为 `resolved`
+  Then 流转成功写入
+- **spec-00001-AC-52.2** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其范围内某条目的某 AC 没有任何验收行
+  When 促进为 `resolved`
+  Then 流转被拒绝且文件未变，拒绝消息点名该条目
+- **spec-00001-AC-52.3** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其范围内某 AC 的验收行存在但结果未通过
+  When 促进为 `resolved`
+  Then 流转被拒绝，拒绝消息点名该条目
+- **spec-00001-AC-52.4** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其范围内条目的通过验收行只存在于 `parent` 指向
+  另一个 plan 的 record 中
+  When 促进为 `resolved`
+  Then 流转被拒绝
+- **spec-00001-AC-52.5** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其 `implements` 含一个无法解析的条目 id
+  When 促进为 `resolved`
+  Then 流转被拒绝，拒绝消息点名该 id
+- **spec-00001-AC-52.6** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其 `implements` 只列 design 文档 id（交付范围
+  为空）
+  When 促进为 `resolved`
+  Then 流转成功
+- **spec-00001-AC-52.7** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其 `implements` 列出一份整 rule 文档 id，该
+  rule 有一条 BR 的 AC 无验收行
+  When 促进为 `resolved`
+  Then 流转被拒绝，拒绝消息点名该 BR
+- **spec-00001-AC-52.8** (spec-00001-FR-52)
+  Given 一个 `open` 的 issue
+  When 促进为 `resolved`
+  Then 不经本门，流转照常成功
+- **spec-00001-AC-52.9** (spec-00001-FR-52)
+  Given 一个交付范围有缺口的 `open` plan
+  When 促进为 `wontfix`
+  Then 不经本门，流转照常成功
+- **spec-00001-AC-52.10** (spec-00001-FR-52)
+  Given 一个 `open` 的 plan，其交付范围的覆盖分散在两份 `parent` 均指向该
+  plan 的 record 中、合并后每条 AC 均有通过行
+  When 促进为 `resolved`
+  Then 流转成功（证据取并集）
 
 ## 5. Technical Design
 
@@ -1387,8 +1494,9 @@ parent: prd-00001-docs-whiteboard
 - 预览打开期间对该文档的外部改动自动重渲染（切回编辑再切预览即取到最新缓冲区）。
 - 文档中 `javascript:` 等 URL scheme 的拦截——FR-24 只承诺不执行脚本、不注入
   原始 HTML。
-- 覆盖状态的执法（据缺口阻止状态流转或推进）——白板只呈现缺口，resolve 门禁仍由
-  流程文档约束（decision-00004 §3）。
+- ~~覆盖状态的执法（据缺口阻止状态流转或推进）~~——第十轮由 FR-52 对 plan 的
+  `open → resolved` 守门（decision-00007 推翻 decision-00004 §3 的否决行）；
+  plan 之外的流转与推进仍不守门。
 - 画布→面板的反向联动（点击边或 record 节点定位到条目行）。
 - 子画布内的编辑、评审与推进——子画布是只读视图。
 - spec 与 rule 之外类型的条目解析。

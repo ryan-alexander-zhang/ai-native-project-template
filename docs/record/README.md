@@ -15,7 +15,10 @@ Add more when useful.
 
 ## Relations
 
-- `parent` — the `plan` this record accepts.
+- `parent` — the `plan` this record accepts. **Required when the record is a
+  plan's acceptance record**: the resolved gate (`rule-00001-BR-25`) only counts
+  rows from records whose `parent` points at the plan being resolved — a record
+  without it is invisible to the gate.
 - `verifies` — what was verified: `spec` / `rule` ids, or requirement ids down to
   `spec-00001-AC-1.1` / `rule-00001-AC-1.1` granularity. It must match the
   acceptance checklist below.

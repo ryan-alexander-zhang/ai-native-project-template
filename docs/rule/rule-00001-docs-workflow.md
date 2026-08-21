@@ -25,6 +25,7 @@ informs: [spec-00001-docs-whiteboard]
 | 促进 | 把文档状态沿合法流转向前推一步 |
 | 终态 | 不再允许任何流转的状态 |
 | 下一步候选 | 从某类型文档可直接推进出的下一阶段文档类型 |
+| 交付范围 | 一个 plan 声明的、其完成所须验证的需求条目集合（见 BR-24） |
 
 ## 3. Rules
 
@@ -67,7 +68,7 @@ Hit policy: `UNIQUE`
 | **rule-00001-BR-13** | `idea` | `prd`、`spec` | `parent` 指向来源 idea |
 | **rule-00001-BR-14** | `prd` | `spec` | `parent` 指向来源 prd |
 | **rule-00001-BR-15** | `spec` | `rule`、`design`、`plan` | `rule`/`design` 以 `informs` 回指来源 spec；`plan` 以 `implements` 指向来源 spec |
-| **rule-00001-BR-16** | `plan` | `task` | `parent` 指向来源 plan |
+| **rule-00001-BR-16** | `plan` | `task`、`issue`、`record` | `task`/`record` 以 `parent` 指向来源 plan；`issue` 以 `blocks` 回指来源 plan |
 | **rule-00001-BR-17** | *(otherwise)* | （无下一步） | — |
 
 - **rule-00001-BR-18** (Definition) 新文档 id：`<type>-<五位数>-<slug>`，五位数
@@ -82,6 +83,28 @@ Hit policy: `UNIQUE`
 - **rule-00001-BR-21** (Definition) 答疑：就一份文档发起的多轮讨论，用于理解
   其内容并按对话结论修订文档；不是评审动作，适用于任意类型与任意状态，不改变
   文档状态。
+- **rule-00001-BR-22** (Definition) 审计：与接收、澄清并列的第三种评审动作
+  ——由未撰写该文档的一方对照其类型文件夹的 README 审查结构与文法，再审内容
+  本身；缺失的规则、用例与 GWT、未经确认的读数、无法确认的值，未决者逐条
+  记入该文档的 Open Questions，已有既定结论者直接修订正文；文档保持
+  `draft`（审计不促进状态，未决发现由 BR-12 在其后的接收时把关）。「未撰写
+  该文档」这一前提由人的流程保证，工具不校验作者身份——工具能承载的是以
+  未撰写者的立场审查的指令约束。
+- **rule-00001-BR-23** (Constraint) 审计只适用于 `spec`、`rule`、`design`
+  三种类型的 `draft` 文档——spec 与 rule 有条目文法与 GWT 的结构可审，
+  design 有取舍与模块边界的内容可审；其余类型承载事实、结果或执行，无可
+  对照的审计约定。On violation: 审计被拒绝。
+- **rule-00001-BR-24** (Definition) plan 的交付范围：其 `implements` 所列
+  目标中，指向 spec/rule 需求条目 id（`spec-<n>-FR-<i>` / `rule-<n>-BR-<i>`）
+  的，该条目计入范围；指向存在的 AC id 的，其**所属条目**计入范围；指向
+  整份 spec 或 rule 文档 id 的，该文档的**全部**需求条目计入范围；指向其他
+  类型文档（如 design、report）的，不计入范围。
+- **rule-00001-BR-25** (Constraint) plan 的 `open → resolved` 前提：
+  以 `parent` 指向该 plan 的 record 的验收行为证据，交付范围内每个条目均
+  判为已验证（该条目的全部 AC 各有通过的验收行，无一缺失、无一未通过）；
+  范围中无法解析的 id（既不是存在的 spec/rule 文档，也不是存在的条目）视为
+  缺口。交付范围为空的 plan 不受本约束（照常流转）。On violation: 流转被
+  拒绝，拒绝理由逐条点名缺口条目。
 
 ## 4. Acceptance (GWT)
 
@@ -176,7 +199,15 @@ Hit policy: `UNIQUE`
 - **rule-00001-AC-16.1** (rule-00001-BR-16)
   Given 一个 plan 文档
   When 查询下一步候选
-  Then 恰为 `task`，且新 task 的 `parent` 指向该 plan
+  Then 恰为 `task`、`issue`、`record`
+- **rule-00001-AC-16.2** (rule-00001-BR-16)
+  Given 从某 plan 推进出一个 task（或 record）
+  When 查看新文档的关系
+  Then 它以 `parent` 指向该 plan
+- **rule-00001-AC-16.3** (rule-00001-BR-16)
+  Given 从某 plan 推进出一个 issue
+  When 查看新文档的关系
+  Then 它以 `blocks` 回指该 plan
 - **rule-00001-AC-17.1** (rule-00001-BR-17)
   Given 一个 record 文档
   When 查询下一步候选
@@ -217,6 +248,73 @@ Hit policy: `UNIQUE`
   Given 答疑的对话得出一条修订结论
   When 答疑收尾
   Then 该结论体现在文档正文中
+- **rule-00001-AC-22.1** (rule-00001-BR-22)
+  Given 一个 `draft` 文档的审计确认了两条未决发现
+  When 审计收尾
+  Then 两条均在该文档的 Open Questions 中，状态仍为 `draft`
+- **rule-00001-AC-22.2** (rule-00001-BR-22)
+  Given 审计中某发现已有既定结论
+  When 审计收尾
+  Then 该结论体现在文档正文中，不作为未决点进入 Open Questions
+- **rule-00001-AC-23.1** (rule-00001-BR-23)
+  Given 一个 `draft` 的 `spec` 文档
+  When 发起审计
+  Then 审计成立
+- **rule-00001-AC-23.2** (rule-00001-BR-23)
+  Given 一个 `draft` 的 `prd` 文档
+  When 发起审计
+  Then 审计被拒绝
+- **rule-00001-AC-23.3** (rule-00001-BR-23)
+  Given 一个 `active` 的 `spec` 文档
+  When 发起审计
+  Then 审计被拒绝
+- **rule-00001-AC-24.1** (rule-00001-BR-24)
+  Given 一个 plan 的 `implements` 列出 `spec-00001-FR-50` 与一份 design 文档 id
+  When 解析其交付范围
+  Then 范围恰为 `spec-00001-FR-50` 一个条目
+- **rule-00001-AC-24.2** (rule-00001-BR-24)
+  Given 一个 plan 的 `implements` 列出一份含三个 BR 条目的 rule 文档 id
+  When 解析其交付范围
+  Then 该 rule 的三个条目全部计入范围
+- **rule-00001-AC-24.3** (rule-00001-BR-24)
+  Given 一个 plan 的 `implements` 只列出 design 文档 id
+  When 解析其交付范围
+  Then 范围为空
+- **rule-00001-AC-24.4** (rule-00001-BR-24)
+  Given 一个 plan 的 `implements` 列出 `spec-00001-AC-52.1`
+  When 解析其交付范围
+  Then 范围恰为其所属条目 `spec-00001-FR-52`
+- **rule-00001-AC-25.1** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其交付范围内每个条目的全部 AC 各有一条通过的
+  验收行，且这些行都来自 `parent` 指向该 plan 的 record
+  When 促进为 `resolved`
+  Then 流转成功
+- **rule-00001-AC-25.2** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其交付范围内某条目的某 AC 没有任何验收行
+  When 促进为 `resolved`
+  Then 流转被拒绝，拒绝理由点名该条目
+- **rule-00001-AC-25.3** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其交付范围内某 AC 的验收行存在但未通过
+  When 促进为 `resolved`
+  Then 流转被拒绝，拒绝理由点名该条目
+- **rule-00001-AC-25.4** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其范围内条目的通过验收行只存在于 `parent`
+  指向**另一个** plan 的 record 中
+  When 促进为 `resolved`
+  Then 流转被拒绝
+- **rule-00001-AC-25.5** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其 `implements` 列出一个无法解析的条目 id
+  When 促进为 `resolved`
+  Then 流转被拒绝，拒绝理由点名该 id
+- **rule-00001-AC-25.6** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其交付范围为空
+  When 促进为 `resolved`
+  Then 流转成功
+- **rule-00001-AC-25.7** (rule-00001-BR-25)
+  Given 一个 `open` 的 plan，其交付范围的覆盖分散在两份 `parent` 均指向该
+  plan 的 record 中、合并后每条 AC 均有通过行
+  When 促进为 `resolved`
+  Then 流转成功（证据取并集）
 
 ## Links
 
