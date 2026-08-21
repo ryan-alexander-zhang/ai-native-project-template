@@ -1,7 +1,7 @@
 ---
 id: plan-00010-whiteboard-audit-and-resolved-gate
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-FR-50, spec-00001-FR-51, spec-00001-FR-52, rule-00001-BR-16, rule-00001-BR-23, rule-00001-BR-24, rule-00001-BR-25, decision-00007-whiteboard-audit-and-resolved-gate, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
