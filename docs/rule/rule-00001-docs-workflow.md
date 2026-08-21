@@ -41,7 +41,7 @@ Hit policy: `UNIQUE`
 | # | 种类 | 当前状态 | 允许的目标状态 |
 | --- | --- | --- | --- |
 | **rule-00001-BR-2** | living doc | `draft` | `active`、`archived` |
-| **rule-00001-BR-3** | living doc | `active` | `archived` |
+| **rule-00001-BR-3** | living doc | `active` | `draft`（修订轮，第十一轮增，decision-00008）、`archived` |
 | **rule-00001-BR-4** | work item | `draft` | `open`、`wontfix`、`archived` |
 | **rule-00001-BR-5** | work item | `open` | `resolved`、`wontfix`、`archived` |
 | **rule-00001-BR-6** | work item | `resolved` | `archived` |
@@ -105,6 +105,13 @@ Hit policy: `UNIQUE`
   范围中无法解析的 id（既不是存在的 spec/rule 文档，也不是存在的条目）视为
   缺口。交付范围为空的 plan 不受本约束（照常流转）。On violation: 流转被
   拒绝，拒绝理由逐条点名缺口条目。
+- **rule-00001-BR-26** (Definition) 流程入口类型与新建：产品流的入口类型
+  恰为 `idea` 与 `prd`——项目从 idea 进入产品流，或跳过 idea 直接从 prd
+  开始（`docs/README.md` 的既有约定）。入口类型的文档可不经推进直接
+  **新建**：id 按 BR-18 取号、slug 自取，正文自该类型模板起草，初始
+  status 为 `draft`。
+- **rule-00001-BR-27** (Constraint) 非入口类型不得新建——它们经产品流推进
+  （BR-13…BR-17）产生，携带指回来源的关系。On violation: 新建被拒绝。
 
 ## 4. Acceptance (GWT)
 
@@ -123,7 +130,23 @@ Hit policy: `UNIQUE`
 - **rule-00001-AC-3.1** (rule-00001-BR-3)
   Given 一个 `active` 的 `decision` 文档
   When 查询允许的目标状态
-  Then 恰为 `archived`
+  Then 恰为 `draft` 与 `archived`
+- **rule-00001-AC-3.2** (rule-00001-BR-3)
+  Given 一个 `active` 的 `spec` 文档经状态流转转为 `draft`（修订轮）
+  When 对它发起审计
+  Then 审计成立（BR-23 按 `draft` 的既有语义适用）
+- **rule-00001-AC-3.3** (rule-00001-BR-3)
+  Given 同 AC-3.2 的文档
+  When 对它发起澄清
+  Then 澄清成立（BR-20 适用）
+- **rule-00001-AC-3.4** (rule-00001-BR-3)
+  Given 同 AC-3.2 的文档带未决 Open Questions
+  When 执行接收
+  Then 接收被拒绝（BR-12 适用）
+- **rule-00001-AC-3.5** (rule-00001-BR-3)
+  Given 同 AC-3.2 的文档修订完成、无未决 Open Questions
+  When 执行接收
+  Then 其状态回到 `active`（active → draft → active 的完整修订轮）
 - **rule-00001-AC-4.1** (rule-00001-BR-4)
   Given 一个 `draft` 的 `plan` 文档
   When 查询允许的目标状态
@@ -315,6 +338,15 @@ Hit policy: `UNIQUE`
   plan 的 record 中、合并后每条 AC 均有通过行
   When 促进为 `resolved`
   Then 流转成功（证据取并集）
+- **rule-00001-AC-26.1** (rule-00001-BR-26)
+  Given 仓库中 idea 现有最大编号为 `00001`
+  When 新建一个 idea
+  Then 新文档 id 为 `idea-00002-<slug>`，status 为 `draft`，正文自
+  idea 模板起草
+- **rule-00001-AC-27.1** (rule-00001-BR-27)
+  Given 任意仓库状态
+  When 请求新建一个 `spec`（非入口类型）
+  Then 新建被拒绝
 
 ## Links
 

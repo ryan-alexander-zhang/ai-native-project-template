@@ -14,7 +14,8 @@ parent: prd-00001-docs-whiteboard
 
 - canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、审计、
   可审计类型、交付范围、resolved 门、可澄清类型、答疑、焦点行、澄清状态
-  文件、推进、终止、流程配置、Agent 会话、留痕、预览。
+  文件、推进、修订轮、流程入口类型、新建、会话历史、终止、流程配置、
+  Agent 会话、留痕、预览。
 - 本 spec 的 Markdown 方言取 GFM。
 - 输入：`parent` 为 [prd-00001-docs-whiteboard](../prd/prd-00001-docs-whiteboard.md)。
 - 本 spec 收窄「文档」一词：白板上的文档指 `docs/**/*.md` 中带 id front matter
@@ -36,17 +37,21 @@ parent: prd-00001-docs-whiteboard
 | S9 | 作为文档负责人，我要在任何节点上向 agent 提问并多轮讨论，看不懂的地方问明白、该改的地方按结论改进文档，这样理解文档不用离开白板 | spec-00001-FR-47 |
 | S10 | 作为文档负责人，我要对 `draft` 的 spec/rule/design 一键发起审计——由没写过它的 agent 对照文件夹 README 拷问结构与内容缺口、发现直接落进文档本身，这样评审前的把关由工具承载而不靠自觉 | spec-00001-FR-50, spec-00001-FR-51 |
 | S11 | 作为文档负责人，我要 plan 的 `resolved` 被验收覆盖守住、实现期的 issue 与 record 也能从 plan 一键推进，这样「做完」由证据定义而不是由记忆定义 | spec-00001-FR-10, spec-00001-FR-52 |
+| S12 | 作为文档负责人，我要在白板上直接新建流程入口文档（idea/prd），这样流程的起点也在流程里、不必板外手写第一份文档 | spec-00001-FR-53 |
+| S13 | 作为文档负责人，我要把 `active` 文档合法地转回 `draft` 进入修订轮，让审计、澄清与接收门管住实质修订，这样 active 文档的修订不再绕过把关 | rule-00001-BR-3 |
+| S14 | 作为文档负责人，我要会话转写落盘成可回看的历史、发起会话时能选用哪个 agent、入口呈现与服务端共用同一份类型集，这样过程记录不随重启蒸发、多 CLI 配置不再形同虚设、前后端的规则不会漂移 | spec-00001-FR-54, spec-00001-FR-55, spec-00001-FR-56 |
 
 ## 3. Business Rules
 
 | Rule set | Doc | Covers |
 | --- | --- | --- |
-| docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表、接收/澄清/审计的含义、澄清与审计的适用类型、答疑的含义、产品流下一步表、新文档 id 取法、plan 交付范围与 resolved 门 |
+| docs 工作流 | [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md) | 文档种类二分、状态流转决策表（含修订轮）、接收/澄清/审计的含义、澄清与审计的适用类型、答疑的含义、产品流下一步表、新文档 id 取法、plan 交付范围与 resolved 门、流程入口类型与新建 |
 
-流程配置（FR-15）承载其中的类型二分与产品流（BR-1、BR-13…BR-17），并为每个
-可澄清类型持有焦点行（FR-48）；状态流转表（BR-2…BR-9）、可澄清类型集
-（BR-20）、可审计类型集（BR-23）与 plan 的 resolved 门（BR-24、BR-25）由
-代码内建，不进配置。均不得与规则冲突。
+流程配置（FR-15）承载其中的类型二分、产品流（BR-1、BR-13…BR-17）与流程
+入口类型列表（BR-26 的机器可读形态，`entry`，见 FR-53），并为每个可澄清
+类型持有焦点行（FR-48）；
+状态流转表（BR-2…BR-9）、可澄清类型集（BR-20）、可审计类型集（BR-23）与
+plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不得与规则冲突。
 
 ## 4. System Requirements
 
@@ -112,18 +117,19 @@ parent: prd-00001-docs-whiteboard
   的写权限约束传递给会话（MVP 默认约束为「仅 `docs/` 可写」）；越界写入由所选
   CLI 的权限机制拒绝，白板不做 git 回滚兜底。
 - **spec-00001-FR-14** (Ubiquitous) 系统应把白板发起的每次变更落为 git commit，
-  且只暂存本次动作涉及的文件：编辑、状态切换、接收为一动作一 commit，推进、
-  澄清、答疑、审计为一会话一 commit；commit 信息指明动作种类与文档 id。（本条裁决 PRD
+  且只暂存本次动作涉及的文件：编辑、状态切换、接收、新建为一动作一 commit，
+  推进、澄清、答疑、审计为一会话一 commit；commit 信息指明动作种类与文档 id。（本条裁决 PRD
   风险项「自动 commit 的噪音」：MVP 取最细粒度，合并策略留待后续版本。）
 - **spec-00001-FR-15** (Unwanted) 系统应在启动时读取并校验流程配置（文档类型、
-  关系字段、下一步映射、焦点行（FR-48）、agent 命令与写权限约束）；若配置缺失
-  或非法，系统应拒绝启动并给出指明问题所在的错误信息。
+  关系字段、下一步映射、焦点行（FR-48）、入口类型列表（FR-53）、agent 命令与
+  写权限约束）；若配置缺失或非法，系统应拒绝启动并给出指明问题所在的错误信息。
 - **spec-00001-FR-16** (Unwanted) 若 agent CLI 不存在或启动失败，系统应在内嵌
   终端呈现错误，且不产生任何 commit。
 - **spec-00001-FR-17** (Event) 当推进会话结束、白板刷新时，系统应校验会话产出
   的新文档 front matter（id 取法按 `rule-00001-BR-18`、关系按
   `rule-00001-BR-13` … `rule-00001-BR-16` 指向来源文档）；不合规的按 FR-2
-  标记为异常。
+  标记为异常。该标记由磁盘当前内容导出、随每次图构建重验，不粘滞：文档在盘
+  上修复后，下一次刷新即不再标异常（第十一轮修订，issue-00014）。
 - **spec-00001-FR-18** (Unwanted) 若已有 agent 会话在运行，再次发起推进、
   澄清、答疑或审计应被拒绝，且不影响运行中的会话（MVP 同时仅一个会话，四种
   会话共用该约束）。
@@ -352,6 +358,28 @@ parent: prd-00001-docs-whiteboard
   点名缺口（条目 id 或无法解析的 id）；交付范围为空时不守门，流转照常。
   plan 之外的类型与其余目标状态的流转（含 `open → wontfix`）不经本门（仍由
   FR-6/FR-7 持有）。
+- **spec-00001-FR-53** (Event) 当用户经顶栏**新建**入口选择流程配置 `entry`
+  声明的类型并给出 slug 时，系统应按 `rule-00001-BR-18` 分配 id 前缀，以该
+  类型 `TEMPLATE.md` 预填编辑器缓冲（front matter 的 id、type 预填为分配值，
+  status 预填 `draft`）；保存时系统应创建对应文件并 commit（信息指明「新建」
+  与文档 id）。目标 id 已存在时拒绝且不覆盖；slug 不合小写连字符时拒绝；
+  类型不在 `entry` 内的新建请求拒绝且不写文件（per `rule-00001-BR-26`）。
+  `entry` 进入 FR-15 的启动校验：列出未声明的类型即拒绝启动并指明；`entry`
+  缺失或为空时正常启动，顶栏不呈现新建入口。
+- **spec-00001-FR-54** (Event) 当会话结束（自然退出或终止）时，系统应把该
+  会话的元数据（会话种类、目标文档 id、所用 agent、起止时间、退出状态）与
+  完整终端转写（纯文本）分别落盘至 `.whiteboard/sessions/`（gitignore 内，
+  不入 commit）；
+  用户应能在白板中列出全部历史会话并查看任一会话的转写全文，服务重启后
+  仍可用。落盘失败不阻塞会话收尾（commit 与刷新照常），仅提示。
+- **spec-00001-FR-55** (Event) 当发起任何会话（推进、澄清、答疑、审计）时，
+  系统应允许指定流程配置 `agents` 中的一条，未指定时取第一条（与既有行为
+  一致）；指定的名字不在配置中时拒绝且不启动会话。UI 仅在配置声明多于一条
+  agent 时呈现选择。
+- **spec-00001-FR-56** (Ubiquitous) 系统应把代码内建的可澄清类型集
+  （`rule-00001-BR-20`）与可审计类型集（`rule-00001-BR-23`）作为生效配置的
+  一部分对外提供（通道见 design-00001 §7）；澄清与审计入口的呈现判定应以
+  该载荷为准——载荷变，呈现随之变。
 
 - **spec-00001-AC-1.1** (spec-00001-FR-1)
   Given `docs/` 下有若干带合法 front matter 且相互引用的文档
@@ -475,6 +503,10 @@ parent: prd-00001-docs-whiteboard
   Given 一个 `open` 的 work item
   When 打开状态切换
   Then 候选中含 `resolved` 与 `wontfix` 且不含 `active`
+- **spec-00001-AC-6.5** (spec-00001-FR-6)
+  Given 一个 `active` 的 living doc
+  When 打开状态切换
+  Then 候选中含 `draft`（修订轮，`rule-00001-BR-3` 第十一轮修订）
 - **spec-00001-AC-7.1** (spec-00001-FR-7)
   Given 一个 `draft` 的 work item
   When 通过接口直接请求将其置为 `resolved`
@@ -640,6 +672,10 @@ parent: prd-00001-docs-whiteboard
   Given 推进会话产出的新文档 front matter 合规
   When 会话结束、白板刷新
   Then 该节点为正常节点且有指向来源文档的边
+- **spec-00001-AC-17.3** (spec-00001-FR-17)
+  Given 一个因产物校验失败被标异常的文档，其缺失的关系已在盘上补齐
+  When 白板刷新（无需新的推进会话）
+  Then 该节点不再带异常标记（issue-00014）
 - **spec-00001-AC-18.1** (spec-00001-FR-18)
   Given 一个运行中的 agent 会话
   When 在另一节点发起推进
@@ -1459,6 +1495,75 @@ parent: prd-00001-docs-whiteboard
   plan 的 record 中、合并后每条 AC 均有通过行
   When 促进为 `resolved`
   Then 流转成功（证据取并集）
+- **spec-00001-AC-53.1** (spec-00001-FR-53)
+  Given 流程配置 `entry` 含 `idea`，仓库中 idea 现有最大编号为 `00001`
+  When 经新建入口选 idea、给出合法 slug 并保存
+  Then 文件按 idea 模板创建，id 为 `idea-00002-<slug>`、status 为 `draft`，
+  存在一次指明「新建」与该 id 的 commit
+- **spec-00001-AC-53.2** (spec-00001-FR-53)
+  Given 流程配置 `entry` 为 `idea`、`prd`
+  When 经接口请求新建一个 `spec`
+  Then 请求被拒绝且不写文件
+- **spec-00001-AC-53.3** (spec-00001-FR-53)
+  Given 目标 id 的文件已存在
+  When 保存新建
+  Then 保存被拒绝且不覆盖磁盘内容
+- **spec-00001-AC-53.4** (spec-00001-FR-53)
+  Given 新建时给出含大写或空格的 slug
+  When 提交
+  Then 请求被拒绝
+- **spec-00001-AC-53.5** (spec-00001-FR-53)
+  Given 流程配置 `entry` 列出一个未声明的类型
+  When 启动白板服务
+  Then 启动失败，错误信息指明该类型
+- **spec-00001-AC-53.6** (spec-00001-FR-53)
+  Given 流程配置无 `entry` 字段（或 `entry` 为空列表）
+  When 启动白板并查看顶栏
+  Then 正常启动，顶栏无新建入口
+- **spec-00001-AC-53.7** (spec-00001-FR-53)
+  Given 仓库启用了拦截 `draft` 文档入库的 pre-commit hook
+  When 新建保存产生一份 `draft` 文档
+  Then commit 成功（白板提交不受该 hook 拦截，decision-00008 §2 第 6 条）
+- **spec-00001-AC-54.1** (spec-00001-FR-54)
+  Given 一个已结束的审计会话
+  When 列出历史会话
+  Then 列表含该会话的种类、目标文档 id 与退出状态
+- **spec-00001-AC-54.2** (spec-00001-FR-54)
+  Given 若干已落盘的历史会话
+  When 重启白板服务后列出历史并打开其中一条
+  Then 列表仍在，转写全文可读且含该会话的终端输出
+- **spec-00001-AC-54.3** (spec-00001-FR-54)
+  Given 会话转写落盘目录不可写
+  When 会话结束
+  Then 收尾照常（commit 与刷新不受影响），仅呈现落盘失败提示
+- **spec-00001-AC-54.4** (spec-00001-FR-54)
+  Given 一个被终止（FR-49）的会话
+  When 列出历史会话
+  Then 该会话在列，退出状态如实呈现
+- **spec-00001-AC-55.1** (spec-00001-FR-55)
+  Given 流程配置声明两条 agent
+  When 指定第二条发起答疑
+  Then 会话以第二条的命令启动
+- **spec-00001-AC-55.2** (spec-00001-FR-55)
+  Given 同 AC-55.1 的配置
+  When 未指定 agent 发起推进
+  Then 会话以第一条的命令启动
+- **spec-00001-AC-55.3** (spec-00001-FR-55)
+  Given 同 AC-55.1 的配置
+  When 指定一个不存在的 agent 名发起会话
+  Then 请求被拒绝且不启动会话
+- **spec-00001-AC-55.4** (spec-00001-FR-55)
+  Given 流程配置只声明一条 agent
+  When 发起会话
+  Then UI 不呈现 agent 选择
+- **spec-00001-AC-56.1** (spec-00001-FR-56)
+  Given 白板服务运行中
+  When 读取生效配置
+  Then 载荷含可澄清类型集与可审计类型集
+- **spec-00001-AC-56.2** (spec-00001-FR-56)
+  Given 前端收到的生效配置中可审计类型集不含 `design`
+  When 渲染一个 `draft` design 节点的浮窗
+  Then 无审计入口（呈现随载荷而变）
 
 ## 5. Technical Design
 
@@ -1473,7 +1578,11 @@ parent: prd-00001-docs-whiteboard
 - 「拒绝」评审动作。
 - 手动填写待澄清点的澄清入口（第八轮废弃——待澄清点一律经澄清会话产生；
   取舍见 decision-00006）。
-- 多会话并行——推进、澄清、答疑共用 FR-18 的单会话约束。
+- 多会话并行——推进、澄清、答疑、审计共用 FR-18 的单会话约束（第十一轮
+  域主裁定维持，decision-00008 §3）。
+- 会话历史的自动清理、配额与全文检索（FR-54 只做落盘、列出与查看）。
+- 修订轮的版本 diff 呈现——「上一有效版」由 git 历史承载。
+- 新建非入口类型的文档（rule-00001-BR-26；非入口类型经推进产生）。
 - 澄清会话中选择题的白板自建表单——选择题交互由所选 CLI 自带的提问机制在
   终端内承载，白板不另建 UI。
 - 异常节点的答疑与澄清（浮窗内容由 FR-2 持有）。
@@ -1521,6 +1630,9 @@ parent: prd-00001-docs-whiteboard
 §8 的裁定不写 GWT——它们没有回归保护，这是明知的取舍：
 
 - 呈现模式支持浅色、深色与跟随系统，偏好在本机保留。
+- 图与条目推导的解析结果按变更失效缓存（watcher 事件与白板自身写路径都使
+  其失效），未变更时重复请求不重读整棵 docs 树（第十一轮，
+  decision-00008 §2 第 8 条）。
 - 编辑器与终端面板的尺寸可调，尺寸在本机保留。
 - 文档检索入口可被发现（不必记住快捷键即可打开命令面板）。
 - 进行中与空结果有可见的呈现形态：保存中、空画布、异常计数为零。空画布本身

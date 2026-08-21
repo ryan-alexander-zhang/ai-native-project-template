@@ -135,6 +135,9 @@ row3                                                                            
 | 发起入口禁用说明 | 无 | 推进/澄清/答疑/审计因会话运行禁用期间，悬停/聚焦呈现 `Tooltip`「session running」；与「no next step」并存时后者优先（它不随会话结束消失，`AC-49.5`） | — |
 | resolved 门拒绝 | 无 | `toast.error` 呈现「N 个条目未验证」计数 + 缺口 id 列表（过长时截断并保留计数；`spec-00001-FR-52` 的逐条点名由 API 的 `gaps` 承载，toast 是它的呈现）。注意检视面板的覆盖取全部 record 口径，与门的证据集不同，不可互替（第十轮） | `TriangleAlert` |
 | 顶栏会话入口 | 无 | 会话 running 且终端面板已收起时，顶栏呈现会话状态 `Badge`/`Button`，点击重开终端面板——终止因此始终可达（`AC-49.8`） | `Terminal` |
+| 新建 | 无 | 顶栏 `Button` + `Dialog`：类型只列流程配置 `entry` 声明者、slug 输入框；确认后编辑器以模板预填打开，保存即建档（`spec-00001-FR-53`，第十一轮）；`entry` 缺失或为空时按钮不呈现 | `FilePlus` |
+| 会话历史 | 无 | 顶栏 `Button` 开历史列表（种类、文档 id、agent、起止、退出状态），点击一条查看转写全文（只读，`spec-00001-FR-54`，第十一轮） | `History` |
+| agent 选择 | 无 | 配置多于一条 agent 时，发起会话的入口旁呈现 `DropdownMenu` 选择（缺省第一条）；仅一条时不呈现（`spec-00001-FR-55`，第十一轮） | `Bot` |
 | 推进 | `<select>` | `DropdownMenu`，逐项列出下一步类型；**无候选时按钮 disabled，并在 `Tooltip` 与菜单内呈现「no next step」**（spec-00001-AC-10.3） | `Plus` |
 | 编辑 | `<button>` | `Button`（ghost 变体） | `Pencil` |
 | 关系列表 | 无 | `Popover` + 按关系字段分组的列表，每项一行「字段名 · 方向 · 对端 id」，点击即定位并选中对端（`spec-00001-FR-30`）；无关系时呈现「no relations」 | `Waypoints` |

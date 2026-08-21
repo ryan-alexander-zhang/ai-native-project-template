@@ -25,6 +25,11 @@ types:
   operation: { kind: living }
   prompt: { kind: living }
 
+# Flow entry types (rule-00001-BR-26, spec-00001-FR-53): the types the board's
+# create entry offers. Every name must be a declared type; omit or empty = no
+# create entry on the board.
+entry: [idea, prd]
+
 relations:
   - parent
   - implements
