@@ -9,7 +9,7 @@ import { ANOMALY_TOKEN, statusColour, statusLabel } from '../src/status.ts'
 import { connectTerminal } from '../src/terminalSocket.ts'
 import { useBoard } from '../src/useBoard.ts'
 import { toast } from 'sonner'
-import { type SessionInfo, api } from '../src/api.ts'
+import { ApiError, type SessionInfo, api } from '../src/api.ts'
 import { COLUMN_GAP, NODE_HEIGHT, NODE_WIDTH, ROW_GAP, layoutGraph } from '../src/layout.ts'
 import { toFlowEdges } from '../src/canvasModel.ts'
 
@@ -364,6 +364,51 @@ describe('the board state', () => {
     await act(() => result.current.run(() => Promise.reject(new Error('not a legal transition'))))
 
     expect(toast.error).toHaveBeenCalledWith('not a legal transition')
+  })
+
+  /**
+   * spec-00001-FR-52 as the user sees it (design-00002 §3): the gate's refusal
+   * is a list of gaps, and the toast leads with how many there are — the number
+   * the user has to work through — before naming them.
+   */
+  it('reports a resolved-gate refusal as a count of unverified items and their ids', async () => {
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+    const refusal = new ApiError(422, 'plan-00001-x has unverified items', [
+      'spec-00001-FR-1',
+      'idea-09999-ghost',
+    ])
+
+    await act(() => result.current.run(() => Promise.reject(refusal)))
+
+    expect(toast.error).toHaveBeenCalledWith('2 items unverified: spec-00001-FR-1, idea-09999-ghost')
+  })
+
+  // A plan can deliver dozens of items; the list is cut and the count is not.
+  it('keeps the count when the gap list is too long to name in full', async () => {
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+    const gaps = Array.from({ length: 8 }, (_, index) => `spec-00001-FR-${index + 1}`)
+
+    await act(() => result.current.run(() => Promise.reject(new ApiError(422, 'unverified', gaps))))
+
+    const said = vi.mocked(toast.error).mock.calls[0]![0] as string
+    expect(said).toContain('8 items unverified')
+    expect(said).toContain('spec-00001-FR-5')
+    expect(said).not.toContain('spec-00001-FR-6')
+    expect(said).toContain('and 3 more')
+  })
+
+  // A 422 that is not the gate's names no gaps, and reads as it always did.
+  it('reports a refusal that names no gaps as its own message', async () => {
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+
+    await act(() =>
+      result.current.run(() => Promise.reject(new ApiError(422, 'draft → resolved is not a legal transition'))),
+    )
+
+    expect(toast.error).toHaveBeenCalledWith('draft → resolved is not a legal transition')
   })
 
   it('reports a non-error refusal as text', async () => {

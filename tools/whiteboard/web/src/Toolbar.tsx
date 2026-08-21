@@ -6,6 +6,7 @@ import {
   MessageCircleQuestionMark,
   Pencil,
   Plus,
+  ShieldCheck,
   Waypoints,
 } from 'lucide-react'
 import { type ReactElement, createElement } from 'react'
@@ -37,12 +38,20 @@ export interface ToolbarProps {
   onAccept: () => void
   onClarify: () => void
   onAsk: () => void
+  onAudit: () => void
   onAdvance: (targetType: string) => void
 }
 
 /**
+ * The types an audit is about, built into the code rather than read off the
+ * config — the folder READMEs these three are audited against are what makes
+ * them auditable, and that is not a configurable fact (spec-00001-FR-50).
+ */
+const AUDITABLE_TYPES = new Set(['spec', 'rule', 'design'])
+
+/**
  * An entry that is disabled has to say why it is (spec-00001-AC-10.3, AC-49.5):
- * a board that has locked its three starting points and given no reason cannot be
+ * a board that has locked its starting points and given no reason cannot be
  * told from a broken one (issue-00010). No reason, no wrapper — the tooltip
  * belongs to the disabled state, not to the entry. The reason hangs on a span
  * because a disabled control takes no pointer events, and the span carries
@@ -70,8 +79,8 @@ function Disabled({ reason, children }: { reason?: string; children: ReactElemen
  */
 export function Toolbar(props: ToolbarProps) {
   const { node, transitions, nextSteps, relations, clarifiable, sessionRunning, onPickRelation } = props
-  const { onEdit, onStatus, onAccept, onClarify, onAsk, onAdvance } = props
-  // The one reason all three starting points share (spec-00001-FR-18).
+  const { onEdit, onStatus, onAccept, onClarify, onAsk, onAudit, onAdvance } = props
+  // The one reason every starting point shares (spec-00001-FR-18).
   const busy = sessionRunning ? 'session running' : undefined
 
   return (
@@ -194,6 +203,22 @@ export function Toolbar(props: ToolbarProps) {
               Ask
             </Button>
           </Disabled>
+
+          {/*
+            Audit is the gate before review, so unlike clarify the entry follows
+            the status as well as the type: it is offered on a `draft` of an
+            auditable type and nowhere else (spec-00001-FR-51). Both halves of
+            that are also ruled on by the server, so a hidden entry is a reading
+            of the same rule, not the only enforcement of it.
+          */}
+          {AUDITABLE_TYPES.has(node.type ?? '') && node.status === 'draft' ? (
+            <Disabled reason={busy}>
+              <Button variant="outline" size="sm" onClick={onAudit} disabled={sessionRunning}>
+                <ShieldCheck className="size-4" aria-hidden />
+                Audit
+              </Button>
+            </Disabled>
+          ) : null}
 
           {nextSteps.length === 0 ? (
             <Disabled reason="no next step">

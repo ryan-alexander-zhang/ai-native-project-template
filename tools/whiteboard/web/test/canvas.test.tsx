@@ -883,6 +883,44 @@ describe('the board', () => {
     vi.unstubAllGlobals()
   })
 
+  // spec-00001-AC-50.1 as the user sees it — one press on a draft spec, and the
+  // auditing happens in the terminal
+  it('starts an audit session from the toolbar and opens the terminal', async () => {
+    stubWebSocket()
+    const spec = node({ id: 'spec-00001-x', type: 'spec', title: 'Whiteboard spec', path: 'spec/a.md' })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [] })
+    const audit = vi.spyOn(api, 'audit').mockResolvedValue({
+      id: 's1',
+      kind: 'audit',
+      sourceId: 'spec-00001-x',
+      status: 'running',
+    })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-spec-00001-x'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Audit' })).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Audit' }))
+
+    expect(audit).toHaveBeenCalledWith('spec-00001-x')
+    await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
+    vi.unstubAllGlobals()
+  })
+
+  // spec-00001-AC-51.2 as the user sees it — the entry is gone once the spec is
+  // past `draft`, while the rest of the toolbar stays
+  it('offers no audit entry on a spec that is no longer a draft', async () => {
+    const spec = node({ id: 'spec-00001-x', type: 'spec', status: 'active', title: 'S', path: 'spec/a.md' })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [] })
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('node-spec-00001-x'))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
+  })
+
   // spec-00001-AC-18.2 at the board: the session the board reattached to holds
   // the one slot, so no entry offers to start another.
   it('disables the three session entries while a session is running', async () => {

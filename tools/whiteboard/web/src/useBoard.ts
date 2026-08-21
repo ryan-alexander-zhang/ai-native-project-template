@@ -3,11 +3,35 @@ import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
-import { type SessionInfo, api } from './api.ts'
+import { ApiError, type SessionInfo, api } from './api.ts'
 import { connectEvents } from './eventSocket.ts'
 import { type Placed, layoutGraph } from './layout.ts'
 
 const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [] }
+
+/**
+ * How many gap ids a refusal toast names. A plan can deliver dozens of items,
+ * and a toast listing every one of them is a wall the count cannot be read off
+ * — so the list is cut and the count, which is the number the user acts on,
+ * is kept whole (design-00002 §3).
+ */
+const GAPS_NAMED = 5
+
+/**
+ * What a refusal reads as. The `resolved` gate names its gaps one by one
+ * (spec-00001-FR-52) and the toast is that list's presentation: the count
+ * first, then as many ids as fit (design-00002 §3). Every other refusal is its
+ * own message and is passed through untouched.
+ */
+function refusalText(error: unknown): string {
+  if (error instanceof ApiError && error.gaps !== undefined) {
+    const named = error.gaps.slice(0, GAPS_NAMED)
+    const rest = error.gaps.length - named.length
+    const tail = rest === 0 ? '' : `, and ${rest} more`
+    return `${error.gaps.length} items unverified: ${named.join(', ')}${tail}`
+  }
+  return error instanceof Error ? error.message : String(error)
+}
 
 /** Board state: what is on the canvas, what is selected, and which panels are open. */
 export function useBoard() {
@@ -86,7 +110,7 @@ export function useBoard() {
         await action()
         await refresh()
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : String(error))
+        toast.error(refusalText(error))
       }
     },
     [refresh],

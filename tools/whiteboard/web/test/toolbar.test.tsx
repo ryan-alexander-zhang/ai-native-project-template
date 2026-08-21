@@ -33,6 +33,7 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     onAccept: vi.fn(),
     onClarify: vi.fn(),
     onAsk: vi.fn(),
+    onAudit: vi.fn(),
     onAdvance: vi.fn(),
     ...overrides,
   }
@@ -210,6 +211,66 @@ describe('the floating toolbar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
 
     expect(props.onAsk).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00001-AC-50.1 as the user sees it — the entry is there for each of the
+  // three auditable types, and only while the document is still a `draft`.
+  it.each([
+    ['spec', 'spec-00001-x'],
+    ['rule', 'rule-00001-x'],
+    ['design', 'design-00001-x'],
+  ])('shows the audit button on a draft %s node', (type, id) => {
+    renderToolbar({ node: { ...NODE, id, type, status: 'draft' } })
+
+    expect(screen.getByRole('button', { name: 'Audit' })).toBeTruthy()
+  })
+
+  // spec-00001-AC-51.2 — the entry follows the status too: an audit is the gate
+  // before review, and a document that is past `draft` is past the gate.
+  it('leaves audit out for a spec that is no longer a draft', () => {
+    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec', status: 'active' } })
+
+    expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
+  })
+
+  // spec-00001-AC-51.1 as the user sees it — a prd has no folder README of rules
+  // to be audited against, whatever its status
+  it('leaves audit out for a type that cannot be audited', () => {
+    renderToolbar()
+
+    expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
+  })
+
+  // spec-00001-AC-51.3 as the user sees it — a document whose front matter
+  // cannot be read is not something an audit can be pointed at
+  it('leaves audit out for an anomalous draft spec', () => {
+    renderToolbar({
+      node: { ...NODE, id: 'spec-00001-x', type: 'spec', ok: false, problems: ['front matter is missing'] },
+    })
+
+    expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
+  })
+
+  // spec-00001-AC-50.1 — one press, and the auditing happens in the terminal
+  it('starts an audit session on one press', async () => {
+    const props = renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' } })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Audit' }))
+
+    expect(props.onAudit).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00001-AC-18.2 and AC-49.5 — audit is a fourth starting point, so the
+  // one running session locks it on the same terms as the other three.
+  it('disables audit while a session is running and says why', async () => {
+    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' }, sessionRunning: true })
+    const audit = screen.getByRole<HTMLButtonElement>('button', { name: 'Audit' })
+
+    expect(audit.disabled).toBe(true)
+    await userEvent.hover(audit.parentElement!)
+
+    expect((await screen.findByRole('tooltip')).textContent).toContain('session running')
   })
 
   // spec-00001-AC-18.2 at the entry: one session runs, so none of the three

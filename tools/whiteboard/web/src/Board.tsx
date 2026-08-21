@@ -363,6 +363,7 @@ function Canvas() {
                         onAccept={() => void board.run(() => api.accept(selected.id))}
                         onClarify={() => void board.startSession(() => api.clarify(selected.id))}
                         onAsk={() => void board.startSession(() => api.ask(selected.id))}
+                        onAudit={() => void board.startSession(() => api.audit(selected.id))}
                         onAdvance={(targetType) => void board.advance(selected.id, targetType)}
                       />
                     </NodeToolbar>

@@ -13,20 +13,24 @@ import {
 } from './docRepository.ts'
 import { type ActionKind, type CommitOutcome, type DirtySnapshot, GitLayer, commitMessage } from './gitLayer.ts'
 import { type ItemsView, declaresItems, requirementView } from './requirements.ts'
+import { itemCoverage, resolvedGaps } from './resolvedGate.ts'
 import type { SessionPlan } from './sessionManager.ts'
 import {
   askInstruction,
+  auditInstruction,
   clarifyInstruction,
   clarifyStatePath,
   readClarifyState,
   relatedDocPaths,
   removeClarifyState,
+  typeReadmePath,
 } from './sessionTasks.ts'
 import {
   WorkflowError,
   applyAccept,
   applyStatusChange,
   assertAskable,
+  assertAuditable,
   assertClarifiable,
   nextStepsFor,
   transitionsFor,
@@ -37,6 +41,22 @@ export class ConflictError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'ConflictError'
+  }
+}
+
+/**
+ * The resolved gate refused the transition (spec-00001-FR-52). A refused action
+ * all the same, so it answers 422 like any other; the gaps ride along in the
+ * body, which is what tells this refusal from a merely illegal transition
+ * (design-00001 §7).
+ */
+export class GateError extends WorkflowError {
+  readonly gaps: string[]
+
+  constructor(message: string, gaps: string[]) {
+    super(message)
+    this.name = 'GateError'
+    this.gaps = gaps
   }
 }
 
@@ -110,12 +130,41 @@ export class DocService {
     return this.write(node, content, 'edit')
   }
 
-  /** spec-00001-FR-6 and FR-7. */
+  /** spec-00001-FR-6 and FR-7, with the resolved gate of FR-52 between the ruling and the write. */
   async changeStatus(id: string, to: string): Promise<ActionResult> {
-    const node = this.require(id)
+    const graph = this.graph()
+    const node = this.require(id, graph)
     const current = this.readOrConflict(node)
     const updated = applyStatusChange(current.content, node, this.config, to)
+    this.assertScopeVerified(node, to, graph)
     return { ...(await this.write(node, updated, 'status')), status: to }
+  }
+
+  /**
+   * spec-00001-FR-52: a plan reaches `resolved` only once the records that name
+   * it verify every item of its delivery scope. Nothing else passes this way —
+   * another type, another target status (`wontfix` included), and the transition
+   * is the transition table's business alone.
+   */
+  private assertScopeVerified(node: DocNode, to: string, graph: DocGraph): void {
+    if (node.type !== 'plan' || node.status !== 'open' || to !== 'resolved') return
+    const body = (candidate: DocNode) => ({ id: candidate.id, body: readDocBody(this.docsDir, candidate) })
+    const docs = itemCoverage(
+      graph.nodes.filter((candidate) => declaresItems(candidate.type)).map(body),
+      // Every record naming this plan its parent, whatever its own status
+      // (decision-00007 §3); another plan's record is no evidence for this one.
+      graph.nodes
+        .filter((candidate) => candidate.type === 'record' && (candidate.relations.parent ?? []).includes(node.id))
+        .map(body),
+    )
+    const gaps = resolvedGaps(
+      node.relations.implements ?? [],
+      graph.nodes.map((candidate) => candidate.id),
+      docs,
+    )
+    if (gaps.length > 0) {
+      throw new GateError(`${node.id} cannot be resolved; its delivery scope is not verified: ${gaps.join(', ')}`, gaps)
+    }
   }
 
   /** spec-00001-FR-8: accept promotes, and closes out that round of clarify. */
@@ -167,6 +216,23 @@ export class DocService {
       kind: 'ask',
       sourceId: node.id,
       instruction: askInstruction({ docPath: node.path, relatedPaths: relatedDocPaths(graph, node.id) }),
+    }
+  }
+
+  /**
+   * What an audit session for `id` is started with (spec-00001-FR-50 and FR-51):
+   * refused unless the document is a draft of an auditable type and still on disk
+   * (FR-19). Audit is stateless — no progress file to read, nothing to recover
+   * from — so the instruction is built from the document alone.
+   */
+  auditPlan(id: string): SessionPlan {
+    const node = this.require(id)
+    this.readOrConflict(node)
+    assertAuditable(node, this.config)
+    return {
+      kind: 'audit',
+      sourceId: node.id,
+      instruction: auditInstruction({ docPath: node.path, readmePath: typeReadmePath(node.type!) }),
     }
   }
 

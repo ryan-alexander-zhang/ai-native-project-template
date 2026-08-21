@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ConflictError, DocService } from '../src/docService.ts'
+import { ConflictError, DocService, GateError } from '../src/docService.ts'
 import { contentHash } from '../src/docRepository.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import { WorkflowError } from '../src/workflow.ts'
@@ -355,6 +355,241 @@ describe('clarifyPlan', () => {
 
     expect(() => service.clarifyPlan('spec-00001-b')).toThrowError(ConflictError)
     expect(() => service.clarifyPlan('spec-00001-b')).toThrowError(/refresh the board/)
+  })
+})
+
+/** spec-00001-FR-50 and FR-51: what an audit session is started with, and who may be audited. */
+describe('auditPlan', () => {
+  const DRAFT_DESIGN = doc({ id: 'design-00001-b', type: 'design', status: 'draft' }, '# Design\n')
+
+  // spec-00001-AC-50.2 with rule-00001-AC-23.1
+  it('plans an audit session carrying the document and its folder README', () => {
+    const { service } = serviceOn({ 'design/b.md': DRAFT_DESIGN })
+
+    const plan = service.auditPlan('design-00001-b')
+
+    expect(plan.kind).toBe('audit')
+    expect(plan.sourceId).toBe('design-00001-b')
+    expect(plan.expectation).toBeUndefined()
+    expect(plan.instruction).toContain('design/b.md')
+    expect(plan.instruction).toContain('design/README.md')
+    expect(plan.instruction).toContain('Open Questions')
+  })
+
+  // spec-00001-AC-51.1 with rule-00001-AC-23.2
+  it('refuses a draft of a type that is not auditable', () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    expect(() => service.auditPlan('prd-00001-x')).toThrowError(/does not apply to a prd/)
+  })
+
+  // spec-00001-AC-51.2 with rule-00001-AC-23.3
+  it('refuses a document that is not draft', () => {
+    const { service } = serviceOn({ 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }) })
+    expect(() => service.auditPlan('spec-00001-b')).toThrowError(/applies to a draft/)
+  })
+
+  // spec-00001-AC-51.3
+  it('refuses an anomalous document', () => {
+    const { service } = serviceOn({ 'spec/broken.md': doc({ id: 'nope', type: 'spec', status: 'draft' }) })
+    expect(() => service.auditPlan('nope')).toThrowError(/front matter problems/)
+  })
+
+  // spec-00001-AC-19.2 for audit's half of «the target is gone»
+  it('refuses a document that is no longer on disk, telling the caller to refresh', () => {
+    const { docsDir, service } = serviceOn({ 'design/b.md': DRAFT_DESIGN })
+    rmSync(join(docsDir, 'design/b.md'))
+
+    expect(() => service.auditPlan('design-00001-b')).toThrowError(ConflictError)
+    expect(() => service.auditPlan('design-00001-b')).toThrowError(/refresh the board/)
+  })
+})
+
+/**
+ * spec-00001-FR-52 on the write path: the gate sits between the transition
+ * ruling and the write, so a refusal leaves the file and the history alone.
+ */
+describe('the resolved gate', () => {
+  const SPEC = doc(
+    { id: 'spec-00001-b', type: 'spec', status: 'active' },
+    [
+      '# Spec',
+      '',
+      '- **spec-00001-FR-1** (Event) the system shall do the thing',
+      '',
+      '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+      '  Given a board',
+      '  When it loads',
+      '  Then it works',
+      '- **spec-00001-AC-1.2** (spec-00001-FR-1)',
+      '  Given a board',
+      '  When it reloads',
+      '  Then it still works',
+      '',
+    ].join('\n'),
+  )
+  const RULE = doc(
+    { id: 'rule-00001-f', type: 'rule', status: 'active' },
+    [
+      '# Rule',
+      '',
+      '- **rule-00001-BR-1** (Constraint) the first rule',
+      '- **rule-00001-BR-2** (Constraint) the second rule',
+      '',
+      '- **rule-00001-AC-1.1** (rule-00001-BR-1)',
+      '  Given a rule',
+      '  When it applies',
+      '  Then it holds',
+      '- **rule-00001-AC-2.1** (rule-00001-BR-2)',
+      '  Given the other rule',
+      '  When it applies',
+      '  Then it holds too',
+      '',
+    ].join('\n'),
+  )
+  const DESIGN = doc({ id: 'design-00001-b', type: 'design', status: 'active' }, '# Design\n')
+
+  /** A record's acceptance checklist, `parent` naming the plan it closes. */
+  function record(id: string, parent: string, rows: [string, string][]): string {
+    return doc(
+      { id, type: 'record', status: 'active', parent },
+      ['# 验收记录', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', ...rows.map(
+        ([target, result]) => `| ${target} | some.test.ts | ${result} |`,
+      ), ''].join('\n'),
+    )
+  }
+
+  function planImplementing(targets: string): string {
+    return doc({ id: 'plan-00001-y', type: 'plan', status: 'open', implements: targets }, '# Plan\n')
+  }
+
+  const BOTH_PASS: [string, string][] = [
+    ['spec-00001-AC-1.1', 'pass'],
+    ['spec-00001-AC-1.2', 'pass'],
+  ]
+
+  // spec-00001-AC-52.1 with rule-00001-AC-25.1
+  it('lets a plan through when the records naming it verify its whole scope', async () => {
+    const { docsDir, repoRoot, service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1]'),
+      'record/r.md': record('record-00001-r', 'plan-00001-y', BOTH_PASS),
+    })
+
+    const result = await service.changeStatus('plan-00001-y', 'resolved')
+
+    expect(result).toEqual({ committed: true, status: 'resolved' })
+    expect(onDisk(docsDir, 'plan/a.md')).toContain('status: resolved')
+    expect(lastCommitMessage(repoRoot)).toBe('wb(status): plan-00001-y')
+  })
+
+  // spec-00001-AC-52.2 with rule-00001-AC-25.2
+  it('refuses, names the item, and writes nothing when a criterion has no row', async () => {
+    const { docsDir, repoRoot, service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1]'),
+      'record/r.md': record('record-00001-r', 'plan-00001-y', [['spec-00001-AC-1.1', 'pass']]),
+    })
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('plan-00001-y', 'resolved')).rejects.toThrowError(/spec-00001-FR-1/)
+    expect(onDisk(docsDir, 'plan/a.md')).toContain('status: open')
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00001-AC-52.3 with rule-00001-AC-25.3
+  it('refuses when a row of the scope exists but did not pass', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1]'),
+      'record/r.md': record('record-00001-r', 'plan-00001-y', [
+        ['spec-00001-AC-1.1', 'pass'],
+        ['spec-00001-AC-1.2', 'fail'],
+      ]),
+    })
+
+    await expect(service.changeStatus('plan-00001-y', 'resolved')).rejects.toThrowError(GateError)
+  })
+
+  // spec-00001-AC-52.4 with rule-00001-AC-25.4 — another plan's record is no evidence
+  it('refuses when the passing rows belong to a record naming another plan', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1]'),
+      'plan/other.md': doc({ id: 'plan-00002-z', type: 'plan', status: 'open' }, '# Other\n'),
+      'record/r.md': record('record-00001-r', 'plan-00002-z', BOTH_PASS),
+    })
+
+    await expect(service.changeStatus('plan-00001-y', 'resolved')).rejects.toThrowError(/spec-00001-FR-1/)
+  })
+
+  // spec-00001-AC-52.5 with rule-00001-AC-25.5
+  it('refuses and names an id its scope could not resolve', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1, spec-00001-FR-99]'),
+      'record/r.md': record('record-00001-r', 'plan-00001-y', BOTH_PASS),
+    })
+
+    await expect(service.changeStatus('plan-00001-y', 'resolved')).rejects.toThrowError(/spec-00001-FR-99/)
+  })
+
+  // spec-00001-AC-52.6 with rule-00001-AC-25.6
+  it('lets a plan whose scope is empty through with no evidence at all', async () => {
+    const { service } = serviceOn({ 'design/b.md': DESIGN, 'plan/a.md': planImplementing('[design-00001-b]') })
+
+    expect((await service.changeStatus('plan-00001-y', 'resolved')).status).toBe('resolved')
+  })
+
+  // spec-00001-AC-52.7 — a whole rule document in scope, one BR unverified
+  it('refuses and names the one item of a whole document in scope that nothing verifies', async () => {
+    const { service } = serviceOn({
+      'rule/f.md': RULE,
+      'plan/a.md': planImplementing('[rule-00001-f]'),
+      'record/r.md': record('record-00001-r', 'plan-00001-y', [['rule-00001-AC-1.1', 'pass']]),
+    })
+
+    await expect(service.changeStatus('plan-00001-y', 'resolved')).rejects.toThrowError(/rule-00001-BR-2/)
+  })
+
+  // spec-00001-AC-52.8 — the gate is the plan's alone
+  it('lets an issue reach resolved without consulting the gate', async () => {
+    const { service } = serviceOn({
+      'issue/i.md': doc({ id: 'issue-00001-i', type: 'issue', status: 'open', implements: '[spec-00001-FR-1]' }),
+      'spec/b.md': SPEC,
+    })
+
+    expect((await service.changeStatus('issue-00001-i', 'resolved')).status).toBe('resolved')
+  })
+
+  // spec-00001-AC-52.9 — only `resolved` is gated
+  it('lets a plan with an unverified scope reach wontfix', async () => {
+    const { service } = serviceOn({ 'spec/b.md': SPEC, 'plan/a.md': planImplementing('[spec-00001-FR-1]') })
+
+    expect((await service.changeStatus('plan-00001-y', 'wontfix')).status).toBe('wontfix')
+  })
+
+  // spec-00001-AC-52.10 with rule-00001-AC-25.7 — the evidence is the union
+  it('lets a plan through on coverage spread across two records naming it', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1]'),
+      'record/r.md': record('record-00001-r', 'plan-00001-y', [['spec-00001-AC-1.1', 'pass']]),
+      'record/s.md': record('record-00002-s', 'plan-00001-y', [['spec-00001-AC-1.2', 'pass']]),
+    })
+
+    expect((await service.changeStatus('plan-00001-y', 'resolved')).status).toBe('resolved')
+  })
+
+  // The gaps ride along on the refusal, for the board to name one by one (design-00001 §7)
+  it('carries the gaps on the refusal itself', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': SPEC,
+      'plan/a.md': planImplementing('[spec-00001-FR-1, spec-00001-FR-99]'),
+    })
+
+    await expect(service.changeStatus('plan-00001-y', 'resolved')).rejects.toMatchObject({
+      gaps: ['spec-00001-FR-1', 'spec-00001-FR-99'],
+    })
   })
 })
 

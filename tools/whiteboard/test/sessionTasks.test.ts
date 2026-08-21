@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest'
 import { readGraph } from '../src/docRepository.ts'
 import {
   askInstruction,
+  auditInstruction,
   clarifyInstruction,
   clarifyStatePath,
   readClarifyState,
   relatedDocPaths,
   removeClarifyState,
+  typeReadmePath,
 } from '../src/sessionTasks.ts'
 import { doc, makeDocsDir, makeRepo, testConfig } from './helpers.ts'
 
@@ -138,6 +140,69 @@ describe('askInstruction', () => {
     expect(instruction).toContain('over as many turns as they need')
     expect(instruction).toContain('Revise documents under the docs tree')
     expect(instruction).toContain('status changes belong to the board, to a transition or a review action')
+  })
+})
+
+/** spec-00001-FR-50 with rule-00001-BR-22: the audit's stance, its two passes, and where findings land. */
+describe('auditInstruction', () => {
+  const AUDIT = { docPath: 'design/board.md', readmePath: typeReadmePath('design') }
+
+  // spec-00001-AC-50.2 — the target document and its folder README
+  it('names the session kind, the document, and the folder README it is held to', () => {
+    const instruction = auditInstruction(AUDIT)
+
+    expect(instruction).toContain('audit session')
+    expect(instruction).toContain('design/board.md')
+    expect(instruction).toContain('design/README.md')
+    expect(instruction).toContain('the README of its own folder')
+  })
+
+  // rule-00001-AC-22.1 at the instruction level: the stance and the two passes
+  it('states the reviewer stance and the order of the two passes', () => {
+    const instruction = auditInstruction(AUDIT)
+
+    expect(instruction).toContain('somebody who did not write it')
+    expect(instruction).toContain('never defend the existing')
+    expect(instruction).toMatch(/first the structure and the grammar design\/README\.md lays down/)
+    expect(instruction).toContain('then the content')
+  })
+
+  // rule-00001-BR-22: what the audit is asked to list
+  it('asks for the missing rules, cases and GWTs, the silent readings, and the unconfirmable values', () => {
+    const instruction = auditInstruction(AUDIT)
+
+    expect(instruction).toContain('every rule, case and GWT that is missing')
+    expect(instruction).toContain('every reading the document took')
+    expect(instruction).toContain('every value you cannot confirm')
+  })
+
+  // spec-00001-AC-50.2 — the landing contract, and the status line left alone
+  it('states where findings land, that duplicates are not re-appended, and that status never moves', () => {
+    const instruction = auditInstruction(AUDIT)
+
+    expect(instruction).toContain('Append each unresolved finding as a list item to the Open Questions section')
+    expect(instruction).toMatch(/find the heading by name, case-insensitively and allowing a numbered form/)
+    expect(instruction).toContain('create the section at the end of the file')
+    expect(instruction).toContain('never create a second one')
+    expect(instruction).toContain('Read what that section already holds before you write')
+    expect(instruction).toContain('is not\n  appended again')
+    expect(instruction).toContain('amend the body itself')
+    expect(instruction).toContain('Never touch the status line')
+    expect(instruction).toContain('Change nothing outside the docs tree')
+  })
+
+  // spec-00001-FR-50: audit is stateless — no progress file, nothing to recover from
+  it('says nothing about a progress file or recovering from one', () => {
+    const instruction = auditInstruction(AUDIT)
+
+    expect(instruction).not.toContain('.whiteboard')
+    expect(instruction).not.toContain('Recover from the progress')
+  })
+
+  it('takes the README of whichever folder the document lives in', () => {
+    expect(auditInstruction({ docPath: 'rule/flow.md', readmePath: typeReadmePath('rule') })).toContain(
+      'rule/README.md',
+    )
   })
 })
 

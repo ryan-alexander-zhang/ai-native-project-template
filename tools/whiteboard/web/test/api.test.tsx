@@ -62,6 +62,17 @@ describe('the api client', () => {
     )
   })
 
+  // spec-00001-FR-50
+  it('starts an audit session for the document', async () => {
+    const fetchMock = mockFetch(200, { id: 's1', kind: 'audit', sourceId: 'spec-00001-x', status: 'running' })
+
+    expect(await api.audit('spec-00001-x')).toMatchObject({ kind: 'audit' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/audit',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ docId: 'spec-00001-x' }) }),
+    )
+  })
+
   it('sends accept without questions', async () => {
     const fetchMock = mockFetch(200, { committed: true })
     await api.accept('prd-00001-x')
@@ -111,6 +122,27 @@ describe('the api client', () => {
     await expect(api.doc('prd-00001-x')).rejects.toThrowError(ApiError)
     await expect(api.doc('prd-00001-x')).rejects.toThrowError(/changed on disk/)
     await expect(api.doc('prd-00001-x').catch((error) => error.status)).resolves.toBe(409)
+  })
+
+  // spec-00001-FR-52 — the gate names its gaps in the body, so the refusal the
+  // board reports has to carry them through
+  it('carries the gaps a resolved-gate refusal names', async () => {
+    mockFetch(422, { error: 'plan-00001-x has unverified items', gaps: ['spec-00001-FR-1', 'idea-09999-ghost'] })
+
+    const error = await api.setStatus('plan-00001-x', 'resolved').catch((thrown) => thrown)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.status).toBe(422)
+    expect(error.gaps).toEqual(['spec-00001-FR-1', 'idea-09999-ghost'])
+  })
+
+  // A refusal that is not the gate's has no gaps field, and must not grow one.
+  it('leaves the gaps unset on a refusal that names none', async () => {
+    mockFetch(422, { error: 'draft → resolved is not a legal transition' })
+
+    const error = await api.setStatus('plan-00001-x', 'resolved').catch((thrown) => thrown)
+
+    expect(error.gaps).toBeUndefined()
   })
 
   it('falls back to the status text when the body carries no error', async () => {

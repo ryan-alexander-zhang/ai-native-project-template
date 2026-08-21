@@ -246,13 +246,64 @@ describe('POST /api/docs/:id/status', () => {
     expect(body).toEqual({ committed: true, status: 'active' })
   })
 
-  // spec-00001-AC-7.1
+  // spec-00001-AC-7.1, and design-00001 §7: a refusal that is not the gate's names no gaps
   it('answers 422 for an illegal transition', async () => {
     const { call } = boardOn({ 'idea/a.md': DRAFT_IDEA })
     const { status, body } = await call('POST', '/api/docs/idea-00001-x/status', { to: 'resolved' })
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/not a legal transition/)
+    expect(body.gaps).toBeUndefined()
+  })
+
+  /**
+   * The resolved gate over the wire (spec-00001-FR-52): the refusal is a 422 like
+   * any other, told apart by the `gaps` it carries (design-00001 §7).
+   */
+  describe('the resolved gate', () => {
+    const SPEC = doc(
+      { id: 'spec-00001-b', type: 'spec', status: 'active' },
+      [
+        '# Spec',
+        '',
+        '- **spec-00001-FR-1** (Event) the system shall do the thing',
+        '',
+        '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+        '  Given a board',
+        '  When it loads',
+        '  Then it works',
+        '',
+      ].join('\n'),
+    )
+    const PLAN = doc({ id: 'plan-00001-y', type: 'plan', status: 'open', implements: '[spec-00001-FR-1]' }, '# Plan\n')
+    const RECORD = doc(
+      { id: 'record-00001-r', type: 'record', status: 'active', parent: 'plan-00001-y' },
+      ['# 验收记录', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', '| spec-00001-AC-1.1 | t.ts | pass |', ''].join(
+        '\n',
+      ),
+    )
+
+    // spec-00001-AC-52.2 over HTTP
+    it('answers 422 naming the gaps, and leaves the file alone', async () => {
+      const { call, docsDir } = boardOn({ 'spec/b.md': SPEC, 'plan/a.md': PLAN })
+
+      const { status, body } = await call('POST', '/api/docs/plan-00001-y/status', { to: 'resolved' })
+
+      expect(status).toBe(422)
+      expect(body.gaps).toEqual(['spec-00001-FR-1'])
+      expect(body.error).toMatch(/spec-00001-FR-1/)
+      expect(readFileSync(join(docsDir, 'plan/a.md'), 'utf8')).toBe(PLAN)
+    })
+
+    // spec-00001-AC-52.1 over HTTP
+    it('applies the transition once the record naming the plan verifies its scope', async () => {
+      const { call } = boardOn({ 'spec/b.md': SPEC, 'plan/a.md': PLAN, 'record/r.md': RECORD })
+
+      const { status, body } = await call('POST', '/api/docs/plan-00001-y/status', { to: 'resolved' })
+
+      expect(status).toBe(200)
+      expect(body).toEqual({ committed: true, status: 'resolved' })
+    })
   })
 })
 
@@ -511,6 +562,136 @@ describe('clarify and ask sessions', () => {
     expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
     expect(commitCount(repoRoot)).toBe(commits)
     expect(board.sessions.current()!.outcome!.committed).toBe(false)
+  })
+})
+
+/**
+ * The fourth session kind (spec-00001-FR-50 and FR-51): the same channel, the
+ * same one slot, its own ruling. Nothing here writes the document — the session's
+ * agent does, and the board commits what it left.
+ */
+describe('audit sessions', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const DRAFT_DESIGN = doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# Design\n')
+  const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+
+  // spec-00001-AC-50.1
+  it('starts an audit session on a draft spec and streams its output to the terminal', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, ['-e', 'console.log("auditing"); setTimeout(() => {}, 5000)'])
+
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+
+    expect(status).toBe(200)
+    expect(body.kind).toBe('audit')
+    expect(body.status).toBe('running')
+    expect(board.sessions.current()!.sourceId).toBe('spec-00001-b')
+    await vi.waitFor(() => expect(board.sessions.attach(() => {}).buffer).toContain('auditing'), SESSION_WAIT)
+  })
+
+  // spec-00001-AC-50.3
+  it('commits what an audit session wrote under docs, naming the action and the document', async () => {
+    const { call, board, repoRoot } = boardOn({ 'design/d.md': DRAFT_DESIGN }, [
+      '-e',
+      `require('fs').appendFileSync('design/d.md', '\\n## Open Questions\\n\\n- which failure mode is unstated?\\n')`,
+    ])
+
+    await call('POST', '/api/sessions/audit', { docId: 'design-00001-d' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(audit): design-00001-d')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/design/d.md'])
+  })
+
+  // spec-00001-AC-50.4 — an audit that found nothing to write leaves no trace
+  it('leaves the document and the history alone when an audit session wrote nothing', async () => {
+    const { call, board, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC })
+    const commits = commitCount(repoRoot)
+
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(board.sessions.current()!.outcome!.committed).toBe(false)
+  })
+
+  // spec-00001-AC-51.1
+  it('answers 422 and starts nothing for a draft of a type that is not auditable', async () => {
+    const { call, board } = boardOn({ 'idea/a.md': DRAFT_IDEA })
+
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'idea-00001-x' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/does not apply to an? idea/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-51.2 — the entry is not offered, and the request is refused all the same
+  it('answers 422 and starts nothing for an auditable type that is no longer draft', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }) })
+
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/applies to a draft/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-51.3
+  it('answers 422 and starts nothing for an anomalous document', async () => {
+    const { call, board } = boardOn({ 'spec/broken.md': doc({ id: 'nope', type: 'spec', status: 'draft' }) })
+
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'nope' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/front matter problems/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  // spec-00001-AC-19.2 for audit's half of «the target is gone»
+  it('answers 409 and starts nothing when the target document was deleted', async () => {
+    const { call, board, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC })
+    rmSync(join(docsDir, 'spec/b.md'))
+
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+
+    expect(status).toBe(409)
+    expect(body.error).toMatch(/refresh the board/)
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  it('answers 422 when the request names no document', async () => {
+    const { call } = boardOn({ 'spec/b.md': DRAFT_SPEC })
+    expect((await call('POST', '/api/sessions/audit', {})).status).toBe(422)
+  })
+
+  // spec-00001-AC-18.3 — the fourth kind shares the one slot
+  it('answers 409 for an audit while a clarify session is running, leaving it alone', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
+    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+
+    expect(status).toBe(409)
+    expect(body.error).toMatch(/already running/)
+    expect(board.sessions.current()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
+  })
+
+  // spec-00001-AC-18.3 the other way round: the audit holds the slot against the rest
+  it('answers 409 for a clarify, an ask and an advance while an audit session is running', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+
+    for (const [path, request] of [
+      ['/api/sessions/clarify', { docId: 'spec-00001-b' }],
+      ['/api/sessions/ask', { docId: 'spec-00001-b' }],
+      ['/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' }],
+    ] as const) {
+      expect((await call('POST', path, request)).status).toBe(409)
+    }
+    expect(board.sessions.current()).toMatchObject({ kind: 'audit', status: 'running' })
   })
 })
 

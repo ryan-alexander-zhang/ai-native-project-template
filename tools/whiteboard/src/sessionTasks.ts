@@ -26,6 +26,14 @@ export interface AskTask {
   relatedPaths: string[]
 }
 
+/** What an audit session is told; its contract is spec-00001-FR-50 with rule-00001-BR-22. */
+export interface AuditTask {
+  /** The document being audited, relative to the session's working directory (the docs tree). */
+  docPath: string
+  /** Its type folder's README, same relativity: the conventions the structure pass is held against. */
+  readmePath: string
+}
+
 /** Paths only, both requirements say (FR-45, FR-47): the session reads the bodies itself. */
 function contextLines(docPath: string, relatedPaths: string[]): string[] {
   return [
@@ -108,6 +116,46 @@ export function askInstruction(task: AskTask): string {
     'Never touch a status line — status changes belong to the board, to a transition or a review action.',
     'Change nothing outside the docs tree.',
   ].join('\n')
+}
+
+/**
+ * The audit session (spec-00001-FR-50 with rule-00001-BR-22). Two things make it
+ * an audit rather than a second read: the stance — the reviewer did not write
+ * this, and owes the existing wording no defence — and the two passes, the folder
+ * README's conventions before the content. The findings land in the document
+ * itself, which is what puts them in front of the accept gate of BR-12; audit
+ * keeps no progress file, so not re-appending what the section already lists is
+ * stated here rather than remembered across sessions.
+ */
+export function auditInstruction(task: AuditTask): string {
+  const { docPath, readmePath } = task
+  return [
+    'This is an audit session: you review one document as somebody who did not write it, and land',
+    'what you find back in that document.',
+    `The document: ${docPath} (relative to your working directory, the docs tree).`,
+    `The conventions it is held to: ${readmePath}, the README of its own folder.`,
+    'These are paths, not content — read both yourself.',
+    'Review from the stance of someone who did NOT write this document: never defend the existing',
+    '  wording, and take nothing in it on trust.',
+    `Go in two passes: first the structure and the grammar ${readmePath} lays down, then the content`,
+    '  itself.',
+    'List, one by one: every rule, case and GWT that is missing; every reading the document took',
+    '  silently; and every value you cannot confirm.',
+    'Append each unresolved finding as a list item to the Open Questions section of that document —',
+    '  find the heading by name, case-insensitively and allowing a numbered form',
+    '  (`## 6. Open Questions`); only if there is none, create the section at the end of the file;',
+    '  never create a second one.',
+    'Read what that section already holds before you write: a finding it already lists is not',
+    '  appended again.',
+    'Where a finding is already settled, amend the body itself instead of leaving a question behind.',
+    'Never touch the status line — the document stays as it is, and status moves only from the board.',
+    'Change nothing outside the docs tree.',
+  ].join('\n')
+}
+
+/** The folder README an audit is held to, relative to the docs tree (spec-00001-FR-50). */
+export function typeReadmePath(type: string): string {
+  return `${type}/README.md`
 }
 
 /** Where a clarify session keeps its progress, relative to the repo root (spec-00001-FR-46). */

@@ -20,12 +20,13 @@ const SUBMIT = '\r'
 export type SessionStatus = 'running' | 'exited' | 'failed'
 
 /**
- * The three kinds of agent session, sharing one channel, one terminal and one
+ * The four kinds of agent session, sharing one channel, one terminal and one
  * slot (spec-00001-FR-18): the board advances the flow, clarify has the agent
- * question the owner, ask has the owner question the agent. The kind is what
- * names the session's commit (spec-00001-FR-14).
+ * question the owner, ask has the owner question the agent, audit has the agent
+ * review a draft it did not write. The kind is what names the session's commit
+ * (spec-00001-FR-14).
  */
-export type SessionKind = 'advance' | 'clarify' | 'ask'
+export type SessionKind = 'advance' | 'clarify' | 'ask' | 'audit'
 
 /** One session's whole input: what kind it is, what it is about, what it is told. */
 export interface SessionPlan {

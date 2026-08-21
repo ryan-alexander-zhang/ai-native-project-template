@@ -3,7 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { WebSocketServer } from 'ws'
 import { type Expectation, findProduct, markProduct, productProblems, taskInstruction } from './advance.ts'
 import type { FlowConfig } from './config.ts'
-import { ConflictError, DocService } from './docService.ts'
+import { ConflictError, DocService, GateError } from './docService.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
 import {
   NoSessionError,
@@ -73,9 +73,9 @@ export class Board {
     // What the session inherited, taken when it started: only what moved since
     // is its own to commit (spec-00001-AC-14.5).
     const before = this.sessions.baseline()
-    // Clarify and ask were asked for no new document, so there is nothing to
-    // check: their commit is named by the kind and carries the document they
-    // were about (spec-00001-AC-14.7, AC-14.8).
+    // Clarify, ask and audit were asked for no new document, so there is nothing
+    // to check: their commit is named by the kind and carries the document they
+    // were about (spec-00001-AC-14.7, AC-14.8, AC-50.3).
     if (plan.expectation === undefined) {
       const outcome = await this.docs.commitSessionChanges(plan.sourceId, before, plan.kind)
       return { docId: plan.sourceId, problems: [], committed: outcome.committed, error: outcome.error }
@@ -121,13 +121,16 @@ export class Board {
 
     app.get('/api/sessions', (_req, res) => res.json({ current: this.sessions.current() }))
     app.post('/api/sessions', (req, res) => res.json(this.startSession(req.body)))
-    // The other two session kinds: same channel, same one slot (spec-00001-FR-18),
-    // each with its own ruling (FR-9, FR-47) made in the doc service.
+    // The other three session kinds: same channel, same one slot (spec-00001-FR-18),
+    // each with its own ruling (FR-9, FR-47, FR-51) made in the doc service.
     app.post('/api/sessions/clarify', (req, res) => {
       res.json(this.sessions.start(this.docs.clarifyPlan(docIdOf(req.body))))
     })
     app.post('/api/sessions/ask', (req, res) => {
       res.json(this.sessions.start(this.docs.askPlan(docIdOf(req.body))))
+    })
+    app.post('/api/sessions/audit', (req, res) => {
+      res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body))))
     })
     // The way out of a session that will not end by itself (spec-00001-FR-49);
     // the wrap-up it answers with has already run.
@@ -217,10 +220,10 @@ export class Board {
   }
 }
 
-/** A clarify or ask request names the one document it is about. */
+/** A clarify, ask or audit request names the one document it is about. */
 function docIdOf(body: { docId?: string }): string {
   if (typeof body.docId !== 'string') {
-    throw new WorkflowError('a clarify or ask session needs a docId')
+    throw new WorkflowError('a clarify, ask or audit session needs a docId')
   }
   return body.docId
 }
@@ -251,5 +254,8 @@ const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [
 
 function errorHandler(error: Error, _req: Request, res: Response, _next: NextFunction): void {
   const match = STATUS_BY_ERROR.find(([type]) => error instanceof type)
-  res.status(match?.[1] ?? 500).json({ error: error.message })
+  // The resolved gate names its gaps in the body (design-00001 §7); every other
+  // refusal carries its message alone, so the field's presence is the gate's.
+  const gaps = error instanceof GateError ? { gaps: error.gaps } : {}
+  res.status(match?.[1] ?? 500).json({ error: error.message, ...gaps })
 }

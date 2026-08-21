@@ -6,6 +6,7 @@ import {
   applyAccept,
   applyStatusChange,
   assertAskable,
+  assertAuditable,
   assertClarifiable,
   hasOpenQuestions,
   idPrefix,
@@ -174,6 +175,36 @@ describe('assertClarifiable', () => {
   })
 })
 
+/** spec-00001-FR-50 and FR-51 with rule-00001-BR-23: who may be audited at all. */
+describe('assertAuditable', () => {
+  // rule-00001-AC-23.1 — the three auditable types, each as its own draft
+  it('allows a draft of every auditable type', () => {
+    for (const type of ['spec', 'rule', 'design']) {
+      const { node } = single({ id: `${type}-00001-x`, type, status: 'draft' }, '# X\n')
+      expect(() => assertAuditable(node, config)).not.toThrow()
+    }
+  })
+
+  // spec-00001-AC-51.1 with rule-00001-AC-23.2 — prd has no auditable structure
+  it('rejects a draft of a type that is not auditable', () => {
+    const { node } = single({ id: 'prd-00001-x', type: 'prd', status: 'draft' }, '# X\n')
+    expect(() => assertAuditable(node, config)).toThrowError(WorkflowError)
+    expect(() => assertAuditable(node, config)).toThrowError(/does not apply to a prd document/)
+  })
+
+  // spec-00001-AC-51.2 with rule-00001-AC-23.3
+  it('rejects an auditable type that is no longer a draft', () => {
+    const { node } = single({ id: 'spec-00001-x', type: 'spec', status: 'active' })
+    expect(() => assertAuditable(node, config)).toThrowError(/applies to a draft document/)
+  })
+
+  // spec-00001-AC-51.3
+  it('rejects an anomalous document', () => {
+    const { node } = single({ id: 'nope', type: 'spec', status: 'draft' })
+    expect(() => assertAuditable(node, config)).toThrowError(/front matter problems/)
+  })
+})
+
 /** spec-00001-FR-47 with rule-00001-BR-21: ask is not a review action. */
 describe('assertAskable', () => {
   // spec-00001-AC-47.1 with rule-00001-AC-21.1 — any type, any status
@@ -231,10 +262,15 @@ describe('nextStepsFor', () => {
     ])
   })
 
-  // rule-00001-AC-16.1
-  it('offers task for a plan, carrying parent', () => {
+  // rule-00001-AC-16.1 with AC-16.2 and AC-16.3: the implementation phase's three
+  // next steps, each carrying its own relation
+  it('offers task, issue, and record for a plan, each carrying its own relation', () => {
     const { node } = single({ id: 'plan-00001-x', type: 'plan', status: 'open' })
-    expect(nextStepsFor(node, config)).toEqual([{ next: 'task', carry: 'parent' }])
+    expect(nextStepsFor(node, config)).toEqual([
+      { next: 'task', carry: 'parent' },
+      { next: 'issue', carry: 'blocks' },
+      { next: 'record', carry: 'parent' },
+    ])
   })
 })
 

@@ -256,7 +256,13 @@ describe('the config shipped with this repo', () => {
       { next: 'design', carry: 'informs' },
       { next: 'plan', carry: 'implements' },
     ])
-    expect(config.flow.plan).toEqual([{ next: 'task', carry: 'parent' }])
+    // rule-00001-AC-16.1 … AC-16.3: the implementation phase's three next steps,
+    // each carrying the relation docs/README.md already gives it
+    expect(config.flow.plan).toEqual([
+      { next: 'task', carry: 'parent' },
+      { next: 'issue', carry: 'blocks' },
+      { next: 'record', carry: 'parent' },
+    ])
     expect(config.flow.record).toBeUndefined()
   })
 

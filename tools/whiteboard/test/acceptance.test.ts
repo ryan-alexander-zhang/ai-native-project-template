@@ -30,8 +30,8 @@ const AGENT_WRITES_PRD = [
    )});`,
 ]
 
-function startBoard(agentArgs: string[]) {
-  const { repoRoot, docsDir } = makeRepo({ 'idea/whiteboard.md': IDEA })
+function startBoard(agentArgs: string[], files: Record<string, string> = { 'idea/whiteboard.md': IDEA }) {
+  const { repoRoot, docsDir } = makeRepo(files)
   const config = testConfig()
   config.agents[0] = { ...config.agents[0]!, args: agentArgs }
   const board = new Board({ repoRoot, docsDir, config, spawn: spawnPty })
@@ -196,6 +196,39 @@ describe('the whiteboard acceptance path', () => {
     ])
   })
 
+  // rule-00001-AC-16.2 and AC-16.3: a plan advances into the two documents the
+  // implementation phase produces, each carrying the relation the flow gave it
+  it('advances a plan into a record carrying parent and an issue carrying blocks', async () => {
+    const plan = doc({ id: 'plan-00001-mvp', type: 'plan', status: 'open' }, '# Plan\n')
+
+    for (const [targetType, front] of [
+      ['record', { id: 'record-00001-run', type: 'record', status: 'draft', parent: 'plan-00001-mvp' }],
+      ['issue', { id: 'issue-00001-bug', type: 'issue', status: 'draft', blocks: '[plan-00001-mvp]' }],
+    ] as const) {
+      const { call, board } = startBoard(
+        [
+          '-e',
+          `const fs = require('fs');
+           fs.mkdirSync('${front.type}', { recursive: true });
+           fs.writeFileSync('${front.type}/x.md', ${JSON.stringify(doc(front, '# Product\n'))});`,
+        ],
+        { 'plan/mvp.md': plan },
+      )
+
+      expect((await call('GET', '/api/docs/plan-00001-mvp/next-steps')).body).toEqual([
+        { next: 'task', carry: 'parent' },
+        { next: 'issue', carry: 'blocks' },
+        { next: 'record', carry: 'parent' },
+      ])
+      await call('POST', '/api/sessions', { sourceId: 'plan-00001-mvp', targetType })
+      await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+      await board.sessions.whenFinished()
+
+      // no problem reported is the relation being the one it was told to carry
+      expect(board.sessions.current()!.outcome).toMatchObject({ docId: front.id, problems: [] })
+    }
+  })
+
   // spec-00001-AC-14.4: everything one session wrote lands in a single commit
   it('commits every file a session touched under one advance commit', async () => {
     const { call, board, repoRoot } = startBoard([
@@ -218,6 +251,81 @@ describe('the whiteboard acceptance path', () => {
       'docs/prd/whiteboard.md',
     ])
     expect(commitTrail(repoRoot)).toHaveLength(3)
+  })
+
+  /**
+   * S10: audit a draft, and let the accept gate do the rest. The findings land in
+   * the audited document itself, so the unresolved one is what BR-12 stops the
+   * promotion on — no second gate is needed (decision-00007 §2 第 3 条).
+   */
+  it('audits a draft spec, lands the finding in it, and has accept refuse the promotion', async () => {
+    const spec = doc({ id: 'spec-00001-board', type: 'spec', status: 'draft' }, '# Spec\n\nOne requirement.\n')
+    const { call, board, repoRoot, docsDir } = startBoard(
+      ['-e', `require('fs').appendFileSync('spec/board.md', '\\n## Open Questions\\n\\n- FR-1 has no AC at all\\n')`],
+      { 'spec/board.md': spec },
+    )
+
+    const session = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-board' })
+    expect(session.body.kind).toBe('audit')
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    // the finding is in the document, and the audit left its status where it was
+    const audited = await call('GET', '/api/docs/spec-00001-board')
+    expect(audited.body.content).toContain('- FR-1 has no AC at all')
+    expect(audited.body.content).toContain('status: draft')
+
+    const refused = await call('POST', '/api/docs/spec-00001-board/review', { action: 'accept' })
+    expect(refused.status).toBe(422)
+    expect(refused.body.error).toMatch(/unresolved open questions/)
+
+    expect(readFileSync(join(docsDir, 'spec/board.md'), 'utf8')).toContain('status: draft')
+    expect(commitTrail(repoRoot)).toEqual(['init', 'wb(audit): spec-00001-board'])
+  })
+
+  /**
+   * S11: the resolved gate as a user meets it — refused with the gap named, then
+   * granted once the record that names the plan covers the scope (FR-52).
+   */
+  it('refuses a plan the records do not cover, and lets it resolve once they do', async () => {
+    const spec = doc(
+      { id: 'spec-00001-board', type: 'spec', status: 'active' },
+      [
+        '# Spec',
+        '',
+        '- **spec-00001-FR-1** (Event) the board shall gate the promotion',
+        '',
+        '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+        '  Given a plan whose scope is unverified',
+        '  When it is promoted',
+        '  Then the gate refuses',
+        '',
+      ].join('\n'),
+    )
+    const record = doc(
+      { id: 'record-00001-gate', type: 'record', status: 'active', parent: 'plan-00001-mvp' },
+      ['# 验收记录', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', ''].join('\n'),
+    )
+    const { call } = startBoard(['-e', ''], {
+      'spec/board.md': spec,
+      'plan/mvp.md': doc({ id: 'plan-00001-mvp', type: 'plan', status: 'open', implements: '[spec-00001-FR-1]' }),
+      'record/gate.md': record,
+    })
+
+    const refused = await call('POST', '/api/docs/plan-00001-mvp/status', { to: 'resolved' })
+    expect(refused.status).toBe(422)
+    expect(refused.body.gaps).toEqual(['spec-00001-FR-1'])
+
+    // the acceptance row arrives, and the same request goes through
+    const opened = await call('GET', '/api/docs/record-00001-gate')
+    await call('PUT', '/api/docs/record-00001-gate', {
+      content: `${opened.body.content}| spec-00001-AC-1.1 | server.test.ts | pass |\n`,
+      baseHash: opened.body.hash,
+    })
+
+    const granted = await call('POST', '/api/docs/plan-00001-mvp/status', { to: 'resolved' })
+    expect(granted.status).toBe(200)
+    expect(granted.body).toEqual({ committed: true, status: 'resolved' })
   })
 
   // the agent that ignores the brief leaves a marked node, not a silent one

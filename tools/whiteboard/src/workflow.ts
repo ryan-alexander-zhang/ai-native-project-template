@@ -1,3 +1,4 @@
+import { isAuditable } from './auditRules.ts'
 import { isClarifiable } from './clarifyRules.ts'
 import type { FlowConfig, FlowStep } from './config.ts'
 import type { DocGraph, DocNode } from './docRepository.ts'
@@ -85,6 +86,21 @@ export function assertClarifiable(node: DocNode, config: FlowConfig): void {
   }
   if (node.status !== 'draft') {
     throw new WorkflowError(`clarify applies to a draft document; ${node.id} is ${node.status}`)
+  }
+}
+
+/**
+ * spec-00001-FR-50 and FR-51 with rule-00001-BR-23: audit starts a session, so
+ * the ruling is all there is to decide here — a draft of an auditable type, and
+ * nothing else. The type set is built in (auditRules.ts), not configured.
+ */
+export function assertAuditable(node: DocNode, config: FlowConfig): void {
+  kindOf(node, config)
+  if (!isAuditable(node.type)) {
+    throw new WorkflowError(`audit does not apply to a ${node.type} document; ${node.id} takes no audit`)
+  }
+  if (node.status !== 'draft') {
+    throw new WorkflowError(`audit applies to a draft document; ${node.id} is ${node.status}`)
   }
 }
 

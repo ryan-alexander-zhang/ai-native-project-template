@@ -18,7 +18,7 @@ types:
   plan: { kind: work }
   issue: { kind: work }
   task: { kind: work }
-relations: [parent, implements, informs, supersedes, verifies]
+relations: [parent, implements, informs, blocks, supersedes, verifies]
 flow:
   idea:
     - { next: prd, carry: parent }
@@ -31,6 +31,8 @@ flow:
     - { next: plan, carry: implements }
   plan:
     - { next: task, carry: parent }
+    - { next: issue, carry: blocks }
+    - { next: record, carry: parent }
 focus:
   idea: is it worth doing, and for whom
   prd: roles, scope, and what the value is traded against

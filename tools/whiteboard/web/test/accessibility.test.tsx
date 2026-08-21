@@ -38,6 +38,7 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     onAccept: vi.fn(),
     onClarify: vi.fn(),
     onAsk: vi.fn(),
+    onAudit: vi.fn(),
     onAdvance: vi.fn(),
     ...overrides,
   }
