@@ -1,7 +1,7 @@
 ---
 id: plan-00011-whiteboard-revision-create-and-session-reach
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-FR-53, spec-00001-FR-54, spec-00001-FR-55, spec-00001-FR-56, rule-00001-BR-3, rule-00001-BR-26, rule-00001-BR-27, decision-00008-whiteboard-revision-create-and-session-reach, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
