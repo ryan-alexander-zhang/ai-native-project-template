@@ -20,12 +20,20 @@ export class DocsWatcher {
   private readonly docsDir: string
   private readonly debounceMs: number
   private readonly listeners = new Set<() => void>()
+  /**
+   * The server's own reaction to a change — dropping the parsed tree (spec-00001
+   * §7 非功能项). It runs before the boards are told, so a refresh they ask for
+   * cannot read the tree the write has just outdated, and it is no `follower`: a
+   * board is a browser, not the server itself (AC-42.8 counts browsers).
+   */
+  private readonly onChange?: () => void
   private watcher?: FSWatcher
   private timer?: ReturnType<typeof setTimeout>
   private scanned = Promise.resolve()
 
-  constructor(docsDir: string, debounceMs = DEBOUNCE_MS) {
+  constructor(docsDir: string, onChange?: () => void, debounceMs = DEBOUNCE_MS) {
     this.docsDir = docsDir
+    this.onChange = onChange
     this.debounceMs = debounceMs
   }
 
@@ -83,6 +91,7 @@ export class DocsWatcher {
     clearTimeout(this.timer)
     this.timer = setTimeout(() => {
       this.timer = undefined
+      this.onChange?.()
       // Nobody listening is not an error — the docs change whether or not a
       // board is open (spec-00001-AC-42.8).
       for (const listener of [...this.listeners]) listener()

@@ -8,7 +8,11 @@ import type { DocKind } from './config.ts'
 const TRANSITIONS: Record<DocKind, Record<string, readonly string[]>> = {
   living: {
     draft: ['active', 'archived'],
-    active: ['archived'],
+    // Back to `draft` is the revision round (rule-00001-BR-3 as amended in the
+    // eleventh round, decision-00008 §2 第 1 条): audit, clarify and the accept
+    // gate all apply to a draft already, so the revision needs no mechanism of
+    // its own — only this row.
+    active: ['draft', 'archived'],
     archived: [],
   },
   work: {

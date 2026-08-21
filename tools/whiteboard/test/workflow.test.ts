@@ -40,10 +40,11 @@ describe('transitionsFor', () => {
     expect(transitions).not.toContain('active')
   })
 
-  // spec-00001-AC-6.3
-  it('offers archived but not resolved or open for an active living doc', () => {
+  // spec-00001-AC-6.3, and AC-6.5 for the revision round: `draft` is a candidate
+  // of its own now (rule-00001-BR-3 as amended in the eleventh round)
+  it('offers draft and archived but not resolved or open for an active living doc', () => {
     const { node } = single({ id: 'prd-00001-x', type: 'prd', status: 'active' })
-    expect(transitionsFor(node, config)).toEqual(['archived'])
+    expect(transitionsFor(node, config)).toEqual(['draft', 'archived'])
   })
 
   // spec-00001-AC-6.4

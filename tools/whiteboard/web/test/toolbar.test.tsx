@@ -26,7 +26,10 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     nextSteps: [{ next: 'spec', carry: 'parent' }],
     relations: [],
     clarifiable: true,
+    auditable: false,
     sessionRunning: false,
+    agents: ['claude'],
+    onPickAgent: vi.fn(),
     onPickRelation: vi.fn(),
     onEdit: vi.fn(),
     onStatus: vi.fn(),
@@ -213,14 +216,16 @@ describe('the floating toolbar', () => {
     expect(props.onAsk).toHaveBeenCalledTimes(1)
   })
 
-  // spec-00001-AC-50.1 as the user sees it — the entry is there for each of the
-  // three auditable types, and only while the document is still a `draft`.
+  // spec-00001-AC-50.1 as the user sees it — the entry is there for each type the
+  // payload calls auditable, and only while the document is still a `draft`.
+  // Which types those are is the payload's word, not the toolbar's
+  // (spec-00001-FR-56).
   it.each([
     ['spec', 'spec-00001-x'],
     ['rule', 'rule-00001-x'],
     ['design', 'design-00001-x'],
   ])('shows the audit button on a draft %s node', (type, id) => {
-    renderToolbar({ node: { ...NODE, id, type, status: 'draft' } })
+    renderToolbar({ node: { ...NODE, id, type, status: 'draft' }, auditable: true })
 
     expect(screen.getByRole('button', { name: 'Audit' })).toBeTruthy()
   })
@@ -228,16 +233,16 @@ describe('the floating toolbar', () => {
   // spec-00001-AC-51.2 — the entry follows the status too: an audit is the gate
   // before review, and a document that is past `draft` is past the gate.
   it('leaves audit out for a spec that is no longer a draft', () => {
-    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec', status: 'active' } })
+    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec', status: 'active' }, auditable: true })
 
     expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
   })
 
-  // spec-00001-AC-51.1 as the user sees it — a prd has no folder README of rules
-  // to be audited against, whatever its status
+  // spec-00001-AC-51.1 and AC-56.2 as the user sees them — a prd is not in the
+  // payload's auditable set, so no entry is drawn whatever its status
   it('leaves audit out for a type that cannot be audited', () => {
-    renderToolbar()
+    renderToolbar({ auditable: false })
 
     expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
   })
@@ -247,6 +252,7 @@ describe('the floating toolbar', () => {
   it('leaves audit out for an anomalous draft spec', () => {
     renderToolbar({
       node: { ...NODE, id: 'spec-00001-x', type: 'spec', ok: false, problems: ['front matter is missing'] },
+      auditable: true,
     })
 
     expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
@@ -254,7 +260,7 @@ describe('the floating toolbar', () => {
 
   // spec-00001-AC-50.1 — one press, and the auditing happens in the terminal
   it('starts an audit session on one press', async () => {
-    const props = renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' } })
+    const props = renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' }, auditable: true })
 
     await userEvent.click(screen.getByRole('button', { name: 'Audit' }))
 
@@ -264,7 +270,7 @@ describe('the floating toolbar', () => {
   // spec-00001-AC-18.2 and AC-49.5 — audit is a fourth starting point, so the
   // one running session locks it on the same terms as the other three.
   it('disables audit while a session is running and says why', async () => {
-    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' }, sessionRunning: true })
+    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' }, auditable: true, sessionRunning: true })
     const audit = screen.getByRole<HTMLButtonElement>('button', { name: 'Audit' })
 
     expect(audit.disabled).toBe(true)

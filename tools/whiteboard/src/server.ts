@@ -2,9 +2,12 @@ import type { Server } from 'node:http'
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
 import { WebSocketServer } from 'ws'
 import { type Expectation, findProduct, markProduct, productProblems, taskInstruction } from './advance.ts'
+import { auditableTypes } from './auditRules.ts'
+import { clarifiableTypes } from './clarifyRules.ts'
 import type { FlowConfig } from './config.ts'
 import { ConflictError, DocService, GateError } from './docService.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
+import { listSessionHistory, readSessionHistory } from './sessionHistory.ts'
 import {
   NoSessionError,
   SessionBusyError,
@@ -31,15 +34,24 @@ export class Board {
   readonly sessions: SessionManager
   /** Live only while the board is listening: a board nobody can connect to has nobody to tell. */
   readonly watcher: DocsWatcher
-  /** Findings from the last advance, folded into the graph until the next one. */
-  private lastFinding?: { docId: string; problems: string[] }
+  private readonly repoRoot: string
+  /**
+   * What the last advance was asked for, re-checked against the disk on every
+   * graph build (spec-00001-FR-17 as amended, issue-00014). The mark is a
+   * reading, not a state: keeping the findings instead would go on marking a
+   * document the user has already fixed.
+   */
+  private lastExpectation?: Expectation
 
   constructor(options: BoardOptions) {
     const { repoRoot, docsDir, config, spawn = spawnPty } = options
+    this.repoRoot = repoRoot
     this.docs = new DocService(repoRoot, docsDir, config)
-    this.watcher = new DocsWatcher(docsDir)
+    // Everything written from outside the board arrives as this signal, so it is
+    // also where the parsed tree goes stale (spec-00001 §7 非功能项).
+    this.watcher = new DocsWatcher(docsDir, () => this.docs.invalidate())
     this.sessions = new SessionManager({
-      agent: config.agents[0]!,
+      agents: config.agents,
       repoRoot,
       spawn,
       snapshot: () => this.docs.snapshotDocs(),
@@ -48,9 +60,24 @@ export class Board {
     this.app = this.buildApp(config)
   }
 
+  /**
+   * The graph as the board renders it: the disk, plus the last advance's product
+   * check (spec-00001-FR-17). The check is re-run here rather than remembered, so
+   * a product fixed on disk stops being marked at the very next refresh, with no
+   * further advance (spec-00001-AC-17.3, issue-00014); once it validates clean
+   * there is nothing left to re-check.
+   */
   graph() {
     const graph = this.docs.graph()
-    return this.lastFinding ? markProduct(graph, this.lastFinding.docId, this.lastFinding.problems) : graph
+    if (!this.lastExpectation) return graph
+    const product = findProduct(graph, this.lastExpectation.idPrefix)
+    if (!product) return graph
+    const problems = productProblems(product, this.lastExpectation)
+    if (problems.length === 0) {
+      this.lastExpectation = undefined
+      return graph
+    }
+    return markProduct(graph, product.id, problems)
   }
 
   /**
@@ -61,6 +88,9 @@ export class Board {
    * issue-00013).
    */
   private async finishSession(plan: SessionPlan): Promise<SessionOutcome> {
+    // Whatever the session wrote, the tree the board parsed is out of date
+    // (spec-00001 §7 非功能项) — and the wrap-up itself reads the graph.
+    this.docs.invalidate()
     try {
       return await this.wrapUpSession(plan)
     } finally {
@@ -86,12 +116,14 @@ export class Board {
   private async finishAdvance(expectation: Expectation, before: DirtySnapshot): Promise<SessionOutcome> {
     const product = findProduct(this.docs.graph(), expectation.idPrefix)
     if (!product) {
-      this.lastFinding = undefined
+      this.lastExpectation = undefined
       const outcome = await this.docs.commitSessionChanges(expectation.sourceId, before)
       return { problems: [], committed: outcome.committed, error: outcome.error }
     }
     const problems = productProblems(product, expectation)
-    this.lastFinding = problems.length > 0 ? { docId: product.id, problems } : undefined
+    // The expectation is what is kept, never the findings: the graph re-checks it
+    // against the disk every time (issue-00014).
+    this.lastExpectation = problems.length > 0 ? expectation : undefined
     const outcome = await this.docs.commitSessionChanges(product.id, before)
     return { docId: product.id, problems, committed: outcome.committed, error: outcome.error }
   }
@@ -102,7 +134,24 @@ export class Board {
     app.use(express.static(new URL('../dist/web', import.meta.url).pathname))
 
     app.get('/api/graph', (_req, res) => res.json(this.graph()))
-    app.get('/api/config', (_req, res) => res.json(config))
+    // The effective config, plus the two type sets the code holds
+    // (spec-00001-FR-56): the front end reads its entry rulings off this one
+    // payload instead of keeping a copy of rule-00001-BR-20 and BR-23.
+    app.get('/api/config', (_req, res) =>
+      res.json({ ...config, clarifiable: clarifiableTypes(), auditable: auditableTypes() }),
+    )
+
+    // Creating a document (spec-00001-FR-53): the prefill first — a number and a
+    // template, nothing written — then the save, which is the write path's create
+    // branch. Its own path, so no id can be read as the word «new» (design-00001 §7).
+    app.get('/api/create', (req, res) => res.json(this.docs.newDocument(typeParam(req.query.type))))
+    app.post('/api/docs', async (req, res) => {
+      const { id, content } = req.body ?? {}
+      if (typeof id !== 'string' || typeof content !== 'string') {
+        throw new WorkflowError('a create needs an id and the content to save')
+      }
+      res.status(201).json(await this.docs.create(id, content))
+    })
 
     app.get('/api/docs/:id', (req, res) => res.json(this.docs.read(req.params.id)))
     app.get('/api/docs/:id/items', (req, res) => res.json(this.docs.items(req.params.id)))
@@ -120,17 +169,25 @@ export class Board {
     })
 
     app.get('/api/sessions', (_req, res) => res.json({ current: this.sessions.current() }))
+    // Sessions that have ended, read straight from `.whiteboard/sessions/`
+    // (spec-00001-FR-54) — which is what makes the history outlive a restart.
+    app.get('/api/sessions/history', (_req, res) => res.json(listSessionHistory(this.repoRoot)))
+    app.get('/api/sessions/history/:id', (req, res) => {
+      const entry = readSessionHistory(this.repoRoot, req.params.id)
+      if (!entry) throw new NoSessionError(`there is no session history for ${req.params.id}`)
+      res.json(entry)
+    })
     app.post('/api/sessions', (req, res) => res.json(this.startSession(req.body)))
     // The other three session kinds: same channel, same one slot (spec-00001-FR-18),
     // each with its own ruling (FR-9, FR-47, FR-51) made in the doc service.
     app.post('/api/sessions/clarify', (req, res) => {
-      res.json(this.sessions.start(this.docs.clarifyPlan(docIdOf(req.body))))
+      res.json(this.sessions.start(this.docs.clarifyPlan(docIdOf(req.body)), agentOf(req.body)))
     })
     app.post('/api/sessions/ask', (req, res) => {
-      res.json(this.sessions.start(this.docs.askPlan(docIdOf(req.body))))
+      res.json(this.sessions.start(this.docs.askPlan(docIdOf(req.body)), agentOf(req.body)))
     })
     app.post('/api/sessions/audit', (req, res) => {
-      res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body))))
+      res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body)), agentOf(req.body)))
     })
     // The way out of a session that will not end by itself (spec-00001-FR-49);
     // the wrap-up it answers with has already run.
@@ -143,7 +200,7 @@ export class Board {
   }
 
   /** spec-00001-FR-10 and FR-11: only a step the flow config declares may be started. */
-  private startSession(body: { sourceId?: string; targetType?: string }) {
+  private startSession(body: { sourceId?: string; targetType?: string; agent?: unknown }) {
     const { sourceId, targetType } = body
     if (typeof sourceId !== 'string' || typeof targetType !== 'string') {
       throw new WorkflowError('an advance needs a sourceId and a targetType')
@@ -158,7 +215,10 @@ export class Board {
       carry: step.carry,
       sourceId,
     }
-    return this.sessions.start({ kind: 'advance', sourceId, instruction: taskInstruction(expectation), expectation })
+    return this.sessions.start(
+      { kind: 'advance', sourceId, instruction: taskInstruction(expectation), expectation },
+      agentOf(body),
+    )
   }
 
   /**
@@ -226,6 +286,25 @@ function docIdOf(body: { docId?: string }): string {
     throw new WorkflowError('a clarify, ask or audit session needs a docId')
   }
   return body.docId
+}
+
+/**
+ * The agent a session request names, if it names one (spec-00001-FR-55). Absent
+ * means the first configured agent, which is every board's behaviour so far;
+ * anything that is not a name is refused rather than quietly read as absent.
+ */
+function agentOf(body: { agent?: unknown } | undefined): string | undefined {
+  const agent = body?.agent
+  if (agent === undefined || agent === null) return undefined
+  if (typeof agent !== 'string') {
+    throw new WorkflowError('agent must name one of the agents in the flow config')
+  }
+  return agent
+}
+
+/** The type a create request asks about; anything but one name is no type at all. */
+function typeParam(value: unknown): string {
+  return typeof value === 'string' ? value : ''
 }
 
 const isTerminalSize = (value: unknown): value is number =>

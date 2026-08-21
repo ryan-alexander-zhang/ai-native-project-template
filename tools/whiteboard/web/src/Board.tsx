@@ -11,8 +11,10 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
+  FilePlus,
   FileQuestionMark,
   FileWarning,
+  History,
   LayoutDashboard,
   Search,
   Terminal as TerminalIcon,
@@ -36,11 +38,13 @@ import { useDefaultLayout } from 'react-resizable-panels'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from './api.ts'
 import { CommandPalette } from './CommandPalette.tsx'
+import { CreateDialog } from './CreateDialog.tsx'
 import { Details } from './Details.tsx'
 import { Editor } from './Editor.tsx'
 import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
 import { NodeCard } from './NodeCard.tsx'
+import { SessionHistory } from './SessionHistory.tsx'
 import { AcceptanceRowNode, CriterionNode, ItemNode } from './SubNodes.tsx'
 import { Terminal } from './Terminal.tsx'
 import { ThemeMenu } from './ThemeMenu.tsx'
@@ -86,6 +90,8 @@ function Canvas() {
   const theme = useTheme()
   const { fitView, setCenter } = useReactFlow()
   const [searching, setSearching] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [history, setHistory] = useState(false)
   const [inspecting, setInspecting] = useState<string>()
   // The document whose sub-canvas has taken the canvas over (spec-00001-FR-35);
   // `undefined` is the top-level board.
@@ -275,6 +281,26 @@ function Canvas() {
           <kbd className="bg-muted rounded px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
         </Button>
 
+        {/*
+          The flow's own starting point: an entry document is created here rather
+          than by hand outside the board (spec-00001-FR-53). A config that
+          declares no entry type has no starting point to offer, so the entry is
+          not there at all — an empty dialog would be worse than none
+          (spec-00001-AC-53.6).
+        */}
+        {board.entry.length > 0 ? (
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setCreating(true)}>
+            <FilePlus className="size-4" aria-hidden />
+            New
+          </Button>
+        ) : null}
+
+        {/* The sessions that have ended are still readable (spec-00001-FR-54). */}
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => setHistory(true)}>
+          <History className="size-4" aria-hidden />
+          History
+        </Button>
+
         <div className="ml-auto flex items-center gap-2">
           {/*
             The stop lives in the terminal panel, so the panel itself must never
@@ -356,14 +382,18 @@ function Canvas() {
                         nextSteps={board.nextSteps}
                         relations={relationsOf(board.graph, selected.id, board.relationOrder)}
                         clarifiable={board.clarifiable.includes(selected.type ?? '')}
+                        auditable={board.auditable.includes(selected.type ?? '')}
                         sessionRunning={board.session?.status === 'running'}
+                        agents={board.agents}
+                        agent={board.agent}
+                        onPickAgent={board.setAgent}
                         onPickRelation={focus}
-                        onEdit={() => board.setEditing(selected.id)}
+                        onEdit={() => board.edit(selected.id)}
                         onStatus={(to) => void board.run(() => api.setStatus(selected.id, to))}
                         onAccept={() => void board.run(() => api.accept(selected.id))}
-                        onClarify={() => void board.startSession(() => api.clarify(selected.id))}
-                        onAsk={() => void board.startSession(() => api.ask(selected.id))}
-                        onAudit={() => void board.startSession(() => api.audit(selected.id))}
+                        onClarify={() => void board.startSession(() => api.clarify(selected.id, board.agent))}
+                        onAsk={() => void board.startSession(() => api.ask(selected.id, board.agent))}
+                        onAudit={() => void board.startSession(() => api.audit(selected.id, board.agent))}
                         onAdvance={(targetType) => void board.advance(selected.id, targetType)}
                       />
                     </NodeToolbar>
@@ -385,8 +415,14 @@ function Canvas() {
                 <ResizablePanel id="editor" defaultSize={38} minSize={20}>
                   <Editor
                     docId={board.editing}
-                    onSaved={() => void board.refresh()}
-                    onClose={() => board.setEditing(undefined)}
+                    draft={board.draft}
+                    // A creation ends differently from a revision: the document
+                    // is new to the board, so it is taken in and selected
+                    // (spec-00001-FR-53).
+                    onSaved={
+                      board.draft === undefined ? () => void board.refresh() : () => void board.created()
+                    }
+                    onClose={() => board.edit(undefined)}
                   />
                 </ResizablePanel>
               </>
@@ -437,6 +473,13 @@ function Canvas() {
           focus(id)
         }}
       />
+      <CreateDialog
+        types={board.entry}
+        open={creating}
+        onOpenChange={setCreating}
+        onCreate={(type, slug) => void board.create(type, slug)}
+      />
+      <SessionHistory open={history} onOpenChange={setHistory} />
       <Toaster position="bottom-right" theme={theme.isDark ? 'dark' : 'light'} richColors closeButton />
     </div>
   )

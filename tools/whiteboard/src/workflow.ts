@@ -138,6 +138,18 @@ export function hasOpenQuestions(content: string): boolean {
   return lines.slice(section.heading + 1, section.end).some((line) => LIST_ITEM.test(line))
 }
 
+/**
+ * rule-00001-BR-26 with BR-27: only a flow entry type may be created on the
+ * board. Every other type comes out of an advance carrying the relation back to
+ * its source, which is the whole reason the flow config holds the entry list; a
+ * config declaring none creates nothing (spec-00001-AC-53.6).
+ */
+export function assertEntryType(type: string, config: FlowConfig): void {
+  if (!config.entry.includes(type)) {
+    throw new WorkflowError(`${type} is not a flow entry type; a new ${type} comes out of an advance`)
+  }
+}
+
 /** rule-00001-BR-18: the number a new document of `type` takes. */
 export function allocateNumber(graph: DocGraph, type: string): number {
   return highestNumber(graph, type) + 1

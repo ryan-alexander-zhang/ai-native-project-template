@@ -195,6 +195,36 @@ describe('the focus lines', () => {
   })
 })
 
+/**
+ * The flow entry types (rule-00001-BR-26, spec-00001-FR-53): the list the create
+ * entry is drawn from. It is optional, and every name in it must be a declared
+ * type — the two readings AC-53.5 and AC-53.6 fix.
+ */
+describe('the entry types', () => {
+  it('reads the entry list', () => {
+    expect(parse(VALID.replace('relations:', 'entry: [idea, prd]\nrelations:')).entry).toEqual(['idea', 'prd'])
+  })
+
+  // spec-00001-AC-53.6 — no entry list, and no create entry: a legal config
+  it('reads a missing entry list as no entry types at all', () => {
+    expect(parse(VALID).entry).toEqual([])
+  })
+
+  it('reads an empty entry list the same way', () => {
+    expect(parse(VALID.replace('relations:', 'entry: []\nrelations:')).entry).toEqual([])
+  })
+
+  // spec-00001-AC-53.5 — the offending type is named
+  it('rejects an entry type the config does not declare, naming it', () => {
+    expectConfigError(VALID.replace('relations:', 'entry: [idea, report]\nrelations:'), /`entry`.*"report"/)
+  })
+
+  it('rejects an entry list that is not a list of strings', () => {
+    expectConfigError(VALID.replace('relations:', 'entry: idea\nrelations:'), /`entry` must be a list of strings/)
+    expectConfigError(VALID.replace('relations:', 'entry: [3]\nrelations:'), /`entry` must be a list of strings/)
+  })
+})
+
 describe('loadFlowConfig', () => {
   it('loads a config file from disk', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wb-config-'))
@@ -277,6 +307,17 @@ describe('the config shipped with this repo', () => {
     expect(Object.keys(config.focus)).toEqual(['idea', 'prd', 'spec', 'rule', 'design'])
     expect(new Set(Object.values(config.focus)).size).toBe(5)
     for (const line of Object.values(config.focus)) expect(line.trim()).toBe(line)
+  })
+
+  /**
+   * rule-00001-BR-26: the flow entry types this repo opens the create entry to —
+   * idea and prd, the two ways docs/README.md says a project enters the flow.
+   */
+  it('declares idea and prd as the flow entry types', () => {
+    expect(loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname).entry).toEqual([
+      'idea',
+      'prd',
+    ])
   })
 
   /**

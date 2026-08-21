@@ -632,3 +632,224 @@ describe('transitions and nextSteps', () => {
     expect(service.nextSteps('prd-00001-x')).toEqual([{ next: 'spec', carry: 'parent' }])
   })
 })
+
+/**
+ * The revision round (rule-00001-BR-3 as amended, decision-00008 §2 第 1 条): an
+ * active living doc goes back to `draft`, and from there every mechanism that
+ * was ever about a draft applies unchanged — audit, clarify and the accept gate.
+ * That the round needs no machinery of its own is the whole decision, so these
+ * are the tests that say so.
+ */
+describe('the revision round', () => {
+  const activeSpec = (body = '# Spec\n') => doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }, body)
+
+  /** An active spec taken back to draft — the transition BR-3 now allows. */
+  async function reDrafted(body?: string) {
+    const open = serviceOn({ 'spec/b.md': activeSpec(body) })
+    const result = await open.service.changeStatus('spec-00001-b', 'draft')
+    expect(result.status).toBe('draft')
+    return open
+  }
+
+  // rule-00001-AC-3.1 on the write path: the transition itself is legal now
+  it('takes an active living doc back to draft and commits it', async () => {
+    const { docsDir, repoRoot } = await reDrafted()
+
+    expect(onDisk(docsDir, 'spec/b.md')).toContain('status: draft')
+    expect(lastCommitMessage(repoRoot)).toBe('wb(status): spec-00001-b')
+  })
+
+  // rule-00001-AC-3.2
+  it('lets an audit start on the re-drafted document', async () => {
+    const { service } = await reDrafted()
+    expect(service.auditPlan('spec-00001-b').kind).toBe('audit')
+  })
+
+  // rule-00001-AC-3.3
+  it('lets a clarify start on the re-drafted document', async () => {
+    const { service } = await reDrafted()
+    expect(service.clarifyPlan('spec-00001-b').kind).toBe('clarify')
+  })
+
+  // rule-00001-AC-3.4 — the accept gate of BR-12 applies to it like any draft
+  it('refuses to accept it while the revision leaves open questions', async () => {
+    const { docsDir, service } = await reDrafted('# Spec\n\n## Open Questions\n\n- which failure mode is unstated?\n')
+
+    await expect(service.review('spec-00001-b', { action: 'accept' })).rejects.toThrowError(
+      /unresolved open questions/,
+    )
+    expect(onDisk(docsDir, 'spec/b.md')).toContain('status: draft')
+  })
+
+  // rule-00001-AC-3.5 — active → draft → active, the round closed
+  it('returns it to active on accept', async () => {
+    const { docsDir, service } = await reDrafted()
+
+    expect((await service.review('spec-00001-b', { action: 'accept' })).status).toBe('active')
+    expect(onDisk(docsDir, 'spec/b.md')).toContain('status: active')
+  })
+})
+
+/**
+ * Creating a flow entry document (spec-00001-FR-53 with rule-00001-BR-26 and
+ * BR-27). The prefill writes nothing; the save is the create branch of the one
+ * write path (design-00001 §6), so what is checked here is its rulings.
+ */
+describe('newDocument and create', () => {
+  const IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
+  const TEMPLATE = doc({ id: 'idea-00001-example-slug', type: 'idea', status: 'draft' }, '# Idea: <one line>\n')
+  const newIdea = (id: string) => doc({ id, type: 'idea', status: 'draft' }, '# A new idea\n')
+
+  // rule-00001-AC-26.1: the number is the highest plus one, the template is the type's
+  it('allocates the next number and hands back the type template', () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA, 'idea/TEMPLATE.md': TEMPLATE })
+
+    expect(service.newDocument('idea')).toEqual({ idPrefix: 'idea-00002-', template: TEMPLATE })
+  })
+
+  it('allocates the first number for a type with no documents yet', () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA })
+    expect(service.newDocument('prd').idPrefix).toBe('prd-00001-')
+  })
+
+  // A folder without a TEMPLATE.md is a repo missing that convention, not a
+  // reason to refuse: the allocated id is what the board owes the editor.
+  it('hands back an empty prefill when the type has no template', () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA })
+    expect(service.newDocument('idea').template).toBe('')
+  })
+
+  // rule-00001-AC-27.1 and spec-00001-AC-53.2
+  it('refuses to prefill a type that is not a flow entry', () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA })
+    expect(() => service.newDocument('spec')).toThrowError(/not a flow entry type/)
+  })
+
+  // spec-00001-AC-53.1 with rule-00001-AC-26.1
+  it('creates the file at the allocated id and commits it as a create', async () => {
+    const { docsDir, repoRoot, service } = serviceOn({ 'idea/a.md': IDEA })
+    const content = newIdea('idea-00002-a-second-idea')
+
+    const result = await service.create('idea-00002-a-second-idea', content)
+
+    expect(result.committed).toBe(true)
+    expect(onDisk(docsDir, 'idea/idea-00002-a-second-idea.md')).toBe(content)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(create): idea-00002-a-second-idea')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/idea/idea-00002-a-second-idea.md'])
+  })
+
+  it('creates the folder of a type that has none yet', async () => {
+    const { docsDir, service } = serviceOn({ 'idea/a.md': IDEA })
+    const content = doc({ id: 'prd-00001-first', type: 'prd', status: 'draft' }, '# First\n')
+
+    await service.create('prd-00001-first', content)
+
+    expect(onDisk(docsDir, 'prd/prd-00001-first.md')).toBe(content)
+  })
+
+  // spec-00001-AC-53.2 and rule-00001-AC-27.1 over the write path
+  it('refuses a type that is not a flow entry, writing nothing', async () => {
+    const { docsDir, repoRoot, service } = serviceOn({ 'idea/a.md': IDEA })
+    const before = commitCount(repoRoot)
+
+    await expect(
+      service.create('spec-00001-mine', doc({ id: 'spec-00001-mine', type: 'spec', status: 'draft' })),
+    ).rejects.toThrowError(/not a flow entry type/)
+    expect(existsSync(join(docsDir, 'spec/spec-00001-mine.md'))).toBe(false)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00001-AC-53.3 — an id already taken is a conflict, never an overwrite
+  it('refuses an id a document already holds, leaving the disk alone', async () => {
+    const { docsDir, service } = serviceOn({ 'idea/a.md': IDEA })
+
+    await expect(service.create('idea-00001-x', newIdea('idea-00001-x'))).rejects.toThrowError(/already exists/)
+    expect(onDisk(docsDir, 'idea/a.md')).toBe(IDEA)
+  })
+
+  it('refuses an id whose file is there under a name the graph does not know', async () => {
+    const { docsDir, service } = serviceOn({ 'idea/a.md': IDEA })
+    writeFileSync(join(docsDir, 'idea/idea-00002-taken.md'), 'not a document at all\n')
+
+    await expect(service.create('idea-00002-taken', newIdea('idea-00002-taken'))).rejects.toThrowError(
+      /already exists/,
+    )
+    expect(onDisk(docsDir, 'idea/idea-00002-taken.md')).toBe('not a document at all\n')
+  })
+
+  // spec-00001-AC-53.4 — the slug is the user's, but only in the shape BR-18 fixes
+  it('refuses a slug that is not lower case and hyphenated', async () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA })
+
+    for (const id of ['idea-00002-My Idea', 'idea-00002-MyIdea', 'idea-00002-my_idea', 'idea-2-my-idea']) {
+      await expect(service.create(id, newIdea(id))).rejects.toThrowError(/is not <type>-<nnnnn>-<slug>/)
+    }
+  })
+
+  // rule-00001-BR-18: the number is the board's to allocate, not the caller's
+  it('refuses a number that is not the allocated one', async () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA })
+
+    await expect(service.create('idea-00009-far-ahead', newIdea('idea-00009-far-ahead'))).rejects.toThrowError(
+      /is not the id allocated for a new idea; it is idea-00002-/,
+    )
+  })
+
+  // The file is filed under the id it was asked for, so its front matter has to
+  // agree — a document whose id is not its name is anomalous the moment it lands.
+  it('refuses content whose front matter declares another id, or none', async () => {
+    const { service } = serviceOn({ 'idea/a.md': IDEA })
+
+    for (const content of [newIdea('idea-00002-something-else'), '# No front matter at all\n']) {
+      await expect(service.create('idea-00002-mine', content)).rejects.toThrowError(/does not declare id/)
+    }
+  })
+})
+
+/**
+ * The parse cache (spec-00001 §7 非功能项, decision-00008 §2 第 8 条). A repeated
+ * read must not walk the tree again, and the only honest way to observe that from
+ * outside is a change the cache has not been told about: it is still answered
+ * from the parse that came before it. Both invalidation signals are here — the
+ * write path's own, and the explicit one the watcher pulls (server.ts).
+ */
+describe('the parse cache', () => {
+  const secondPrd = doc({ id: 'prd-00002-y', type: 'prd', status: 'draft' }, '# Y\n')
+
+  it('answers a repeated read from the parse it already has', () => {
+    const { docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    expect(service.graph().nodes).toHaveLength(1)
+
+    writeFileSync(join(docsDir, 'prd/b.md'), secondPrd)
+
+    // Nothing has invalidated it, so the tree was not read again.
+    expect(service.graph().nodes).toHaveLength(1)
+    service.invalidate()
+    expect(service.graph().nodes).toHaveLength(2)
+  })
+
+  it('drops the cache when a save writes through it', async () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+    const base = service.read('prd-00001-x')
+
+    await service.save('prd-00001-x', DRAFT_PRD.replace('# X', '# X renamed'), base.hash)
+
+    expect(service.graph().nodes[0]!.title).toBe('X renamed')
+  })
+
+  it('drops the cache when a status change writes through it', async () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+
+    await service.changeStatus('prd-00001-x', 'active')
+
+    expect(service.graph().nodes[0]!.status).toBe('active')
+  })
+
+  it('drops the cache when a create writes through it', async () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+
+    await service.create('prd-00002-y', secondPrd)
+
+    expect(service.graph().nodes.map((node) => node.id)).toEqual(['prd-00001-x', 'prd-00002-y'])
+  })
+})

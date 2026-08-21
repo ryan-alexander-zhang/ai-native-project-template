@@ -10,6 +10,12 @@ import { Preview } from './Preview.tsx'
 
 export interface EditorProps {
   docId: string
+  /**
+   * The prefilled buffer of a document that is not on disk yet (spec-00001-FR-53).
+   * Its presence is what makes this a creation: nothing is read, and saving
+   * creates the file rather than revising one.
+   */
+  draft?: string
   onSaved: () => void
   onClose: () => void
 }
@@ -17,7 +23,7 @@ export interface EditorProps {
 type View = 'source' | 'preview'
 
 /** Edits the whole file, front matter included, and refuses to clobber a changed file. */
-export function Editor({ docId, onSaved, onClose }: EditorProps) {
+export function Editor({ docId, draft, onSaved, onClose }: EditorProps) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView>(null)
   const [opened, setOpened] = useState<DocContent>()
@@ -26,6 +32,12 @@ export function Editor({ docId, onSaved, onClose }: EditorProps) {
   const [preview, setPreview] = useState('')
 
   useEffect(() => {
+    // A new document has nothing to read: the buffer it opens with is the
+    // prefill, and there is no base version to be in conflict with.
+    if (draft !== undefined) {
+      setOpened({ path: '', content: draft, hash: '' })
+      return
+    }
     let live = true
     api.doc(docId).then((content) => {
       if (live) setOpened(content)
@@ -33,7 +45,7 @@ export function Editor({ docId, onSaved, onClose }: EditorProps) {
     return () => {
       live = false
     }
-  }, [docId])
+  }, [docId, draft])
 
   useEffect(() => {
     if (!host.current || !opened) return
@@ -63,14 +75,26 @@ export function Editor({ docId, onSaved, onClose }: EditorProps) {
   async function save() {
     if (!opened || !view.current) return
     setSaving(true)
+    const content = view.current.state.doc.toString()
     try {
-      await api.save(docId, view.current.state.doc.toString(), opened.hash)
-      toast.success(`saved ${docId}`)
+      // Saving a prefilled buffer creates the document; saving an opened one
+      // revises it. Two calls, one button — which one it is was settled when the
+      // buffer was opened (spec-00001-FR-53).
+      if (draft !== undefined) {
+        await api.createDoc(docId, content)
+        toast.success(`created ${docId}`)
+      } else {
+        await api.save(docId, content, opened.hash)
+        toast.success(`saved ${docId}`)
+      }
       onSaved()
     } catch (error) {
       const conflict = error instanceof ApiError && error.status === 409
+      // A conflict is a different problem on each path, so it gets a different
+      // way out: the file moved under a revision, the id is taken for a create.
+      const wayOut = draft === undefined ? 'reopen it to pick up the change' : 'pick another slug'
       toast.error(error instanceof Error ? error.message : String(error), {
-        description: conflict ? 'reopen it to pick up the change' : undefined,
+        description: conflict ? wayOut : undefined,
       })
     } finally {
       setSaving(false)

@@ -139,6 +139,9 @@ function serve() {
     flow: {},
     focus: {},
     agents: [{ name: 'claude', command: 'claude', args: [] }],
+    entry: [],
+    clarifiable: [],
+    auditable: ['spec', 'rule', 'design'],
   })
 }
 
@@ -475,7 +478,7 @@ describe('a board whose channel is down', () => {
  * already forgotten.
  */
 describe('a session that ends with no docs change', () => {
-  const RUNNING: SessionInfo = { id: 's1', kind: 'ask', sourceId: 'spec-00001-x', status: 'running' }
+  const RUNNING: SessionInfo = { id: 's1', kind: 'ask', agent: 'claude', sourceId: 'spec-00001-x', status: 'running' }
 
   /** The one socket that carries the signal; the terminal opens one of its own. */
   const channel = () => ChannelSocket.opened.find((socket) => socket.url.endsWith('/api/events'))!
@@ -486,14 +489,17 @@ describe('a session that ends with no docs change', () => {
 
   beforeEach(() => {
     serve()
-    // The three entries only exist where the config puts them: clarify needs a
-    // focus line for the type, advance a flow step out of it.
+    // The three entries only exist where the payload puts them: clarify needs
+    // the type in the clarifiable set, advance a flow step out of it.
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
       relations: ['verifies'],
       flow: { spec: [{ next: 'plan', carry: 'implements' }] },
       focus: { spec: 'the boundaries of each FR and the gaps in its acceptance' },
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: ['spec'],
+      auditable: ['spec', 'rule', 'design'],
     })
     vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'plan', carry: 'implements' }])
   })

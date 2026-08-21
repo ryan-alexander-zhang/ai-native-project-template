@@ -267,6 +267,9 @@ describe('the board state', () => {
       flow: {},
       focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: [],
+      auditable: ['spec', 'rule', 'design'],
     })
     vi.spyOn(toast, 'error').mockImplementation(() => 'id')
   })
@@ -338,7 +341,7 @@ describe('the board state', () => {
     const { result } = renderHook(() => useBoard())
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
-    act(() => result.current.setEditing('prd-00001-x'))
+    act(() => result.current.edit('prd-00001-x'))
     act(() => result.current.setTerminalOpen(true))
 
     expect(result.current.editing).toBe('prd-00001-x')
@@ -426,6 +429,9 @@ describe('the board state', () => {
       flow: {},
       focus: { prd: 'roles, scope, and the value trade-offs' },
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: ['prd'],
+      auditable: ['spec', 'rule', 'design'],
     })
     const { result } = renderHook(() => useBoard())
 
@@ -435,7 +441,7 @@ describe('the board state', () => {
   // spec-00001-AC-18.2 — a refused start leaves the running session alone
   it('keeps the session it has when a second start is refused', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
     })
     vi.spyOn(api, 'ask').mockRejectedValue(new Error('an agent session is already running'))
     const { result } = renderHook(() => useBoard())
@@ -452,6 +458,7 @@ describe('the board state', () => {
     vi.spyOn(api, 'advance').mockResolvedValue({
       id: 's1',
       kind: 'advance',
+      agent: 'claude',
       sourceId: 'idea-00001-x',
       targetType: 'prd',
       status: 'running',
@@ -476,7 +483,7 @@ describe('the board state', () => {
   // spec-00001-AC-21.2 — the board reattaches to a session that outlived the page
   it('opens the terminal on load when a session is still running', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'advance', sourceId: 'idea-00001-x', targetType: 'prd', status: 'running' },
+      current: { id: 's1', kind: 'advance', agent: 'claude', sourceId: 'idea-00001-x', targetType: 'prd', status: 'running' },
     })
     const { result } = renderHook(() => useBoard())
 
@@ -488,7 +495,13 @@ describe('the board state', () => {
     // The server is the one authority on the session, and the refresh that
     // follows the stop reads it again (issue-00013) — so the stand-in has to end
     // the session too, not go on reporting the one it was asked to stop.
-    const stopped = { id: 's1', kind: 'clarify' as const, sourceId: 'prd-00001-x', status: 'exited' as const }
+    const stopped = {
+      id: 's1',
+      kind: 'clarify' as const,
+      agent: 'claude',
+      sourceId: 'prd-00001-x',
+      status: 'exited' as const,
+    }
     let current: SessionInfo = { ...stopped, status: 'running' }
     vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
     const stop = vi.spyOn(api, 'stopSession').mockImplementation(async () => {
@@ -506,7 +519,7 @@ describe('the board state', () => {
 
   it('keeps the session it has when the stop is refused', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
     })
     vi.spyOn(api, 'stopSession').mockRejectedValue(new Error('there is no running agent session to stop'))
     const { result } = renderHook(() => useBoard())
@@ -520,7 +533,7 @@ describe('the board state', () => {
 
   it('leaves the terminal closed when the last session already exited', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'advance', sourceId: 'idea-00001-x', targetType: 'prd', status: 'exited' },
+      current: { id: 's1', kind: 'advance', agent: 'claude', sourceId: 'idea-00001-x', targetType: 'prd', status: 'exited' },
     })
     const { result } = renderHook(() => useBoard())
 

@@ -85,6 +85,9 @@ describe('the inspector panel', () => {
       flow: {},
       focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: [],
+      auditable: ['spec', 'rule', 'design'],
     })
   })
 
@@ -384,6 +387,9 @@ describe('hovering an item in the panel', () => {
       flow: {},
       focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: [],
+      auditable: ['spec', 'rule', 'design'],
     })
   })
 
@@ -583,6 +589,9 @@ describe('expanding an item row', () => {
       flow: {},
       focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: [],
+      auditable: ['spec', 'rule', 'design'],
     })
   })
 

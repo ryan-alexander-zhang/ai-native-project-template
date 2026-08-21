@@ -36,7 +36,7 @@ const managers: SessionManager[] = []
 function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUTCOME)) {
   const { repoRoot, docsDir } = makeRepo({})
   const manager = new SessionManager({
-    agent: { name: 'test', command: 'node', args: [], cwd: 'docs', ...agent },
+    agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs', ...agent }],
     repoRoot,
     spawn: spawnPty,
     // A real process is slow enough already; the submit's own wait is the one
@@ -94,7 +94,10 @@ describe('start', () => {
     manager.start(ADVANCE)
     await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
 
-    expect(manager.start(ADVANCE).id).toBe('s2')
+    // The id carries the start time as well as the counter, because it names the
+    // session's history files (spec-00001-FR-54); what this asserts is the
+    // second session, not the exact stamp.
+    expect(manager.start(ADVANCE).id).toMatch(/^\d{4}-\d{2}-\d{2}T[\d-]+Z-2$/)
   })
 
   // spec-00001-AC-16.1
@@ -153,7 +156,7 @@ describe('the write-scope constraint', () => {
     const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agent: { name: 'test', command: 'node', args: ['--version'], cwd: 'docs' },
+      agents: [{ name: 'test', command: 'node', args: ['--version'], cwd: 'docs' }],
       repoRoot,
       spawn: (command, args, cwd) => {
         spawned.push({ command, args, cwd })
@@ -171,7 +174,7 @@ describe('the write-scope constraint', () => {
     const spawned: string[] = []
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agent: { name: 'test', command: 'node', args: [] },
+      agents: [{ name: 'test', command: 'node', args: [] }],
       repoRoot,
       spawn: (_command, _args, cwd) => {
         spawned.push(cwd)
@@ -267,7 +270,7 @@ describe('submitting the instruction', () => {
     const hooks: { data?: (data: string) => void; exit?: (event: { exitCode: number }) => void } = {}
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agent: { name: 'test', command: 'node', args: [] },
+      agents: [{ name: 'test', command: 'node', args: [] }],
       repoRoot,
       submitDelayMs: DELAY,
       spawn: () => ({

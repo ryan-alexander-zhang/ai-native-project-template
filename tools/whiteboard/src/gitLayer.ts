@@ -9,7 +9,7 @@ import { type SimpleGit, simpleGit } from 'simple-git'
  * last four are the session kinds: one commit per session, named by the kind it
  * was (spec-00001-AC-14.4, AC-14.7, AC-14.8, AC-50.3).
  */
-export type ActionKind = 'edit' | 'status' | 'accept' | 'advance' | 'clarify' | 'ask' | 'audit'
+export type ActionKind = 'edit' | 'status' | 'accept' | 'create' | 'advance' | 'clarify' | 'ask' | 'audit'
 
 /**
  * What the dirty files under a directory held at one moment: repo-relative path
@@ -20,6 +20,14 @@ export type DirtySnapshot = ReadonlyMap<string, string>
 
 /** The digest of a path that is not there — a deletion is a content too. */
 const ABSENT = 'absent'
+
+/**
+ * Every board commit skips the repo's commit hooks (decision-00008 §2 第 6 条,
+ * design-00001 §7). The hook's audience is a hand-made commit, while the board
+ * commits `draft` products by spec (spec-00001-FR-17, FR-53) and carries its own
+ * review gates — one policy needs one enforcer, not two that stop each other.
+ */
+const NO_VERIFY = { '--no-verify': null }
 
 export interface CommitOutcome {
   committed: boolean
@@ -48,7 +56,7 @@ export class GitLayer {
     if (paths.length === 0) return { committed: false }
     try {
       await this.git.add(paths)
-      await this.git.commit(message, paths)
+      await this.git.commit(message, paths, NO_VERIFY)
       return { committed: true }
     } catch (cause) {
       return { committed: false, error: (cause as Error).message }

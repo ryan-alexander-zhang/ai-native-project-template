@@ -25,6 +25,8 @@ export interface FlowConfig {
   flow: Record<string, FlowStep[]>
   /** Clarifiable type -> its focus line (spec-00001-FR-48). */
   focus: Record<string, string>
+  /** Flow entry types the create entry offers (rule-00001-BR-26); empty = no create entry (spec-00001-FR-53). */
+  entry: string[]
   agents: AgentConfig[]
 }
 
@@ -128,6 +130,26 @@ function readFocus(raw: unknown, types: Record<string, DocKind>): Record<string,
   return focus
 }
 
+/**
+ * The flow entry types (rule-00001-BR-26, spec-00001-FR-53): the only types the
+ * board may create a document of. A missing or empty list is a legal reading —
+ * the board starts and offers no create entry (spec-00001-AC-53.6) — so the one
+ * thing checked here is that every name is a declared type, named in the error
+ * when it is not (AC-53.5).
+ */
+function readEntry(raw: unknown, types: Record<string, DocKind>): string[] {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string')) {
+    throw new ConfigError('config: `entry` must be a list of strings')
+  }
+  for (const name of raw as string[]) {
+    if (!(name in types)) {
+      throw new ConfigError(`config: \`entry\` names unknown type ${JSON.stringify(name)}`)
+    }
+  }
+  return raw as string[]
+}
+
 function readAgentCwd(value: unknown, at: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || (value !== 'docs' && !value.startsWith('docs/')) || value.includes('..')) {
@@ -173,6 +195,7 @@ export function parseFlowConfig(text: string, source: string): FlowConfig {
     relations,
     flow: readFlow(root.flow, types, relations),
     focus: readFocus(root.focus, types),
+    entry: readEntry(root.entry, types),
     agents: readAgents(root.agents),
   }
 }

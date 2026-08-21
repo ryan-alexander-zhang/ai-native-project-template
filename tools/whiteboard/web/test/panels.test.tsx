@@ -48,7 +48,7 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 const CONTENT = '---\nid: prd-00001-x\ntype: prd\nstatus: draft\n---\n\n# X\n'
-const RUNNING: SessionInfo = { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' }
+const RUNNING: SessionInfo = { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' }
 
 afterEach(() => {
   cleanup()

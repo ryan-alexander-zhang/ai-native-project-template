@@ -8,9 +8,10 @@ describe('allowedTransitions', () => {
     expect(allowedTransitions('living', 'draft')).toEqual(['active', 'archived'])
   })
 
-  // rule-00001-AC-3.1 (an active decision document)
-  it('offers archived from an active living doc', () => {
-    expect(allowedTransitions('living', 'active')).toEqual(['archived'])
+  // rule-00001-AC-3.1 (an active decision document) — `draft` is the revision
+  // round, added in the eleventh round (decision-00008 §2 第 1 条)
+  it('offers draft and archived from an active living doc', () => {
+    expect(allowedTransitions('living', 'active')).toEqual(['draft', 'archived'])
   })
 
   // rule-00001-AC-4.1 (a draft plan)

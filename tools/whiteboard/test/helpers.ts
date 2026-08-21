@@ -33,6 +33,7 @@ flow:
     - { next: task, carry: parent }
     - { next: issue, carry: blocks }
     - { next: record, carry: parent }
+entry: [idea, prd]
 focus:
   idea: is it worth doing, and for whom
   prd: roles, scope, and what the value is traded against

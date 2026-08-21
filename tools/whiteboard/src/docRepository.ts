@@ -239,8 +239,38 @@ export function readDocBody(docsDir: string, node: DocNode): string {
   return parseDoc(docsDir, node.path).body
 }
 
+/**
+ * The id a raw file declares, before it is a document in the graph at all — what
+ * the create path checks the submitted content against (spec-00001-FR-53).
+ * Unreadable front matter declares nothing.
+ */
+export function frontMatterId(content: string): string | undefined {
+  try {
+    const { id } = matter(content).data as { id?: unknown }
+    return typeof id === 'string' ? id : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function findNode(graph: DocGraph, id: string): DocNode | undefined {
   return graph.nodes.find((node) => node.id === id)
+}
+
+export interface DocId {
+  type: string
+  number: number
+  slug: string
+}
+
+/**
+ * An id read back into its three parts (rule-00001-BR-18), or nothing when it is
+ * not one. The slug half of the pattern is what refuses an upper-case letter or
+ * a space in a hand-typed slug (spec-00001-AC-53.4).
+ */
+export function parseDocId(id: string): DocId | undefined {
+  const match = ID_PATTERN.exec(id)
+  return match ? { type: match[1]!, number: Number(match[2]), slug: match[3]! } : undefined
 }
 
 /** Highest five-digit number already used by documents of `type`, or 0 when there are none. */

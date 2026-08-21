@@ -2,6 +2,8 @@ import { join } from 'node:path'
 import type { AgentConfig } from './config.ts'
 import type { Expectation } from './advance.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
+import { writeSessionHistory } from './sessionHistory.ts'
+import { WorkflowError } from './workflow.ts'
 
 /** Rolling window of session output replayed on reconnect (spec-00001-AC-21.2). */
 const BUFFER_LIMIT = 1024 * 1024
@@ -45,11 +47,15 @@ export interface SessionInfo {
   sourceId: string
   /** The type an advance was asked to produce; the other kinds produce no new document. */
   targetType?: string
+  /** Which agent of the flow config is running it (spec-00001-FR-55). */
+  agent: string
   status: SessionStatus
   exitCode?: number
   error?: string
   /** Set once the exit hook has run: what the session produced and whether it was committed. */
   outcome?: SessionOutcome
+  /** Why the session's history could not be saved, if it could not (spec-00001-AC-54.3). */
+  historyError?: string
 }
 
 export interface SessionOutcome {
@@ -91,7 +97,16 @@ interface Session {
   plan: SessionPlan
   /** The docs/ dirt this session inherited; the exit hook scopes its commit against it. */
   baseline: DirtySnapshot
+  startedAt: string
   buffer: string
+  /**
+   * Everything the session has printed, whole. The replay buffer is a window
+   * (BUFFER_LIMIT) because a reconnecting terminal only needs the recent past,
+   * while the history transcript is the record of the whole session
+   * (spec-00001-FR-54) — so the two are kept apart rather than one being the
+   * other's truncation.
+   */
+  transcript: string[]
   pty?: PtyProcess
   listeners: Set<(data: string) => void>
   finished: Promise<void>
@@ -103,7 +118,8 @@ interface Session {
 }
 
 export interface SessionManagerOptions {
-  agent: AgentConfig
+  /** Every agent the flow config declares; a session runs the one it names, or the first (spec-00001-FR-55). */
+  agents: AgentConfig[]
   repoRoot: string
   spawn: SpawnPty
   /**
@@ -132,17 +148,25 @@ export class SessionManager {
     this.options = options
   }
 
-  /** spec-00001-FR-11, FR-9 and FR-47; a spawn failure yields a failed session carrying the error (FR-16). */
-  start(plan: SessionPlan): SessionInfo {
+  /**
+   * spec-00001-FR-11, FR-9 and FR-47; a spawn failure yields a failed session
+   * carrying the error (FR-16). `agentName` picks one of the configured agents
+   * (spec-00001-FR-55); an unknown name starts nothing at all, which is why it
+   * is resolved before anything is created.
+   */
+  start(plan: SessionPlan, agentName?: string): SessionInfo {
+    const agent = this.resolveAgent(agentName)
     if (this.session?.info.status === 'running') {
       throw new SessionBusyError('an agent session is already running; wait for it to finish')
     }
-    const { agent, repoRoot } = this.options
+    const { repoRoot } = this.options
+    const startedAt = new Date().toISOString()
     const info: SessionInfo = {
-      id: `s${++this.counter}`,
+      id: this.nextId(startedAt),
       kind: plan.kind,
       sourceId: plan.sourceId,
       targetType: plan.expectation?.targetType,
+      agent: agent.name,
       status: 'running',
     }
     // Before the spawn, never after: from here on anything under docs/ that
@@ -156,7 +180,9 @@ export class SessionManager {
       info,
       plan,
       baseline,
+      startedAt,
       buffer: '',
+      transcript: [],
       listeners: new Set(),
       finished: Promise.resolve(),
       ended,
@@ -257,6 +283,31 @@ export class SessionManager {
     return session.info
   }
 
+  /**
+   * The agent a session runs (spec-00001-FR-55): the one it names, or the first
+   * the flow config declares — which is the behaviour of every board before the
+   * eleventh round, so a single-agent config is unaffected.
+   */
+  private resolveAgent(name?: string): AgentConfig {
+    const { agents } = this.options
+    if (name === undefined) return agents[0]!
+    const agent = agents.find((candidate) => candidate.name === name)
+    if (!agent) {
+      throw new WorkflowError(`${JSON.stringify(name)} is not an agent in the flow config`)
+    }
+    return agent
+  }
+
+  /**
+   * The session's id, and with it the name of its two history files
+   * (spec-00001-FR-54) — so it carries the start time as well as the counter:
+   * the counter alone restarts with the process, and a second `s1` would write
+   * over the first one's history.
+   */
+  private nextId(startedAt: string): string {
+    return `${startedAt.replace(/[:.]/g, '-')}-${++this.counter}`
+  }
+
   private requireSession(): Session {
     if (!this.session) throw new SessionBusyError('there is no agent session')
     return this.session
@@ -271,7 +322,38 @@ export class SessionManager {
 
   private publish(session: Session, data: string): void {
     session.buffer = (session.buffer + data).slice(-BUFFER_LIMIT)
+    session.transcript.push(data)
     for (const listener of session.listeners) listener(data)
+  }
+
+  /**
+   * The session's history on disk (spec-00001-FR-54): the metadata as JSON, the
+   * whole transcript as plain text. It runs before the wrap-up's commit
+   * (design-00001 §5) and blocks nothing — a directory that cannot be written to
+   * costs the user this record and nothing else, so the failure is a notice in
+   * the terminal they are already looking at (spec-00001-AC-54.3).
+   */
+  private saveHistory(session: Session): void {
+    try {
+      writeSessionHistory(
+        this.options.repoRoot,
+        {
+          id: session.info.id,
+          kind: session.plan.kind,
+          docId: session.plan.sourceId,
+          agent: session.info.agent,
+          startedAt: session.startedAt,
+          endedAt: new Date().toISOString(),
+          status: session.info.status,
+          exitCode: session.info.exitCode,
+        },
+        session.transcript.join(''),
+      )
+    } catch (cause) {
+      const message = (cause as Error).message
+      session.info.historyError = message
+      this.publish(session, `whiteboard: could not save the session history — ${message}\r\n`)
+    }
   }
 
   private exit(session: Session, exitCode: number): void {
@@ -280,6 +362,7 @@ export class SessionManager {
     session.info.status = 'exited'
     session.info.exitCode = exitCode
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)
+    this.saveHistory(session)
     session.finished = this.options
       .onExit(session.plan)
       .then((outcome) => {

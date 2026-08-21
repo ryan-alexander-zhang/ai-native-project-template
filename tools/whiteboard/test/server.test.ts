@@ -1,5 +1,5 @@
 import type { Server } from 'node:http'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,7 @@ import {
   armWatch,
   commitCount,
   doc,
+  git,
   lastCommitFiles,
   lastCommitMessage,
   makeRepo,
@@ -48,6 +49,15 @@ function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?
   const { repoRoot, docsDir } = makeRepo(files)
   const config = testConfig()
   config.agents[0] = { ...config.agents[0]!, args: agentArgs, ...(command ? { command } : {}) }
+  return boardOnRepo(repoRoot, docsDir, config, spawn)
+}
+
+/**
+ * A board on a repo that is already there. Called a second time on the same
+ * tree it is a restart, as far as anything on disk is concerned
+ * (spec-00001-AC-54.2).
+ */
+function boardOnRepo(repoRoot: string, docsDir: string, config = testConfig(), spawn = spawnPty) {
   const board = new Board({ repoRoot, docsDir, config, spawn })
   const server = board.listen(0)
   servers.push(server)
@@ -93,6 +103,22 @@ describe('GET /api/config', () => {
     const { call } = boardOn({})
     const { body } = await call('GET', '/api/config')
     expect(body.types.idea).toBe('living')
+    // The entry list rides along with the config it belongs to (spec-00001-FR-53)
+    expect(body.entry).toEqual(['idea', 'prd'])
+  })
+
+  /**
+   * spec-00001-AC-56.1 — the two type sets the code holds (rule-00001-BR-20 and
+   * BR-23) are part of the effective config, so the front end reads its entry
+   * rulings off this payload instead of keeping a second copy of the rule.
+   */
+  it('serves the built-in clarifiable and auditable type sets', async () => {
+    const { call } = boardOn({})
+
+    const { body } = await call('GET', '/api/config')
+
+    expect(body.clarifiable).toEqual(['idea', 'prd', 'spec', 'rule', 'design'])
+    expect(body.auditable).toEqual(['spec', 'rule', 'design'])
   })
 })
 
@@ -117,6 +143,13 @@ describe('document reads', () => {
   it('serves the legal transitions', async () => {
     const { call } = boardOn({ 'idea/a.md': DRAFT_IDEA })
     expect((await call('GET', '/api/docs/idea-00001-x/transitions')).body).toEqual(['active', 'archived'])
+  })
+
+  // spec-00001-AC-6.5 — the revision round is a candidate on an active living doc
+  // (rule-00001-BR-3 as amended, decision-00008 §2 第 1 条)
+  it('offers draft as a transition of an active living doc', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    expect((await call('GET', '/api/docs/idea-00001-x/transitions')).body).toEqual(['draft', 'archived'])
   })
 
   // spec-00001-AC-10.2
@@ -1346,5 +1379,440 @@ describe('what a session produced, read against the item grammar', () => {
     const { body } = await call('GET', '/api/graph')
     expect(body.diagnostics).toEqual([])
     expect(body.nodes.find((n: { id: string }) => n.id === 'spec-00001-new').ok).toBe(true)
+  })
+})
+
+/**
+ * Creating a flow entry document over the wire (spec-00001-FR-53): the prefill
+ * writes nothing, and the save is the create branch of the one write path
+ * (design-00001 §6, §7).
+ */
+describe('creating a document', () => {
+  const IDEA_TEMPLATE = doc({ id: 'idea-00001-example-slug', type: 'idea', status: 'draft' }, '# Idea: <one line>\n')
+  const newIdea = (id: string) => doc({ id, type: 'idea', status: 'draft' }, '# A second idea\n')
+
+  // spec-00001-AC-53.1, first half: the prefill is an allocation, not a write
+  it('serves the allocated id prefix and the type template without writing anything', async () => {
+    const { call, docsDir } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'idea/TEMPLATE.md': IDEA_TEMPLATE })
+
+    const { status, body } = await call('GET', '/api/create?type=idea')
+
+    expect(status).toBe(200)
+    expect(body).toEqual({ idPrefix: 'idea-00002-', template: IDEA_TEMPLATE })
+    expect(existsSync(join(docsDir, 'idea/idea-00002-a-second-idea.md'))).toBe(false)
+  })
+
+  // spec-00001-AC-53.2 for the prefill half, and AC-53.6's other reading: a type
+  // outside `entry` is refused however the request arrives
+  it('answers 422 for a type that is not a flow entry, and for no type at all', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+
+    for (const query of ['?type=spec', '?type=', '']) {
+      const { status, body } = await call('GET', `/api/create${query}`)
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/not a flow entry type/)
+    }
+  })
+
+  // spec-00001-AC-53.1 and rule-00001-AC-26.1: the save is what creates the file
+  it('creates the document at the allocated id, as a draft, and commits it', async () => {
+    const { call, docsDir, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    const { body: prefill } = await call('GET', '/api/create?type=idea')
+    const id = `${prefill.idPrefix}a-second-idea`
+
+    const { status, body } = await call('POST', '/api/docs', { id, content: newIdea(id) })
+
+    expect(status).toBe(201)
+    expect(body.committed).toBe(true)
+    expect(readFileSync(join(docsDir, `idea/${id}.md`), 'utf8')).toBe(newIdea(id))
+    expect(lastCommitMessage(repoRoot)).toBe(`wb(create): ${id}`)
+    // …and the board sees it at once: the create invalidates the parsed tree
+    const { body: graph } = await call('GET', '/api/graph')
+    expect(graph.nodes.map((node: { id: string }) => node.id)).toEqual(['idea-00001-x', id])
+    expect(graph.nodes[1].status).toBe('draft')
+  })
+
+  // spec-00001-AC-53.2 with rule-00001-AC-27.1 — refused, and nothing written
+  it('answers 422 for a create of a type outside the entry list', async () => {
+    const { call, docsDir, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    const commits = commitCount(repoRoot)
+    const content = doc({ id: 'spec-00001-mine', type: 'spec', status: 'draft' }, '# Mine\n')
+
+    const { status, body } = await call('POST', '/api/docs', { id: 'spec-00001-mine', content })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/not a flow entry type/)
+    expect(existsSync(join(docsDir, 'spec/spec-00001-mine.md'))).toBe(false)
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // spec-00001-AC-53.3
+  it('answers 409 for an id that already exists, without overwriting it', async () => {
+    const { call, docsDir } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+
+    const { status, body } = await call('POST', '/api/docs', {
+      id: 'idea-00001-x',
+      content: newIdea('idea-00001-x'),
+    })
+
+    expect(status).toBe(409)
+    expect(body.error).toMatch(/already exists/)
+    expect(readFileSync(join(docsDir, 'idea/a.md'), 'utf8')).toBe(ACTIVE_IDEA)
+  })
+
+  // spec-00001-AC-53.4
+  it('answers 422 for a slug with an upper-case letter or a space', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+
+    for (const id of ['idea-00002-My Idea', 'idea-00002-MyIdea']) {
+      const { status, body } = await call('POST', '/api/docs', { id, content: newIdea(id) })
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/lower-case hyphenated slug/)
+    }
+  })
+
+  it('answers 422 for a request that names no id or no content', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+
+    expect((await call('POST', '/api/docs', { content: newIdea('idea-00002-x') })).status).toBe(422)
+    expect((await call('POST', '/api/docs', { id: 'idea-00002-x' })).status).toBe(422)
+  })
+
+  /**
+   * spec-00001-AC-53.7 — the board commits `draft` documents by spec, and this
+   * repo's pre-commit hook rejects exactly those (decision-00008 §2 第 6 条). The
+   * hook is armed for real here: a hand-made commit of the same kind of file is
+   * refused, and the board's create goes through all the same.
+   */
+  it('commits a draft even with a pre-commit hook that rejects drafts', async () => {
+    const { call, repoRoot, docsDir } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
+    mkdirSync(join(repoRoot, '.githooks'), { recursive: true })
+    const hook = join(repoRoot, '.githooks/pre-commit')
+    // The repo's own hook, cut down to the check this is about.
+    writeFileSync(
+      hook,
+      [
+        '#!/bin/sh',
+        'for f in $(git diff --cached --name-only --diff-filter=ACM | grep -E "\\.md$"); do',
+        '  if git show ":$f" | grep -Eq "^status:[[:space:]]*draft[[:space:]]*$"; then',
+        '    echo "  $f is still draft"; exit 1',
+        '  fi',
+        'done',
+        '',
+      ].join('\n'),
+    )
+    chmodSync(hook, 0o755)
+    git(repoRoot, 'config', 'core.hooksPath', '.githooks')
+
+    const id = 'idea-00002-created-under-the-hook'
+    const { status, body } = await call('POST', '/api/docs', { id, content: doc({ id, type: 'idea', status: 'draft' }) })
+
+    expect(status).toBe(201)
+    expect(body.committed).toBe(true)
+    expect(lastCommitMessage(repoRoot)).toBe(`wb(create): ${id}`)
+    // …and the hook was live the whole time, which is what makes that mean something.
+    writeFileSync(join(docsDir, 'idea/by-hand.md'), doc({ id: 'idea-00003-by-hand', type: 'idea', status: 'draft' }))
+    git(repoRoot, 'add', 'docs/idea/by-hand.md')
+    expect(() => git(repoRoot, 'commit', '-m', 'by hand')).toThrowError(/is still draft/)
+  })
+})
+
+/**
+ * The session history (spec-00001-FR-54): every session that ends leaves its
+ * metadata and its whole transcript under `.whiteboard/sessions/`, which is why
+ * the history outlives both the session and the server.
+ */
+describe('session history', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+
+  /** Run one audit session to its end, so there is a history to read. */
+  async function afterAnAudit(agentArgs = ['-e', "console.log('auditing away')"]) {
+    const open = boardOn({ 'spec/b.md': DRAFT_SPEC }, agentArgs)
+    await open.call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    await vi.waitFor(() => expect(open.board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await open.board.sessions.whenFinished()
+    return open
+  }
+
+  // spec-00001-AC-54.1
+  it('lists a session that has ended with its kind, document and exit status', async () => {
+    const { call } = await afterAnAudit()
+
+    const { status, body } = await call('GET', '/api/sessions/history')
+
+    expect(status).toBe(200)
+    expect(body).toHaveLength(1)
+    expect(body[0]).toMatchObject({
+      kind: 'audit',
+      docId: 'spec-00001-b',
+      agent: 'claude',
+      status: 'exited',
+      exitCode: 0,
+    })
+    expect(body[0].startedAt <= body[0].endedAt).toBe(true)
+  })
+
+  // spec-00001-AC-54.2 — the files are the store, so a restart changes nothing
+  it('serves the list and the whole transcript to a board started after a restart', async () => {
+    const { repoRoot, docsDir, call } = await afterAnAudit()
+    const { body: before } = await call('GET', '/api/sessions/history')
+
+    const restarted = boardOnRepo(repoRoot, docsDir)
+
+    const { body: listed } = await restarted.call('GET', '/api/sessions/history')
+    expect(listed.map((entry: { id: string }) => entry.id)).toEqual(before.map((entry: { id: string }) => entry.id))
+
+    const { status, body } = await restarted.call('GET', `/api/sessions/history/${listed[0].id}`)
+    expect(status).toBe(200)
+    expect(body.meta.kind).toBe('audit')
+    expect(body.transcript).toContain('auditing away')
+    expect(body.transcript).toContain('session ended with code 0')
+  })
+
+  it('answers 404 for a session it has no history of', async () => {
+    const { call } = boardOn({})
+
+    for (const id of ['nothing-like-that', '..%2F..%2Fetc%2Fpasswd']) {
+      const { status, body } = await call('GET', `/api/sessions/history/${id}`)
+      expect(status).toBe(404)
+      expect(body.error).toMatch(/no session history/)
+    }
+  })
+
+  it('lists nothing at all before the first session', async () => {
+    const { call } = boardOn({})
+    expect((await call('GET', '/api/sessions/history')).body).toEqual([])
+  })
+
+  // One unreadable file must not cost the user the rest of the history
+  it('leaves a history file it cannot read out of the list', async () => {
+    const { call, repoRoot } = await afterAnAudit(['-e', ''])
+    writeFileSync(join(repoRoot, '.whiteboard/sessions/half-written.json'), 'not json at all')
+
+    expect((await call('GET', '/api/sessions/history')).body).toHaveLength(1)
+  })
+
+  /**
+   * spec-00001-AC-54.3 — the history is a record, not a gate: a directory it
+   * cannot be written to costs the user that record and nothing else. The commit
+   * lands, the board is told, and the failure is a notice on the session.
+   */
+  it('commits and refreshes all the same when the history cannot be written', async () => {
+    const { call, board, repoRoot } = boardOn({ 'spec/b.md': DRAFT_SPEC }, [
+      '-e',
+      `require('fs').appendFileSync('spec/b.md', '\\nrevised\\n')`,
+    ])
+    const sessions = join(repoRoot, '.whiteboard/sessions')
+    mkdirSync(sessions, { recursive: true })
+    chmodSync(sessions, 0o500)
+
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(audit): spec-00001-b')
+    expect(board.sessions.current()!.outcome!.committed).toBe(true)
+    expect(board.sessions.current()!.historyError).toBeTruthy()
+    expect(board.sessions.attach(() => {}).buffer).toContain('could not save the session history')
+    expect((await call('GET', '/api/sessions/history')).body).toEqual([])
+    chmodSync(sessions, 0o700)
+  })
+
+  // spec-00001-AC-54.4 — a stopped session is a session that ended
+  it('lists a stopped session with the exit status it really had', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+
+    await call('DELETE', '/api/sessions')
+
+    const { body } = await call('GET', '/api/sessions/history')
+    expect(body).toHaveLength(1)
+    expect(body[0]).toMatchObject({ id: board.sessions.current()!.id, kind: 'audit', status: 'exited' })
+    expect(body[0].exitCode).toBe(board.sessions.current()!.exitCode)
+  })
+
+  it('lists the newest session first', async () => {
+    const { call, board } = await afterAnAudit(['-e', ''])
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    const { body } = await call('GET', '/api/sessions/history')
+
+    expect(body).toHaveLength(2)
+    expect(body[0].startedAt >= body[1].startedAt).toBe(true)
+    expect(body[0].id).toBe(board.sessions.current()!.id)
+  })
+})
+
+/**
+ * Choosing the agent a session runs (spec-00001-FR-55). The flow config has
+ * allowed several since the first round; taking the first one was an
+ * implementation debt, not a design (decision-00008 §2 第 4 条).
+ */
+describe('the agent a session runs', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+
+  /** A board on a two-agent config whose pty is a stand-in recording what it spawned. */
+  function twoAgentBoard() {
+    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD })
+    const config = testConfig()
+    config.agents = [
+      { name: 'claude', command: 'first-cli', args: [], cwd: 'docs' },
+      { name: 'other', command: 'second-cli', args: ['--yolo'], cwd: 'docs' },
+    ]
+    const spawned: Array<{ command: string; args: string[] }> = []
+    const open = boardOnRepo(repoRoot, docsDir, config, (command, args) => {
+      spawned.push({ command, args })
+      return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
+    })
+    return { ...open, spawned }
+  }
+
+  // spec-00001-AC-55.1
+  it('starts an ask session on the agent the request names', async () => {
+    const { call, spawned, board } = twoAgentBoard()
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 'other' })
+
+    expect(status).toBe(200)
+    expect(body.agent).toBe('other')
+    expect(spawned).toEqual([{ command: 'second-cli', args: ['--yolo'] }])
+    expect(board.sessions.current()!.agent).toBe('other')
+  })
+
+  // spec-00001-AC-55.2 — no name means the first, which is every earlier board
+  it('starts an advance on the first configured agent when none is named', async () => {
+    const { call, spawned } = twoAgentBoard()
+
+    const { body } = await call('POST', '/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' })
+
+    expect(body.agent).toBe('claude')
+    expect(spawned).toEqual([{ command: 'first-cli', args: [] }])
+  })
+
+  // spec-00001-AC-55.3 — every one of the four kinds refuses a name it has never heard
+  it('answers 422 and starts nothing for an agent the config does not declare', async () => {
+    const { call, spawned, board } = twoAgentBoard()
+
+    for (const [path, request] of [
+      ['/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan', agent: 'nope' }],
+      ['/api/sessions/clarify', { docId: 'spec-00001-b', agent: 'nope' }],
+      ['/api/sessions/ask', { docId: 'spec-00001-b', agent: 'nope' }],
+      ['/api/sessions/audit', { docId: 'spec-00001-b', agent: 'nope' }],
+    ] as const) {
+      const { status, body } = await call('POST', path, request)
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/is not an agent in the flow config/)
+    }
+    expect(spawned).toEqual([])
+    expect(board.sessions.current()).toBeNull()
+  })
+
+  it('answers 422 for an agent that is not a name at all', async () => {
+    const { call, spawned } = twoAgentBoard()
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 3 })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/must name one of the agents/)
+    expect(spawned).toEqual([])
+  })
+
+  // The agent that ran is part of what the history remembers (spec-00001-FR-54)
+  it('records which agent ran in the session history', async () => {
+    const { call, board } = boardOn({ 'record/r.md': ACTIVE_RECORD })
+
+    await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 'claude' })
+    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect((await call('GET', '/api/sessions/history')).body[0].agent).toBe('claude')
+  })
+})
+
+/**
+ * issue-00014 with spec-00001-AC-17.3: the product check is a reading of the
+ * disk, not a state the board keeps. A document the user has fixed stops being
+ * marked at the very next refresh — no further advance needed.
+ */
+describe('a product marked anomalous, then fixed on disk', () => {
+  const writeProduct = (content: string) =>
+    `-e|require('fs').mkdirSync('prd',{recursive:true});require('fs').writeFileSync('prd/new.md',${JSON.stringify(content)})`
+  const WITHOUT_PARENT = doc({ id: 'prd-00001-new', type: 'prd', status: 'draft' }, '# New\n')
+  const WITH_PARENT = doc({ id: 'prd-00001-new', type: 'prd', status: 'draft', parent: 'idea-00001-x' }, '# New\n')
+
+  /** A signal crosses a watch, a debounce and a socket; a busy suite stretches all three. */
+  const REFRESH_WAIT = { timeout: 10_000, interval: 25 }
+
+  /**
+   * An advance whose product does not point back at its source: marked, per
+   * AC-17.1. The board's watch is armed before the test writes, so the fix that
+   * follows is a real refresh — the one FR-42 gives the user for free.
+   */
+  async function afterAMarkedAdvance() {
+    const open = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(WITHOUT_PARENT).split('|'))
+    await open.call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await vi.waitFor(() => expect(open.board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await open.board.sessions.whenFinished()
+    const node = (await open.call('GET', '/api/graph')).body.nodes.find(
+      (found: { id: string }) => found.id === 'prd-00001-new',
+    )
+    expect(node.ok).toBe(false)
+    await armWatch(open.board.watcher, open.docsDir)
+    return open
+  }
+
+  // spec-00001-AC-17.3
+  it('drops the mark on the next refresh once the relation is there', async () => {
+    const { call, docsDir } = await afterAMarkedAdvance()
+
+    writeFileSync(join(docsDir, 'prd/new.md'), WITH_PARENT)
+
+    const graph = await vi.waitFor(async () => {
+      const { body } = await call('GET', '/api/graph')
+      const found = body.nodes.find((node: { id: string }) => node.id === 'prd-00001-new')
+      expect(found.ok).toBe(true)
+      expect(found.problems).toEqual([])
+      return body
+    }, REFRESH_WAIT)
+
+    expect(graph.issues).toEqual([])
+    // …and the edge the relation declares is on the graph, as AC-17.2 has it
+    expect(graph.edges).toContainEqual({
+      from: 'prd-00001-new',
+      to: 'idea-00001-x',
+      relation: 'parent',
+      ok: true,
+      declaredTargets: ['idea-00001-x'],
+    })
+  })
+
+  // The mark is still a mark while the document is still wrong (AC-17.1 on a
+  // second reading, which is the one the defect broke).
+  it('keeps marking it on every refresh while the relation is still missing', async () => {
+    const { call } = await afterAMarkedAdvance()
+
+    const { body } = await call('GET', '/api/graph')
+
+    const node = body.nodes.find((found: { id: string }) => found.id === 'prd-00001-new')
+    expect(node.ok).toBe(false)
+    expect(node.problems).toContain('parent does not point at idea-00001-x')
+  })
+
+  it('marks nothing once the product itself is gone from disk', async () => {
+    const { call, docsDir } = await afterAMarkedAdvance()
+
+    rmSync(join(docsDir, 'prd/new.md'))
+
+    const graph = await vi.waitFor(async () => {
+      const { body } = await call('GET', '/api/graph')
+      expect(body.nodes.map((node: { id: string }) => node.id)).toEqual(['idea-00001-x'])
+      return body
+    }, REFRESH_WAIT)
+
+    expect(graph.issues).toEqual([])
   })
 })

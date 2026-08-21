@@ -5,6 +5,7 @@ import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
 import { ApiError, type SessionInfo, api } from './api.ts'
 import { connectEvents } from './eventSocket.ts'
+import { prefillFrontMatter } from './frontMatter.ts'
 import { type Placed, layoutGraph } from './layout.ts'
 
 const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [] }
@@ -40,10 +41,20 @@ export function useBoard() {
   const [kinds, setKinds] = useState<Record<string, DocKind>>({})
   // Relation field order drives the relation list's grouping (spec-00001-FR-30).
   const [relationOrder, setRelationOrder] = useState<string[]>([])
-  // Which types may be clarified is the config's answer, never the board's: the
-  // types carrying a focus line are exactly the clarifiable ones on show
-  // (spec-00001-FR-48).
+  // Which types may be clarified and which audited are the payload's answer,
+  // never the board's: the entries follow the sets `GET /api/config` sends, so a
+  // set that changes there changes what is on show here and the two cannot drift
+  // (spec-00001-FR-56, AC-56.2).
   const [clarifiable, setClarifiable] = useState<string[]>([])
+  const [auditable, setAuditable] = useState<string[]>([])
+  // The types a document may be created at (spec-00001-FR-53); none means no
+  // create entry at all (spec-00001-AC-53.6).
+  const [entry, setEntry] = useState<string[]>([])
+  // The agents a session may run under, and the one the next session will use.
+  // A single agent is left unnamed: the request then carries no agent field and
+  // the server takes the first, as it always did (spec-00001-AC-55.4).
+  const [agents, setAgents] = useState<string[]>([])
+  const [agent, setAgent] = useState<string>()
   const [selected, setSelected] = useState<string>()
   // Carried with the document it was read for, so a panel never shows the
   // previous selection's items while the next ones are in flight.
@@ -52,6 +63,10 @@ export function useBoard() {
   const [nextSteps, setNextSteps] = useState<FlowStep[]>([])
   // Editor and terminal are independent: an agent can work while a document is open.
   const [editing, setEditing] = useState<string>()
+  // The prefilled buffer of a document that is not on disk yet: set together
+  // with `editing`, and what tells the editor that saving creates rather than
+  // revises (spec-00001-FR-53).
+  const [draft, setDraft] = useState<string>()
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [session, setSession] = useState<SessionInfo | null>(null)
 
@@ -83,6 +98,14 @@ export function useBoard() {
     return next
   }, [])
 
+  /** Hold a document as the selection and read what its toolbar offers. */
+  const load = useCallback(async (id: string) => {
+    setSelected(id)
+    const [nextTransitions, steps] = await Promise.all([api.transitions(id), api.nextSteps(id)])
+    setTransitions(nextTransitions)
+    setNextSteps(steps)
+  }, [])
+
   const select = useCallback(
     async (id: string) => {
       // Selecting is only meaningful for a document that is on the board. The
@@ -93,12 +116,9 @@ export function useBoard() {
         toast.error(`no document ${id} on the board`)
         return
       }
-      setSelected(id)
-      const [nextTransitions, steps] = await Promise.all([api.transitions(id), api.nextSteps(id)])
-      setTransitions(nextTransitions)
-      setNextSteps(steps)
+      await load(id)
     },
-    [graph],
+    [graph, load],
   )
 
   const deselect = useCallback(() => setSelected(undefined), [])
@@ -144,10 +164,50 @@ export function useBoard() {
 
   const advance = useCallback(
     async (sourceId: string, targetType: string) => {
-      await startSession(() => api.advance(sourceId, targetType))
+      await startSession(() => api.advance(sourceId, targetType, agent))
     },
-    [startSession],
+    [startSession, agent],
   )
+
+  /**
+   * Open a document's own text, or close the panel. Either way the prefilled
+   * buffer goes: a creation abandoned must not follow the next document into the
+   * editor.
+   */
+  const edit = useCallback((id?: string) => {
+    setDraft(undefined)
+    setEditing(id)
+  }, [])
+
+  /**
+   * Open a new document's buffer (spec-00001-FR-53). The server allocates the
+   * number and hands back the type's template; the id is that prefix and the
+   * slug the user chose. Nothing is written — the buffer is created on save, so
+   * a dialog thought better of leaves no file behind.
+   */
+  const create = useCallback(async (type: string, slug: string) => {
+    try {
+      const { idPrefix, template } = await api.createPrefill(type)
+      const id = `${idPrefix}${slug}`
+      setDraft(prefillFrontMatter(template, id, type))
+      setEditing(id)
+    } catch (error) {
+      toast.error(refusalText(error))
+    }
+  }, [])
+
+  /**
+   * A created document exists from here on, so the prefilled buffer is done with
+   * and the board takes the new node in and selects it: what was just created is
+   * what the user wants in front of them (spec-00001-FR-53).
+   */
+  const created = useCallback(async () => {
+    const id = editing
+    setDraft(undefined)
+    setEditing(undefined)
+    const next = await refresh()
+    if (id !== undefined && next.nodes.some((node) => node.id === id)) await load(id)
+  }, [editing, refresh, load])
 
   // Only a spec or a rule declares requirement items, and only for those does
   // the inspector panel exist at all (spec-00001-FR-31). A document whose front
@@ -184,7 +244,15 @@ export function useBoard() {
         typeOrder.current = Object.keys(config.types)
         setKinds(config.types)
         setRelationOrder(config.relations)
-        setClarifiable(Object.keys(config.focus))
+        setClarifiable(config.clarifiable)
+        setAuditable(config.auditable)
+        setEntry(config.entry)
+        const names = config.agents.map((declared) => declared.name)
+        setAgents(names)
+        // One agent is no choice at all: it is left unnamed so the request
+        // carries no agent field (spec-00001-AC-55.4). More than one, and the
+        // first is the one on show until the user picks another.
+        setAgent(names.length > 1 ? names[0] : undefined)
       } catch (error) {
         // A board with no column order still beats no board: the graph is the
         // thing the user came for, so draw it and say why it looks odd.
@@ -213,16 +281,22 @@ export function useBoard() {
     kinds,
     relationOrder,
     clarifiable,
+    auditable,
+    entry,
+    agents,
+    agent,
     selected,
     selectedNode: graph.nodes.find((node) => node.id === selected),
     items: items !== undefined && items.docId === selected ? items.view : undefined,
     transitions,
     nextSteps,
     editing,
+    draft,
     terminalOpen,
     session,
-    setEditing,
+    edit,
     setTerminalOpen,
+    setAgent,
     refresh,
     select,
     deselect,
@@ -230,5 +304,7 @@ export function useBoard() {
     startSession,
     stopSession,
     advance,
+    create,
+    created,
   }
 }

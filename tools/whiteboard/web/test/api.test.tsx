@@ -91,6 +91,59 @@ describe('the api client', () => {
     )
   })
 
+  // spec-00001-FR-55 — the agent is named only when there is a choice to name,
+  // and an unnamed one leaves no field behind for the server to read
+  it('names the agent a session is to run under', async () => {
+    const fetchMock = mockFetch(200, { id: 's1' })
+    await api.clarify('prd-00001-x', 'codex')
+    await api.advance('idea-00001-x', 'prd', 'codex')
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/sessions/clarify',
+      expect.objectContaining({ body: JSON.stringify({ docId: 'prd-00001-x', agent: 'codex' }) }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/sessions',
+      expect.objectContaining({
+        body: JSON.stringify({ sourceId: 'idea-00001-x', targetType: 'prd', agent: 'codex' }),
+      }),
+    )
+  })
+
+  // spec-00001-FR-53 — the prefill asks for a type and writes nothing; the save
+  // is what creates, and it goes to the collection, not to an id that has no
+  // document behind it yet
+  it('takes a prefill for a new document and saves it as a create', async () => {
+    const fetchMock = mockFetch(200, { idPrefix: 'idea-00002-', template: '---\nid: idea-00001-example\n---\n' })
+    expect(await api.createPrefill('idea')).toMatchObject({ idPrefix: 'idea-00002-' })
+    await api.createDoc('idea-00002-notes', 'body')
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/create?type=idea',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/docs',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ id: 'idea-00002-notes', content: 'body' }) }),
+    )
+  })
+
+  // spec-00001-FR-54 — the list and one entry read whole
+  it('reads the session history and one transcript', async () => {
+    const fetchMock = mockFetch(200, [])
+    await api.sessionHistory()
+    await api.sessionTranscript('s1')
+
+    expect(fetchMock.mock.calls.map((call) => (call as unknown as [string])[0])).toEqual([
+      '/api/sessions/history',
+      '/api/sessions/history/s1',
+    ])
+  })
+
   it('reads the transitions, next steps, a document, and the session', async () => {
     const fetchMock = mockFetch(200, [])
     await api.transitions('a')

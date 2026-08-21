@@ -1,5 +1,5 @@
-import { writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import type { FlowConfig, FlowStep } from './config.ts'
 import {
   type DocContent,
@@ -7,6 +7,8 @@ import {
   type DocNode,
   contentHash,
   findNode,
+  frontMatterId,
+  parseDocId,
   readDocBody,
   readDocContent,
   readGraph,
@@ -27,11 +29,14 @@ import {
 } from './sessionTasks.ts'
 import {
   WorkflowError,
+  allocateNumber,
   applyAccept,
   applyStatusChange,
   assertAskable,
   assertAuditable,
   assertClarifiable,
+  assertEntryType,
+  idPrefix,
   nextStepsFor,
   transitionsFor,
 } from './workflow.ts'
@@ -81,6 +86,8 @@ export class DocService {
   private readonly docsDir: string
   private readonly config: FlowConfig
   private readonly git: GitLayer
+  /** The parsed tree, held until something invalidates it (spec-00001 §7 非功能项). */
+  private cached?: DocGraph
 
   constructor(repoRoot: string, docsDir: string, config: FlowConfig, git: GitLayer = new GitLayer(repoRoot)) {
     this.repoRoot = repoRoot
@@ -90,7 +97,18 @@ export class DocService {
   }
 
   graph(): DocGraph {
-    return readGraph(this.docsDir, this.config)
+    this.cached ??= readGraph(this.docsDir, this.config)
+    return this.cached
+  }
+
+  /**
+   * Drop the parsed tree, so the next read parses again (spec-00001 §7 非功能项,
+   * decision-00008 §2 第 8 条). The invalidation signals already exist: every
+   * board write path invalidates on its way out, and the watcher of FR-42
+   * invalidates for everything written from outside.
+   */
+  invalidate(): void {
+    this.cached = undefined
   }
 
   read(id: string): DocContent {
@@ -128,6 +146,62 @@ export class DocService {
       throw new ConflictError(`${id} changed on disk since it was opened`)
     }
     return this.write(node, content, 'edit')
+  }
+
+  /**
+   * The prefill for a new document of an entry type (spec-00001-FR-53): the
+   * number rule-00001-BR-18 allocates, and that type's own template. Nothing is
+   * written — the file appears only when the editor saves it (design-00001 §6).
+   */
+  newDocument(type: string): { idPrefix: string; template: string } {
+    assertEntryType(type, this.config)
+    return { idPrefix: idPrefix(type, allocateNumber(this.graph(), type)), template: this.template(type) }
+  }
+
+  /**
+   * spec-00001-FR-53: the create branch of the one write path (design-00001 §6).
+   * Its read-from-disk step is a non-existence check — an id already taken is a
+   * conflict, never an overwrite (AC-53.3) — and the id must carry the number
+   * BR-18 allocates, so nothing files a second document under a taken number.
+   */
+  async create(id: string, content: string): Promise<ActionResult> {
+    const parsed = parseDocId(id)
+    if (!parsed) {
+      throw new WorkflowError(`${JSON.stringify(id)} is not <type>-<nnnnn>-<slug> with a lower-case hyphenated slug`)
+    }
+    assertEntryType(parsed.type, this.config)
+    const graph = this.graph()
+    const relPath = `${parsed.type}/${id}.md`
+    const absolute = join(this.docsDir, relPath)
+    if (findNode(graph, id) || existsSync(absolute)) {
+      throw new ConflictError(`${id} already exists; refresh the board`)
+    }
+    const allocated = allocateNumber(graph, parsed.type)
+    if (parsed.number !== allocated) {
+      const allocatedPrefix = idPrefix(parsed.type, allocated)
+      throw new WorkflowError(`${id} is not the id allocated for a new ${parsed.type}; it is ${allocatedPrefix}<slug>`)
+    }
+    // The document is filed under the id it was asked for, so its front matter
+    // has to say the same: a file whose id disagrees with its name is an
+    // anomalous node the moment it lands (spec-00001-FR-2).
+    if (frontMatterId(content) !== id) {
+      throw new WorkflowError(`the content to save does not declare id: ${id} in its front matter`)
+    }
+    mkdirSync(dirname(absolute), { recursive: true })
+    return this.writeFile(absolute, content, id, 'create')
+  }
+
+  /**
+   * A type's TEMPLATE.md, or nothing to prefill with. A folder without one is a
+   * repo missing that convention, not a reason to refuse the create: the
+   * allocated id is the part the board owes the editor.
+   */
+  private template(type: string): string {
+    try {
+      return readFileSync(join(this.docsDir, type, 'TEMPLATE.md'), 'utf8')
+    } catch {
+      return ''
+    }
   }
 
   /** spec-00001-FR-6 and FR-7, with the resolved gate of FR-52 between the ruling and the write. */
@@ -279,10 +353,15 @@ export class DocService {
   }
 
   private async write(node: DocNode, content: string, action: ActionKind): Promise<ActionResult> {
-    const absolute = join(this.docsDir, node.path)
+    return this.writeFile(join(this.docsDir, node.path), content, node.id, action)
+  }
+
+  /** The write-then-commit every action ends on; the parsed tree goes stale here. */
+  private async writeFile(absolute: string, content: string, docId: string, action: ActionKind): Promise<ActionResult> {
     writeFileSync(absolute, content)
+    this.invalidate()
     const repoPath = relative(this.repoRoot, absolute).split(/[\\/]/).join('/')
-    return this.git.commit([repoPath], commitMessage(action, node.id))
+    return this.git.commit([repoPath], commitMessage(action, docId))
   }
 }
 

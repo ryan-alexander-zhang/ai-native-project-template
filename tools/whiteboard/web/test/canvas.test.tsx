@@ -438,14 +438,18 @@ describe('the board', () => {
     // Selecting a spec or a rule reads its items for the inspector panel
     // (spec-00001-FR-31); the cases below that reach one do not care what it says.
     vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
-    // The focus block is where the board reads which types may be clarified
-    // (spec-00001-FR-48): prd may, idea is left out of it on purpose.
+    // The clarifiable and auditable sets come down with the config and are the
+    // only word on which entries are drawn (spec-00001-FR-56): prd may be
+    // clarified, idea is left out of the set on purpose.
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
       flow: {},
       focus: { prd: 'roles, scope, and the value trade-offs' },
       agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      clarifiable: ['prd'],
+      auditable: ['spec', 'rule', 'design'],
     })
   })
 
@@ -835,6 +839,7 @@ describe('the board', () => {
     const clarify = vi.spyOn(api, 'clarify').mockResolvedValue({
       id: 's1',
       kind: 'clarify',
+      agent: 'claude',
       sourceId: 'prd-00001-x',
       status: 'running',
     })
@@ -845,7 +850,9 @@ describe('the board', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
 
-    expect(clarify).toHaveBeenCalledWith('prd-00001-x')
+    // One agent in the config, so none is named and the server takes the first
+    // (spec-00001-AC-55.4).
+    expect(clarify).toHaveBeenCalledWith('prd-00001-x', undefined)
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
     vi.unstubAllGlobals()
   })
@@ -868,6 +875,7 @@ describe('the board', () => {
     const ask = vi.spyOn(api, 'ask').mockResolvedValue({
       id: 's1',
       kind: 'ask',
+      agent: 'claude',
       sourceId: 'idea-00001-x',
       status: 'running',
     })
@@ -878,7 +886,7 @@ describe('the board', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
 
-    expect(ask).toHaveBeenCalledWith('idea-00001-x')
+    expect(ask).toHaveBeenCalledWith('idea-00001-x', undefined)
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
     vi.unstubAllGlobals()
   })
@@ -892,6 +900,7 @@ describe('the board', () => {
     const audit = vi.spyOn(api, 'audit').mockResolvedValue({
       id: 's1',
       kind: 'audit',
+      agent: 'claude',
       sourceId: 'spec-00001-x',
       status: 'running',
     })
@@ -902,7 +911,7 @@ describe('the board', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Audit' }))
 
-    expect(audit).toHaveBeenCalledWith('spec-00001-x')
+    expect(audit).toHaveBeenCalledWith('spec-00001-x', undefined)
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
     vi.unstubAllGlobals()
   })
@@ -926,7 +935,7 @@ describe('the board', () => {
   it('disables the three session entries while a session is running', async () => {
     stubWebSocket()
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
     })
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
@@ -948,7 +957,7 @@ describe('the board', () => {
   it('offers the session in the top bar once the terminal panel is put away', async () => {
     stubWebSocket()
     vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'running' },
+      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
     })
     render(<Board />)
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
@@ -981,7 +990,13 @@ describe('the board', () => {
     // The stop is followed by a refresh, which reads the session again
     // (issue-00013): a stand-in that kept answering «running» would put the
     // session the user just ended straight back on the board.
-    const stopped = { id: 's1', kind: 'clarify' as const, sourceId: 'prd-00001-x', status: 'exited' as const }
+    const stopped = {
+      id: 's1',
+      kind: 'clarify' as const,
+      agent: 'claude',
+      sourceId: 'prd-00001-x',
+      status: 'exited' as const,
+    }
     let current: SessionInfo = { ...stopped, status: 'running' }
     vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
     const stop = vi.spyOn(api, 'stopSession').mockImplementation(async () => {
@@ -1010,6 +1025,7 @@ describe('the board', () => {
     const advance = vi.spyOn(api, 'advance').mockResolvedValue({
       id: 's1',
       kind: 'advance',
+      agent: 'claude',
       sourceId: 'prd-00001-x',
       targetType: 'spec',
       status: 'running',
@@ -1022,7 +1038,7 @@ describe('the board', () => {
     await userEvent.click(screen.getByLabelText('Advance to the next step'))
     await userEvent.click(await screen.findByRole('menuitem', { name: /spec/ }))
 
-    expect(advance).toHaveBeenCalledWith('prd-00001-x', 'spec')
+    expect(advance).toHaveBeenCalledWith('prd-00001-x', 'spec', undefined)
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
     vi.unstubAllGlobals()
   })

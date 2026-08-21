@@ -1,4 +1,5 @@
 import {
+  Bot,
   Check,
   ChevronDown,
   CircleHelp,
@@ -30,8 +31,19 @@ export interface ToolbarProps {
   relations: RelationItem[]
   /** Whether this document's type may be clarified — the config's answer, not the toolbar's (spec-00001-FR-48). */
   clarifiable: boolean
+  /**
+   * Whether this document's type may be audited. Like `clarifiable` it is read
+   * off the payload the server sends, never off a set the toolbar keeps: the two
+   * would drift (spec-00001-FR-56, AC-56.2).
+   */
+  auditable: boolean
   /** A session of any kind holds the one slot, so no entry may start another (spec-00001-FR-18). */
   sessionRunning: boolean
+  /** The agents a session may be run by; a single one is not a choice (spec-00001-FR-55). */
+  agents: string[]
+  /** The one that will run the next session — the first, until the user picks another. */
+  agent?: string
+  onPickAgent: (name: string) => void
   onPickRelation: (id: string) => void
   onEdit: () => void
   onStatus: (to: string) => void
@@ -41,13 +53,6 @@ export interface ToolbarProps {
   onAudit: () => void
   onAdvance: (targetType: string) => void
 }
-
-/**
- * The types an audit is about, built into the code rather than read off the
- * config — the folder READMEs these three are audited against are what makes
- * them auditable, and that is not a configurable fact (spec-00001-FR-50).
- */
-const AUDITABLE_TYPES = new Set(['spec', 'rule', 'design'])
 
 /**
  * An entry that is disabled has to say why it is (spec-00001-AC-10.3, AC-49.5):
@@ -78,7 +83,8 @@ function Disabled({ reason, children }: { reason?: string; children: ReactElemen
  * same one can be picked twice running.
  */
 export function Toolbar(props: ToolbarProps) {
-  const { node, transitions, nextSteps, relations, clarifiable, sessionRunning, onPickRelation } = props
+  const { node, transitions, nextSteps, relations, clarifiable, auditable, sessionRunning } = props
+  const { agents, agent, onPickAgent, onPickRelation } = props
   const { onEdit, onStatus, onAccept, onClarify, onAsk, onAudit, onAdvance } = props
   // The one reason every starting point shares (spec-00001-FR-18).
   const busy = sessionRunning ? 'session running' : undefined
@@ -211,7 +217,7 @@ export function Toolbar(props: ToolbarProps) {
             that are also ruled on by the server, so a hidden entry is a reading
             of the same rule, not the only enforcement of it.
           */}
-          {AUDITABLE_TYPES.has(node.type ?? '') && node.status === 'draft' ? (
+          {auditable && node.status === 'draft' ? (
             <Disabled reason={busy}>
               <Button variant="outline" size="sm" onClick={onAudit} disabled={sessionRunning}>
                 <ShieldCheck className="size-4" aria-hidden />
@@ -247,6 +253,31 @@ export function Toolbar(props: ToolbarProps) {
               </DropdownMenu>
             </Disabled>
           )}
+
+          {/*
+            Which agent runs the next session, beside the entries that start one
+            (spec-00001-FR-55). One agent is not a choice, so nothing is drawn
+            and nothing is sent — the server then takes the first, exactly as it
+            did before there was a picker (spec-00001-AC-55.4).
+          */}
+          {agents.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" aria-label="Agent">
+                  <Bot className="size-4" aria-hidden />
+                  {agent ?? agents[0]}
+                  <ChevronDown className="size-3 opacity-60" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {agents.map((name) => (
+                  <DropdownMenuItem key={name} onSelect={() => onPickAgent(name)}>
+                    {name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </>
       ) : null}
 
