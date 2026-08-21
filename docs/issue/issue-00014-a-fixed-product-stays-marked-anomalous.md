@@ -1,7 +1,7 @@
 ---
 id: issue-00014-a-fixed-product-stays-marked-anomalous
 type: issue
-status: open
+status: resolved
 blocks: [plan-00011-whiteboard-revision-create-and-session-reach]
 ---
 
