@@ -54,3 +54,30 @@ Add more when useful.
 A spec is one feature — a coherent, shippable capability delivered as one
 increment. It holds the requirements and their acceptance, and links to
 everything else.
+
+## Sizing and Splitting
+
+The one-feature definition above is also a size rule. These are review
+triggers, not hard gates — but when one fires, decide deliberately instead of
+appending by default:
+
+- a new revision round mostly **adds** requirements instead of amending
+  existing ones — the "feature" has become a product area
+- an auditor can no longer read the whole spec in one pass (as an order of
+  magnitude: past ~20 FRs or ~500 body lines)
+- the Stories table no longer describes one increment
+
+How to split:
+
+1. **New capability → new spec.** Grow sideways, not downward: open a new spec
+   with the same `parent` (prd/idea) instead of appending FRs to an existing
+   `active` spec. This is the default.
+2. **Decomposing an oversized spec.** Write the replacement specs, each
+   carrying `supersedes: [<old spec id>]`; set the old spec to `archived`
+   (this satisfies `rule-00001-BR-19`). Requirement ids are namespaced by doc
+   id, so they are **not** renumbered or migrated: existing `record` rows and
+   `plan` scopes keep pointing at the archived spec's items, which remain
+   resolvable — history is evidence, not content to rewrite. New work cites
+   the new specs' items.
+3. Never split by moving FRs between two live specs — that breaks every
+   acceptance row and delivery scope pointing at the moved ids.
