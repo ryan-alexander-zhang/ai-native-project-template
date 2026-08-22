@@ -5,7 +5,9 @@ import {
   type DocContent,
   type DocGraph,
   type DocNode,
+  collidingPaths,
   contentHash,
+  declaredId,
   findNode,
   frontMatterId,
   parseDocId,
@@ -175,7 +177,12 @@ export class DocService {
     const graph = this.graph()
     const relPath = `${parsed.type}/${id}.md`
     const absolute = join(this.docsDir, relPath)
-    if (findNode(graph, id) || existsSync(absolute)) {
+    // Asked of the **declared** ids, not the node keys: a colliding document is
+    // keyed by its path, so `findNode` would miss it and a third file would land
+    // under the same id. `existsSync` stays as the last line of defence — it only
+    // knows the canonical path, and a document filed elsewhere is invisible to it
+    // (design-00001 §2).
+    if (graph.nodes.some((node) => declaredId(node) === id) || existsSync(absolute)) {
       throw new ConflictError(`${id} already exists; refresh the board`)
     }
     const allocated = allocateNumber(graph, parsed.type)
@@ -282,7 +289,13 @@ export class DocService {
     if (node.type !== 'plan' || node.status !== 'open' || to !== 'resolved') return
     const body = (candidate: DocNode) => ({ id: candidate.id, body: readDocBody(this.docsDir, candidate) })
     const docs = itemCoverage(
-      graph.nodes.filter((candidate) => declaresItems(candidate.type)).map(body),
+      // Colliding documents are out (spec-00002-FR-8): ambiguous evidence is no
+      // evidence. The test is `duplicateOf`, never `ok` — the gate must go on
+      // serving a document whose front matter is broken but whose body reads,
+      // and only a collision takes it out (design-00001 §2).
+      graph.nodes
+        .filter((candidate) => declaresItems(candidate.type) && candidate.duplicateOf === undefined)
+        .map(body),
       // Every record naming this plan its parent, whatever its own status
       // (decision-00007 §3); another plan's record is no evidence for this one.
       graph.nodes
@@ -396,10 +409,22 @@ export class DocService {
     return relative(this.repoRoot, this.docsDir).split(/[\\/]/).join('/')
   }
 
+  /**
+   * The node an action is addressed to. An id two documents declare is nobody's
+   * key, so nothing is found — and answering «no such document» would be a lie
+   * the user cannot act on. It is refused as a conflict instead
+   * (spec-00002-FR-9 a): 409 is the state the request collides with, the id
+   * points at no single document, and the message says which files to fix. The
+   * repair is addressed by path, which is what these nodes are keyed by.
+   */
   private require(id: string, graph: DocGraph = this.graph()): DocNode {
     const node = findNode(graph, id)
-    if (!node) throw new ConflictError(`${id} is not a document in this repo; refresh the board`)
-    return node
+    if (node) return node
+    const colliding = collidingPaths(graph, id)
+    if (colliding.length > 0) {
+      throw new ConflictError(`${id} is declared by ${colliding.join(' and ')}; fix the id collision first`)
+    }
+    throw new ConflictError(`${id} is not a document in this repo; refresh the board`)
   }
 
   private readOrConflict(node: DocNode): DocContent {

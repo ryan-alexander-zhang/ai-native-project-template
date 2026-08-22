@@ -637,6 +637,29 @@ describe('what a refresh keeps', () => {
     expect(screen.getByTestId('node-record-00001-x')).toBeTruthy()
   })
 
+  /**
+   * spec-00002-AC-8.9: presentation state is held by node key, and the key of a
+   * document that collides on its id is its file path. Two nodes carrying the
+   * same `duplicateOf` are told apart by nothing else, so the selection has to
+   * come back on the same file.
+   */
+  it('keeps the selection on the same file when the node is keyed by its path', async () => {
+    const first = node({ id: 'spec/first.md', path: 'spec/first.md', duplicateOf: 'spec-00002-clash', ok: false, title: 'The first' })
+    const second = node({ id: 'spec/second.md', path: 'spec/second.md', duplicateOf: 'spec-00002-clash', ok: false, title: 'The second' })
+    graph = { nodes: [first, second], edges: [], issues: [], diagnostics: [] }
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec/second.md')).toBeTruthy(), SETTLED)
+    await act(async () => ChannelSocket.last.connect())
+    await settle()
+    fireEvent.click(screen.getByTestId('node-spec/second.md'))
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /spec\/second\.md/ })).toBeTruthy(), SETTLED)
+
+    await push()
+
+    expect(screen.getByRole('toolbar', { name: /spec\/second\.md/ })).toBeTruthy()
+    expect(screen.queryByRole('toolbar', { name: /spec\/first\.md/ })).toBeNull()
+  })
+
   // spec-00001-AC-44.7
   it('collapses an expanded row whose item is deleted, and keeps the rest', async () => {
     await openPanel()

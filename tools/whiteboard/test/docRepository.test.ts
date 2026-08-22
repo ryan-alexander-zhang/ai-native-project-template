@@ -309,6 +309,122 @@ describe('highestNumber', () => {
   it('returns 0 for a type with no documents', () => {
     expect(highestNumber(graphOf({ 'prd/a.md': PRD }), 'task')).toBe(0)
   })
+
+  /**
+   * rule-00001-BR-18 against the re-keying of spec-00002-FR-8: a colliding
+   * document is keyed by its path, which matches no id pattern, so counting
+   * node keys would lose the number and hand it out again — two documents
+   * sharing an id would become three. The count reads declared ids.
+   */
+  it('still counts a number two documents collided on', () => {
+    const graph = graphOf({
+      'prd/a.md': PRD,
+      'prd/b.md': doc({ id: 'prd-00007-later', type: 'prd', status: 'active' }),
+      'prd/c.md': doc({ id: 'prd-00007-later', type: 'prd', status: 'draft' }, '# Another\n'),
+    })
+
+    expect(highestNumber(graph, 'prd')).toBe(7)
+  })
+})
+
+/**
+ * Two documents declaring one id (spec-00002-FR-8, issue-00004). Neither may
+ * disappear and neither may be acted on by that id: each becomes a node keyed
+ * by its own file path, marked anomalous, pointing at the other.
+ */
+describe('documents that collide on an id', () => {
+  const FIRST = doc({ id: 'spec-00002-clash', type: 'spec', status: 'draft' }, '# The first\n')
+  const SECOND = doc({ id: 'spec-00002-clash', type: 'spec', status: 'active' }, '# The second\n')
+  const COLLIDING = { 'spec/first.md': FIRST, 'spec/second.md': SECOND }
+
+  // spec-00002-AC-8.1
+  it('presents both, each keyed by its own file path and carrying the colliding id', () => {
+    const nodes = graphOf(COLLIDING).nodes
+
+    expect(nodes.map((node) => node.id)).toEqual(['spec/first.md', 'spec/second.md'])
+    expect(nodes.map((node) => node.duplicateOf)).toEqual(['spec-00002-clash', 'spec-00002-clash'])
+    expect(nodes.map((node) => node.title)).toEqual(['The first', 'The second'])
+  })
+
+  // spec-00002-AC-8.2
+  it('marks both anomalous, each problem naming the other file', () => {
+    const nodes = graphOf(COLLIDING).nodes
+
+    expect(nodes.map((node) => node.ok)).toEqual([false, false])
+    expect(nodes[0]!.problems).toContain('id "spec-00002-clash" is also declared by spec/second.md')
+    expect(nodes[1]!.problems).toContain('id "spec-00002-clash" is also declared by spec/first.md')
+  })
+
+  // spec-00002-AC-8.3
+  it('presents all three when three documents collide, every one of them anomalous', () => {
+    const nodes = graphOf({
+      ...COLLIDING,
+      'spec/third.md': doc({ id: 'spec-00002-clash', type: 'spec', status: 'draft' }, '# The third\n'),
+    }).nodes
+
+    expect(nodes.map((node) => node.id)).toEqual(['spec/first.md', 'spec/second.md', 'spec/third.md'])
+    expect(nodes.every((node) => node.ok)).toBe(false)
+    expect(nodes.filter((node) => node.ok)).toEqual([])
+  })
+
+  // spec-00002-AC-8.6 — the colliding id is nobody's key, so the target is ambiguous
+  it('breaks an edge aimed at the colliding id', () => {
+    const graph = graphOf({
+      ...COLLIDING,
+      'plan/p.md': doc({ id: 'plan-00001-p', type: 'plan', status: 'open', parent: 'spec-00002-clash' }, '# P\n'),
+    })
+
+    expect(graph.edges).toContainEqual(
+      relationEdge('plan-00001-p', 'spec-00002-clash', 'parent', false),
+    )
+  })
+
+  /**
+   * spec-00002-FR-8 and AC-8.7 at the level that exists today: the items in a
+   * colliding body are claimed by nobody, which is the one filter the global
+   * coverage view of FR-10 will select on (plan-00013). Ambiguous evidence is
+   * no evidence.
+   */
+  it('lets no requirement item of a colliding document be claimed', () => {
+    const graph = graphOf({
+      'spec/first.md': doc({ id: 'spec-00001-whiteboard', type: 'spec', status: 'active' }, SPEC_ITEMS),
+      'spec/second.md': doc({ id: 'spec-00001-whiteboard', type: 'spec', status: 'draft' }, '# The other\n'),
+      'plan/p.md': doc(
+        { id: 'plan-00001-p', type: 'plan', status: 'open', implements: '[spec-00001-FR-1]' },
+        '# P\n',
+      ),
+    })
+
+    expect(graph.edges).toContainEqual(relationEdge('plan-00001-p', 'spec-00001-FR-1', 'implements', false))
+  })
+
+  // spec-00002-AC-8.10
+  it('clears the anomaly on the survivor once the other file is gone', () => {
+    const nodes = graphOf({ 'spec/first.md': FIRST }).nodes
+
+    expect(nodes.map((node) => node.id)).toEqual(['spec-00002-clash'])
+    expect(nodes[0]!.ok).toBe(true)
+    expect(nodes[0]!.duplicateOf).toBeUndefined()
+  })
+
+  // spec-00002-AC-8.11
+  it('clears the anomaly on both once one of them takes a free id', () => {
+    const nodes = graphOf({
+      'spec/first.md': FIRST,
+      'spec/second.md': doc({ id: 'spec-00003-apart', type: 'spec', status: 'active' }, '# The second\n'),
+    }).nodes
+
+    expect(nodes.map((node) => node.id)).toEqual(['spec-00002-clash', 'spec-00003-apart'])
+    expect(nodes.every((node) => node.ok && node.duplicateOf === undefined)).toBe(true)
+  })
+
+  // The document with no id at all is keyed by path too, and collides with nobody
+  it('leaves a document that declares no id keyed by its path and alone', () => {
+    const nodes = graphOf({ 'spec/none.md': '# No front matter\n' }).nodes
+
+    expect(nodes[0]!.id).toBe('spec/none.md')
+    expect(nodes[0]!.duplicateOf).toBeUndefined()
+  })
 })
 
 function frontMatterOf(source: string): Record<string, string> {

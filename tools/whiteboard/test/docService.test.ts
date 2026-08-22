@@ -1134,3 +1134,132 @@ describe('the parse cache', () => {
     expect(service.graph().nodes.map((node) => node.id)).toEqual(['prd-00001-x', 'prd-00002-y'])
   })
 })
+
+/**
+ * Addressing a document by an id two of them declare (spec-00002-FR-9). The id
+ * points at no single document, so a write addressed by it is refused as a
+ * conflict — and the way out is the editor, which addresses the node's own file
+ * path.
+ */
+describe('a write addressed by a colliding id', () => {
+  const FIRST = doc({ id: 'spec-00002-clash', type: 'spec', status: 'draft' }, '# The first\n')
+  const SECOND = doc({ id: 'spec-00002-clash', type: 'spec', status: 'draft' }, '# The second\n')
+
+  function colliding() {
+    return serviceOn({ 'spec/first.md': FIRST, 'spec/second.md': SECOND })
+  }
+
+  // spec-00002-AC-9.2
+  it('refuses it, names the files to fix, and writes nothing', async () => {
+    const { docsDir, repoRoot, service } = colliding()
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('spec-00002-clash', 'active')).rejects.toThrowError(ConflictError)
+    await expect(service.changeStatus('spec-00002-clash', 'active')).rejects.toThrowError(
+      /spec\/first\.md and spec\/second\.md; fix the id collision first/,
+    )
+    expect(onDisk(docsDir, 'spec/first.md')).toBe(FIRST)
+    expect(onDisk(docsDir, 'spec/second.md')).toBe(SECOND)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  it('refuses every other write addressed the same way', async () => {
+    const { service } = colliding()
+    const collision = /fix the id collision first/
+
+    expect(() => service.read('spec-00002-clash')).toThrowError(collision)
+    await expect(service.save('spec-00002-clash', 'x', 'h')).rejects.toThrowError(collision)
+    await expect(service.review('spec-00002-clash', { action: 'accept' })).rejects.toThrowError(collision)
+  })
+
+  // spec-00002-AC-9.3 — the refusal keeps no state, so it repeats unchanged
+  it('refuses the same request again, still writing nothing', async () => {
+    const { docsDir, repoRoot, service } = colliding()
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('spec-00002-clash', 'active')).rejects.toThrowError(ConflictError)
+    await expect(service.changeStatus('spec-00002-clash', 'active')).rejects.toThrowError(ConflictError)
+    expect(onDisk(docsDir, 'spec/first.md')).toBe(FIRST)
+    expect(onDisk(docsDir, 'spec/second.md')).toBe(SECOND)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00002-AC-9.4 — this is the repair path: edit by path, change the id, save
+  it('saves an edit addressed by the node path, writing that one file only', async () => {
+    const { docsDir, repoRoot, service } = colliding()
+    const base = service.read('spec/second.md')
+    const fixed = SECOND.replace('spec-00002-clash', 'spec-00003-apart')
+
+    const result = await service.save('spec/second.md', fixed, base.hash)
+
+    expect(result.committed).toBe(true)
+    expect(onDisk(docsDir, 'spec/second.md')).toBe(fixed)
+    expect(onDisk(docsDir, 'spec/first.md')).toBe(FIRST)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/second.md'])
+    // The collision is gone, so both are sound documents again.
+    expect(service.graph().nodes.map((node) => node.id)).toEqual(['spec-00002-clash', 'spec-00003-apart'])
+  })
+
+  // spec-00002-AC-8.8 — a scope landing on a colliding document is an unresolved gap
+  it('refuses to resolve a plan whose scope names an item of a colliding document', async () => {
+    const spec = doc(
+      { id: 'spec-00001-b', type: 'spec', status: 'active' },
+      [
+        '# Spec',
+        '',
+        '- **spec-00001-FR-1** (Event) the system shall do the thing',
+        '',
+        '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+        '  Given a board',
+        '  When it loads',
+        '  Then it works',
+        '',
+      ].join('\n'),
+    )
+    const { docsDir, service } = serviceOn({
+      'spec/b.md': spec,
+      'spec/clash.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# The other one\n'),
+      'plan/a.md': doc(
+        { id: 'plan-00001-y', type: 'plan', status: 'open', implements: '[spec-00001-FR-1]' },
+        '# Plan\n',
+      ),
+      'record/r.md': doc(
+        { id: 'record-00001-r', type: 'record', status: 'active', parent: 'plan-00001-y' },
+        ['# 验收记录', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', '| spec-00001-AC-1.1 | some.test.ts | pass |', ''].join('\n'),
+      ),
+    })
+
+    const refusal = await service.changeStatus('plan-00001-y', 'resolved').catch((error) => error)
+
+    expect(refusal).toBeInstanceOf(GateError)
+    expect(refusal.gaps).toEqual(['spec-00001-FR-1'])
+    expect(onDisk(docsDir, 'plan/a.md')).toContain('status: open')
+  })
+
+  /**
+   * rule-00001-BR-18 on the create path: the check asks about declared ids, not
+   * node keys. `findNode` alone would miss a colliding document and file a third
+   * one under the same id (design-00001 §2).
+   */
+  it('refuses to create a third document under an id two already collide on', async () => {
+    const { docsDir, service } = serviceOn({
+      'idea/first.md': doc({ id: 'idea-00001-clash', type: 'idea', status: 'draft' }, '# First\n'),
+      'idea/second.md': doc({ id: 'idea-00001-clash', type: 'idea', status: 'draft' }, '# Second\n'),
+    })
+
+    await expect(
+      service.create('idea-00001-clash', doc({ id: 'idea-00001-clash', type: 'idea', status: 'draft' }, '# Third\n')),
+    ).rejects.toThrowError(ConflictError)
+    expect(existsSync(join(docsDir, 'idea/idea-00001-clash.md'))).toBe(false)
+  })
+
+  // The collided number stays allocated, so the next create takes the one after it
+  it('allocates the number after the collided one', () => {
+    const { service } = serviceOn({
+      'idea/first.md': doc({ id: 'idea-00003-clash', type: 'idea', status: 'draft' }, '# First\n'),
+      'idea/second.md': doc({ id: 'idea-00003-clash', type: 'idea', status: 'draft' }, '# Second\n'),
+    })
+
+    expect(service.newDocument('idea').idPrefix).toBe('idea-00004-')
+  })
+})

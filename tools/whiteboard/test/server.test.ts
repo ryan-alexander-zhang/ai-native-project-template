@@ -139,6 +139,37 @@ describe('document reads', () => {
     expect(body.error).toMatch(/refresh the board/)
   })
 
+  /**
+   * spec-00002-AC-9.2 at the HTTP boundary. 409 rather than 422 is settled in
+   * design-00001 §2: the request collides with the state of the repo — this id
+   * points at no one document — and 422 stays the workflow's own refusal.
+   */
+  it('answers 409 for an id two documents declare, naming the files to fix', async () => {
+    const { call } = boardOn({
+      'idea/first.md': doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# First\n'),
+      'idea/second.md': doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Second\n'),
+    })
+
+    const { status, body } = await call('POST', '/api/docs/idea-00001-x/status', { to: 'active' })
+
+    expect(status).toBe(409)
+    expect(body.error).toMatch(/idea\/first\.md and idea\/second\.md; fix the id collision first/)
+  })
+
+  /** The node key of such a document is its path, and Express hands `%2F` back whole. */
+  it('serves a colliding document addressed by its encoded file path', async () => {
+    const second = doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Second\n')
+    const { call } = boardOn({
+      'idea/first.md': doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# First\n'),
+      'idea/second.md': second,
+    })
+
+    const { status, body } = await call('GET', `/api/docs/${encodeURIComponent('idea/second.md')}`)
+
+    expect(status).toBe(200)
+    expect(body.content).toBe(second)
+  })
+
   // spec-00001-AC-6.1
   it('serves the legal transitions', async () => {
     const { call } = boardOn({ 'idea/a.md': DRAFT_IDEA })

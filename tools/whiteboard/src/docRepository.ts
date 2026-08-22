@@ -11,9 +11,20 @@ const ID_PATTERN = /^([a-z]+)-(\d{5})-([a-z0-9]+(?:-[a-z0-9]+)*)$/
 const H1_PATTERN = /^#[ \t]+(.+?)[ \t]*$/m
 
 export interface DocNode {
-  /** Front matter id, or the repo-relative path when the document has none. */
+  /**
+   * The node key: the front matter id, or the repo-relative path when the
+   * document has none — and also when the id it declares is not its alone
+   * (spec-00002-FR-8), which is what `duplicateOf` then holds.
+   */
   id: string
   path: string
+  /**
+   * The id this document collides on, when two or more declare the same one
+   * (spec-00002-FR-8). Absent for every document whose id is its own. The label
+   * and the command palette need it, and it is how the «declared id» is read
+   * back out of a node that no longer carries it as a key.
+   */
+  duplicateOf?: string
   type?: string
   status?: string
   title: string
@@ -236,8 +247,38 @@ function unallowedFields(data: Record<string, unknown>, relations: string[], all
   )
 }
 
+/**
+ * spec-00002-FR-8: an id two or more documents declare is nobody's key. Each of
+ * them is re-keyed by its **file path** — the same treatment a document with no
+ * id at all already gets — marked anomalous, and given a problem naming the
+ * other files; the id they collided on is kept in `duplicateOf`.
+ *
+ * Three downstream behaviours follow from the re-keying alone, with no further
+ * test anywhere: the colliding id is no longer any node's key, so `knownIds`
+ * and `itemOwners` miss it and every edge aimed at it breaks
+ * (spec-00002-AC-8.6); `itemOwners` already skips a node that is not `ok`, so
+ * the items in these bodies are claimed by nobody; and presentation state is
+ * held by node key, which is now the path, so a refresh puts the selection back
+ * on the same file (spec-00002-AC-8.9).
+ */
+function markDuplicates(nodes: DocNode[]): DocNode[] {
+  const filesById = new Map<string, string[]>()
+  for (const node of nodes) filesById.set(node.id, [...(filesById.get(node.id) ?? []), node.path])
+  return nodes.map((node) => {
+    const others = filesById.get(node.id)!.filter((path) => path !== node.path)
+    if (others.length === 0) return node
+    return {
+      ...node,
+      id: node.path,
+      duplicateOf: node.id,
+      ok: false,
+      problems: [...node.problems, `id ${JSON.stringify(node.id)} is also declared by ${others.join(', ')}`],
+    }
+  })
+}
+
 function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
-  const nodes = docs.map((doc) => toNode(doc, config))
+  const nodes = markDuplicates(docs.map((doc) => toNode(doc, config)))
   const knownIds = new Set(nodes.filter((node) => node.ok).map((node) => node.id))
   const owners = itemOwners(docs, nodes)
   const edges = nodes.flatMap((node) => toEdges(node, knownIds, owners))
@@ -309,6 +350,21 @@ export function findNode(graph: DocGraph, id: string): DocNode | undefined {
   return graph.nodes.find((node) => node.id === id)
 }
 
+/**
+ * The id a document declares, which is its node key unless it collides with
+ * another document's (design-00001 §2 治理轮). Anything counting ids rather
+ * than nodes has to read them this way, or a collided number falls out of the
+ * count and gets handed out a second time.
+ */
+export function declaredId(node: DocNode): string {
+  return node.duplicateOf ?? node.id
+}
+
+/** The files declaring `id`, when more than one does; empty when the id is somebody's own. */
+export function collidingPaths(graph: DocGraph, id: string): string[] {
+  return graph.nodes.filter((node) => node.duplicateOf === id).map((node) => node.path)
+}
+
 export interface DocId {
   type: string
   number: number
@@ -325,10 +381,16 @@ export function parseDocId(id: string): DocId | undefined {
   return match ? { type: match[1]!, number: Number(match[2]), slug: match[3]! } : undefined
 }
 
-/** Highest five-digit number already used by documents of `type`, or 0 when there are none. */
+/**
+ * Highest five-digit number already used by documents of `type`, or 0 when
+ * there are none. Counted over **declared** ids, never node keys: a colliding
+ * document is keyed by its path, which matches no id pattern, so counting keys
+ * would drop its number from the tally and allocate it again — turning two
+ * documents sharing an id into three (rule-00001-BR-18).
+ */
 export function highestNumber(graph: DocGraph, type: string): number {
   const numbers = graph.nodes
-    .map((node) => ID_PATTERN.exec(node.id))
+    .map((node) => ID_PATTERN.exec(declaredId(node)))
     .filter((match) => match?.[1] === type)
     .map((match) => Number(match![2]))
   return numbers.length === 0 ? 0 : Math.max(...numbers)

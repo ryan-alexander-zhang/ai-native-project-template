@@ -235,7 +235,7 @@ describe('addressing a document whose key is a file path', () => {
     await api.setStatus(PATH_KEY, 'active')
     await api.accept(PATH_KEY)
 
-    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+    expect(fetchMock.mock.calls.map(([url]: unknown[]) => url)).toEqual([
       `/api/docs/${ENCODED}/items`,
       `/api/docs/${ENCODED}/transitions`,
       `/api/docs/${ENCODED}/next-steps`,

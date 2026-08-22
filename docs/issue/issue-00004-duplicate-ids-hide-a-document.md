@@ -1,7 +1,7 @@
 ---
 id: issue-00004-duplicate-ids-hide-a-document
 type: issue
-status: open
+status: resolved
 blocks: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, plan-00012-whiteboard-governance-gates]
 ---
 
@@ -68,19 +68,22 @@ blocks: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, plan-0001
 
 ## 5. Reproduction (test-first)
 
-**尚未落地**——本 issue 保持 `open`，修复推迟（见 §6）。修复时先写下面这条：
+计划的两条已随修复落地为回归护栏（见 §7）：
 
-- `test/docRepository.test.ts::flags two documents sharing an id` —— 两个文件写
-  同一个 id，断言两个节点都 `ok: false`、`problems` 含撞 id 的说明，且 `issues`
-  里两条各自指向**自己的**文件路径。
-- 以及 `web/test/canvas.test.tsx` 一条：两份同 id 文档在画布上产出两个节点（
-  或按裁定的呈现方式），而不是一个。
-- 复现观察点已实测过（本 issue §1 的三条结论均来自一次真实渲染），只是回归测试
-  随修复一起落地。
+- `test/docRepository.test.ts` 的 `describe('documents that collide on an id')`
+  —— 两个文件写同一个 id，断言两个节点都 `ok: false`、`problems` 各自点名对方
+  的文件路径、节点键各是自己的路径。
+- `web/test/board.test.tsx` 的节点标签用例与 `web/test/canvas.test.tsx` 的命令
+  面板用例：两份同 id 文档产出两个各自可定位的节点，而不是一个。
+- 复现观察点已实测过（本 issue §1 的三条结论均来自一次真实渲染）。
 
 ## 6. Fix
 
-- **本次不修**。它先于本轮改动存在，且需要一次产品裁定：撞 id 的两份文档在
+- **裁定已作出，修复已落地**（`spec-00002-FR-8`/`FR-9`）：两份都标异常各占
+  一格，节点键改用文件路径；异常清单的「id 不唯一」由 `spec-00002-FR-8` 承载
+  （它沿用 `spec-00001-FR-2` 的异常语义，不改写 `spec-00001`）。以下为当时
+  推迟的记录，保留原文。
+- ~~**本次不修**~~。它先于本轮改动存在，且需要一次产品裁定：撞 id 的两份文档在
   白板上如何呈现——两个都标异常各占一格（`type` 相同，故同列上下），还是合成
   一处并列出冲突路径。裁定后 `spec-00001-FR-2` 的异常清单需加入「id 不唯一」，
   并补对应 AC。
@@ -95,7 +98,31 @@ blocks: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, plan-0001
 
 ## 7. Verification
 
-未修复。`open` 期间的现状即 §1 所述。
+已修复并验证（`spec-00002-FR-8`/`FR-9`，`plan-00012` T4）。裁定落在
+`spec-00002-FR-8`：**两个都标异常各占一格**，节点键改用文件路径。
+
+- `docRepository.buildGraph` 在 `docs.map(toNode)` 之后过一遍 `markDuplicates`：
+  凡一个 id 落在两份及以上文件上，每一份都改以**文件路径**为节点键、置
+  `ok = false`、problem 点名其余同 id 文件，并记下 `duplicateOf`。§5 计划的
+  `test/docRepository.test.ts` 那条落地为
+  `describe('documents that collide on an id')`，覆盖 `AC-8.1`…`AC-8.3`、
+  `AC-8.6`、`AC-8.10`、`AC-8.11`。
+- §4 扫到的下游因改键而自动收敛：`knownIds` 与 `itemOwners` 都命不中那个撞的
+  id，指向它的边判为断链；`findNode` 不再「取第一个」——它一个也取不到，
+  `DocService.require` 因此改为先查 `duplicateOf` 并抛 `ConflictError`（409，
+  消息要求先修复 id 冲突），动作再也落不到看不见的那一份上（`AC-9.2`、
+  `AC-9.3`）。
+- §4 判为「no」的 `highestNumber`/`allocateNumber` 因改键**反转成 yes**并一并
+  修掉：取号按「声明的 id」＝`duplicateOf ?? id` 数，撞掉的编号不会被再发一次
+  （`rule-00001-BR-18`）；`DocService.create` 的存在性校验同样按它判。
+- 前端：`matchDocuments` 加匹配 `duplicateOf`（`AC-8.4`、`AC-8.5`），
+  `NodeCard` 第四行并列路径与撞的 id（`AC-8.1`）。呈现状态按节点键即路径保持
+  （`AC-8.9`）。按路径寻址的编辑保存照常落盘，这就是修复通路（`AC-9.4`）——
+  它依赖 `issue-00016` 先补上 URL 编码。
+
+§5 计划的画布那条以 `web/test/board.test.tsx` 的节点标签用例与
+`web/test/canvas.test.tsx` 的命令面板用例落地：两份同 id 文档产出两个各自可
+定位的节点，不再是一个。
 
 ## 8. Follow-through
 

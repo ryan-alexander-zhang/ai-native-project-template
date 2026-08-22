@@ -427,6 +427,31 @@ describe('matchDocuments', () => {
     const anomalous = node({ id: 'prd/broken.md', ok: false, problems: ['front matter is missing'] })
     expect(matchDocuments([anomalous], 'broken').map((n) => n.id)).toEqual(['prd/broken.md'])
   })
+
+  /**
+   * The two sides of an id collision (spec-00002-FR-8): each is keyed by its own
+   * path, and both carry the id they collided on, so the palette reaches them
+   * either way — one by path, both by the id.
+   */
+  describe('a document that collides on its id', () => {
+    const clashing = [
+      node({ id: 'spec/first.md', path: 'spec/first.md', duplicateOf: 'spec-00002-clash', ok: false, title: 'The first' }),
+      node({ id: 'spec/second.md', path: 'spec/second.md', duplicateOf: 'spec-00002-clash', ok: false, title: 'The second' }),
+    ]
+
+    // spec-00002-AC-8.4 — both come up, each still going to its own node
+    it('matches every file declaring the colliding id', () => {
+      expect(matchDocuments(clashing, 'spec-00002-clash').map((n) => n.id)).toEqual([
+        'spec/first.md',
+        'spec/second.md',
+      ])
+    })
+
+    // spec-00002-AC-8.5
+    it('matches only the one file a path fragment names', () => {
+      expect(matchDocuments(clashing, 'second').map((n) => n.id)).toEqual(['spec/second.md'])
+    })
+  })
 })
 
 describe('the board', () => {

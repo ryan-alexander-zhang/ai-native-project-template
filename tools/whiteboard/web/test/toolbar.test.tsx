@@ -77,6 +77,34 @@ describe('the floating toolbar', () => {
     expect(screen.queryByLabelText('Advance to the next step')).toBeNull()
   })
 
+  /**
+   * spec-00002-AC-9.1: a node that collides on its id is an anomalous node and
+   * nothing more — spec-00001-FR-2 already rules its toolbar, so FR-9 adds no
+   * presentation of its own. The editor it keeps addresses the node's own file
+   * path, which is the repair path (spec-00002-FR-9 b).
+   */
+  it('offers a colliding document the same editor-only toolbar', () => {
+    renderToolbar({
+      node: {
+        ...NODE,
+        id: 'spec/second.md',
+        path: 'spec/second.md',
+        type: 'spec',
+        duplicateOf: 'spec-00002-clash',
+        ok: false,
+        problems: ['id "spec-00002-clash" is also declared by spec/first.md'],
+      },
+    })
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
+    expect(screen.getByLabelText('Relations')).toBeTruthy()
+    expect(screen.queryByLabelText('Change status')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
+    expect(screen.queryByLabelText('Advance to the next step')).toBeNull()
+  })
+
   // spec-00001-AC-30.4
   it('says there are no relations rather than showing an empty list', async () => {
     renderToolbar({ relations: [] })

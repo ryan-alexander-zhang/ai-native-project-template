@@ -110,6 +110,35 @@ describe('a node on the canvas', () => {
     const { container } = renderCard({ node: node(), selected: false })
     expect(container.querySelector('.node--suppressed')).toBeNull()
   })
+
+  /**
+   * A node that collides on its id (spec-00002-AC-8.1, design-00002 §4): it is
+   * an anomalous node like any other — same border, same badge, same popover —
+   * and the one difference is the fourth line, which shows the file path the
+   * node is keyed by and the id it collided on beside it. Both have to be
+   * there: the path tells the two files apart, the id says what they collided on.
+   */
+  it('shows the file path and the colliding id of a duplicated document', async () => {
+    const clashing = node({
+      id: 'spec/second.md',
+      path: 'spec/second.md',
+      duplicateOf: 'spec-00002-clash',
+      ok: false,
+      problems: ['id "spec-00002-clash" is also declared by spec/first.md'],
+    })
+    renderCard({ node: clashing, selected: false })
+
+    expect(screen.getByText('spec/second.md')).toBeTruthy()
+    expect(screen.getByText('spec-00002-clash')).toBeTruthy()
+
+    await userEvent.click(screen.getByLabelText('Front matter problems of spec/second.md'))
+    expect(screen.getByText('id "spec-00002-clash" is also declared by spec/first.md')).toBeTruthy()
+  })
+
+  it('shows no second id on a document whose id is its own', () => {
+    renderCard({ node: node(), selected: false })
+    expect(screen.getByText('prd-00001-x').textContent).toBe('prd-00001-x')
+  })
 })
 
 // spec-00001-AC-1.1, AC-1.2 and AC-1.6 … AC-1.9 (decision-00002 §2)

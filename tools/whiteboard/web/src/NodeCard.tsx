@@ -77,7 +77,18 @@ export function NodeCard({ node, selected, kind, suppressed = false }: NodeCardP
       </div>
 
       <div className="line-clamp-2 text-[13px] leading-tight font-semibold">{node.title}</div>
-      <div className="text-muted-foreground truncate font-mono text-[10px]">{node.id}</div>
+      {/*
+        The key, and — for a node that collides on its id — the id it collides
+        on beside it (spec-00002-AC-8.1, design-00002 §4). Both have to be
+        there: without the path there is no telling the two files apart, and
+        without the id there is no seeing what they collided on.
+      */}
+      <div className="text-muted-foreground truncate font-mono text-[10px]">
+        {node.id}
+        {node.duplicateOf === undefined ? null : (
+          <span className="text-destructive ml-1.5">{node.duplicateOf}</span>
+        )}
+      </div>
 
       {node.ok ? null : (
         <Popover>
