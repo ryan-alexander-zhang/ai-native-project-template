@@ -107,7 +107,7 @@ describe('readGraph', () => {
     expect(broken.id).toBe('prd/broken.md')
     expect(broken.problems).toEqual(['front matter is missing'])
     expect(graph.nodes.find((node) => node.id === 'idea-00001-whiteboard')!.ok).toBe(true)
-    expect(graph.issues).toEqual([{ path: 'prd/broken.md', message: 'front matter is missing' }])
+    expect(graph.issues).toEqual([{ path: 'prd/broken.md', nodeId: 'prd/broken.md', message: 'front matter is missing' }])
   })
 
   it('marks a document whose front matter is not valid YAML', () => {
@@ -124,7 +124,7 @@ describe('readGraph', () => {
       relationEdge('prd-00001-whiteboard', 'idea-09999-ghost', 'parent', false),
     ])
     expect(graph.issues).toEqual([
-      { path: 'prd/b.md', message: 'parent points at unknown document "idea-09999-ghost"' },
+      { path: 'prd/b.md', nodeId: 'prd-00001-whiteboard', message: 'parent points at unknown document "idea-09999-ghost"' },
     ])
     expect(graph.nodes.every((node) => node.ok)).toBe(true)
   })
@@ -214,7 +214,7 @@ describe('readGraph', () => {
       relationEdge('record-00001-acceptance', 'spec-00001-FR-999', 'verifies', false, ['spec-00001-FR-999']),
     ])
     expect(graph.issues).toEqual([
-      { path: 'record/r.md', message: 'verifies points at unknown document "spec-00001-FR-999"' },
+      { path: 'record/r.md', nodeId: 'record-00001-acceptance', message: 'verifies points at unknown document "spec-00001-FR-999"' },
     ])
   })
 

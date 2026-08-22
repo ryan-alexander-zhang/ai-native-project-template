@@ -98,7 +98,7 @@ describe('the diagnostics of the whole tree', () => {
     })
 
     expect(graph.diagnostics).toHaveLength(1)
-    expect(graph.issues).toEqual([{ path: 'prd/broken.md', message: 'front matter is missing' }])
+    expect(graph.issues).toEqual([{ path: 'prd/broken.md', nodeId: 'prd/broken.md', message: 'front matter is missing' }])
   })
 
   it('reads no items and so no diagnostics from a type that declares none', () => {

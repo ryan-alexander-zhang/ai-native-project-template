@@ -131,7 +131,7 @@ describe('markProduct', () => {
 
     expect(marked.nodes[0]!.ok).toBe(false)
     expect(marked.nodes[0]!.problems).toContain('parent does not point at idea-00001-x')
-    expect(marked.issues).toEqual([{ path: 'prd/b.md', message: 'parent does not point at idea-00001-x' }])
+    expect(marked.issues).toEqual([{ path: 'prd/b.md', nodeId: 'prd-00002-new', message: 'parent does not point at idea-00001-x' }])
   })
 
   it('marks only the produced node, leaving its neighbours untouched', () => {
@@ -153,6 +153,6 @@ describe('markProduct', () => {
 
   it('falls back to the document id when the node is not in the graph', () => {
     const marked = markProduct(graphOf({}), 'prd-00002-ghost', ['it vanished'])
-    expect(marked.issues).toEqual([{ path: 'prd-00002-ghost', message: 'it vanished' }])
+    expect(marked.issues).toEqual([{ path: 'prd-00002-ghost', nodeId: 'prd-00002-ghost', message: 'it vanished' }])
   })
 })

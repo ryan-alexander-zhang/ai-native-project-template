@@ -46,6 +46,13 @@ export interface DocEdge {
 
 export interface GraphIssue {
   path: string
+  /**
+   * The node this anomaly is located to (spec-00002-FR-15, design-00001 §7).
+   * A node's own problem carries its key; a broken edge carries the **declaring**
+   * node's — a broken link is repaired where it was declared
+   * (spec-00002-AC-13.4, AC-15.4).
+   */
+  nodeId: string
   message: string
 }
 
@@ -284,11 +291,12 @@ function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
   const edges = nodes.flatMap((node) => toEdges(node, knownIds, owners))
 
   const issues: GraphIssue[] = [
-    ...nodes.flatMap((node) => node.problems.map((message) => ({ path: node.path, message }))),
+    ...nodes.flatMap((node) => node.problems.map((message) => ({ path: node.path, nodeId: node.id, message }))),
     ...edges
       .filter((edge) => !edge.ok)
       .map((edge) => ({
         path: nodes.find((node) => node.id === edge.from)!.path,
+        nodeId: edge.from,
         message: `${edge.relation} points at unknown document ${JSON.stringify(edge.to)}`,
       })),
   ]

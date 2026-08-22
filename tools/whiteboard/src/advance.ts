@@ -92,6 +92,7 @@ export function markProduct(graph: DocGraph, docId: string, problems: string[]):
       ...graph.issues,
       ...problems.map((message) => ({
         path: graph.nodes.find((node) => node.id === docId)?.path ?? docId,
+        nodeId: docId,
         message,
       })),
     ],

@@ -42,6 +42,7 @@ import { CommandPalette } from './CommandPalette.tsx'
 import { CoverageView } from './CoverageView.tsx'
 import { CreateDialog } from './CreateDialog.tsx'
 import { Details } from './Details.tsx'
+import { DiagnosticList, IssueList } from './Drilldowns.tsx'
 import { Editor } from './Editor.tsx'
 import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
@@ -94,6 +95,10 @@ function Canvas() {
   const [searching, setSearching] = useState(false)
   const [creating, setCreating] = useState(false)
   const [history, setHistory] = useState(false)
+  // The two top-bar counts each open a list of their own; the two never mix
+  // (spec-00002-FR-13, FR-14).
+  const [issuesOpen, setIssuesOpen] = useState(false)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const [inspecting, setInspecting] = useState<string>()
   // The document whose sub-canvas has taken the canvas over (spec-00001-FR-35);
   // `undefined` is the top-level board.
@@ -333,24 +338,35 @@ function Canvas() {
               session running
             </Button>
           ) : null}
+          {/*
+            The count is the way into the list (spec-00002-FR-13): above zero
+            the badge wraps a real button, so it is reached by Tab and fired by
+            Enter. At zero there is nothing to list, and the wording stays what
+            it was (spec-00002-AC-13.2).
+          */}
           {board.graph.issues.length === 0 ? (
             <span className="text-muted-foreground text-xs">no issues</span>
           ) : (
-            <Badge variant="destructive" className="gap-1 text-xs">
-              <TriangleAlert className="size-3" aria-hidden />
-              {board.graph.issues.length} issues
+            <Badge variant="destructive" className="gap-1 text-xs" asChild>
+              <button type="button" aria-label="Open the anomaly list" onClick={() => setIssuesOpen(true)}>
+                <TriangleAlert className="size-3" aria-hidden />
+                {board.graph.issues.length} issues
+              </button>
             </Badge>
           )}
           {/*
             A count of its own, next to the anomaly count and never folded into
             it: a diagnostic is a reading that drifted, not a broken document,
             so it takes the outline variant and disappears at zero
-            (spec-00001-FR-40, AC-40.3/AC-40.5; design-00002 §9).
+            (spec-00001-FR-40, AC-40.3/AC-40.5; design-00002 §9). Zero therefore
+            leaves nothing to click, which is all spec-00002-AC-14.2 asks.
           */}
           {board.graph.diagnostics.length === 0 ? null : (
-            <Badge variant="outline" className="gap-1 text-xs">
-              <FileWarning className="size-3" aria-hidden />
-              {board.graph.diagnostics.length} diagnostics
+            <Badge variant="outline" className="gap-1 text-xs" asChild>
+              <button type="button" aria-label="Open the diagnostics list" onClick={() => setDiagnosticsOpen(true)}>
+                <FileWarning className="size-3" aria-hidden />
+                {board.graph.diagnostics.length} diagnostics
+              </button>
             </Badge>
           )}
           <ThemeMenu theme={theme.theme} onChoose={theme.choose} />
@@ -504,6 +520,27 @@ function Canvas() {
         // refused by `select` with its own toast (spec-00002-AC-12.5).
         onPick={(docId) => {
           board.showCoverage(false)
+          focus(docId)
+        }}
+      />
+      {/* Each list closes on its way to the node it names (spec-00002-FR-15);
+          `focus` is the same path the palette and the relation list take. */}
+      <IssueList
+        open={issuesOpen}
+        onOpenChange={setIssuesOpen}
+        issues={board.graph.issues}
+        nodes={board.graph.nodes}
+        onPick={(nodeId) => {
+          setIssuesOpen(false)
+          focus(nodeId)
+        }}
+      />
+      <DiagnosticList
+        open={diagnosticsOpen}
+        onOpenChange={setDiagnosticsOpen}
+        diagnostics={board.graph.diagnostics}
+        onPick={(docId) => {
+          setDiagnosticsOpen(false)
           focus(docId)
         }}
       />

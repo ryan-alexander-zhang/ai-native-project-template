@@ -742,7 +742,7 @@ describe('the board', () => {
   it('counts the issues it found', async () => {
     vi.spyOn(api, 'graph').mockResolvedValue({
       ...GRAPH,
-      issues: [{ path: 'prd/a.md', message: 'front matter is missing' }],
+      issues: [{ path: 'prd/a.md', nodeId: 'prd-00001-x', message: 'front matter is missing' }],
       diagnostics: [],
     })
     render(<Board />)
@@ -754,7 +754,7 @@ describe('the board', () => {
   it('counts the parse diagnostics apart from the anomalies', async () => {
     vi.spyOn(api, 'graph').mockResolvedValue({
       ...GRAPH,
-      issues: [{ path: 'prd/a.md', message: 'front matter is missing' }],
+      issues: [{ path: 'prd/a.md', nodeId: 'prd-00001-x', message: 'front matter is missing' }],
       diagnostics: [
         { docId: 'spec-00001-x', kind: 'item-shape', line: 4, text: '**spec-00001-FR-2** drifted' },
         { docId: 'spec-00001-x', kind: 'checklist-row', recordId: 'record-00001-x', line: 9, text: '| a … b |' },
