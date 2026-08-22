@@ -130,6 +130,132 @@ describe('the promotion gate', () => {
     expect(onDisk(docsDir, 'plan/a.md')).toBe(file)
     expect(commitCount(repoRoot)).toBe(before)
   })
+
+  // spec-00002-AC-1.3
+  it('names the unresolved open questions in the refusal', async () => {
+    const { service } = serviceOn({ 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, OPEN_QUESTIONS) })
+
+    await expect(service.changeStatus('spec-00001-b', 'active')).rejects.toThrowError(
+      /spec-00001-b has unresolved open questions/,
+    )
+  })
+
+  // spec-00002-AC-1.4 — the gate is a pure reading, so it leaves nothing behind to weaken it
+  it('refuses the same promotion again, still writing nothing', async () => {
+    const file = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, OPEN_QUESTIONS)
+    const { docsDir, repoRoot, service } = serviceOn({ 'spec/b.md': file })
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('spec-00001-b', 'active')).rejects.toThrowError(WorkflowError)
+    await expect(service.changeStatus('spec-00001-b', 'active')).rejects.toThrowError(WorkflowError)
+    expect(onDisk(docsDir, 'spec/b.md')).toBe(file)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00002-AC-1.5
+  it('promotes a draft that has no open questions section at all', async () => {
+    const { service } = serviceOn({ 'design/d.md': doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# D\n') })
+
+    expect((await service.changeStatus('design-00001-d', 'active')).status).toBe('active')
+  })
+
+  // spec-00002-AC-1.6 — a section whose questions are all closed carries no list item
+  it('promotes a draft whose open questions section holds no list item', async () => {
+    const body = '# X\n\n## Open Questions\n\nnothing left to ask.\n'
+    const { service } = serviceOn({ 'prd/a.md': doc({ id: 'prd-00001-x', type: 'prd', status: 'draft' }, body) })
+
+    expect((await service.changeStatus('prd-00001-x', 'active')).status).toBe('active')
+  })
+
+  // spec-00002-AC-1.7 — one reading, so the two paths cannot disagree
+  it('refuses on the status path what the accept path already refused', async () => {
+    const { service } = serviceOn({ 'prd/a.md': doc({ id: 'prd-00001-x', type: 'prd', status: 'draft' }, OPEN_QUESTIONS) })
+
+    await expect(service.review('prd-00001-x', { action: 'accept' })).rejects.toThrowError(
+      /unresolved open questions/,
+    )
+    await expect(service.changeStatus('prd-00001-x', 'active')).rejects.toThrowError(
+      /unresolved open questions/,
+    )
+  })
+})
+
+/**
+ * spec-00002-FR-2: which transitions the promotion gate is none of the business
+ * of. Each of these carries unresolved open questions and goes through all the
+ * same — the gate reads the target status, not the presence of questions.
+ */
+describe('transitions the promotion gate leaves alone', () => {
+  const OPEN_QUESTIONS = '# Doc\n\n## Open Questions\n\n- still unanswered?\n'
+
+  // spec-00002-AC-2.1
+  it('lets a draft work item reach wontfix', async () => {
+    const { service } = serviceOn({ 'issue/i.md': doc({ id: 'issue-00001-i', type: 'issue', status: 'draft' }, OPEN_QUESTIONS) })
+
+    expect((await service.changeStatus('issue-00001-i', 'wontfix')).status).toBe('wontfix')
+  })
+
+  // spec-00002-AC-2.2 — the revision round goes the other way, so it is no promotion
+  it('lets an active living doc go back to draft', async () => {
+    const { service } = serviceOn({ 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }, OPEN_QUESTIONS) })
+
+    expect((await service.changeStatus('spec-00001-b', 'draft')).status).toBe('draft')
+  })
+
+  // spec-00002-AC-2.3
+  it('lets a draft reach archived when another document supersedes it', async () => {
+    const { service } = serviceOn({
+      'design/d.md': doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, OPEN_QUESTIONS),
+      'design/e.md': doc(
+        { id: 'design-00002-e', type: 'design', status: 'active', supersedes: '[design-00001-d]' },
+        '# E\n',
+      ),
+    })
+
+    expect((await service.changeStatus('design-00001-d', 'archived')).status).toBe('archived')
+  })
+
+  // spec-00002-AC-2.4
+  it('lets an open plan whose scope is verified reach resolved', async () => {
+    const spec = doc(
+      { id: 'spec-00001-b', type: 'spec', status: 'active' },
+      [
+        '# Spec',
+        '',
+        '- **spec-00001-FR-1** (Event) the system shall do the thing',
+        '',
+        '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+        '  Given a board',
+        '  When it loads',
+        '  Then it works',
+        '',
+      ].join('\n'),
+    )
+    const { service } = serviceOn({
+      'spec/b.md': spec,
+      'plan/a.md': doc(
+        { id: 'plan-00001-y', type: 'plan', status: 'open', implements: '[spec-00001-FR-1]' },
+        OPEN_QUESTIONS,
+      ),
+      'record/r.md': doc(
+        { id: 'record-00001-r', type: 'record', status: 'active', parent: 'plan-00001-y' },
+        ['# 验收记录', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', '| spec-00001-AC-1.1 | some.test.ts | pass |', ''].join('\n'),
+      ),
+    })
+
+    expect((await service.changeStatus('plan-00001-y', 'resolved')).status).toBe('resolved')
+  })
+
+  // spec-00002-AC-2.5 — rule-00001-BR-12 does not roll a promoted document back
+  it('leaves an already active document active when questions appear under it', () => {
+    const spec = doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }, '# Spec\n')
+    const { docsDir, service } = serviceOn({ 'spec/b.md': spec })
+    writeFileSync(join(docsDir, 'spec/b.md'), doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }, OPEN_QUESTIONS))
+
+    service.invalidate()
+
+    expect(service.graph().nodes.find((node) => node.id === 'spec-00001-b')?.status).toBe('active')
+  })
 })
 
 describe('review', () => {

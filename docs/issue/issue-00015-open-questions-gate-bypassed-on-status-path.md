@@ -1,7 +1,7 @@
 ---
 id: issue-00015-open-questions-gate-bypassed-on-status-path
 type: issue
-status: open
+status: resolved
 blocks: [spec-00002-whiteboard-governance, plan-00012-whiteboard-governance-gates]
 ---
 
@@ -113,7 +113,20 @@ AssertionError: promise resolved "{ committed: true, status: 'open' }" instead o
 
 ## 7. Verification
 
-未修复。`draft` 期间的现状即 §1 所述。
+已修复并验证。`DocService.changeStatus`（`tools/whiteboard/src/docService.ts`）
+在 `applyStatusChange` 算出新正文之后、唯一那次写盘之前调
+`assertQuestionsResolved`，与 `assertScopeVerified`（resolved 门）并排；判定调
+的是 `workflow.hasOpenQuestions`——`applyAccept` 用的同一个函数、同一个整文件
+入参，故两条通路不可能给出不同结论。守卫条件写成「来源为 `draft` 且目标等于
+`statusRules.promotedStatus(kind)`」，`draft → wontfix`、`draft → archived`、
+`open → resolved` 与 `active → draft` 因此都不经此门（`spec-00002-FR-2`）。
+
+§5 的两条测试转绿；`docService.test.ts` 的
+`describe('the promotion gate')` 另覆盖拒绝消息点名（`AC-1.3`）、重复请求仍
+被拒且不写盘（`AC-1.4`）、无 Open Questions 小节与小节空无列表项照常促进
+（`AC-1.5`、`AC-1.6`）、接收被拒后状态通路同样被拒（`AC-1.7`）；
+`describe('transitions the promotion gate leaves alone')` 覆盖不经本门的四条
+流转与「已促进文档不回退」（`AC-2.1`…`AC-2.5`）。
 
 ## 8. Follow-through
 

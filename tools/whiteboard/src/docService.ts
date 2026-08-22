@@ -17,6 +17,7 @@ import { type ActionKind, type CommitOutcome, type DirtySnapshot, GitLayer, comm
 import { type ItemsView, declaresItems, requirementView } from './requirements.ts'
 import { itemCoverage, resolvedGaps } from './resolvedGate.ts'
 import type { SessionPlan } from './sessionManager.ts'
+import { promotedStatus } from './statusRules.ts'
 import {
   askInstruction,
   auditInstruction,
@@ -36,6 +37,7 @@ import {
   assertAuditable,
   assertClarifiable,
   assertEntryType,
+  hasOpenQuestions,
   idPrefix,
   nextStepsFor,
   transitionsFor,
@@ -204,14 +206,42 @@ export class DocService {
     }
   }
 
-  /** spec-00001-FR-6 and FR-7, with the resolved gate of FR-52 between the ruling and the write. */
+  /**
+   * spec-00001-FR-6 and FR-7, with every gate between the ruling and the write.
+   * The order is fixed (design-00001 §6): the transition table, then the
+   * promotion gate, the archive gate and the resolved gate. The three are
+   * mutually exclusive, so the order changes no verdict — it is fixed for the
+   * cost gradient and for a message the tests can predict. All of them run on
+   * the new body held in memory, before the one `writeFileSync`, which is what
+   * makes a refusal leave neither a half-written file nor a commit.
+   */
   async changeStatus(id: string, to: string): Promise<ActionResult> {
     const graph = this.graph()
     const node = this.require(id, graph)
     const current = this.readOrConflict(node)
     const updated = applyStatusChange(current.content, node, this.config, to)
+    this.assertQuestionsResolved(node, to, current.content)
     this.assertScopeVerified(node, to, graph)
     return { ...(await this.write(node, updated, 'status')), status: to }
+  }
+
+  /**
+   * spec-00002-FR-1 and FR-2 with rule-00001-BR-12 (issue-00015): a draft
+   * carrying unresolved open questions is not promoted out of `draft`, whichever
+   * action asks for it. The reading is `workflow.hasOpenQuestions` — the very
+   * function `applyAccept` calls, on the same whole-file content — so the two
+   * paths cannot reach different verdicts (spec-00002-AC-1.7).
+   *
+   * The condition is «the target is the promoted status», not «the target is not
+   * draft»: `draft → archived`, a work item's `draft → wontfix` and
+   * `open → resolved`, and a living doc's `active → draft` revision round are
+   * therefore none of this gate's business (spec-00002-FR-2).
+   */
+  private assertQuestionsResolved(node: DocNode, to: string, content: string): void {
+    if (node.status !== 'draft' || to !== promotedStatus(this.config.types[node.type!]!)) return
+    if (hasOpenQuestions(content)) {
+      throw new WorkflowError(`${node.id} has unresolved open questions and cannot be promoted to ${to}`)
+    }
   }
 
   /**
