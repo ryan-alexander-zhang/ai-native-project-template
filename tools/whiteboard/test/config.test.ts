@@ -365,13 +365,18 @@ describe('the config shipped with this repo', () => {
   })
 
   /**
-   * rule-00001-BR-26: the flow entry types this repo opens the create entry to —
-   * idea and prd, the two ways docs/README.md says a project enters the flow.
+   * rule-00001-BR-26: the four flow entry types this repo opens the create entry
+   * to, in two segments — idea and prd are the product flow's starters, the two
+   * ways docs/README.md says a project enters the flow; design and analysis are
+   * the upstream-less thinking carriers the rule's 第十四轮 revision added, which
+   * may exist before any spec and so need no advance to produce them.
    */
-  it('declares idea and prd as the flow entry types', () => {
+  it('declares four flow entry types: the two product-flow starters and the two thinking carriers', () => {
     expect(loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname).entry).toEqual([
       'idea',
       'prd',
+      'design',
+      'analysis',
     ])
   })
 
