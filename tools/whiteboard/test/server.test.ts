@@ -30,12 +30,15 @@ vi.setConfig({ testTimeout: 30_000 })
  * *submitted*: its last line stays in the terminal's line buffer until the Enter
  * that follows the CLI's first output arrives (issue-00011).
  */
-const SUBMITTED_TAIL = `got:${taskInstruction({
-  targetType: 'prd',
-  idPrefix: 'prd-00001-',
-  carry: 'parent',
-  sourceId: 'idea-00001-x',
-})
+const SUBMITTED_TAIL = `got:${taskInstruction(
+  {
+    targetType: 'prd',
+    idPrefix: 'prd-00001-',
+    carry: 'parent',
+    sourceId: 'idea-00001-x',
+  },
+  'idea/idea-00001-x.md',
+)
   .split('\n')
   .at(-1)}`
 

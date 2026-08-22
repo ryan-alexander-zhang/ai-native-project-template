@@ -10,6 +10,7 @@ const EXPECTATION: Expectation = {
   carry: 'parent',
   sourceId: 'idea-00001-x',
 }
+const SOURCE_PATH = 'idea/idea-00001-x.md'
 
 function graphOf(files: Record<string, string>) {
   return readGraph(makeDocsDir(files), config)
@@ -18,7 +19,7 @@ function graphOf(files: Record<string, string>) {
 // spec-00001-AC-11.2
 describe('taskInstruction', () => {
   it('names the target type, the fixed id number, and the relation to the source', () => {
-    const instruction = taskInstruction(EXPECTATION)
+    const instruction = taskInstruction(EXPECTATION, SOURCE_PATH)
 
     expect(instruction).toContain('Write one new prd document')
     expect(instruction).toContain('prd-00002-<slug>')
@@ -26,7 +27,7 @@ describe('taskInstruction', () => {
   })
 
   it('points at the folder template and readme and pins the status', () => {
-    const instruction = taskInstruction(EXPECTATION)
+    const instruction = taskInstruction(EXPECTATION, SOURCE_PATH)
 
     expect(instruction).toContain('prd/TEMPLATE.md')
     expect(instruction).toContain('prd/README.md')
@@ -35,7 +36,7 @@ describe('taskInstruction', () => {
 
   /** spec-00001-FR-41: the item grammar travels with the brief, or not at all. */
   function instructionFor(targetType: string): string {
-    return taskInstruction({ ...EXPECTATION, targetType, idPrefix: `${targetType}-00002-` })
+    return taskInstruction({ ...EXPECTATION, targetType, idPrefix: `${targetType}-00002-` }, SOURCE_PATH)
   }
 
   // spec-00001-AC-41.1
@@ -70,6 +71,25 @@ describe('taskInstruction', () => {
       expect(instructionFor(targetType)).not.toContain('机器可读形态')
       expect(instructionFor(targetType)).not.toContain('item grammar')
     }
+  })
+
+  // spec-00001-AC-11.3
+  it('gives the source path and asks a clarifiable target to inherit the unresolved questions', () => {
+    const instruction = instructionFor('prd')
+
+    expect(instruction).toContain(`The source document is ${SOURCE_PATH}`)
+    expect(instruction).toContain('Read the unresolved Open Questions of the source document')
+    expect(instruction).toMatch(/inherit the ones\s+that still bind this new document/)
+    expect(instruction).toContain('into its own Open Questions section')
+    expect(instruction).toContain('Never silently decide one of them for the source')
+  })
+
+  // spec-00001-AC-11.4
+  it('leaves the inheritance out for a target with no Open Questions, and still gives the source path', () => {
+    const instruction = instructionFor('record')
+
+    expect(instruction).toContain(`The source document is ${SOURCE_PATH}`)
+    expect(instruction).not.toContain('Open Questions')
   })
 })
 

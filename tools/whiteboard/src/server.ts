@@ -221,7 +221,12 @@ export class Board {
       sourceId,
     }
     return this.sessions.start(
-      { kind: 'advance', sourceId, instruction: taskInstruction(expectation), expectation },
+      {
+        kind: 'advance',
+        sourceId,
+        instruction: taskInstruction(expectation, this.docs.pathOf(sourceId)),
+        expectation,
+      },
       agentOf(body),
     )
   }

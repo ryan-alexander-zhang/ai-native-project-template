@@ -1,3 +1,4 @@
+import { isClarifiable } from './clarifyRules.ts'
 import type { DocGraph, DocNode } from './docRepository.ts'
 
 /** What the board asked a session to produce; the yardstick for spec-00001-FR-17. */
@@ -47,20 +48,36 @@ const ITEM_GRAMMAR: Record<string, string[]> = {
   ],
 }
 
+/**
+ * Carrying the upstream's unfinished business downstream (spec-00001-FR-11, the
+ * thirteenth round). Advance has no Open Questions gate — a draft may be written
+ * from an unsettled source — so the uncertainty has to travel with it, in writing,
+ * instead of being absorbed by whoever writes the new document. Conditional the
+ * way the item grammar is: only a target type that has an Open Questions section
+ * to inherit into (the clarifiable set, rule-00001-BR-20) is told this.
+ */
+const OPEN_QUESTION_INHERITANCE = [
+  'Read the unresolved Open Questions of the source document before you write, and inherit the ones',
+  '  that still bind this new document into its own Open Questions section, stated in its own terms.',
+  'Never silently decide one of them for the source: it stays an open question here, for its owner to settle.',
+]
+
 /** The initial input handed to the agent CLI; its working directory is the docs tree. */
-export function taskInstruction(expectation: Expectation): string {
+export function taskInstruction(expectation: Expectation, sourcePath: string): string {
   const { targetType, idPrefix, carry, sourceId } = expectation
   const grammar = ITEM_GRAMMAR[targetType]
   return [
     `Write one new ${targetType} document under ${targetType}/ in your working directory (the docs tree).`,
     `Give it the id ${idPrefix}<slug>: keep the number, choose the slug.`,
     `Its front matter must carry ${carry}: ${sourceId}.`,
+    `The source document is ${sourcePath} (relative to your working directory, the docs tree) — read it.`,
     `Follow ${targetType}/TEMPLATE.md for front matter and ${targetType}/README.md for what belongs in it.`,
     'Leave status: draft — a human promotes it from the board.',
     'Change nothing outside the docs tree.',
     ...(grammar === undefined
       ? []
       : [`Its body must follow the item grammar of ${targetType}/README.md (「机器可读形态」):`, ...grammar]),
+    ...(isClarifiable(targetType) ? OPEN_QUESTION_INHERITANCE : []),
   ].join('\n')
 }
 

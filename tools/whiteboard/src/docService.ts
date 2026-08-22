@@ -241,6 +241,11 @@ export class DocService {
     return nextStepsFor(this.require(id), this.config)
   }
 
+  /** Where the document lives, relative to the docs tree: the advance instruction names it (spec-00001-FR-11). */
+  pathOf(id: string): string {
+    return this.require(id).path
+  }
+
   /** spec-00001-FR-4 and FR-5: the edit lands only if the file still matches what was opened. */
   async save(id: string, content: string, baseHash: string): Promise<ActionResult> {
     const node = this.require(id)

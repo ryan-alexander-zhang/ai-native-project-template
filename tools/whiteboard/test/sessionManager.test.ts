@@ -18,7 +18,7 @@ const EXPECTATION: Expectation = {
 const ADVANCE: SessionPlan = {
   kind: 'advance',
   sourceId: EXPECTATION.sourceId,
-  instruction: taskInstruction(EXPECTATION),
+  instruction: taskInstruction(EXPECTATION, 'idea/idea-00001-x.md'),
   expectation: EXPECTATION,
 }
 
