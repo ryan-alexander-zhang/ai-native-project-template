@@ -1,7 +1,7 @@
 ---
 id: plan-00016-entry-types-widen
 type: plan
-status: open
+status: resolved
 implements: [rule-00001-AC-26.2]
 ---
 
