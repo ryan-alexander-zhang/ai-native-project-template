@@ -26,7 +26,7 @@ blocks: [spec-00001-docs-whiteboard]
 
 - Affected: 全部三种会话的无变更结束路径；表现为 issue-00010 式锁死的
   前端复刻——服务端明明空闲，前端拒绝发起任何新会话，只能整页重载解锁。
-- Since: MVP（推进会话几乎必写文件，路径长期未走到）· Still occurring: yes
+- Since: MVP（推进会话几乎必写文件，路径长期未走到）· Still occurring: no（本 issue 已修）
 - Severity: 中高——答疑恰恰常常"聊完不改"，第八轮起该路径变成日常。
 
 ## 3. Root Cause (first principles)

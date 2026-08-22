@@ -2,7 +2,7 @@
 id: plan-00006-whiteboard-text-rendering
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-37, spec-00001-FR-38, spec-00001-FR-39, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
 # Plan: 文本呈现——渲染、详情与标签阈值

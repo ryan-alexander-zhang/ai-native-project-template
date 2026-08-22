@@ -27,7 +27,7 @@ blocks: [design-00001-docs-whiteboard]
   plan-00006 U2 的落地裁定（子画布期间图刷新的状态保持）因此端到端不可触发，
   只能按构造成立。
 - Since: MVP 起（chokidar 在 package.json 里但 `src/`、`web/src/`、`bin/` 无
-  任何引用）。Still occurring: yes。
+  任何引用）。Still occurring: no（本 issue 已修）。
 - Severity: 中——spec §7 NF 的字面（「刷新即可反映」）靠手动刷新页面尚能满足，
   但手动刷新会丢掉 `drilled`/`detail`/选中等全部呈现状态（实测确认），且
   design 与实现的落差会误导后续每一轮依赖「刷新会来」的设计（本轮 U2 即是）。
@@ -101,4 +101,4 @@ blocks: [design-00001-docs-whiteboard]
 
 - Blocks: design-00001-docs-whiteboard（§1、§6 的推送承诺待对账）
 - Related: plan-00006（实测 (f) BLOCKED 的出处）、record-00005（该实测的记录）、
-  plan-00008（本 issue 的修复轮）、record-00007（修复的验收，待建）
+  plan-00008（本 issue 的修复轮）、record-00007（修复的验收）

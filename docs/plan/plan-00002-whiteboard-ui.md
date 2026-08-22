@@ -2,7 +2,7 @@
 id: plan-00002-whiteboard-ui
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-26, spec-00001-FR-27, design-00002-whiteboard-ui]
 ---
 
 # Plan: 白板界面改造
@@ -42,3 +42,5 @@ implements: [spec-00001-docs-whiteboard, design-00002-whiteboard-ui]
 5. **可访问性**：design §6 列出的每条行为都有用例实测。
 6. **收尾门槛**：由未参与实现的 subagent 按文档核验，`record-00001` 补上 FR-26/FR-27
    的验收行与被改名用例的更新；任何 gap 阻塞 `resolved`。
+7. 验收证据位于 record-00001（其 parent 为 plan-00001）；本 plan 早于 resolved
+   门（第十轮）完成，按当时流程记录。

@@ -6,6 +6,12 @@ status: active
 
 # Docs 白板（Whiteboard）：docs 工作流的可视化操作台
 
+> 本 idea 已由 `prd-00001-docs-whiteboard` 承接，现状以 prd 与 spec 为准。
+> 正文保留起草时的设想，其中三处已被后续裁定取代：分层布局（§2.1）被
+> `decision-00002` 的类型分列布局取代；「两种评审动作」（§4）已扩为接收/
+> 澄清/审计三种（decision-00007）；澄清的「手动记录待澄清点」语义（§4）
+> 已由 agent 逐题提问取代（decision-00006）。
+
 ## 问题陈述
 
 当前 docs 体系（`idea → prd → spec/rule → design → plan → task/issue → record`）

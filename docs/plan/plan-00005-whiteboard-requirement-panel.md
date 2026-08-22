@@ -2,7 +2,7 @@
 id: plan-00005-whiteboard-requirement-panel
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-31, spec-00001-FR-32, spec-00001-FR-33, spec-00001-FR-34, spec-00001-FR-35, spec-00001-FR-36, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
 # Plan: 检视面板、覆盖状态与子画布

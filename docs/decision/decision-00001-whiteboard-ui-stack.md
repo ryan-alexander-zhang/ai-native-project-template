@@ -3,7 +3,7 @@ id: decision-00001-whiteboard-ui-stack
 type: decision
 status: active
 motivated_by: [spec-00001-docs-whiteboard]
-constrains: [design-00002-whiteboard-ui, plan-00002-whiteboard-ui]
+constrains: [design-00002-whiteboard-ui, plan-00002-whiteboard-ui, plan-00003-whiteboard-relation-edges, plan-00004-whiteboard-edge-emphasis, plan-00005-whiteboard-requirement-panel, plan-00006-whiteboard-text-rendering, plan-00007-whiteboard-parsing-contract, plan-00008-whiteboard-refresh-and-commit-scope, plan-00009-whiteboard-ask-clarify, plan-00010-whiteboard-audit-and-resolved-gate, plan-00011-whiteboard-revision-create-and-session-reach]
 ---
 
 # Decision: 白板前端采用 Tailwind CSS + shadcn/ui + Lucide

@@ -24,7 +24,7 @@ blocks: [spec-00001-docs-whiteboard]
 
 - Affected: 三种会话在真实 claude CLI 下的启动；用户不知道要按一次回车，
   且输入框里的残留文本吞掉后续命令。
-- Since: MVP（指令写入方式自始如此）· Still occurring: yes
+- Since: MVP（指令写入方式自始如此）· Still occurring: no（本 issue 已修）
 - Severity: 高——澄清/答疑的"agent 先开口"流程走不到第一步。
 
 ## 3. Root Cause (first principles)

@@ -27,7 +27,7 @@ blocks: [plan-00006-whiteboard-text-rendering]
 - Affected: 所有 spec/rule 节点的选中后首屏——恰恰是本仓最常用的两个中枢文档；
   被盖住的是推进（Advance）入口。
 - Since: plan-00005 引入检视面板起（961d0b74）；plan-00006 的 U3 试图以
-  「重居中」修复，实测（2026-08-17）证实未修复。Still occurring: yes。
+  「重居中」修复，实测（2026-08-17）证实未修复。Still occurring: no（本 issue 已修）。
 - Severity: 中——功能可用（放大或拖动可见），但首屏即缺一个主要动作入口，
   且 record-00004 已记录过一次、宣称修复后仍在。
 

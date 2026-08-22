@@ -2,7 +2,7 @@
 id: plan-00001-docs-whiteboard-mvp
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard]
+implements: [spec-00001-FR-1, spec-00001-FR-2, spec-00001-FR-3, spec-00001-FR-4, spec-00001-FR-5, spec-00001-FR-6, spec-00001-FR-7, spec-00001-FR-8, spec-00001-FR-9, spec-00001-FR-10, spec-00001-FR-11, spec-00001-FR-12, spec-00001-FR-13, spec-00001-FR-14, spec-00001-FR-15, spec-00001-FR-16, spec-00001-FR-17, spec-00001-FR-18, spec-00001-FR-19, spec-00001-FR-20, spec-00001-FR-21, spec-00001-FR-22, spec-00001-FR-23, spec-00001-FR-24, spec-00001-FR-25, rule-00001-BR-1, rule-00001-BR-2, rule-00001-BR-3, rule-00001-BR-4, rule-00001-BR-5, rule-00001-BR-6, rule-00001-BR-7, rule-00001-BR-8, rule-00001-BR-9, rule-00001-BR-10, rule-00001-BR-11, rule-00001-BR-12, rule-00001-BR-13, rule-00001-BR-14, rule-00001-BR-15, rule-00001-BR-16, rule-00001-BR-17, rule-00001-BR-18, design-00001-docs-whiteboard]
 ---
 
 # Plan: Docs 白板 MVP 实现

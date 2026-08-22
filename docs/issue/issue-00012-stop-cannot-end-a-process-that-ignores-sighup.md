@@ -23,7 +23,7 @@ blocks: [spec-00001-docs-whiteboard]
 
 - Affected: Stop 的全部使用场景；恰恰是"会话卡死"这个 Stop 存在的理由
   本身。
-- Since: FR-49 落地（issue-00010 修复）· Still occurring: yes
+- Since: FR-49 落地（issue-00010 修复）· Still occurring: no（本 issue 已修）
 - Severity: 高——issue-00010 的锁死症状在最需要解锁的场景下复活。
 
 ## 3. Root Cause (first principles)

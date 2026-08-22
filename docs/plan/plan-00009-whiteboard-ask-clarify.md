@@ -2,7 +2,7 @@
 id: plan-00009-whiteboard-ask-clarify
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-9, spec-00001-FR-45, spec-00001-FR-46, spec-00001-FR-47, spec-00001-FR-48, rule-00001-BR-11, rule-00001-BR-20, rule-00001-BR-21, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
 # Plan: 澄清改会话、新增答疑——落地第八轮（FR-9 改写与 FR-45…48）

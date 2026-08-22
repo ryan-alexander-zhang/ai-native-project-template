@@ -24,7 +24,7 @@ blocks: [spec-00001-docs-whiteboard]
 
 - Affected: 全部三种会话（推进/澄清/答疑）在真实 claude CLI 下的交互；纯流式
   输出场景只错行宽、勉强可读，交互场景不可用。
-- Since: MVP（plan-00001 的终端通道）· Still occurring: yes
+- Since: MVP（plan-00001 的终端通道）· Still occurring: no（本 issue 已修）
 - Severity: 高——澄清功能事实不可用；叠加 issue-00010（会话无法终止）时整个
   白板的发起入口被锁死。
 
@@ -108,5 +108,5 @@ blocks: [spec-00001-docs-whiteboard]
 
 ## Links
 
-- Blocks: spec-00001-docs-whiteboard · plan-00009-whiteboard-ask-clarify
+- Blocks: spec-00001-docs-whiteboard
 - Related: issue-00010-a-stuck-session-locks-the-board

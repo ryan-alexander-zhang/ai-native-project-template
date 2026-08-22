@@ -24,7 +24,7 @@ blocks: [spec-00001-docs-whiteboard]
 ## 2. Impact
 
 - Affected: 单用户白板的全部会话功能；触发后功能性等同服务不可用。
-- Since: MVP（单会话约束落地时）· Still occurring: yes
+- Since: MVP（单会话约束落地时）· Still occurring: no（本 issue 已修）
 - Severity: 高——与 issue-00009 叠加时白板被锁死；单独出现时（agent 真卡住）
   同样无解。
 
@@ -103,5 +103,5 @@ blocks: [spec-00001-docs-whiteboard]
 
 ## Links
 
-- Blocks: spec-00001-docs-whiteboard · plan-00009-whiteboard-ask-clarify
+- Blocks: spec-00001-docs-whiteboard
 - Related: issue-00009-terminal-size-never-reaches-the-pty · decision-00006-whiteboard-ask-clarify

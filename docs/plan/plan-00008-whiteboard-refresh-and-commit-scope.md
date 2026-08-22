@@ -2,7 +2,7 @@
 id: plan-00008-whiteboard-refresh-and-commit-scope
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-42, spec-00001-FR-43, spec-00001-FR-44, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
 # Plan: 变更推送与会话暂存范围——修 issue-00007 与 issue-00008

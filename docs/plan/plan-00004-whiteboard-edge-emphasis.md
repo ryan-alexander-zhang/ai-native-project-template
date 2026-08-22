@@ -2,7 +2,7 @@
 id: plan-00004-whiteboard-edge-emphasis
 type: plan
 status: resolved
-implements: [spec-00001-FR-29, spec-00001-FR-30, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-28, spec-00001-FR-29, spec-00001-FR-30, design-00002-whiteboard-ui]
 ---
 
 # Plan: 边的弱化/强调与关系列表

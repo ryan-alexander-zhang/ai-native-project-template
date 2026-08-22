@@ -26,7 +26,7 @@ blocks: [spec-00001-docs-whiteboard]
 
 - Affected: 推进（advance）动作的留痕正确性——无关工作被归因到错误的动作与
   文档 id 下，git 历史失真；若使用者不核对，半成品文档会被悄悄提交。
-- Since: MVP 的 advance 实现起。Still occurring: yes。
+- Since: MVP 的 advance 实现起。Still occurring: no（本 issue 已修）。
 - Severity: 高——留痕（S5）是本产品的核心承诺之一，且触发条件是常态而非边角。
 
 ## 3. Root Cause (first principles)
@@ -75,11 +75,6 @@ blocks: [spec-00001-docs-whiteboard]
   参照系」，本修复给出参照系并按内容比较；不是给暂存集再加一层过滤规则。
 - 按内容而非按路径集求差的理由见 design-00001 §4：路径集差会把「会话在一份
   本来就脏的草稿上继续改」的产出误排除，而那正是本仓最常见的推进形态。
-- 检测缺口的更正：初稿写「`AC-14.2` 的夹具只用了 docs/ 之外的脏文件」——**这是
-  错的**，实查 `test/docService.test.ts` 的脏文件是 `docs/idea/b.md`，本就在
-  docs/ 之内；AC-14.2 之所以绿，是因为编辑动作走显式路径暂存、根本不经过
-  `changedPaths`。真正的缺口是：**advance 这条路径上从来没有过「会话启动前已有
-  脏文件」的用例**——`AC-14.5`/`AC-14.6` 补的正是它。
 - 检测缺口的更正：初稿写「`AC-14.2` 的夹具只用了 docs/ 之外的脏文件」——**这是
   错的**，实查 `test/docService.test.ts` 的脏文件是 `docs/idea/b.md`，本就在
   docs/ 之内；AC-14.2 之所以绿，是因为编辑动作走显式路径暂存、根本不经过

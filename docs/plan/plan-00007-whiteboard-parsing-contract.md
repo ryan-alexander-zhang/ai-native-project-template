@@ -2,7 +2,7 @@
 id: plan-00007-whiteboard-parsing-contract
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui, decision-00005-whiteboard-parsing-contract]
+implements: [spec-00001-FR-40, spec-00001-FR-41, design-00001-docs-whiteboard, design-00002-whiteboard-ui, decision-00005-whiteboard-parsing-contract]
 ---
 
 # Plan: 解析契约——AST、诊断与 agent 输出约束

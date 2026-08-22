@@ -2,7 +2,7 @@
 id: plan-00003-whiteboard-relation-edges
 type: plan
 status: resolved
-implements: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
+implements: [spec-00001-FR-1, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
 # Plan: 画出关系边，并把布局改成类型分列

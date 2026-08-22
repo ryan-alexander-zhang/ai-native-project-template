@@ -28,7 +28,7 @@ blocks: [plan-00011-whiteboard-revision-create-and-session-reach]
 - Affected: 全部推进产物的修复路径。用户被告知"补上关系"，补完了白板却不
   认账；唯一的解锁手段是再跑一次推进（会新建第二份文档）或重启服务。
 - Since: 第五轮 FR-17 的产出校验落地（`lastFinding` 引入）· Still
-  occurring: yes
+  occurring: no（本 issue 已修）
 - Severity: 中高——它把"修好"这条路堵死，而"标记异常并让用户去修"正是 FR-17
   设计中的唯一出路；且它使白板呈现与磁盘事实长期不一致，违背 FR-42…FR-44 的
   单一事实来源承诺。
