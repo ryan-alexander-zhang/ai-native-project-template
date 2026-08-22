@@ -78,6 +78,23 @@ describe('clarifyInstruction', () => {
     )
   })
 
+  // spec-00001-AC-45.7
+  it('asks the session to settle the stage advance decision with the fewest questions', () => {
+    expect(clarifyInstruction(TASK)).toContain(
+      "Settle this stage's advance decision with the fewest questions that do it.",
+    )
+  })
+
+  // spec-00001-AC-45.6
+  it('asks the session to declare the clarification saturated and close instead of asking on', () => {
+    const instruction = clarifyInstruction(TASK)
+
+    expect(instruction).toContain('Once the remaining questions would no longer change that decision')
+    expect(instruction).toContain('the stop condition the focus')
+    expect(instruction).toContain('declare the clarification saturated')
+    expect(instruction).toContain('move to the closing instead of')
+  })
+
   // spec-00001-AC-45.5
   it('states the closing: Open Questions, status stays draft, settled answers revise the body', () => {
     const instruction = clarifyInstruction(TASK)

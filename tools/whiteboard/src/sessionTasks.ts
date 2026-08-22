@@ -99,6 +99,13 @@ export function clarifyInstruction(task: ClarifyTask): string {
     ...contextLines(docPath, relatedPaths),
     ...SKELETON,
     `What to weigh your questions on: ${focus}`,
+    // The convergence call (spec-00001-FR-45, twelfth round). It follows the
+    // focus line rather than joining SKELETON, because the focus line is what
+    // defines this stage's advance decision and carries its stop condition.
+    "Settle this stage's advance decision with the fewest questions that do it.",
+    'Once the remaining questions would no longer change that decision — the stop condition the focus',
+    '  line above names — declare the clarification saturated and move to the closing instead of',
+    '  asking on.',
     ...stateFileLines(statePath, state),
     ...CLOSING,
     'Change nothing outside the docs tree, other than that progress file.',
