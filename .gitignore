@@ -76,7 +76,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#   Anchored: a bare `lib/` matches at every depth and swallowed
+#   tools/whiteboard/web/src/lib/ (issue-00017). setuptools writes this one at
+#   the repo root, which is all this rule ever meant.
+/lib/
 lib64/
 parts/
 sdist/

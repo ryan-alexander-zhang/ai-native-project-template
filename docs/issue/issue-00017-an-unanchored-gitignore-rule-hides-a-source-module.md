@@ -33,7 +33,7 @@ blocks: [plan-00013-whiteboard-coverage-and-drilldowns]
 - Affected: 任何**不是**从这台机器的现有工作副本继续干活的人或流程——新 clone
   的协作者、CI、以及每一个 `git worktree`。后果不是某个用例坏了，是整个 web
   测试套件在 clone 状态下起不来。
-- Since: commit `5939fc56`（2026-08-13） · Still occurring: yes
+- Since: commit `5939fc56`（2026-08-13） · Still occurring: no（本 issue 已修）
 - Severity: 高。它同时具备「后果全局」与「本地永远看不见」两条：所有既有检查
   （`npm test`、`typecheck`、`build`）读的都是工作副本，因此没有一处会报，缺陷
   可以无限期潜伏——它已经潜伏了两个多月、跨越十来轮开发。
@@ -146,7 +146,17 @@ AssertionError: expected [] to deeply equal [ Array(1) ]
 
 ## 7. Verification
 
-待 §6 的修复落地后回填。此刻库中只有 §5 的失败守卫。
+- `test/tracked.test.ts::tracks the module every vendored ui component imports`
+  ——修复后通过；`git ls-files tools/whiteboard/web/src/lib/` 列出该文件。
+- `git check-ignore tools/whiteboard/web/src/lib/utils.ts` 以退出码 1 结束
+  （无匹配，即不再被忽略）。
+- `cd tools/whiteboard && npm test` 全绿：37 个测试文件、948 个用例。
+- §5 的真实复现不再复现：从修复后的 HEAD 重开一个全新 worktree，其中
+  `web/src/lib/utils.ts` 在位，`npx vitest run web/test` 20 个文件全过。
+- 锚定没有放开任何本该被忽略的路径：对全树（`node_modules` 与 `.git` 除外）逐
+  文件跑 `git check-ignore`，改动前后的命中统计只差这一个文件——`target/`
+  的 9494 个、`tools/*/dist/` 的 97 个、`coverage/` 的 60 个、`.idea/` 的 4 个
+  一个不动。
 
 ## 8. Follow-through
 
