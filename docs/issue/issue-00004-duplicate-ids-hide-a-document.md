@@ -2,7 +2,7 @@
 id: issue-00004-duplicate-ids-hide-a-document
 type: issue
 status: open
-blocks: [spec-00001-docs-whiteboard]
+blocks: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance]
 ---
 
 # Issue: 两份文档撞 id 时，一份从白板上消失，动作还会落到另一份上
@@ -111,6 +111,7 @@ blocks: [spec-00001-docs-whiteboard]
 
 ## Links
 
-- Blocks: spec-00001-docs-whiteboard
+- Blocks: spec-00001-docs-whiteboard · spec-00002-whiteboard-governance
+  （撞 id 的呈现与寻址裁定落在 spec-00002 的 FR-8 与 FR-9）
 - Related: plan-00003-whiteboard-relation-edges（其 `(id, path)` 排序与本 issue
   相邻但不构成修复）、decision-00002-whiteboard-layout
