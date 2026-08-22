@@ -19,6 +19,7 @@ Write the document description or comment after the front matter.
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
+- An `id` is **unique across the whole repo**: no two documents may declare the same one. Allocating the next free number per type (`rule-00001-BR-18`) is what keeps a new document from colliding; a collision that already exists is surfaced by the whiteboard as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]` and set the old doc to `archived`.
 - `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).

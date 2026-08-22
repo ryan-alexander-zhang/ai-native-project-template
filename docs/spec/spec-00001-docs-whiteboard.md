@@ -1590,12 +1590,16 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   不处置（接收路径的清理由 FR-46 持有，域主裁定）。
 - 在白板内编辑 `docs/` 之外的文件。
 - `active → archived` 的归档配对自动化——MVP 只保证合法流转可选，不强制
-  `rule-00001-BR-19` 的 `supersedes` 配对检查。
+  `rule-00001-BR-19` 的 `supersedes` 配对检查。**已由
+  [spec-00002](spec-00002-whiteboard-governance.md) 的 FR-3/FR-4 接管**（本条
+  就地留存，移除属本 spec 自己的修订轮）。
 - commit 合并/降噪策略（FR-14 固定为最细粒度）。
 - **id 唯一性校验**。FR-2 的异常清单不含「两份文档撞 id」，因此撞 id 时其中一份
   在白板上不可见、且动作会落到另一份上——已知缺陷，见
   [issue-00004](../issue/issue-00004-duplicate-ids-hide-a-document.md)；纳入
-  FR-2 需要一次呈现方式的裁定。
+  FR-2 需要一次呈现方式的裁定。**该裁定已作出、已由
+  [spec-00002](spec-00002-whiteboard-governance.md) 的 FR-8/FR-9 接管**（撞 id
+  的文档各以文件路径为节点键并标异常；本条就地留存，移除属本 spec 自己的修订轮）。
 - 写权限范围的用户自定义配置（后续版本；MVP 固定默认「仅 `docs/`」）。
 - 越界写入的 git 回滚兜底（依赖 CLI 权限机制，见 FR-13）。
 - 编辑与预览分栏并实时联动（MVP 为互斥切换）。
