@@ -1,7 +1,7 @@
 ---
 id: issue-00016-path-keyed-nodes-cannot-be-addressed
 type: issue
-status: open
+status: resolved
 blocks: [plan-00012-whiteboard-governance-gates]
 ---
 
@@ -114,7 +114,10 @@ AssertionError: expected "vi.fn()" to be called with arguments: [ …(2) ]
 
 ## 7. Verification
 
-未修复。`open` 期间的现状即 §1 所述。
+已修复并验证。七个调用点收敛到 `web/src/api.ts` 的一个 `at(key)` 辅助函数，
+它做那一次 `encodeURIComponent` 并拼出 `/api/docs/<编码后的键>`；服务端与路由
+一行未动。§5 的三条测试转绿，它们逐一断言七个 URL 的构造，因此「凡按节点键
+寻址的调用都编码」是可回归的。前端全部 18 个测试文件、375 条测试通过。
 
 ## 8. Follow-through
 

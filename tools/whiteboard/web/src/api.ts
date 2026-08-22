@@ -69,17 +69,30 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return payload as T
 }
 
+/**
+ * A document's own path segment. What addresses a document is its **node key**,
+ * which is its id only while the front matter carries one: an anomalous
+ * document is keyed by its file path (spec-00001-FR-2), and so is each side of
+ * an id collision (spec-00002-FR-8). A path carries slashes, and a slash left
+ * raw in the URL becomes another path segment, so the request never reaches the
+ * document — the defect of issue-00016. Express 5 hands `%2F` back to `:id` as
+ * a slash, so the encoding is the whole fix and the routes are untouched.
+ */
+function at(key: string): string {
+  return `/api/docs/${encodeURIComponent(key)}`
+}
+
 export const api = {
   graph: () => request<DocGraph>('GET', '/api/graph'),
   config: () => request<ConfigPayload>('GET', '/api/config'),
-  doc: (id: string) => request<DocContent>('GET', `/api/docs/${id}`),
-  items: (id: string) => request<ItemsView>('GET', `/api/docs/${id}/items`),
+  doc: (id: string) => request<DocContent>('GET', at(id)),
+  items: (id: string) => request<ItemsView>('GET', `${at(id)}/items`),
   save: (id: string, content: string, baseHash: string) =>
-    request<ActionResult>('PUT', `/api/docs/${id}`, { content, baseHash }),
-  transitions: (id: string) => request<string[]>('GET', `/api/docs/${id}/transitions`),
-  setStatus: (id: string, to: string) => request<ActionResult>('POST', `/api/docs/${id}/status`, { to }),
-  accept: (id: string) => request<ActionResult>('POST', `/api/docs/${id}/review`, { action: 'accept' }),
-  nextSteps: (id: string) => request<FlowStep[]>('GET', `/api/docs/${id}/next-steps`),
+    request<ActionResult>('PUT', at(id), { content, baseHash }),
+  transitions: (id: string) => request<string[]>('GET', `${at(id)}/transitions`),
+  setStatus: (id: string, to: string) => request<ActionResult>('POST', `${at(id)}/status`, { to }),
+  accept: (id: string) => request<ActionResult>('POST', `${at(id)}/review`, { action: 'accept' }),
+  nextSteps: (id: string) => request<FlowStep[]>('GET', `${at(id)}/next-steps`),
   session: () => request<{ current: SessionInfo | null }>('GET', '/api/sessions'),
   // Every session entry may name which agent runs it; leaving it out is what a
   // single-agent config does, and the server then takes the first
