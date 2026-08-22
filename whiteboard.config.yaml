@@ -105,11 +105,11 @@ flow:
 # yours to retune at any time. A clarifiable type with no line here, or a line
 # given to any other type, refuses to start the board.
 focus:
-  idea: Whether it is worth doing and for whom — how real the pain is, who is hit, and the cost of not doing it.
-  prd: Actors, scope, and the value trade-off — who it serves, what this version keeps out, and why it goes first.
-  spec: FR boundaries and acceptance gaps — failure paths, edge inputs, and an observable criterion for every FR.
-  rule: The branches the decision table misses — value combinations across dimensions, the default row, and who wins on conflict.
-  design: Structural trade-offs and failure modes — the rejected options, the module boundaries, and how the system behaves when it breaks.
+  idea: Whether it is worth doing and for whom — how real the pain is, who is hit, and the cost of not doing it. Ask nothing a prd or spec would settle (features, scope cuts, mechanisms); stop once the go/no-go toward a prd is settled.
+  prd: Actors, scope, and the value trade-off — who it serves, what this version keeps out, and why it goes first. Ask nothing a spec would settle (requirement mechanics, acceptance details); stop once the scope is firm enough to write a spec.
+  spec: FR boundaries and acceptance gaps — failure paths, edge inputs, and an observable criterion for every FR. Ask nothing a design would settle (module shape, technology choices); stop once every FR carries a decidable acceptance.
+  rule: The branches the decision table misses — value combinations across dimensions, the default row, and who wins on conflict. Ask nothing about system behaviour (that belongs to the consuming spec); stop once every rule is decidable.
+  design: Structural trade-offs and failure modes — the rejected options, the module boundaries, and how the system behaves when it breaks. Ask nothing a plan would settle (task order, effort); stop once the structure is buildable without silent choices.
 
 agents:
   claude:
