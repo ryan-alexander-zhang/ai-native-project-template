@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
-import { ApiError, type SessionInfo, api } from './api.ts'
+import { ApiError, type CoverageRow, type SessionInfo, api } from './api.ts'
 import { connectEvents } from './eventSocket.ts'
 import { prefillFrontMatter } from './frontMatter.ts'
 import { type Placed, layoutGraph } from './layout.ts'
@@ -69,9 +69,41 @@ export function useBoard() {
   const [draft, setDraft] = useState<string>()
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [session, setSession] = useState<SessionInfo | null>(null)
+  // The global coverage view (spec-00002-FR-10): whether it is on show, and the
+  // payload it is showing. Undefined is «not read yet», which is what the first
+  // moment after opening looks like.
+  const [coverageOpen, setCoverageOpen] = useState(false)
+  const [coverage, setCoverage] = useState<CoverageRow[]>()
 
   // Column order comes from the config; the layout is meaningless without it.
   const typeOrder = useRef<string[]>([])
+  // The same flag as `coverageOpen`, readable from `refresh` without making the
+  // callback depend on it: a `refresh` rebuilt on every open would tear the
+  // docs-change channel down and dial it again (design-00002 §10).
+  const viewing = useRef(false)
+
+  /** The coverage payload, re-read (spec-00002-AC-10.4). A failure is the toast every read gets. */
+  const readCoverage = useCallback(async () => {
+    try {
+      setCoverage(await api.coverage())
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    }
+  }, [])
+
+  /**
+   * Open or close the coverage view. Closing lets the payload go: the view is
+   * re-read from scratch when it comes back, so nothing stale is ever on show.
+   */
+  const showCoverage = useCallback(
+    (open: boolean) => {
+      viewing.current = open
+      setCoverageOpen(open)
+      if (open) void readCoverage()
+      else setCoverage(undefined)
+    },
+    [readCoverage],
+  )
 
   /**
    * The one way the board takes the docs in again (spec-00001-FR-44): all three
@@ -95,8 +127,12 @@ export function useBoard() {
     setSelected((current) =>
       current !== undefined && next.nodes.some((node) => node.id === current) ? current : undefined,
     )
+    // The third payload of the one refresh path, and only while somebody is
+    // looking at it: the coverage view has no refresh of its own, and the read
+    // is the heaviest the board makes (design-00001 §6, spec-00002-AC-10.4).
+    if (viewing.current) await readCoverage()
     return next
-  }, [])
+  }, [readCoverage])
 
   /** Hold a document as the selection and read what its toolbar offers. */
   const load = useCallback(async (id: string) => {
@@ -294,6 +330,9 @@ export function useBoard() {
     draft,
     terminalOpen,
     session,
+    coverageOpen,
+    coverage,
+    showCoverage,
     edit,
     setTerminalOpen,
     setAgent,

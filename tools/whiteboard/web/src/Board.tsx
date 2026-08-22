@@ -14,6 +14,7 @@ import {
   FilePlus,
   FileQuestionMark,
   FileWarning,
+  Gauge,
   History,
   LayoutDashboard,
   Search,
@@ -38,6 +39,7 @@ import { useDefaultLayout } from 'react-resizable-panels'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from './api.ts'
 import { CommandPalette } from './CommandPalette.tsx'
+import { CoverageView } from './CoverageView.tsx'
 import { CreateDialog } from './CreateDialog.tsx'
 import { Details } from './Details.tsx'
 import { Editor } from './Editor.tsx'
@@ -295,6 +297,17 @@ function Canvas() {
           </Button>
         ) : null}
 
+        {/*
+          Where the coverage gaps of the whole repo are read off, rather than
+          node by node (spec-00002-FR-10). It is a dialog, so it owes nothing to
+          the editor, the terminal, a sub-canvas or a running session — it opens
+          over any of them (spec-00002-AC-10.5, AC-10.6).
+        */}
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => board.showCoverage(true)}>
+          <Gauge className="size-4" aria-hidden />
+          Coverage
+        </Button>
+
         {/* The sessions that have ended are still readable (spec-00001-FR-54). */}
         <Button variant="outline" size="sm" className="gap-2" onClick={() => setHistory(true)}>
           <History className="size-4" aria-hidden />
@@ -478,6 +491,21 @@ function Canvas() {
         open={creating}
         onOpenChange={setCreating}
         onCreate={(type, slug) => void board.create(type, slug)}
+      />
+      <CoverageView
+        open={board.coverageOpen}
+        onOpenChange={board.showCoverage}
+        rows={board.coverage}
+        nodes={board.graph.nodes}
+        // Picking an item is a top-level act: the view goes, and `focus` leaves
+        // any sub-canvas behind and selects the document — with the inspector
+        // following the right-slot rule it already follows (spec-00002-FR-12).
+        // A document that has left the disk since the payload was read is
+        // refused by `select` with its own toast (spec-00002-AC-12.5).
+        onPick={(docId) => {
+          board.showCoverage(false)
+          focus(docId)
+        }}
       />
       <SessionHistory open={history} onOpenChange={setHistory} />
       <Toaster position="bottom-right" theme={theme.isDark ? 'dark' : 'light'} richColors closeButton />

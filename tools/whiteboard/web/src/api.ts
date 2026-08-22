@@ -1,11 +1,12 @@
 import type { FlowConfig, FlowStep } from '../../src/config.ts'
 import type { DocContent, DocGraph } from '../../src/docRepository.ts'
-import type { ActionResult } from '../../src/docService.ts'
+import type { ActionResult, CoverageRow } from '../../src/docService.ts'
 import type { ItemsView } from '../../src/requirements.ts'
 import type { SessionHistoryEntry, SessionHistoryMeta } from '../../src/sessionHistory.ts'
 import type { SessionInfo } from '../../src/sessionManager.ts'
 
 export type {
+  CoverageRow,
   DocContent,
   DocGraph,
   FlowConfig,
@@ -84,6 +85,9 @@ function at(key: string): string {
 
 export const api = {
   graph: () => request<DocGraph>('GET', '/api/graph'),
+  // The global coverage view's one read (spec-00002-FR-10). Asked for only while
+  // the view is open: it is the heaviest read the board has (design-00001 §6).
+  coverage: () => request<CoverageRow[]>('GET', '/api/coverage'),
   config: () => request<ConfigPayload>('GET', '/api/config'),
   doc: (id: string) => request<DocContent>('GET', at(id)),
   items: (id: string) => request<ItemsView>('GET', `${at(id)}/items`),
