@@ -97,6 +97,9 @@ draft 产物（推进的半成品、新建的第一版）——两个都对的�
   `--no-verify`、`wb(create)`）。
 - `design-00002-whiteboard-ui`：§3（顶栏新建按钮与对话框、会话历史入口、
   agent 选择控件）。
-- `whiteboard.config.yaml`：新增 `entry: [idea, prd]`。
+- `whiteboard.config.yaml`：新增 `entry: [idea, prd]`。（第十四轮注记：
+  入口集经 `rule-00001-BR-26` 修订扩为 idea/prd/design/analysis——本行的
+  取值是当时的落地记录，不是对集合的裁定；§4 否决的是「对全部 16 种类型
+  开放」，本次只增两个无上游类型，不触其否决理由。）
 - `CONTEXT.md`：新增修订轮、流程入口类型、新建、会话历史四条术语。
 - 实现期：`issue-00014`（lastFinding 陈旧）先立后修。

@@ -105,11 +105,16 @@ Hit policy: `UNIQUE`
   范围中无法解析的 id（既不是存在的 spec/rule 文档，也不是存在的条目）视为
   缺口。交付范围为空的 plan 不受本约束（照常流转）。On violation: 流转被
   拒绝，拒绝理由逐条点名缺口条目。
-- **rule-00001-BR-26** (Definition) 流程入口类型与新建：产品流的入口类型
-  恰为 `idea` 与 `prd`——项目从 idea 进入产品流，或跳过 idea 直接从 prd
-  开始（`docs/README.md` 的既有约定）。入口类型的文档可不经推进直接
-  **新建**：id 按 BR-18 取号、slug 自取，正文自该类型模板起草，初始
-  status 为 `draft`。
+- **rule-00001-BR-26** (Definition) 流程入口类型与新建：流程入口类型恰为
+  `idea`、`prd`、`design` 与 `analysis`（第十四轮增后二者）——idea 与 prd
+  是产品流的起点（项目从 idea 进入产品流，或跳过 idea 直接从 prd 开始，
+  `docs/README.md` 的既有约定）；design 与 analysis 是**无上游的思考承载
+  类型**，可先于任何 spec 存在（design 的 `informs` 可留空待拾取、analysis
+  的 `parent` 可为空——各自文件夹 README 的既有约定），故同样不必经推进
+  产生。流程入口类型的文档可不经推进直接**新建**：id 按 BR-18 取号、slug
+  自取，正文自该类型模板起草，初始 status 为 `draft`。入口身份不把该类型
+  移出产品流的下一步候选（design 仍是 BR-15 的 next）——两条通路的差别只
+  在是否携带指回来源的关系：推进来的带、新建的不带。
 - **rule-00001-BR-27** (Constraint) 非入口类型不得新建——它们经产品流推进
   （BR-13…BR-17）产生，携带指回来源的关系。On violation: 新建被拒绝。
 
@@ -343,6 +348,11 @@ Hit policy: `UNIQUE`
   When 新建一个 idea
   Then 新文档 id 为 `idea-00002-<slug>`，status 为 `draft`，正文自
   idea 模板起草
+- **rule-00001-AC-26.2** (rule-00001-BR-26)
+  Given 仓库中 design 现有最大编号为 `00002`，且仓库中不存在任何 spec
+  When 新建一个 design
+  Then 新文档 id 为 `design-00003-<slug>`，status 为 `draft`，正文自
+  design 模板起草
 - **rule-00001-AC-27.1** (rule-00001-BR-27)
   Given 任意仓库状态
   When 请求新建一个 `spec`（非入口类型）

@@ -31,8 +31,9 @@ types:
 
 # Flow entry types (rule-00001-BR-26, spec-00001-FR-53): the types the board's
 # create entry offers. Every name must be a declared type; omit or empty = no
-# create entry on the board.
-entry: [idea, prd]
+# create entry on the board. design and analysis are situational folders —
+# projects that do not use them should drop them from this list.
+entry: [idea, prd, design, analysis]
 
 relations:
   - parent
