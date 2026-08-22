@@ -140,6 +140,7 @@ function serve() {
     focus: {},
     agents: [{ name: 'claude', command: 'claude', args: [] }],
     entry: [],
+    carries: {},
     clarifiable: [],
     auditable: ['spec', 'rule', 'design'],
   })
@@ -498,6 +499,7 @@ describe('a session that ends with no docs change', () => {
       focus: { spec: 'the boundaries of each FR and the gaps in its acceptance' },
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
+      carries: {},
       clarifiable: ['spec'],
       auditable: ['spec', 'rule', 'design'],
     })

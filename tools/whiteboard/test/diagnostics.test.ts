@@ -106,3 +106,149 @@ describe('the diagnostics of the whole tree', () => {
       .toMatchObject({ diagnostics: [] })
   })
 })
+
+/**
+ * The relation-field diagnostics of spec-00002-FR-5 … FR-7: whether a relation
+ * field belongs to a type is answered by the matrix in the flow config and by
+ * nothing else — the board does not read the prose in a folder README. The
+ * finding is a diagnostic, never an anomaly: how a field is written is drift,
+ * not damage, and a node that drifts keeps every one of its actions.
+ */
+describe('the relation matrix diagnostics', () => {
+  const MATRIX = `
+carries:
+  spec: [parent]
+  design: [informs]
+  record: [parent, verifies]
+  idea: []
+`
+  const matrixConfig = testConfig(MATRIX)
+
+  function matrixGraph(files: Record<string, string>) {
+    return readGraph(makeDocsDir(files), matrixConfig)
+  }
+
+  function relationFieldText(files: Record<string, string>): string[] {
+    return matrixGraph(files)
+      .diagnostics.filter((diagnostic) => diagnostic.kind === 'relation-field')
+      .map((diagnostic) => diagnostic.text!)
+  }
+
+  // spec-00002-AC-5.1
+  it('passes a field its type is allowed to carry', () => {
+    const files = { 'design/d.md': doc({ id: 'design-00001-d', type: 'design', status: 'active', informs: '[spec-00001-x]' }, '# D\n') }
+
+    expect(relationFieldText(files)).toEqual([])
+  })
+
+  // spec-00002-AC-5.2 and AC-7.1
+  it('reports a field its type does not carry, naming the field, the type and the document', () => {
+    const graph = matrixGraph({
+      'record/r.md': doc(
+        { id: 'record-00001-r', type: 'record', status: 'active', implements: '[spec-00001-FR-1]' },
+        '# Record\n',
+      ),
+    })
+
+    expect(graph.diagnostics).toEqual([
+      {
+        docId: 'record-00001-r',
+        kind: 'relation-field',
+        // Front matter has no body line to point at, so the row carries none.
+        text: 'implements is not a relation field a record document carries',
+      },
+    ])
+  })
+
+  // spec-00002-AC-5.3 — an empty list is the matrix saying «this type carries nothing»
+  it('reports any relation field on a type whose allowed set is empty', () => {
+    const files = {
+      'idea/i.md': doc({ id: 'idea-00001-i', type: 'idea', status: 'draft', motivated_by: '[prd-00001-x]' }, '# I\n'),
+    }
+
+    expect(relationFieldText(files)).toEqual(['motivated_by is not a relation field a idea document carries'])
+  })
+
+  // spec-00002-AC-5.4 — opting in is per type, so a type left out is not checked
+  it('checks nothing about a type the matrix does not list', () => {
+    const files = {
+      'plan/p.md': doc({ id: 'plan-00001-p', type: 'plan', status: 'open', implements: '[spec-00001-x]', blocks: '[issue-00001-i]' }, '# P\n'),
+    }
+
+    expect(relationFieldText(files)).toEqual([])
+  })
+
+  // The ruling of design-00001 §2: docs/README.md grants supersedes to every type
+  it('allows supersedes on a type whose list does not mention it', () => {
+    const files = {
+      'spec/s.md': doc({ id: 'spec-00002-s', type: 'spec', status: 'active', supersedes: '[spec-00001-x]' }, '# S\n'),
+    }
+
+    expect(relationFieldText(files)).toEqual([])
+  })
+
+  // spec-00002-AC-6.4 — no matrix, no check, whatever the documents declare
+  it('reports nothing at all when the flow config carries no matrix', () => {
+    const mismatched = doc(
+      { id: 'record-00001-r', type: 'record', status: 'active', implements: '[spec-00001-FR-1]' },
+      '# Record\n',
+    )
+
+    expect(graphOf({ 'record/r.md': mismatched }).diagnostics).toEqual([])
+  })
+
+  // spec-00002-AC-7.3 — single-valued `parent` is held by the code, not the matrix
+  it('reports a parent declared with two ids, naming parent as single-valued', () => {
+    const files = {
+      'spec/s.md': doc({ id: 'spec-00001-s', type: 'spec', status: 'active', parent: '[prd-00001-x, prd-00002-y]' }, '# S\n'),
+    }
+
+    expect(relationFieldText(files)).toEqual(['parent is a single-valued field, but this spec declares 2 ids'])
+  })
+
+  // A one-element list reads as a single value — FR-7 says «multi-valued»
+  it('says nothing about a parent written as a one-element list', () => {
+    const files = {
+      'spec/s.md': doc({ id: 'spec-00001-s', type: 'spec', status: 'active', parent: '[prd-00001-x]' }, '# S\n'),
+    }
+
+    expect(relationFieldText(files)).toEqual([])
+  })
+
+  // spec-00002-AC-7.2 — the node keeps its health, its edges and its coverage
+  it('leaves the node sound, its edges drawn and the anomaly list empty', () => {
+    const graph = matrixGraph({
+      'spec/s.md': doc({ id: 'spec-00001-s', type: 'spec', status: 'active' }, '# S\n'),
+      'record/r.md': doc(
+        { id: 'record-00001-r', type: 'record', status: 'active', implements: '[spec-00001-s]' },
+        '# Record\n',
+      ),
+    })
+    const record = graph.nodes.find((node) => node.id === 'record-00001-r')!
+
+    expect(record.ok).toBe(true)
+    expect(record.problems).toEqual([])
+    expect(graph.issues).toEqual([])
+    expect(graph.edges).toContainEqual(
+      expect.objectContaining({ from: 'record-00001-r', to: 'spec-00001-s', relation: 'implements', ok: true }),
+    )
+  })
+
+  // spec-00002-AC-7.4 — one document off the matrix, one diagnostic in the count
+  it('counts as one diagnostic in a tree that otherwise has none', () => {
+    const graph = matrixGraph({
+      'spec/a.md': SPEC,
+      'record/r.md': doc(
+        { id: 'record-00001-x', type: 'record', status: 'active', implements: '[spec-00001-x]' },
+        ['# Record', '', '| GWT id | 测试 | 结果 |', '| --- | --- | --- |', '| spec-00001-AC-1.1 | a test | pass |', ''].join('\n'),
+      ),
+    })
+
+    expect(graph.diagnostics).toHaveLength(1)
+  })
+
+  // A document whose type will not parse has no matrix entry to be read against
+  it('checks nothing about a file whose front matter declares no type', () => {
+    expect(relationFieldText({ 'spec/broken.md': '# No front matter at all\n' })).toEqual([])
+  })
+})

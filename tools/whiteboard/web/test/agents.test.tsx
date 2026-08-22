@@ -52,6 +52,7 @@ function serve(payload: Partial<ConfigPayload> = {}, nodes: DocNode[] = [node()]
     focus: {},
     agents: [CLAUDE],
     entry: [],
+    carries: {},
     clarifiable: ['prd'],
     auditable: ['spec', 'rule', 'design'],
     ...payload,

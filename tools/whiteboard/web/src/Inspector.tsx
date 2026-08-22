@@ -11,6 +11,9 @@ const DIAGNOSTIC_LABEL: Record<DiagnosticKind, string> = {
   'item-shape': 'shape',
   'checklist-row': 'checklist row',
   unattributable: 'unattributable',
+  // spec-00002-FR-7: the one kind read off the front matter, so its row carries
+  // the field and the type instead of a source line.
+  'relation-field': 'relation field',
 }
 
 /** The source line is evidence, not reading matter: enough of it to recognise the line. */

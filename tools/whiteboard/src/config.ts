@@ -27,6 +27,14 @@ export interface FlowConfig {
   focus: Record<string, string>
   /** Flow entry types the create entry offers (rule-00001-BR-26); empty = no create entry (spec-00001-FR-53). */
   entry: string[]
+  /**
+   * The relation matrix of spec-00002-FR-5: type -> the relation fields a
+   * document of that type may declare. A type absent from it is not checked, so
+   * an absent matrix reads as this record being empty; a type present with an
+   * empty list carries no relation field at all. The two readings differ, which
+   * is why the distinction is the presence of the key.
+   */
+  carries: Record<string, string[]>
   agents: AgentConfig[]
 }
 
@@ -150,6 +158,37 @@ function readEntry(raw: unknown, types: Record<string, DocKind>): string[] {
   return raw as string[]
 }
 
+/**
+ * The relation matrix (spec-00002-FR-5 and FR-6): which relation fields each
+ * type may declare, the one thing that answers it — the board never reads the
+ * prose in a folder README. Missing, null or empty is a legal reading and the
+ * check is simply off for everything (spec-00002-AC-6.4): the configs already
+ * in the field carry no matrix, and backward compatibility beats completeness.
+ *
+ * `supersedes` is deliberately not required of any list: docs/README.md grants
+ * it to every type, so it is allowed globally and never looked up here
+ * (design-00001 §2 治理轮裁定).
+ */
+function readCarries(raw: unknown, types: Record<string, DocKind>, relations: string[]): Record<string, string[]> {
+  if (raw === undefined || raw === null) return {}
+  const carries: Record<string, string[]> = {}
+  for (const [type, value] of Object.entries(asRecord(raw, 'carries'))) {
+    if (!(type in types)) {
+      throw new ConfigError(`config: \`carries.${type}\` names unknown type ${JSON.stringify(type)}`)
+    }
+    if (!Array.isArray(value) || value.some((field) => typeof field !== 'string')) {
+      throw new ConfigError(`config: \`carries.${type}\` must be a list of strings`)
+    }
+    for (const field of value as string[]) {
+      if (!relations.includes(field)) {
+        throw new ConfigError(`config: \`carries.${type}\` names unknown relation ${JSON.stringify(field)}`)
+      }
+    }
+    carries[type] = value as string[]
+  }
+  return carries
+}
+
 function readAgentCwd(value: unknown, at: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || (value !== 'docs' && !value.startsWith('docs/')) || value.includes('..')) {
@@ -196,6 +235,7 @@ export function parseFlowConfig(text: string, source: string): FlowConfig {
     flow: readFlow(root.flow, types, relations),
     focus: readFocus(root.focus, types),
     entry: readEntry(root.entry, types),
+    carries: readCarries(root.carries, types, relations),
     agents: readAgents(root.agents),
   }
 }

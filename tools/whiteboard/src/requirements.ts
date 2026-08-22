@@ -73,8 +73,14 @@ export interface RequirementItem {
  * - `checklist-row` — a checklist row whose first cell is not exactly one id
  *   (a range, or several ids in one cell);
  * - `unattributable` — a row or a criterion with nowhere to belong (FR-33).
+ *
+ * And the one of spec-00002-FR-7, which is the first that does not come from the
+ * body at all:
+ * - `relation-field` — a relation field the document's type does not carry, or a
+ *   `parent` declared with more than one id. It is read off the front matter, so
+ *   it has no body line to point at (design-00001 §2).
  */
-export type DiagnosticKind = 'item-shape' | 'checklist-row' | 'unattributable'
+export type DiagnosticKind = 'item-shape' | 'checklist-row' | 'unattributable' | 'relation-field'
 
 export interface Diagnostic {
   kind: DiagnosticKind

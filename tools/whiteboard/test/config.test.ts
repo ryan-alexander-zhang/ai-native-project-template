@@ -225,6 +225,61 @@ describe('the entry types', () => {
   })
 })
 
+/**
+ * The relation matrix (spec-00002-FR-5 and FR-6): the startup check of
+ * spec-00001-FR-15 extended to `carries`. Missing is a legal reading — the
+ * check is then off — so the whole block is opt-in, and so is each type in it.
+ */
+describe('the relation matrix', () => {
+  /** `VALID` with a `carries` block spliced in before `flow`. */
+  function withCarries(block: string): string {
+    return VALID.replace('flow:', `carries:\n${block}flow:`)
+  }
+
+  it('reads a type to the relation fields it carries', () => {
+    expect(parse(withCarries('  spec: [parent]\n  prd: [parent, informs]\n')).carries).toEqual({
+      spec: ['parent'],
+      prd: ['parent', 'informs'],
+    })
+  })
+
+  // spec-00002-FR-5: an empty list is a reading of its own — this type carries nothing
+  it('keeps an empty list apart from a type that is not listed', () => {
+    const carries = parse(withCarries('  idea: []\n')).carries
+    expect(carries.idea).toEqual([])
+    expect('prd' in carries).toBe(false)
+  })
+
+  // spec-00002-AC-6.4 — the configs already in the field carry no matrix
+  it('reads a missing matrix as no matrix at all, and still starts', () => {
+    expect(parse(VALID).carries).toEqual({})
+  })
+
+  it('reads an empty matrix the same way', () => {
+    expect(parse(VALID.replace('flow:', 'carries:\nflow:')).carries).toEqual({})
+  })
+
+  // spec-00002-AC-6.1
+  it('rejects a matrix entry for a type the config does not declare, naming it', () => {
+    expectConfigError(withCarries('  report: [informs]\n'), /`carries\.report`.*unknown type "report"/)
+  })
+
+  // spec-00002-AC-6.2
+  it('rejects a relation field the config does not declare, naming it', () => {
+    expectConfigError(withCarries('  spec: [parent, verifies]\n'), /`carries\.spec`.*unknown relation "verifies"/)
+  })
+
+  // spec-00002-AC-6.3 — a bare string is the case this catches
+  it('rejects a matrix value that is not a list of strings, naming the type', () => {
+    expectConfigError(withCarries('  spec: parent\n'), /`carries\.spec` must be a list of strings/)
+    expectConfigError(withCarries('  spec: [3]\n'), /`carries\.spec` must be a list of strings/)
+  })
+
+  it('rejects a matrix that is not a mapping', () => {
+    expectConfigError(VALID.replace('flow:', 'carries: [spec]\nflow:'), /`carries` must be a mapping/)
+  })
+})
+
 describe('loadFlowConfig', () => {
   it('loads a config file from disk', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wb-config-'))
@@ -318,6 +373,21 @@ describe('the config shipped with this repo', () => {
       'idea',
       'prd',
     ])
+  })
+
+  /**
+   * spec-00002-FR-5: the matrix carries every folder README's "Relations"
+   * section, so every declared type is in it — a type left out would silently
+   * stop being checked. `supersedes` is in none of the lists on purpose: it is
+   * allowed to every type and never looked up (design-00001 §2).
+   */
+  it('gives every declared type a relation matrix entry', () => {
+    const config = loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname)
+
+    expect(Object.keys(config.carries).sort()).toEqual(Object.keys(config.types).sort())
+    expect(config.carries.idea).toEqual([])
+    expect(config.carries.prompt).toEqual([])
+    expect(Object.values(config.carries).flat()).not.toContain('supersedes')
   })
 
   /**

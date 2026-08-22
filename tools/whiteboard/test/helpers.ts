@@ -18,7 +18,7 @@ types:
   plan: { kind: work }
   issue: { kind: work }
   task: { kind: work }
-relations: [parent, implements, informs, blocks, supersedes, verifies]
+relations: [parent, implements, informs, motivated_by, blocks, supersedes, verifies]
 flow:
   idea:
     - { next: prd, carry: parent }
@@ -47,8 +47,9 @@ agents:
     cwd: docs
 `
 
-export function testConfig(): FlowConfig {
-  return parseFlowConfig(TEST_CONFIG, 'test-config')
+/** `extra` is appended as further top-level YAML — a `carries` matrix, say. */
+export function testConfig(extra = ''): FlowConfig {
+  return parseFlowConfig(`${TEST_CONFIG}${extra}`, 'test-config')
 }
 
 /** Create a temporary docs tree; keys are paths relative to the docs dir. */

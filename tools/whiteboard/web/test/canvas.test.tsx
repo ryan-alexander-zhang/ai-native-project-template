@@ -448,6 +448,7 @@ describe('the board', () => {
       focus: { prd: 'roles, scope, and the value trade-offs' },
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
+      carries: {},
       clarifiable: ['prd'],
       auditable: ['spec', 'rule', 'design'],
     })

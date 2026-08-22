@@ -192,6 +192,50 @@ function graphDiagnostics(docs: ParsedDoc[], nodes: DocNode[]): GraphDiagnostic[
   })
 }
 
+/**
+ * `supersedes` is allowed to every type before the matrix is consulted at all:
+ * docs/README.md grants it to all of them, so it is no folder README's Relations
+ * convention and belongs in no list (design-00001 §2 治理轮裁定).
+ */
+const UNIVERSAL_RELATION = 'supersedes'
+
+/**
+ * The relation-field diagnostics of spec-00002-FR-7 — the first ones that come
+ * from the front matter rather than the body, which is why they carry no line.
+ * Two findings share the kind, because to the reader they are one thing:
+ *
+ * - a relation field the type's matrix entry does not allow. A type absent from
+ *   the matrix is not checked, and an absent matrix leaves every type absent
+ *   (spec-00002-AC-5.4, AC-6.4);
+ * - a `parent` declared with two or more ids. That one is held by the code, not
+ *   the matrix: single-valued `parent` is a structural invariant of the document
+ *   system, not a per-project knob (spec-00002-FR-5 治理轮裁定). A one-element
+ *   list reads as a single value and is no finding.
+ *
+ * None of this touches `node.ok`, the edges or the coverage derivation: drift in
+ * how a field is written is drift, not damage (spec-00002-AC-7.2).
+ */
+function relationFieldDiagnostics(doc: ParsedDoc, node: DocNode, config: FlowConfig): GraphDiagnostic[] {
+  if (node.type === undefined) return []
+  const allowed = config.carries[node.type]
+  const row = (text: string): GraphDiagnostic => ({ docId: node.id, kind: 'relation-field', text })
+  const diagnostics = (allowed === undefined ? [] : unallowedFields(doc.data, config.relations, allowed)).map(
+    (relation) => row(`${relation} is not a relation field a ${node.type} document carries`),
+  )
+  const parent = doc.data.parent
+  if (Array.isArray(parent) && parent.length > 1) {
+    diagnostics.push(row(`parent is a single-valued field, but this ${node.type} declares ${parent.length} ids`))
+  }
+  return diagnostics
+}
+
+/** The relation fields this front matter writes down that its type's matrix entry leaves out. */
+function unallowedFields(data: Record<string, unknown>, relations: string[], allowed: string[]): string[] {
+  return relations.filter(
+    (relation) => relation !== UNIVERSAL_RELATION && relation in data && !allowed.includes(relation),
+  )
+}
+
 function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
   const nodes = docs.map((doc) => toNode(doc, config))
   const knownIds = new Set(nodes.filter((node) => node.ok).map((node) => node.id))
@@ -207,7 +251,15 @@ function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
         message: `${edge.relation} points at unknown document ${JSON.stringify(edge.to)}`,
       })),
   ]
-  return { nodes, edges, issues, diagnostics: graphDiagnostics(docs, nodes) }
+  return {
+    nodes,
+    edges,
+    issues,
+    diagnostics: [
+      ...graphDiagnostics(docs, nodes),
+      ...nodes.flatMap((node, index) => relationFieldDiagnostics(docs[index]!, node, config)),
+    ],
+  }
 }
 
 /** Scan `docsDir` and build the node graph. An unreadable or empty directory yields an empty graph. */

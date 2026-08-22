@@ -143,6 +143,7 @@ describe('requirement text wherever it is shown', () => {
       focus: {},
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
+      carries: {},
       clarifiable: [],
       auditable: ['spec', 'rule', 'design'],
     })

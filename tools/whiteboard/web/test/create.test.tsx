@@ -44,6 +44,7 @@ function config(entry: string[]): ConfigPayload {
     focus: {},
     agents: [{ name: 'claude', command: 'claude', args: [] }],
     entry,
+    carries: {},
     clarifiable: [],
     auditable: [],
   }
