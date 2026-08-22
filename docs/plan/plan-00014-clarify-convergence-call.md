@@ -1,7 +1,7 @@
 ---
 id: plan-00014-clarify-convergence-call
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-AC-45.6, spec-00001-AC-45.7]
 ---
 
