@@ -221,6 +221,7 @@ export class DocService {
     const current = this.readOrConflict(node)
     const updated = applyStatusChange(current.content, node, this.config, to)
     this.assertQuestionsResolved(node, to, current.content)
+    this.assertSuperseded(node, to, graph)
     this.assertScopeVerified(node, to, graph)
     return { ...(await this.write(node, updated, 'status')), status: to }
   }
@@ -241,6 +242,33 @@ export class DocService {
     if (node.status !== 'draft' || to !== promotedStatus(this.config.types[node.type!]!)) return
     if (hasOpenQuestions(content)) {
       throw new WorkflowError(`${node.id} has unresolved open questions and cannot be promoted to ${to}`)
+    }
+  }
+
+  /**
+   * spec-00002-FR-3 and FR-4 with rule-00001-BR-19: `archived` means «replaced»,
+   * so nothing reaches it until another document declares it replaced. Three
+   * readings, all of them deliberate (design-00001 §2):
+   *
+   * - the candidates are **not** filtered by `node.ok` — the pairing reads a
+   *   front matter declaration, not whether the declaring node is healthy
+   *   (spec-00002-AC-4.6). A file whose front matter will not parse at all
+   *   declares nothing, so it pairs with nobody; that is the same reading, not
+   *   an exception to it;
+   * - «another» is judged by **path**, the one key every document has to itself
+   *   — a document's own `supersedes` is no pairing for itself
+   *   (spec-00002-AC-4.3);
+   * - neither the type nor the status of the replacement matters, and many
+   *   replacements or many replaced ids are all one pairing each
+   *   (spec-00002-AC-4.1, AC-4.2, AC-4.4, AC-4.5).
+   */
+  private assertSuperseded(node: DocNode, to: string, graph: DocGraph): void {
+    if (to !== 'archived') return
+    const paired = graph.nodes.some(
+      (candidate) => candidate.path !== node.path && (candidate.relations.supersedes ?? []).includes(node.id),
+    )
+    if (!paired) {
+      throw new WorkflowError(`${node.id} cannot be archived; no other document declares supersedes: ${node.id}`)
     }
   }
 

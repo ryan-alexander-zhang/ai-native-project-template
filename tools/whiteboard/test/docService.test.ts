@@ -258,6 +258,129 @@ describe('transitions the promotion gate leaves alone', () => {
   })
 })
 
+/**
+ * The archive gate (spec-00002-FR-3 and FR-4 with rule-00001-BR-19): `archived`
+ * means «replaced», so the transition waits on another document saying so. The
+ * gate reads front matter declarations across the whole repo — not node health,
+ * not the replacement's type or status.
+ */
+describe('the archive gate', () => {
+  const ACTIVE_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'active' }, '# Spec\n')
+
+  /** A document whose `supersedes` lists `targets`, written as a YAML flow list. */
+  function replacement(id: string, type: string, status: string, targets: string[]): string {
+    return doc({ id, type, status, supersedes: `[${targets.join(', ')}]` }, `# ${id}\n`)
+  }
+
+  // spec-00002-AC-3.1
+  it('refuses to archive a document nothing supersedes, leaving the file alone', async () => {
+    const { docsDir, repoRoot, service } = serviceOn({ 'spec/b.md': ACTIVE_SPEC })
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('spec-00001-b', 'archived')).rejects.toThrowError(WorkflowError)
+    expect(onDisk(docsDir, 'spec/b.md')).toBe(ACTIVE_SPEC)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00002-AC-3.2
+  it('names the missing supersedes pairing in the refusal', async () => {
+    const { service } = serviceOn({ 'spec/b.md': ACTIVE_SPEC })
+
+    await expect(service.changeStatus('spec-00001-b', 'archived')).rejects.toThrowError(
+      /no other document declares supersedes: spec-00001-b/,
+    )
+  })
+
+  // spec-00002-AC-3.3 — a work item's completion is `resolved`; `archived` still needs a replacement
+  it('refuses to archive a resolved plan nothing supersedes', async () => {
+    const { service } = serviceOn({
+      'plan/a.md': doc({ id: 'plan-00001-y', type: 'plan', status: 'resolved' }, '# Plan\n'),
+    })
+
+    await expect(service.changeStatus('plan-00001-y', 'archived')).rejects.toThrowError(WorkflowError)
+  })
+
+  // spec-00002-AC-3.4
+  it('refuses the same archive again, still writing nothing', async () => {
+    const file = doc({ id: 'issue-00001-i', type: 'issue', status: 'wontfix' }, '# Issue\n')
+    const { docsDir, repoRoot, service } = serviceOn({ 'issue/i.md': file })
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('issue-00001-i', 'archived')).rejects.toThrowError(WorkflowError)
+    await expect(service.changeStatus('issue-00001-i', 'archived')).rejects.toThrowError(WorkflowError)
+    expect(onDisk(docsDir, 'issue/i.md')).toBe(file)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00002-AC-4.1
+  it('archives when the superseding document is itself a draft', async () => {
+    const { docsDir, service } = serviceOn({
+      'spec/b.md': ACTIVE_SPEC,
+      'spec/c.md': replacement('spec-00002-c', 'spec', 'draft', ['spec-00001-b']),
+    })
+
+    expect((await service.changeStatus('spec-00001-b', 'archived')).status).toBe('archived')
+    expect(onDisk(docsDir, 'spec/b.md')).toContain('status: archived')
+  })
+
+  // spec-00002-AC-4.2
+  it('archives when the superseding document is of another type', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': ACTIVE_SPEC,
+      'design/d.md': replacement('design-00001-d', 'design', 'active', ['spec-00001-b']),
+    })
+
+    expect((await service.changeStatus('spec-00001-b', 'archived')).status).toBe('archived')
+  })
+
+  // spec-00002-AC-4.3 — «another» is judged by path, so a self-declaration pairs with nobody
+  it('refuses to archive a document that only supersedes itself', async () => {
+    const { docsDir, service } = serviceOn({
+      'spec/b.md': replacement('spec-00001-b', 'spec', 'active', ['spec-00001-b']),
+    })
+
+    await expect(service.changeStatus('spec-00001-b', 'archived')).rejects.toThrowError(WorkflowError)
+    expect(onDisk(docsDir, 'spec/b.md')).toContain('status: active')
+  })
+
+  // spec-00002-AC-4.4
+  it('archives when two documents both supersede it', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': ACTIVE_SPEC,
+      'spec/c.md': replacement('spec-00002-c', 'spec', 'active', ['spec-00001-b']),
+      'spec/d.md': replacement('spec-00003-d', 'spec', 'active', ['spec-00001-b']),
+    })
+
+    expect((await service.changeStatus('spec-00001-b', 'archived')).status).toBe('archived')
+  })
+
+  // spec-00002-AC-4.5
+  it('archives when the superseding document also replaces two others', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': ACTIVE_SPEC,
+      'spec/c.md': replacement('spec-00002-c', 'spec', 'active', [
+        'spec-00003-gone',
+        'spec-00001-b',
+        'spec-00004-also-gone',
+      ]),
+    })
+
+    expect((await service.changeStatus('spec-00001-b', 'archived')).status).toBe('archived')
+  })
+
+  // spec-00002-AC-4.6 — the pairing reads the declaration, never the declaring node's health
+  it('archives when the superseding document is itself an anomalous node', async () => {
+    const { service } = serviceOn({
+      'spec/b.md': ACTIVE_SPEC,
+      'spec/c.md': replacement('spec-00002-c', 'spec', 'nonsense', ['spec-00001-b']),
+    })
+    const declarer = service.graph().nodes.find((node) => node.id === 'spec-00002-c')
+    expect(declarer?.ok).toBe(false)
+
+    expect((await service.changeStatus('spec-00001-b', 'archived')).status).toBe('archived')
+  })
+})
+
 describe('review', () => {
   // spec-00001-AC-8.1 and AC-14.3
   it('accepts a draft living doc into active and commits it', async () => {
