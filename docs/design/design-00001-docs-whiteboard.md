@@ -2,7 +2,7 @@
 id: design-00001-docs-whiteboard
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance]
 ---
 
 # Design: Docs 白板 MVP
@@ -88,6 +88,40 @@ flowchart LR
   类型集（BR-20）、可审计类型集（BR-23）与 resolved 门（BR-24、BR-25）由
   代码内建，不进配置；配置承载的是类型二分、产品流（BR-1、BR-13…BR-17，
   第十轮起含 `plan → issue/record`）与每个可澄清类型的焦点行（spec FR-48）。
+  **治理轮（spec-00002）：状态流转通路上再加两道门**，二者与 resolved 门同处
+  一地——`docService.changeStatus` 里 `assertScopeVerified` 所在的那一段：先由
+  `applyStatusChange`（workflow.ts，纯函数）按流转表算出新正文，再依次过门，
+  全部通过才写盘。放这里而不是放进 `applyStatusChange`，理由是归档门要读**全仓
+  的 front matter 声明**，而 `DocService` 是唯一同时持有图与「刚重读的那份原文」
+  的地方；三道门写在同一个函数里，`spec-00002-FR-1` 的「不得有一条通路绕过」
+  才是读一个函数就能核的事。**以下两条内不带前缀的 `AC-n.m` 一律指
+  `spec-00002`。**
+  - **促进门**（`spec-00002-FR-1`/`FR-2`，`rule-00001-BR-12`）：来源为 `draft`
+    且目标为该种类的促进态（living 的 `active`、work 的 `open`，取
+    `statusRules.promotedStatus(kind)`）时，对**刚重读的整文件原文**调用
+    `workflow.hasOpenQuestions`——与 `applyAccept` 调用的是同一个函数、同一个
+    入参形态（两条通路都从 `readOrConflict` 取 content）。「未决」因此只有一处
+    定义，两条通路不可能给出不同结论（`spec-00002-AC-1.7`）；日后改判定只改
+    `hasOpenQuestions`，不动任何一道门。条件写成「目标是促进态」而不是「目标非
+    draft」，`draft → archived`、work 的 `draft → wontfix` 与 `open → resolved`、
+    living 的 `active → draft`（修订轮）因此自然不经此门（`FR-2`）。
+  - **归档门**（`spec-00002-FR-3`/`FR-4`，`rule-00001-BR-19`）：目标为
+    `archived` 时，在全图中找**另一份**文档的 front matter `supersedes` 列出该
+    文档 id。三条判定细节写在设计里而非留给实现：
+    1. **读声明，不读健康**——候选不按 `node.ok` 过滤，异常节点的 `supersedes`
+       照样算数（`AC-4.6`）。这与 `toEdges` 里 `knownIds` 只收 `ok` 节点是**有意
+       的不一致**：边解析问的是「目标是不是一份可用的文档」，配对只问「有没有
+       另一份文档声明过替代」。边界一句：front matter **整体不可解析**的文件
+       `doc.data` 为空，读不出任何 `supersedes`，故它不配对任何人——这不是本门
+       的例外，是「读声明」在没有声明时的自然结果。
+    2. **「另一份」按文件路径判，不按 id 判**（`node.path !== candidate.path`）：
+       自己的 `supersedes` 不构成对自己的配对（`AC-4.3`），而路径是每份文档唯一
+       的键——撞 id 时 id 不是（见下条 Doc Repository）。
+    3. 不区分替代文档的类型与 status（`AC-4.1`、`AC-4.2`）；一份文档列出多个
+       被替代 id、多份文档同列一个被替代 id 都成立（`AC-4.5`、`AC-4.4`）。
+    已知后果，记明不修：`DocNode.relations` 的键取自流程配置的 `relations`，
+    配置若不声明 `supersedes`，本门将永远找不到配对、一切归档都到不了。本轮不为
+    它加启动校验（`spec-00002-FR-6` 未列该项），留给 plan 轮判断是否补。
 - **Editor**：编辑与预览是同一份正文的两个视图——预览渲染的是编辑器**当前
   缓冲区**而非磁盘内容，切换不落盘也不丢改动（spec FR-22）。预览时 CodeMirror
   视图只隐藏、不卸载，光标与滚动位置因此保留（spec FR-25）。渲染前剥掉 front
@@ -111,6 +145,110 @@ flowchart LR
   重复请求不重读整树（spec §7 非功能项）。会话产物的异常标记（FR-17 的
   `lastFinding`）随每次图构建按磁盘当前内容重验，验证通过即清除——不再等
   下一次推进（issue-00014 的修复口径）。
+- **Doc Repository（治理轮补，spec-00002）**——三件事，都落在既有的
+  `buildGraph` 一遍里。**本条内不带前缀的 `FR-n` / `AC-n.m` 一律指
+  `spec-00002`**（低号 FR/AC 在 `spec-00001` 里另有其人，凡指后者处均写全）：
+
+  **撞 id（`FR-8`/`FR-9`）**：`docs.map(toNode)` 之后按 front matter id 分组，
+  凡一个 id 落在两份及以上文件上，**每一份**都改以**文件路径**为节点键
+  （`node.id = node.path`）、置 `ok = false`、problem 点名其余同 id 文件的路径，
+  并新增字段 `duplicateOf` ＝那个撞的 id（节点标签与命令面板检索都要它，
+  `AC-8.1`/`AC-8.4`，见 design-00002 §4）。这与无 id 节点的处置是同一处置——路径
+  本来就是 `toNode` 的回退键。**下游三件事因此自动成立，不加新判断**：
+  1. 撞的那个 id 不再是任何节点的键，`toEdges` 的 `knownIds` 与 `itemOwners`
+     都命不中它，指向它的边即判 `ok: false`（`AC-8.6`）；
+  2. `itemOwners` 本就跳过 `!node.ok` 的节点，撞 id 文档的条目因此不被任何一处
+     认领（`FR-8`）；
+  3. 呈现状态按节点键保持，键即路径，刷新后选中仍落在同一份文件上（`AC-8.9`）。
+
+  **要改的有三处，一处都不能少**：
+
+  1. **resolved 门的条目文档集**（`docService.assertScopeVerified` 里
+     `declaresItems(type)` 那一步）加 `duplicateOf === undefined`；
+  2. **全局覆盖率视图的文档集**同样加 `duplicateOf === undefined`。
+     这两处今天不按 `ok` 过滤，因而不被上面第 2 条捎带；**判据取 `duplicateOf`
+     而不是 `ok`**，因为两处都必须继续服务「front matter 异常但正文可解析」的
+     文档（`FR-10` 明写，resolved 门今天亦然），只有撞 id 才出局。撞的 id 既不在
+     条目集、也不在 `docIds` 里，落到它上面的交付范围 id 因此经 `deliveryScope`
+     的 `unresolved` 一支计为无法解析的缺口（`AC-8.8`），这一步不加新判断。
+  3. **取号必须按「声明的 id」数，不能按节点键数**——这一处是**改键的反作用，
+     不修就出新缺陷**：`highestNumber`（`docRepository.ts:277`）拿
+     `ID_PATTERN` 去 `exec(node.id)`，而撞 id 节点的键已被改成文件路径，路径不
+     匹配该模式，于是那个被撞的编号**从计数里消失**，`allocateNumber` 会把它
+     **再发一次**——本来只是两份撞 id，一取号就成了三份，直接违反
+     `rule-00001-BR-18`。**实现要求**：本节引入一个统一读法——**声明的 id**
+     ＝`node.duplicateOf ?? node.id`——`highestNumber` 按它匹配。
+     **`DocService.create` 的存在性校验同样按它判**：现行
+     `findNode(graph, id) || existsSync(absolute)` 两条都不够——`findNode` 找的是
+     节点键（撞 id 后不含那个 id），而 `existsSync` 只看**规范路径**
+     `docs/<type>/<id>.md`，一份放在非规范路径上的同 id 文档它看不见，于是新建
+     会再落一份、把两份撞 id 变成三份。校验必须问「有没有任何节点的**声明的
+     id** 等于它」，`existsSync` 仅作最后一道防线保留。
+  按撞的 id 寻址的写入（`FR-9` a）：`DocService.require` 找不到节点时先看是否有
+  节点的 `duplicateOf` 等于该 id——是则抛 `ConflictError`（`409`），消息点名那几份
+  文件并要求先修复 id 冲突（`AC-9.2`）。**状态码取 409 而不是 422，本文钉死**：
+  `FR-9` a 只说「拒绝」，没指定码；409 的语义（请求与资源的当前状态冲突）正是
+  「这个 id 现在指不到唯一一份文档」，且它复用 `require` 既有的 `ConflictError`
+  通路，不新增错误类与映射。422 留给「工作流裁定拒绝了这个动作」——两道新门用它
+  （§7）。按路径寻址的编辑（`FR-9` b）不需要
+  新端点：异常节点的编辑入口本就用节点键，而它现在就是路径；**但节点键含 `/`，
+  客户端必须 `encodeURIComponent` 后再拼进 URL**——已实测 Express 5 的 `:id` 会把
+  `%2F` 解回斜杠，**路由不必改，改的全在客户端**。
+  **范围要说全**：`web/src/api.ts` 里 `/api/docs/:id` 这一族的**七个调用点**
+  （`doc`、`items`、`save`、`transitions`、`setStatus`、`accept`、`nextSteps`）
+  一律直接字符串拼接、都不编码；只有 `createPrefill` 走查询参数并已编码。所以
+  这不是「编辑那一处」的问题——凡以节点键寻址的调用都要一起补，否则异常节点仍会
+  在别的入口上失败。这是**先于本轮存在的缺口**（无 id 的异常节点今天同样编辑
+  不了），`FR-9` b 的落地依赖它被补上；按仓库约定先开 issue 复现再修，**归宿已
+  定**：`issue-00016` 与 `plan-00012` T4，本轮不就地处置。
+
+  **关系矩阵校验（`FR-5`…`FR-7`）**：这是**第一条不来自正文的诊断**——它读
+  `doc.data`（front matter 原值），因此产在节点那一遍里，与正文解析、正文缓存
+  都无关。两件事各产一条 `relation-field` 诊断：该文档 `type` 在矩阵中不被允许
+  的关系字段；以及 `parent` 声明为含**两个及以上** id 的列表（单元素列表按单值
+  读，不诊断——`FR-7` 说的是「多值」）。诊断行沿用 `GraphDiagnostic`：
+  `kind: 'relation-field'`（`DiagnosticKind` 新增此值）、`docId` ＝节点键、
+  `text` ＝字段名与该类型（诊断清单要显示的那一行）；**不带 `line`**——front
+  matter 的行号不在其余诊断所用的「正文相对行号」编号里，清单须容忍缺行号（该
+  字段本就可选）。矩阵缺失、或某类型不在矩阵中，则该文档不过此校验（`AC-6.4`、
+  `AC-5.4`）。诊断不改 `node.ok`、不改边、不改覆盖推导——它与 `graphDiagnostics`
+  并列拼进 `graph.diagnostics`，无任何连锁（`AC-7.2`）。
+  两条裁定写明，因为它们决定了配置长什么样（二者均已由领域负责人裁定，不是
+  本文的读法）：
+  - **`supersedes` 在查表前先放行**。`docs/README.md` 把它授予每一种类型（替代
+    文档一律带它），它不是任何文件夹 README 的 Relations 约定，故不进矩阵；矩阵
+    只回答「某文件夹 README 的关系字段属不属于这个类型」。这正是 `idea` 与
+    `prompt` 能保持空集合（`FR-5` 明写「这两型不带任何关系字段」）而它们仍可被
+    替代的原因。反面做法——把 `supersedes` 逐类型列 16 遍——被否决：它不携带任何
+    信息，且日后新增一个类型忘了带它就会产出假诊断。
+  - **`parent` 单值一条是代码，不是配置**——**治理轮已裁定**，`spec-00002-FR-5`
+    与 `CONTEXT.md` 的「关系矩阵」条目已同步改写为这一分工。理由是它属于文档
+    体系的**结构不变量**，不是逐项目可调的旋钮，故与流转表同类：写死在代码里，
+    由矩阵这一遍报出，与矩阵违规共用同一条 `relation-field` 诊断类别。矩阵的形状
+    是「类型 → 字段列表」，本就表达不了元数；曾考虑另立 `single: [parent]` 键，
+    否决：`docs/` 里没有第二处声明元数，多一套语法换不到任何人要过的可配置性。
+
+  **正文解析缓存下延一层（`spec-00002` §7 非功能项）**：第十一轮的缓存只存
+  `DocGraph`（front matter 一层），`/items`、resolved 门与 `graphDiagnostics`
+  每次都重新 `readDocBody` 整棵树。全局覆盖率视图一次要读全部 spec/rule 与全部
+  record，是现有读取里最重的一处，故缓存**两样东西**：（1）「文件读取 +
+  gray-matter 分离」的结果，键为文件路径；（2）以**全部 record** 为证据集的那
+  一次 `scanRecords` 与逐文档 `requirementViewFrom` 结果，**按文档缓存**。
+  **共用的是缓存与证据集，不是文档集——这三者各选各的文档，不得合一**：
+  - `graphDiagnostics` **保留它现有的 `node.ok` 过滤**（`spec-00001-FR-40` 的
+    当前行为），front matter 异常的文档不产文法诊断；
+  - `/coverage` 选 `declaresItems(type) && duplicateOf === undefined`，
+    **不按 `ok` 过滤**——`FR-10` 明写异常但正文可解析的文档在列；
+  - `/items` 选被点名的那一份。
+
+  写明是为了防一种「顺手统一」：三处都读同一份缓存，看上去像是可以抽成一个
+  「算出全部文档的覆盖」的函数再各自取用——**那会把 `graphDiagnostics` 的
+  `ok` 过滤一并抹掉，静默改掉 `spec-00001-FR-40` 的行为**。缓存共用到
+  `requirementViewFrom` 的**逐文档结果**为止，选哪些文档是各调用点自己的事。
+  resolved 门的证据集是收窄过的
+  （`parent` 指向该 plan 的 record），**不复用推导结果**，但复用（1）。
+  **失效条件不新增**：与 `DocGraph` 同一个 `DocService.invalidate()`——一个缓存、
+  一个失效信号，图与正文因此不可能各自停在不同的磁盘状态上。
 - **Git Layer**：每个动作 `git add <涉及路径>` 后 commit，从不 `add -A`
   （spec FR-14 的"只暂存本次动作涉及的文件"）。commit 失败不回滚已写盘内容
   （spec FR-20），失败信息沿 API 返回给前端呈现。**快照与差集的能力归它**
@@ -151,6 +289,13 @@ flow:                       # rule-00001-BR-13…BR-17
 
 entry: [idea, prd]          # rule-00001-BR-26 的流程入口类型（spec FR-53）；缺失或空 = 无新建入口
 
+carries:                    # 治理轮（spec-00002-FR-5）的关系矩阵：类型 → 该类型允许声明的关系字段
+  spec:   [parent]
+  design: [informs]
+  record: [parent, verifies]
+  idea:   []                # 空列表 = 不带任何关系字段
+  # 未出现在此处的类型不做该校验；supersedes 不列，它对每种类型都允许
+
 agents:
   claude:
     command: claude
@@ -171,6 +316,30 @@ agents:
 - 多 agent 并存时可在发起会话时指定其中一条（`POST /sessions*` 的可选
   `agent` 字段），缺省取配置中的**第一项**；未知名字拒绝且不启动（spec
   FR-55，第十一轮取代原「由用户选择 CLI 留后续版本」的搁置）。
+- **关系矩阵 `carries`（治理轮，spec-00002-FR-5/FR-6）**。**键名取
+  `carries` 的理由**：配置里已有 `flow[].carry`（「这一步带上哪个关系」），
+  `carries` 是同一个动词在类型这一层的用法（「这个类型带哪些关系字段」），不引入
+  第二套词汇；两者的分工写进配置文件注释——`carry` 是逐步的，`carries` 是逐类型
+  的。校验规则（与 `types`/`relations`/`entry` 同一遍，任何违规即拒绝启动）：
+  - `carries` 必须是映射；其每个键必须在 `types` 中，否则拒绝启动并**指明该
+    类型**（`AC-6.1`）；
+  - 每个值必须是**字符串列表**，否则拒绝启动并指明该类型（`AC-6.3`，一个裸
+    字符串即此情形）；
+  - 列表中每个字段必须在 `relations` 中，否则拒绝启动并**指明该字段**
+    （`AC-6.2`）；
+  - `carries` 缺失、为 null 或为空映射：**照常启动，不做字段-类型校验**
+    （`AC-6.4`）——与 `entry`、`focus` 缺失的读法一致，向后兼容优先。
+  - **空列表与「不出现」不同**，这是 `FR-5` 明写的两种语义：空列表＝该类型不许
+    带任何关系字段（会产诊断），不出现＝不校验该类型（不产诊断）。校验代码因此
+    要分得清「键存在且值为 `[]`」与「键不存在」，不能把二者归一。
+- **本轮就把矩阵写进仓库根的 `whiteboard.config.yaml`**，按各文件夹 README 的
+  「Relations」小节填满 16 个类型（`idea` 与 `prompt` 为空列表，它们没有该小节）。
+  这**不会拦住今天的白板**：现行 `parseFlowConfig`（`tools/whiteboard/src/config.ts`）
+  在 `asRecord(raw, 'config root')` 之后只读自己认识的键，没有未知顶层键的拒绝
+  分支，故矩阵在实现落地前只是一段被忽略的配置——已实测启动与既有配置用例照常
+  通过。因此不采用「注释掉 + 留 TODO」的写法。已按这份矩阵对全仓 front matter
+  跑过一遍：**现有文档产出 0 条 `relation-field` 诊断**（含 `parent` 多值一项），
+  与 `spec-00002` §1 的读数一致——矩阵落地时不会一上来就亮一片诊断。
 
 ## 4. 推进（Advance）交互
 
@@ -248,6 +417,32 @@ stateDiagram-v2
   管道：**读盘校验 → 裁决（Workflow Engine）→ 写盘 → commit**。新建的
   「读盘校验」是不存在性校验（目标 id 已存在 → 409，FR-53/AC-53.3）。澄清与答疑不走
   写管道——它们发起会话，写由会话内的 agent 完成（第八轮，decision-00006）。
+- **状态切换这一支的裁决段有固定次序**（治理轮，spec-00002）：
+  **流转合法性表（`spec-00001-FR-7`）→ 促进门（`spec-00002-FR-1`）→ 归档门
+  （`spec-00002-FR-3`）→ resolved 门（`spec-00001-FR-52`）**，全部通过才写盘。事实上这三道门**两两互斥**
+  ——促进门只看「draft → 促进态」，归档门只看「→ archived」，resolved 门只看
+  「plan open → resolved」，一次流转至多触发其中一道，故次序不改变任何一次拒绝的
+  结论；把它定死是为了两件事：拒绝消息与用例的可预期，以及代价递增（合法性只看
+  两个字段，促进门只读一份文件，归档门读全图 front matter，resolved 门要正文
+  推导）。**拒绝不留半写**：新正文是 `applyStatusChange` 在内存里算出的字符串，
+  门在 `writeFileSync` 之前跑完，任何一道拒绝都发生在唯一那次写盘之前，也就没有
+  commit（`spec-00002` §7 第 3 条、`spec-00002-AC-1.1`、`AC-3.1`）；重复请求同样
+  被拒且同样不改文件（`AC-1.4`、`AC-3.4`——本条内 `AC-n.m` 均指 `spec-00002`），
+  因为门是纯判定、不留状态。
+
+  ```mermaid
+  flowchart LR
+    RQ[POST /status] --> LG{流转合法性表<br/>spec-00001-FR-7}
+    LG -->|不合法| RJ[422 拒绝<br/>不写盘·无 commit]
+    LG -->|合法| OQ{促进门<br/>spec-00002-FR-1}
+    OQ -->|有未决 Open Questions| RJ
+    OQ -->|通过或不适用| AR{归档门<br/>spec-00002-FR-3}
+    AR -->|无 supersedes 配对| RJ
+    AR -->|通过或不适用| RV{resolved 门<br/>spec-00001-FR-52}
+    RV -->|交付范围有缺口| RJ
+    RV -->|通过或不适用| WR[写盘 → commit]
+  ```
+
 - 冲突检测（spec FR-5）：编辑器打开时记录整文件 hash；保存时 hash 不符或文件
   不存在 → `409`。状态切换/评审按「动作发起时的 status」做 compare-and-swap：
   落盘前重读，status 已变或文件已删 → 拒绝（FR-19）。
@@ -269,6 +464,16 @@ stateDiagram-v2
   `GET /api/docs/:id/items`**——覆盖状态、诊断、展开行与详情目标都活在 items
   载荷里，只重取 graph 则条目侧的变化不可见（`AC-42.2`、`AC-44.1`…`AC-44.7`
   依赖这一半）。无选中且未下钻时只取 graph。
+  **治理轮（spec-00002）加第三项，已由领域负责人裁定**：**全局覆盖率视图打开
+  期间**，同一次刷新一并重取 `GET /api/coverage`；视图未打开时**不取**——它是
+  最重的一次读取，没人在看就不该跑。三份载荷共用同一条通路，覆盖率视图因此
+  没有自己的刷新机制。后果按 §10 的既有规则落位：行随刷新重新推导，计数当场
+  更新（`spec-00002-AC-10.4`）；一份已被删除的文档**整行消失**——这就是「就近
+  关闭」用在视图行上（并入 `spec-00001-FR-44` 族）；展开态按**文档 id** 保持
+  （`spec-00002-AC-11.5`），所指文档没了则该展开态一并消失。`spec-00002-AC-12.5`
+  因此守的不是「刷新之后」，而是**推送尚未到达视图、或点击与刷新同刻**的那个
+  竞态窗口：点击落到一份磁盘上已不存在的文档时，沿用既有的选中失败通路，以
+  提示条拒绝、不改变当前选中。
   连接未建立或中断时白板照常可用、自动重连（间隔递增，起始 1s、上限 30s），
   连接建立或重建即刷新一次补回断连期间的变化（`FR-43`）；不轮询。白板自身动作
   与会话结束后的刷新通路照旧，三者共用同一个「重取 + 保持呈现状态」实现。
@@ -307,6 +512,7 @@ WS   /api/terminal                    双向。文本帧 = stdin 原样字节；
 WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。两个来源：docs/ 变更（watcher），以及会话收尾——**无论有无 commit**（FR-12/issue-00013，三触发源由此真正共用一条通路）
 GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）
 GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
+GET  /api/coverage                    → [{docId, title, verified, failing, uncovered, items: [{id, coverage}]}]   # 全局覆盖率视图（spec-00002-FR-10/FR-11，治理轮）：全仓每份 spec/rule 一行，三态计数 + 逐条目覆盖；不区分文档 status，撞 id 的文档不在列；无可列文档时为 []
 ```
 
 `/items` 的载荷字段是 T1 与后续任务并行时的共同事实：验收行对象至少含
@@ -320,6 +526,45 @@ line?, text?}`——无法归属（原 `unattributed`，FR-33）与文法诊断�
 声明的原始 id **列表**；细粒度引用时它们与 `target`（所属文档）不同。同一字段
 的多个值落到同一文档时合并为一条边（FR-28 合并规则的延伸，AC-28.5），关系列表
 （FR-30）按 `declaredTargets` 逐项展开。
+
+**治理轮（spec-00002）对上述载荷的增补，逐项如下**（以下四段内不带前缀的
+`FR-n` / `AC-n.m` 一律指 `spec-00002`）。
+
+`/api/coverage` **把逐条目状态折进同一次调用**，而不是「展开时再取一份」，理由
+有三：三态计数本来就是逐条目覆盖数出来的——服务端为了给出计数必须先算出每个
+条目的状态，`items` 因此是白拿的，拆成第二个端点等于把同一次推导做两遍；计数
+与展开行来自同一次快照，二者不可能对不上（与「门与 `/items` 永不相异」同一
+理由）；展开态是纯呈现状态（`FR-11` 按文档 id 跨刷新保持），本就不需要往返。
+载荷代价可忽略——每条目只有 id 与三态之一，本仓最大的 spec 也只有几十条。行内
+的 `items` 只带 `{id, coverage}`，**不带正文与 AC**：`FR-11` 只要 id 与状态，
+读正文走检视面板与子画布的 `/items`。该端点与 `/items`、`graph.diagnostics`
+共用 §2 所定的同一份「全部 record 为证据集」的推导与缓存，这也是 `spec-00002`
+§7 那条非功能项的落点。
+
+`GET /api/graph` 的两个数组现在各自还是一份**下钻清单**的数据源（`FR-13`、
+`FR-14`），只增一个字段：`issues` 行增加 `nodeId`——该条异常所定位到的节点键，
+边的异常取**声明方**节点（`FR-13`/`FR-15`、`AC-13.4`、`AC-15.4`）。`path` 始终
+呈现（`FR-13` 的「来源」），旁边再显示哪个 id，**分两种情形**——早先写的
+「`nodeId !== path` 即有 id」这条单一判据**对撞 id 的节点是错的**（它们的
+`nodeId` 恰恰等于 `path`，却明明有一个 id 要给人看），故改为：
+- `nodeId !== path`：该文件解析出了可用的文档 id，显示 `nodeId`；
+- `nodeId === path` 且节点带 `duplicateOf`：显示 `duplicateOf`——**撞的那个 id
+  正是这条异常的内容**，不显示它，清单就只剩两行长得一样的路径（`FR-13` 要
+  「来源」可辨，`FR-8` 要那个 id 看得见）；
+- `nodeId === path` 且无 `duplicateOf`：该文件根本没有 id，只显示路径。
+
+判据仍然只读已有字段，不需要第三个新字段。
+`diagnostics` 行**无需增补**：`docId` 取的就是节点键，`FR-15` 的定位直接可用；
+新增的 `relation-field` 只是 `kind` 的一个新值（§2）。节点侧新增
+`duplicateOf?`——撞 id 时那个撞的 id，节点标签与命令面板要它（§2、design-00002
+§4）；不撞 id 时字段缺席。
+
+**两道新门的拒绝沿用既有的 422 形**：`POST /api/docs/:id/status` 的
+`422 {error}`，**不带 `gaps`**——`gaps` 仍是 resolved 门专有的判别标志
+（`web/src/api.ts` 靠它区分两种 422）。促进门的 `error` 点名该文档有未决 Open
+Questions（`AC-1.3`），归档门的 `error` 说明缺少列出该 id 的 `supersedes` 配对
+（`AC-3.2`）。按撞的 id 寻址的写入沿用 `409`（`ConflictError`），消息要求先修复
+id 冲突（`FR-9` a、`AC-9.2`）。
 
 白板的 commit 一律带 `--no-verify`（第十一轮，decision-00008 §2 第 6 条）：
 pre-commit hook 的受众是人手提交，白板按 spec 提交 draft 产物（FR-17 的推进
@@ -341,3 +586,24 @@ spec-00001-FR-26、FR-27 承接。
 - 运行：仓库根部 `npm run whiteboard`（根 package.json 脚本代理到
   `npm start --prefix tools/whiteboard`），读取 `./docs` 与
   `./whiteboard.config.yaml`。
+
+## 9. 治理轮的两处裁定余项（已裁，非未决）
+
+- **启动校验不要求 `relations` 声明 `supersedes`（治理轮裁定）。** 归档门（§2）
+  读的是 `DocNode.relations.supersedes`，该键只在流程配置的 `relations` 列出它
+  时才存在；一份漏掉它的配置会让白板照常启动，而**一切归档永远找不到配对**。
+  裁定：这是配置层的自担选择——`relations` 本就是项目自定的字段词表，删掉任何
+  字段都会关掉依赖它的能力，`supersedes` 不特殊；`spec-00002-FR-6` 的校验集不
+  扩。模板自带配置始终列全八个字段，正常项目不会踩到。
+- **`graphDiagnostics` 的 `ok` 过滤保持现状（治理轮裁定）。** 本轮出现一处口径
+  不齐：`/coverage` 服务「front matter 异常但正文可解析」的文档
+  （`spec-00002-FR-10` 明写），而文法诊断对同一批文档不产出
+  （`spec-00001-FR-40` 的现行行为，§2 已钉住不得顺手统一）。于是这些文档在
+  覆盖率视图里有计数，却拿不到解释计数的诊断。裁定：按现行行为保留——修复
+  front matter 是第一动作，诊断随修复自然出现；放宽属 `spec-00001-FR-40` 自己
+  的修订轮，本轮不做。
+
+**已有归宿的实现项**：`web/src/api.ts` 那七个未编码的 `/api/docs/:id`
+调用点（§2）已归 `issue-00016` 与 `plan-00012` T4；从 `spec-00001` §6 移除被
+`spec-00002` 覆盖的两条范围外事项、以及把「id 唯一」写进 `docs/README.md`，
+已由 `spec-00002` §1 指给 plan 轮。

@@ -2,7 +2,7 @@
 id: issue-00015-open-questions-gate-bypassed-on-status-path
 type: issue
 status: open
-blocks: [spec-00002-whiteboard-governance]
+blocks: [spec-00002-whiteboard-governance, plan-00012-whiteboard-governance-gates]
 ---
 
 # Issue: 带未决 Open Questions 的文档，走状态切换就能促进出 draft

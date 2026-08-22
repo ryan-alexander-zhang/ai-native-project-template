@@ -1,7 +1,11 @@
 # Docs whiteboard flow config — the machine-readable carrier of rule-00001-docs-workflow.
-# Carries the type split (BR-1) and the product flow (BR-13…BR-17).
+# Carries the type split (BR-1) and the product flow (BR-13…BR-17), and — since
+# spec-00002 — the relation matrix (`carries`) that holds each folder README's
+# "Relations" section.
 # The status transition table (BR-2…BR-9), the clarifiable set (BR-20), the
-# auditable set (BR-23), and the resolved gate (BR-24, BR-25) are built into the
+# auditable set (BR-23), the resolved gate (BR-24, BR-25), the Open Questions
+# promotion gate and the archive `supersedes` gate (spec-00002-FR-1, FR-3), and
+# the "`parent` is single-valued" rule of docs/README.md are all built into the
 # code and are not configured here.
 
 # The declaration order below IS the whiteboard's column order, left to right
@@ -39,6 +43,45 @@ relations:
   - blocks
   - verifies
   - supersedes
+
+# The relation matrix (spec-00002-FR-5): type -> the relation fields a document of
+# that type may declare. This is the only thing that answers "does this relation
+# field belong to this type"; the board reads it instead of the prose in each
+# folder's README, and every list below is copied from that README's "Relations"
+# section. A field a document declares outside its type's list produces a
+# `relation-field` parse diagnostic (FR-7) — never a node anomaly, and nothing
+# downstream changes.
+#
+# `carries` is `flow[].carry` one level up: `carry` is per step ("which relation
+# this step brings along"), `carries` is per type ("which relation fields this
+# type carries"). Same verb, no second vocabulary.
+#
+# An empty list means the type carries no relation field at all (idea and prompt
+# have no Relations section). A type left out of this block entirely is NOT
+# checked — opting in is per type. Drop the whole block and the check is off,
+# and the board still starts (FR-6).
+#
+# `supersedes` is deliberately absent from every list: docs/README.md grants it to
+# every type (a replacement doc always carries it), so it is allowed globally and
+# never checked against this matrix. Listing it sixteen times would carry no
+# information and would go stale the first time a type is added without it.
+carries:
+  idea: []
+  prd: [parent]
+  analysis: [parent, informs]
+  reference: [informs]
+  integration: [informs]
+  spec: [parent]
+  rule: [informs]
+  decision: [motivated_by, constrains]
+  design: [informs]
+  plan: [implements]
+  task: [parent]
+  issue: [blocks]
+  record: [parent, verifies]
+  report: [informs]
+  operation: [implements]
+  prompt: []
 
 flow:
   idea:

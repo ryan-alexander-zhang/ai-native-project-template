@@ -2,7 +2,7 @@
 id: issue-00004-duplicate-ids-hide-a-document
 type: issue
 status: open
-blocks: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance]
+blocks: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, plan-00012-whiteboard-governance-gates]
 ---
 
 # Issue: 两份文档撞 id 时，一份从白板上消失，动作还会落到另一份上
