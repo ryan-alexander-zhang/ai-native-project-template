@@ -203,3 +203,44 @@ describe('the api client', () => {
     await expect(api.graph()).rejects.toThrowError('Error')
   })
 })
+
+/**
+ * issue-00016: a node key is not always a document id. An anomalous document —
+ * no id in its front matter, or an id it collides on — is keyed by its file
+ * path, and a path carries slashes. Every `/api/docs/:id` call has to encode
+ * the key, or the slashes are read as further path segments and the request
+ * never reaches the document.
+ */
+describe('addressing a document whose key is a file path', () => {
+  const PATH_KEY = 'spec/duplicate-b.md'
+  const ENCODED = 'spec%2Fduplicate-b.md'
+
+  it('encodes the key when reading the document', async () => {
+    const fetchMock = mockFetch(200, { path: PATH_KEY, content: '', hash: 'h' })
+    await api.doc(PATH_KEY)
+    expect(fetchMock).toHaveBeenCalledWith(`/api/docs/${ENCODED}`, expect.anything())
+  })
+
+  it('encodes the key when saving the document — the repair path of spec-00002-FR-9', async () => {
+    const fetchMock = mockFetch(200, { committed: true })
+    await api.save(PATH_KEY, 'fixed', 'h')
+    expect(fetchMock).toHaveBeenCalledWith(`/api/docs/${ENCODED}`, expect.objectContaining({ method: 'PUT' }))
+  })
+
+  it('encodes the key on every other call that addresses a document', async () => {
+    const fetchMock = mockFetch(200, [])
+    await api.items(PATH_KEY)
+    await api.transitions(PATH_KEY)
+    await api.nextSteps(PATH_KEY)
+    await api.setStatus(PATH_KEY, 'active')
+    await api.accept(PATH_KEY)
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/docs/${ENCODED}/items`,
+      `/api/docs/${ENCODED}/transitions`,
+      `/api/docs/${ENCODED}/next-steps`,
+      `/api/docs/${ENCODED}/status`,
+      `/api/docs/${ENCODED}/review`,
+    ])
+  })
+})
