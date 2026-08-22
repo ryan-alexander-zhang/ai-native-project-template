@@ -1,7 +1,7 @@
 ---
 id: plan-00017-whiteboard-inline-id-navigation
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-FR-57, spec-00001-FR-58, spec-00001-FR-59]
 ---
 
