@@ -1,7 +1,7 @@
 ---
 id: issue-00017-an-unanchored-gitignore-rule-hides-a-source-module
 type: issue
-status: draft
+status: resolved
 blocks: [plan-00013-whiteboard-coverage-and-drilldowns]
 ---
 
