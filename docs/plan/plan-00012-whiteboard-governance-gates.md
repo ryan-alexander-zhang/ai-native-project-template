@@ -1,7 +1,7 @@
 ---
 id: plan-00012-whiteboard-governance-gates
 type: plan
-status: open
+status: resolved
 implements: [spec-00002-FR-1, spec-00002-FR-2, spec-00002-FR-3, spec-00002-FR-4, spec-00002-FR-5, spec-00002-FR-6, spec-00002-FR-7, spec-00002-FR-8, spec-00002-FR-9, design-00001-docs-whiteboard]
 ---
 

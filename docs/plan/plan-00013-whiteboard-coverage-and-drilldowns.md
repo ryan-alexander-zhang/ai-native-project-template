@@ -1,7 +1,7 @@
 ---
 id: plan-00013-whiteboard-coverage-and-drilldowns
 type: plan
-status: open
+status: resolved
 implements: [spec-00002-FR-10, spec-00002-FR-11, spec-00002-FR-12, spec-00002-FR-13, spec-00002-FR-14, spec-00002-FR-15, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
