@@ -23,7 +23,7 @@ Add more when useful.
 
 - `motivated_by` — what created the need for the choice: usually an `analysis`,
   `report`, `spec`, `prd`, or `idea`.
-- `constrains` — the `spec` / `design` / `plan` / `operation` docs the choice binds,
+- `constrains` — the `prd` / `spec` / `rule` / `design` / `plan` / `operation` docs the choice binds,
   minus any that already declare `implements: [<this decision>]`. When a new doc
   later falls under an `active` decision, add it here: the list is metadata about
   reach, not content, so updating it is not an amendment to the decision.
