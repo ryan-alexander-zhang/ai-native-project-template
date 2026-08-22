@@ -1,7 +1,7 @@
 ---
 id: plan-00015-advance-inherits-open-questions
 type: plan
-status: open
+status: resolved
 implements: [spec-00001-AC-11.3, spec-00001-AC-11.4]
 ---
 
