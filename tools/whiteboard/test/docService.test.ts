@@ -980,12 +980,44 @@ describe('newDocument and create', () => {
   const IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
   const TEMPLATE = doc({ id: 'idea-00001-example-slug', type: 'idea', status: 'draft' }, '# Idea: <one line>\n')
   const newIdea = (id: string) => doc({ id, type: 'idea', status: 'draft' }, '# A new idea\n')
+  // The shipped design template itself, so the body the create hands out is the
+  // one the repo really drafts from (docs/design/TEMPLATE.md).
+  const DESIGN_TEMPLATE = readFileSync(new URL('../../../docs/design/TEMPLATE.md', import.meta.url).pathname, 'utf8')
 
   // rule-00001-AC-26.1: the number is the highest plus one, the template is the type's
   it('allocates the next number and hands back the type template', () => {
     const { service } = serviceOn({ 'idea/a.md': IDEA, 'idea/TEMPLATE.md': TEMPLATE })
 
     expect(service.newDocument('idea')).toEqual({ idPrefix: 'idea-00002-', template: TEMPLATE })
+  })
+
+  /**
+   * rule-00001-AC-26.2: design is an entry type with no upstream (BR-26 第十四轮),
+   * so a repo that holds no spec at all creates one all the same — the number
+   * carries on from the design folder's own highest, and the draft body is the
+   * design template. The fixture declares nothing but designs on purpose.
+   */
+  // rule-00001-AC-26.2
+  it('creates a design with no spec in the repo, drafted from the design template', async () => {
+    const { repoRoot, docsDir } = makeRepo({
+      'design/design-00001-a.md': doc({ id: 'design-00001-a', type: 'design', status: 'active' }, '# Design A\n'),
+      'design/design-00002-b.md': doc({ id: 'design-00002-b', type: 'design', status: 'active' }, '# Design B\n'),
+      'design/TEMPLATE.md': DESIGN_TEMPLATE,
+    })
+    const service = new DocService(repoRoot, docsDir, { ...config, entry: [...config.entry, 'design'] })
+
+    const { idPrefix, template } = service.newDocument('design')
+    expect(idPrefix).toBe('design-00003-')
+
+    const id = 'design-00003-mine'
+    const drafted = template
+      .replace('id: design-00001-example-slug', `id: ${id}`)
+      .replace('status: draft|active|archived', 'status: draft')
+    await service.create(id, drafted)
+
+    const written = onDisk(docsDir, `design/${id}.md`)
+    expect(written).toContain('status: draft')
+    expect(written).toContain('# Design: <subject>')
   })
 
   it('allocates the first number for a type with no documents yet', () => {
