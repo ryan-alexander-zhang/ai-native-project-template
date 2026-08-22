@@ -369,9 +369,12 @@ sequenceDiagram
 - 任务指令模板（作为会话的初始输入经 PTY 写给 CLI——各 CLI 都支持交互式
   stdin，免去命令行转义差异）：目标类型、指定的 `<type>-<编号>-<slug>` id
   格式（编号已定，slug 自取）、按 flow `carry` 应携带的关系与来源 id、对应
-  文件夹 `TEMPLATE.md` 与 `README.md` 的路径、「status 保持 draft」约束；
+  文件夹 `TEMPLATE.md` 与 `README.md` 的路径、「status 保持 draft」约束、
+  **来源文档路径**（第十三轮）；
   目标类型有条目文法时（spec/rule/record）另附该类型的「机器可读形态」要求
-  （spec FR-41，decision-00005）。会话结束的产出校验相应扩展到正文文法，
+  （spec FR-41，decision-00005）；目标类型带 Open Questions 语义（可澄清集）
+  时另附**上游未决点继承**要求（spec FR-11 第十三轮，与文法段同为条件追加，
+  排在无条件指令行之后）。会话结束的产出校验相应扩展到正文文法，
   诊断按 FR-40 呈现、不阻塞 commit。
 - **会话结束处理**：按会话记录的期望 `{targetType, 编号, carry, sourceId}`
   定向校验产出文档（id 前缀匹配、carry 关系指向来源）——这就是 FR-17 的

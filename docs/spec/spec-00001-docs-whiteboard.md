@@ -104,7 +104,14 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
 - **spec-00001-FR-11** (Event) 当用户选定下一步类型时，系统应在内嵌终端中启动
   流程配置指定的本地 agent CLI 会话，任务指令中给定目标文档类型、id（取法按
   `rule-00001-BR-18`）与新文档应携带的关系（per `rule-00001-BR-13` …
-  `rule-00001-BR-16`，指向来源文档）。
+  `rule-00001-BR-16`，指向来源文档）；任务指令并应给出**来源文档路径**，
+  且当目标类型带 Open Questions 语义（即可澄清类型集，`rule-00001-BR-20`；
+  推进可达者为 prd/spec/rule/design）时包含**上游未决点继承**要求
+  （第十三轮）——读取来源文档的未决 Open Questions，把仍影响新文档的
+  继承进新文档的 Open Questions 小节，不得沉默替上游做决定；目标类型无该
+  语义（plan/task/issue/record）时不含该段，与 FR-41 文法段的条件追加同构。
+  （推进不设 OQ 门是既有取舍：下游可从未收敛的上游起草，但不确定性须显式
+  传递，最终由新文档自己的接收门把关。）
 - **spec-00001-FR-12** (State) 当 agent 会话运行中时，内嵌终端应流式呈现其
   输出（无需用户手动刷新）并把用户输入转发给会话；内嵌终端应把其实际行列
   尺寸同步给会话——终端接入时与面板尺寸变化时皆然，使会话进程读到的终端
@@ -570,6 +577,16 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   Given 同 AC-11.1，且 prd 类型现有最大编号为 00001
   When 会话启动
   Then 任务指令包含目标类型 prd、id `prd-00002-<slug>` 的格式要求与 `parent: <该 idea id>`
+- **spec-00001-AC-11.3** (spec-00001-FR-11)
+  Given 在某 idea 节点选定下一步类型为 prd（目标类型带 Open Questions 语义）
+  When 会话启动
+  Then 任务指令包含来源文档路径与上游未决点继承要求：读取来源的未决
+  Open Questions，仍影响新文档的继承进新文档的 Open Questions 小节，不得
+  沉默替上游做决定
+- **spec-00001-AC-11.4** (spec-00001-FR-11)
+  Given 在某 plan 节点选定下一步类型为 record（目标类型无 Open Questions 语义）
+  When 会话启动
+  Then 任务指令不含上游未决点继承段，来源文档路径照常给出
 - **spec-00001-AC-12.1** (spec-00001-FR-12)
   Given 一个运行中的 agent 会话
   When CLI 产生输出

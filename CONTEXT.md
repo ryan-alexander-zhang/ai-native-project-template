@@ -214,8 +214,16 @@ _Avoid_：id 冲突（指单次动作被拒时说「先修复撞 id」）、重�
 _Avoid_：取消、中断、kill
 
 **推进（Advance）**：
-从一个节点按流程配置发起下一阶段文档的创建（如 idea → prd），由 agent 会话执行。
+从一个节点按流程配置发起下一阶段文档的创建（如 idea → prd），由 agent 会话
+执行；不设 OQ 门——来源文档带未决 Open Questions 时照常可推进，未决点经
+上游未决点继承显式传递。
 _Avoid_：流转、派生
+
+**上游未决点继承（Upstream Question Inheritance）**：
+推进任务指令的一项要求（`spec-00001-FR-11`，第十三轮）：目标类型带
+Open Questions 语义时，读取来源文档的未决 Open Questions，把仍影响新文档
+的继承进新文档的 Open Questions 小节，不得沉默替上游做决定。
+_Avoid_：OQ 传递、问题下沉
 
 **修订轮（Revision Round）**：
 把一份 `active` 的 living doc 经合法状态流转转回 `draft` 以修订它；回到
