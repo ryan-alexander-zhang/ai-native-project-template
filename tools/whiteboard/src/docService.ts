@@ -16,7 +16,15 @@ import {
   readGraph,
 } from './docRepository.ts'
 import { type ActionKind, type CommitOutcome, type DirtySnapshot, GitLayer, commitMessage } from './gitLayer.ts'
-import { type ItemsView, declaresItems, requirementView } from './requirements.ts'
+import {
+  type Coverage,
+  type DocBody,
+  type ItemsView,
+  type RecordScan,
+  declaresItems,
+  requirementViewFrom,
+  scanRecords,
+} from './requirements.ts'
 import { itemCoverage, resolvedGaps } from './resolvedGate.ts'
 import type { SessionPlan } from './sessionManager.ts'
 import { promotedStatus } from './statusRules.ts'
@@ -74,6 +82,22 @@ export interface ActionResult extends CommitOutcome {
 }
 
 /**
+ * One row of the global coverage view (spec-00002-FR-10 and FR-11,
+ * design-00001 §7): a spec or a rule, its three counts, and every item with the
+ * state those counts were taken from. The per-item states ride along rather
+ * than waiting for a second call — the counts are derived from them, so they
+ * are already in hand, and a row and its expansion then come from one snapshot.
+ */
+export interface CoverageRow {
+  docId: string
+  title: string
+  verified: number
+  failing: number
+  uncovered: number
+  items: Array<{ id: string; coverage: Coverage }>
+}
+
+/**
  * Accept is the only review action that writes: clarify is an agent session now,
  * and it writes from inside the session (spec-00001-FR-9, decision-00006).
  */
@@ -92,6 +116,17 @@ export class DocService {
   private readonly git: GitLayer
   /** The parsed tree, held until something invalidates it (spec-00001 §7 非功能项). */
   private cached?: DocGraph
+  /**
+   * The body-parse cache of spec-00002 §7 (design-00001 §2): the graph cache
+   * held the front matter alone, so `/items`, the resolved gate and the global
+   * coverage view each re-read the whole tree. Two things are kept — a file's
+   * body, by path, and the derivation over **every** record, by document — and
+   * both die on the one `invalidate()` the graph dies on, so the two can never
+   * stand on different states of the disk.
+   */
+  private readonly bodies = new Map<string, string>()
+  private readonly views = new Map<string, ItemsView>()
+  private scanned?: RecordScan
 
   constructor(repoRoot: string, docsDir: string, config: FlowConfig, git: GitLayer = new GitLayer(repoRoot)) {
     this.repoRoot = repoRoot
@@ -113,6 +148,43 @@ export class DocService {
    */
   invalidate(): void {
     this.cached = undefined
+    this.bodies.clear()
+    this.views.clear()
+    this.scanned = undefined
+  }
+
+  /** A document's body, read off disk once per change (spec-00002 §7 非功能项). */
+  private body(node: DocNode): DocBody {
+    let body = this.bodies.get(node.path)
+    if (body === undefined) {
+      body = readDocBody(this.docsDir, node)
+      this.bodies.set(node.path, body)
+    }
+    return { id: node.id, body }
+  }
+
+  /** Every record in the repo, scanned once — the evidence set `/items` and `/coverage` share. */
+  private recordScan(graph: DocGraph): RecordScan {
+    this.scanned ??= scanRecords(
+      graph.nodes.filter((node) => node.type === 'record').map((record) => this.body(record)),
+    )
+    return this.scanned
+  }
+
+  /**
+   * One document's items against every record, held by document id. What is
+   * shared is this derivation and the bodies under it — never which documents to
+   * run it over: `/items` names one, `/coverage` takes every spec and rule that
+   * is not a collision, and `graphDiagnostics` keeps its own `ok` filter. Folding
+   * the three together would silently drop that filter (design-00001 §2).
+   */
+  private view(node: DocNode, graph: DocGraph): ItemsView {
+    let view = this.views.get(node.id)
+    if (view === undefined) {
+      view = requirementViewFrom(this.body(node), this.recordScan(graph))
+      this.views.set(node.id, view)
+    }
+    return view
   }
 
   read(id: string): DocContent {
@@ -128,10 +200,37 @@ export class DocService {
     const graph = this.graph()
     const node = this.require(id, graph)
     if (!declaresItems(node.type)) return { items: [], diagnostics: [] }
-    const records = graph.nodes
-      .filter((candidate) => candidate.type === 'record')
-      .map((record) => ({ id: record.id, body: readDocBody(this.docsDir, record) }))
-    return requirementView({ id: node.id, body: readDocBody(this.docsDir, node) }, records)
+    return this.view(node, graph)
+  }
+
+  /**
+   * The global coverage view's payload (spec-00002-FR-10 and FR-11): every spec
+   * and rule in the repo, its three counts, and its items with their state.
+   *
+   * What is listed is judged by `declaresItems` and `duplicateOf`, never by
+   * `ok`: a document whose front matter is broken but whose body reads is in
+   * (FR-10, spec-00002-AC-10.10), whatever its own status (AC-10.9), and only a
+   * document colliding on its id is out — its items are claimed by nobody, so
+   * ambiguous evidence stays out of the count (FR-8, spec-00002-AC-8.7). The
+   * derivation is the one `/items` serves, over the same every-record evidence
+   * set, so a row and the inspector cannot disagree.
+   */
+  coverage(): CoverageRow[] {
+    const graph = this.graph()
+    return graph.nodes
+      .filter((node) => declaresItems(node.type) && node.duplicateOf === undefined)
+      .map((node) => {
+        const items = this.view(node, graph).items
+        const count = (state: Coverage) => items.filter((item) => item.coverage === state).length
+        return {
+          docId: node.id,
+          title: node.title,
+          verified: count('verified'),
+          failing: count('failing'),
+          uncovered: count('uncovered'),
+          items: items.map((item) => ({ id: item.id, coverage: item.coverage })),
+        }
+      })
   }
 
   transitions(id: string): string[] {
@@ -287,7 +386,9 @@ export class DocService {
    */
   private assertScopeVerified(node: DocNode, to: string, graph: DocGraph): void {
     if (node.type !== 'plan' || node.status !== 'open' || to !== 'resolved') return
-    const body = (candidate: DocNode) => ({ id: candidate.id, body: readDocBody(this.docsDir, candidate) })
+    // The bodies come off the shared cache; the derivation does not — the gate's
+    // evidence set is narrowed to this plan's records (design-00001 §2).
+    const body = (candidate: DocNode) => this.body(candidate)
     const docs = itemCoverage(
       // Colliding documents are out (spec-00002-FR-8): ambiguous evidence is no
       // evidence. The test is `duplicateOf`, never `ok` — the gate must go on

@@ -270,6 +270,43 @@ describe('GET /api/docs/:id/items', () => {
   it('answers 409 for a document that is not there', async () => {
     expect((await boardOn({}).call('GET', '/api/docs/spec-09999-ghost/items')).status).toBe(409)
   })
+
+  /**
+   * The global coverage view's one read (spec-00002-FR-10, design-00001 §7):
+   * every spec and rule in the repo, whatever its status, with the three counts
+   * and the items behind them.
+   */
+  describe('GET /api/coverage', () => {
+    // spec-00002-AC-10.1
+    it('serves a row per spec and rule, each with its counts and items', async () => {
+      const { call } = boardOn({
+        'spec/a.md': SPEC,
+        'record/r.md': record('active', ['| spec-00001-AC-1.1 | draws a node | pass |']),
+      })
+
+      const { status, body } = await call('GET', '/api/coverage')
+
+      expect(status).toBe(200)
+      expect(body).toEqual([
+        {
+          docId: 'spec-00001-x',
+          title: 'Spec',
+          verified: 1,
+          failing: 0,
+          uncovered: 1,
+          items: [
+            { id: 'spec-00001-FR-1', coverage: 'verified' },
+            { id: 'spec-00001-FR-2', coverage: 'uncovered' },
+          ],
+        },
+      ])
+    })
+
+    // spec-00002-AC-10.3
+    it('serves an empty list for a repo with no spec and no rule', async () => {
+      expect((await boardOn({ 'idea/a.md': ACTIVE_IDEA }).call('GET', '/api/coverage')).body).toEqual([])
+    })
+  })
 })
 
 describe('PUT /api/docs/:id', () => {

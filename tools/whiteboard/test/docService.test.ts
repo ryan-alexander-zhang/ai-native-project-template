@@ -1088,6 +1088,205 @@ describe('newDocument and create', () => {
 })
 
 /**
+ * The payload behind the global coverage view (spec-00002-FR-10 and FR-11): one
+ * row per spec and rule, three counts, and every item with the state the counts
+ * were taken from. What is listed is judged by `declaresItems` and `duplicateOf`
+ * alone — never by `ok`, never by status (design-00001 §2).
+ */
+describe('coverage', () => {
+  /** Five items in one spec, one AC each but the last, so all three states appear. */
+  const SPEC_A = doc(
+    { id: 'spec-00001-a', type: 'spec', status: 'active' },
+    [
+      '# Spec A',
+      '',
+      '- **spec-00001-FR-1** (Event) the first thing',
+      '- **spec-00001-FR-2** (Event) the second thing',
+      '- **spec-00001-FR-3** (Event) the third thing',
+      '- **spec-00001-FR-4** (Event) the fourth thing',
+      '- **spec-00001-FR-5** (Event) the fifth thing',
+      '',
+      '- **spec-00001-AC-1.1** (spec-00001-FR-1)',
+      '  Given a board When it loads Then it works',
+      '- **spec-00001-AC-2.1** (spec-00001-FR-2)',
+      '  Given a board When it reloads Then it works',
+      '- **spec-00001-AC-3.1** (spec-00001-FR-3)',
+      '  Given a board When it is read Then it works',
+      '- **spec-00001-AC-5.1** (spec-00001-FR-5)',
+      '  Given a board When it is closed Then it works',
+      '',
+    ].join('\n'),
+  )
+  const SPEC_B = doc(
+    { id: 'spec-00002-b', type: 'spec', status: 'draft' },
+    [
+      '# Spec B',
+      '',
+      '- **spec-00002-FR-1** (Event) the only thing',
+      '',
+      '- **spec-00002-AC-1.1** (spec-00002-FR-1)',
+      '  Given a board When it loads Then it works',
+      '',
+    ].join('\n'),
+  )
+  const RULE = doc(
+    { id: 'rule-00001-r', type: 'rule', status: 'active' },
+    [
+      '# Rule',
+      '',
+      '- **rule-00001-BR-1** (Constraint) the only rule',
+      '',
+      '- **rule-00001-AC-1.1** (rule-00001-BR-1)',
+      '  Given a rule When it applies Then it holds',
+      '',
+    ].join('\n'),
+  )
+
+  /** A record's acceptance checklist; its own status is no part of the reading. */
+  function record(rows: [string, string][]): string {
+    return doc(
+      { id: 'record-00001-r', type: 'record', status: 'active' },
+      [
+        '# 验收记录',
+        '',
+        '| GWT id | 测试 | 结果 |',
+        '| --- | --- | --- |',
+        ...rows.map(([target, result]) => `| ${target} | some.test.ts | ${result} |`),
+        '',
+      ].join('\n'),
+    )
+  }
+
+  const EVIDENCE = record([
+    ['spec-00001-AC-1.1', 'pass'],
+    ['spec-00001-AC-2.1', 'fail'],
+    ['spec-00001-AC-5.1', 'pass'],
+    ['rule-00001-AC-1.1', 'pass'],
+  ])
+  const TREE = { 'spec/a.md': SPEC_A, 'spec/b.md': SPEC_B, 'rule/r.md': RULE, 'record/r.md': EVIDENCE }
+
+  const rowOf = (service: DocService, docId: string) => service.coverage().find((row) => row.docId === docId)!
+
+  // spec-00002-AC-10.1
+  it('lists every spec and rule, each with its three counts', () => {
+    const { service } = serviceOn(TREE)
+
+    const rows = service.coverage()
+
+    expect(rows.map((row) => [row.docId, row.verified, row.failing, row.uncovered])).toEqual([
+      ['rule-00001-r', 1, 0, 0],
+      ['spec-00001-a', 2, 1, 2],
+      ['spec-00002-b', 0, 0, 1],
+    ])
+    expect(rows.map((row) => row.title)).toEqual(['Rule', 'Spec A', 'Spec B'])
+  })
+
+  // spec-00002-AC-10.2 — two of the five items are uncovered
+  it('counts the uncovered items of a document', () => {
+    const { service } = serviceOn(TREE)
+
+    expect(rowOf(service, 'spec-00001-a').uncovered).toBe(2)
+  })
+
+  // spec-00002-FR-11's data half: the row carries every item with its state
+  it('carries each item id and its coverage on the row', () => {
+    const { service } = serviceOn(TREE)
+
+    expect(rowOf(service, 'spec-00001-a').items).toEqual([
+      { id: 'spec-00001-FR-1', coverage: 'verified' },
+      { id: 'spec-00001-FR-2', coverage: 'failing' },
+      { id: 'spec-00001-FR-3', coverage: 'uncovered' },
+      { id: 'spec-00001-FR-4', coverage: 'uncovered' },
+      { id: 'spec-00001-FR-5', coverage: 'verified' },
+    ])
+  })
+
+  // spec-00002-AC-10.3
+  it('lists nothing when the repo holds no spec and no rule', () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD, 'record/r.md': EVIDENCE })
+
+    expect(service.coverage()).toEqual([])
+  })
+
+  // spec-00002-AC-10.4 — a record gains a passing row outside the board
+  it('re-derives the counts once the tree it read has been invalidated', () => {
+    const { docsDir, service } = serviceOn(TREE)
+    expect(rowOf(service, 'spec-00002-b').uncovered).toBe(1)
+
+    writeFileSync(join(docsDir, 'record/r.md'), record([['spec-00002-AC-1.1', 'pass']]))
+    service.invalidate()
+
+    expect(rowOf(service, 'spec-00002-b')).toMatchObject({ verified: 1, uncovered: 0 })
+  })
+
+  // spec-00002-AC-10.9 — status is no part of the selection, on either side
+  it('lists an archived spec and a draft rule alike', () => {
+    const { service } = serviceOn({
+      'spec/a.md': SPEC_A.replace('status: active', 'status: archived'),
+      'rule/r.md': RULE.replace('status: active', 'status: draft'),
+      'record/r.md': EVIDENCE,
+    })
+
+    expect(service.coverage().map((row) => row.docId)).toEqual(['rule-00001-r', 'spec-00001-a'])
+  })
+
+  // spec-00002-AC-10.10 — broken front matter, readable body
+  it('lists a document whose front matter is broken but whose body parses', () => {
+    const { service } = serviceOn({
+      'spec/a.md': SPEC_A.replace('status: active', 'status: nonsense'),
+      'record/r.md': EVIDENCE,
+    })
+
+    expect(service.graph().nodes.find((node) => node.id === 'spec-00001-a')!.ok).toBe(false)
+    expect(rowOf(service, 'spec-00001-a')).toMatchObject({ verified: 2, failing: 1, uncovered: 2 })
+  })
+
+  /**
+   * spec-00002-AC-8.7 verified where the AC puts it — on the coverage payload
+   * itself. plan-00012 could only show that the items of a colliding document
+   * are claimed by nobody; the row is what the user sees, and it must be absent.
+   */
+  it('leaves a document colliding on its id out of the payload', () => {
+    const { service } = serviceOn({
+      'spec/a.md': SPEC_A,
+      'spec/clash.md': doc({ id: 'spec-00001-a', type: 'spec', status: 'draft' }, '# The other Spec A\n'),
+      'rule/r.md': RULE,
+      'record/r.md': EVIDENCE,
+    })
+
+    expect(service.graph().nodes.map((node) => node.id)).toContain('spec/clash.md')
+    expect(service.coverage().map((row) => row.docId)).toEqual(['rule-00001-r'])
+  })
+
+  /**
+   * The body-parse cache of spec-00002 §7: the heaviest read the board has must
+   * not walk the tree again while nothing has changed. Observed the only honest
+   * way — a body edited behind the cache's back is still answered from the parse
+   * that came before it, and the one `invalidate()` the graph uses lets it
+   * through (design-00001 §2).
+   */
+  it('answers a repeated read from the bodies it already parsed', () => {
+    const { docsDir, service } = serviceOn(TREE)
+    expect(rowOf(service, 'spec-00002-b').uncovered).toBe(1)
+
+    writeFileSync(join(docsDir, 'record/r.md'), record([['spec-00002-AC-1.1', 'pass']]))
+
+    expect(rowOf(service, 'spec-00002-b').uncovered).toBe(1)
+    service.invalidate()
+    expect(rowOf(service, 'spec-00002-b').uncovered).toBe(0)
+  })
+
+  // The cache is shared, so the two readings are the same reading (design-00001 §7)
+  it('gives the row the very coverage /items gives the same document', () => {
+    const { service } = serviceOn(TREE)
+
+    expect(rowOf(service, 'spec-00001-a').items).toEqual(
+      service.items('spec-00001-a').items.map((item) => ({ id: item.id, coverage: item.coverage })),
+    )
+  })
+})
+
+/**
  * The parse cache (spec-00001 §7 非功能项, decision-00008 §2 第 8 条). A repeated
  * read must not walk the tree again, and the only honest way to observe that from
  * outside is a change the cache has not been told about: it is still answered

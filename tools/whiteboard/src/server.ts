@@ -134,6 +134,11 @@ export class Board {
     app.use(express.static(new URL('../dist/web', import.meta.url).pathname))
 
     app.get('/api/graph', (_req, res) => res.json(this.graph()))
+    // The global coverage view (spec-00002-FR-10): every spec and rule in one
+    // read. The heaviest read the board has, which is why it is asked for only
+    // while the view is open (design-00001 §6) and why the bodies under it are
+    // cached (design-00001 §2).
+    app.get('/api/coverage', (_req, res) => res.json(this.docs.coverage()))
     // The effective config, plus the two type sets the code holds
     // (spec-00001-FR-56): the front end reads its entry rulings off this one
     // payload instead of keeping a copy of rule-00001-BR-20 and BR-23.
