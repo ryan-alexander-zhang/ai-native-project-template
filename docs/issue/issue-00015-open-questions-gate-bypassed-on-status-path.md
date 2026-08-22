@@ -75,17 +75,31 @@ blocks: [spec-00002-whiteboard-governance, plan-00012-whiteboard-governance-gate
 
 ## 5. Reproduction (test-first)
 
-**尚未落地**——本 issue 为 `draft`，修复属 `spec-00002` 的实现轮。修复轮的
-第一步是先写下面这条测试并**记录它的失败输出到本节**，然后才动代码：
+两条测试已落地在 `tools/whiteboard/test/docService.test.ts` 的
+`describe('the promotion gate')` 下，**先于修复**运行并如预期失败：
 
-- 计划的失败测试：
-  `tools/whiteboard/test/docService.test.ts::refuses to promote a draft with
-  open questions on the status path` —— 造一份带内容非空 Open Questions 小节
-  的 `draft` spec，调 `changeStatus(id, 'active')`，断言抛出拒绝、消息点名
-  未决 Open Questions、且磁盘内容未变。当前实现下它会因**流转成功、文件已被
-  改写**而失败。
-- 配套一条 work item 侧的：同样的 plan 文档 `changeStatus(id, 'open')` 被拒。
-- 两条测试落地后再改 `changeStatus`；测试转绿即为回归守卫。
+- `refuses to promote a draft with open questions on the status path` —— 造一份
+  带内容非空 Open Questions 小节的 `draft` spec，调 `changeStatus(id, 'active')`，
+  断言抛出拒绝、磁盘内容未变、无新 commit。
+- `refuses to promote a draft work item with open questions into open` ——
+  同形状的 `draft` plan 调 `changeStatus(id, 'open')`。
+
+修复前的实际失败输出（`npx vitest run test/docService.test.ts -t "promotion gate"`）：
+
+```
+ FAIL  test/docService.test.ts > the promotion gate > refuses to promote a draft with open questions on the status path
+AssertionError: promise resolved "{ committed: true, status: 'active' }" instead of rejecting
+
+ FAIL  test/docService.test.ts > the promotion gate > refuses to promote a draft work item with open questions into open
+AssertionError: promise resolved "{ committed: true, status: 'open' }" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 72 skipped (74)
+```
+
+失败的原因正是 §1 所述：促进**成功**了——`changeStatus` 返回
+`{ committed: true, status: 'active' }`／`{ committed: true, status: 'open' }`，
+文件被改写、commit 照常产生，一句把关都没有。两条测试转绿即为回归守卫。
 
 ## 6. Fix
 

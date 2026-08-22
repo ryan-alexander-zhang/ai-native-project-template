@@ -100,6 +100,38 @@ describe('changeStatus', () => {
   })
 })
 
+/**
+ * The promotion gate on the status path (spec-00002-FR-1 and FR-2 with
+ * rule-00001-BR-12, issue-00015): the gate is on the transition, not on the
+ * accept button, so a promotion out of `draft` meets the same reading whichever
+ * action produced it.
+ */
+describe('the promotion gate', () => {
+  const OPEN_QUESTIONS = '# Doc\n\n## Open Questions\n\n- which failure mode is unstated?\n'
+
+  // spec-00002-AC-1.1
+  it('refuses to promote a draft with open questions on the status path', async () => {
+    const file = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, OPEN_QUESTIONS)
+    const { docsDir, repoRoot, service } = serviceOn({ 'spec/b.md': file })
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('spec-00001-b', 'active')).rejects.toThrowError(WorkflowError)
+    expect(onDisk(docsDir, 'spec/b.md')).toBe(file)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+
+  // spec-00002-AC-1.2
+  it('refuses to promote a draft work item with open questions into open', async () => {
+    const file = doc({ id: 'plan-00001-y', type: 'plan', status: 'draft' }, OPEN_QUESTIONS)
+    const { docsDir, repoRoot, service } = serviceOn({ 'plan/a.md': file })
+    const before = commitCount(repoRoot)
+
+    await expect(service.changeStatus('plan-00001-y', 'open')).rejects.toThrowError(WorkflowError)
+    expect(onDisk(docsDir, 'plan/a.md')).toBe(file)
+    expect(commitCount(repoRoot)).toBe(before)
+  })
+})
+
 describe('review', () => {
   // spec-00001-AC-8.1 and AC-14.3
   it('accepts a draft living doc into active and commits it', async () => {
