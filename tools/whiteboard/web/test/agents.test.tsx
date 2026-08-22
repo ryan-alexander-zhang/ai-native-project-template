@@ -39,7 +39,7 @@ function stubWebSocket() {
 }
 
 function serve(payload: Partial<ConfigPayload> = {}, nodes: DocNode[] = [node()]) {
-  const graph: DocGraph = { nodes, edges: [], issues: [], diagnostics: [] }
+  const graph: DocGraph = { nodes, edges: [], issues: [], diagnostics: [], idOwners: {} }
   vi.spyOn(api, 'graph').mockResolvedValue(graph)
   vi.spyOn(api, 'transitions').mockResolvedValue(['active'])
   vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])

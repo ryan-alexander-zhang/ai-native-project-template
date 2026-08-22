@@ -1,9 +1,10 @@
 import { Handle } from '@xyflow/react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useContext } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { SIDE_POSITION, handleId } from './canvasModel.ts'
 import { COVERAGE } from './coverageMarks.ts'
 import { InlineMarkdown } from './InlineMarkdown.tsx'
+import { JumpContext } from './jump.ts'
 import {
   SUB_COLUMN_WIDTH,
   SUB_NODE_HEIGHT,
@@ -63,6 +64,7 @@ function Shell({ testId, column, children }: ShellProps) {
 /** A requirement item: its coverage mark, its id, and two lines of its text. */
 export function ItemNode({ data }: { data: ItemNodeData }) {
   const { item } = data
+  const jump = useContext(JumpContext)
   const { Icon, label, token } = COVERAGE[item.coverage]
   return (
     <Shell testId={`sub-item-${item.id}`} column={0}>
@@ -71,7 +73,7 @@ export function ItemNode({ data }: { data: ItemNodeData }) {
         <span className="truncate font-mono text-xs">{item.id}</span>
       </div>
       <p className="text-muted-foreground mt-1 line-clamp-2 text-[11px]">
-        <InlineMarkdown text={item.text} />
+        <InlineMarkdown text={item.text} idOwners={jump?.idOwners} onJump={jump?.onJump} />
       </p>
     </Shell>
   )
@@ -80,11 +82,16 @@ export function ItemNode({ data }: { data: ItemNodeData }) {
 /** An acceptance criterion: its id and the first line of its GWT. */
 export function CriterionNode({ data }: { data: CriterionNodeData }) {
   const { criterion } = data
+  const jump = useContext(JumpContext)
   return (
     <Shell testId={`sub-ac-${criterion.id}`} column={1}>
       <span className="truncate font-mono text-[11px]">{criterion.id}</span>
       <p className="text-muted-foreground line-clamp-1 text-[11px]">
-        <InlineMarkdown text={criterion.text.replace(/\n[^]*$/, '')} />
+        <InlineMarkdown
+          text={criterion.text.replace(/\n[^]*$/, '')}
+          idOwners={jump?.idOwners}
+          onJump={jump?.onJump}
+        />
       </p>
     </Shell>
   )
@@ -93,6 +100,7 @@ export function CriterionNode({ data }: { data: CriterionNodeData }) {
 /** An acceptance row: which record ran it, which test, and how it went. */
 export function AcceptanceRowNode({ data }: { data: AcceptanceRowNodeData }) {
   const { row } = data
+  const jump = useContext(JumpContext)
   return (
     <Shell testId={`sub-row-${row.recordId}-${row.targetId}`} column={2}>
       <div className="flex items-center gap-2">
@@ -102,7 +110,7 @@ export function AcceptanceRowNode({ data }: { data: AcceptanceRowNodeData }) {
         </Badge>
       </div>
       <p className="text-muted-foreground truncate text-[11px]">
-        <InlineMarkdown text={row.test} />
+        <InlineMarkdown text={row.test} idOwners={jump?.idOwners} onJump={jump?.onJump} />
       </p>
     </Shell>
   )

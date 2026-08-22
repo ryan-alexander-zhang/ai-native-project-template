@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button'
 import { InlineMarkdown } from './InlineMarkdown.tsx'
 import type { DetailTarget } from './subCanvas.ts'
 
-export interface DetailsProps {
+/** What the inline-id jump needs at each render site (spec-00001-FR-57). */
+export interface JumpProps {
+  idOwners?: Record<string, string>
+  onJump?: (docId: string) => void
+}
+
+export interface DetailsProps extends JumpProps {
   target: DetailTarget
   /** Leave the sub-canvas for the record this row came from (spec-00001-AC-37.6). */
   onGoToRecord: (recordId: string) => void
@@ -17,7 +23,7 @@ export interface DetailsProps {
  * (design-00002 §9). It takes the right slot the sub-canvas left free, and it
  * offers no way to write anything — the sub-canvas is read-only (FR-35).
  */
-export function Details({ target, onGoToRecord }: DetailsProps) {
+export function Details({ target, onGoToRecord, ...jump }: DetailsProps) {
   return (
     <section aria-label={`Details of ${target.id}`} className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b px-3 py-2">
@@ -27,11 +33,11 @@ export function Details({ target, onGoToRecord }: DetailsProps) {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3 text-xs">
         {target.kind === 'item' ? (
-          <ItemDetail item={target.item} />
+          <ItemDetail item={target.item} {...jump} />
         ) : target.kind === 'criterion' ? (
-          <CriterionDetail criterion={target.criterion} />
+          <CriterionDetail criterion={target.criterion} {...jump} />
         ) : (
-          <RowDetail row={target.row} onGoToRecord={onGoToRecord} />
+          <RowDetail row={target.row} onGoToRecord={onGoToRecord} {...jump} />
         )}
       </div>
     </section>
@@ -39,10 +45,10 @@ export function Details({ target, onGoToRecord }: DetailsProps) {
 }
 
 /** The whole GWT, unclamped: reading it is the reason the panel exists. */
-function CriterionDetail({ criterion }: { criterion: Criterion }) {
+function CriterionDetail({ criterion, ...jump }: JumpProps & { criterion: Criterion }) {
   return (
     <p className="leading-relaxed">
-      <InlineMarkdown text={criterion.text} />
+      <InlineMarkdown text={criterion.text} {...jump} />
     </p>
   )
 }
@@ -51,11 +57,11 @@ function CriterionDetail({ criterion }: { criterion: Criterion }) {
  * The item's own text in full, then its criteria as a *list* — each of them is
  * a node of the sub-canvas, one click from its own full text (design-00002 §9).
  */
-function ItemDetail({ item }: { item: RequirementItem }) {
+function ItemDetail({ item, ...jump }: JumpProps & { item: RequirementItem }) {
   return (
     <>
       <p className="leading-relaxed">
-        <InlineMarkdown text={item.text} />
+        <InlineMarkdown text={item.text} {...jump} />
       </p>
       <h3 className="text-muted-foreground mt-3 text-[11px] font-medium">{item.criteria.length} AC</h3>
       {item.criteria.length === 0 ? (
@@ -74,7 +80,11 @@ function ItemDetail({ item }: { item: RequirementItem }) {
 }
 
 /** Which record ran which test, how it went, what it offers as proof, and the way back to it. */
-function RowDetail({ row, onGoToRecord }: { row: AcceptanceRow; onGoToRecord: (recordId: string) => void }) {
+function RowDetail({
+  row,
+  onGoToRecord,
+  ...jump
+}: JumpProps & { row: AcceptanceRow; onGoToRecord: (recordId: string) => void }) {
   return (
     <>
       <dl className="space-y-2">
@@ -82,7 +92,7 @@ function RowDetail({ row, onGoToRecord }: { row: AcceptanceRow; onGoToRecord: (r
           <span className="font-mono text-[11px]">{row.recordId}</span>
         </Field>
         <Field term="test">
-          <InlineMarkdown text={row.test} />
+          <InlineMarkdown text={row.test} {...jump} />
         </Field>
         <Field term="result">
           <Badge variant="secondary" className="text-[10px]">
@@ -93,7 +103,7 @@ function RowDetail({ row, onGoToRecord }: { row: AcceptanceRow; onGoToRecord: (r
             field, so the panel shows none (spec-00001-AC-37.8). */}
         {row.evidence === undefined ? null : (
           <Field term="evidence">
-            <InlineMarkdown text={row.evidence} />
+            <InlineMarkdown text={row.evidence} {...jump} />
           </Field>
         )}
       </dl>

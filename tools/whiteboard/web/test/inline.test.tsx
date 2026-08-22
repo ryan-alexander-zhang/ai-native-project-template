@@ -31,6 +31,7 @@ const GRAPH: DocGraph = {
     { from: 'record-00001-x', to: 'spec-00001-x', relation: 'verifies', ok: true, declaredTargets: ['spec-00001-x'] },
   ],
   issues: [],
+  idOwners: {},
   diagnostics: [],
 }
 

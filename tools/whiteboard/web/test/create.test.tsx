@@ -34,7 +34,7 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
   }
 }
 
-const GRAPH: DocGraph = { nodes: [node()], edges: [], issues: [], diagnostics: [] }
+const GRAPH: DocGraph = { nodes: [node()], edges: [], issues: [], diagnostics: [], idOwners: {} }
 
 function config(entry: string[]): ConfigPayload {
   return {

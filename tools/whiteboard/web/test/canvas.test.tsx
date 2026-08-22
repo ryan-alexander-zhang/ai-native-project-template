@@ -47,6 +47,7 @@ const GRAPH: DocGraph = {
   nodes: [node(), IDEA],
   edges: [relationEdge('prd-00001-x', 'idea-00001-x', 'parent')],
   issues: [],
+  idOwners: {},
   diagnostics: [],
 }
 const PLACED = [
@@ -195,6 +196,7 @@ describe('toFlowEdges', () => {
       nodes: [],
       edges: [relationEdge('spec-00002-b', 'spec-00001-a', 'supersedes')],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
     const placed = [
@@ -214,6 +216,7 @@ describe('toFlowEdges', () => {
       nodes: [],
       edges: [relationEdge('spec-00001-a', 'spec-00002-b', 'informs')],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
     const placed = [
@@ -232,6 +235,7 @@ describe('toFlowEdges', () => {
       nodes: [],
       edges: [relationEdge('spec-00001-a', 'spec-00001-a', 'supersedes')],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
     const edge = toFlowEdges(graph, [{ id: 'spec-00001-a', x: 0, y: 0 }])[0]!
@@ -268,6 +272,7 @@ describe('suppressedNodes', () => {
       nodes: [node(), IDEA, node({ id: 'far-00001-x', path: 'far/a.md' })],
       edges: GRAPH.edges,
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
 
@@ -292,6 +297,7 @@ describe('relationsOf', () => {
       relationEdge('spec-00001-x', 'ghost', 'informs', false),
     ],
     issues: [],
+    idOwners: {},
     diagnostics: [],
   }
 
@@ -335,6 +341,7 @@ describe('relationsOf', () => {
         ]),
       ],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
 
@@ -363,6 +370,7 @@ describe('relationsOf', () => {
         relationEdge('plan-00001-x', 'spec-00001-a', 'implements'),
       ],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
     expect(relationsOf(same, 'plan-00001-x', ORDER).map((item) => item.otherId)).toEqual([
@@ -379,6 +387,7 @@ describe('relationsOf', () => {
         relationEdge('a-00001-x', 'b-00001-x', 'parent'),
       ],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     }
     expect(relationsOf(extra, 'a-00001-x', ORDER).map((item) => item.field)).toEqual(['parent', 'mystery'])
@@ -608,6 +617,7 @@ describe('the board', () => {
         relationEdge('record-00003-x', 'spec-00001-x', 'verifies', true, ['spec-00001-FR-28', 'spec-00001-FR-29']),
       ],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     })
     const { container } = render(<Board />)
@@ -637,6 +647,7 @@ describe('the board', () => {
       nodes: [node()],
       edges: [relationEdge('prd-00001-x', 'idea-09999-ghost', 'parent', false)],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     })
     render(<Board />)
@@ -691,7 +702,7 @@ describe('the board', () => {
 
   // spec-00001-AC-29.5 — a node with no edges at all
   it('emphasises nothing when the selected document has no relations', async () => {
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [node()], edges: [], issues: [], diagnostics: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [node()], edges: [], issues: [], diagnostics: [], idOwners: {} })
     const { container } = render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
 
@@ -731,7 +742,7 @@ describe('the board', () => {
 
   // spec-00001-AC-1.4
   it('renders an empty canvas without error for an empty docs tree', async () => {
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [], edges: [], issues: [], diagnostics: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} })
     const { container } = render(<Board />)
 
     await waitFor(() => expect(screen.getByText('no issues')).toBeTruthy())
@@ -768,7 +779,7 @@ describe('the board', () => {
 
   // spec-00001-AC-40.4 and AC-40.5 — a diagnostic marks no node, and zero shows nothing
   it('renders no diagnostics badge and no anomalous node when the tree follows the grammar', async () => {
-    vi.spyOn(api, 'graph').mockResolvedValue({ ...GRAPH, issues: [], diagnostics: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ ...GRAPH, issues: [], diagnostics: [], idOwners: {} })
     render(<Board />)
 
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
@@ -922,7 +933,7 @@ describe('the board', () => {
   it('starts an audit session from the toolbar and opens the terminal', async () => {
     stubWebSocket()
     const spec = node({ id: 'spec-00001-x', type: 'spec', title: 'Whiteboard spec', path: 'spec/a.md' })
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [], idOwners: {} })
     const audit = vi.spyOn(api, 'audit').mockResolvedValue({
       id: 's1',
       kind: 'audit',
@@ -946,7 +957,7 @@ describe('the board', () => {
   // past `draft`, while the rest of the toolbar stays
   it('offers no audit entry on a spec that is no longer a draft', async () => {
     const spec = node({ id: 'spec-00001-x', type: 'spec', status: 'active', title: 'S', path: 'spec/a.md' })
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [], idOwners: {} })
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy())
 

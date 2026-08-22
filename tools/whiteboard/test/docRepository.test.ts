@@ -80,11 +80,17 @@ describe('readGraph', () => {
 
   // spec-00001-AC-1.4
   it('yields an empty graph for an empty docs tree', () => {
-    expect(graphOf({})).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [] })
+    expect(graphOf({})).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} })
   })
 
   it('yields an empty graph when the docs directory does not exist', () => {
-    expect(readGraph('/nonexistent/docs', config)).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [] })
+    expect(readGraph('/nonexistent/docs', config)).toEqual({
+      nodes: [],
+      edges: [],
+      issues: [],
+      diagnostics: [],
+      idOwners: {},
+    })
   })
 
   // spec-00001-AC-1.5
@@ -424,6 +430,63 @@ describe('documents that collide on an id', () => {
 
     expect(nodes[0]!.id).toBe('spec/none.md')
     expect(nodes[0]!.duplicateOf).toBeUndefined()
+  })
+})
+
+/**
+ * The resolvable-id table of the inline-id jump (spec-00001-FR-57): document
+ * ids off the node keys, item and criterion ids off the bodies. It serves the
+ * presentation layer alone — nothing in it feeds an edge or a diagnostic
+ * (spec-00001-FR-59).
+ */
+describe('idOwners', () => {
+  // spec-00001-FR-57 — a document id resolves to itself, an item or AC id to its document
+  it('maps document ids to themselves and item and AC ids to their document', () => {
+    const graph = graphOf({ 'idea/a.md': IDEA, 'spec/c.md': ITEMISED_SPEC })
+
+    expect(graph.idOwners['idea-00001-whiteboard']).toBe('idea-00001-whiteboard')
+    expect(graph.idOwners['spec-00001-whiteboard']).toBe('spec-00001-whiteboard')
+    expect(graph.idOwners['spec-00001-FR-1']).toBe('spec-00001-whiteboard')
+    expect(graph.idOwners['spec-00001-AC-1.1']).toBe('spec-00001-whiteboard')
+  })
+
+  // spec-00001-AC-58.5 — a collided id is an ambiguous target, so it enters nowhere
+  it('keeps a colliding id and the items behind it out of the table', () => {
+    const graph = graphOf({
+      'spec/first.md': doc({ id: 'spec-00001-whiteboard', type: 'spec', status: 'active' }, SPEC_ITEMS),
+      'spec/second.md': doc({ id: 'spec-00001-whiteboard', type: 'spec', status: 'draft' }, '# The other\n'),
+    })
+
+    // The nodes are path-keyed (spec-00002-FR-8) and a path is not an id, so
+    // the table is empty rather than pointing anywhere.
+    expect(graph.idOwners).toEqual({})
+  })
+
+  // spec-00001-FR-57 — an anomalous document is still a jump target; its items claim nothing
+  it('keeps an anomalous document reachable while its items stay unclaimed', () => {
+    const graph = graphOf({
+      'spec/bad.md': doc({ id: 'spec-00001-whiteboard', type: 'spec', status: 'bogus' }, SPEC_ITEMS),
+    })
+
+    expect(graph.idOwners['spec-00001-whiteboard']).toBe('spec-00001-whiteboard')
+    expect(graph.idOwners['spec-00001-FR-1']).toBeUndefined()
+  })
+
+  it('gives a document with no id no entry at all', () => {
+    expect(graphOf({ 'spec/none.md': '# No front matter\n' }).idOwners).toEqual({})
+  })
+
+  // spec-00001-AC-59.1 — a prose reference is in the table and nowhere else
+  it('feeds no edge and no diagnostic for an id referenced in prose', () => {
+    const reader = doc(
+      { id: 'spec-00002-reader', type: 'spec', status: 'active' },
+      '# Spec: Reader\n\n- **spec-00002-FR-1** (Event) applies `spec-00001-FR-1` as written.\n',
+    )
+    const graph = graphOf({ 'spec/c.md': ITEMISED_SPEC, 'spec/r.md': reader })
+
+    expect(graph.edges).toEqual([])
+    expect(graph.diagnostics).toEqual([])
+    expect(graph.idOwners['spec-00001-FR-1']).toBe('spec-00001-whiteboard')
   })
 })
 

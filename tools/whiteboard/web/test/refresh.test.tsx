@@ -90,6 +90,7 @@ const GRAPH: DocGraph = {
     { from: 'record-00001-x', to: 'spec-00001-x', relation: 'verifies', ok: true, declaredTargets: ['spec-00001-x'] },
   ],
   issues: [],
+  idOwners: {},
   diagnostics: [],
 }
 
@@ -646,7 +647,7 @@ describe('what a refresh keeps', () => {
   it('keeps the selection on the same file when the node is keyed by its path', async () => {
     const first = node({ id: 'spec/first.md', path: 'spec/first.md', duplicateOf: 'spec-00002-clash', ok: false, title: 'The first' })
     const second = node({ id: 'spec/second.md', path: 'spec/second.md', duplicateOf: 'spec-00002-clash', ok: false, title: 'The second' })
-    graph = { nodes: [first, second], edges: [], issues: [], diagnostics: [] }
+    graph = { nodes: [first, second], edges: [], issues: [], diagnostics: [], idOwners: {} }
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-spec/second.md')).toBeTruthy(), SETTLED)
     await act(async () => ChannelSocket.last.connect())

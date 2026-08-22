@@ -70,7 +70,7 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
 const SPEC = node()
 const RULE = node({ id: 'rule-00001-y', type: 'rule', status: 'draft', title: 'Docs workflow', path: 'rule/a.md' })
 const OTHER = node({ id: 'spec-00002-z', type: 'spec', status: 'archived', title: 'Governance', path: 'spec/b.md' })
-const GRAPH: DocGraph = { nodes: [SPEC, RULE, OTHER], edges: [], issues: [], diagnostics: [] }
+const GRAPH: DocGraph = { nodes: [SPEC, RULE, OTHER], edges: [], issues: [], diagnostics: [], idOwners: {} }
 
 /** Five items over the three states: two verified, one failing, two uncovered. */
 const SPEC_ROW: CoverageRow = {

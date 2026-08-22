@@ -30,6 +30,9 @@ export interface InspectorProps {
   onInspect: (itemId?: string) => void
   /** Swap the canvas for this document's sub-canvas (spec-00001-FR-35). */
   onExpand: () => void
+  /** The inline-id jump (spec-00001-FR-57): resolvable ids, and the way to their documents. */
+  idOwners?: Record<string, string>
+  onJump?: (docId: string) => void
 }
 
 /**
@@ -38,7 +41,7 @@ export interface InspectorProps {
  * acceptance rows imply. It only reports what the server derived — the coverage
  * verdict is never recomputed here (design-00001 §2).
  */
-export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) {
+export function Inspector({ docId, view, onInspect, onExpand, idOwners, onJump }: InspectorProps) {
   // An accordion, one row at a time (spec-00001-FR-38). The id is what is held,
   // not the item, so a refresh brings the same row back open — and resolving it
   // against the payload on every render is what closes the row when the item it
@@ -109,9 +112,9 @@ export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) 
                   <p
                     className={`text-muted-foreground mt-1 text-xs ${expanded === item.id ? '' : 'line-clamp-2'}`}
                   >
-                    <InlineMarkdown text={item.text} />
+                    <InlineMarkdown text={item.text} idOwners={idOwners} onJump={onJump} />
                   </p>
-                  {expanded === item.id ? <Expansion item={item} /> : null}
+                  {expanded === item.id ? <Expansion item={item} idOwners={idOwners} onJump={onJump} /> : null}
                 </li>
               )
             })}
@@ -161,7 +164,15 @@ export function Inspector({ docId, view, onInspect, onExpand }: InspectorProps) 
  * has no AC node to click — that is the sub-canvas's job (design-00002 §9). An
  * item with no criteria says so rather than opening onto nothing.
  */
-function Expansion({ item }: { item: RequirementItem }) {
+function Expansion({
+  item,
+  idOwners,
+  onJump,
+}: {
+  item: RequirementItem
+  idOwners?: Record<string, string>
+  onJump?: (docId: string) => void
+}) {
   return (
     <div aria-label={`Expanded ${item.id}`} className="mt-2 space-y-2 border-l pl-3">
       {item.criteria.length === 0 ? (
@@ -171,7 +182,7 @@ function Expansion({ item }: { item: RequirementItem }) {
           <div key={criterion.id}>
             <p className="font-mono text-[11px]">{criterion.id}</p>
             <p className="text-muted-foreground text-xs">
-              <InlineMarkdown text={criterion.text} />
+              <InlineMarkdown text={criterion.text} idOwners={idOwners} onJump={onJump} />
             </p>
           </div>
         ))

@@ -8,7 +8,7 @@ import { connectEvents } from './eventSocket.ts'
 import { prefillFrontMatter } from './frontMatter.ts'
 import { type Placed, layoutGraph } from './layout.ts'
 
-const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [] }
+const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} }
 
 /**
  * How many gap ids a refusal toast names. A plan can deliver dozens of items,

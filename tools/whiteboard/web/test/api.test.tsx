@@ -17,8 +17,8 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('the api client', () => {
   it('reads the graph', async () => {
-    const fetchMock = mockFetch(200, { nodes: [], edges: [], issues: [], diagnostics: [] })
-    expect(await api.graph()).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [] })
+    const fetchMock = mockFetch(200, { nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} })
+    expect(await api.graph()).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} })
     expect(fetchMock).toHaveBeenCalledWith('/api/graph', expect.objectContaining({ method: 'GET' }))
   })
 

@@ -22,7 +22,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import type { DocNode } from '../../src/docRepository.ts'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -54,6 +54,7 @@ import { ThemeMenu } from './ThemeMenu.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { evidenceOf, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from './canvasModel.ts'
 import { onFlowError } from './flowError.ts'
+import { JumpContext } from './jump.ts'
 import { detailTarget, subCanvas } from './subCanvas.ts'
 import { useTheme } from './theme.ts'
 import { useBoard } from './useBoard.ts'
@@ -229,9 +230,16 @@ function Canvas() {
    * Centre the viewport on a document node and select it (spec-00001-FR-27).
    * Going to a document is a top-level act, so it also leaves any sub-canvas
    * and its detail — which is what the breadcrumb's «Board» does
-   * (spec-00001-FR-36, spec-00001-AC-37.9).
+   * (spec-00001-FR-36, spec-00001-AC-37.9). The target is checked before
+   * anything is torn down (close nearest, design-00002 §10): a jump whose
+   * document has left the board refuses in place, and the sub-canvas and the
+   * detail stay exactly where they were (spec-00001-AC-57.8).
    */
   function focus(id: string) {
+    if (!board.graph.nodes.some((node) => node.id === id)) {
+      toast.error(`no document ${id} on the board`)
+      return
+    }
     setDrilled(undefined)
     setDetail(undefined)
     centre(id)
@@ -250,6 +258,10 @@ function Canvas() {
   }
 
   return (
+    // The inline-id jump's route to the sub-canvas nodes: React Flow renders
+    // them from node data, so the context carries what a prop chain cannot
+    // (spec-00001-FR-57, design-00002 §9).
+    <JumpContext.Provider value={{ idOwners: board.graph.idOwners, onJump: focus }}>
     <div className="flex h-screen flex-col">
       <header className="flex items-center gap-3 border-b px-4 py-2">
         <LayoutDashboard className="size-5" aria-hidden />
@@ -464,6 +476,8 @@ function Canvas() {
                     view={inspector}
                     onInspect={setInspecting}
                     onExpand={() => setDrilled(selected.id)}
+                    idOwners={board.graph.idOwners}
+                    onJump={focus}
                   />
                 </ResizablePanel>
               </>
@@ -471,7 +485,7 @@ function Canvas() {
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel id="detail" defaultSize={38} minSize={20}>
-                  <Details target={shown} onGoToRecord={focus} />
+                  <Details target={shown} onGoToRecord={focus} idOwners={board.graph.idOwners} onJump={focus} />
                 </ResizablePanel>
               </>
             ) : null}
@@ -547,6 +561,7 @@ function Canvas() {
       <SessionHistory open={history} onOpenChange={setHistory} />
       <Toaster position="bottom-right" theme={theme.isDark ? 'dark' : 'light'} richColors closeButton />
     </div>
+    </JumpContext.Provider>
   )
 }
 

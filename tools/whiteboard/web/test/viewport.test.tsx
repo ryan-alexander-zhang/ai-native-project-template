@@ -75,6 +75,7 @@ const GRAPH: DocGraph = {
   nodes: [node(), node({ id: 'record-00001-x', type: 'record', title: 'First record', path: 'record/a.md' })],
   edges: [],
   issues: [],
+  idOwners: {},
   diagnostics: [],
 }
 

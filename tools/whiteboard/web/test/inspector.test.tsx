@@ -39,6 +39,7 @@ const GRAPH: DocGraph = {
   nodes: [SPEC, RECORD_ONE, RECORD_TWO, RECORD_THREE, PLAN],
   edges: [verifies('record-00001-x'), verifies('record-00002-x')],
   issues: [],
+  idOwners: {},
   diagnostics: [],
 }
 
@@ -121,7 +122,7 @@ describe('the inspector panel', () => {
   // declaration shapes, so the panel is exercised over the real thing.
   it('lists an item declared in a decision table beside one declared as a list entry', async () => {
     const rule = node({ id: 'rule-00001-x', type: 'rule', title: 'Workflow rule', path: 'rule/a.md' })
-    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [rule], edges: [], issues: [], diagnostics: [] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [rule], edges: [], issues: [], diagnostics: [], idOwners: {} })
     vi.spyOn(api, 'items').mockResolvedValue(
       requirementView(
         {
@@ -203,6 +204,7 @@ describe('the inspector panel', () => {
       nodes: [node({ status: undefined, ok: false, problems: ['front matter has no status'] })],
       edges: [],
       issues: [],
+      idOwners: {},
       diagnostics: [],
     })
     vi.spyOn(api, 'items').mockResolvedValue(view({ items: [item('spec-00001-FR-1')] }))

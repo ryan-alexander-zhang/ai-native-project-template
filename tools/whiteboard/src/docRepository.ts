@@ -62,6 +62,13 @@ export interface DocGraph {
   issues: GraphIssue[]
   /** What drifted from the item grammar (spec-00001-FR-40); never an issue — a node stays sound. */
   diagnostics: GraphDiagnostic[]
+  /**
+   * Every resolvable id → the document owning it (spec-00001-FR-57, design-00001
+   * §7): a document id maps to itself, an item or criterion id to the document
+   * declaring it. The one basis of the inline-id jump's clickability; it feeds
+   * no edge and no diagnostic (spec-00001-FR-59).
+   */
+  idOwners: Record<string, string>
 }
 
 interface ParsedDoc {
@@ -308,6 +315,15 @@ function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
       ...graphDiagnostics(docs, nodes),
       ...nodes.flatMap((node, index) => relationFieldDiagnostics(docs[index]!, node, config)),
     ],
+    // Document ids are read off the node key, never `declaredId()`: a colliding
+    // id is path-keyed and stays out (ambiguous target, spec-00002-FR-8), and so
+    // does a malformed one. An anomalous document's own id stays in — jumping to
+    // it is how it gets repaired — while its items claim nothing, because
+    // `itemOwners` already skips a node that is not ok (spec-00001-FR-57).
+    idOwners: Object.fromEntries([
+      ...nodes.filter((node) => ID_PATTERN.test(node.id)).map((node) => [node.id, node.id]),
+      ...owners,
+    ]),
   }
 }
 

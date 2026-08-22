@@ -62,6 +62,7 @@ const GRAPH: DocGraph = {
   edges: [],
   issues: ISSUES,
   diagnostics: DIAGNOSTICS,
+  idOwners: {},
 }
 
 let graph: DocGraph

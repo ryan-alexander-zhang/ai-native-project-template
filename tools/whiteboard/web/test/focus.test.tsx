@@ -33,6 +33,7 @@ const GRAPH: DocGraph = {
   nodes: [node(), node({ id: 'idea-00001-x', type: 'idea', title: 'Whiteboard idea', path: 'idea/a.md' })],
   edges: [],
   issues: [],
+  idOwners: {},
   diagnostics: [],
 }
 
