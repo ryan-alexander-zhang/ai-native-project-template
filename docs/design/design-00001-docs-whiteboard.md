@@ -494,7 +494,7 @@ stateDiagram-v2
 ## 7. API 契约
 
 ```
-GET  /api/graph                       → {nodes, edges, issues, diagnostics}   # diagnostics: 解析诊断（FR-40），行含 {docId, kind, line?, text}
+GET  /api/graph                       → {nodes, edges, issues, diagnostics, idOwners}   # diagnostics: 解析诊断（FR-40），行含 {docId, kind, line?, text}；idOwners: 可解析 id → 所属文档 id（第十五轮，FR-57，见下）
 GET  /api/docs/:id                    → {content, hash}            # 整文件原文，front matter 可改
 PUT  /api/docs/:id                    {content, baseHash}          → 200 {committed, error?} | 409 冲突
 GET  /api/docs/:id/transitions        → [status]                   # 合法目标状态（FR-6）
@@ -529,6 +529,18 @@ line?, text?}`——无法归属（原 `unattributed`，FR-33）与文法诊断�
 声明的原始 id **列表**；细粒度引用时它们与 `target`（所属文档）不同。同一字段
 的多个值落到同一文档时合并为一条边（FR-28 合并规则的延伸，AC-28.5），关系列表
 （FR-30）按 `declaredTargets` 逐项展开。
+
+**第十五轮增补（行内 id 跳转，`spec-00001-FR-57`…`FR-59`）**：graph 载荷新增
+`idOwners`——「可解析 id → 所属文档 id」一张表，前端可点击判定的唯一依据。
+构建：每个 ok 节点的文档 id 自映射（按**节点键**取——撞 id 节点的键是路径，
+其 id 因目标歧义不入表，`spec-00002-FR-8`；构建不得经 `declaredId()`，那会
+复活撞 id）；ok 且有条目文法的节点，其全部条目与 AC id 映射到所属文档 id
+（与 `itemOwners` 同源的构建逻辑——该函数今日是 docRepository 模块私有、
+不在任何载荷；异常文档的条目按归属的既有排除不入表）。规模 = 全仓文档、
+条目与 AC 的 id 总数——本仓量级下是几百个短字符串，随 graph 一次下发即可，
+不另设端点；已有的 `declaredTargets` 只覆盖被 front matter 引用过的 id，
+覆盖不了散文引用面，不足以承载。该表只服务呈现层，不参与边与诊断的推导
+（`spec-00001-AC-59.1` 的守卫）。
 
 **治理轮（spec-00002）对上述载荷的增补，逐项如下**（以下四段内不带前缀的
 `FR-n` / `AC-n.m` 一律指 `spec-00002`）。
@@ -610,3 +622,7 @@ spec-00001-FR-26、FR-27 承接。
 调用点（§2）已归 `issue-00016` 与 `plan-00012` T4；从 `spec-00001` §6 移除被
 `spec-00002` 覆盖的两条范围外事项、以及把「id 唯一」写进 `docs/README.md`，
 已由 `spec-00002` §1 指给 plan 轮。
+
+## 10. Open Questions
+
+- 本文档当前无未决项。
