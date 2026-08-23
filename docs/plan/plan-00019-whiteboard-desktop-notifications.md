@@ -1,7 +1,7 @@
 ---
 id: plan-00019-whiteboard-desktop-notifications
 type: plan
-status: open
+status: resolved
 implements: [spec-00004-whiteboard-desktop-notifications]
 ---
 
@@ -36,7 +36,7 @@ T1 与 T2 是文档轮，先行且互相独立；T3 依赖 T1；T4 收口。**T1
   （含转入离场时的补发、逐会话各一条）；同会话后到替换先到；点击回跳
   （聚焦尽力而为 + 终端呈现 + 定位选中/就近处置/会话已不在的提示）；
   内容最小化。
-- **T4 — 测试与验收收口**：按 `spec-00004-AC-1.1` … `AC-6.3` 全部 19 条
+- **T4 — 测试与验收收口**：按 `spec-00004-AC-1.1` … `AC-6.3` 全部 21 条
   各落一测，每测带 `// <AC id>` 溯源标注；`npm test`、typecheck、覆盖率
   门不降；写 record（`parent` 指向本 plan，
   `verifies: [spec-00004-whiteboard-desktop-notifications]`）逐 AC 列行，
@@ -49,7 +49,7 @@ T1 与 T2 是文档轮，先行且互相独立；T3 依赖 T1；T4 收口。**T1
 2. T3 落地 → verify: `spec-00004-AC-1.1` … `AC-6.3` 对应测试全部通过。
 3. 全量测试、typecheck、覆盖率门全绿 → verify: 命令退出码与阈值，无门槛
    下调。
-4. record 列全 6 条 FR 的 19 条 AC，本 plan 经 `open → resolved` 放行 →
+4. record 列全 6 条 FR 的 21 条 AC，本 plan 经 `open → resolved` 放行 →
    verify: resolved 门通过（`rule-00001-BR-25`）。
 
 ## Out of Scope
