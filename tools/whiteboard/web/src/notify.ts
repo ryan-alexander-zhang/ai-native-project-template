@@ -41,14 +41,6 @@ function permissionNow(): NotificationPermission | 'unsupported' {
 }
 
 /**
- * `renotify` is not in lib.dom's `NotificationOptions`, and browsers ignore an
- * option they do not know — so it is passed for the ones that do (a replacement
- * announces itself again) and costs nothing on the ones that do not
- * (design-00002 §13).
- */
-type NoticeOptions = NotificationOptions & { renotify?: boolean }
-
-/**
  * Away: the page is not in front of the user — hidden (a background tab) or in a
  * window that does not have the focus (working in another window). Both halves
  * are needed; visibility alone misses the main case (design-00002 §13,
@@ -93,6 +85,20 @@ export function useDesktopNotifications(sessions: SessionListing[], open: (sessi
   const round = useRef(new Map<string, number>())
   /** The round each session's waiting notice has already gone out for. */
   const sent = useRef(new Map<string, number>())
+  /**
+   * The notification each session has standing, so the next one of that session
+   * can take its place. «同一会话同刻至多一条» is the page's own to keep: a tag
+   * cannot be leaned on for it — on macOS Chrome a tag whose notification has
+   * been dismissed is never displayed again, so the second notice of a session
+   * was silently dropped (issue-00019).
+   */
+  const standing = useRef(new Map<string, Notification>())
+  /** Notices posted, ever: what makes every tag its own (issue-00019). */
+  const posted = useRef(0)
+
+  // The handles outlive nothing: a page going away takes its notifications'
+  // onclick with it (spec-00004 §6), and holding the objects past that is a leak.
+  useEffect(() => () => standing.current.clear(), [])
 
   useEffect(() => {
     switchedOn.current = wanted
@@ -115,14 +121,23 @@ export function useDesktopNotifications(sessions: SessionListing[], open: (sessi
     // silence — no notification, no error, no second request
     // (spec-00004-FR-4, AC-4.3).
     if (api === undefined || api.permission !== 'granted' || !switchedOn.current || !away.current) return false
-    // One tag per session, so a later notice of the same session replaces the
-    // earlier one and there is never a stack of them (spec-00004-FR-6).
+    // Never a stack of one session's notices, and never a tag reused: the one
+    // that session has standing is closed here, by us (spec-00004-FR-6,
+    // issue-00019).
+    standing.current.get(session.id)?.close()
+    posted.current += 1
     const notice = new api(`${session.kind} · ${session.sourceId}`, {
-      tag: session.id,
+      tag: `${session.id}:${posted.current}`,
       body: status,
-      renotify: true,
-    } as NoticeOptions)
+    })
+    standing.current.set(session.id, notice)
+    /** Gone from the screen, however it went: there is nothing left to replace. */
+    const forget = () => {
+      if (standing.current.get(session.id) === notice) standing.current.delete(session.id)
+    }
+    notice.onclose = forget
     notice.onclick = () => {
+      forget()
       // Best effort, and said as such: whether the window comes forward is the
       // browser's and the system's to decide (spec-00004-FR-5).
       window.focus()

@@ -69,12 +69,24 @@ class Notice {
   static requests = 0
   static made: Notice[] = []
   onclick: (() => void) | null = null
+  onclose: (() => void) | null = null
+  /**
+   * How many times the page closed this one. Replacement is the page's own act
+   * now, not the browser's reading of a shared tag (issue-00019), so
+   * `spec-00004-AC-6.3` is a claim about this number.
+   */
+  closed = 0
 
   constructor(
     readonly title: string,
-    readonly options: NotificationOptions & { renotify?: boolean } = {},
+    readonly options: NotificationOptions = {},
   ) {
     Notice.made.push(this)
+  }
+
+  close(): void {
+    this.closed += 1
+    this.onclose?.()
   }
 
   static requestPermission(): Promise<NotificationPermission> {
@@ -434,7 +446,9 @@ describe('being called back to a session that is waiting', () => {
 
     expect(Notice.made).toHaveLength(2)
     expect(Notice.made[1]!.options.body).toBe('awaiting')
-    expect(Notice.made[1]!.options.tag).toBe('s1')
+    // A second round of the same session is a notification of its own, and it
+    // does not reuse the first round's tag (issue-00019).
+    expect(Notice.made[1]!.options.tag).not.toBe(Notice.made[0]!.options.tag)
   })
 
   /**
@@ -467,7 +481,7 @@ describe('being called back to a session that is waiting', () => {
 
   /**
    * spec-00004-AC-2.4 — two sessions start waiting one after the other, and each
-   * gets its own notification (they are told apart by their own tags).
+   * gets its own notification (their tags each name their own session).
    */
   it('posts one notification per session when two start waiting', async () => {
     enabled()
@@ -484,7 +498,7 @@ describe('being called back to a session that is waiting', () => {
     await push()
 
     expect(Notice.made).toHaveLength(2)
-    expect(Notice.made.map((notice) => notice.options.tag)).toEqual(['s1', 's2'])
+    expect(Notice.made.map((notice) => notice.options.tag?.split(':')[0])).toEqual(['s1', 's2'])
     expect(Notice.made[1]!.title).toBe('ask · idea-00001-x')
   })
 
@@ -578,7 +592,7 @@ describe('being told a session has ended', () => {
     await push()
 
     expect(Notice.made).toHaveLength(2)
-    expect(Notice.made.map((notice) => notice.options.tag)).toEqual(['s1', 's2'])
+    expect(Notice.made.map((notice) => notice.options.tag?.split(':')[0])).toEqual(['s1', 's2'])
     expect(Notice.made[1]!.options.body).toBe('failed')
   })
 
@@ -821,10 +835,10 @@ describe('what a notification carries', () => {
   })
 
   /**
-   * spec-00004-AC-6.3 — the waiting notification and the end notification of one
-   * session share one tag, so the second replaces the first and the session never
-   * has two notifications standing at once; the replacement asks to be noticed
-   * again where the browser can (design-00002 §13).
+   * spec-00004-AC-6.3 — the end notification of one session replaces its waiting
+   * notification, so the session never has two standing at once. The replacement
+   * is the page's own act: it closes the one it is standing on (issue-00019 —
+   * leaving it to the browser's tag lost the second notification altogether).
    */
   it('replaces a session own earlier notification instead of stacking one on it', async () => {
     enabled()
@@ -838,8 +852,85 @@ describe('what a notification carries', () => {
     await push()
 
     expect(Notice.made).toHaveLength(2)
-    expect(Notice.made[0]!.options.tag).toBe('s1')
-    expect(Notice.made[1]!.options.tag).toBe('s1')
-    expect(Notice.made[1]!.options.renotify).toBe(true)
+    expect(Notice.made[0]!.closed).toBe(1)
+    expect(Notice.made[1]!.closed).toBe(0)
+  })
+
+  /**
+   * issue-00019 — two notifications of one session never carry the same tag. On
+   * macOS Chrome a tag that has already been dismissed is not a replacement
+   * channel: a later notification reusing it is silently never displayed, so
+   * the session got one notification and never another.
+   */
+  it('gives two notifications of one session different tags', async () => {
+    enabled()
+    serve([listing()])
+    await openBoard()
+    await leave()
+
+    served = [listing({ awaiting: true })]
+    await push()
+    served = [listing({ status: 'exited', exitCode: 0 })]
+    await push()
+
+    expect(Notice.made).toHaveLength(2)
+    expect(Notice.made[0]!.options.tag).not.toBe(Notice.made[1]!.options.tag)
+  })
+
+  /**
+   * issue-00019 — a browser reports a close asynchronously, so the notice we
+   * closed to make room can report it after its replacement is already standing.
+   * That late report must forget the closed one and not the one standing, or the
+   * session's next notice has nothing to replace and starts stacking.
+   */
+  it('keeps the standing notification when the one it replaced reports its close late', async () => {
+    enabled()
+    serve()
+    await openBoard()
+    await leave()
+
+    served = [listing({ awaiting: true })]
+    await push()
+    served = [listing({ awaiting: false })]
+    await push()
+    served = [listing({ awaiting: true })]
+    await push()
+    expect(Notice.made).toHaveLength(2)
+
+    // The first round's notice, closed by the second, only now says so.
+    await act(async () => void Notice.made[0]!.onclose?.())
+
+    served = [listing({ status: 'exited', exitCode: 0 })]
+    await push()
+
+    expect(Notice.made).toHaveLength(3)
+    expect(Notice.made[1]!.closed).toBe(1)
+  })
+
+  /**
+   * issue-00019 — replacement is per session, and it stays that way now that the
+   * page performs it: one session's notice must not take down another's, which
+   * is what spec-00004-AC-2.4 and AC-3.3 ask for on the posting side.
+   */
+  it('leaves another session own notification standing', async () => {
+    enabled()
+    serve([listing({ id: 's1', sourceId: 'prd-00001-x' }), listing({ id: 's2', sourceId: 'idea-00001-x' })])
+    await openBoard()
+    await leave()
+
+    served = [
+      listing({ id: 's1', sourceId: 'prd-00001-x', awaiting: true }),
+      listing({ id: 's2', sourceId: 'idea-00001-x' }),
+    ]
+    await push()
+    served = [
+      listing({ id: 's1', sourceId: 'prd-00001-x', awaiting: true }),
+      listing({ id: 's2', sourceId: 'idea-00001-x', status: 'exited', exitCode: 0 }),
+    ]
+    await push()
+
+    expect(Notice.made).toHaveLength(2)
+    expect(Notice.made[0]!.closed).toBe(0)
+    expect(Notice.made[1]!.closed).toBe(0)
   })
 })

@@ -631,10 +631,14 @@ design-00001 §5，API 见 design-00001 §7。控件逐项已并入 §3 的表�
   口径交给本节持有）。监听 `visibilitychange` + `focus`/`blur`；转入
   离场的瞬间对当前已 awaiting 且回合未通知过的会话补发
   （`spec-00004-FR-2`）。
-- **通知本体**：`new Notification(title, { tag, body })`——`tag` 取
-  会话 id，天然承载「同一会话后到替换先到」（`spec-00004-FR-6`）；替换
-  时带重新提醒标志（支持的浏览器对结束通知重新提醒，不支持则静默替换
-  ——弱语义）；title/body 只由种类、文档 id、状态拼出，不经手正文。
+- **通知本体**：`new Notification(title, { tag, body })`——**tag 每条
+  唯一**（`会话 id:序号`），「同一会话后到替换先到」（`spec-00004-FR-6`）
+  由页面自己承载：每会话记住在场的那一条，发下一条前 `close()` 它（句柄
+  在 close 与 click 时按同一性守卫释放——真浏览器的 close 异步上报，被
+  替换者可能晚于替换者报到）。不依赖平台的 tag 替换语义，`renotify`
+  取消——macOS Chrome 对被点掉的 tag 会吞掉后续同 tag 通知
+  （issue-00019 据实校正；本条初版写作「tag 取会话 id、天然承载替换」，
+  即该缺陷的来源）。title/body 只由种类、文档 id、状态拼出，不经手正文。
   `Bell`/`BellOff` 落地时按所装 lucide-react 版本复验（§11/§12 的既有
   约定）。
 - **权限路径**（`spec-00004-FR-1`/`AC-1.2`）：权限请求只发生在开关的
