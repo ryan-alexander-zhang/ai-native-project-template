@@ -2,7 +2,7 @@
 id: design-00001-docs-whiteboard
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions]
 ---
 
 # Design: Docs 白板 MVP
@@ -77,7 +77,8 @@ flowchart LR
   不合形态、验收清单的不合式行、无法归属——spec FR-40 的载体），随图与
   `/items` 下发。
 - **Workflow Engine**：唯一的裁决点。状态流转候选、接收裁决、澄清与答疑的
-  发起裁决（status、可澄清类型、单会话约束——第八轮起澄清是会话不是写回，
+  发起裁决（status、可澄清类型、并发约束（同文档互斥 + 总数上限，第十六轮
+  由单会话约束改写）——第八轮起澄清是会话不是写回，
   decision-00006）、审计的发起裁决（status 为 `draft` 且类型可审计——第十轮，
   decision-00007）、plan 的 **resolved 门**（第十轮，spec FR-52：按 BR-24 从
   `implements` 解析交付范围，把证据限定为 `parent` 指向该 plan 的 record 后，
@@ -132,9 +133,11 @@ flowchart LR
   文档中的原始 HTML 被丢弃；mermaid 以 `securityLevel: 'strict'` 初始化，它产出
   并经 innerHTML 注入的 SVG 由它自己消毒——这条通路是 `rehype-raw` 那一半论证
   覆盖不到的。
-- **Session Manager**：会话注册表（单例槽位，spec FR-18），生命周期与浏览器
-  连接解耦（spec FR-21）；PTY 输出保留最近 1 MB 的滚动缓冲，重连时回放——
-  「此前输出」的完整性以该窗口为限。**第十一轮起（decision-00008）**：会话
+- **Session Manager**：会话注册表——**多会话，键为会话 id，容量
+  `max_sessions`**（第十六轮随 decision-00009 由单例槽位改写；并发约束
+  见 §5），生命周期与浏览器连接解耦（spec FR-21）；每会话各自持有 PTY 与
+  最近 1 MB 的滚动缓冲，重连与切换时回放——「此前输出」的完整性以该窗口
+  为限。**第十一轮起（decision-00008）**：会话
   收尾时把元数据落盘 `.whiteboard/sessions/<会话 id>.json`、纯文本转写落盘
   `<会话 id>.log`（第一读者是人，与 JSON 状态文件的分工互补——
   decision-00008 §2 第 3 条；gitignore 内，落盘失败只提示不阻塞收尾，
@@ -289,6 +292,8 @@ flow:                       # rule-00001-BR-13…BR-17
 
 entry: [idea, prd]          # rule-00001-BR-26 的流程入口类型（spec FR-53）；缺失或空 = 无新建入口
 
+max_sessions: 3             # 会话并发上限（spec-00003-FR-3，第十六轮）；缺失取缺省 3，非正整数拒绝启动
+
 carries:                    # 治理轮（spec-00002-FR-5）的关系矩阵：类型 → 该类型允许声明的关系字段
   spec:   [parent]
   design: [informs]
@@ -307,7 +312,8 @@ agents:
   agent 命令与写权限约束"）：`flow` 中的类型必须在 `types` 中且 `carry` 在
   `relations` 中；`entry` 若有，其中每个名字必须在 `types` 中（FR-53）；
   `agents` 至少一项，`command` 非空字符串、`args` 为字符串数组、`cwd` 若有必须
-  是 `docs` 内路径。任何违规 → 启动失败并指明条目。
+  是 `docs` 内路径；`max_sessions` 若有必须是正整数（缺失取缺省 3——
+  spec-00003-AC-3.4/AC-3.5，第十六轮）。任何违规 → 启动失败并指明条目。
 - **写权限约束（spec FR-13）**：机制为 per-CLI 适配——首选「会话工作目录设为
   `docs/` + CLI 自身的权限模式（越界写需显式批准）」，辅以 CLI 的
   allow/deny 权限参数。**本节的具体参数是意向而非已验证事实**：每个接入的
@@ -355,10 +361,10 @@ sequenceDiagram
   WE-->>FE: 候选类型（flow 表）
   U->>FE: 选定类型
   FE->>SM: POST sessions {sourceId, targetType}
-  SM->>WE: 取新文档的类型+编号（BR-18）
+  SM->>WE: 取新文档的类型+编号（BR-18；编号入保留集，§5，第十六轮）
   SM->>SM: 渲染任务指令，spawn pty（command/args/cwd）
   SM-->>FE: sessionId
-  FE->>SM: WS attach → xterm.js 双向流
+  FE->>SM: WS attach（?sessionId，§7）→ xterm.js 双向流
   Note over SM: 会话运行，与浏览器连接解耦
   SM->>SM: pty exit → 按 <type>-<编号>- 前缀扫描回收完整 id
   SM->>GL: commit 会话变更（wb(advance): <new-id>）
@@ -380,7 +386,8 @@ sequenceDiagram
   定向校验产出文档（id 前缀匹配、carry 关系指向来源）——这就是 FR-17 的
   "会话感知校验"，不合规进 `issues` 标异常。找不到前缀匹配文件时视为无产出，
   commit 信息退化为 `wb(advance): <sourceId>`。
-- **advance 的暂存范围**：commit 时暂存 `docs/` 下自会话启动以来的全部变动
+- **会话的暂存范围**（第十六轮起四种会话同一机制，本节以 advance 为例）：
+  commit 时暂存 `docs/` 下自会话启动以来的全部变动
   路径。**「相对会话前快照」是实现约束，不是修辞**：会话启动时必须取一次
   `docs/` 的快照，结束时以差集为暂存集——只按前缀过滤当前 `git status` 会把
   会话前就脏的文件一并卷入（`issue-00008` 即此缺陷，由 `AC-14.5`/`AC-14.6`
@@ -392,20 +399,28 @@ sequenceDiagram
   已变的（会话在别人的脏文件上继续改的）**暂存**。若只按路径集求差，第三种会被
   误排除，agent 对一份本来就脏的文档所做的修订将永远提交不进去——而「在既有
   草稿上继续写」正是本仓最常见的推进形态。
-  边界声明：会话期间外部对 `docs/` 的改动无法与会话产出区分，单人单会话前提
-  下接受。
+  边界声明：会话期间外部对 `docs/` 的改动无法与会话产出区分，单人前提下
+  接受；**并行会话写同一文件时，归属按结束顺序**——先结束者的差集按上述
+  内容规则计算，故其 commit 允许含对方对该文件已写入的内容（已知噪音，
+  decision-00009 §2 第 9 条），任何变更不丢失。
+  **第十六轮起快照-差集机制推广到四种会话**（`CONTEXT.md`「会话前快照」
+  已随之扩义），且白板发起的全部 commit——四种会话的收尾 commit 与用户
+  动作 commit（FR-14）——进**同一条串行队列**：逐会话在收尾时刻取当前
+  脏路径对自己快照求差、暂存、commit，队列保证互不吞并
+  （spec-00003-FR-8）。
 - 会话正常退出但 `docs/` 无任何变动时跳过 commit。
 
 ## 5. 会话生命周期
 
 ```mermaid
 stateDiagram-v2
-  [*] --> running: POST sessions（无运行中会话时）
+  [*] --> running: POST sessions（并发约束放行时，第十六轮）
   running --> running: 浏览器断开/重连（缓冲回放）
   running --> exited: pty exit
-  running --> exited: DELETE sessions（终止，FR-49）
-  running --> failed: spawn 失败（FR-16，无 commit）
+  running --> terminated: DELETE sessions/:id（终止，FR-49；第十六轮增第三结束态）
+  running --> failed: spawn 失败（FR-16，无 commit，释放槽位）
   exited --> [*]: 有变更则 commit + 刷新
+  terminated --> [*]: 收尾同 exited；面板与历史标「终止」
   failed --> [*]: 终端呈现错误
 ```
 
@@ -414,10 +429,40 @@ stateDiagram-v2
 **历史落盘**（元数据 `.json` + 转写 `.log`，spec FR-54）：落盘失败不阻塞
 后续步骤——commit 与刷新照常，失败仅提示。
 
+**第十六轮（并行会话，spec-00003 / decision-00009）**——生命周期按会话
+各自独立，另加五条注册表级规则：
+
+- **槽位记账**：槽位在服务端**受理发起时**占用（互斥与上限的判定与占用在
+  同一次受理里串行完成——先到先得由此免费获得，spec-00003-FR-3）；spawn
+  失败即释放，failed 会话不计入运行中总数，但照常入会话列表（面板呈现
+  「失败」）并发提示条（spec-00003-FR-7）。
+- **id 保留**：推进会话受理时分配的目标文档编号进注册表的保留集；取号时
+  把保留中的号视同已占用。这是并发下取号的**系统机制**，不修订
+  `rule-00001-BR-18` 的业务语义（「现有最大编号加一」）——保留的号正是
+  即将落盘的文档的号。会话结束（产出落盘或无产出）即出保留集。无此保留，
+  两个并行推进会拿到同一个号（spec-00003-FR-1）。
+- **等待输入判定**（spec-00003-FR-6）：每会话维护「最近输出时刻」；连续
+  无输出达静默阈值（实现常数，取 10s）且进程存活 → 会话状态附
+  `awaiting: true`，任何新输出或退出即清除。判定只改会话载荷（面板与
+  徽标读它），不触发状态机迁移、不触发 commit——弱语义，允许误报。
+- **刷新合并**：会话收尾的 `/api/events` 广播经一个短去抖窗口（量级
+  100ms，与 §6 watcher 推送的去抖同语义）合并——两个「几乎同时」结束的
+  会话经串行队列相继收尾，其广播落在同一窗口即只发一次
+  （spec-00003-FR-8 / AC-8.3）；提示条逐会话各发一条，不合并
+  （spec-00003-FR-7）。
+- **关停收尾**：服务端收到正常关停信号时，对注册表中每个 running 会话
+  依次执行终止路径（信号升级同 issue-00012），逐会话走既有收尾
+  （历史落盘 + commit，经同一串行队列）后再退出进程；异常崩溃不保证
+  （spec-00003-FR-9）。重启后注册表为空，面板空态；「本次服务启动以来」
+  的已结束会话列表也由注册表内存持有，不做持久化——跨重启回看走
+  `.whiteboard/sessions/` 的会话历史（FR-54）。
+
 ## 6. 写路径与冲突
 
 - 所有写（编辑保存、状态切换、接收、新建的保存——第十一轮）走同一条服务端
-  管道：**读盘校验 → 裁决（Workflow Engine）→ 写盘 → commit**。新建的
+  管道：**读盘校验 → 裁决（Workflow Engine）→ 写盘 → commit**。第十六轮起，
+  本管道末端的 commit 与四种会话的收尾 commit 进**同一条串行队列**（§4/§5）：
+  用户动作与会话收尾并发时由队列定序、互不吞并（spec-00003-AC-8.4）。新建的
   「读盘校验」是不存在性校验（目标 id 已存在 → 409，FR-53/AC-53.3）。澄清与答疑不走
   写管道——它们发起会话，写由会话内的 agent 完成（第八轮，decision-00006）。
 - **状态切换这一支的裁决段有固定次序**（治理轮，spec-00002）：
@@ -501,19 +546,19 @@ GET  /api/docs/:id/transitions        → [status]                   # 合法目
 POST /api/docs/:id/status             {to}                         → 200 {committed, error?} | 422 {error, gaps?: [<item-id | unresolved-id>]} 非法流转/resolved 门拒绝（FR-52：plan open→resolved 时按交付范围守门，缺口以 gaps 逐条点名，文件不变；非门拒绝无 gaps 字段）
 POST /api/docs/:id/review             {action: accept}             → 200 {committed, error?} | 422   # clarify 分支第八轮移除（decision-00006），非 accept 一律 422
 GET  /api/docs/:id/next-steps         → [{type, carry}]
-GET  /api/sessions                    → {current: {id, status} | null}   # 重连发现（FR-21）
-POST /api/sessions                    {sourceId, targetType, agent?} → {sessionId} | 409 已有会话 | 422 未知 agent（FR-55）   # 推进会话；任务指令正文单独写入（不带提交字节），提交键为会话首批输出后延迟发出的独立 `\r`（再延迟补发一次；空输入框回车幂等）——同一突发里的 `\r` 会被 cooked 模式的 ICRNL 翻回 LF 或被粘贴检测吞掉（issue-00011）
-POST /api/sessions/clarify            {docId, agent?}              → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可澄清类型/未知 agent   # 澄清会话（FR-9，第八轮；agent 第十一轮）
-POST /api/sessions/ask                {docId, agent?}              → {sessionId} | 409 已有会话/文档已删 | 422 异常文档/未知 agent   # 答疑会话（FR-47，第八轮）
-POST /api/sessions/audit              {docId, agent?}              → {sessionId} | 409 已有会话/文档已删 | 422 非 draft/非可审计类型/异常文档/未知 agent   # 审计会话（FR-50/FR-51，第十轮）
+GET  /api/sessions                    → {sessions: [{id, kind, docId, agent, status, awaiting, startedAt, endedAt?, exitCode?}]}   # 全部会话：运行中 + 本次服务启动以来已结束——会话面板与重连发现的数据源（FR-21、spec-00003-FR-4/FR-9；第十六轮由 {current|null} 改列表）。status ∈ running|exited|failed|terminated——terminated 第十六轮新增，承载面板与历史的「终止」态（spec-00003-FR-4）；上限只随 /api/config 下发，不在此重复（FR-56 的单一来源原则）
+POST /api/sessions                    {sourceId, targetType, agent?} → {sessionId} | 409 {error, reason: doc-busy|cap-reached|doc-missing} | 422 未知 agent（FR-55）   # 409 的 reason 四个发起端点同形（spec-00003-FR-2/FR-3 的「原因可区分」由它承载）；同文档互斥与上限并存时取 doc-busy（更具体者，spec FR-49 的悬停文案同序）   # 推进会话；任务指令正文单独写入（不带提交字节），提交键为会话首批输出后延迟发出的独立 `\r`（再延迟补发一次；空输入框回车幂等）——同一突发里的 `\r` 会被 cooked 模式的 ICRNL 翻回 LF 或被粘贴检测吞掉（issue-00011）
+POST /api/sessions/clarify            {docId, agent?}              → {sessionId} | 409 同文档已有会话/已达上限/文档已删 | 422 非 draft/非可澄清类型/未知 agent   # 澄清会话（FR-9，第八轮；agent 第十一轮；并发 409 第十六轮）
+POST /api/sessions/ask                {docId, agent?}              → {sessionId} | 409 同文档已有会话/已达上限/文档已删 | 422 异常文档/未知 agent   # 答疑会话（FR-47，第八轮）
+POST /api/sessions/audit              {docId, agent?}              → {sessionId} | 409 同文档已有会话/已达上限/文档已删 | 422 非 draft/非可审计类型/异常文档/未知 agent   # 审计会话（FR-50/FR-51，第十轮）
 GET  /api/create?type=<t>             → {idPrefix, template} | 422 非入口类型   # 新建预填：取号 + 模板，不写盘（FR-53；独立路径避开 /api/docs/:id 的路由重叠）
 POST /api/docs                        {id, content}                → 201 {committed} | 409 id 已存在 | 422 非入口类型/id 不合分配前缀或 slug 非法   # 新建的保存（FR-53，第十一轮）：保存才建档——写盘 + commit wb(create)，与 FR-4/FR-5 同一条写管道的创建分支；此后修订走既有 PUT
-GET  /api/sessions/history            → [{id, kind, docId, agent, startedAt, endedAt, status, exitCode?}]   # 历史会话列表（FR-54，第十一轮），读 .whiteboard/sessions/；status/exitCode 沿用会话状态词汇（exited/failed）
+GET  /api/sessions/history            → [{id, kind, docId, agent, startedAt, endedAt, status, exitCode?}]   # 历史会话列表（FR-54，第十一轮），读 .whiteboard/sessions/；status/exitCode 沿用会话状态词汇（exited/failed/terminated——第十六轮增，元数据落盘时记下终止，重启后「退出状态」仍如实呈现）
 GET  /api/sessions/history/:id        → {meta, transcript}         # 单条元数据 + 转写全文（FR-54；meta 读 <会话 id>.json，transcript 读 <会话 id>.log）
-DELETE /api/sessions                  → 200 | 404 无运行中会话（从未有，或已 exited/failed——重复终止同 404，不二次 commit）   # 终止会话（FR-49，issue-00010）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
-WS   /api/terminal                    双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正）
-WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。两个来源：docs/ 变更（watcher），以及会话收尾——**无论有无 commit**（FR-12/issue-00013，三触发源由此真正共用一条通路）
-GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）
+DELETE /api/sessions/:id              → 200 | 404 该会话不存在或非运行中（已 exited/failed——重复终止同 404，不二次 commit；逐会话判定，spec-00003-FR-5）   # 终止指定会话（FR-49，issue-00010；第十六轮加会话标识，原无标识形态废止）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
+WS   /api/terminal?sessionId=<id>     双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正；第十六轮加 sessionId——终端接入指定会话，尺寸帧只随呈现中的会话连接到达，未呈现的会话自然无帧，spec-00003-FR-5）
+WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。两个来源：docs/ 变更（watcher），以及会话收尾——**无论有无 commit**（FR-12/issue-00013，三触发源由此真正共用一条通路）。同批多会话收尾只广播一次（spec-00003-FR-8，第十六轮）
+GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）；max_sessions 随配置下发（spec-00003-FR-4 的「运行中数/上限」，第十六轮）
 GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
 GET  /api/coverage                    → [{docId, title, verified, failing, uncovered, items: [{id, coverage}]}]   # 全局覆盖率视图（spec-00002-FR-10/FR-11，治理轮）：全仓每份 spec/rule 一行，三态计数 + 逐条目覆盖；不区分文档 status，撞 id 的文档不在列；无可列文档时为 []
 ```

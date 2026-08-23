@@ -43,7 +43,7 @@ plan-00010 的收口经白板的门放行完成。
 | spec-00001-AC-52.8 | lets an issue reach resolved without consulting the gate (test/docService.test.ts) | pass |
 | spec-00001-AC-52.9 | lets a plan with an unverified scope reach wontfix (test/docService.test.ts) | pass |
 | spec-00001-AC-52.10 | lets a plan through on coverage spread across two records naming it (test/docService.test.ts) | pass |
-| spec-00001-AC-18.3 | answers 409 for an audit while a clarify session is running, leaving it alone；answers 409 for a clarify, an ask and an advance while an audit session is running (test/server.test.ts) | pass |
+| spec-00001-AC-18.3 | answers 409 for an audit while a clarify session is running, leaving it alone；answers 409 for a clarify, an ask and an advance while an audit session is running (test/server.test.ts) | n/a（第十六轮语义改写，待 plan-00018 重验） |
 | rule-00001-AC-16.1 | offers task, issue, and record for a plan, each carrying its own relation (test/workflow.test.ts)；loads and matches rule-00001 product flow (test/config.test.ts) | pass |
 | rule-00001-AC-16.2 | advances a plan into a record carrying parent and an issue carrying blocks — record leg (test/acceptance.test.ts)；offers task, issue, and record for a plan, each carrying its own relation (test/workflow.test.ts) | pass |
 | rule-00001-AC-16.3 | advances a plan into a record carrying parent and an issue carrying blocks — issue leg (test/acceptance.test.ts)；offers task, issue, and record for a plan, each carrying its own relation (test/workflow.test.ts) | pass |

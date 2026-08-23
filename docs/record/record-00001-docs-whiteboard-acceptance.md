@@ -74,7 +74,7 @@ verifies: [spec-00001-docs-whiteboard, rule-00001-docs-workflow]
 | spec-00001-AC-16.2 | leaves no commit behind when the agent CLI never starts (t/server) | pass | commit 数不变 |
 | spec-00001-AC-17.1 | marks a product that does not point back at its source (t/server, t/acceptance) | pass | node.ok=false |
 | spec-00001-AC-17.2 | commits the product and finds nothing wrong with it (t/server)；advances an idea into a prd the agent writes, and commits it (t/acceptance) | pass | 节点正常 + parent 边 |
-| spec-00001-AC-18.1 | refuses a second session and leaves the running one alone (t/sessionManager)；answers 409 while a session is running (t/server) | pass | 409 + 原会话仍 running |
+| spec-00001-AC-18.1 | refuses a second session and leaves the running one alone (t/sessionManager)；answers 409 while a session is running (t/server) | n/a | 第十六轮语义改写（并发模型，decision-00009），旧证据断言全局单会话，待 plan-00018 重验 |
 | spec-00001-AC-19.1 | rejects an action on a document whose file was deleted, without committing (t/docService) | pass | 提示刷新 + 无 commit |
 | spec-00001-AC-20.1 | reports the error and keeps the written file (t/docService) | pass | 清空 git 身份，文件保留 |
 | spec-00001-AC-21.1 | keeps writing files after the last terminal detaches (t/sessionManager) | pass | 断连后产出仍落盘 |

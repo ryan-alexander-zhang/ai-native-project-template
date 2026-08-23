@@ -15,7 +15,7 @@ parent: prd-00001-docs-whiteboard
 - canonical terms 见 `CONTEXT.md`：白板、节点、评审动作、接收、澄清、审计、
   可审计类型、交付范围、resolved 门、可澄清类型、答疑、焦点行、澄清状态
   文件、推进、修订轮、流程入口类型、新建、会话历史、终止、流程配置、
-  Agent 会话、留痕、预览、行内 id 跳转。
+  Agent 会话、会话面板（第十六轮）、留痕、预览、行内 id 跳转。
 - 本 spec 的 Markdown 方言取 GFM。
 - 输入：`parent` 为 [prd-00001-docs-whiteboard](../prd/prd-00001-docs-whiteboard.md)。
 - 本 spec 收窄「文档」一词：白板上的文档指 `docs/**/*.md` 中带 id front matter
@@ -120,7 +120,8 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   绘制）；退化尺寸（0 行或 0 列，如面板收起时）不下发；会话已退出后到达的
   尺寸帧被忽略、不出错；会话进程退出时终端呈现结束状态且白板刷新——**无论
   会话有没有产生 `docs/` 变更**（issue-00013：无变更的结束同样触发，刷新
-  的重取范围含会话状态，会话相关入口随之复位）。
+  的重取范围含会话状态，会话相关入口随之按并发约束复原——逐文档 + 上限
+  口径，第十六轮）。
 - **spec-00001-FR-13** (Event) 当 agent 会话启动时，系统应把流程配置中该 CLI
   的写权限约束传递给会话（MVP 默认约束为「仅 `docs/` 可写」）；越界写入由所选
   CLI 的权限机制拒绝，白板不做 git 回滚兜底。
@@ -130,7 +131,10 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   风险项「自动 commit 的噪音」：MVP 取最细粒度，合并策略留待后续版本。）
 - **spec-00001-FR-15** (Unwanted) 系统应在启动时读取并校验流程配置（文档类型、
   关系字段、下一步映射、焦点行（FR-48）、入口类型列表（FR-53）、agent 命令与
-  写权限约束）；若配置缺失或非法，系统应拒绝启动并给出指明问题所在的错误信息。
+  写权限约束、会话并发上限——`max_sessions`，非正整数拒绝启动、缺失取缺省
+  （第十六轮，`spec-00003-FR-3`；键专属用例由 `spec-00003-AC-3.4` /
+  `spec-00003-AC-3.5` 持有））；若配置缺失或非法，系统应拒绝启动并给出
+  指明问题所在的错误信息。
 - **spec-00001-FR-16** (Unwanted) 若 agent CLI 不存在或启动失败，系统应在内嵌
   终端呈现错误，且不产生任何 commit。
 - **spec-00001-FR-17** (Event) 当推进会话结束、白板刷新时，系统应校验会话产出
@@ -138,16 +142,20 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   `rule-00001-BR-13` … `rule-00001-BR-16` 指向来源文档）；不合规的按 FR-2
   标记为异常。该标记由磁盘当前内容导出、随每次图构建重验，不粘滞：文档在盘
   上修复后，下一次刷新即不再标异常（第十一轮修订，issue-00014）。
-- **spec-00001-FR-18** (Unwanted) 若已有 agent 会话在运行，再次发起推进、
-  澄清、答疑或审计应被拒绝，且不影响运行中的会话（MVP 同时仅一个会话，四种
-  会话共用该约束）。
+- **spec-00001-FR-18** (Unwanted) 若发起推进、澄清、答疑或审计不符合并发
+  约束——目标文档已有运行中会话，或运行中会话总数已达上限——应被拒绝，
+  且不影响任何运行中的会话；四种会话共用该约束。并发模型（同目标文档
+  互斥 + `max_sessions` 总数上限）由 `spec-00003-FR-1` …
+  `spec-00003-FR-3` 持有。（第十六轮修订：`decision-00009` 推翻单会话
+  约束，原「MVP 同时仅一个会话」废止。）
 - **spec-00001-FR-19** (Unwanted) 若动作（状态切换、评审、答疑、推进）的目标
   文档在磁盘上已不存在，系统应拒绝该动作、提示刷新，且不产生 commit。
 - **spec-00001-FR-20** (Unwanted) 若 git commit 失败（如仓库缺失、提交身份未
   配置），系统应呈现错误；已落盘的文件变更保留在工作区，不回滚。
 - **spec-00001-FR-21** (State) 当浏览器与白板断开连接时，运行中的 agent 会话应
   在服务端存续；当白板重新打开时，用户应能回到该会话的终端（含此前输出）继续
-  查看与交互。
+  查看与交互。多会话时全部运行中会话一并存续，经会话面板逐一回入（第十六轮，
+  `spec-00003-FR-9`）。
 - **spec-00001-FR-22** (Event) 当用户在编辑器中切换到预览时，系统应把编辑器
   当前缓冲区（未落盘的正文）按 GFM 渲染，至少包括标题、列表、表格、代码块，
   其中 `mermaid` 代码块渲染为图形，front matter 不作为正文渲染；预览与编辑
@@ -340,18 +348,23 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   立即结束该会话进程，其后走既有的退出收尾且**恰执行一次**（终止与自然退出
   竞态时先到者定）：终端呈现结束状态、按 FR-14 的一会话一 commit 处置会话
   已写入的变更（无变更则无 commit；半成品文档由 FR-17/FR-40 的异常与诊断
-  体系承接，commit 信息不区分终止与自然结束）、白板刷新，四个发起入口随
-  会话结束恢复可用；终止澄清会话**不删除**其澄清状态文件——进度保留供下次
-  恢复（FR-46 的删除时机不变）。无运行中会话时终止请求应被拒绝，已
-  `exited`/`failed` 的会话视同无运行中会话——重复终止同样被拒绝，且不产生
-  第二次 commit。终止入口位于终端面板头部，仅会话运行中可用；会话运行中把
-  终端面板收起后，顶栏应始终提供重开终端的会话入口（终止因此始终可达）；
-  发起入口因会话运行而禁用期间，悬停或聚焦时应呈现原因说明（与「无下一步」
-  说明并存时后者优先——它不随会话结束消失）。（issue-00010 的规格缺口
-  补齐。）
+  体系承接，commit 信息不区分终止与自然结束）、白板刷新；终止澄清会话
+  **不删除**其澄清状态文件——进度保留供下次恢复（FR-46 的删除时机不变）。
+  无运行中会话时终止请求应被拒绝，已 `exited`/`failed` 的会话视同无运行中
+  会话——重复终止同样被拒绝，且不产生第二次 commit；该拒绝语义**逐会话**
+  判定（第十六轮，`spec-00003-FR-5`）。终止入口位于终端面板头部，仅当前
+  呈现的会话运行中可用，作用于当前呈现的会话；会话运行中把终端面板收起后，
+  顶栏的会话面板入口（`spec-00003-FR-4`）保证终止始终可达；发起入口因并发
+  约束（同文档互斥或达上限，FR-18）而禁用期间，悬停或聚焦时应呈现对应
+  原因说明——两种原因并存时呈现同文档互斥（更具体者；与「无下一步」说明
+  并存时「无下一步」最优先——它不随会话结束消失）；
+  发起入口随该约束解除（该文档会话结束，或总数降至上限之下）恢复可用。
+  （issue-00010 的规格缺口补齐；第十六轮随 `decision-00009` 改多会话
+  语义。）
 - **spec-00001-FR-50** (Event) 当用户对 `draft` 的可审计类型文档执行**审计**
-  时，系统应启动审计的 agent 会话（与 FR-11 同一会话通道与终端；单会话约束
-  同 FR-18；终止同 FR-49；按 FR-14 一会话一 commit，信息指明「审计」与文档
+  时，系统应启动审计的 agent 会话（与 FR-11 同一会话通道与终端；并发约束
+  同 FR-18（第十六轮起为同文档互斥 + 总数上限）；终止同 FR-49；按 FR-14
+  一会话一 commit，信息指明「审计」与文档
   id）。任务指令应包含：目标文档路径；该类型文件夹 README 的路径；会话性质
   ——以未撰写者的立场（不为已有措辞辩护）先对照 README 审结构与文法，再审
   内容本身，逐条列出缺失的规则、用例与 GWT、未经确认的读数、无法确认的值
@@ -655,8 +668,9 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
 - **spec-00001-AC-12.8** (spec-00001-FR-12)
   Given 一个运行中的会话
   When 会话进程未产生任何 `docs/` 变更即退出（如用户在终端里 `/exit`）
-  Then 会话徽章呈现结束状态、三个发起入口恢复可用、终止入口不再呈现——
-  无需任何用户动作
+  Then 会话徽章呈现结束状态、该目标文档的发起入口恢复可用（其余文档的
+  入口不因本会话禁用，第十六轮修订）、终止入口不再呈现——无需任何用户
+  动作
 - **spec-00001-AC-13.1** (spec-00001-FR-13)
   Given 流程配置对所选 CLI 定义了默认写权限约束「仅 `docs/`」
   When 会话启动
@@ -738,17 +752,18 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   When 白板刷新（无需新的推进会话）
   Then 该节点不再带异常标记（issue-00014）
 - **spec-00001-AC-18.1** (spec-00001-FR-18)
-  Given 一个运行中的 agent 会话
-  When 在另一节点发起推进
-  Then 发起被拒绝，运行中的会话不受影响
+  Given 一份文档的运行中会话
+  When 对同一份文档发起另一种会话
+  Then 发起被拒绝，运行中的会话不受影响（第十六轮修订）
 - **spec-00001-AC-18.2** (spec-00001-FR-18)
-  Given 一个运行中的澄清会话
-  When 在另一节点发起答疑
-  Then 发起被拒绝，运行中的会话不受影响
+  Given 运行中会话总数已达 `max_sessions` 上限
+  When 在另一无会话的节点发起答疑
+  Then 发起被拒绝，全部运行中会话不受影响（第十六轮修订）
 - **spec-00001-AC-18.3** (spec-00001-FR-18)
-  Given 一个运行中的 agent 会话
-  When 在另一节点发起审计
-  Then 发起被拒绝，运行中的会话不受影响
+  Given 对一份已有运行中会话的文档的发起已被拒绝一次
+  When 不等该会话结束再次对同一文档发起
+  Then 再次被拒绝，且不产生额外副作用（第十六轮修订：拒绝的幂等性，与
+  `spec-00003-AC-2.2` 同构；并发放行的正例由 `spec-00003-AC-1.1` 持有）
 - **spec-00001-AC-19.1** (spec-00001-FR-19)
   Given 某节点对应的文件已在磁盘上被删除
   When 对该节点执行接收
@@ -1459,17 +1474,17 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   When 执行终止
   Then 存在一次含该变更的 commit，信息指明「澄清」与文档 id
 - **spec-00001-AC-49.3** (spec-00001-FR-49)
-  Given 一个会话刚被终止
-  When 打开某 `draft` 可澄清节点的浮窗
-  Then 澄清入口可用
+  Given 一份 `draft` 可澄清文档的会话刚被终止
+  When 打开该文档的浮窗
+  Then 澄清入口可用（同文档互斥随终止解除，第十六轮修订）
 - **spec-00001-AC-49.4** (spec-00001-FR-49)
   Given 无运行中会话（从未有，或已 `exited`/`failed`）
-  When 经接口请求终止
-  Then 请求被拒绝
+  When 经接口对一个不存在或已结束的会话 id 请求终止
+  Then 请求被拒绝（逐会话判定，第十六轮修订）
 - **spec-00001-AC-49.5** (spec-00001-FR-49)
-  Given 一个运行中的会话
-  When 悬停或聚焦被禁用的发起入口
-  Then 呈现「session running」的原因说明
+  Given 一份文档的会话运行中
+  When 悬停或聚焦该文档被禁用的发起入口
+  Then 呈现同文档互斥的原因说明（第十六轮修订）
 - **spec-00001-AC-49.6** (spec-00001-FR-49)
   Given 一个刚被终止的会话
   When 再次经接口请求终止
@@ -1481,7 +1496,7 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
 - **spec-00001-AC-49.8** (spec-00001-FR-49)
   Given 一个运行中的会话，其终端面板已被收起
   When 查看顶栏
-  Then 存在重开终端面板的会话入口
+  Then 会话面板入口存在且可重开终端面板（第十六轮修订，`spec-00003-FR-4`）
 - **spec-00001-AC-49.9** (spec-00001-FR-49)
   Given 一个刚被终止的澄清会话，其澄清状态文件存在
   When 查看 `.whiteboard/clarify/`
@@ -1490,6 +1505,14 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   Given 一个忽略终止信号的运行中会话进程
   When 执行终止
   Then 宽限期后该进程仍被结束，终端呈现结束状态（issue-00012）
+- **spec-00001-AC-49.11** (spec-00001-FR-49)
+  Given 运行中会话总数已达上限
+  When 悬停或聚焦一份无会话文档被禁用的发起入口
+  Then 呈现已达上限的原因说明（第十六轮新增）
+- **spec-00001-AC-49.12** (spec-00001-FR-49)
+  Given 各发起入口因达上限而禁用
+  When 一个会话结束使总数降至上限之下
+  Then 无会话文档的发起入口恢复可用（第十六轮新增）
 - **spec-00001-AC-50.1** (spec-00001-FR-50)
   Given 一个 `draft` 的 spec 节点
   When 打开浮窗并执行审计
@@ -1715,8 +1738,6 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
 - 「拒绝」评审动作。
 - 手动填写待澄清点的澄清入口（第八轮废弃——待澄清点一律经澄清会话产生；
   取舍见 decision-00006）。
-- 多会话并行——推进、澄清、答疑、审计共用 FR-18 的单会话约束（第十一轮
-  域主裁定维持，decision-00008 §3）。
 - 会话历史的自动清理、配额与全文检索（FR-54 只做落盘、列出与查看）。
 - 修订轮的版本 diff 呈现——「上一有效版」由 git 历史承载。
 - 新建非入口类型的文档（rule-00001-BR-26；非入口类型经推进产生）。
@@ -1792,6 +1813,7 @@ plan 的 resolved 门（BR-24、BR-25）由代码内建，不进配置。均不�
   遗漏扫描已做——时序落为 AC-57.8，基数落为 AC-57.3，撞 id 落为 AC-58.5。
 
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
+- Sibling specs: [spec-00002-whiteboard-governance](spec-00002-whiteboard-governance.md) · [spec-00003-whiteboard-parallel-sessions](spec-00003-whiteboard-parallel-sessions.md)（第十六轮起持有 FR-18 的并发模型）
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) · [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)
 - Plan: [plan-00001-docs-whiteboard-mvp](../plan/plan-00001-docs-whiteboard-mvp.md) · [plan-00002-whiteboard-ui](../plan/plan-00002-whiteboard-ui.md) · [plan-00003-whiteboard-relation-edges](../plan/plan-00003-whiteboard-relation-edges.md) · [plan-00004-whiteboard-edge-emphasis](../plan/plan-00004-whiteboard-edge-emphasis.md) · [plan-00005-whiteboard-requirement-panel](../plan/plan-00005-whiteboard-requirement-panel.md) · [plan-00006-whiteboard-text-rendering](../plan/plan-00006-whiteboard-text-rendering.md) · [plan-00007-whiteboard-parsing-contract](../plan/plan-00007-whiteboard-parsing-contract.md) · [plan-00008-whiteboard-refresh-and-commit-scope](../plan/plan-00008-whiteboard-refresh-and-commit-scope.md) · [plan-00009-whiteboard-ask-clarify](../plan/plan-00009-whiteboard-ask-clarify.md) · [plan-00010-whiteboard-audit-and-resolved-gate](../plan/plan-00010-whiteboard-audit-and-resolved-gate.md) · [plan-00011-whiteboard-revision-create-and-session-reach](../plan/plan-00011-whiteboard-revision-create-and-session-reach.md)
-- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）· [decision-00005-whiteboard-parsing-contract](../decision/decision-00005-whiteboard-parsing-contract.md)（持有 FR-40/FR-41 与条目文法的取舍）· [decision-00006-whiteboard-ask-clarify](../decision/decision-00006-whiteboard-ask-clarify.md)（持有 FR-9 改写与 FR-45…FR-48 的取舍）· [decision-00007-whiteboard-audit-and-resolved-gate](../decision/decision-00007-whiteboard-audit-and-resolved-gate.md)（持有 FR-50…FR-52 的取舍）· [decision-00008-whiteboard-revision-create-and-session-reach](../decision/decision-00008-whiteboard-revision-create-and-session-reach.md)（持有 FR-53…FR-56 的取舍）
+- Decisions: [decision-00001-whiteboard-ui-stack](../decision/decision-00001-whiteboard-ui-stack.md) · [decision-00002-whiteboard-layout](../decision/decision-00002-whiteboard-layout.md)（持有 FR-1 的完整布局规则）· [decision-00003-whiteboard-edge-emphasis](../decision/decision-00003-whiteboard-edge-emphasis.md)（持有 FR-28…FR-30 的取舍）· [decision-00004-whiteboard-requirement-panel](../decision/decision-00004-whiteboard-requirement-panel.md)（持有 FR-31…FR-36 的取舍）· [decision-00005-whiteboard-parsing-contract](../decision/decision-00005-whiteboard-parsing-contract.md)（持有 FR-40/FR-41 与条目文法的取舍）· [decision-00006-whiteboard-ask-clarify](../decision/decision-00006-whiteboard-ask-clarify.md)（持有 FR-9 改写与 FR-45…FR-48 的取舍）· [decision-00007-whiteboard-audit-and-resolved-gate](../decision/decision-00007-whiteboard-audit-and-resolved-gate.md)（持有 FR-50…FR-52 的取舍）· [decision-00008-whiteboard-revision-create-and-session-reach](../decision/decision-00008-whiteboard-revision-create-and-session-reach.md)（持有 FR-53…FR-56 的取舍）· [decision-00009-whiteboard-parallel-sessions](../decision/decision-00009-whiteboard-parallel-sessions.md)（持有第十六轮 FR-18/FR-49 并发改写的取舍）

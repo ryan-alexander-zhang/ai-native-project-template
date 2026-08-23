@@ -33,12 +33,12 @@ FR-49（AC-49.1…49.9）的验收行。本轮无 plan——bugfix 尺寸，issu
 | spec-00001-AC-12.7 | sends no size while the panel is collapsed to nothing (w/panels)；sends no size while the terminal cannot be measured at all (w/panels) | pass |
 | spec-00001-AC-49.1 | ends the running process and leaves the end state in the terminal (t/server)；stops the session on request while it is running (w/panels) | pass |
 | spec-00001-AC-49.2 | commits what the stopped session wrote, named by its kind (t/server)——`wb(clarify): <id>`，只含该文档 | pass |
-| spec-00001-AC-49.3 | lets a new session start once the stuck one has been stopped (t/server)；stops the session from the terminal panel and hands the entries back (w/canvas) | pass |
+| spec-00001-AC-49.3 | lets a new session start once the stuck one has been stopped (t/server)；stops the session from the terminal panel and hands the entries back (w/canvas) | n/a（第十六轮语义改写，待 plan-00018 重验） |
 | spec-00001-AC-49.4 | answers 404 when no session is running (t/server)；answers 404 for a session that has already exited (t/server) | pass |
-| spec-00001-AC-49.5 | says why each of Clarify, Ask, and Advance is disabled while a session runs（it.each 三入口，w/toolbar）；prefers no next step over session running when both hold (w/toolbar) | pass |
+| spec-00001-AC-49.5 | says why each of Clarify, Ask, and Advance is disabled while a session runs（it.each 三入口，w/toolbar）；prefers no next step over session running when both hold (w/toolbar) | n/a（第十六轮语义改写，待 plan-00018 重验） |
 | spec-00001-AC-49.6 | refuses a second stop of the same session and commits nothing again (t/server) | pass |
 | spec-00001-AC-49.7 | offers no stop for a session that has already ended (w/panels)；offers no stop when there is no session at all (w/panels) | pass |
-| spec-00001-AC-49.8 | offers the session in the top bar once the terminal panel is put away (w/canvas)——收起后呈现、点击重开、重开后消失；offers no top-bar session entry when no session is running (w/canvas) | pass |
+| spec-00001-AC-49.8 | offers the session in the top bar once the terminal panel is put away (w/canvas)——收起后呈现、点击重开、重开后消失；offers no top-bar session entry when no session is running (w/canvas) | n/a（第十六轮语义改写，待 plan-00018 重验） |
 | spec-00001-AC-49.9 | leaves the clarify state file in place when the session is stopped (t/server)——文件与内容俱在 | pass |
 | spec-00001-AC-49.10 | ends a session whose process ignores the polite signal (t/server，真 PTY + `trap '' HUP`，宽限后 SIGKILL；issue-00012) | pass |
 

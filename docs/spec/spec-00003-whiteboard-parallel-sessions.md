@@ -25,11 +25,12 @@ parent: prd-00001-docs-whiteboard
   [decision-00009-whiteboard-parallel-sessions](../decision/decision-00009-whiteboard-parallel-sessions.md)。
   `spec-00001` §6 的该条范围外事项**不就地删除**：移除属 `spec-00001`
   自己的修订轮，由 plan 轮列为任务（沿 `spec-00002` 覆盖 §6 事项的先例）。
+  （第十六轮修订轮已执行该移除——原地追注。）
 - 本 spec 沿用 `spec-00001-docs-whiteboard` 对「文档」的收窄。
 - 本 spec 是 `spec-00001-docs-whiteboard` 的**并列新 spec**（`docs/spec/README.md`
   Sizing and Splitting 第 1 条），与它同 `parent`，不 supersede 它。
 - **与 `spec-00001` 的五处交接（均不就地改它，修订属其自己的修订轮，由 plan
-  轮列为任务）**：
+  轮列为任务；第十六轮修订轮已执行——原地追注）**：
   - `spec-00001-FR-18`（单会话约束）：本 spec 的 `spec-00003-FR-1` …
     `spec-00003-FR-3` 以「同目标文档互斥 + 总数上限」取代「全局仅一个」。
   - `spec-00001-FR-49`：其中「顶栏重开终端的会话入口」的可达性职责由会话

@@ -60,7 +60,10 @@ T8 依赖它；T7 依赖 T4–T6；T9 收口。**T1、T2 未接收前不得开�
   各落一测，每测带 `// <AC id>` 溯源标注（沿 plan-00016 T2 的约定）；
   `npm test`、typecheck、覆盖率门不降；写 record（`parent` 指向本 plan，
   `verifies: [spec-00003-whiteboard-parallel-sessions]`）逐 AC 列行，以
-  本 plan 过 resolved 门收口。
+  本 plan 过 resolved 门收口。旧 record 中随第十六轮语义改写而改记 n/a 的
+  行——`spec-00001-AC-18.1` … `AC-18.3`、`AC-49.3`、`AC-49.5`、
+  `AC-49.8`（record-00001/00008/00009/00010）——本 plan 的 record 须以
+  新语义为其各补一行新证据。
 
 ## Detailed Acceptance Path
 

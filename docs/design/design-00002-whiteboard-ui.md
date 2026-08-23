@@ -2,7 +2,7 @@
 id: design-00002-whiteboard-ui
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions]
 ---
 
 # Design: Docs 白板界面
@@ -59,7 +59,7 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 
 ```mermaid
 flowchart TB
-  TB[Top bar<br/>标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 主题切换]
+  TB[Top bar<br/>标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 主题切换]
   subgraph Work[工作区]
     direction LR
     CV[Canvas<br/>React Flow] ---|可拖动分隔| EP[Editor panel<br/>宽度可调]
@@ -134,11 +134,14 @@ row3                                                                            
 | 接收 | `<button>` | `Button`（default 变体） | `Check` |
 | 澄清 | 工具栏内联 textarea | `Button`，点击即发起澄清会话（终端内逐题提问；第八轮由 decision-00006 改写，原 `Dialog` + `Textarea` 废弃）；仅可澄清类型的节点呈现 | `MessageCircleQuestionMark` |
 | 答疑 | 无 | `Button`（ghost 变体），点击即发起答疑会话（终端内多轮讨论，`spec-00001-FR-47`） | `CircleHelp` |
-| 审计 | 无 | `Button`（outline 变体），点击即发起审计会话（终端内对照 README 审查，`spec-00001-FR-50`，第十轮）；仅 `draft` 的可审计类型（spec/rule/design）节点呈现（`spec-00001-FR-51`）；因会话运行禁用时同澄清/答疑呈现「session running」 | `ShieldCheck` |
-| 终止会话 | 无 | 终端面板头部 `Button`（destructive 变体），仅会话 running 时可用，点击即终止（`spec-00001-FR-49`，issue-00010） | `Square` |
-| 发起入口禁用说明 | 无 | 推进/澄清/答疑/审计因会话运行禁用期间，悬停/聚焦呈现 `Tooltip`「session running」；与「no next step」并存时后者优先（它不随会话结束消失，`AC-49.5`） | — |
+| 审计 | 无 | `Button`（outline 变体），点击即发起审计会话（终端内对照 README 审查，`spec-00001-FR-50`，第十轮）；仅 `draft` 的可审计类型（spec/rule/design）节点呈现（`spec-00001-FR-51`）；因并发约束禁用时同澄清/答疑（见「发起入口禁用说明」行） | `ShieldCheck` |
+| 终止会话 | 无 | 终端面板头部 `Button`（destructive 变体），仅**当前呈现的会话** running 时可用，作用于当前呈现的会话、逐会话判定（`spec-00001-FR-49`，issue-00010；第十六轮改多会话语义，`spec-00003-FR-5`） | `Square` |
+| 发起入口禁用说明 | 无 | 推进/澄清/答疑/审计因并发约束禁用期间，悬停/聚焦呈现 `Tooltip`——**两种原因文案**：同文档互斥（该文档已有会话）或已达上限（`spec-00003-FR-2`/`FR-3`，第十六轮取代单一「session running」）；与「no next step」并存时后者优先（它不随会话结束消失，`spec-00001-AC-49.5`） | — |
 | resolved 门拒绝 | 无 | `toast.error` 呈现「N 个条目未验证」计数 + 缺口 id 列表（过长时截断并保留计数；`spec-00001-FR-52` 的逐条点名由 API 的 `gaps` 承载，toast 是它的呈现）。注意检视面板的覆盖取全部 record 口径，与门的证据集不同，不可互替（第十轮） | `TriangleAlert` |
-| 顶栏会话入口 | 无 | 会话 running 且终端面板已收起时，顶栏呈现会话状态 `Badge`/`Button`，点击重开终端面板——终止因此始终可达（`AC-49.8`） | `Terminal` |
+| 会话面板入口 | 原「顶栏会话入口」（条件呈现的重开按钮） | 顶栏**常驻** `Button` + `Badge`：呈现「运行中数/上限」，有等待输入会话时另呈等待计数徽标（零态不渲染，沿诊断计数口径）；点击开会话面板（下一行）。原条件入口废止，终止可达性由本入口承接（`spec-00001-AC-49.8`、`spec-00003-FR-4`/`FR-6`，第十六轮） | `Terminal` |
+| 会话面板 | 无 | 与命令面板同一承载形态的全屏 `Dialog`：逐会话一行「种类图标 · 目标文档 id · agent（配置多于一条时）· 状态 · 发起时间」，运行中在前、已结束（exited/failed/terminated 分别标明）在后；点击一行关闭面板、终端呈现该会话，目标在图上则定位并选中其节点，不在则仅呈现终端 + toast 提示、选中不变（`spec-00003-FR-4`）；无会话时空态文案，入口仍可开 | `Terminal` |
+| 节点会话标记 | 无 | 目标文档节点 `Card` 上的 `Badge`：运行中与等待输入以**不同图标**区分（非颜色可辨）；激活（单击/Enter）即在终端呈现该会话，不触发节点选中语义；会话结束随刷新消失；只作用呈现层（`spec-00003-FR-10`） | `Terminal` `Keyboard` |
+| 会话结束通知 | 无 | `Sonner` 提示条：每会话结束（自然退出/终止/启动失败）各一条，含种类、文档 id 与结束态，逐条堆叠不合并（`spec-00003-FR-7`） | `Terminal` |
 | 新建 | 无 | 顶栏 `Button` + `Dialog`：类型只列流程配置 `entry` 声明者、slug 输入框；确认后编辑器以模板预填打开，保存即建档（`spec-00001-FR-53`，第十一轮）；`entry` 缺失或为空时按钮不呈现 | `FilePlus` |
 | 会话历史 | 无 | 顶栏 `Button` 开历史列表（种类、文档 id、agent、起止、退出状态），点击一条查看转写全文（只读，`spec-00001-FR-54`，第十一轮） | `History` |
 | agent 选择 | 无 | 配置多于一条 agent 时，发起会话的入口旁呈现 `DropdownMenu` 选择（缺省第一条）；仅一条时不呈现（`spec-00001-FR-55`，第十一轮） | `Bot` |
@@ -150,7 +153,7 @@ row3                                                                            
 | 关闭面板 | `<button>` | `Button`（ghost, icon） | `X` |
 | 动作被拒 / 冲突 | 面板内纯文本 / 画布下红条 | `Sonner` 提示条，错误态（`toast.error`） | `TriangleAlert` |
 | 编辑器面板 | 底部固定 45vh | 右侧 `ResizablePanel`，宽度可调并持久化 | — |
-| 终端面板 | 底部固定 45vh | 底部 `ResizablePanel` + `Card` 头 + 会话状态 `Badge`（running/exited/failed），高度可调 | `Terminal` |
+| 终端面板 | 底部固定 45vh | 底部 `ResizablePanel` + `Card` 头 + 会话状态 `Badge`（running / awaiting（由载荷 status=running 且 awaiting=true 派生，非独立状态）/ exited / failed / terminated——词汇同 design-00001 §7 的会话载荷）；头部含当前会话的种类与目标文档 id，一次呈现一个会话、经会话面板切换（`spec-00003-FR-5`，第十六轮）；高度可调 | `Terminal` |
 | 空画布 | 空白 | 空状态：图标 + 一句说明 | `FileQuestionMark` |
 | 检视面板 | 无 | 右侧 `ResizablePanel`，选中 spec/rule 节点时可见，与编辑器互斥占用右槽（§9）；条目行含 id、正文、AC 计数与覆盖图标（`spec-00001-FR-31`…`FR-33`） | `PanelRight` `CircleCheck` `CircleX` `CircleDashed` |
 | 子画布面包屑 | 无 | shadcn `Breadcrumb`，仅子画布中出现，「Board」项可点返回（`spec-00001-FR-35`/`FR-36`） | `ChevronRight` |
@@ -181,18 +184,22 @@ row3                                                                            
 
 ## 4. 节点
 
-一个节点承载四件事，按信息层级排布（以 shadcn `Card` 组件作为实现载体）：
+一个节点承载四件事，按信息层级排布（以 shadcn `Card` 组件作为实现载体；
+第十六轮为会话中的节点加第六槽）：
 
 ```mermaid
 flowchart LR
   subgraph Node
     direction TB
-    R1["① 类型图标 + 类型名 · · · ② 状态 Badge"]
+    R1["① 类型图标 + 类型名 · · · ⑥ 会话状态标记（会话中，第十六轮）· ② 状态 Badge"]
     R2["③ 标题（H1，两行截断）"]
     R3["④ id（等宽小字）"]
     R4["⑤ 异常时：Badge + Popover 列出 problems"]
   end
 ```
+
+⑥ 只在该文档有运行中会话时呈现，位于状态 Badge 之前（同一行、不同区），
+图标与激活语义见 §3「节点会话标记」行与 §12。
 
 - **类型图标**：每个文档类型一个 Lucide 图标 —— `idea: Lightbulb`、
   `prd: Target`、`spec: FileText`、`rule: Scale`、`design: DraftingCompass`、
@@ -417,7 +424,12 @@ FR-26/FR-27 及其 AC 需要新的验收行。
 | 工具栏避让右槽 | 实测验收，不写 GWT（§9 视口修正） |
 | 解析诊断区与顶栏诊断计数 | `spec-00001-FR-40` 及其 AC |
 | 终端尺寸随面板同步 | `spec-00001-FR-12` 修订（`AC-12.5`…`AC-12.7`） |
-| 终止会话按钮、禁用原因 tooltip、顶栏会话入口 | `spec-00001-FR-49` 及其 AC |
+| 终止会话按钮（逐会话）、禁用原因 tooltip（两种原因）、会话面板入口 | `spec-00001-FR-49` 及其 AC；逐会话语义与两种原因由 `spec-00003-FR-2`/`FR-3`/`FR-5` 持有（第十六轮） |
+| 会话面板的列出、点击呈现与定位（第十六轮） | `spec-00003-FR-4` 及其 AC |
+| 终端切换与呈现状态保持（第十六轮） | `spec-00003-FR-5` 及其 AC |
+| 等待输入徽标与计数（第十六轮） | `spec-00003-FR-6` 及其 AC |
+| 会话结束与启动失败的提示条（第十六轮） | `spec-00003-FR-7` 及其 AC |
+| 节点会话状态标记（第十六轮） | `spec-00003-FR-10` 及其 AC |
 | 推进指令的文法段与产出校验 | `spec-00001-FR-41` 及其 AC |
 | 磁盘变更自动刷新与断连时的沉默 | `spec-00001-FR-42`、`FR-43` 及其 AC |
 | 刷新后呈现状态按 id 保持与就近关闭 | `spec-00001-FR-44` 及其 AC |
@@ -555,6 +567,11 @@ AC ≤3 条逐项并列，>3 条折叠为「首个 id +N」——标签管指路
 **保持的粒度是 id，不是索引**：条目行的展开、详情的目标、下钻的文档、
 **全局覆盖率视图的展开行**（治理轮）全部按 id 比对——按位置保持会在文档新增
 或重排后指向别的东西。`CONTEXT.md` 的「呈现状态」条目已同步列入这一项。
+**第十六轮增两项**（与 `CONTEXT.md`「呈现状态」的枚举一致）：当前呈现的
+会话；各会话终端滚动位置——均按会话保持（`spec-00003-FR-5`；呈现的会话
+消失时按就近关闭只关终端呈现）。另注：同批多会话收尾的刷新合并为一次是
+**服务端行为**、不属呈现状态（`spec-00003-FR-8`，见 design-00001 §5），
+记在此只为说明合并不影响本节的保持语义。
 
 ## 11. 治理轮的两处裁定余项（已裁，非未决）
 
@@ -571,7 +588,33 @@ AC ≤3 条逐项并列，>3 条折叠为「首个 id +N」——标签管指路
 **已有归宿的实现项**：`Gauge` 与其余 Lucide 标识符按 §4 的既有约定，落地时
 按所装 `lucide-react` 版本逐个复验。
 
-## 12. Open Questions
+## 12. 并行会话与会话面板（第十六轮）
+
+承载 `spec-00003` 的界面侧；服务端的注册表、槽位、等待判定与收尾串行见
+design-00001 §5，API 见 design-00001 §7。控件逐项已并入 §3 的表；本节只
+持有三条结构性决定：
+
+- **每会话一个常驻 xterm 实例**，切换即挂载/卸载 DOM 容器，不销毁实例——
+  这是「切回后完整输出与滚动位置保持」（`spec-00003-AC-5.1`）的最省实现：
+  重放 1 MB 缓冲能恢复输出但恢复不了滚动位置。代价是内存按并行数线性
+  增长，上界 = `max_sessions`（缺省 3）个实例各持 1 MB 缓冲，可接受。
+  尺寸帧只从**已挂载**的实例上报（`fit` 只对可见容器有意义），未呈现的
+  会话自然无帧——与 design-00001 §7 的 WS 语义互为两端（`AC-5.7`）。
+- **会话面板取全屏 `Dialog`**（与命令面板、三份治理轮清单同一承载形态）：
+  它同样是「全局的、读完就走」的清单——点一行即关闭并落到终端与节点，
+  不是并排监控台；常驻监控由入口 `Badge` 的「运行中数/上限 + 等待计数」
+  承担，面板只在需要切换或查看时打开。面板行是真控件、键盘可达——§6 对
+  治理轮三份清单行的口径**扩展适用于本面板**（第四份同形清单，同一
+  义务）。
+- **节点标记不是第四种覆盖图标**：它落在节点 `Card` 头部第⑥槽（§4）、用
+  `Terminal`（运行中）/ `Keyboard`（等待输入）两个图标——不取
+  `MessageSquareDot`，它与 `prompt` 类型图标 `MessageSquare`（§4）只差
+  一点，同板呈现时非颜色可辨性存疑；两个图标 §4 类型表未占用，落地时按
+  所装 lucide-react 版本复验，与覆盖三态图标不同区不同形；激活标记
+  `stopPropagation`，不触发节点单击的选中语义（`spec-00003-FR-10` 与
+  行内 id 跳转的 FR-57 同构约定）。
+
+## 13. Open Questions
 
 - 本文档当前无未决项（第十五轮审计的两问已由域主裁定，见 spec-00001 §8；
-  就近关闭的裁定已回写 §9）。
+  就近关闭的裁定已回写 §9；第十六轮的取舍全部由 decision-00009 在案）。

@@ -38,7 +38,7 @@ verifies: [spec-00001-FR-9, spec-00001-FR-45, spec-00001-FR-46, spec-00001-FR-47
 | spec-00001-AC-14.8 | commits what a clarify session wrote under docs, and nothing outside it (t/server) | pass |
 | spec-00001-AC-16.3 | reports a missing agent CLI in the terminal, with no commit and no state file (t/server) | pass |
 | spec-00001-AC-16.4 | reports a missing agent CLI in the terminal, with no commit and no state file (t/server) | pass |
-| spec-00001-AC-18.2 | answers 409 for an ask while a clarify session is running, leaving it alone (t/server)；disables advance, clarify, and ask while a session is running (w/toolbar) | pass |
+| spec-00001-AC-18.2 | answers 409 for an ask while a clarify session is running, leaving it alone (t/server)；disables advance, clarify, and ask while a session is running (w/toolbar) | n/a（第十六轮语义改写，待 plan-00018 重验） |
 | spec-00001-AC-19.2 | answers 409 and starts nothing when the target document was deleted (t/server) | pass |
 | spec-00001-AC-45.1 | carries the target path and both its relation document paths, as paths only (t/sessionTasks) | pass |
 | spec-00001-AC-45.2 | leaves the relation context out when the document has none (t/sessionTasks) | pass |
