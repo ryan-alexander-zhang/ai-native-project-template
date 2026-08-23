@@ -1,7 +1,7 @@
 ---
 id: plan-00018-whiteboard-parallel-sessions
 type: plan
-status: open
+status: resolved
 implements: [spec-00003-whiteboard-parallel-sessions]
 ---
 
@@ -56,8 +56,9 @@ T8 依赖它；T7 依赖 T4–T6；T9 收口。**T1、T2 未接收前不得开�
   作用呈现层）；发起入口的逐文档/上限禁用原因说明。
 - **T8 — 关停收尾** (spec-00003-FR-9)：服务端正常关停对每个运行中会话
   执行终止的收尾（结束进程、commit、历史落盘）。
-- **T9 — 测试与验收收口**：按 `spec-00003-AC-1.1` … `AC-10.4` 全部 41 条
-  各落一测，每测带 `// <AC id>` 溯源标注（沿 plan-00016 T2 的约定）；
+- **T9 — 测试与验收收口**：按 `spec-00003-AC-1.1` … `AC-10.4` 全部 55 条
+  （原 41 条，后续轮次增补）各落一测，每测带 `// <AC id>` 溯源标注
+  （沿 plan-00016 T2 的约定）；
   `npm test`、typecheck、覆盖率门不降；写 record（`parent` 指向本 plan，
   `verifies: [spec-00003-whiteboard-parallel-sessions]`）逐 AC 列行，以
   本 plan 过 resolved 门收口。旧 record 中随第十六轮语义改写而改记 n/a 的
@@ -74,8 +75,8 @@ T8 依赖它；T7 依赖 T4–T6；T9 收口。**T1、T2 未接收前不得开�
    通过。
 3. 全量测试、typecheck、覆盖率门全绿 → verify: 命令退出码与阈值，无门槛
    下调。
-4. record 列全 10 条 FR 的 41 条 AC，本 plan 经 `open → resolved` 放行 →
-   verify: resolved 门通过（`rule-00001-BR-25`）。
+4. record 列全 10 条 FR 的 55 条 AC（原 41 条，后续轮次增补），本 plan 经
+   `open → resolved` 放行 → verify: resolved 门通过（`rule-00001-BR-25`）。
 
 ## Out of Scope
 
