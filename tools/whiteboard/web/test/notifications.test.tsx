@@ -457,7 +457,7 @@ describe('being called back to a session that is waiting', () => {
   })
 
   /**
-   * spec-00004-AC-2.5 (issue-00018) — the first round was answered from in front of the board, so
+   * spec-00004-FR-2 guard (issue-00018) — the first round was answered from in front of the board, so
    * nothing was posted for it (the badge carried it); the user leaves before the
    * second round, and that round is still owed its notice.
    */
@@ -485,7 +485,7 @@ describe('being called back to a session that is waiting', () => {
   })
 
   /**
-   * issue-00020 — the server's waiting mark is not a wait: any output at all takes
+   * spec-00004-AC-2.6 (issue-00020) — the server's waiting mark is not a wait: any output at all takes
    * it down and ten seconds of silence puts it back (spec-00003-FR-6), and a CLI
    * sitting at an idle prompt redraws its status line long after it stopped
    * answering. One wait therefore reaches the page as turn after turn. A real new

@@ -149,9 +149,10 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * and is announced the same way (spec-00003-AC-7.4).
    *
    * The same diff carries the waiting turns (design-00002 §13): «not waiting →
-   * waiting» is one round of waiting, and it is what a desktop notification is
-   * owed for, at most one per round (spec-00004-FR-2). Waiting being lifted is
-   * the user's own doing and says nothing (spec-00004-AC-2.2).
+   * waiting» is reported as a turn; whether it is owed a desktop notification
+   * is notify.ts's per-away-stint judgment — at most one per session per stint
+   * (spec-00004-FR-2, issue-00020). Waiting being lifted is the user's own
+   * doing and says nothing (spec-00004-AC-2.2).
    */
   const announce = useCallback(
     (listing: SessionListing[]) => {
