@@ -414,7 +414,10 @@ parent: prd-00001-docs-whiteboard
 ## 6. Out of Scope
 
 - 板外通知（浏览器系统通知、邮件等）——`decision-00009` §2 第 8 条维持
-  范围外
+  范围外。**桌面通知半边已由
+  [spec-00004](spec-00004-whiteboard-desktop-notifications.md) 接管**
+  （decision-00010 推翻该维持；邮件等其他通道仍范围外；本条就地留存，
+  移除属本 spec 自己的修订轮）
 - 跨服务重启的会话存续（tmux 式 PTY 托管，`decision-00009` §3 否决）
 - 多用户 / 多浏览器并发协作（仍是本地单人白板）
 - 历史会话的检索与管理增强（`spec-00001-FR-54` 现状不变）
