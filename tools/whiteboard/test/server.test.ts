@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { taskInstruction } from '../src/advance.ts'
 import { Board } from '../src/server.ts'
 import { ptySpawner, spawnPty } from '../src/pty.ts'
-import type { SessionInfo, SpawnPty } from '../src/sessionManager.ts'
+import type { SessionInfo, SessionListing, SpawnPty } from '../src/sessionManager.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import {
   SESSION_WAIT,
@@ -44,17 +44,32 @@ const SUBMITTED_TAIL = `got:${taskInstruction(
   .split('\n')
   .at(-1)}`
 
+/**
+ * The silence the tests about waiting on the user run at (spec-00003-FR-6): the
+ * real threshold is ten seconds, and nothing here is proved by waiting it out —
+ * only that the flip happens with no output arriving at all. Comfortably longer
+ * than the refresh window a flip is announced through, so a board reading the
+ * listing after a flip reads what that flip left rather than the next one.
+ */
+const AWAIT_THRESHOLD = 500
+
 const DRAFT_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'draft' }, '# Idea X\n')
 const ACTIVE_IDEA = doc({ id: 'idea-00001-x', type: 'idea', status: 'active' }, '# Idea X\n')
 const servers: Server[] = []
 const watching: Board[] = []
 
 /** Start a board on an ephemeral port and give back a fetch bound to it. */
-function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?: string, spawn = spawnPty) {
+function boardOn(
+  files: Record<string, string>,
+  agentArgs = ['-e', ''],
+  command?: string,
+  spawn = spawnPty,
+  awaitThresholdMs?: number,
+) {
   const { repoRoot, docsDir } = makeRepo(files)
   const config = testConfig()
   config.agents[0] = { ...config.agents[0]!, args: agentArgs, ...(command ? { command } : {}) }
-  return boardOnRepo(repoRoot, docsDir, config, spawn)
+  return boardOnRepo(repoRoot, docsDir, config, spawn, awaitThresholdMs)
 }
 
 /**
@@ -62,8 +77,16 @@ function boardOn(files: Record<string, string>, agentArgs = ['-e', ''], command?
  * tree it is a restart, as far as anything on disk is concerned
  * (spec-00001-AC-54.2).
  */
-function boardOnRepo(repoRoot: string, docsDir: string, config = testConfig(), spawn = spawnPty) {
-  const board = new Board({ repoRoot, docsDir, config, spawn })
+function boardOnRepo(
+  repoRoot: string,
+  docsDir: string,
+  config = testConfig(),
+  spawn = spawnPty,
+  // The silence a session is read as waiting after (spec-00003-FR-6); given only
+  // by the tests that turn on it, so nothing else waits out the real threshold.
+  awaitThresholdMs?: number,
+) {
+  const board = new Board({ repoRoot, docsDir, config, spawn, awaitThresholdMs })
   const server = board.listen(0)
   servers.push(server)
   // The http server only announces its close once every socket has gone, and a
@@ -87,27 +110,39 @@ function boardOnRepo(repoRoot: string, docsDir: string, config = testConfig(), s
 type BoardCall = ReturnType<typeof boardOn>['call']
 
 /**
- * Stand-in agents whose exit the test fires, in start order. What the commit
- * queue does depends on the order two wrap-ups reach it in (spec-00003-FR-8), and
- * a spawned process ends when it ends — so the end is the one thing these tests
- * hold in their own hands.
+ * Stand-in agents whose output and exit the test fires, in start order. What the
+ * commit queue does depends on the order two wrap-ups reach it in
+ * (spec-00003-FR-8), and whether a session is silent depends on when it last
+ * spoke (spec-00003-FR-6) — a spawned process speaks and ends when it does, so
+ * both are things these tests hold in their own hands. A stand-in also echoes
+ * nothing back, which a real pty does: the silence here is exactly the silence
+ * the test scripted.
  */
 function scriptedAgents() {
   const exits: Array<(exitCode: number) => void> = []
+  const says: Array<(data: string) => void> = []
   const spawn: SpawnPty = () => {
     const listeners: Array<(event: { exitCode: number }) => void> = []
+    const readers: Array<(data: string) => void> = []
     exits.push((exitCode) => {
       for (const listener of listeners) listener({ exitCode })
     })
+    says.push((data) => {
+      for (const reader of readers) reader(data)
+    })
     return {
-      onData: () => {},
+      onData: (listener) => void readers.push(listener),
       onExit: (listener) => void listeners.push(listener),
       write: () => {},
       resize: () => {},
       kill: () => {},
     }
   }
-  return { spawn, exit: (index: number, exitCode = 0) => exits[index]!(exitCode) }
+  return {
+    spawn,
+    exit: (index: number, exitCode = 0) => exits[index]!(exitCode),
+    say: (index: number, data: string) => says[index]!(data),
+  }
 }
 
 afterEach(async () => {
@@ -646,6 +681,30 @@ describe('sessions', () => {
     // The panel lists each session's kind and when it started (spec-00003-FR-4).
     expect(body.sessions[0].kind).toBe('advance')
     expect(body.sessions[0].startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  /**
+   * spec-00003-AC-6.5's server half — two sessions silent past the threshold are
+   * both marked in the one payload the panel reads (design-00001 §7). The count
+   * the top bar's badge shows is the front end's reading of these rows
+   * (spec-00003-FR-6, T7), so what is checked here is that both rows carry it.
+   */
+  it('marks every session that has gone quiet in the listing', async () => {
+    const agents = scriptedAgents()
+    const { call } = boardOn(
+      { 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD },
+      undefined,
+      undefined,
+      agents.spawn,
+      AWAIT_THRESHOLD,
+    )
+    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+    await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+
+    await vi.waitFor(async () => {
+      const { body } = await call('GET', '/api/sessions')
+      expect(body.sessions.map((session: SessionListing) => session.awaiting)).toEqual([true, true])
+    }, SESSION_WAIT)
   })
 })
 
@@ -1516,6 +1575,35 @@ describe('the docs-change socket', () => {
     // board re-reads is the one after both of them, with nothing left behind.
     expect(git(repoRoot, 'status', '--porcelain', '--', 'docs').trim()).toBe('')
     expect((await open.call('GET', '/api/graph')).body.nodes).toHaveLength(2)
+  })
+
+  /**
+   * spec-00003-FR-6 on the wire — a session's waiting mark is session state, and
+   * the one way session state reaches a board is this signal, after which the
+   * board re-reads (spec-00001-FR-42; design-00001 §7's refresh covers the
+   * sessions). Nothing else moves here — no file is written and no session ends —
+   * so without a signal of its own the mark would sit on the server unseen and
+   * the badge could never appear. One signal per flip, on the same window as
+   * every other trigger.
+   */
+  it('signals a session going quiet, and again when it speaks', async () => {
+    const agents = scriptedAgents()
+    const open = boardOn({ 'spec/b.md': DRAFT_SPEC }, undefined, undefined, agents.spawn, AWAIT_THRESHOLD)
+    await armWatch(open.board.watcher, open.docsDir)
+    const watching = await subscribe(open)
+    await open.call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    await vi.waitFor(() => expect(watching.signals).toBe(1), SIGNAL_WAIT)
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+    expect(watching.signals).toBe(1)
+    const quiet = await open.call('GET', '/api/sessions')
+    expect(quiet.body.sessions[0].awaiting).toBe(true)
+
+    agents.say(0, 'here is what I found')
+
+    await vi.waitFor(() => expect(watching.signals).toBe(2), SIGNAL_WAIT)
+    const speaking = await open.call('GET', '/api/sessions')
+    expect(speaking.body.sessions[0].awaiting).toBe(false)
   })
 
   // spec-00001-AC-42.8 — nobody listening is not a failure

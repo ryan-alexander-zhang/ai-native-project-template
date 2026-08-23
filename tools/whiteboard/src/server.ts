@@ -25,6 +25,13 @@ export interface BoardOptions {
   docsDir: string
   config: FlowConfig
   spawn?: SpawnPty
+  /**
+   * The silence a running session is read as «waiting on the user» after
+   * (spec-00003-FR-6). An implementation constant, not a config key
+   * (design-00001 §5); it is settable here for the same reason `spawn` is — so a
+   * test need not wait out the real ten seconds.
+   */
+  awaitThresholdMs?: number
 }
 
 /** Wires the modules into one board: doc service, session manager, and the HTTP/WS surface. */
@@ -44,7 +51,7 @@ export class Board {
   private lastExpectation?: Expectation
 
   constructor(options: BoardOptions) {
-    const { repoRoot, docsDir, config, spawn = spawnPty } = options
+    const { repoRoot, docsDir, config, spawn = spawnPty, awaitThresholdMs } = options
     this.repoRoot = repoRoot
     this.docs = new DocService(repoRoot, docsDir, config)
     // Everything written from outside the board arrives as this signal, so it is
@@ -56,6 +63,13 @@ export class Board {
       repoRoot,
       spawn,
       snapshot: () => this.docs.snapshotDocs(),
+      awaitThresholdMs,
+      // A waiting mark going up or coming down is session state, and session
+      // state reaches a board the one way all of it does: the refresh signal,
+      // after which the board re-reads `GET /api/sessions` (spec-00001-FR-42,
+      // spec-00003-FR-6). Through `signal` rather than a channel of its own, so
+      // it folds into the same window as everything else (design-00001 §5).
+      onAwaitingChange: () => this.watcher.signal(),
       onExit: (plan, baseline) => this.finishSession(plan, baseline),
     })
     this.app = this.buildApp(config)

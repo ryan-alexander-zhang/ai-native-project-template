@@ -20,6 +20,15 @@ const SUBMIT_DELAY_MS = 400
 const SUBMIT = '\r'
 
 /**
+ * How long a running session must print nothing before it is read as waiting on
+ * the user (spec-00003-FR-6). An implementation constant of the order of ten
+ * seconds, not a config key (design-00001 §5): the judgment is deliberately weak
+ * — a false positive costs a badge and nothing more, since the mark drives no
+ * transition and no commit.
+ */
+const AWAIT_THRESHOLD_MS = 10_000
+
+/**
  * How a session stands. `terminated` is the third end state of the sixteenth
  * round (design-00001 §5): a session the user stopped ended on its own wrap-up
  * like any other, but the panel and the history have to say it was stopped
@@ -81,6 +90,14 @@ export interface SessionOutcome {
 export interface SessionListing extends SessionInfo {
   startedAt: string
   endedAt?: string
+  /**
+   * True while the session has printed nothing for the silence threshold and its
+   * process is still alive — «waiting on the user» (spec-00003-FR-6). Never true
+   * of a session that has ended, whichever way it ended; it is the registry's
+   * reading of the session rather than anything the session said, which is why it
+   * lives here and not on `SessionInfo`.
+   */
+  awaiting?: boolean
 }
 
 export interface PtyProcess {
@@ -152,6 +169,10 @@ interface Session {
   announceEnd: () => void
   /** The pending submit keypresses; a session that ends first is never typed into. */
   submits: NodeJS.Timeout[]
+  /** Whether the silence has already been read as «waiting on the user» (spec-00003-FR-6). */
+  awaiting?: boolean
+  /** The pending silence window, re-armed by every output and cleared by the end. */
+  silence?: NodeJS.Timeout
 }
 
 export interface SessionManagerOptions {
@@ -170,6 +191,16 @@ export interface SessionManagerOptions {
   snapshot?: () => DirtySnapshot
   /** Overrides `SUBMIT_DELAY_MS`, so a test need not wait out the real one. */
   submitDelayMs?: number
+  /** Overrides `AWAIT_THRESHOLD_MS`, so a test need not wait out the real silence. */
+  awaitThresholdMs?: number
+  /**
+   * Called when a session's waiting-on-the-user mark goes up or comes down
+   * (spec-00003-FR-6). A board learns session state by re-reading after the
+   * refresh signal (spec-00001-FR-42) and by nothing else, so a flip nobody
+   * announced would never reach the panel; the caller routes it through the
+   * signal's own debounce window.
+   */
+  onAwaitingChange?: () => void
   /**
    * Runs when a process exits: commits and validates what that session produced.
    * It is handed the session's **own** baseline, because several sessions run at
@@ -251,8 +282,12 @@ export class SessionManager {
     session.pty.onData((data) => {
       this.publish(session, data)
       this.armSubmit(session)
+      this.armSilence(session)
     })
     session.pty.onExit((event) => this.exit(session, event.exitCode))
+    // The clock starts at the spawn, not at the first output: a CLI that prints
+    // nothing at all is as silent as one that stopped printing (spec-00003-FR-6).
+    this.armSilence(session)
     // The text alone, ending on whatever it ends on: a submit byte in this same
     // burst is swallowed by the terminal's cooked mode or read as the tail of a
     // paste, and either way never sends (issue-00011). Its own newlines stay LF,
@@ -307,6 +342,35 @@ export class SessionManager {
   }
 
   /**
+   * Restart the silence window (spec-00003-FR-6). Any output at all is proof the
+   * session is not waiting on anybody, so this both takes the mark down and arms
+   * the next window; a session whose process is gone is never armed again, which
+   * is the whole of «a process that has exited does not enter the judgment» —
+   * neither its last words nor the wrap-up's silence can mark it
+   * (spec-00003-AC-6.4).
+   */
+  private armSilence(session: Session): void {
+    clearTimeout(session.silence)
+    session.silence = undefined
+    this.setAwaiting(session, false)
+    if (session.info.status !== 'running') return
+    const threshold = this.options.awaitThresholdMs ?? AWAIT_THRESHOLD_MS
+    // Unreffed like the submits: a board is not held open by a session's silence.
+    session.silence = setTimeout(() => this.setAwaiting(session, true), threshold).unref()
+  }
+
+  /**
+   * The mark, and the refresh that carries it. Only a real change is announced,
+   * so the ordinary case — output arriving on a session that was never marked —
+   * signals nothing (spec-00003-FR-6).
+   */
+  private setAwaiting(session: Session, awaiting: boolean): void {
+    if ((session.awaiting ?? false) === awaiting) return
+    session.awaiting = awaiting
+    this.options.onAwaitingChange?.()
+  }
+
+  /**
    * Replay what that session has printed so far and follow it from there. Each
    * session keeps its own buffer and its own listeners, so output reaches the
    * terminal watching it and no other (spec-00003-AC-1.2).
@@ -346,6 +410,7 @@ export class SessionManager {
       ...session.info,
       startedAt: session.startedAt,
       endedAt: session.endedAt,
+      awaiting: session.awaiting,
     }))
   }
 
@@ -497,6 +562,13 @@ export class SessionManager {
     // natural exit is settled by whichever got here first (spec-00001-FR-49).
     session.info.status = session.stopping ? 'terminated' : 'exited'
     session.info.exitCode = exitCode
+    // An ended session is not waiting on anybody, whatever it was a moment ago,
+    // and its silence from here on is the wrap-up's (spec-00003-AC-6.3, AC-6.4).
+    // Cleared without announcing it: the end is a refresh trigger in its own
+    // right, and one refresh carries both (spec-00001-AC-12.8).
+    clearTimeout(session.silence)
+    session.silence = undefined
+    session.awaiting = undefined
     const endedAt = new Date().toISOString()
     session.endedAt = endedAt
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)

@@ -522,6 +522,129 @@ describe('submitting the instruction', () => {
   })
 })
 
+/**
+ * spec-00003-FR-6 — silence read as «waiting on the user». The judgment is about
+ * time passing with nothing arriving, so these run on fake timers and a
+ * stand-in pty: what has to be shown is that the mark goes up with no output at
+ * all, which no amount of scripted output can show. Weak semantics by design —
+ * a false positive costs a badge, and the mark drives no transition and no
+ * commit (design-00001 §5).
+ */
+describe('waiting on the user', () => {
+  const THRESHOLD = 100
+
+  /** A manager on stand-in ptys, one per session, whose output and exit the test fires. */
+  function stubManager(onExit = async () => OUTCOME) {
+    const hooks: Array<{ data?: (data: string) => void; exit?: (event: { exitCode: number }) => void }> = []
+    const onAwaitingChange = vi.fn()
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: [] }],
+      maxSessions: 3,
+      repoRoot,
+      awaitThresholdMs: THRESHOLD,
+      spawn: () => {
+        const hook: (typeof hooks)[number] = {}
+        hooks.push(hook)
+        return {
+          onData: (listener) => void (hook.data = listener),
+          onExit: (listener) => void (hook.exit = listener),
+          write: () => {},
+          resize: () => {},
+          kill: () => {},
+        }
+      },
+      onExit,
+      onAwaitingChange,
+    })
+    managers.push(manager)
+    return { manager, hooks, onAwaitingChange }
+  }
+
+  /** What the listing the panel reads says about that session (design-00001 §7). */
+  const awaiting = (manager: SessionManager, id: string) =>
+    manager.list().find((session) => session.id === id)?.awaiting
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // spec-00003-AC-6.1's manager half: the row the panel and the badge are drawn
+  // from says the session is waiting (the badge itself is the front end's).
+  it('marks a running session that has printed nothing for the threshold', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    hooks[0]!.data!('what should this cover?')
+
+    expect(awaiting(manager, id)).toBeFalsy()
+    vi.advanceTimersByTime(THRESHOLD)
+
+    expect(awaiting(manager, id)).toBe(true)
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00003-AC-6.2's manager half — the answer typed in the terminal is
+  // followed by output, and output is the whole of «not waiting any more».
+  it('takes the mark down as soon as the session speaks again', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    vi.advanceTimersByTime(THRESHOLD)
+    expect(awaiting(manager, id)).toBe(true)
+
+    hooks[0]!.data!('thank you, carrying on')
+
+    expect(awaiting(manager, id)).toBe(false)
+    // Both flips were announced, and each exactly once: the badge is redrawn off
+    // the refresh they trigger (spec-00001-FR-42).
+    expect(onAwaitingChange).toHaveBeenCalledTimes(2)
+    // The window starts over, so a session that goes quiet again is marked again.
+    vi.advanceTimersByTime(THRESHOLD)
+    expect(awaiting(manager, id)).toBe(true)
+  })
+
+  // spec-00003-AC-6.3's manager half: the mark is gone from the ended row, so
+  // nothing is left for the count to be drawn from.
+  it('drops the mark when a waiting session ends', async () => {
+    const { manager, hooks } = stubManager()
+    const { id } = manager.start(planFor('ask', 'record-00001-b'))
+    vi.advanceTimersByTime(THRESHOLD)
+    expect(awaiting(manager, id)).toBe(true)
+
+    hooks[0]!.exit!({ exitCode: 0 })
+
+    expect(manager.list()[0]!.status).toBe('exited')
+    expect(awaiting(manager, id)).toBeFalsy()
+    // And nothing arms it again, however long the ended session stays listed.
+    vi.advanceTimersByTime(10 * THRESHOLD)
+    expect(awaiting(manager, id)).toBeFalsy()
+    await manager.whenFinished(id)
+  })
+
+  // spec-00003-AC-6.4 — a process that has exited does not enter the judgment,
+  // not even while its wrap-up is still running: the silence from the exit
+  // onward is the wrap-up's, and there is nobody left to answer anything.
+  it('never marks a session whose process has exited with its wrap-up still running', () => {
+    // A wrap-up that never finishes, which is the state the case is about.
+    const { manager, hooks, onAwaitingChange } = stubManager(() => new Promise<SessionOutcome>(() => {}))
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+
+    hooks[0]!.exit!({ exitCode: 0 })
+    // A pty can print its last words after the exit; neither they nor the
+    // silence that follows them is the agent waiting on anybody.
+    hooks[0]!.data!('goodbye')
+    vi.advanceTimersByTime(10 * THRESHOLD)
+
+    expect(awaiting(manager, id)).toBeFalsy()
+    expect(manager.list()[0]!.outcome).toBeUndefined()
+    // Nothing to announce means nothing for the badge count to change by.
+    expect(onAwaitingChange).not.toHaveBeenCalled()
+  })
+})
+
 describe('exit', () => {
   // spec-00001-AC-12.3
   it('shows the end state and runs the exit hook once the process ends', async () => {
