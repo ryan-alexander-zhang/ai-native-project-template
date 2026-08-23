@@ -473,7 +473,7 @@ describe('the board state', () => {
     await waitFor(() => expect(result.current.clarifiable).toEqual(['prd']))
   })
 
-  // spec-00001-AC-18.2 — a refused start leaves the running session alone
+  // spec-00003-AC-2.1 — a refused start leaves the running session alone
   it('keeps the session it has when a second start is refused', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
       current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
@@ -552,6 +552,22 @@ describe('the board state', () => {
     expect(result.current.session?.status).toBe('exited')
   })
 
+  /**
+   * spec-00001-AC-49.4 — with no session on show there is no session to stop, so
+   * the board asks nothing of the server.
+   */
+  it('stops nothing when no session is on show', async () => {
+    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    const stop = vi.spyOn(api, 'stopSession')
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+
+    await act(() => result.current.stopSession())
+
+    expect(stop).not.toHaveBeenCalled()
+    expect(result.current.session).toBeNull()
+  })
+
   it('keeps the session it has when the stop is refused', async () => {
     vi.spyOn(api, 'session').mockResolvedValue({
       current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
@@ -624,22 +640,23 @@ describe('the terminal socket', () => {
 
   it('streams frames from the session to the terminal', () => {
     const seen: string[] = []
-    connectTerminal((data) => seen.push(data))
+    connectTerminal('s1', (data) => seen.push(data))
 
     FakeSocket.last.emit('hello from the agent')
 
     expect(seen).toEqual(['hello from the agent'])
-    expect(FakeSocket.last.url).toMatch(/^ws:\/\/.*\/api\/terminal$/)
+    // The channel names the session it is showing (spec-00003-FR-5).
+    expect(FakeSocket.last.url).toMatch(/^ws:\/\/.*\/api\/terminal\?sessionId=s1$/)
   })
 
   it('forwards keystrokes while the socket is open', () => {
-    const link = connectTerminal(() => {})
+    const link = connectTerminal('s1', () => {})
     link.send('ping\n')
     expect(FakeSocket.last.sent).toEqual(['ping\n'])
   })
 
   it('drops keystrokes once the socket is gone', () => {
-    const link = connectTerminal(() => {})
+    const link = connectTerminal('s1', () => {})
     FakeSocket.last.readyState = 3
 
     link.send('ping\n')
@@ -648,14 +665,14 @@ describe('the terminal socket', () => {
   })
 
   it('closes the socket on request', () => {
-    connectTerminal(() => {}).close()
+    connectTerminal('s1', () => {}).close()
     expect(FakeSocket.last.closed).toBe(true)
   })
 
   // spec-00001-AC-12.5 — a size travels as its own kind of frame, so no keystroke
   // can be read as a size and no size typed at the agent (issue-00009)
   it('sends the size as a binary frame, apart from the stdin stream', () => {
-    const link = connectTerminal(() => {})
+    const link = connectTerminal('s1', () => {})
 
     link.resize(100, 40)
 
@@ -664,7 +681,7 @@ describe('the terminal socket', () => {
   })
 
   it('holds a size measured before the socket opened, and sends it on open', () => {
-    const link = connectTerminal(() => {})
+    const link = connectTerminal('s1', () => {})
     FakeSocket.last.readyState = 0
 
     link.resize(100, 40)
@@ -676,7 +693,7 @@ describe('the terminal socket', () => {
   })
 
   it('sends nothing on open when no size was measured yet', () => {
-    connectTerminal(() => {})
+    connectTerminal('s1', () => {})
     FakeSocket.last.open()
 
     expect(FakeSocket.last.sent).toEqual([])

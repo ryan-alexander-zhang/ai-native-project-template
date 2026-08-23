@@ -9,11 +9,14 @@ export interface TerminalLink {
 }
 
 /**
- * The session's terminal channel. The socket carries the replayed buffer as its
- * first frame, so a reconnecting board picks up where it left off (spec-00001-FR-21).
+ * One session's terminal channel, named by its id — a channel per session, so
+ * output and keystrokes cannot cross between them (spec-00003-FR-1, FR-5). The
+ * socket carries that session's replayed buffer as its first frame, so a
+ * reconnecting board picks up where it left off (spec-00001-FR-21).
  */
-export function connectTerminal(onData: (data: string) => void): TerminalLink {
-  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/terminal`
+export function connectTerminal(sessionId: string, onData: (data: string) => void): TerminalLink {
+  const query = `?sessionId=${encodeURIComponent(sessionId)}`
+  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/terminal${query}`
   const socket = new WebSocket(url)
   socket.addEventListener('message', (event) => onData(String(event.data)))
 

@@ -178,7 +178,7 @@ describe('the terminal panel', () => {
 
   // spec-00001-AC-12.1 as the user sees it
   it('writes what the session prints into the terminal', async () => {
-    const { container } = render(<Terminal onClose={vi.fn()} onStop={vi.fn()} />)
+    const { container } = render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={RUNNING} />)
 
     FakeSocket.last.emit('hello from the agent\r\n')
 
@@ -187,14 +187,14 @@ describe('the terminal panel', () => {
 
   // spec-00001-AC-12.5 as the user sees it — the fit is reported, not kept
   it('sends the size the terminal fitted to as soon as it attaches', async () => {
-    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} />)
+    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={RUNNING} />)
 
     await waitFor(() => expect(sizeFrames()[0]).toEqual({ cols: 100, rows: 40 }))
   })
 
   // spec-00001-AC-12.6 as the user sees it — dragging the panel divider
   it('fits again and sends the new size when the panel changes size', async () => {
-    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} />)
+    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={RUNNING} />)
     await waitFor(() => expect(sizeFrames().length).toBeGreaterThan(0))
 
     panelSize.cols = 60
@@ -208,7 +208,7 @@ describe('the terminal panel', () => {
   // that is not a size to draw at: the session keeps the one it had. (node-pty
   // throws outright on a zero size, so an unfiltered fit would break the session.)
   it('sends no size while the panel is collapsed to nothing', async () => {
-    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} />)
+    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={RUNNING} />)
     await waitFor(() => expect(sizeFrames().length).toBeGreaterThan(0))
     const sent = sizeFrames().length
 
@@ -223,7 +223,7 @@ describe('the terminal panel', () => {
   // The same rule for the other degenerate answer: an unmeasurable terminal has
   // no size to report, and the default 80×24 is not one to invent for it.
   it('sends no size while the terminal cannot be measured at all', async () => {
-    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} />)
+    render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={RUNNING} />)
     await waitFor(() => expect(sizeFrames().length).toBeGreaterThan(0))
     const sent = sizeFrames().length
 
@@ -234,7 +234,7 @@ describe('the terminal panel', () => {
   })
 
   it('closes the socket when the panel goes away', () => {
-    const { unmount } = render(<Terminal onClose={vi.fn()} onStop={vi.fn()} />)
+    const { unmount } = render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={RUNNING} />)
     unmount()
     expect(FakeSocket.last.closed).toBe(true)
   })

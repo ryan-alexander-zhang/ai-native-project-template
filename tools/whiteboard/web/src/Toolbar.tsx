@@ -37,7 +37,12 @@ export interface ToolbarProps {
    * would drift (spec-00001-FR-56, AC-56.2).
    */
   auditable: boolean
-  /** A session of any kind holds the one slot, so no entry may start another (spec-00001-FR-18). */
+  /**
+   * Whether the session the board is showing is running: while it is, no entry
+   * here offers to start another. Which starts the server would actually refuse
+   * is the concurrency rules' answer — this document's own session, or the cap
+   * (spec-00003-FR-2, FR-3).
+   */
   sessionRunning: boolean
   /** The agents a session may be run by; a single one is not a choice (spec-00001-FR-55). */
   agents: string[]
@@ -86,7 +91,7 @@ export function Toolbar(props: ToolbarProps) {
   const { node, transitions, nextSteps, relations, clarifiable, auditable, sessionRunning } = props
   const { agents, agent, onPickAgent, onPickRelation } = props
   const { onEdit, onStatus, onAccept, onClarify, onAsk, onAudit, onAdvance } = props
-  // The one reason every starting point shares (spec-00001-FR-18).
+  // The reason every starting point shares while a session runs (spec-00001-FR-49).
   const busy = sessionRunning ? 'session running' : undefined
 
   return (

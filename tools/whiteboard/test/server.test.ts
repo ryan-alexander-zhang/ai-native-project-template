@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { taskInstruction } from '../src/advance.ts'
 import { Board } from '../src/server.ts'
 import { ptySpawner, spawnPty } from '../src/pty.ts'
+import type { SessionInfo } from '../src/sessionManager.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import {
   SESSION_WAIT,
@@ -33,6 +34,7 @@ vi.setConfig({ testTimeout: 30_000 })
 const SUBMITTED_TAIL = `got:${taskInstruction(
   {
     targetType: 'prd',
+    number: 1,
     idPrefix: 'prd-00001-',
     carry: 'parent',
     sourceId: 'idea-00001-x',
@@ -449,9 +451,21 @@ describe('POST /api/docs/:id/review', () => {
 })
 
 describe('sessions', () => {
-  it('reports no current session before the first advance', async () => {
+  /** A prd related to the idea by `parent`, so an edge joins the two documents. */
+  const RELATED_PRD = doc({ id: 'prd-00001-p', type: 'prd', status: 'active', parent: 'idea-00001-x' }, '# Prd P\n')
+  const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+
+  /** A board whose flow config declares the session cap this test needs (spec-00003-FR-3). */
+  function cappedBoard(files: Record<string, string>, maxSessions: number, agentArgs = HOLD) {
+    const { repoRoot, docsDir } = makeRepo(files)
+    const config = testConfig(`max_sessions: ${maxSessions}\n`)
+    config.agents[0] = { ...config.agents[0]!, args: agentArgs }
+    return boardOnRepo(repoRoot, docsDir, config)
+  }
+
+  it('lists no session before the first one is started', async () => {
     const { call } = boardOn({})
-    expect((await call('GET', '/api/sessions')).body).toEqual({ current: null })
+    expect((await call('GET', '/api/sessions')).body).toEqual({ sessions: [] })
   })
 
   // spec-00001-AC-11.1
@@ -462,7 +476,7 @@ describe('sessions', () => {
 
     expect(status).toBe(200)
     expect(body.targetType).toBe('prd')
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
   })
 
@@ -489,26 +503,125 @@ describe('sessions', () => {
     expect(commitCount(repoRoot)).toBe(before)
   })
 
-  // spec-00001-AC-18.1
-  it('answers 409 while a session is running', async () => {
-    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, ['-e', 'setTimeout(() => {}, 5000)'])
+  // spec-00001-AC-18.1 — the document already has a session, whatever kind is asked for
+  it('answers 409 with the same-document reason while that document has a session', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
     const { status, body } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
     expect(status).toBe(409)
-    expect(body.error).toMatch(/already running/)
+    expect(body.reason).toBe('doc-busy')
+    expect(body.error).toMatch(/already has a running agent session/)
   })
 
-  // spec-00001-AC-21.2 — a reconnecting browser finds the session
-  it('reports the running session so a reconnecting board can find it', async () => {
-    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, ['-e', 'setTimeout(() => {}, 5000)'])
+  // spec-00001-AC-18.3 — the refusal is idempotent: no session, no commit
+  it('answers 409 again for the same document, with no side effect', async () => {
+    const { call, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const commits = commitCount(repoRoot)
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+
+    expect((await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })).status).toBe(409)
+
+    expect((await call('GET', '/api/sessions')).body.sessions).toHaveLength(1)
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // spec-00003-AC-2.3 — the exclusion is the document's own; it does not travel
+  // along the edges to its related documents
+  it('starts a session on a document related to the one that has a session', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, HOLD)
+    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+
+    expect(status).toBe(200)
+    expect(body.status).toBe('running')
+    expect((await call('GET', '/api/sessions')).body.sessions.map((s: SessionInfo) => s.status)).toEqual([
+      'running',
+      'running',
+    ])
+  })
+
+  // spec-00001-AC-18.2 — nothing to do with the target document: the cap is full
+  it('answers 409 with the cap reason once the cap is reached', async () => {
+    const { call } = cappedBoard({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, 1)
+    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('cap-reached')
+    expect(body.error).toMatch(/max_sessions/)
+    expect((await call('GET', '/api/sessions')).body.sessions).toHaveLength(1)
+  })
+
+  // spec-00003-AC-3.3 — a slot freed by an ending session is a slot to start in
+  it('starts a session at the cap once one of the running ones has ended', async () => {
+    const { call, board } = cappedBoard({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, 1, ['-e', ''])
+    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished()
+
+    expect((await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })).status).toBe(200)
+  })
+
+  /**
+   * spec-00003-AC-1.3 — the number of an advance that is still running counts as
+   * taken, so the second advance is told a different one even though the first
+   * document is not on disk yet (design-00001 §5). The instruction the agent was
+   * handed is where the allocated id shows.
+   */
+  it('gives two parallel advances of the same type different target ids', async () => {
+    const { repoRoot, docsDir } = makeRepo({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD })
+    const instructions: string[] = []
+    const config = testConfig()
+    const board = new Board({
+      repoRoot,
+      docsDir,
+      config,
+      spawn: () => ({
+        onData: () => {},
+        onExit: () => {},
+        write: (data: string) => void instructions.push(data),
+        resize: () => {},
+        kill: () => {},
+      }),
+    })
+    const server = board.listen(0)
+    servers.push(server)
+    watching.push(board)
+    const port = (server.address() as { port: number }).port
+    const advance = (sourceId: string) =>
+      fetch(`http://127.0.0.1:${port}/api/sessions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sourceId, targetType: 'spec' }),
+      })
+
+    await advance('idea-00001-x')
+    await advance('prd-00001-p')
+
+    expect(instructions[0]).toContain('spec-00001-<slug>')
+    expect(instructions[1]).toContain('spec-00002-<slug>')
+  })
+
+  // spec-00003-AC-9.1's server half — the sessions outlive the browser, and a
+  // board opening again finds every one of them (spec-00001-AC-21.2)
+  it('lists every running session so a reconnecting board can find them all', async () => {
+    const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, HOLD)
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
 
     const { body } = await call('GET', '/api/sessions')
 
-    expect(body.current.status).toBe('running')
-    expect(body.current.sourceId).toBe('idea-00001-x')
+    expect(body.sessions).toHaveLength(2)
+    expect(body.sessions.map((session: SessionInfo) => session.sourceId)).toEqual(['idea-00001-x', 'prd-00001-p'])
+    expect(body.sessions.every((session: SessionInfo) => session.status === 'running')).toBe(true)
+    // The panel lists each session's kind and when it started (spec-00003-FR-4).
+    expect(body.sessions[0].kind).toBe('advance')
+    expect(body.sessions[0].startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 })
 
@@ -534,7 +647,7 @@ describe('clarify and ask sessions', () => {
     expect(status).toBe(200)
     expect(body.kind).toBe('clarify')
     expect(body.status).toBe('running')
-    expect(board.sessions.current()!.sourceId).toBe('spec-00001-b')
+    expect(board.sessions.latest()!.sourceId).toBe('spec-00001-b')
   })
 
   // spec-00001-AC-9.2
@@ -545,7 +658,7 @@ describe('clarify and ask sessions', () => {
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/applies to a draft/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   // spec-00001-AC-9.4
@@ -558,7 +671,7 @@ describe('clarify and ask sessions', () => {
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/does not apply to a record/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   // spec-00001-AC-47.1 — ask is not a review action: any type, any status
@@ -569,7 +682,7 @@ describe('clarify and ask sessions', () => {
 
     expect(status).toBe(200)
     expect(body.kind).toBe('ask')
-    expect(board.sessions.current()!.status).toBe('running')
+    expect(board.sessions.latest()!.status).toBe('running')
   })
 
   // spec-00001-AC-47.5
@@ -580,7 +693,7 @@ describe('clarify and ask sessions', () => {
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/front matter problems/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   // spec-00001-AC-19.2
@@ -593,20 +706,38 @@ describe('clarify and ask sessions', () => {
 
       expect(status).toBe(409)
       expect(body.error).toMatch(/refresh the board/)
+      // The third reason a start is refused (design-00001 §7), told apart from
+      // the two concurrency ones.
+      expect(body.reason).toBe('doc-missing')
     }
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
-  // spec-00001-AC-18.2 — one slot for all three kinds
-  it('answers 409 for an ask while a clarify session is running, leaving it alone', async () => {
+  // spec-00003-AC-2.1 — the exclusion holds across kinds, on the one document
+  it('answers 409 for an ask on the document a clarify session is running on', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, HOLD)
+    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'spec-00001-b' })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('doc-busy')
+    expect(board.sessions.latest()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
+  })
+
+  // spec-00003-AC-1.1 — two documents, two kinds, both running
+  it('starts an ask on another document while a clarify session runs', async () => {
     const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, HOLD)
     await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
 
     const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
 
-    expect(status).toBe(409)
-    expect(body.error).toMatch(/already running/)
-    expect(board.sessions.current()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
+    expect(status).toBe(200)
+    expect(body.status).toBe('running')
+    expect(board.sessions.list().map((session) => [session.kind, session.status])).toEqual([
+      ['clarify', 'running'],
+      ['ask', 'running'],
+    ])
   })
 
   it('answers 422 when the request names no document', async () => {
@@ -624,7 +755,7 @@ describe('clarify and ask sessions', () => {
 
     expect(body.status).toBe('failed')
     expect(body.error).toMatch(/not found on PATH/)
-    expect(board.sessions.attach(() => {}).buffer).toContain('could not start the agent')
+    expect(board.sessions.attach(board.sessions.latest()!.id, () => {}).buffer).toContain('could not start the agent')
     expect(commitCount(repoRoot)).toBe(commits)
     expect(existsSync(join(repoRoot, clarifyStatePath('spec-00001-b')))).toBe(false)
   })
@@ -636,7 +767,7 @@ describe('clarify and ask sessions', () => {
     writeFileSync(join(repoRoot, clarifyStatePath('spec-00001-b')), '{"answered":1}')
 
     await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
@@ -648,7 +779,7 @@ describe('clarify and ask sessions', () => {
     const { call, board, repoRoot } = boardOn({ 'record/r.md': ACTIVE_RECORD }, REVISE('record/r.md'))
 
     await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(lastCommitMessage(repoRoot)).toBe('wb(ask): record-00001-r')
@@ -660,12 +791,12 @@ describe('clarify and ask sessions', () => {
     const commits = commitCount(repoRoot)
 
     await call('POST', '/api/sessions/ask', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
     expect(commitCount(repoRoot)).toBe(commits)
-    expect(board.sessions.current()!.outcome!.committed).toBe(false)
+    expect(board.sessions.latest()!.outcome!.committed).toBe(false)
   })
 })
 
@@ -688,8 +819,8 @@ describe('audit sessions', () => {
     expect(status).toBe(200)
     expect(body.kind).toBe('audit')
     expect(body.status).toBe('running')
-    expect(board.sessions.current()!.sourceId).toBe('spec-00001-b')
-    await vi.waitFor(() => expect(board.sessions.attach(() => {}).buffer).toContain('auditing'), SESSION_WAIT)
+    expect(board.sessions.latest()!.sourceId).toBe('spec-00001-b')
+    await vi.waitFor(() => expect(board.sessions.attach(board.sessions.latest()!.id, () => {}).buffer).toContain('auditing'), SESSION_WAIT)
   })
 
   // spec-00001-AC-50.3
@@ -700,7 +831,7 @@ describe('audit sessions', () => {
     ])
 
     await call('POST', '/api/sessions/audit', { docId: 'design-00001-d' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(lastCommitMessage(repoRoot)).toBe('wb(audit): design-00001-d')
@@ -713,12 +844,12 @@ describe('audit sessions', () => {
     const commits = commitCount(repoRoot)
 
     await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
     expect(commitCount(repoRoot)).toBe(commits)
-    expect(board.sessions.current()!.outcome!.committed).toBe(false)
+    expect(board.sessions.latest()!.outcome!.committed).toBe(false)
   })
 
   // spec-00001-AC-51.1
@@ -729,7 +860,7 @@ describe('audit sessions', () => {
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/does not apply to an? idea/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   // spec-00001-AC-51.2 — the entry is not offered, and the request is refused all the same
@@ -740,7 +871,7 @@ describe('audit sessions', () => {
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/applies to a draft/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   // spec-00001-AC-51.3
@@ -751,7 +882,7 @@ describe('audit sessions', () => {
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/front matter problems/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   // spec-00001-AC-19.2 for audit's half of «the target is gone»
@@ -763,7 +894,7 @@ describe('audit sessions', () => {
 
     expect(status).toBe(409)
     expect(body.error).toMatch(/refresh the board/)
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   it('answers 422 when the request names no document', async () => {
@@ -771,19 +902,19 @@ describe('audit sessions', () => {
     expect((await call('POST', '/api/sessions/audit', {})).status).toBe(422)
   })
 
-  // spec-00001-AC-18.3 — the fourth kind shares the one slot
-  it('answers 409 for an audit while a clarify session is running, leaving it alone', async () => {
+  // spec-00003-AC-2.1 — the fourth kind is no exception to the exclusion
+  it('answers 409 for an audit while a clarify session is running on that document', async () => {
     const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
     await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
 
     const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
 
     expect(status).toBe(409)
-    expect(body.error).toMatch(/already running/)
-    expect(board.sessions.current()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
+    expect(body.reason).toBe('doc-busy')
+    expect(board.sessions.latest()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
   })
 
-  // spec-00001-AC-18.3 the other way round: the audit holds the slot against the rest
+  // spec-00003-AC-2.1 the other way round: the audit excludes the rest on its document
   it('answers 409 for a clarify, an ask and an advance while an audit session is running', async () => {
     const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
     await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
@@ -795,16 +926,18 @@ describe('audit sessions', () => {
     ] as const) {
       expect((await call('POST', path, request)).status).toBe(409)
     }
-    expect(board.sessions.current()).toMatchObject({ kind: 'audit', status: 'running' })
+    expect(board.sessions.latest()).toMatchObject({ kind: 'audit', status: 'running' })
   })
 })
 
 /**
  * spec-00001-FR-49 (issue-00010): the one way out of a session that will not end
  * by itself. The exit wrap-up is the ordinary one — end state, the kind's commit,
- * a refreshed board — so what is new here is only the way in.
+ * a refreshed board — so what is new here is only the way in. The session is
+ * named in the path, and the refusal is judged for that session alone
+ * (spec-00003-FR-5, design-00001 §7).
  */
-describe('DELETE /api/sessions', () => {
+describe('DELETE /api/sessions/:id', () => {
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
   const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
   /**
@@ -834,45 +967,59 @@ describe('DELETE /api/sessions', () => {
     "require('fs').appendFileSync('spec/b.md', '\\nrevised\\n'); setTimeout(() => {}, 5000)",
   ]
 
-  /** A clarify session on the draft spec, held until it has actually written. */
-  async function clarifyThatWrote(call: BoardCall, docsDir: string) {
-    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+  /** A clarify session on the draft spec, held until it has actually written; its id. */
+  async function clarifyThatWrote(call: BoardCall, docsDir: string): Promise<string> {
+    const { body } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
     await vi.waitFor(
       () => expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toContain('revised'),
       SESSION_WAIT,
     )
+    return body.id
   }
 
   // spec-00001-AC-49.1
   it('ends the running process and leaves the end state in the terminal', async () => {
     const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
-    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const { body: started } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    const { status, body } = await call('DELETE', '/api/sessions')
+    const { status, body } = await call('DELETE', `/api/sessions/${started.id}`)
 
     expect(status).toBe(200)
-    expect(body.status).toBe('exited')
-    expect(board.sessions.current()!.status).toBe('exited')
-    expect(board.sessions.attach(() => {}).buffer).toContain('session ended with code')
+    // A stopped session ends `terminated`, which is what tells the panel and the
+    // history that the user ended it (design-00001 §5, spec-00003-FR-4).
+    expect(body.status).toBe('terminated')
+    expect(board.sessions.latest()!.status).toBe('terminated')
+    expect(board.sessions.attach(board.sessions.latest()!.id, () => {}).buffer).toContain('session ended with code')
+  })
+
+  // spec-00003-AC-5.3 — the stop reaches the session it names, and no other
+  it('stops the session it names and leaves the other one running', async () => {
+    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'spec/b.md': DRAFT_SPEC }, HOLD)
+    const { body: first } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    expect((await call('DELETE', `/api/sessions/${first.id}`)).status).toBe(200)
+
+    expect(board.sessions.list().map((session) => session.status)).toEqual(['terminated', 'running'])
   })
 
   // spec-00001-AC-49.2 — a stopped session's writings are committed under its kind
   it('commits what the stopped session wrote, named by its kind', async () => {
     const { call, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC }, REVISE_AND_HOLD)
-    await clarifyThatWrote(call, docsDir)
+    const id = await clarifyThatWrote(call, docsDir)
 
-    await call('DELETE', '/api/sessions')
+    await call('DELETE', `/api/sessions/${id}`)
 
     expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/b.md'])
   })
 
-  // spec-00001-AC-49.3 — the slot is free again, which is the point of stopping
-  it('lets a new session start once the stuck one has been stopped', async () => {
+  // spec-00001-AC-49.3 — the document is free again, which is the point of stopping
+  it('lets a new session start on that document once the stuck one has been stopped', async () => {
     const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
-    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const { body: started } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    await call('DELETE', '/api/sessions')
+    await call('DELETE', `/api/sessions/${started.id}`)
 
     expect((await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })).status).toBe(200)
   })
@@ -881,11 +1028,11 @@ describe('DELETE /api/sessions', () => {
   // second attempt must not put a second commit on the same wrap-up.
   it('refuses a second stop of the same session and commits nothing again', async () => {
     const { call, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC }, REVISE_AND_HOLD)
-    await clarifyThatWrote(call, docsDir)
-    await call('DELETE', '/api/sessions')
+    const id = await clarifyThatWrote(call, docsDir)
+    await call('DELETE', `/api/sessions/${id}`)
     const commits = commitCount(repoRoot)
 
-    const { status, body } = await call('DELETE', '/api/sessions')
+    const { status, body } = await call('DELETE', `/api/sessions/${id}`)
 
     expect(status).toBe(404)
     expect(body.error).toMatch(/no running agent session/)
@@ -899,9 +1046,9 @@ describe('DELETE /api/sessions', () => {
     const statePath = join(repoRoot, clarifyStatePath('spec-00001-b'))
     mkdirSync(join(repoRoot, '.whiteboard/clarify'), { recursive: true })
     writeFileSync(statePath, '{"answered":1}')
-    await clarifyThatWrote(call, docsDir)
+    const id = await clarifyThatWrote(call, docsDir)
 
-    await call('DELETE', '/api/sessions')
+    await call('DELETE', `/api/sessions/${id}`)
 
     expect(existsSync(statePath)).toBe(true)
     expect(readFileSync(statePath, 'utf8')).toBe('{"answered":1}')
@@ -915,38 +1062,45 @@ describe('DELETE /api/sessions', () => {
   it('ends a session whose process ignores the polite signal', async () => {
     rmSync(PID_FILE, { force: true })
     const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, DEAF_TO_HUP, 'bash', ptySpawner(TEST_GRACE_MS))
-    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const { body: started } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
     await vi.waitFor(() => expect(existsSync(PID_FILE)).toBe(true), SESSION_WAIT)
     const pid = Number(readFileSync(PID_FILE, 'utf8').trim())
     expect(isRunning(pid)).toBe(true)
 
-    const { status, body } = await call('DELETE', '/api/sessions')
+    const { status, body } = await call('DELETE', `/api/sessions/${started.id}`)
 
     expect(status).toBe(200)
-    expect(body.status).toBe('exited')
-    expect(board.sessions.attach(() => {}).buffer).toContain('session ended with code')
+    expect(body.status).toBe('terminated')
+    expect(board.sessions.attach(board.sessions.latest()!.id, () => {}).buffer).toContain('session ended with code')
     expect(isRunning(pid)).toBe(false)
     rmSync(PID_FILE, { force: true })
   })
 
-  // spec-00001-AC-49.4
-  it('answers 404 when no session is running', async () => {
+  // spec-00001-AC-49.4 — an id the registry never knew is nothing to stop
+  it('answers 404 for a session id it does not know', async () => {
     const { call } = boardOn({})
 
-    const { status, body } = await call('DELETE', '/api/sessions')
+    const { status, body } = await call('DELETE', '/api/sessions/no-such-session')
 
     expect(status).toBe(404)
     expect(body.error).toMatch(/no running agent session/)
   })
 
-  // spec-00001-AC-49.4 — a session that already ended is not one to stop either
-  it('answers 404 for a session that has already exited', async () => {
-    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
-    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+  /**
+   * spec-00001-AC-49.4 and spec-00003-AC-5.5 — a session that already ended is
+   * not one to stop either, and the answer is that session's alone: another one
+   * running does not make the ended one stoppable.
+   */
+  it('answers 404 for a session that has already ended, whatever else runs', async () => {
+    const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'spec/b.md': DRAFT_SPEC }, ['-e', ''])
+    const { body: ended } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
+    const { body: running } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
 
-    expect((await call('DELETE', '/api/sessions')).status).toBe(404)
+    expect((await call('DELETE', `/api/sessions/${ended.id}`)).status).toBe(404)
+
+    expect(board.sessions.list().find((session) => session.id === running.id)!.status).toBe('running')
   })
 })
 
@@ -977,13 +1131,17 @@ describe('terminal size frames', () => {
     const server = board.listen(0)
     servers.push(server)
     watching.push(board)
-    board.sessions.start({ kind: 'ask', sourceId: 'idea-00001-x', instruction: 'answer this' })
-    return { board, sizes, typed, port: (server.address() as { port: number }).port }
+    const session = board.sessions.start({ kind: 'ask', sourceId: 'idea-00001-x', instruction: 'answer this' })
+    return { board, sizes, typed, session, port: (server.address() as { port: number }).port }
   }
 
-  /** An open terminal socket on that board. */
-  async function attach(port: number) {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal`)
+  /**
+   * An open terminal socket on that board's session. The session rides in the
+   * query, so the frames reach that session's pty and no other
+   * (design-00001 §7, spec-00003-FR-5).
+   */
+  async function attach(port: number, sessionId: string) {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal?sessionId=${sessionId}`)
     await new Promise<void>((resolve) => socket.addEventListener('open', () => resolve()))
     return socket
   }
@@ -995,8 +1153,8 @@ describe('terminal size frames', () => {
 
   // spec-00001-AC-12.5
   it('resizes the session pty to the size the attached terminal reports', async () => {
-    const { sizes, port } = boardWithRecordingPty()
-    const socket = await attach(port)
+    const { sizes, port, session } = boardWithRecordingPty()
+    const socket = await attach(port, session.id)
 
     socket.send(sizeFrame(100, 40))
 
@@ -1006,8 +1164,8 @@ describe('terminal size frames', () => {
 
   // spec-00001-AC-12.6 — the panel moved, so the size the pty holds moves with it
   it('resizes the pty again for every later size frame', async () => {
-    const { sizes, port } = boardWithRecordingPty()
-    const socket = await attach(port)
+    const { sizes, port, session } = boardWithRecordingPty()
+    const socket = await attach(port, session.id)
 
     socket.send(sizeFrame(100, 40))
     socket.send(sizeFrame(80, 24))
@@ -1022,8 +1180,8 @@ describe('terminal size frames', () => {
   })
 
   it('keeps a size frame out of stdin, and a keystroke out of the size', async () => {
-    const { sizes, typed, port } = boardWithRecordingPty()
-    const socket = await attach(port)
+    const { sizes, typed, port, session } = boardWithRecordingPty()
+    const socket = await attach(port, session.id)
 
     socket.send(sizeFrame(100, 40))
     socket.send('{"cols":9,"rows":9}')
@@ -1038,8 +1196,8 @@ describe('terminal size frames', () => {
   })
 
   it('drops a control frame it cannot read as a size, and carries on', async () => {
-    const { sizes, typed, port } = boardWithRecordingPty()
-    const socket = await attach(port)
+    const { sizes, typed, port, session } = boardWithRecordingPty()
+    const socket = await attach(port, session.id)
 
     socket.send(Buffer.from('not json at all'))
     socket.send(Buffer.from(JSON.stringify({ cols: 'wide', rows: null })))
@@ -1052,9 +1210,11 @@ describe('terminal size frames', () => {
 })
 
 describe('the terminal socket', () => {
-  /** Collect frames until `match` shows up, then hand back the socket. */
-  function connect(port: number) {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal`)
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+
+  /** Collect the frames of one session's channel, then hand back the socket. */
+  function connect(port: number, sessionId = '') {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal?sessionId=${sessionId}`)
     let text = ''
     socket.addEventListener('message', (event) => {
       text += event.data
@@ -1075,9 +1235,9 @@ describe('the terminal socket', () => {
       '-e',
       "process.stdin.on('data', (d) => console.log('got:' + d.toString().trim()))",
     ])
-    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const { body: started } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    const terminal = connect(port)
+    const terminal = connect(port, started.id)
     await terminal.opened
     await vi.waitFor(() => expect(terminal.text).toContain('got:Write one new prd document'), SESSION_WAIT)
     // The line-reading stand-in completes the instruction's last line only once
@@ -1096,23 +1256,54 @@ describe('the terminal socket', () => {
       '-e',
       "console.log('printed early'); setTimeout(() => {}, 5000)",
     ])
-    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const { body: started } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    const first = connect(port)
+    const first = connect(port, started.id)
     await first.opened
     await vi.waitFor(() => expect(first.text).toContain('printed early'), SESSION_WAIT)
     first.socket.close()
     await first.closed
 
-    const second = connect(port)
+    const second = connect(port, started.id)
     await second.opened
     await vi.waitFor(() => expect(second.text).toContain('printed early'), SESSION_WAIT)
     second.socket.close()
   })
 
-  it('closes a terminal opened before any session started', async () => {
+  /**
+   * spec-00003-AC-9.1 — two sessions, two channels: each terminal replays the
+   * output of the session it names and nothing of the other's
+   * (spec-00003-AC-1.2, spec-00001-FR-21 over several sessions).
+   */
+  it('replays each session its own output to its own terminal', async () => {
+    const { call, port } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'spec/b.md': DRAFT_SPEC }, [
+      '-e',
+      "process.stdin.on('data', (d) => console.log('got:' + d.toString().trim()))",
+    ])
+    const { body: advance } = await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    const { body: clarify } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    const first = connect(port, advance.id)
+    const second = connect(port, clarify.id)
+    await Promise.all([first.opened, second.opened])
+
+    await vi.waitFor(() => expect(first.text).toContain('got:Write one new prd document'), SESSION_WAIT)
+    await vi.waitFor(() => expect(second.text).toContain('got:This is a clarify session'), SESSION_WAIT)
+    expect(first.text).not.toContain('This is a clarify session')
+    first.socket.close()
+    second.socket.close()
+  })
+
+  it('closes a terminal opened on no session at all', async () => {
     const { port } = boardOn({})
     const terminal = connect(port)
+    await terminal.closed
+    expect(terminal.text).toBe('')
+  })
+
+  it('closes a terminal opened on a session id it does not know', async () => {
+    const { port } = boardOn({})
+    const terminal = connect(port, 'no-such-session')
     await terminal.closed
     expect(terminal.text).toBe('')
   })
@@ -1237,7 +1428,7 @@ describe('the docs-change socket', () => {
     })
 
     await vi.waitFor(() => expect(watching.signals).toBeGreaterThanOrEqual(1), SESSION_WAIT)
-    expect(board.sessions.current()!.status).toBe('running')
+    expect(board.sessions.latest()!.status).toBe('running')
   })
 
   /**
@@ -1256,7 +1447,7 @@ describe('the docs-change socket', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sourceId: 'idea-00001-x', targetType: 'prd' }),
     })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     await vi.waitFor(() => expect(watching.signals).toBe(1), SIGNAL_WAIT)
@@ -1319,10 +1510,10 @@ describe('when a session ends', () => {
     const { call, board, repoRoot } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(product).split('|'))
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
-    expect(board.sessions.current()!.outcome).toEqual({
+    expect(board.sessions.latest()!.outcome).toEqual({
       docId: 'prd-00001-new',
       problems: [],
       committed: true,
@@ -1340,7 +1531,7 @@ describe('when a session ends', () => {
     const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(product).split('|'))
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     const node = (await call('GET', '/api/graph')).body.nodes.find((n: { id: string }) => n.id === 'prd-00001-new')
@@ -1352,10 +1543,10 @@ describe('when a session ends', () => {
     const { call, board } = boardOn({ 'idea/a.md': ACTIVE_IDEA })
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
-    expect(board.sessions.current()!.outcome).toEqual({ problems: [], committed: false, error: undefined })
+    expect(board.sessions.latest()!.outcome).toEqual({ problems: [], committed: false, error: undefined })
   })
 
   // spec-00001-AC-14.5 through the whole lifecycle: the snapshot is only worth
@@ -1368,7 +1559,7 @@ describe('when a session ends', () => {
     writeFileSync(join(docsDir, 'idea/a.md'), dirty)
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/new.md'])
@@ -1383,11 +1574,11 @@ describe('when a session ends', () => {
     const commits = commitCount(repoRoot)
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(commitCount(repoRoot)).toBe(commits)
-    expect(board.sessions.current()!.outcome!.committed).toBe(false)
+    expect(board.sessions.latest()!.outcome!.committed).toBe(false)
   })
 })
 
@@ -1423,7 +1614,7 @@ describe('what a session produced, read against the item grammar', () => {
   async function advanceInto(body: string) {
     const board = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeSpec(body))
     await board.call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'spec' })
-    await vi.waitFor(() => expect(board.board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.board.sessions.whenFinished()
     return board
   }
@@ -1601,7 +1792,7 @@ describe('session history', () => {
   async function afterAnAudit(agentArgs = ['-e', "console.log('auditing away')"]) {
     const open = boardOn({ 'spec/b.md': DRAFT_SPEC }, agentArgs)
     await open.call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(open.board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(open.board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await open.board.sessions.whenFinished()
     return open
   }
@@ -1679,41 +1870,42 @@ describe('session history', () => {
     chmodSync(sessions, 0o500)
 
     await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(lastCommitMessage(repoRoot)).toBe('wb(audit): spec-00001-b')
-    expect(board.sessions.current()!.outcome!.committed).toBe(true)
-    expect(board.sessions.current()!.historyError).toBeTruthy()
-    expect(board.sessions.attach(() => {}).buffer).toContain('could not save the session history')
+    expect(board.sessions.latest()!.outcome!.committed).toBe(true)
+    expect(board.sessions.latest()!.historyError).toBeTruthy()
+    expect(board.sessions.attach(board.sessions.latest()!.id, () => {}).buffer).toContain('could not save the session history')
     expect((await call('GET', '/api/sessions/history')).body).toEqual([])
     chmodSync(sessions, 0o700)
   })
 
-  // spec-00001-AC-54.4 — a stopped session is a session that ended
+  // spec-00001-AC-54.4 — a stopped session is a session that ended, and the
+  // metadata says it was stopped (design-00001 §7, spec-00003-FR-4)
   it('lists a stopped session with the exit status it really had', async () => {
     const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
-    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    const { body: started } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
 
-    await call('DELETE', '/api/sessions')
+    await call('DELETE', `/api/sessions/${started.id}`)
 
     const { body } = await call('GET', '/api/sessions/history')
     expect(body).toHaveLength(1)
-    expect(body[0]).toMatchObject({ id: board.sessions.current()!.id, kind: 'audit', status: 'exited' })
-    expect(body[0].exitCode).toBe(board.sessions.current()!.exitCode)
+    expect(body[0]).toMatchObject({ id: board.sessions.latest()!.id, kind: 'audit', status: 'terminated' })
+    expect(body[0].exitCode).toBe(board.sessions.latest()!.exitCode)
   })
 
   it('lists the newest session first', async () => {
     const { call, board } = await afterAnAudit(['-e', ''])
     await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     const { body } = await call('GET', '/api/sessions/history')
 
     expect(body).toHaveLength(2)
     expect(body[0].startedAt >= body[1].startedAt).toBe(true)
-    expect(body[0].id).toBe(board.sessions.current()!.id)
+    expect(body[0].id).toBe(board.sessions.latest()!.id)
   })
 })
 
@@ -1751,7 +1943,7 @@ describe('the agent a session runs', () => {
     expect(status).toBe(200)
     expect(body.agent).toBe('other')
     expect(spawned).toEqual([{ command: 'second-cli', args: ['--yolo'] }])
-    expect(board.sessions.current()!.agent).toBe('other')
+    expect(board.sessions.latest()!.agent).toBe('other')
   })
 
   // spec-00001-AC-55.2 — no name means the first, which is every earlier board
@@ -1779,7 +1971,7 @@ describe('the agent a session runs', () => {
       expect(body.error).toMatch(/is not an agent in the flow config/)
     }
     expect(spawned).toEqual([])
-    expect(board.sessions.current()).toBeNull()
+    expect(board.sessions.latest()).toBeNull()
   })
 
   it('answers 422 for an agent that is not a name at all', async () => {
@@ -1797,7 +1989,7 @@ describe('the agent a session runs', () => {
     const { call, board } = boardOn({ 'record/r.md': ACTIVE_RECORD })
 
     await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 'claude' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect((await call('GET', '/api/sessions/history')).body[0].agent).toBe('claude')
@@ -1826,7 +2018,7 @@ describe('a product marked anomalous, then fixed on disk', () => {
   async function afterAMarkedAdvance() {
     const open = boardOn({ 'idea/a.md': ACTIVE_IDEA }, writeProduct(WITHOUT_PARENT).split('|'))
     await open.call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await vi.waitFor(() => expect(open.board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(open.board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await open.board.sessions.whenFinished()
     const node = (await open.call('GET', '/api/graph')).body.nodes.find(
       (found: { id: string }) => found.id === 'prd-00001-new',

@@ -144,8 +144,8 @@ describe('the api client', () => {
     ])
   })
 
-  it('reads the transitions, next steps, a document, and the session', async () => {
-    const fetchMock = mockFetch(200, [])
+  it('reads the transitions, next steps, a document, and the sessions', async () => {
+    const fetchMock = mockFetch(200, { sessions: [] })
     await api.transitions('a')
     await api.nextSteps('a')
     await api.doc('a')
@@ -161,12 +161,42 @@ describe('the api client', () => {
     ])
   })
 
+  /**
+   * spec-00003-AC-9.1 — the payload is every session the server holds, and the
+   * one the terminal comes back to is the newest running one (spec-00003-FR-9);
+   * the panel is what picks another (spec-00003-FR-5).
+   */
+  it('takes the newest running session off the list of every session', async () => {
+    mockFetch(200, {
+      sessions: [
+        { id: 's1', kind: 'ask', agent: 'claude', sourceId: 'spec-00001-a', status: 'running', startedAt: 'a' },
+        { id: 's2', kind: 'ask', agent: 'claude', sourceId: 'spec-00002-b', status: 'exited', startedAt: 'b' },
+        { id: 's3', kind: 'clarify', agent: 'claude', sourceId: 'spec-00003-c', status: 'running', startedAt: 'c' },
+      ],
+    })
+
+    expect((await api.session()).current!.id).toBe('s3')
+  })
+
+  // With nothing running, the newest session there was is still what the panel
+  // shows — how the last one ended is worth seeing (spec-00003-FR-4).
+  it('falls back to the newest ended session when none is running', async () => {
+    mockFetch(200, {
+      sessions: [
+        { id: 's1', kind: 'ask', agent: 'claude', sourceId: 'spec-00001-a', status: 'exited', startedAt: 'a' },
+        { id: 's2', kind: 'ask', agent: 'claude', sourceId: 'spec-00002-b', status: 'terminated', startedAt: 'b' },
+      ],
+    })
+
+    expect((await api.session()).current!.id).toBe('s2')
+  })
+
   // spec-00001-FR-49 — the one way out of a session that will not end (issue-00010)
   it('stops the running session', async () => {
     const fetchMock = mockFetch(200, { id: 's1', kind: 'clarify', sourceId: 'prd-00001-x', status: 'exited' })
 
-    expect(await api.stopSession()).toMatchObject({ status: 'exited' })
-    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.objectContaining({ method: 'DELETE' }))
+    expect(await api.stopSession('s1')).toMatchObject({ status: 'exited' })
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions/s1', expect.objectContaining({ method: 'DELETE' }))
   })
 
   it('raises the refusal the board reports, with its status', async () => {

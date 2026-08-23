@@ -19,14 +19,21 @@ const SUBMIT_DELAY_MS = 400
 /** The submit keypress itself: Enter as the terminal sends it. */
 const SUBMIT = '\r'
 
-export type SessionStatus = 'running' | 'exited' | 'failed'
+/**
+ * How a session stands. `terminated` is the third end state of the sixteenth
+ * round (design-00001 §5): a session the user stopped ended on its own wrap-up
+ * like any other, but the panel and the history have to say it was stopped
+ * rather than that it finished (spec-00003-FR-4).
+ */
+export type SessionStatus = 'running' | 'exited' | 'failed' | 'terminated'
 
 /**
- * The four kinds of agent session, sharing one channel, one terminal and one
- * slot (spec-00001-FR-18): the board advances the flow, clarify has the agent
- * question the owner, ask has the owner question the agent, audit has the agent
- * review a draft it did not write. The kind is what names the session's commit
- * (spec-00001-FR-14).
+ * The four kinds of agent session, sharing one channel and one registry: the
+ * board advances the flow, clarify has the agent question the owner, ask has the
+ * owner question the agent, audit has the agent review a draft it did not write.
+ * No kind is exclusive of another — the concurrency rules are per target
+ * document and per total (spec-00003-FR-1). The kind is what names the session's
+ * commit (spec-00001-FR-14).
  */
 export type SessionKind = 'advance' | 'clarify' | 'ask' | 'audit'
 
@@ -65,6 +72,17 @@ export interface SessionOutcome {
   error?: string
 }
 
+/**
+ * One row of `GET /api/sessions` (design-00001 §7): the session as it stands,
+ * plus when it ran — the session panel lists every session since boot by its
+ * start time (spec-00003-FR-4). The times are the registry's, not the started
+ * session's own answer, which is why they live here and not on `SessionInfo`.
+ */
+export interface SessionListing extends SessionInfo {
+  startedAt: string
+  endedAt?: string
+}
+
 export interface PtyProcess {
   onData(listener: (data: string) => void): void
   onExit(listener: (event: { exitCode: number }) => void): void
@@ -76,15 +94,31 @@ export interface PtyProcess {
 
 export type SpawnPty = (command: string, args: string[], cwd: string) => PtyProcess
 
-/** A second session of any kind while one is running is refused (spec-00001-FR-18). */
+/**
+ * Why a start was refused, in a word the board can act on (design-00001 §7):
+ * the target document already has a running session (spec-00003-FR-2), or the
+ * cap is reached (spec-00003-FR-3). The two are told apart because the entry's
+ * hover text says which one holds (spec-00001-FR-49).
+ */
+export type SessionRefusal = 'doc-busy' | 'cap-reached'
+
+/** A start the concurrency rules refuse (spec-00003-FR-2, spec-00003-FR-3). */
 export class SessionBusyError extends Error {
-  constructor(message: string) {
+  readonly reason: SessionRefusal
+
+  constructor(message: string, reason: SessionRefusal) {
     super(message)
     this.name = 'SessionBusyError'
+    this.reason = reason
   }
 }
 
-/** Asked to stop a session when none is running (spec-00001-FR-49). */
+/**
+ * Addressed to a session that is not there to be addressed: an id the registry
+ * does not know, or one whose session has already ended. Judged per session, so
+ * another session running changes nothing about this answer
+ * (spec-00001-AC-49.4, spec-00003-AC-5.5).
+ */
 export class NoSessionError extends Error {
   constructor(message: string) {
     super(message)
@@ -95,9 +129,12 @@ export class NoSessionError extends Error {
 interface Session {
   info: SessionInfo
   plan: SessionPlan
-  /** The docs/ dirt this session inherited; the exit hook scopes its commit against it. */
+  /** The docs/ dirt this session inherited; its own commit is scoped against it. */
   baseline: DirtySnapshot
   startedAt: string
+  endedAt?: string
+  /** Set by `terminate` before the signal, so the exit knows it was stopped, not finished. */
+  stopping?: boolean
   buffer: string
   /**
    * Everything the session has printed, whole. The replay buffer is a window
@@ -120,6 +157,8 @@ interface Session {
 export interface SessionManagerOptions {
   /** Every agent the flow config declares; a session runs the one it names, or the first (spec-00001-FR-55). */
   agents: AgentConfig[]
+  /** How many sessions may run at once — `max_sessions` of the flow config (spec-00003-FR-3). */
+  maxSessions: number
   repoRoot: string
   spawn: SpawnPty
   /**
@@ -131,17 +170,27 @@ export interface SessionManagerOptions {
   snapshot?: () => DirtySnapshot
   /** Overrides `SUBMIT_DELAY_MS`, so a test need not wait out the real one. */
   submitDelayMs?: number
-  /** Runs when the process exits: commits and validates what the session produced. */
-  onExit: (plan: SessionPlan) => Promise<SessionOutcome>
+  /**
+   * Runs when a process exits: commits and validates what that session produced.
+   * It is handed the session's **own** baseline, because several sessions run at
+   * once and each commits the difference from the dirt it alone inherited
+   * (spec-00003-FR-8, design-00001 §4).
+   */
+  onExit: (plan: SessionPlan, baseline: DirtySnapshot) => Promise<SessionOutcome>
 }
 
 /**
- * Owns the one running agent session. Its lifetime is tied to the process, not to
- * any browser connection, so closing the page leaves it running (spec-00001-FR-21).
+ * The registry of agent sessions (design-00001 §5): every session started since
+ * the server came up, running or ended, keyed by its id. Several run at once,
+ * bounded by the two concurrency rules — one running session per target document
+ * and `max_sessions` in total (spec-00003-FR-1 … FR-3). A session's lifetime is
+ * tied to its process, not to any browser connection, so closing the page leaves
+ * them all running (spec-00001-FR-21, spec-00003-FR-9).
  */
 export class SessionManager {
   private readonly options: SessionManagerOptions
-  private session?: Session
+  /** Insertion order is start order, which is what «the newest session» reads off. */
+  private readonly sessions = new Map<string, Session>()
   private counter = 0
 
   constructor(options: SessionManagerOptions) {
@@ -153,12 +202,15 @@ export class SessionManager {
    * carrying the error (FR-16). `agentName` picks one of the configured agents
    * (spec-00001-FR-55); an unknown name starts nothing at all, which is why it
    * is resolved before anything is created.
+   *
+   * Admission and taking the slot happen in this one synchronous call
+   * (design-00001 §5): two starts racing for the last slot are therefore ordered
+   * by arrival, and first come first served needs no lock of its own
+   * (spec-00003-AC-3.6).
    */
   start(plan: SessionPlan, agentName?: string): SessionInfo {
     const agent = this.resolveAgent(agentName)
-    if (this.session?.info.status === 'running') {
-      throw new SessionBusyError('an agent session is already running; wait for it to finish')
-    }
+    this.admit(plan)
     const { repoRoot } = this.options
     const startedAt = new Date().toISOString()
     const info: SessionInfo = {
@@ -189,7 +241,7 @@ export class SessionManager {
       announceEnd,
       submits: [],
     }
-    this.session = session
+    this.sessions.set(info.id, session)
 
     try {
       session.pty = this.options.spawn(agent.command, agent.args, join(repoRoot, agent.cwd ?? '.'))
@@ -210,6 +262,34 @@ export class SessionManager {
   }
 
   /**
+   * The two concurrency rules, judged together and in this order
+   * (spec-00003-FR-2, FR-3): the target document first, the total second, so a
+   * start that breaks both is refused with the more specific reason — the same
+   * order the disabled entry's hover text follows (spec-00001-FR-49).
+   *
+   * The target document of an advance is its **source** (spec-00001-FR-19's
+   * reading, spec-00003-AC-2.6), which is what `sourceId` already holds for
+   * every kind. A failed session is out of both counts: it holds no slot
+   * (spec-00003-AC-3.7) and it is running nothing to be exclusive of.
+   */
+  private admit(plan: SessionPlan): void {
+    const running = this.running()
+    if (running.some((session) => session.info.sourceId === plan.sourceId)) {
+      throw new SessionBusyError(`${plan.sourceId} already has a running agent session`, 'doc-busy')
+    }
+    if (running.length >= this.options.maxSessions) {
+      throw new SessionBusyError(
+        `${running.length} agent sessions are already running, which is the max_sessions limit`,
+        'cap-reached',
+      )
+    }
+  }
+
+  private running(): Session[] {
+    return [...this.sessions.values()].filter((session) => session.info.status === 'running')
+  }
+
+  /**
    * Press Enter on the instruction, once the session has printed anything at
    * all — the nearest thing to "the CLI is up and its input box is listening"
    * that a pty offers. Twice, spaced the same way: the first press is the one
@@ -226,59 +306,102 @@ export class SessionManager {
     }
   }
 
-  /** Replay what the session has printed so far and follow it from there. */
-  attach(listener: (data: string) => void): { buffer: string; detach: () => void } {
-    const session = this.requireSession()
+  /**
+   * Replay what that session has printed so far and follow it from there. Each
+   * session keeps its own buffer and its own listeners, so output reaches the
+   * terminal watching it and no other (spec-00003-AC-1.2).
+   */
+  attach(id: string, listener: (data: string) => void): { buffer: string; detach: () => void } {
+    const session = this.require(id)
     session.listeners.add(listener)
     return { buffer: session.buffer, detach: () => session.listeners.delete(listener) }
   }
 
-  /** spec-00001-FR-12: keystrokes from the embedded terminal reach the CLI. */
-  write(data: string): void {
-    this.requireSession().pty?.write(data)
+  /** spec-00001-FR-12: keystrokes from a terminal reach the CLI of the session it is attached to. */
+  write(id: string, data: string): void {
+    this.require(id).pty?.write(data)
   }
 
   /**
    * spec-00001-FR-12: the terminal's own size reaches the process, which is what
-   * a full-screen TUI draws by (issue-00009). A size that lands when nothing is
-   * running — the window between an exit and a terminal noticing — has nothing
-   * to resize, and refusing it would break the reconnect rather than the frame.
+   * a full-screen TUI draws by (issue-00009). A size that lands on a session that
+   * is not running — the window between an exit and a terminal noticing, or a
+   * session nobody is presenting any more — has nothing to resize, and refusing
+   * it would break the reconnect rather than the frame (spec-00003-FR-5).
    */
-  resize(cols: number, rows: number): void {
-    if (this.session?.info.status !== 'running') return
-    this.session.pty?.resize(cols, rows)
-  }
-
-  current(): SessionInfo | null {
-    return this.session?.info ?? null
-  }
-
-  /** The dirt the current session started from, for the exit hook to scope its commit by. */
-  baseline(): DirtySnapshot {
-    return this.session?.baseline ?? new Map<string, string>()
-  }
-
-  /** Resolves once the exit hook (commit + directed validation) has run. */
-  whenFinished(): Promise<void> {
-    return this.session?.finished ?? Promise.resolve()
-  }
-
-  stop(): void {
-    this.session?.pty?.kill()
+  resize(id: string, cols: number, rows: number): void {
+    const session = this.sessions.get(id)
+    if (session?.info.status !== 'running') return
+    session.pty?.resize(cols, rows)
   }
 
   /**
-   * spec-00001-FR-49: end the running session on the user's word. The wrap-up is
-   * the ordinary exit path — end state, the kind's commit, a refreshed board — and
-   * the caller waits for it, so what comes back is the session as it finished
-   * rather than as it was asked to stop (issue-00010).
+   * Every session since the server came up, oldest first: the running ones and
+   * the ended ones alike (spec-00003-FR-4). Nothing is persisted — a restart
+   * starts this list empty, and the whole history lives on disk instead
+   * (spec-00001-FR-54, design-00001 §5).
    */
-  async terminate(): Promise<SessionInfo> {
-    const session = this.session
+  list(): SessionListing[] {
+    return [...this.sessions.values()].map((session) => ({
+      ...session.info,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+    }))
+  }
+
+  /**
+   * The most recently started session, which is the one a terminal that was not
+   * told which session to show falls back to (spec-00003-FR-9). Choosing among
+   * several is the session panel's business (spec-00003-FR-4, FR-5).
+   */
+  latest(): SessionInfo | null {
+    return [...this.sessions.values()].at(-1)?.info ?? null
+  }
+
+  /**
+   * The numbers already handed to advance sessions that are still running
+   * (spec-00003-FR-1): allocation counts them as taken, so two parallel advances
+   * of the same target type cannot be given the same number even though neither
+   * document is on disk yet (spec-00003-AC-1.3). Derived from the running
+   * sessions rather than kept in a set of its own — that is what releases the
+   * number the moment a session ends, whichever way it ended (design-00001 §5).
+   */
+  reservedNumbers(type: string): number[] {
+    return this.running()
+      .map((session) => session.plan.expectation)
+      .filter((expectation) => expectation?.targetType === type)
+      .map((expectation) => expectation!.number)
+  }
+
+  /** Resolves once that session's exit hook (commit + directed validation) has run. */
+  whenFinished(id?: string): Promise<void> {
+    const session = id === undefined ? [...this.sessions.values()].at(-1) : this.sessions.get(id)
+    return session?.finished ?? Promise.resolve()
+  }
+
+  /** Signal every running session's process, without waiting on any of them. */
+  stop(): void {
+    for (const session of this.running()) session.pty?.kill()
+  }
+
+  /**
+   * spec-00001-FR-49: end one session on the user's word. The wrap-up is the
+   * ordinary exit path — end state, the kind's commit, a refreshed board — and
+   * the caller waits for it, so what comes back is the session as it finished
+   * rather than as it was asked to stop (issue-00010). Judged per session: an id
+   * the registry never knew, or one whose session has already ended, is refused
+   * however many other sessions are running (spec-00001-AC-49.4,
+   * spec-00003-AC-5.5).
+   */
+  async terminate(id: string): Promise<SessionInfo> {
+    const session = this.sessions.get(id)
     if (session?.info.status !== 'running') {
-      throw new NoSessionError('there is no running agent session to stop')
+      throw new NoSessionError(`there is no running agent session ${id} to stop`)
     }
-    this.stop()
+    // Read by the exit hook, which is why it is set before the signal: the same
+    // wrap-up runs, and only the end state says the user stopped it.
+    session.stopping = true
+    session.pty?.kill()
     await session.ended
     return session.info
   }
@@ -308,13 +431,22 @@ export class SessionManager {
     return `${startedAt.replace(/[:.]/g, '-')}-${++this.counter}`
   }
 
-  private requireSession(): Session {
-    if (!this.session) throw new SessionBusyError('there is no agent session')
-    return this.session
+  private require(id: string): Session {
+    const session = this.sessions.get(id)
+    if (!session) throw new NoSessionError(`there is no agent session ${id}`)
+    return session
   }
 
+  /**
+   * spec-00001-FR-16: the agent never started. The slot goes back at once — a
+   * failed session runs nothing, so it counts towards no cap (spec-00003-AC-3.7)
+   * — while the session itself stays in the registry, because the panel lists it
+   * as «failed» (spec-00003-AC-4.6). Both of those follow from the status alone,
+   * which is the whole of the bookkeeping.
+   */
   private fail(session: Session, message: string): SessionInfo {
     session.info.status = 'failed'
+    session.endedAt = new Date().toISOString()
     session.info.error = message
     this.publish(session, `whiteboard: could not start the agent — ${message}\r\n`)
     return session.info
@@ -333,7 +465,7 @@ export class SessionManager {
    * costs the user this record and nothing else, so the failure is a notice in
    * the terminal they are already looking at (spec-00001-AC-54.3).
    */
-  private saveHistory(session: Session): void {
+  private saveHistory(session: Session, endedAt: string): void {
     try {
       writeSessionHistory(
         this.options.repoRoot,
@@ -343,7 +475,7 @@ export class SessionManager {
           docId: session.plan.sourceId,
           agent: session.info.agent,
           startedAt: session.startedAt,
-          endedAt: new Date().toISOString(),
+          endedAt,
           status: session.info.status,
           exitCode: session.info.exitCode,
         },
@@ -359,12 +491,21 @@ export class SessionManager {
   private exit(session: Session, exitCode: number): void {
     // Nothing is typed into a session that has ended, and no timer outlives it.
     for (const submit of session.submits.splice(0)) clearTimeout(submit)
-    session.info.status = 'exited'
+    // A session the user stopped ends `terminated`, one that ran out ends
+    // `exited` (design-00001 §5). Whichever it is, the wrap-up below is the same
+    // one and runs exactly once — `onExit` fires once, so a stop that races a
+    // natural exit is settled by whichever got here first (spec-00001-FR-49).
+    session.info.status = session.stopping ? 'terminated' : 'exited'
     session.info.exitCode = exitCode
+    const endedAt = new Date().toISOString()
+    session.endedAt = endedAt
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)
-    this.saveHistory(session)
+    // The history records the end state as it is, `terminated` included
+    // (design-00001 §7): a restart must not turn a stopped session into one that
+    // finished (spec-00001-AC-54.4).
+    this.saveHistory(session, endedAt)
     session.finished = this.options
-      .onExit(session.plan)
+      .onExit(session.plan, session.baseline)
       .then((outcome) => {
         session.info.outcome = outcome
         this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)

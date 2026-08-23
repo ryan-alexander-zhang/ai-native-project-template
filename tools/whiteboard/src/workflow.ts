@@ -150,9 +150,16 @@ export function assertEntryType(type: string, config: FlowConfig): void {
   }
 }
 
-/** rule-00001-BR-18: the number a new document of `type` takes. */
-export function allocateNumber(graph: DocGraph, type: string): number {
-  return highestNumber(graph, type) + 1
+/**
+ * rule-00001-BR-18: the number a new document of `type` takes. `reserved` are the
+ * numbers already handed to sessions that have not filed their document yet — the
+ * rule's «highest existing number» counts them as existing, or two parallel
+ * advances would be given the same one (spec-00003-FR-1, design-00001 §5). The
+ * business rule is unchanged: a reserved number is the number of a document that
+ * is about to land.
+ */
+export function allocateNumber(graph: DocGraph, type: string, reserved: readonly number[] = []): number {
+  return Math.max(highestNumber(graph, type), ...reserved) + 1
 }
 
 /** The `<type>-<nnnnn>-` prefix a new document must carry; the agent picks the slug. */

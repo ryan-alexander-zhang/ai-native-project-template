@@ -4,6 +4,13 @@ import type { DocGraph, DocNode } from './docRepository.ts'
 /** What the board asked a session to produce; the yardstick for spec-00001-FR-17. */
 export interface Expectation {
   targetType: string
+  /**
+   * The number allocated to the product (rule-00001-BR-18). Held apart from the
+   * prefix it is rendered into because the registry reserves it while the session
+   * runs, so a parallel advance of the same type cannot be given it too
+   * (spec-00003-FR-1).
+   */
+  number: number
   /** `<type>-<nnnnn>-` — the number is fixed, the agent picks the slug (rule-00001-BR-18). */
   idPrefix: string
   carry: string

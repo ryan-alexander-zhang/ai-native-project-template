@@ -36,9 +36,12 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive'> = 
  */
 export function Terminal({ onClose, onStop, session, dark }: TerminalProps) {
   const host = useRef<HTMLDivElement>(null)
+  // Which session is on show: the channel is that session's, so a different
+  // session means a different socket (spec-00003-FR-5).
+  const sessionId = session?.id
 
   useEffect(() => {
-    if (!host.current) return
+    if (!host.current || sessionId === undefined) return
     const xterm = new Xterm({
       fontSize: 12,
       theme: dark
@@ -49,7 +52,7 @@ export function Terminal({ onClose, onStop, session, dark }: TerminalProps) {
     xterm.loadAddon(fit)
     xterm.open(host.current)
 
-    const link = connectTerminal((data) => xterm.write(data))
+    const link = connectTerminal(sessionId, (data) => xterm.write(data))
     xterm.onData((data) => link.send(data))
 
     /**
@@ -77,7 +80,7 @@ export function Terminal({ onClose, onStop, session, dark }: TerminalProps) {
       link.close()
       xterm.dispose()
     }
-  }, [dark])
+  }, [dark, sessionId])
 
   return (
     <section aria-label="Agent session" className="flex h-full min-h-0 flex-col">

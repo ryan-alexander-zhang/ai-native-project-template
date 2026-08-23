@@ -55,9 +55,18 @@ import {
 
 /** The document changed under the action, or is gone; the caller must refresh (spec-00001-FR-5, FR-19). */
 export class ConflictError extends Error {
-  constructor(message: string) {
+  /**
+   * `doc-missing` when the document the action names is not on disk. The session
+   * entries answer their 409 with a reason (design-00001 §7), and this is the
+   * third of them — the other two are the concurrency refusals. A conflict that
+   * is not about a missing document carries none.
+   */
+  readonly reason?: 'doc-missing'
+
+  constructor(message: string, reason?: 'doc-missing') {
     super(message)
     this.name = 'ConflictError'
+    this.reason = reason
   }
 }
 
@@ -530,14 +539,14 @@ export class DocService {
     if (colliding.length > 0) {
       throw new ConflictError(`${id} is declared by ${colliding.join(' and ')}; fix the id collision first`)
     }
-    throw new ConflictError(`${id} is not a document in this repo; refresh the board`)
+    throw new ConflictError(`${id} is not a document in this repo; refresh the board`, 'doc-missing')
   }
 
   private readOrConflict(node: DocNode): DocContent {
     try {
       return readDocContent(this.docsDir, node)
     } catch {
-      throw new ConflictError(`${node.id} is no longer on disk; refresh the board`)
+      throw new ConflictError(`${node.id} is no longer on disk; refresh the board`, 'doc-missing')
     }
   }
 

@@ -52,10 +52,11 @@ export class Board {
     this.watcher = new DocsWatcher(docsDir, () => this.docs.invalidate())
     this.sessions = new SessionManager({
       agents: config.agents,
+      maxSessions: config.maxSessions,
       repoRoot,
       spawn,
       snapshot: () => this.docs.snapshotDocs(),
-      onExit: (plan) => this.finishSession(plan),
+      onExit: (plan, baseline) => this.finishSession(plan, baseline),
     })
     this.app = this.buildApp(config)
   }
@@ -87,22 +88,24 @@ export class Board {
    * showing a session the server has already finished with (spec-00001-AC-12.8,
    * issue-00013).
    */
-  private async finishSession(plan: SessionPlan): Promise<SessionOutcome> {
+  private async finishSession(plan: SessionPlan, baseline: DirtySnapshot): Promise<SessionOutcome> {
     // Whatever the session wrote, the tree the board parsed is out of date
     // (spec-00001 §7 非功能项) — and the wrap-up itself reads the graph.
     this.docs.invalidate()
     try {
-      return await this.wrapUpSession(plan)
+      return await this.wrapUpSession(plan, baseline)
     } finally {
       this.watcher.signal()
     }
   }
 
-  /** Commit what the session wrote, then check it against what was asked for (spec-00001-FR-17). */
-  private async wrapUpSession(plan: SessionPlan): Promise<SessionOutcome> {
-    // What the session inherited, taken when it started: only what moved since
-    // is its own to commit (spec-00001-AC-14.5).
-    const before = this.sessions.baseline()
+  /**
+   * Commit what the session wrote, then check it against what was asked for
+   * (spec-00001-FR-17). `before` is that session's **own** baseline, handed over
+   * by the registry: with several sessions running, the dirt one of them
+   * inherited says nothing about what another may commit (spec-00003-FR-8).
+   */
+  private async wrapUpSession(plan: SessionPlan, before: DirtySnapshot): Promise<SessionOutcome> {
     // Clarify, ask and audit were asked for no new document, so there is nothing
     // to check: their commit is named by the kind and carries the document they
     // were about (spec-00001-AC-14.7, AC-14.8, AC-50.3).
@@ -173,7 +176,10 @@ export class Board {
       res.json(await this.docs.review(req.params.id, req.body))
     })
 
-    app.get('/api/sessions', (_req, res) => res.json({ current: this.sessions.current() }))
+    // Every session since the server came up (design-00001 §7): the session panel
+    // reads it, and so does a board reconnecting to the sessions it left running
+    // (spec-00003-FR-4, FR-9).
+    app.get('/api/sessions', (_req, res) => res.json({ sessions: this.sessions.list() }))
     // Sessions that have ended, read straight from `.whiteboard/sessions/`
     // (spec-00001-FR-54) — which is what makes the history outlive a restart.
     app.get('/api/sessions/history', (_req, res) => res.json(listSessionHistory(this.repoRoot)))
@@ -183,8 +189,9 @@ export class Board {
       res.json(entry)
     })
     app.post('/api/sessions', (req, res) => res.json(this.startSession(req.body)))
-    // The other three session kinds: same channel, same one slot (spec-00001-FR-18),
-    // each with its own ruling (FR-9, FR-47, FR-51) made in the doc service.
+    // The other three session kinds: same channel, same concurrency rules
+    // (spec-00003-FR-2, FR-3), each with its own ruling (FR-9, FR-47, FR-51)
+    // made in the doc service.
     app.post('/api/sessions/clarify', (req, res) => {
       res.json(this.sessions.start(this.docs.clarifyPlan(docIdOf(req.body)), agentOf(req.body)))
     })
@@ -195,9 +202,11 @@ export class Board {
       res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body)), agentOf(req.body)))
     })
     // The way out of a session that will not end by itself (spec-00001-FR-49);
-    // the wrap-up it answers with has already run.
-    app.delete('/api/sessions', async (_req, res) => {
-      res.json(await this.sessions.terminate())
+    // the wrap-up it answers with has already run. The session is named, because
+    // the stop acts on the one the terminal is showing and the refusal is judged
+    // per session (spec-00003-FR-5).
+    app.delete('/api/sessions/:id', async (req, res) => {
+      res.json(await this.sessions.terminate(req.params.id))
     })
 
     app.use(errorHandler)
@@ -214,9 +223,16 @@ export class Board {
     if (!step) {
       throw new WorkflowError(`${targetType} is not a next step of ${sourceId}`)
     }
+    // The numbers of advances still running count as taken (spec-00003-FR-1):
+    // their documents are not on disk yet, so the graph alone would hand the same
+    // number to two parallel advances (spec-00003-AC-1.3). The number is taken
+    // before the admission below and only becomes a reservation if that start is
+    // admitted — a refused start reserves nothing.
+    const number = allocateNumber(this.docs.graph(), targetType, this.sessions.reservedNumbers(targetType))
     const expectation: Expectation = {
       targetType,
-      idPrefix: idPrefix(targetType, allocateNumber(this.docs.graph(), targetType)),
+      number,
+      idPrefix: idPrefix(targetType, number),
       carry: step.carry,
       sourceId,
     }
@@ -252,10 +268,16 @@ export class Board {
       route.handleUpgrade(request, socket, head, (connection) => route.emit('connection', connection, request))
     })
 
-    terminals.on('connection', (socket) => {
+    // Which session the terminal is showing rides in the query (design-00001 §7):
+    // one channel per session, so output and keystrokes reach that session and no
+    // other (spec-00003-FR-1, FR-5). A connection naming a session the registry
+    // does not know — none at all, or one from before a restart — is closed, which
+    // is what the front end reads as «nothing to show here».
+    terminals.on('connection', (socket, request) => {
+      const sessionId = new URL(request.url ?? '/', 'http://board').searchParams.get('sessionId') ?? ''
       let attached: { buffer: string; detach: () => void }
       try {
-        attached = this.sessions.attach((data) => socket.send(data))
+        attached = this.sessions.attach(sessionId, (data) => socket.send(data))
       } catch {
         socket.close()
         return
@@ -266,11 +288,11 @@ export class Board {
       // binary frame is the terminal's size (design-00001 §7, issue-00009).
       socket.on('message', (data, isBinary) => {
         if (!isBinary) {
-          this.sessions.write(data.toString())
+          this.sessions.write(sessionId, data.toString())
           return
         }
         const size = parseSize(data.toString())
-        if (size) this.sessions.resize(size.cols, size.rows)
+        if (size) this.sessions.resize(sessionId, size.cols, size.rows)
       })
       socket.on('close', () => attached.detach())
     })
@@ -341,10 +363,21 @@ const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [
   [WorkflowError, 422],
 ]
 
+/**
+ * The word a refusal carries when there is one to carry: the session entries'
+ * 409 says whether the target document is busy, the cap is reached, or the
+ * document is gone (design-00001 §7). Read off the error rather than decided per
+ * route, so the four entries cannot answer the same refusal differently.
+ */
+function reasonOf(error: Error): { reason?: string } {
+  const { reason } = error as { reason?: unknown }
+  return typeof reason === 'string' ? { reason } : {}
+}
+
 function errorHandler(error: Error, _req: Request, res: Response, _next: NextFunction): void {
   const match = STATUS_BY_ERROR.find(([type]) => error instanceof type)
   // The resolved gate names its gaps in the body (design-00001 §7); every other
   // refusal carries its message alone, so the field's presence is the gate's.
   const gaps = error instanceof GateError ? { gaps: error.gaps } : {}
-  res.status(match?.[1] ?? 500).json({ error: error.message, ...gaps })
+  res.status(match?.[1] ?? 500).json({ error: error.message, ...gaps, ...reasonOf(error) })
 }

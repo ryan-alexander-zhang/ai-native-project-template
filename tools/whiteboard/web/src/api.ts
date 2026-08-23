@@ -3,7 +3,7 @@ import type { DocContent, DocGraph } from '../../src/docRepository.ts'
 import type { ActionResult, CoverageRow } from '../../src/docService.ts'
 import type { ItemsView } from '../../src/requirements.ts'
 import type { SessionHistoryEntry, SessionHistoryMeta } from '../../src/sessionHistory.ts'
-import type { SessionInfo } from '../../src/sessionManager.ts'
+import type { SessionInfo, SessionListing } from '../../src/sessionManager.ts'
 
 export type {
   CoverageRow,
@@ -15,6 +15,7 @@ export type {
   SessionHistoryEntry,
   SessionHistoryMeta,
   SessionInfo,
+  SessionListing,
 }
 
 /**
@@ -97,7 +98,20 @@ export const api = {
   setStatus: (id: string, to: string) => request<ActionResult>('POST', `${at(id)}/status`, { to }),
   accept: (id: string) => request<ActionResult>('POST', `${at(id)}/review`, { action: 'accept' }),
   nextSteps: (id: string) => request<FlowStep[]>('GET', `${at(id)}/next-steps`),
-  session: () => request<{ current: SessionInfo | null }>('GET', '/api/sessions'),
+  /**
+   * The session the terminal is to show, off the list of every session the
+   * server holds (`GET /api/sessions`, design-00001 §7): the newest running one,
+   * or — when nothing runs — the newest there was, so the panel still says how
+   * the last one ended. Several running sessions are all in the payload;
+   * choosing between them is the session panel's business (spec-00003-FR-4,
+   * FR-5), and this is the one a reconnecting board reattaches to
+   * (spec-00003-FR-9).
+   */
+  session: async (): Promise<{ current: SessionInfo | null }> => {
+    const { sessions } = await request<{ sessions: SessionListing[] }>('GET', '/api/sessions')
+    const running = sessions.filter((session) => session.status === 'running')
+    return { current: (running.length > 0 ? running : sessions).at(-1) ?? null }
+  },
   // Every session entry may name which agent runs it; leaving it out is what a
   // single-agent config does, and the server then takes the first
   // (spec-00001-FR-55). `undefined` drops out of the body on its own, so an
@@ -111,8 +125,9 @@ export const api = {
   ask: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/ask', { docId, agent }),
   audit: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/audit', { docId, agent }),
   // The way out of a session that will not end by itself; what comes back is the
-  // session as it finished (spec-00001-FR-49).
-  stopSession: () => request<SessionInfo>('DELETE', '/api/sessions'),
+  // session as it finished (spec-00001-FR-49). The session is named: the stop
+  // acts on the one the terminal is showing (spec-00003-FR-5).
+  stopSession: (id: string) => request<SessionInfo>('DELETE', `/api/sessions/${encodeURIComponent(id)}`),
   // Creating is two steps, and only the second one writes: the prefill takes a
   // number and a template, the save creates the file (spec-00001-FR-53). The
   // path is its own rather than under `/api/docs/:id` — there is no id yet.

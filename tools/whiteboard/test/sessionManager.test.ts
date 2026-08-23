@@ -4,11 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentConfig } from '../src/config.ts'
 import { type Expectation, taskInstruction } from '../src/advance.ts'
 import { spawnPty } from '../src/pty.ts'
-import { SessionBusyError, SessionManager, type SessionOutcome, type SessionPlan } from '../src/sessionManager.ts'
+import {
+  NoSessionError,
+  SessionBusyError,
+  SessionManager,
+  type SessionOutcome,
+  type SessionPlan,
+} from '../src/sessionManager.ts'
 import { SESSION_WAIT, makeRepo } from './helpers.ts'
 
 const EXPECTATION: Expectation = {
   targetType: 'prd',
+  number: 2,
   idPrefix: 'prd-00002-',
   carry: 'parent',
   sourceId: 'idea-00001-x',
@@ -31,12 +38,19 @@ const OUTCOME: SessionOutcome = { docId: 'prd-00002-new', problems: [], committe
  */
 const SUBMITTED_TAIL = `got:${ADVANCE.instruction.split('\n').at(-1)}`
 
+/** A stand-in that prints back whatever it is told, so input can be traced to its own session. */
+const ECHO = ['-e', "process.stdin.on('data', (d) => console.log('got:' + d.toString().trim()))"]
+
+/** Long enough to still be running when the test looks. */
+const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+
 const managers: SessionManager[] = []
 
-function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUTCOME)) {
+function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUTCOME), maxSessions = 3) {
   const { repoRoot, docsDir } = makeRepo({})
   const manager = new SessionManager({
     agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs', ...agent }],
+    maxSessions,
     repoRoot,
     spawn: spawnPty,
     // A real process is slow enough already; the submit's own wait is the one
@@ -48,9 +62,13 @@ function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUT
   return { manager, onExit, docsDir }
 }
 
-/** Collect everything the session prints, from attach onward plus the replayed buffer. */
-function transcript(manager: SessionManager) {
-  const attached = manager.attach((data) => {
+/**
+ * Collect everything one session prints, from attach onward plus the replayed
+ * buffer. The session is named: each has its own buffer and its own listeners
+ * (spec-00003-FR-1).
+ */
+function transcript(manager: SessionManager, id = manager.latest()!.id) {
+  const attached = manager.attach(id, (data) => {
     seen += data
   })
   let seen = attached.buffer
@@ -60,6 +78,21 @@ function transcript(manager: SessionManager) {
     },
     detach: attached.detach,
   }
+}
+
+/** The refusal a start threw, so the reason it carries can be read (spec-00003-FR-2, FR-3). */
+function refusalOf(start: () => unknown): SessionBusyError {
+  try {
+    start()
+  } catch (error) {
+    return error as SessionBusyError
+  }
+  throw new Error('the start was admitted, so there is no refusal to read')
+}
+
+/** A plan of the given kind on the given document; the instruction is its caller's. */
+function planFor(kind: SessionPlan['kind'], sourceId: string, instruction = `${kind} ${sourceId}`): SessionPlan {
+  return { kind, sourceId, instruction }
 }
 
 afterEach(() => {
@@ -79,25 +112,144 @@ describe('start', () => {
     await vi.waitFor(() => expect(output.text).toContain('hello from the agent'), SESSION_WAIT)
   })
 
-  // spec-00001-AC-18.1
-  it('refuses a second session and leaves the running one alone', async () => {
-    const { manager } = makeManager({ args: ['-e', 'setTimeout(() => {}, 5000)'] })
-    const first = manager.start(ADVANCE)
+  // spec-00003-AC-1.1
+  it('runs sessions on two different documents at once, both of them interactive', async () => {
+    const { manager } = makeManager({ args: ECHO })
 
-    expect(() => manager.start(ADVANCE)).toThrowError(SessionBusyError)
-    expect(manager.current()).toEqual(first)
-    expect(manager.current()!.status).toBe('running')
+    const first = manager.start(planFor('clarify', 'spec-00001-a'))
+    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const a = transcript(manager, first.id)
+    const b = transcript(manager, second.id)
+
+    expect([first.status, second.status]).toEqual(['running', 'running'])
+    await vi.waitFor(() => expect(a.text).toContain('got:clarify spec-00001-a'), SESSION_WAIT)
+    await vi.waitFor(() => expect(b.text).toContain('got:ask record-00001-b'), SESSION_WAIT)
+    manager.write(first.id, 'to a\n')
+    manager.write(second.id, 'to b\n')
+    await vi.waitFor(() => expect(a.text).toContain('got:to a'), SESSION_WAIT)
+    await vi.waitFor(() => expect(b.text).toContain('got:to b'), SESSION_WAIT)
   })
 
-  it('allows a new session once the previous one has exited', async () => {
+  // spec-00003-AC-1.2
+  it('keeps the output and the input of each session to itself', async () => {
+    const { manager } = makeManager({ args: ECHO })
+    const first = manager.start(planFor('clarify', 'spec-00001-a'))
+    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const a = transcript(manager, first.id)
+    const b = transcript(manager, second.id)
+    // Each stand-in echoes only once its own instruction has been submitted, so
+    // both are known to be listening before anything is typed at one of them.
+    await vi.waitFor(() => expect(a.text).toContain('got:clarify spec-00001-a'), SESSION_WAIT)
+    await vi.waitFor(() => expect(b.text).toContain('got:ask record-00001-b'), SESSION_WAIT)
+
+    manager.write(first.id, 'only for a\n')
+
+    await vi.waitFor(() => expect(a.text).toContain('got:only for a'), SESSION_WAIT)
+    expect(b.text).not.toContain('only for a')
+    expect(a.text).not.toContain('record-00001-b')
+  })
+
+  // spec-00003-AC-2.1
+  it('refuses a second session on the same document, naming the exclusion, and leaves the first alone', () => {
+    const { manager } = makeManager({ args: HOLD })
+    const first = manager.start(planFor('ask', 'spec-00001-a'))
+
+    expect(refusalOf(() => manager.start(planFor('clarify', 'spec-00001-a'))).reason).toBe('doc-busy')
+    expect(manager.latest()).toEqual(first)
+    expect(manager.latest()!.status).toBe('running')
+  })
+
+  // spec-00003-AC-2.2
+  it('refuses the same document again, adding no session', () => {
+    const { manager } = makeManager({ args: HOLD })
+    manager.start(planFor('ask', 'spec-00001-a'))
+    expect(() => manager.start(planFor('clarify', 'spec-00001-a'))).toThrowError(SessionBusyError)
+
+    expect(() => manager.start(planFor('clarify', 'spec-00001-a'))).toThrowError(SessionBusyError)
+
+    expect(manager.list()).toHaveLength(1)
+  })
+
+  // spec-00003-AC-2.6 — the target document of an advance is its source, so two
+  // advances from the same document are two sessions on the same document
+  it('refuses a second advance from the same source document', () => {
+    const { manager } = makeManager({ args: HOLD })
+    manager.start(ADVANCE)
+
+    const refusal = refusalOf(() => manager.start({ ...ADVANCE, expectation: { ...EXPECTATION, targetType: 'spec' } }))
+
+    expect(refusal.reason).toBe('doc-busy')
+    expect(manager.list()).toHaveLength(1)
+  })
+
+  // spec-00003-AC-2.5
+  it('starts a new session on a document whose session has ended', async () => {
     const { manager } = makeManager({ args: ['-e', ''] })
     manager.start(ADVANCE)
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
 
     // The id carries the start time as well as the counter, because it names the
     // session's history files (spec-00001-FR-54); what this asserts is the
     // second session, not the exact stamp.
     expect(manager.start(ADVANCE).id).toMatch(/^\d{4}-\d{2}-\d{2}T[\d-]+Z-2$/)
+  })
+
+  // spec-00003-AC-3.1
+  it('refuses a start once the cap is reached, naming the cap, and leaves the running ones alone', () => {
+    const { manager } = makeManager({ args: HOLD }, undefined, 2)
+    const first = manager.start(planFor('ask', 'spec-00001-a'))
+    const second = manager.start(planFor('ask', 'spec-00002-b'))
+
+    expect(refusalOf(() => manager.start(planFor('ask', 'record-00001-c'))).reason).toBe('cap-reached')
+    expect(manager.list().map((session) => session.id)).toEqual([first.id, second.id])
+    expect(manager.list().every((session) => session.status === 'running')).toBe(true)
+  })
+
+  /**
+   * spec-00003-AC-2.1 with spec-00003-AC-3.1 — both rules hold at once, and the
+   * reason given is the more specific one, in the order the disabled entry's
+   * hover text follows (design-00001 §7, spec-00001-FR-49).
+   */
+  it('names the same-document reason when the cap is reached as well', () => {
+    const { manager } = makeManager({ args: HOLD }, undefined, 1)
+    manager.start(planFor('ask', 'spec-00001-a'))
+
+    expect(refusalOf(() => manager.start(planFor('clarify', 'spec-00001-a'))).reason).toBe('doc-busy')
+  })
+
+  // spec-00003-AC-3.2
+  it('refuses again at the cap, adding no session', () => {
+    const { manager } = makeManager({ args: HOLD }, undefined, 1)
+    manager.start(planFor('ask', 'spec-00001-a'))
+    expect(() => manager.start(planFor('ask', 'spec-00002-b'))).toThrowError(SessionBusyError)
+
+    expect(() => manager.start(planFor('ask', 'record-00001-c'))).toThrowError(SessionBusyError)
+
+    expect(manager.list()).toHaveLength(1)
+  })
+
+  // spec-00003-AC-3.3
+  it('admits the next start once one of the capped sessions has ended', async () => {
+    const { manager } = makeManager({ args: ['-e', ''] }, undefined, 1)
+    manager.start(planFor('ask', 'spec-00001-a'))
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
+
+    expect(manager.start(planFor('ask', 'spec-00002-b')).status).toBe('running')
+  })
+
+  /**
+   * spec-00003-AC-3.6 — admission and taking the slot happen inside the one
+   * synchronous `start`, so two starts arriving at the last slot are ordered by
+   * arrival with nothing else to arbitrate them (design-00001 §5).
+   */
+  it('gives the last slot to whichever start got there first', () => {
+    const { manager } = makeManager({ args: HOLD }, undefined, 1)
+
+    const first = manager.start(planFor('ask', 'spec-00001-a'))
+    const refusal = refusalOf(() => manager.start(planFor('ask', 'spec-00002-b')))
+
+    expect(refusal.reason).toBe('cap-reached')
+    expect(first.status).toBe('running')
   })
 
   // spec-00001-AC-16.1
@@ -117,10 +269,41 @@ describe('start', () => {
     expect(manager.start(ADVANCE).error).toMatch(/not executable/)
   })
 
+  // spec-00003-AC-3.7 — a session that never started holds no slot, and is still
+  // one the panel lists as failed (spec-00003-AC-4.6)
+  it('counts a spawn failure towards no cap and lists it as failed', () => {
+    // The cap is one, and the first spawn is the one that fails: if the failure
+    // held the slot, the second start would be refused rather than admitted.
+    let attempts = 0
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: [] }],
+      maxSessions: 1,
+      repoRoot,
+      spawn: () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('agent command not found on PATH: nope')
+        return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
+      },
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    const failed = manager.start(planFor('ask', 'spec-00001-a'))
+
+    const next = manager.start(planFor('ask', 'record-00001-b'))
+
+    expect(failed.status).toBe('failed')
+    expect(next.status).toBe('running')
+    expect(manager.list().map((session) => [session.id, session.status])).toEqual([
+      [failed.id, 'failed'],
+      [next.id, 'running'],
+    ])
+  })
+
   /**
-   * The three kinds share this one manager, this one slot and this one terminal
-   * (spec-00001-FR-18); what tells them apart is the kind on the session and the
-   * instruction its caller built. Only an advance expects a target type.
+   * The four kinds share this one registry and one channel each (spec-00003-FR-1);
+   * what tells them apart is the kind on the session and the instruction its
+   * caller built. Only an advance expects a target type.
    */
   it('carries the kind and the instruction of a clarify or ask session', async () => {
     const { manager } = makeManager({
@@ -137,16 +320,17 @@ describe('start', () => {
   })
 
   // The exit hook is handed the plan, so it can tell an advance's product check
-  // from a clarify or ask that was asked for no new document.
+  // from a clarify or ask that was asked for no new document — and that session's
+  // own baseline, which is what scopes its commit (spec-00003-FR-8).
   it('hands the exit hook the plan the session ran on', async () => {
     const plan = { kind: 'ask' as const, sourceId: 'record-00001-x', instruction: 'answer this' }
     const { manager, onExit } = makeManager({ args: ['-e', ''] })
 
     manager.start(plan)
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
-    expect(onExit).toHaveBeenCalledWith(plan)
+    expect(onExit).toHaveBeenCalledWith(plan, new Map())
   })
 })
 
@@ -157,6 +341,7 @@ describe('the write-scope constraint', () => {
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
       agents: [{ name: 'test', command: 'node', args: ['--version'], cwd: 'docs' }],
+      maxSessions: 3,
       repoRoot,
       spawn: (command, args, cwd) => {
         spawned.push({ command, args, cwd })
@@ -175,6 +360,7 @@ describe('the write-scope constraint', () => {
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
       agents: [{ name: 'test', command: 'node', args: [] }],
+      maxSessions: 3,
       repoRoot,
       spawn: (_command, _args, cwd) => {
         spawned.push(cwd)
@@ -211,7 +397,7 @@ describe('a running session', () => {
     // line (issue-00011).
     await vi.waitFor(() => expect(output.text).toContain(SUBMITTED_TAIL), SESSION_WAIT)
 
-    manager.write('ping\n')
+    manager.write(manager.latest()!.id, 'ping\n')
 
     await vi.waitFor(() => expect(output.text).toContain('got:ping'), SESSION_WAIT)
   })
@@ -229,7 +415,7 @@ describe('a running session', () => {
     manager.start(ADVANCE)
     const output = transcript(manager)
 
-    manager.resize(100, 40)
+    manager.resize(manager.latest()!.id, 100, 40)
 
     await vi.waitFor(() => expect(output.text).toContain('100x40'), SESSION_WAIT)
   })
@@ -271,6 +457,7 @@ describe('submitting the instruction', () => {
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
       agents: [{ name: 'test', command: 'node', args: [] }],
+      maxSessions: 3,
       repoRoot,
       submitDelayMs: DELAY,
       spawn: () => ({
@@ -342,12 +529,12 @@ describe('exit', () => {
     manager.start(ADVANCE)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('session ended with code 0')
-    expect(onExit).toHaveBeenCalledWith(ADVANCE)
-    expect(manager.current()!.outcome).toEqual(OUTCOME)
+    expect(onExit).toHaveBeenCalledWith(ADVANCE, new Map())
+    expect(manager.latest()!.outcome).toEqual(OUTCOME)
     expect(output.text).toContain('prd-00002-new committed')
   })
 
@@ -356,7 +543,7 @@ describe('exit', () => {
     manager.start(ADVANCE)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('no new document was produced')
@@ -368,7 +555,7 @@ describe('exit', () => {
     manager.start(ADVANCE)
     const output = transcript(manager)
 
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished()
 
     expect(output.text).toContain('not committed (no changes)')
@@ -386,7 +573,7 @@ describe('attach', () => {
     await vi.waitFor(() => expect(first.text).toContain('before detach'), SESSION_WAIT)
     first.detach()
 
-    expect(manager.current()!.status).toBe('running')
+    expect(manager.latest()!.status).toBe('running')
     expect(transcript(manager).text).toContain('before detach')
   })
 
@@ -407,10 +594,62 @@ describe('attach', () => {
     await vi.waitFor(() => expect(existsSync(join(docsDir, 'after-detach.md'))).toBe(true), SESSION_WAIT)
   })
 
-  it('refuses to attach or write when no session was ever started', () => {
+  it('refuses to attach to or write to a session the registry does not know', () => {
     const { manager } = makeManager({})
-    expect(() => manager.attach(() => {})).toThrowError(SessionBusyError)
-    expect(() => manager.write('x')).toThrowError(SessionBusyError)
+    expect(() => manager.attach('nope', () => {})).toThrowError(NoSessionError)
+    expect(() => manager.write('nope', 'x')).toThrowError(NoSessionError)
+  })
+
+  /**
+   * spec-00003-AC-9.1's server half at the registry: a session with no terminal
+   * on it goes on running, and each is reattached by its own id with its own
+   * output behind it (spec-00001-FR-21 extended to several sessions).
+   */
+  it('holds two unattached sessions and replays each one its own output', async () => {
+    const { manager } = makeManager({ args: ECHO })
+    const first = manager.start(planFor('clarify', 'spec-00001-a'))
+    const second = manager.start(planFor('ask', 'record-00001-b'))
+    await vi.waitFor(
+      () => expect(transcript(manager, second.id).text).toContain('got:ask record-00001-b'),
+      SESSION_WAIT,
+    )
+
+    const a = transcript(manager, first.id)
+    const b = transcript(manager, second.id)
+
+    expect(manager.list().map((session) => session.status)).toEqual(['running', 'running'])
+    await vi.waitFor(() => expect(a.text).toContain('got:clarify spec-00001-a'), SESSION_WAIT)
+    expect(b.text).toContain('got:ask record-00001-b')
+    expect(b.text).not.toContain('spec-00001-a')
+  })
+
+  /**
+   * spec-00001-AC-49.4, spec-00003-AC-5.5 — judged per session: an id nobody ever
+   * held and an id whose session has ended are both refused, and another session
+   * running changes neither answer.
+   */
+  it('refuses to stop a session it does not know or one that has ended', async () => {
+    const { manager } = makeManager({ args: ['-e', ''] })
+    const ended = manager.start(planFor('ask', 'spec-00001-a'))
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
+    await manager.whenFinished(ended.id)
+
+    await expect(manager.terminate('nope')).rejects.toThrowError(NoSessionError)
+    await expect(manager.terminate(ended.id)).rejects.toThrowError(NoSessionError)
+  })
+
+  // spec-00001-AC-49.1 — the stop ends that session, and only that one; the end
+  // state says it was stopped rather than that it ran out (spec-00003-AC-5.3)
+  it('stops the session it is given and leaves the other one running', async () => {
+    const { manager } = makeManager({ args: HOLD })
+    const first = manager.start(planFor('ask', 'spec-00001-a'))
+    const second = manager.start(planFor('ask', 'record-00001-b'))
+
+    const stopped = await manager.terminate(first.id)
+
+    expect(stopped.status).toBe('terminated')
+    expect(manager.list().map((session) => session.status)).toEqual(['terminated', 'running'])
+    expect(second.status).toBe('running')
   })
 
   /**
@@ -420,20 +659,22 @@ describe('attach', () => {
    */
   it('ignores a resize with no session behind it', () => {
     const { manager } = makeManager({})
-    expect(() => manager.resize(100, 40)).not.toThrow()
+    expect(() => manager.resize('nope', 100, 40)).not.toThrow()
   })
 
   it('ignores a resize that arrives after the session has exited', async () => {
     const { manager } = makeManager({ args: ['-e', ''] })
     manager.start(ADVANCE)
-    await vi.waitFor(() => expect(manager.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
 
-    expect(() => manager.resize(100, 40)).not.toThrow()
+    expect(() => manager.resize(manager.latest()!.id, 100, 40)).not.toThrow()
   })
 
-  it('reports no current session before the first start', () => {
+  it('lists nothing and reports no session before the first start', () => {
     const { manager } = makeManager({})
-    expect(manager.current()).toBeNull()
+    expect(manager.latest()).toBeNull()
+    expect(manager.list()).toEqual([])
     expect(manager.whenFinished()).resolves.toBeUndefined()
+    expect(manager.whenFinished('nope')).resolves.toBeUndefined()
   })
 })

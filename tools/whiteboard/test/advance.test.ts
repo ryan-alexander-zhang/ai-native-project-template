@@ -6,6 +6,7 @@ import { doc, makeDocsDir, testConfig } from './helpers.ts'
 const config = testConfig()
 const EXPECTATION: Expectation = {
   targetType: 'prd',
+  number: 2,
   idPrefix: 'prd-00002-',
   carry: 'parent',
   sourceId: 'idea-00001-x',

@@ -114,7 +114,9 @@ export function useBoard() {
    *
    * The session state is re-read with the graph, not just at load: a session that
    * ended is exactly what a refresh may have been sent to tell us about, and the
-   * badge, the three entries and the stop all hang off it (issue-00013).
+   * badge, the entries and the stop all hang off it (issue-00013). What comes
+   * back is the session the terminal is to show, picked off the list of them all
+   * (api.ts, spec-00003-FR-9).
    */
   const refresh = useCallback(async () => {
     const [next, { current }] = await Promise.all([api.graph(), api.session()])
@@ -173,9 +175,10 @@ export function useBoard() {
   )
 
   /**
-   * The one way a session opens, whichever kind it is (spec-00001-FR-18): the
-   * started session takes the single slot and the terminal comes up with it. A
-   * refusal — the slot is taken, the document is gone — leaves both alone.
+   * The one way a session opens, whichever kind it is: the started session is the
+   * one the terminal comes up on (spec-00003-AC-5.4). A refusal — the document
+   * already has a session, the cap is reached, the document is gone — leaves both
+   * alone (spec-00003-FR-2, FR-3).
    */
   const startSession = useCallback(
     async (start: () => Promise<SessionInfo>) => {
@@ -188,15 +191,18 @@ export function useBoard() {
   )
 
   /**
-   * The one way a session ends on the user's word (spec-00001-FR-49). The board
-   * takes the finished session back from the server rather than assuming it: the
-   * three entries come back with it, and the graph is re-read like any action's.
+   * The one way a session ends on the user's word (spec-00001-FR-49): the one the
+   * terminal is showing, which is the session held here (spec-00003-FR-5). The
+   * board takes the finished session back from the server rather than assuming
+   * it: the entries come back with it, and the graph is re-read like any
+   * action's. With no session on show there is nothing to stop.
    */
   const stopSession = useCallback(async () => {
+    if (!session) return
     await run(async () => {
-      setSession(await api.stopSession())
+      setSession(await api.stopSession(session.id))
     })
-  }, [run])
+  }, [run, session])
 
   const advance = useCallback(
     async (sourceId: string, targetType: string) => {
@@ -270,7 +276,8 @@ export function useBoard() {
     }
   }, [graph, selected])
 
-  // A session outlives the browser, so a board opening fresh reattaches to it.
+  // Sessions outlive the browser, so a board opening fresh reattaches to one of
+  // them (spec-00003-FR-9).
   useEffect(() => {
     // Config first: laying out before the column order lands would place every
     // node in the unknown-type bucket and then move it (spec-00001-AC-1.12).

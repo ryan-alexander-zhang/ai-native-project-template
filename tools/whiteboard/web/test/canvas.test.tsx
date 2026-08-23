@@ -968,8 +968,8 @@ describe('the board', () => {
     expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
   })
 
-  // spec-00001-AC-18.2 at the board: the session the board reattached to holds
-  // the one slot, so no entry offers to start another.
+  // spec-00003-AC-2.4 at the board: the document the board reattached to has a
+  // session running, so its entries offer to start none.
   it('disables the three session entries while a session is running', async () => {
     stubWebSocket()
     vi.spyOn(api, 'session').mockResolvedValue({

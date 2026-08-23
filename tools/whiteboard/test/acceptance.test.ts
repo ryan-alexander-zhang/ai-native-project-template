@@ -87,7 +87,7 @@ describe('the whiteboard acceptance path', () => {
     // the document stays draft and accept is refused while the question stands
     const session = await call('POST', '/api/sessions/clarify', { docId: 'idea-00001-whiteboard' })
     expect(session.body.kind).toBe('clarify')
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     const clarified = await call('GET', '/api/docs/idea-00001-whiteboard')
@@ -133,12 +133,12 @@ describe('the whiteboard acceptance path', () => {
     })
     expect(session.body.status).toBe('running')
 
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     // the product is on disk, sound, committed, and on the board with its edge
     expect(readFileSync(join(docsDir, 'prd/whiteboard.md'), 'utf8')).toContain('parent: idea-00001-whiteboard')
-    expect(board.sessions.current()!.outcome).toMatchObject({ docId: 'prd-00001-whiteboard', problems: [] })
+    expect(board.sessions.latest()!.outcome).toMatchObject({ docId: 'prd-00001-whiteboard', problems: [] })
     expect(commitTrail(repoRoot)).toEqual([
       'init',
       'wb(accept): idea-00001-whiteboard',
@@ -182,11 +182,11 @@ describe('the whiteboard acceptance path', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sourceId: 'spec-00001-board', targetType }),
       })
-      await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+      await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
       await board.sessions.whenFinished()
 
       // the product carries the relation the flow config told the agent to carry
-      expect(board.sessions.current()!.outcome).toMatchObject({ docId: front.id, problems: [] })
+      expect(board.sessions.latest()!.outcome).toMatchObject({ docId: front.id, problems: [] })
     }
 
     const graph = new Board({ repoRoot, docsDir, config, spawn: spawnPty }).graph()
@@ -221,11 +221,11 @@ describe('the whiteboard acceptance path', () => {
         { next: 'record', carry: 'parent' },
       ])
       await call('POST', '/api/sessions', { sourceId: 'plan-00001-mvp', targetType })
-      await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+      await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
       await board.sessions.whenFinished()
 
       // no problem reported is the relation being the one it was told to carry
-      expect(board.sessions.current()!.outcome).toMatchObject({ docId: front.id, problems: [] })
+      expect(board.sessions.latest()!.outcome).toMatchObject({ docId: front.id, problems: [] })
     }
   })
 
@@ -243,7 +243,7 @@ describe('the whiteboard acceptance path', () => {
     await call('POST', '/api/docs/idea-00001-whiteboard/review', { action: 'accept' })
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-whiteboard', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     expect(git(repoRoot, 'show', '--name-only', '--pretty=', 'HEAD').trim().split('\n').sort()).toEqual([
@@ -267,7 +267,7 @@ describe('the whiteboard acceptance path', () => {
 
     const session = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-board' })
     expect(session.body.kind).toBe('audit')
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     // the finding is in the document, and the audit left its status where it was
@@ -340,7 +340,7 @@ describe('the whiteboard acceptance path', () => {
     await call('POST', '/api/docs/idea-00001-whiteboard/review', { action: 'accept' })
 
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-whiteboard', targetType: 'prd' })
-    await vi.waitFor(() => expect(board.sessions.current()!.status).toBe('exited'), SESSION_WAIT)
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
     const node = (await call('GET', '/api/graph')).body.nodes.find(
