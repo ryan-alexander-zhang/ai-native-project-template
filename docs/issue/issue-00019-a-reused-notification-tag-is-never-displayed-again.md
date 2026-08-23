@@ -168,6 +168,10 @@ domain owner in macOS Chrome.
   console sequence of §1 re-run on the fixed board in macOS Chrome — two
   notices of one session, the first dismissed before the second is posted.
 
+- 域主实机复测通过（2026-08-23，macOS Chrome）：多轮 ask——每轮回答后
+  agent 再次等待均收到新通知，无论前一条通知是否被点掉；结束通知照常
+  替换。现场症状消除。
+
 ## 8. Follow-through
 
 - Detection gap: the display layer is not reachable from jsdom, and the test's
