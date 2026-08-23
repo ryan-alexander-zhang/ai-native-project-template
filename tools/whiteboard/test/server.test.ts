@@ -570,6 +570,18 @@ describe('sessions', () => {
     expect(commitCount(repoRoot)).toBe(before)
   })
 
+  // spec-00003-AC-3.8 — a declared cap of one refuses the second start like any cap
+  it('refuses a second session outright when the cap is one', async () => {
+    const { call } = cappedBoard({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, 1)
+    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+
+    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('cap-reached')
+    expect((await call('GET', '/api/sessions')).body.sessions).toHaveLength(1)
+  })
+
   // spec-00001-AC-18.1 — the document already has a session, whatever kind is asked for
   it('answers 409 with the same-document reason while that document has a session', async () => {
     const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA }, HOLD)
@@ -1829,6 +1841,22 @@ describe('several commits at once', () => {
       committed: false,
       error: undefined,
     })
+  })
+
+  // spec-00003-AC-5.2 — no terminal was ever attached: the wrap-up is unchanged
+  it('wraps up a session nobody is watching, commit and history included', async () => {
+    const { call, board, repoRoot, docsDir, exit } = scriptedBoard({ 'spec/b.md': DRAFT_SPEC })
+    const commits = commitCount(repoRoot)
+    const { body: session } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    exit(0)
+    await board.sessions.whenFinished(session.id)
+
+    expect(commitCount(repoRoot)).toBe(commits + 1)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
+    const history = (await call('GET', '/api/sessions/history')).body as Array<{ id: string }>
+    expect(history.map((entry) => entry.id)).toContain(session.id)
   })
 
   // spec-00003-AC-8.6

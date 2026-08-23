@@ -97,7 +97,7 @@ async function push() {
 /** What `GET /api/sessions` answers with; a test moves the server by moving this. */
 let served: SessionListing[] = []
 
-function serve(sessions: SessionListing[] = []) {
+function serve(sessions: SessionListing[] = [], maxSessions = 3) {
   served = sessions
   vi.spyOn(api, 'graph').mockImplementation(async () => structuredClone(GRAPH))
   vi.spyOn(api, 'sessions').mockImplementation(async () => served)
@@ -111,7 +111,7 @@ function serve(sessions: SessionListing[] = []) {
     agents: [{ name: 'claude', command: 'claude', args: [] }],
     entry: [],
     carries: {},
-    maxSessions: 3,
+    maxSessions,
     clarifiable: ['prd'],
     auditable: ['spec', 'rule', 'design'],
   })
@@ -273,6 +273,15 @@ describe('the top-bar session entry', () => {
     await openBoard()
 
     expect(screen.getByRole('button', { name: 'Open the session panel' }).textContent).toContain('2/3')
+  })
+
+  // spec-00003-AC-3.8 — a cap of one degenerates to single-session, panel and badge unchanged
+  it('keeps the panel entry and badge working at a cap of one', async () => {
+    serve([listing({ awaiting: true })], 1)
+    await openBoard()
+
+    expect(screen.getByRole('button', { name: 'Open the session panel' }).textContent).toContain('1/1')
+    expect(screen.getByLabelText('1 awaiting input')).toBeTruthy()
   })
 
   // spec-00003-AC-6.1 — the badge appears with the count of sessions waiting
