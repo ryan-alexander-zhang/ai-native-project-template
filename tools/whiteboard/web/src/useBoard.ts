@@ -7,6 +7,7 @@ import { ApiError, type CoverageRow, type SessionInfo, type SessionListing, api 
 import { connectEvents } from './eventSocket.ts'
 import { prefillFrontMatter } from './frontMatter.ts'
 import { type Placed, layoutGraph } from './layout.ts'
+import { useDesktopNotifications } from './notify.ts'
 
 const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} }
 
@@ -50,8 +51,13 @@ function refusalText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Board state: what is on the canvas, what is selected, and which panels are open. */
-export function useBoard() {
+/**
+ * Board state: what is on the canvas, what is selected, and which panels are
+ * open. `openSession` is what a clicked desktop notification does — the session
+ * panel row's own act, which the board owns because half of it is the canvas
+ * moving (spec-00004-FR-5).
+ */
+export function useBoard(openSession: (session: SessionListing) => void) {
   const [graph, setGraph] = useState<DocGraph>(EMPTY_GRAPH)
   const [placed, setPlaced] = useState<Placed[]>([])
   const [kinds, setKinds] = useState<Record<string, DocKind>>({})
@@ -105,15 +111,16 @@ export function useBoard() {
   // docs-change channel down and dial it again (design-00002 §10).
   const viewing = useRef(false)
   /**
-   * The status each session was last seen in. The refresh signal is the only
-   * channel a session's end reaches the board through (design-00001 §5), so an
-   * ending is a difference between two readings of the listing rather than an
-   * event of its own — which is what the notifications are derived from
-   * (spec-00003-FR-7). `undefined` is «nothing read yet»: the first reading is
-   * the baseline and announces nothing, or a board opened after a session ended
+   * How each session was last seen: the status it was in, and whether it was
+   * waiting. The refresh signal is the only channel either reaches the board
+   * through (design-00001 §5), so both are differences between two readings of
+   * the listing rather than events of their own — which is what the toasts
+   * (spec-00003-FR-7) and the desktop notifications (spec-00004-FR-2, FR-3) are
+   * derived from. `undefined` is «nothing read yet»: the first reading is the
+   * baseline and announces nothing, or a board opened after a session ended
    * would report it as news.
    */
-  const seen = useRef<Map<string, string> | undefined>(undefined)
+  const seen = useRef<Map<string, { status: string; awaiting: boolean }> | undefined>(undefined)
   /**
    * The session on show, readable from `refresh` without making the callback
    * depend on it — the same reason `viewing` is a ref: a `refresh` rebuilt on
@@ -121,21 +128,41 @@ export function useBoard() {
    */
   const shownRef = useRef<string | undefined>(undefined)
 
+  // The desktop side of the same two events (spec-00004): it is fed from the
+  // diff below and posts nothing while the user is looking at the board.
+  const notifications = useDesktopNotifications(sessions, openSession)
+
   /**
    * One toast per session that has just reached an end state, stacked and never
    * folded together (spec-00003-FR-7). A session that appears already ended was
    * never running here — a start that failed on the spawn (spec-00001-FR-16) —
    * and is announced the same way (spec-00003-AC-7.4).
+   *
+   * The same diff carries the waiting turns (design-00002 §13): «not waiting →
+   * waiting» is one round of waiting, and it is what a desktop notification is
+   * owed for, at most one per round (spec-00004-FR-2). Waiting being lifted is
+   * the user's own doing and says nothing (spec-00004-AC-2.2).
    */
-  const announce = useCallback((listing: SessionListing[]) => {
-    const before = seen.current
-    seen.current = new Map(listing.map((session) => [session.id, session.status]))
-    if (before === undefined) return
-    for (const session of listing) {
-      if (!ended(session) || before.get(session.id) === session.status) continue
-      toast.message(`${session.kind} · ${session.sourceId}`, { description: session.status })
-    }
-  }, [])
+  const announce = useCallback(
+    (listing: SessionListing[]) => {
+      const before = seen.current
+      seen.current = new Map(
+        listing.map((session) => [session.id, { status: session.status, awaiting: session.awaiting === true }]),
+      )
+      if (before === undefined) return
+      for (const session of listing) {
+        const was = before.get(session.id)
+        if (ended(session) && was?.status !== session.status) {
+          toast.message(`${session.kind} · ${session.sourceId}`, { description: session.status })
+          notifications.ended(session)
+        }
+        if (!ended(session) && session.awaiting === true && was?.awaiting !== true) {
+          notifications.waiting(session)
+        }
+      }
+    },
+    [notifications.ended, notifications.waiting],
+  )
 
   /** The coverage payload, re-read (spec-00002-AC-10.4). A failure is the toast every read gets. */
   const readCoverage = useCallback(async () => {
@@ -438,6 +465,10 @@ export function useBoard() {
     running: runningOf(sessions),
     awaitingCount: sessions.filter((one) => !ended(one) && one.awaiting === true).length,
     maxSessions,
+    // The desktop notification switch: the three-state reading it shows, and the
+    // click that is the one place a permission is asked for (spec-00004-FR-1).
+    notifyState: notifications.state,
+    toggleNotify: notifications.toggle,
     coverageOpen,
     coverage,
     showCoverage,

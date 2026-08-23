@@ -48,6 +48,7 @@ import { Editor } from './Editor.tsx'
 import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
 import { NodeCard } from './NodeCard.tsx'
+import { NotifySwitch } from './NotifySwitch.tsx'
 import { SessionHistory } from './SessionHistory.tsx'
 import { SessionPanel } from './SessionPanel.tsx'
 import { AcceptanceRowNode, CriterionNode, ItemNode } from './SubNodes.tsx'
@@ -106,7 +107,10 @@ function minZoomFor(sub: { nodes: FlowNode[] }, width: number, height: number): 
 }
 
 function Canvas() {
-  const board = useBoard()
+  // A clicked desktop notification lands exactly where the session panel's row
+  // lands (spec-00004-FR-5): `goToSession` below is that one act, held here
+  // because half of it is the canvas moving.
+  const board = useBoard(goToSession)
   const theme = useTheme()
   const { fitView, setCenter } = useReactFlow()
   const [searching, setSearching] = useState(false)
@@ -281,6 +285,21 @@ function Canvas() {
   }
 
   /**
+   * Go to a session: the terminal comes up on it, and the board goes to its
+   * document (spec-00003-FR-4). One act with two callers — the session panel's
+   * row and a clicked desktop notification (spec-00004-FR-5). `focus` is the
+   * same path the palette and the three lists take, and it is what makes the
+   * second half give way on its own: a session whose document has left the
+   * board refuses in place with its own toast, the terminal shows it all the
+   * same, and the selection and the viewport stay exactly where they were
+   * (spec-00003-AC-4.4, spec-00004-AC-5.3).
+   */
+  function goToSession(session: SessionListing) {
+    board.showSession(session.id)
+    focus(session.sourceId)
+  }
+
+  /**
    * Selecting on the top-level canvas. The panel it may open takes the right
    * third, so the same wait applies: a click that changes the canvas width ends
    * with the node back in the middle of what is left (issue-00006).
@@ -430,6 +449,10 @@ function Canvas() {
               </button>
             </Badge>
           )}
+          {/* Being called back when the board is not in front of the user is a
+              choice made once and remembered, so its switch is resident next to
+              the theme (spec-00004-FR-1, design-00002 §3). */}
+          <NotifySwitch state={board.notifyState} onToggle={board.toggleNotify} />
           <ThemeMenu theme={theme.theme} onChoose={theme.choose} />
         </div>
       </header>
@@ -615,14 +638,9 @@ function Canvas() {
           focus(docId)
         }}
       />
-      {/*
-        Picking a session is two acts at once (spec-00003-FR-4): the terminal
-        comes up on it, and the board goes to its document. `focus` is the same
-        path the palette and the three lists take, and it is what makes the
-        second act give way on its own — a session whose document has left the
-        board refuses in place with its own toast, and the selection and the
-        viewport stay exactly where they were (spec-00003-AC-4.4).
-      */}
+      {/* Picking a session closes the panel and goes to it — `goToSession` is the
+          whole act, and the same one a desktop notification's click performs
+          (spec-00003-FR-4, spec-00004-FR-5). */}
       <SessionPanel
         open={sessionsOpen}
         onOpenChange={setSessionsOpen}
@@ -630,8 +648,7 @@ function Canvas() {
         showAgent={board.agents.length > 1}
         onPick={(session) => {
           setSessionsOpen(false)
-          board.showSession(session.id)
-          focus(session.sourceId)
+          goToSession(session)
         }}
       />
       <SessionHistory open={history} onOpenChange={setHistory} />

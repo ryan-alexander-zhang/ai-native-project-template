@@ -347,6 +347,12 @@ describe('the layout', () => {
   })
 })
 
+/**
+ * What a clicked desktop notification would go to (spec-00004-FR-5). These cases
+ * drive the hook directly and never post one, so the destination is a stand-in.
+ */
+const GO_TO_SESSION = () => {}
+
 describe('the board state', () => {
   beforeEach(() => {
     vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
@@ -371,7 +377,7 @@ describe('the board state', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('loads the graph and its layout on mount', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     expect(result.current.placed).toHaveLength(2)
@@ -380,7 +386,7 @@ describe('the board state', () => {
   // The column order arrives from GET /api/config; laying out before it lands
   // would put every node in the unknown-type bucket (design-00002 §2).
   it('lays out with the column order the config declares', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.placed).toHaveLength(2))
 
     const idea = result.current.placed.find((item) => item.id === 'idea-00001-x')!
@@ -393,7 +399,7 @@ describe('the board state', () => {
   // must not cost the user the board (verifier finding on plan-00003).
   it('still draws the graph when the config cannot be read', async () => {
     vi.spyOn(api, 'config').mockRejectedValue(new Error('config: no flow config at whiteboard.config.yaml'))
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.placed).toHaveLength(2))
     expect(toast.error).toHaveBeenCalledWith('config: no flow config at whiteboard.config.yaml')
@@ -401,7 +407,7 @@ describe('the board state', () => {
 
   // spec-00001-AC-1.12
   it('puts every node back where it was after a refresh', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.placed).toHaveLength(2))
     const before = result.current.placed
 
@@ -411,7 +417,7 @@ describe('the board state', () => {
   })
 
   it('selects a node and loads what it may do', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     await act(() => result.current.select('prd-00001-x'))
@@ -423,7 +429,7 @@ describe('the board state', () => {
 
   // spec-00001-AC-3.2
   it('drops the selection on deselect', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await act(() => result.current.select('prd-00001-x'))
 
     act(() => result.current.deselect())
@@ -432,7 +438,7 @@ describe('the board state', () => {
   })
 
   it('keeps the editor and the terminal as independent switches', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     act(() => result.current.edit('prd-00001-x'))
@@ -443,7 +449,7 @@ describe('the board state', () => {
   })
 
   it('refreshes the graph after an action', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     const action = vi.fn().mockResolvedValue(undefined)
 
@@ -455,7 +461,7 @@ describe('the board state', () => {
 
   // spec-00001-AC-7.1 as the user sees it — the refusal reaches the user as a toast
   it('reports a refusal instead of throwing', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     await act(() => result.current.run(() => Promise.reject(new Error('not a legal transition'))))
@@ -469,7 +475,7 @@ describe('the board state', () => {
    * the user has to work through — before naming them.
    */
   it('reports a resolved-gate refusal as a count of unverified items and their ids', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     const refusal = new ApiError(422, 'plan-00001-x has unverified items', [
       'spec-00001-FR-1',
@@ -483,7 +489,7 @@ describe('the board state', () => {
 
   // A plan can deliver dozens of items; the list is cut and the count is not.
   it('keeps the count when the gap list is too long to name in full', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     const gaps = Array.from({ length: 8 }, (_, index) => `spec-00001-FR-${index + 1}`)
 
@@ -498,7 +504,7 @@ describe('the board state', () => {
 
   // A 422 that is not the gate's names no gaps, and reads as it always did.
   it('reports a refusal that names no gaps as its own message', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     await act(() =>
@@ -509,7 +515,7 @@ describe('the board state', () => {
   })
 
   it('reports a non-error refusal as text', async () => {
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await act(() => result.current.run(() => Promise.reject('nope')))
     expect(toast.error).toHaveBeenCalledWith('nope')
   })
@@ -529,7 +535,7 @@ describe('the board state', () => {
       clarifiable: ['prd'],
       auditable: ['spec', 'rule', 'design'],
     })
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.clarifiable).toEqual(['prd']))
   })
@@ -538,7 +544,7 @@ describe('the board state', () => {
   it('keeps the session it has when a second start is refused', async () => {
     vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     vi.spyOn(api, 'ask').mockRejectedValue(new Error('an agent session is already running'))
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.id).toBe('s1'))
 
     await act(() => result.current.startSession(() => api.ask('idea-00001-x')))
@@ -557,7 +563,7 @@ describe('the board state', () => {
       listing({ id: 's2', sourceId: 'idea-00001-x' }),
       listing({ id: 's3', sourceId: 'spec-00001-x', status: 'exited' }),
     ])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.running).toHaveLength(2))
     expect(result.current.maxSessions).toBe(3)
@@ -573,7 +579,7 @@ describe('the board state', () => {
       // Ended and quiet is not waiting on anybody (spec-00003-AC-6.4).
       listing({ id: 's4', sourceId: 'rule-00001-x', status: 'exited', awaiting: true }),
     ])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.awaitingCount).toBe(2))
   })
@@ -593,7 +599,7 @@ describe('the board state', () => {
       held = [started]
       return started
     })
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await act(() => result.current.advance('idea-00001-x', 'prd'))
 
@@ -603,7 +609,7 @@ describe('the board state', () => {
 
   it('keeps the terminal closed when the advance is refused', async () => {
     vi.spyOn(api, 'advance').mockRejectedValue(new Error('an agent session is already running'))
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await act(() => result.current.advance('idea-00001-x', 'prd'))
 
@@ -622,7 +628,7 @@ describe('the board state', () => {
       listing({ id: 's2', sourceId: 'idea-00001-x' }),
       listing({ id: 's3', sourceId: 'spec-00001-x' }),
     ])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.terminalOpen).toBe(true))
     expect(result.current.shownSession?.id).toBe('s3')
@@ -635,7 +641,7 @@ describe('the board state', () => {
       listing({ id: 's1', status: 'exited' }),
       listing({ id: 's2', sourceId: 'idea-00001-x', status: 'terminated' }),
     ])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.shownSession?.id).toBe('s2'))
     expect(result.current.terminalOpen).toBe(false)
@@ -651,7 +657,7 @@ describe('the board state', () => {
       listing({ id: 's1' }),
       listing({ id: 's2', sourceId: 'idea-00001-x' }),
     ])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.id).toBe('s2'))
 
     act(() => result.current.showSession('s1'))
@@ -666,7 +672,7 @@ describe('the board state', () => {
       listing({ id: 's1' }),
       listing({ id: 's2', sourceId: 'idea-00001-x' }),
     ])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.id).toBe('s2'))
     act(() => result.current.showSession('s1'))
 
@@ -683,7 +689,7 @@ describe('the board state', () => {
   it('closes the terminal view when the session on show is gone', async () => {
     let held = [listing()]
     vi.spyOn(api, 'sessions').mockImplementation(async () => held)
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.terminalOpen).toBe(true))
 
     held = []
@@ -705,7 +711,7 @@ describe('the board state', () => {
       held = [listing({ status: 'terminated' })]
       return held[0]!
     })
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.status).toBe('running'))
 
     await act(() => result.current.stopSession())
@@ -722,7 +728,7 @@ describe('the board state', () => {
   it('stops nothing when no session is on show', async () => {
     vi.spyOn(api, 'sessions').mockResolvedValue([])
     const stop = vi.spyOn(api, 'stopSession')
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     await act(() => result.current.stopSession())
@@ -734,7 +740,7 @@ describe('the board state', () => {
   it('keeps the session it has when the stop is refused', async () => {
     vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     vi.spyOn(api, 'stopSession').mockRejectedValue(new Error('there is no running agent session to stop'))
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.status).toBe('running'))
 
     await act(() => result.current.stopSession())
@@ -745,7 +751,7 @@ describe('the board state', () => {
 
   it('leaves the terminal closed when the last session already exited', async () => {
     vi.spyOn(api, 'sessions').mockResolvedValue([listing({ status: 'exited' })])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     expect(result.current.terminalOpen).toBe(false)
@@ -760,7 +766,7 @@ describe('the board state', () => {
     const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
     let held = [listing({ id: 's1' }), listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' })]
     vi.spyOn(api, 'sessions').mockImplementation(async () => held)
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.running).toHaveLength(2))
     expect(message).not.toHaveBeenCalled()
 
@@ -784,7 +790,7 @@ describe('the board state', () => {
     const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
     let held = [listing()]
     vi.spyOn(api, 'sessions').mockImplementation(async () => held)
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.running).toHaveLength(1))
 
     held = [listing({ status: 'exited' })]
@@ -806,7 +812,7 @@ describe('the board state', () => {
       held = [listing({ status: 'terminated' })]
       return held[0]!
     })
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.status).toBe('running'))
 
     await act(() => result.current.stopSession())
@@ -828,7 +834,7 @@ describe('the board state', () => {
       held = [failed]
       return failed
     })
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
 
     await act(() => result.current.startSession(() => api.clarify('prd-00001-x')))
@@ -846,7 +852,7 @@ describe('the board state', () => {
   it('announces nothing for a session that had already ended before it looked', async () => {
     const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
     vi.spyOn(api, 'sessions').mockResolvedValue([listing({ status: 'exited' })])
-    const { result } = renderHook(() => useBoard())
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
 
     await waitFor(() => expect(result.current.sessions).toHaveLength(1))
     expect(message).not.toHaveBeenCalled()
