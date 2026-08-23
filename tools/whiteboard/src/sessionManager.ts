@@ -223,6 +223,8 @@ export class SessionManager {
   /** Insertion order is start order, which is what «the newest session» reads off. */
   private readonly sessions = new Map<string, Session>()
   private counter = 0
+  /** The one shutdown, once it has begun: a second call joins it (spec-00003-AC-9.3). */
+  private shuttingDown?: Promise<void>
 
   constructor(options: SessionManagerOptions) {
     this.options = options
@@ -469,6 +471,36 @@ export class SessionManager {
     session.pty?.kill()
     await session.ended
     return session.info
+  }
+
+  /**
+   * The server is going down normally, so every running session gets the wrap-up
+   * a stop would have given it — process ended, history written, commit through
+   * the one serial queue — and only then may the process go (spec-00003-FR-9,
+   * design-00001 §5). Bounded by the same signal escalation a stop is bounded by
+   * (issue-00012), which is what makes waiting for all of them safe.
+   *
+   * Settled rather than all: one session whose wrap-up throws must not leave the
+   * others' commits unwaited for. Each is awaited to its exit hook and not
+   * merely to its exit, because the commit is the whole point of waiting.
+   *
+   * Nothing here is persisted, and nothing is meant to be: the registry is
+   * memory, so the next boot lists no sessions and the transcripts are looked up
+   * in the session history instead (spec-00003-AC-9.3, spec-00001-FR-54). A
+   * crash promises none of this.
+   */
+  shutdown(): Promise<void> {
+    // Memoised, so a second signal arriving mid-shutdown joins the one running
+    // instead of wrapping anything up twice, and a call after it has finished is
+    // the no-op it should be.
+    this.shuttingDown ??= Promise.allSettled(
+      this.running().map(async (session) => {
+        const { id } = session.info
+        await this.terminate(id)
+        await this.whenFinished(id)
+      }),
+    ).then(() => {})
+    return this.shuttingDown
   }
 
   /**

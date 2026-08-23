@@ -324,6 +324,17 @@ export class Board {
     server.on('close', () => void this.watcher.close())
     return server
   }
+
+  /**
+   * A normal shutdown, as the entry point runs it on SIGINT/SIGTERM: every
+   * running session is wrapped up the way a stop wraps one up — history written
+   * and commit made — and only then is the process let go (spec-00003-FR-9,
+   * spec-00003-AC-9.3). Idempotent, so a second signal joins the shutdown
+   * already running.
+   */
+  async shutdown(): Promise<void> {
+    await this.sessions.shutdown()
+  }
 }
 
 /** A clarify, ask or audit request names the one document it is about. */

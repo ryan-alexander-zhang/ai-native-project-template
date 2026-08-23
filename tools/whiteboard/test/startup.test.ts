@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -130,6 +130,28 @@ agents:
     expect(result.stderr).toContain(`cannot listen on port ${port}`)
     expect(result.stdout).not.toContain('http://localhost')
   })
+
+  /**
+   * spec-00003-AC-9.3 at the entry point, and no further: a normal signal is
+   * handled rather than killing the board where it stands, so there is a
+   * shutdown to run at all — the exit is the board's own, code 0 and no signal.
+   * What the shutdown then does per session is the Board's, proved at that level
+   * in server.test.ts; nothing is running here to wrap up.
+   */
+  it('handles SIGTERM itself instead of being killed by it', async () => {
+    const { repoRoot } = makeRepo({})
+    writeFileSync(join(repoRoot, 'whiteboard.config.yaml'), MINIMAL_CONFIG)
+    const child = spawn(process.execPath, [ENTRY], { cwd: repoRoot, env: { ...process.env, PORT: '0' } })
+
+    // Only once it is listening: a signal before that has no server to close.
+    await new Promise((resolve) => child.stdout.once('data', resolve))
+    child.kill('SIGTERM')
+
+    const ended = await new Promise<[number | null, string | null]>((resolve) => {
+      child.on('exit', (code, signal) => resolve([code, signal]))
+    })
+    expect(ended).toEqual([0, null])
+  }, 20_000)
 
   it('starts and reports its address on a valid config', () => {
     const { repoRoot } = makeRepo({})

@@ -776,6 +776,31 @@ describe('attach', () => {
   })
 
   /**
+   * spec-00003-AC-9.3 — a shutdown wraps up every running session, and one whose
+   * wrap-up throws must not cost the others theirs: they are settled, not raced
+   * (spec-00003-FR-9). The failing hook is the first to run, so what is checked
+   * is that the shutdown carried on past it.
+   */
+  it('wraps up every session on a shutdown even when one wrap-up throws', async () => {
+    let calls = 0
+    const onExit = vi.fn(async () => {
+      calls += 1
+      if (calls === 1) throw new Error('the commit failed')
+      return OUTCOME
+    })
+    const { manager } = makeManager({ args: HOLD }, onExit)
+    const first = manager.start(planFor('ask', 'spec-00001-a'))
+    const second = manager.start(planFor('ask', 'record-00001-b'))
+
+    await manager.shutdown()
+
+    expect(manager.list().map((session) => session.status)).toEqual(['terminated', 'terminated'])
+    expect(onExit).toHaveBeenCalledTimes(2)
+    expect(manager.list().find((session) => session.id === first.id)!.outcome).toBeUndefined()
+    expect(manager.list().find((session) => session.id === second.id)!.outcome).toEqual(OUTCOME)
+  })
+
+  /**
    * A size frame is not an instruction to anyone: one that lands with nothing
    * running — the window between a session ending and a terminal noticing — has
    * nothing to resize, and saying so as an error would only break the reconnect.

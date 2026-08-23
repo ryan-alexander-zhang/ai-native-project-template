@@ -124,9 +124,15 @@ function scriptedAgents() {
   const spawn: SpawnPty = () => {
     const listeners: Array<(event: { exitCode: number }) => void> = []
     const readers: Array<(data: string) => void> = []
-    exits.push((exitCode) => {
+    // Once, like a process: whichever ends it — the script or a signal — the
+    // second attempt is nothing, so no wrap-up can be run twice.
+    let gone = false
+    const end = (exitCode: number) => {
+      if (gone) return
+      gone = true
       for (const listener of listeners) listener({ exitCode })
-    })
+    }
+    exits.push(end)
     says.push((data) => {
       for (const reader of readers) reader(data)
     })
@@ -135,7 +141,9 @@ function scriptedAgents() {
       onExit: (listener) => void listeners.push(listener),
       write: () => {},
       resize: () => {},
-      kill: () => {},
+      // A stand-in that hears the polite signal: what a stop and a shutdown wait
+      // on is this exit (spec-00003-FR-9, issue-00012).
+      kill: () => end(0),
     }
   }
   return {
@@ -1903,6 +1911,72 @@ describe('several commits at once', () => {
     expect(commitCount(repoRoot)).toBeLessThanOrEqual(commits + 2)
     expect(commitFiles(repoRoot, 0)).toContain('docs/idea/a.md')
     expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
+  })
+})
+
+/**
+ * spec-00003-FR-9's shutdown half: a normal shutdown is a terminate on every
+ * running session — process ended, history written, commit made through the one
+ * serial queue — and nothing of the registry outlives the process, so the next
+ * boot's panel starts empty (design-00001 §5 关停收尾).
+ */
+describe('shutting the board down', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+
+  /** A board whose two sessions are running and have each written something. */
+  async function twoSessionsThatWrote() {
+    const agents = scriptedAgents()
+    const open = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, undefined, undefined, agents.spawn)
+    const first = (await open.call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })).body.id
+    const second = (await open.call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })).body.id
+    appendFileSync(join(open.docsDir, 'spec/b.md'), '\nasked and answered\n')
+    appendFileSync(join(open.docsDir, 'record/r.md'), '\none more line of evidence\n')
+    return { ...open, sessions: [first, second] as [string, string] }
+  }
+
+  // spec-00003-AC-9.3
+  it('wraps up every running session, and the next boot lists none of them', async () => {
+    const open = await twoSessionsThatWrote()
+    const commits = commitCount(open.repoRoot)
+
+    await open.board.shutdown()
+
+    // Each ended the way a stop ends one, and each wrap-up is in: nothing under
+    // docs/ is left dirty and both writes are in the tree. Which of the two
+    // commits carries which line is FR-8's end-order boundary (AC-8.6), so what
+    // is pinned here is only that nothing was lost and nothing piled up.
+    expect(open.board.sessions.list().map((session) => session.status)).toEqual(['terminated', 'terminated'])
+    expect(git(open.repoRoot, 'status', '--porcelain', '--', 'docs').trim()).toBe('')
+    expect(commitCount(open.repoRoot)).toBeGreaterThan(commits)
+    expect(commitCount(open.repoRoot)).toBeLessThanOrEqual(commits + 2)
+    expect(git(open.repoRoot, 'show', 'HEAD:docs/spec/b.md')).toContain('asked and answered')
+    expect(git(open.repoRoot, 'show', 'HEAD:docs/record/r.md')).toContain('one more line of evidence')
+
+    // A restart is a restart: the registry was memory, so the panel starts empty
+    // — and both transcripts are where they are kept (spec-00001-FR-54).
+    const rebooted = boardOnRepo(open.repoRoot, open.docsDir)
+    expect((await rebooted.call('GET', '/api/sessions')).body.sessions).toEqual([])
+    const history = (await rebooted.call('GET', '/api/sessions/history')).body
+    expect(history.map((entry: { id: string }) => entry.id).sort()).toEqual([...open.sessions].sort())
+    expect(history.every((entry: { status: string }) => entry.status === 'terminated')).toBe(true)
+    expect((await rebooted.call('GET', `/api/sessions/history/${open.sessions[0]}`)).body.transcript).toContain(
+      'session ended with code',
+    )
+  })
+
+  // spec-00003-AC-9.3 — one shutdown however many signals ask for it: a second
+  // one must not put a second commit on wrap-ups that are already done.
+  it('does nothing on a second shutdown', async () => {
+    const open = await twoSessionsThatWrote()
+    await open.board.shutdown()
+    const commits = commitCount(open.repoRoot)
+    const settled = open.board.sessions.list()
+
+    await open.board.shutdown()
+
+    expect(commitCount(open.repoRoot)).toBe(commits)
+    expect(open.board.sessions.list()).toEqual(settled)
   })
 })
 
