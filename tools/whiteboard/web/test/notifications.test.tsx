@@ -435,9 +435,14 @@ describe('being called back to a session that is waiting', () => {
     await push()
     expect(Notice.made).toHaveLength(1)
 
-    // Answered: the agent prints again and the mark comes down.
+    // Answered: the user came back to the board to answer — the only way a new
+    // turn can come about at all, since input reaches a session through this
+    // page's terminal and nowhere else (issue-00020) — the agent prints again so
+    // the mark comes down, and the user goes away once more.
+    await comeBack()
     served = [listing({ awaiting: false })]
     await push()
+    await leave()
     expect(Notice.made).toHaveLength(1)
 
     // Silent again — a second round, and a second notice.
@@ -480,6 +485,53 @@ describe('being called back to a session that is waiting', () => {
   })
 
   /**
+   * issue-00020 — the server's waiting mark is not a wait: any output at all takes
+   * it down and ten seconds of silence puts it back (spec-00003-FR-6), and a CLI
+   * sitting at an idle prompt redraws its status line long after it stopped
+   * answering. One wait therefore reaches the page as turn after turn. A real new
+   * turn needs the user's own input and input only reaches a session through this
+   * page's terminal, so while the user has not come back it is the same wait and
+   * is owed nothing more.
+   */
+  it('posts one notice however often the waiting mark flickers while the user stays away', async () => {
+    enabled()
+    serve()
+    await openBoard()
+    await leave()
+
+    served = [listing({ awaiting: true })]
+    await push()
+    expect(Notice.made).toHaveLength(1)
+
+    // A cosmetic redraw at the idle prompt takes the mark down; ten seconds of
+    // silence later it is back up. Nobody has answered anything.
+    served = [listing({ awaiting: false })]
+    await push()
+    served = [listing({ awaiting: true })]
+    await push()
+
+    expect(Notice.made).toHaveLength(1)
+  })
+
+  /**
+   * issue-00020 — the browser reports blur and visibility oftener than the page
+   * changes state. A reading that says what the last one said is not a new
+   * departure, and the catch-up is not owed a second run for it.
+   */
+  it('says nothing again when a blur arrives on a page that was already away', async () => {
+    enabled()
+    serve([listing({ awaiting: true })])
+    await openBoard()
+
+    await leave()
+    expect(Notice.made).toHaveLength(1)
+
+    await leave()
+
+    expect(Notice.made).toHaveLength(1)
+  })
+
+  /**
    * spec-00004-AC-2.4 — two sessions start waiting one after the other, and each
    * gets its own notification (their tags each name their own session).
    */
@@ -518,6 +570,12 @@ describe('being called back to a session that is waiting', () => {
     served = [listing({ awaiting: true })]
     await push()
     expect(Notice.made).toHaveLength(1)
+
+    // The user came back to answer and went away again, which is what makes the
+    // turn below a wait of its own rather than the same one printing
+    // (issue-00020).
+    await comeBack()
+    await leave()
 
     // The answered reading, held back on the graph half of the same refresh.
     let release: (() => void) | undefined
@@ -891,8 +949,12 @@ describe('what a notification carries', () => {
 
     served = [listing({ awaiting: true })]
     await push()
+    // Answered from in front of the board, and away again: the second round is a
+    // wait of its own only because the user came back for it (issue-00020).
+    await comeBack()
     served = [listing({ awaiting: false })]
     await push()
+    await leave()
     served = [listing({ awaiting: true })]
     await push()
     expect(Notice.made).toHaveLength(2)

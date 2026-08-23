@@ -77,14 +77,25 @@ export function useDesktopNotifications(sessions: SessionListing[], open: (sessi
   const listing = useRef(sessions)
   const opener = useRef(open)
   /**
-   * The waiting round each session is in: its own count of «not waiting →
-   * waiting» turns, page-local (design-00002 §13). It is the key both the
-   * catch-up and the dedup are decided on, which is what makes «one notice per
-   * round of waiting» answerable (spec-00004-AC-2.3).
+   * The sessions whose waiting notice has gone out and is still the last word.
+   * The unit «one notice per wait» is counted in is the **away stint** — the span
+   * between going away and coming back — and not the server's waiting mark: that
+   * mark comes down on any output at all and goes back up after ten seconds of
+   * silence (spec-00003-FR-6), and a CLI at an idle prompt still prints (it emits
+   * its own «waiting for your input» sequence about a minute in), so one wait
+   * reaches the page as turn after turn (issue-00020). A real new turn cannot
+   * happen without the user's input, and input only reaches a session through
+   * this page's terminal — so nothing said while the user has not come back is
+   * new (spec-00004-AC-2.3).
    */
-  const round = useRef(new Map<string, number>())
-  /** The round each session's waiting notice has already gone out for. */
-  const sent = useRef(new Map<string, number>())
+  const notified = useRef(new Set<string>())
+  /**
+   * Of those, the sessions the user has been in front of the board for since. It
+   * is what lets the next turn count as a wait of its own — and it is only spent
+   * on a turn, never on going away again, since going away twice within one wait
+   * is owed nothing (spec-00004-AC-2.3, AC-2.5).
+   */
+  const returned = useRef(new Set<string>())
   /**
    * The notification each session has standing, so the next one of that session
    * can take its place. «同一会话同刻至多一条» is the page's own to keep: a tag
@@ -155,24 +166,29 @@ export function useDesktopNotifications(sessions: SessionListing[], open: (sessi
   }, [])
 
   /**
-   * The waiting notice of one session, at most one per round. A session already
-   * waiting when the board first read the listing is in round one: no turn was
-   * there to be seen, and the catch-up still owes it a notice.
+   * The waiting notice of one session, at most one per away stint — whether it
+   * comes from a turn or from the catch-up on going away, which is why a session
+   * already waiting when the board first read the listing is served here too.
    */
   const postWaiting = useCallback(
     (session: SessionListing) => {
-      const current = round.current.get(session.id) ?? 1
-      round.current.set(session.id, current)
-      if (sent.current.get(session.id) === current) return
-      if (post(session, 'awaiting')) sent.current.set(session.id, current)
+      if (notified.current.has(session.id)) return
+      if (post(session, 'awaiting')) {
+        notified.current.add(session.id)
+        returned.current.delete(session.id)
+      }
     },
     [post],
   )
 
-  /** A session has just turned to waiting: a new round, and a notice for it. */
+  /**
+   * A session has just turned to waiting. It is a wait of its own only if the
+   * user has been back since the last notice — otherwise it is the same wait,
+   * printing at its idle prompt (issue-00020).
+   */
   const waiting = useCallback(
     (session: SessionListing) => {
-      round.current.set(session.id, (round.current.get(session.id) ?? 0) + 1)
+      if (returned.current.delete(session.id)) notified.current.delete(session.id)
       postWaiting(session)
     },
     [postWaiting],
@@ -188,7 +204,9 @@ export function useDesktopNotifications(sessions: SessionListing[], open: (sessi
 
   // Going away is an event of its own: what was already waiting when the user
   // left would otherwise never be said, which is the very thing being missed
-  // (spec-00004-FR-2, decision-00010 §2). The permission is re-read here too —
+  // (spec-00004-FR-2, decision-00010 §2). Coming back is one too — it is where a
+  // stint ends and the next notice of a session becomes owed again
+  // (issue-00020). The permission is re-read here too —
   // it can be taken back while the page is not being looked at, and the switch
   // then shows «inactive» on the way back with nothing else happening
   // (spec-00004-FR-4, AC-4.3).
@@ -198,7 +216,15 @@ export function useDesktopNotifications(sessions: SessionListing[], open: (sessi
       const now = isAway()
       const was = away.current
       away.current = now
-      if (!now || was) return
+      if (now === was) return
+      // Back in front of the board: what was said has been seen, and the next
+      // turn of each of those sessions is a wait of its own — it cannot come
+      // without the user's input, and input only reaches a session through this
+      // page's terminal (issue-00020).
+      if (!now) {
+        for (const id of notified.current) returned.current.add(id)
+        return
+      }
       for (const session of listing.current) {
         if (session.status === 'running' && session.awaiting === true) postWaiting(session)
       }
