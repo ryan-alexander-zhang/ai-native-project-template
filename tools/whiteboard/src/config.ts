@@ -35,6 +35,8 @@ export interface FlowConfig {
    * is why the distinction is the presence of the key.
    */
   carries: Record<string, string[]>
+  /** How many agent sessions may run at once (spec-00003-FR-3); a missing key reads as {@link DEFAULT_MAX_SESSIONS}. */
+  maxSessions: number
   agents: AgentConfig[]
 }
 
@@ -47,6 +49,9 @@ export class ConfigError extends Error {
 }
 
 const KINDS: readonly string[] = ['living', 'work']
+
+/** The session cap a config that declares no `max_sessions` runs with (spec-00003-AC-3.5). */
+export const DEFAULT_MAX_SESSIONS = 3
 
 function asRecord(value: unknown, field: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -189,6 +194,20 @@ function readCarries(raw: unknown, types: Record<string, DocKind>, relations: st
   return carries
 }
 
+/**
+ * The session cap of spec-00003-FR-3: how many agent sessions may run at once.
+ * A missing key is a legal reading — the board starts on the default
+ * (spec-00003-AC-3.5) — and anything that is not a positive integer refuses to
+ * start, naming the key (spec-00003-AC-3.4).
+ */
+function readMaxSessions(raw: unknown): number {
+  if (raw === undefined || raw === null) return DEFAULT_MAX_SESSIONS
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+    throw new ConfigError(`config: \`max_sessions\` must be a positive integer, got ${JSON.stringify(raw)}`)
+  }
+  return raw
+}
+
 function readAgentCwd(value: unknown, at: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || (value !== 'docs' && !value.startsWith('docs/')) || value.includes('..')) {
@@ -236,6 +255,7 @@ export function parseFlowConfig(text: string, source: string): FlowConfig {
     focus: readFocus(root.focus, types),
     entry: readEntry(root.entry, types),
     carries: readCarries(root.carries, types, relations),
+    maxSessions: readMaxSessions(root.max_sessions),
     agents: readAgents(root.agents),
   }
 }

@@ -300,6 +300,7 @@ describe('the board state', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: [],
       auditable: ['spec', 'rule', 'design'],
     })
@@ -463,6 +464,7 @@ describe('the board state', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: ['prd'],
       auditable: ['spec', 'rule', 'design'],
     })

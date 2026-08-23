@@ -142,6 +142,7 @@ function serve() {
     agents: [{ name: 'claude', command: 'claude', args: [] }],
     entry: [],
     carries: {},
+    maxSessions: 3,
     clarifiable: [],
     auditable: ['spec', 'rule', 'design'],
   })
@@ -501,6 +502,7 @@ describe('a session that ends with no docs change', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: ['spec'],
       auditable: ['spec', 'rule', 'design'],
     })

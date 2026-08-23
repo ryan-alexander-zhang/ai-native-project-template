@@ -53,6 +53,7 @@ function serve(payload: Partial<ConfigPayload> = {}, nodes: DocNode[] = [node()]
     agents: [CLAUDE],
     entry: [],
     carries: {},
+    maxSessions: 3,
     clarifiable: ['prd'],
     auditable: ['spec', 'rule', 'design'],
     ...payload,

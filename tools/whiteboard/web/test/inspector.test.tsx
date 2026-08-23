@@ -88,6 +88,7 @@ describe('the inspector panel', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: [],
       auditable: ['spec', 'rule', 'design'],
     })
@@ -392,6 +393,7 @@ describe('hovering an item in the panel', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: [],
       auditable: ['spec', 'rule', 'design'],
     })
@@ -595,6 +597,7 @@ describe('expanding an item row', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: [],
       auditable: ['spec', 'rule', 'design'],
     })

@@ -483,6 +483,7 @@ describe('the board', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: ['prd'],
       auditable: ['spec', 'rule', 'design'],
     })

@@ -226,6 +226,32 @@ describe('the entry types', () => {
 })
 
 /**
+ * The session cap (spec-00003-FR-3): the one number the config owns about
+ * concurrency. It is optional — a config that predates the key runs on the
+ * default — and every other reading of it stops the board at startup.
+ */
+describe('the session cap', () => {
+  it('reads a declared cap', () => {
+    expect(parse(VALID.replace('relations:', 'max_sessions: 5\nrelations:')).maxSessions).toBe(5)
+  })
+
+  // spec-00003-AC-3.4 — a non-positive-integer cap refuses to start, naming the key
+  it('rejects a cap that is not a positive integer, naming the key', () => {
+    for (const value of ['0', '-1', '2.5', '"3"', '[]']) {
+      expectConfigError(
+        VALID.replace('relations:', `max_sessions: ${value}\nrelations:`),
+        /`max_sessions` must be a positive integer/,
+      )
+    }
+  })
+
+  // spec-00003-AC-3.5 — no cap declared, and the board starts on the default 3
+  it('reads a missing cap as the default of three', () => {
+    expect(parse(VALID).maxSessions).toBe(3)
+  })
+})
+
+/**
  * The relation matrix (spec-00002-FR-5 and FR-6): the startup check of
  * spec-00001-FR-15 extended to `carries`. Missing is a legal reading — the
  * check is then off — so the whole block is opt-in, and so is each type in it.
@@ -378,6 +404,11 @@ describe('the config shipped with this repo', () => {
       'design',
       'analysis',
     ])
+  })
+
+  /** spec-00003-FR-3: the cap this repo runs on, spelled out rather than left to the default. */
+  it('declares a session cap of three', () => {
+    expect(loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname).maxSessions).toBe(3)
   })
 
   /**

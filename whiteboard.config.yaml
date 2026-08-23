@@ -35,6 +35,11 @@ types:
 # projects that do not use them should drop them from this list.
 entry: [idea, prd, design, analysis]
 
+# Session concurrency cap (spec-00003-FR-3): how many agent sessions may run at
+# once. Omit it and the board runs with the default 3; anything that is not a
+# positive integer refuses to start the board.
+max_sessions: 3
+
 relations:
   - parent
   - implements

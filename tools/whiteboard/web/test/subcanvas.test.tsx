@@ -159,6 +159,7 @@ describe('the sub-canvas', () => {
       agents: [{ name: 'claude', command: 'claude', args: [] }],
       entry: [],
       carries: {},
+      maxSessions: 3,
       clarifiable: [],
       auditable: ['spec', 'rule', 'design'],
     })
