@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
-import type { SessionInfo } from '../src/api.ts'
+import type { SessionListing } from '../src/api.ts'
 import { ApiError, api } from '../src/api.ts'
 import { Editor } from '../src/Editor.tsx'
 import { Terminal } from '../src/Terminal.tsx'
@@ -48,7 +48,14 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 const CONTENT = '---\nid: prd-00001-x\ntype: prd\nstatus: draft\n---\n\n# X\n'
-const RUNNING: SessionInfo = { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' }
+const RUNNING: SessionListing = {
+  id: 's1',
+  kind: 'clarify',
+  agent: 'claude',
+  sourceId: 'prd-00001-x',
+  status: 'running',
+  startedAt: '2026-01-01T00:00:00.000Z',
+}
 
 afterEach(() => {
   cleanup()

@@ -43,7 +43,7 @@ function serve(payload: Partial<ConfigPayload> = {}, nodes: DocNode[] = [node()]
   vi.spyOn(api, 'graph').mockResolvedValue(graph)
   vi.spyOn(api, 'transitions').mockResolvedValue(['active'])
   vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
-  vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+  vi.spyOn(api, 'sessions').mockResolvedValue([])
   vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
   vi.spyOn(api, 'config').mockResolvedValue({
     types: { prd: 'living', spec: 'living', design: 'living' },

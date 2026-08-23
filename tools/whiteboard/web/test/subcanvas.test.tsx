@@ -149,7 +149,7 @@ describe('the sub-canvas', () => {
     vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
     vi.spyOn(api, 'transitions').mockResolvedValue(['archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([])
-    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'sessions').mockResolvedValue([])
     vi.spyOn(api, 'items').mockResolvedValue(ITEMS)
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },

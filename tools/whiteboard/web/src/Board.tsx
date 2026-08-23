@@ -16,6 +16,7 @@ import {
   FileWarning,
   Gauge,
   History,
+  Keyboard,
   LayoutDashboard,
   Search,
   Terminal as TerminalIcon,
@@ -37,7 +38,7 @@ import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { api } from './api.ts'
+import { type SessionListing, api } from './api.ts'
 import { CommandPalette } from './CommandPalette.tsx'
 import { CoverageView } from './CoverageView.tsx'
 import { CreateDialog } from './CreateDialog.tsx'
@@ -48,6 +49,7 @@ import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
 import { NodeCard } from './NodeCard.tsx'
 import { SessionHistory } from './SessionHistory.tsx'
+import { SessionPanel } from './SessionPanel.tsx'
 import { AcceptanceRowNode, CriterionNode, ItemNode } from './SubNodes.tsx'
 import { Terminal } from './Terminal.tsx'
 import { ThemeMenu } from './ThemeMenu.tsx'
@@ -59,11 +61,25 @@ import { detailTarget, subCanvas } from './subCanvas.ts'
 import { useTheme } from './theme.ts'
 import { useBoard } from './useBoard.ts'
 
-type DocNodeData = { node: DocNode; kind?: string; suppressed?: boolean }
+type DocNodeData = {
+  node: DocNode
+  kind?: string
+  suppressed?: boolean
+  /** The session running on this document, if one is (spec-00003-FR-10). */
+  session?: SessionListing
+  onShowSession?: (id: string) => void
+}
 
 const nodeTypes = {
   doc: ({ data, selected }: { data: DocNodeData; selected?: boolean }) => (
-    <NodeCard node={data.node} kind={data.kind} selected={selected ?? false} suppressed={data.suppressed} />
+    <NodeCard
+      node={data.node}
+      kind={data.kind}
+      selected={selected ?? false}
+      suppressed={data.suppressed}
+      session={data.session}
+      onShowSession={data.onShowSession}
+    />
   ),
   item: ItemNode,
   criterion: CriterionNode,
@@ -96,6 +112,9 @@ function Canvas() {
   const [searching, setSearching] = useState(false)
   const [creating, setCreating] = useState(false)
   const [history, setHistory] = useState(false)
+  // The session panel (spec-00003-FR-4): opened from the resident top-bar entry,
+  // closed by the row that takes the user to a session.
+  const [sessionsOpen, setSessionsOpen] = useState(false)
   // The two top-bar counts each open a list of their own; the two never mix
   // (spec-00002-FR-13, FR-14).
   const [issuesOpen, setIssuesOpen] = useState(false)
@@ -133,6 +152,14 @@ function Canvas() {
     panelIds: ['canvas', 'detail'],
   })
 
+  // Which document each running session is on. One per document at most — the
+  // concurrency rule is exactly that (spec-00003-FR-2) — so a node has one
+  // marker or none, and the same lookup answers whether its entries are locked.
+  const runningOn = useMemo(
+    () => new Map(board.running.map((session) => [session.sourceId, session])),
+    [board.running],
+  )
+
   const nodes = useMemo(() => {
     const laid = toFlowNodes(board.graph, board.placed, board.selected)
     const suppressed = suppressedNodes(board.graph, board.selected)
@@ -140,10 +167,16 @@ function Canvas() {
       const data = node.data as DocNodeData
       return {
         ...node,
-        data: { ...data, kind: board.kinds[data.node.type ?? ''], suppressed: suppressed.has(node.id) },
+        data: {
+          ...data,
+          kind: board.kinds[data.node.type ?? ''],
+          suppressed: suppressed.has(node.id),
+          session: runningOn.get(node.id),
+          onShowSession: board.showSession,
+        },
       }
     })
-  }, [board.graph, board.placed, board.selected, board.kinds])
+  }, [board.graph, board.placed, board.selected, board.kinds, runningOn, board.showSession])
 
   // Hovering a panel row asks "where is this item's evidence": the records that
   // verified it, and the AC ids they cited (spec-00001-FR-34).
@@ -333,23 +366,39 @@ function Canvas() {
 
         <div className="ml-auto flex items-center gap-2">
           {/*
-            The stop lives in the terminal panel, so the panel itself must never
-            become unreachable: while a session runs with the panel put away, the
-            top bar carries the way back to it — which is the way back to the stop
-            (spec-00001-AC-49.8, design-00002 §3).
+            The way into the session panel, and resident: it is how many sessions
+            are running out of how many may be, which is worth reading whether or
+            not any are (spec-00003-FR-4). It is also why the stop can never
+            become unreachable — a session running with the terminal put away is
+            two clicks from being stopped, through here (spec-00001-AC-49.8).
           */}
-          {board.session?.status === 'running' && !board.terminalOpen ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              aria-label="Reopen the agent session"
-              onClick={() => board.setTerminalOpen(true)}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            aria-label="Open the session panel"
+            onClick={() => setSessionsOpen(true)}
+          >
+            <TerminalIcon className="size-4" aria-hidden />
+            {board.running.length}/{board.maxSessions}
+          </Button>
+          {/*
+            How many sessions are waiting on an answer (spec-00003-FR-6). The
+            icon carries it as much as the number does, so it is not colour
+            telling them apart; at zero there is nothing to be told, and the badge
+            is not drawn at all — the diagnostics count's zero reading
+            (spec-00001-AC-40.5, design-00002 §3).
+          */}
+          {board.awaitingCount === 0 ? null : (
+            <Badge
+              variant="secondary"
+              className="gap-1 text-xs"
+              aria-label={`${board.awaitingCount} awaiting input`}
             >
-              <TerminalIcon className="size-4" aria-hidden />
-              session running
-            </Button>
-          ) : null}
+              <Keyboard className="size-3" aria-hidden />
+              {board.awaitingCount}
+            </Badge>
+          )}
           {/*
             The count is the way into the list (spec-00002-FR-13): above zero
             the badge wraps a real button, so it is reached by Tab and fired by
@@ -424,7 +473,12 @@ function Canvas() {
                         relations={relationsOf(board.graph, selected.id, board.relationOrder)}
                         clarifiable={board.clarifiable.includes(selected.type ?? '')}
                         auditable={board.auditable.includes(selected.type ?? '')}
-                        sessionRunning={board.session?.status === 'running'}
+                        // The two concurrency rules, each read where it holds:
+                        // this document's own session, and the cap on all of
+                        // them (spec-00003-FR-2, FR-3). Another document's
+                        // session locks nothing here (spec-00001-AC-12.8).
+                        docBusy={runningOn.has(selected.id)}
+                        capReached={board.running.length >= board.maxSessions}
                         agents={board.agents}
                         agent={board.agent}
                         onPickAgent={board.setAgent}
@@ -497,8 +551,11 @@ function Canvas() {
             <ResizableHandle withHandle />
             <ResizablePanel id="terminal" defaultSize={35} minSize={15}>
               <Terminal
-                session={board.session}
+                session={board.shownSession}
                 dark={theme.isDark}
+                // One terminal per session is kept alive, and the cap on
+                // sessions is the cap on them (design-00002 §12).
+                keep={board.maxSessions}
                 onClose={() => board.setTerminalOpen(false)}
                 onStop={() => void board.stopSession()}
               />
@@ -556,6 +613,25 @@ function Canvas() {
         onPick={(docId) => {
           setDiagnosticsOpen(false)
           focus(docId)
+        }}
+      />
+      {/*
+        Picking a session is two acts at once (spec-00003-FR-4): the terminal
+        comes up on it, and the board goes to its document. `focus` is the same
+        path the palette and the three lists take, and it is what makes the
+        second act give way on its own — a session whose document has left the
+        board refuses in place with its own toast, and the selection and the
+        viewport stay exactly where they were (spec-00003-AC-4.4).
+      */}
+      <SessionPanel
+        open={sessionsOpen}
+        onOpenChange={setSessionsOpen}
+        sessions={board.sessions}
+        showAgent={board.agents.length > 1}
+        onPick={(session) => {
+          setSessionsOpen(false)
+          board.showSession(session.id)
+          focus(session.sourceId)
         }}
       />
       <SessionHistory open={history} onOpenChange={setHistory} />

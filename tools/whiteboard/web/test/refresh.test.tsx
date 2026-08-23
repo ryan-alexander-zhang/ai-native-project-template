@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import type { AcceptanceRow, Criterion, ItemsView, RequirementItem } from '../../src/requirements.ts'
-import { type SessionInfo, api } from '../src/api.ts'
+import { type SessionListing, api } from '../src/api.ts'
 import { Board } from '../src/Board.tsx'
 import { type EventLink, FIRST_RETRY_MS, MAX_RETRY_MS, connectEvents } from '../src/eventSocket.ts'
 
@@ -133,7 +133,7 @@ function serve() {
   vi.spyOn(api, 'items').mockImplementation(async () => structuredClone(items))
   vi.spyOn(api, 'transitions').mockResolvedValue(['archived'])
   vi.spyOn(api, 'nextSteps').mockResolvedValue([])
-  vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+  vi.spyOn(api, 'sessions').mockResolvedValue([])
   vi.spyOn(api, 'config').mockResolvedValue({
     types: { spec: 'living', rule: 'living', plan: 'work', record: 'work' },
     relations: ['verifies'],
@@ -481,7 +481,14 @@ describe('a board whose channel is down', () => {
  * already forgotten.
  */
 describe('a session that ends with no docs change', () => {
-  const RUNNING: SessionInfo = { id: 's1', kind: 'ask', agent: 'claude', sourceId: 'spec-00001-x', status: 'running' }
+  const RUNNING: SessionListing = {
+    id: 's1',
+    kind: 'ask',
+    agent: 'claude',
+    sourceId: 'spec-00001-x',
+    status: 'running',
+    startedAt: '2026-01-01T00:00:00.000Z',
+  }
 
   /** The one socket that carries the signal; the terminal opens one of its own. */
   const channel = () => ChannelSocket.opened.find((socket) => socket.url.endsWith('/api/events'))!
@@ -510,8 +517,8 @@ describe('a session that ends with no docs change', () => {
   })
 
   it('shows the end state, hands the entries back and takes the stop away', async () => {
-    let current: SessionInfo | null = RUNNING
-    vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
+    let held = [RUNNING]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy(), SETTLED)
     fireEvent.click(screen.getByTestId('node-spec-00001-x'))
@@ -522,7 +529,7 @@ describe('a session that ends with no docs change', () => {
     expect(screen.getByRole('button', { name: 'Stop the agent session' })).toBeTruthy()
 
     // The session ends by itself — `/exit`, nothing written — and the server says so.
-    current = { ...RUNNING, status: 'exited', exitCode: 0 }
+    held = [{ ...RUNNING, status: 'exited', exitCode: 0 }]
     await act(async () => channel().signal())
     await settle()
 

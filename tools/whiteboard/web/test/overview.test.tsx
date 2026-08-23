@@ -122,7 +122,7 @@ function serve() {
   vi.spyOn(api, 'items').mockResolvedValue(ITEMS)
   vi.spyOn(api, 'transitions').mockResolvedValue([])
   vi.spyOn(api, 'nextSteps').mockResolvedValue([])
-  vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+  vi.spyOn(api, 'sessions').mockResolvedValue([])
   vi.spyOn(api, 'config').mockResolvedValue({
     types: { spec: 'living', rule: 'living' },
     relations: [],

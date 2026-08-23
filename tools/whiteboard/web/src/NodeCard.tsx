@@ -1,7 +1,8 @@
 import { Handle } from '@xyflow/react'
-import { TriangleAlert } from 'lucide-react'
+import { Keyboard, TerminalIcon, TriangleAlert } from 'lucide-react'
 import { Fragment } from 'react'
 import type { DocNode } from '../../src/docRepository.ts'
+import type { SessionListing } from './api.ts'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { SIDES, SIDE_POSITION, handleId } from './canvasModel.ts'
@@ -13,10 +14,14 @@ export interface NodeCardProps {
   kind?: string
   /** Recedes while another node holds the focus (spec-00001-AC-29.2). */
   suppressed?: boolean
+  /** The session running on this document, if one is (spec-00003-FR-10); nothing when none is. */
+  session?: SessionListing
+  /** Put that session on the terminal — the same act as picking it in the session panel. */
+  onShowSession?: (id: string) => void
 }
 
 /** A document on the canvas: type, status, title, id, and any anomaly. */
-export function NodeCard({ node, selected, kind, suppressed = false }: NodeCardProps) {
+export function NodeCard({ node, selected, kind, suppressed = false, session, onShowSession }: NodeCardProps) {
   const Icon = typeIcon(node.type)
   return (
     <div
@@ -68,6 +73,38 @@ export function NodeCard({ node, selected, kind, suppressed = false }: NodeCardP
           <Icon className="size-3.5" aria-hidden />
           {node.type ?? '—'}
         </span>
+        {/*
+          Slot ⑥ (design-00002 §4): this document has a session running, and this
+          is the way onto its terminal (spec-00003-FR-10). Running and awaiting
+          input are told apart by the icon and by the accessible name, never by
+          colour alone. Activating it is not selecting the node — the gesture is
+          stopped here, on click and on the Enter that fires it, the same
+          convention the inline id jump follows (spec-00001-FR-57): the pointer
+          events go too, or React Flow would drag the node under the press.
+        */}
+        {session === undefined ? null : (
+          <Badge variant="outline" className="px-1.5 py-0.5" asChild>
+            <button
+              type="button"
+              aria-label={`${session.awaiting === true ? 'Awaiting input' : 'Running'} session of ${node.id}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+              }}
+              onClick={(event) => {
+                event.stopPropagation()
+                onShowSession?.(session.id)
+              }}
+            >
+              {session.awaiting === true ? (
+                <Keyboard className="size-3.5" aria-hidden />
+              ) : (
+                <TerminalIcon className="size-3.5" aria-hidden />
+              )}
+            </button>
+          </Badge>
+        )}
         <Badge
           className="border-transparent text-[10px] text-white"
           style={{ backgroundColor: statusColour(node) }}

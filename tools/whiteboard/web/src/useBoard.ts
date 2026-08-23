@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
-import { ApiError, type CoverageRow, type SessionInfo, api } from './api.ts'
+import { ApiError, type CoverageRow, type SessionInfo, type SessionListing, api } from './api.ts'
 import { connectEvents } from './eventSocket.ts'
 import { prefillFrontMatter } from './frontMatter.ts'
 import { type Placed, layoutGraph } from './layout.ts'
@@ -17,6 +17,22 @@ const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [
  * is kept whole (design-00002 §3).
  */
 const GAPS_NAMED = 5
+
+/** The cap the board assumes until `GET /api/config` says otherwise (spec-00003-AC-3.5). */
+const DEFAULT_MAX_SESSIONS = 3
+
+/** A session is over once it is any of these, whichever way it got there (spec-00003-FR-7). */
+function ended(session: SessionListing): boolean {
+  return session.status !== 'running'
+}
+
+/**
+ * The running ones, in start order. Awaiting input is a reading of a running
+ * session, not a state of its own, so it counts here too (spec-00003-FR-6).
+ */
+function runningOf(sessions: SessionListing[]): SessionListing[] {
+  return sessions.filter((session) => !ended(session))
+}
 
 /**
  * What a refusal reads as. The `resolved` gate names its gaps one by one
@@ -68,7 +84,14 @@ export function useBoard() {
   // revises (spec-00001-FR-53).
   const [draft, setDraft] = useState<string>()
   const [terminalOpen, setTerminalOpen] = useState(false)
-  const [session, setSession] = useState<SessionInfo | null>(null)
+  // Every session the server holds, and — apart from it — which one the terminal
+  // is showing: the pick is presentation state, kept by session id across a
+  // refresh (spec-00003-FR-5, design-00002 §10).
+  const [sessions, setSessions] = useState<SessionListing[]>([])
+  const [shownId, setShownId] = useState<string>()
+  // What «N/limit» divides by (spec-00003-FR-4). The config is the single source
+  // of the cap; until it lands the default is the one the server would use.
+  const [maxSessions, setMaxSessions] = useState(DEFAULT_MAX_SESSIONS)
   // The global coverage view (spec-00002-FR-10): whether it is on show, and the
   // payload it is showing. Undefined is «not read yet», which is what the first
   // moment after opening looks like.
@@ -81,6 +104,38 @@ export function useBoard() {
   // callback depend on it: a `refresh` rebuilt on every open would tear the
   // docs-change channel down and dial it again (design-00002 §10).
   const viewing = useRef(false)
+  /**
+   * The status each session was last seen in. The refresh signal is the only
+   * channel a session's end reaches the board through (design-00001 §5), so an
+   * ending is a difference between two readings of the listing rather than an
+   * event of its own — which is what the notifications are derived from
+   * (spec-00003-FR-7). `undefined` is «nothing read yet»: the first reading is
+   * the baseline and announces nothing, or a board opened after a session ended
+   * would report it as news.
+   */
+  const seen = useRef<Map<string, string> | undefined>(undefined)
+  /**
+   * The session on show, readable from `refresh` without making the callback
+   * depend on it — the same reason `viewing` is a ref: a `refresh` rebuilt on
+   * every switch would tear the docs-change channel down and dial it again.
+   */
+  const shownRef = useRef<string | undefined>(undefined)
+
+  /**
+   * One toast per session that has just reached an end state, stacked and never
+   * folded together (spec-00003-FR-7). A session that appears already ended was
+   * never running here — a start that failed on the spawn (spec-00001-FR-16) —
+   * and is announced the same way (spec-00003-AC-7.4).
+   */
+  const announce = useCallback((listing: SessionListing[]) => {
+    const before = seen.current
+    seen.current = new Map(listing.map((session) => [session.id, session.status]))
+    if (before === undefined) return
+    for (const session of listing) {
+      if (!ended(session) || before.get(session.id) === session.status) continue
+      toast.message(`${session.kind} · ${session.sourceId}`, { description: session.status })
+    }
+  }, [])
 
   /** The coverage payload, re-read (spec-00002-AC-10.4). A failure is the toast every read gets. */
   const readCoverage = useCallback(async () => {
@@ -112,17 +167,40 @@ export function useBoard() {
    * them (design-00002 §10). The items of the document on show follow the graph
    * through the effect below.
    *
-   * The session state is re-read with the graph, not just at load: a session that
-   * ended is exactly what a refresh may have been sent to tell us about, and the
-   * badge, the entries and the stop all hang off it (issue-00013). What comes
-   * back is the session the terminal is to show, picked off the list of them all
-   * (api.ts, spec-00003-FR-9).
+   * The session listing is re-read with the graph, not just at load: a session
+   * that ended is exactly what a refresh may have been sent to tell us about,
+   * and the counts, the markers, the entries and the stop all hang off it
+   * (issue-00013). Every session comes back, running and ended alike
+   * (spec-00003-FR-4); which one the terminal shows is decided here and nowhere
+   * else, so a refresh keeps the user on the session they were on
+   * (spec-00003-AC-5.6).
    */
   const refresh = useCallback(async () => {
-    const [next, { current }] = await Promise.all([api.graph(), api.session()])
+    const [next, listing] = await Promise.all([api.graph(), api.sessions()])
+    const first = seen.current === undefined
+    announce(listing)
     setGraph(next)
     setPlaced(layoutGraph(next, typeOrder.current))
-    setSession(current)
+    setSessions(listing)
+    if (first) {
+      // Nothing has been shown yet, so the board picks: the newest running
+      // session — the one a reconnecting board reattaches to — or, with nothing
+      // running, the newest there was, so the panel still says how it ended
+      // (spec-00003-FR-9). Only a running one brings the terminal up with it.
+      const running = runningOf(listing)
+      const pick = (running.length > 0 ? running : listing).at(-1)
+      if (pick !== undefined) {
+        shownRef.current = pick.id
+        setShownId(pick.id)
+        if (!ended(pick)) setTerminalOpen(true)
+      }
+    } else if (shownRef.current !== undefined && !listing.some((one) => one.id === shownRef.current)) {
+      // Close nearest: the session on show has gone from the listing, so the
+      // terminal view of it goes and nothing else does (design-00002 §10).
+      shownRef.current = undefined
+      setShownId(undefined)
+      setTerminalOpen(false)
+    }
     // The selection is held by id, never by position: a document still on the
     // board keeps it, and one that has left the disk takes it with it, closing
     // its toolbar (spec-00001-AC-44.6).
@@ -183,7 +261,9 @@ export function useBoard() {
   const startSession = useCallback(
     async (start: () => Promise<SessionInfo>) => {
       await run(async () => {
-        setSession(await start())
+        const started = await start()
+        shownRef.current = started.id
+        setShownId(started.id)
         setTerminalOpen(true)
       })
     },
@@ -191,18 +271,30 @@ export function useBoard() {
   )
 
   /**
+   * Put a session on the terminal — the one act the session panel and the node
+   * markers both perform (spec-00003-FR-4, FR-10). A session that was put away
+   * brings the panel back up with it; an ended one is shown too, since its
+   * output is still worth reading.
+   */
+  const showSession = useCallback((id: string) => {
+    shownRef.current = id
+    setShownId(id)
+    setTerminalOpen(true)
+  }, [])
+
+  /**
    * The one way a session ends on the user's word (spec-00001-FR-49): the one the
-   * terminal is showing, which is the session held here (spec-00003-FR-5). The
-   * board takes the finished session back from the server rather than assuming
-   * it: the entries come back with it, and the graph is re-read like any
-   * action's. With no session on show there is nothing to stop.
+   * terminal is showing, and no other, however many are running
+   * (spec-00003-FR-5, AC-5.3). The board does not assume what the stop did — the
+   * refresh that follows re-reads the listing, which is where the end state, the
+   * counts and the entries all come from. With no session on show there is
+   * nothing to stop.
    */
   const stopSession = useCallback(async () => {
-    if (!session) return
-    await run(async () => {
-      setSession(await api.stopSession(session.id))
-    })
-  }, [run, session])
+    const id = shownRef.current
+    if (id === undefined) return
+    await run(() => api.stopSession(id))
+  }, [run])
 
   const advance = useCallback(
     async (sourceId: string, targetType: string) => {
@@ -276,8 +368,9 @@ export function useBoard() {
     }
   }, [graph, selected])
 
-  // Sessions outlive the browser, so a board opening fresh reattaches to one of
-  // them (spec-00003-FR-9).
+  // The first read of everything. Sessions outlive the browser, so this read is
+  // also where a board opening fresh finds the ones still running and reattaches
+  // to one of them — `refresh` above holds that (spec-00003-FR-9).
   useEffect(() => {
     // Config first: laying out before the column order lands would place every
     // node in the unknown-type bucket and then move it (spec-00001-AC-1.12).
@@ -290,6 +383,7 @@ export function useBoard() {
         setClarifiable(config.clarifiable)
         setAuditable(config.auditable)
         setEntry(config.entry)
+        setMaxSessions(config.maxSessions)
         const names = config.agents.map((declared) => declared.name)
         setAgents(names)
         // One agent is no choice at all: it is left unnamed so the request
@@ -303,10 +397,6 @@ export function useBoard() {
       }
       await refresh()
     })()
-    void api.session().then(({ current }) => {
-      setSession(current)
-      if (current?.status === 'running') setTerminalOpen(true)
-    })
   }, [refresh])
 
   // docs/ moves under the board more often than the board moves it — an agent
@@ -336,7 +426,18 @@ export function useBoard() {
     editing,
     draft,
     terminalOpen,
-    session,
+    sessions,
+    // Held by id, resolved from the current listing: a refresh keeps the user on
+    // the same session, and one that is gone takes only its terminal view with
+    // it (spec-00003-AC-5.6, design-00002 §10).
+    shownSession: sessions.find((one) => one.id === shownId),
+    // What the top bar counts and what the concurrency rules are read off: the
+    // running sessions (spec-00003-FR-3, FR-4), and of those the ones waiting on
+    // an answer (FR-6). A count of zero renders no badge, which is the caller's
+    // reading of these numbers, not this hook's.
+    running: runningOf(sessions),
+    awaitingCount: sessions.filter((one) => !ended(one) && one.awaiting === true).length,
+    maxSessions,
     coverageOpen,
     coverage,
     showCoverage,
@@ -348,6 +449,7 @@ export function useBoard() {
     deselect,
     run,
     startSession,
+    showSession,
     stopSession,
     advance,
     create,

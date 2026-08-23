@@ -66,6 +66,17 @@ export function typeIcon(type: string | undefined): LucideIcon {
   return TYPE_ICONS[type ?? ''] ?? File
 }
 
+/**
+ * A recorded instant, made readable when it parses and left alone when it does
+ * not: a stamp the board cannot read is still evidence, and blanking it would
+ * hide that. Read by both places that list sessions — the panel of the live ones
+ * (spec-00003-FR-4) and the history of the ended ones (spec-00001-FR-54).
+ */
+export function stamp(value: string): string {
+  const at = new Date(value)
+  return Number.isNaN(at.getTime()) ? value : at.toLocaleString()
+}
+
 /** living / work drives the node's outline; the kind comes from the flow config. */
 export function kindColour(kind: string | undefined): string {
   if (kind === 'living') return 'var(--kind-living)'

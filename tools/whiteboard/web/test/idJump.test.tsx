@@ -232,7 +232,7 @@ describe('the jump, across the board', () => {
     vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
     vi.spyOn(api, 'transitions').mockResolvedValue(['archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([])
-    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'sessions').mockResolvedValue([])
     vi.spyOn(api, 'items').mockImplementation(async (id) => (id === 'rule-00001-x' ? RULE_ITEMS : SPEC_ITEMS))
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { spec: 'living', rule: 'living' },

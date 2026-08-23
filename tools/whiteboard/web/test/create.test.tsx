@@ -55,7 +55,7 @@ function serve(entry: string[]) {
   vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
   vi.spyOn(api, 'transitions').mockResolvedValue(['active'])
   vi.spyOn(api, 'nextSteps').mockResolvedValue([])
-  vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+  vi.spyOn(api, 'sessions').mockResolvedValue([])
   vi.spyOn(api, 'config').mockResolvedValue(config(entry))
   vi.spyOn(toast, 'success').mockImplementation(() => 'id')
   vi.spyOn(toast, 'error').mockImplementation(() => 'id')

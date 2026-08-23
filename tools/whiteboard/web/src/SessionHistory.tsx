@@ -11,16 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { stamp } from './status.ts'
 
 export interface SessionHistoryProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-}
-
-/** The stamp as it was recorded, made readable when it parses and left alone when it does not. */
-function stamp(value: string): string {
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString()
 }
 
 /**

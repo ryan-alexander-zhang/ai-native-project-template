@@ -5,7 +5,7 @@ import { MarkerType } from '@xyflow/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocEdge, DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
-import { type SessionInfo, api } from '../src/api.ts'
+import { type SessionListing, api } from '../src/api.ts'
 import { matchDocuments, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from '../src/canvasModel.ts'
 import { onFlowError } from '../src/flowError.ts'
 
@@ -35,6 +35,37 @@ function stubWebSocket() {
       close() {}
     },
   )
+}
+
+/**
+ * One row of `GET /api/sessions` (design-00001 §7): a clarify session running on
+ * the prd. Several may run at once, so the board works off the list of them
+ * (spec-00003-FR-4).
+ */
+function listing(overrides: Partial<SessionListing> = {}): SessionListing {
+  return {
+    id: 's1',
+    kind: 'clarify',
+    agent: 'claude',
+    sourceId: 'prd-00001-x',
+    status: 'running',
+    startedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+/** What `GET /api/sessions` is answering with; a test moves it by moving this. */
+let served: SessionListing[] = []
+
+/**
+ * A start, as the server answers it: the session comes back from the POST *and*
+ * is in the listing the refresh reads right after (design-00001 §7). A stand-in
+ * that started a session and then denied holding it would have the board close
+ * the terminal it had just opened — close nearest, design-00002 §10.
+ */
+function starts(session: SessionListing): SessionListing {
+  served = [...served, session]
+  return session
 }
 
 /** A plain document-to-document relation: what it declares is the document it lands on. */
@@ -468,7 +499,8 @@ describe('the board', () => {
     vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
     vi.spyOn(api, 'transitions').mockResolvedValue(['active', 'archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
-    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    served = []
+    vi.spyOn(api, 'sessions').mockImplementation(async () => served)
     // Selecting a spec or a rule reads its items for the inspector panel
     // (spec-00001-FR-31); the cases below that reach one do not care what it says.
     vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
@@ -874,13 +906,9 @@ describe('the board', () => {
   // in the terminal.
   it('starts a clarify session from the toolbar and opens the terminal', async () => {
     stubWebSocket()
-    const clarify = vi.spyOn(api, 'clarify').mockResolvedValue({
-      id: 's1',
-      kind: 'clarify',
-      agent: 'claude',
-      sourceId: 'prd-00001-x',
-      status: 'running',
-    })
+    const clarify = vi
+      .spyOn(api, 'clarify')
+      .mockImplementation(async () => starts(listing({ kind: 'clarify', sourceId: 'prd-00001-x' })))
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
     fireEvent.click(screen.getByTestId('node-prd-00001-x'))
@@ -910,13 +938,9 @@ describe('the board', () => {
   // spec-00001-AC-47.1 as the user sees it — any type, any status
   it('starts an ask session from the toolbar and opens the terminal', async () => {
     stubWebSocket()
-    const ask = vi.spyOn(api, 'ask').mockResolvedValue({
-      id: 's1',
-      kind: 'ask',
-      agent: 'claude',
-      sourceId: 'idea-00001-x',
-      status: 'running',
-    })
+    const ask = vi
+      .spyOn(api, 'ask')
+      .mockImplementation(async () => starts(listing({ kind: 'ask', sourceId: 'idea-00001-x' })))
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
     fireEvent.click(screen.getByTestId('node-idea-00001-x'))
@@ -935,13 +959,9 @@ describe('the board', () => {
     stubWebSocket()
     const spec = node({ id: 'spec-00001-x', type: 'spec', title: 'Whiteboard spec', path: 'spec/a.md' })
     vi.spyOn(api, 'graph').mockResolvedValue({ nodes: [spec], edges: [], issues: [], diagnostics: [], idOwners: {} })
-    const audit = vi.spyOn(api, 'audit').mockResolvedValue({
-      id: 's1',
-      kind: 'audit',
-      agent: 'claude',
-      sourceId: 'spec-00001-x',
-      status: 'running',
-    })
+    const audit = vi
+      .spyOn(api, 'audit')
+      .mockImplementation(async () => starts(listing({ kind: 'audit', sourceId: 'spec-00001-x' })))
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy())
     fireEvent.click(screen.getByTestId('node-spec-00001-x'))
@@ -968,13 +988,11 @@ describe('the board', () => {
     expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
   })
 
-  // spec-00003-AC-2.4 at the board: the document the board reattached to has a
-  // session running, so its entries offer to start none.
+  // spec-00003-AC-2.4 at the board: this document has a session running, so its
+  // own entries offer to start none.
   it('disables the three session entries while a session is running', async () => {
     stubWebSocket()
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
-    })
+    vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
 
@@ -988,34 +1006,43 @@ describe('the board', () => {
   })
 
   /**
-   * spec-00001-AC-49.8: the stop lives in the terminal panel, so a panel that has
-   * been put away must be gettable back — otherwise closing it strands the user
-   * with a locked board and no way to unlock it (issue-00010, design-00002 §3).
+   * spec-00001-AC-49.8 (sixteenth round): the stop lives in the terminal panel, so
+   * a panel that has been put away must be gettable back — otherwise closing it
+   * strands the user with a locked board and no way to unlock it (issue-00010).
+   * The way back is the resident session panel entry now, not a conditional
+   * reopen button: the panel lists the running session and picking it puts the
+   * terminal — and with it the stop — back (spec-00003-FR-4).
    */
-  it('offers the session in the top bar once the terminal panel is put away', async () => {
+  it('reopens the terminal through the session panel once the panel is put away', async () => {
     stubWebSocket()
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
-    })
+    vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     render(<Board />)
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'Reopen the agent session' })).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByLabelText('Agent session')).toBeNull()
 
-    const entry = await screen.findByRole('button', { name: 'Reopen the agent session' })
-    await userEvent.click(entry)
+    await userEvent.click(screen.getByRole('button', { name: 'Open the session panel' }))
+    const rows = await screen.findByRole('list', { name: 'Agent sessions' })
+    await userEvent.click(within(rows).getByRole('button'))
 
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'Reopen the agent session' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Stop the agent session' })).toBeTruthy()
     vi.unstubAllGlobals()
   })
 
-  it('offers no top-bar session entry when no session is running', async () => {
+  // spec-00003-AC-4.2 / AC-4.5 — the entry is resident: nothing running still
+  // reads «0 of 3», and the panel still opens (on an empty state).
+  it('keeps the session panel entry in the top bar with nothing running', async () => {
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
 
-    expect(screen.queryByRole('button', { name: 'Reopen the agent session' })).toBeNull()
+    const entry = screen.getByRole('button', { name: 'Open the session panel' })
+    expect(entry.textContent).toContain('0/3')
+    await userEvent.click(entry)
+
+    expect(await screen.findByText('no sessions since the board came up')).toBeTruthy()
+    expect(screen.queryByRole('list', { name: 'Agent sessions' })).toBeNull()
   })
 
   /**
@@ -1028,18 +1055,11 @@ describe('the board', () => {
     // The stop is followed by a refresh, which reads the session again
     // (issue-00013): a stand-in that kept answering «running» would put the
     // session the user just ended straight back on the board.
-    const stopped = {
-      id: 's1',
-      kind: 'clarify' as const,
-      agent: 'claude',
-      sourceId: 'prd-00001-x',
-      status: 'exited' as const,
-    }
-    let current: SessionInfo = { ...stopped, status: 'running' }
-    vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
+    let held = [listing()]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
     const stop = vi.spyOn(api, 'stopSession').mockImplementation(async () => {
-      current = stopped
-      return stopped
+      held = [listing({ status: 'terminated' })]
+      return held[0]!
     })
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
@@ -1060,14 +1080,9 @@ describe('the board', () => {
   // spec-00001-AC-11.1 as the user sees it
   it('starts an advance from the toolbar and opens the terminal', async () => {
     stubWebSocket()
-    const advance = vi.spyOn(api, 'advance').mockResolvedValue({
-      id: 's1',
-      kind: 'advance',
-      agent: 'claude',
-      sourceId: 'prd-00001-x',
-      targetType: 'spec',
-      status: 'running',
-    })
+    const advance = vi
+      .spyOn(api, 'advance')
+      .mockImplementation(async () => starts(listing({ kind: 'advance', targetType: 'spec' })))
     render(<Board />)
     await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
     fireEvent.click(screen.getByTestId('node-prd-00001-x'))

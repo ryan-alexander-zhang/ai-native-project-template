@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { ReactFlowProvider } from '@xyflow/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,7 +9,7 @@ import { ANOMALY_TOKEN, statusColour, statusLabel } from '../src/status.ts'
 import { connectTerminal } from '../src/terminalSocket.ts'
 import { useBoard } from '../src/useBoard.ts'
 import { toast } from 'sonner'
-import { ApiError, type SessionInfo, api } from '../src/api.ts'
+import { ApiError, type SessionListing, api } from '../src/api.ts'
 import { COLUMN_GAP, NODE_HEIGHT, NODE_WIDTH, ROW_GAP, layoutGraph } from '../src/layout.ts'
 import { toFlowEdges } from '../src/canvasModel.ts'
 
@@ -23,6 +23,23 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
     relations: {},
     ok: true,
     problems: [],
+    ...overrides,
+  }
+}
+
+/**
+ * One row of `GET /api/sessions` (design-00001 §7). The list is what the board
+ * works off since the sixteenth round: several sessions run at once, and which
+ * one the terminal shows is the board's own state (spec-00003-FR-4, FR-5).
+ */
+function listing(overrides: Partial<SessionListing> = {}): SessionListing {
+  return {
+    id: 's1',
+    kind: 'clarify',
+    agent: 'claude',
+    sourceId: 'prd-00001-x',
+    status: 'running',
+    startedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
 }
@@ -94,6 +111,50 @@ describe('a node on the canvas', () => {
   it('counts the problems on the node face', () => {
     renderCard({ node: node({ ok: false, problems: ['a', 'b'] }), selected: true })
     expect(screen.getByLabelText('Front matter problems of prd-00001-x').textContent).toContain('2 problems')
+  })
+
+  /**
+   * spec-00003-FR-10 and design-00002 §12 — the marker's whole gesture stops at
+   * the marker: the click that fires it, the Enter that fires it, and the press
+   * that would otherwise have React Flow select or drag the node underneath. A
+   * key that is neither Enter nor Space is not the marker's, and is left to travel.
+   */
+  it('keeps the node gestures off the session marker', () => {
+    const reachedTheNode = vi.fn()
+    render(
+      <ReactFlowProvider>
+        {/* Standing in for React Flow's own node wrapper, which is what selects
+            and drags the node the marker sits on. */}
+        <div
+          onClick={reachedTheNode}
+          onPointerDown={reachedTheNode}
+          onMouseDown={reachedTheNode}
+          onKeyDown={reachedTheNode}
+        >
+          <NodeCard node={node()} selected={false} session={listing()} onShowSession={vi.fn()} />
+        </div>
+      </ReactFlowProvider>,
+    )
+    const marker = screen.getByLabelText('Running session of prd-00001-x')
+
+    fireEvent.pointerDown(marker)
+    fireEvent.mouseDown(marker)
+    fireEvent.click(marker)
+    fireEvent.keyDown(marker, { key: 'Enter' })
+    expect(reachedTheNode).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(marker, { key: 'Escape' })
+    expect(reachedTheNode).toHaveBeenCalledTimes(1)
+  })
+
+  // The marker is not offered a way onto the terminal here, and pressing it is
+  // still not an error — a card rendered outside the canvas has no session to show.
+  it('takes a press on the marker with nowhere to send it', () => {
+    renderCard({ node: node(), selected: false, session: listing({ awaiting: true }) })
+
+    fireEvent.click(screen.getByLabelText('Awaiting input session of prd-00001-x'))
+
+    expect(screen.getByLabelText('Awaiting input session of prd-00001-x')).toBeTruthy()
   })
 
   it('shows a placeholder type when the front matter carries none', () => {
@@ -291,7 +352,7 @@ describe('the board state', () => {
     vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
     vi.spyOn(api, 'transitions').mockResolvedValue(['active', 'archived'])
     vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
-    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'sessions').mockResolvedValue([])
     vi.spyOn(api, 'config').mockResolvedValue({
       types: { prd: 'living', idea: 'living' },
       relations: ['parent'],
@@ -475,34 +536,69 @@ describe('the board state', () => {
 
   // spec-00003-AC-2.1 — a refused start leaves the running session alone
   it('keeps the session it has when a second start is refused', async () => {
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
-    })
+    vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     vi.spyOn(api, 'ask').mockRejectedValue(new Error('an agent session is already running'))
     const { result } = renderHook(() => useBoard())
-    await waitFor(() => expect(result.current.session?.id).toBe('s1'))
+    await waitFor(() => expect(result.current.shownSession?.id).toBe('s1'))
 
     await act(() => result.current.startSession(() => api.ask('idea-00001-x')))
 
-    expect(result.current.session).toMatchObject({ id: 's1', status: 'running' })
+    expect(result.current.shownSession).toMatchObject({ id: 's1', status: 'running' })
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/already running/))
   })
 
-  // spec-00001-AC-11.1
-  it('opens the terminal when an advance starts', async () => {
-    vi.spyOn(api, 'advance').mockResolvedValue({
-      id: 's1',
-      kind: 'advance',
-      agent: 'claude',
-      sourceId: 'idea-00001-x',
-      targetType: 'prd',
-      status: 'running',
+  /**
+   * spec-00003-AC-4.5 — the entry divides the running ones by the cap, and the
+   * cap is the config's word (`GET /api/config`, design-00001 §7).
+   */
+  it('counts the running sessions against the cap the config declares', async () => {
+    vi.spyOn(api, 'sessions').mockResolvedValue([
+      listing({ id: 's1' }),
+      listing({ id: 's2', sourceId: 'idea-00001-x' }),
+      listing({ id: 's3', sourceId: 'spec-00001-x', status: 'exited' }),
+    ])
+    const { result } = renderHook(() => useBoard())
+
+    await waitFor(() => expect(result.current.running).toHaveLength(2))
+    expect(result.current.maxSessions).toBe(3)
+    expect(result.current.sessions).toHaveLength(3)
+  })
+
+  // spec-00003-AC-6.5 — awaiting input is counted off the running sessions
+  it('counts the sessions that are waiting on an answer', async () => {
+    vi.spyOn(api, 'sessions').mockResolvedValue([
+      listing({ id: 's1', awaiting: true }),
+      listing({ id: 's2', sourceId: 'idea-00001-x', awaiting: true }),
+      listing({ id: 's3', sourceId: 'spec-00001-x' }),
+      // Ended and quiet is not waiting on anybody (spec-00003-AC-6.4).
+      listing({ id: 's4', sourceId: 'rule-00001-x', status: 'exited', awaiting: true }),
+    ])
+    const { result } = renderHook(() => useBoard())
+
+    await waitFor(() => expect(result.current.awaitingCount).toBe(2))
+  })
+
+  /**
+   * spec-00001-AC-11.1 and spec-00003-AC-5.4 — the terminal comes up on the
+   * session that was just started, whether or not one was on it before. The
+   * stand-in answers the POST *and* the listing the refresh reads right after, as
+   * the server does: a session the server denied holding would be closed again on
+   * the spot (close nearest, design-00002 §10).
+   */
+  it('opens the terminal on the session an advance starts', async () => {
+    const started = listing({ id: 's9', kind: 'advance', sourceId: 'idea-00001-x', targetType: 'prd' })
+    let held: SessionListing[] = []
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
+    vi.spyOn(api, 'advance').mockImplementation(async () => {
+      held = [started]
+      return started
     })
     const { result } = renderHook(() => useBoard())
 
     await act(() => result.current.advance('idea-00001-x', 'prd'))
 
     expect(result.current.terminalOpen).toBe(true)
+    expect(result.current.shownSession?.id).toBe('s9')
   })
 
   it('keeps the terminal closed when the advance is refused', async () => {
@@ -515,14 +611,87 @@ describe('the board state', () => {
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/already running/))
   })
 
-  // spec-00001-AC-21.2 — the board reattaches to a session that outlived the page
-  it('opens the terminal on load when a session is still running', async () => {
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'advance', agent: 'claude', sourceId: 'idea-00001-x', targetType: 'prd', status: 'running' },
-    })
+  /**
+   * spec-00001-AC-21.2 / spec-00003-AC-9.1 — the board reattaches to the sessions
+   * that outlived the page, and comes up on the newest running one; the panel is
+   * what picks another (spec-00003-FR-5).
+   */
+  it('opens the terminal on load on the newest running session', async () => {
+    vi.spyOn(api, 'sessions').mockResolvedValue([
+      listing({ id: 's1', status: 'exited' }),
+      listing({ id: 's2', sourceId: 'idea-00001-x' }),
+      listing({ id: 's3', sourceId: 'spec-00001-x' }),
+    ])
     const { result } = renderHook(() => useBoard())
 
     await waitFor(() => expect(result.current.terminalOpen).toBe(true))
+    expect(result.current.shownSession?.id).toBe('s3')
+  })
+
+  // With nothing running, the newest session there was is still what the terminal
+  // shows — how the last one ended is worth seeing (spec-00003-FR-4).
+  it('falls back to the newest ended session when none is running', async () => {
+    vi.spyOn(api, 'sessions').mockResolvedValue([
+      listing({ id: 's1', status: 'exited' }),
+      listing({ id: 's2', sourceId: 'idea-00001-x', status: 'terminated' }),
+    ])
+    const { result } = renderHook(() => useBoard())
+
+    await waitFor(() => expect(result.current.shownSession?.id).toBe('s2'))
+    expect(result.current.terminalOpen).toBe(false)
+  })
+
+  /**
+   * spec-00003-AC-4.3 / AC-10.1 — putting a session on the terminal is one act,
+   * whether the session panel or a node marker asks for it, and it brings the
+   * panel back up with it.
+   */
+  it('puts the asked-for session on the terminal', async () => {
+    vi.spyOn(api, 'sessions').mockResolvedValue([
+      listing({ id: 's1' }),
+      listing({ id: 's2', sourceId: 'idea-00001-x' }),
+    ])
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.shownSession?.id).toBe('s2'))
+
+    act(() => result.current.showSession('s1'))
+
+    expect(result.current.shownSession?.id).toBe('s1')
+    expect(result.current.terminalOpen).toBe(true)
+  })
+
+  // spec-00003-AC-5.6 — the session on show is held by id across a refresh
+  it('keeps the session on show when the graph is re-read', async () => {
+    vi.spyOn(api, 'sessions').mockResolvedValue([
+      listing({ id: 's1' }),
+      listing({ id: 's2', sourceId: 'idea-00001-x' }),
+    ])
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.shownSession?.id).toBe('s2'))
+    act(() => result.current.showSession('s1'))
+
+    await act(() => result.current.refresh().then(() => undefined))
+
+    expect(result.current.shownSession?.id).toBe('s1')
+  })
+
+  /**
+   * design-00002 §10 — close nearest: the session on show has gone from the
+   * listing (a restarted server holds none of the old ones), so its terminal view
+   * goes and nothing else does.
+   */
+  it('closes the terminal view when the session on show is gone', async () => {
+    let held = [listing()]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.terminalOpen).toBe(true))
+
+    held = []
+    await act(() => result.current.refresh().then(() => undefined))
+
+    expect(result.current.shownSession).toBeUndefined()
+    expect(result.current.terminalOpen).toBe(false)
+    expect(result.current.graph.nodes).toHaveLength(2)
   })
 
   // spec-00001-AC-49.3 — stopping the session hands the three entries back
@@ -530,26 +699,20 @@ describe('the board state', () => {
     // The server is the one authority on the session, and the refresh that
     // follows the stop reads it again (issue-00013) — so the stand-in has to end
     // the session too, not go on reporting the one it was asked to stop.
-    const stopped = {
-      id: 's1',
-      kind: 'clarify' as const,
-      agent: 'claude',
-      sourceId: 'prd-00001-x',
-      status: 'exited' as const,
-    }
-    let current: SessionInfo = { ...stopped, status: 'running' }
-    vi.spyOn(api, 'session').mockImplementation(async () => ({ current }))
+    let held = [listing()]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
     const stop = vi.spyOn(api, 'stopSession').mockImplementation(async () => {
-      current = stopped
-      return stopped
+      held = [listing({ status: 'terminated' })]
+      return held[0]!
     })
     const { result } = renderHook(() => useBoard())
-    await waitFor(() => expect(result.current.session?.status).toBe('running'))
+    await waitFor(() => expect(result.current.shownSession?.status).toBe('running'))
 
     await act(() => result.current.stopSession())
 
-    expect(stop).toHaveBeenCalled()
-    expect(result.current.session?.status).toBe('exited')
+    expect(stop).toHaveBeenCalledWith('s1')
+    expect(result.current.shownSession?.status).toBe('terminated')
+    expect(result.current.running).toHaveLength(0)
   })
 
   /**
@@ -557,7 +720,7 @@ describe('the board state', () => {
    * the board asks nothing of the server.
    */
   it('stops nothing when no session is on show', async () => {
-    vi.spyOn(api, 'session').mockResolvedValue({ current: null })
+    vi.spyOn(api, 'sessions').mockResolvedValue([])
     const stop = vi.spyOn(api, 'stopSession')
     const { result } = renderHook(() => useBoard())
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
@@ -565,31 +728,128 @@ describe('the board state', () => {
     await act(() => result.current.stopSession())
 
     expect(stop).not.toHaveBeenCalled()
-    expect(result.current.session).toBeNull()
+    expect(result.current.shownSession).toBeUndefined()
   })
 
   it('keeps the session it has when the stop is refused', async () => {
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' },
-    })
+    vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     vi.spyOn(api, 'stopSession').mockRejectedValue(new Error('there is no running agent session to stop'))
     const { result } = renderHook(() => useBoard())
-    await waitFor(() => expect(result.current.session?.status).toBe('running'))
+    await waitFor(() => expect(result.current.shownSession?.status).toBe('running'))
 
     await act(() => result.current.stopSession())
 
-    expect(result.current.session?.status).toBe('running')
+    expect(result.current.shownSession?.status).toBe('running')
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no running agent session/))
   })
 
   it('leaves the terminal closed when the last session already exited', async () => {
-    vi.spyOn(api, 'session').mockResolvedValue({
-      current: { id: 's1', kind: 'advance', agent: 'claude', sourceId: 'idea-00001-x', targetType: 'prd', status: 'exited' },
-    })
+    vi.spyOn(api, 'sessions').mockResolvedValue([listing({ status: 'exited' })])
     const { result } = renderHook(() => useBoard())
 
     await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
     expect(result.current.terminalOpen).toBe(false)
+  })
+
+  /**
+   * spec-00003-AC-7.1 / AC-7.3 — an ending reaches the board as a difference
+   * between two readings of the listing, and each one gets its own toast: two
+   * sessions ending in the same batch are two notifications, not one.
+   */
+  it('announces each session that has ended since the last reading', async () => {
+    const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
+    let held = [listing({ id: 's1' }), listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' })]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.running).toHaveLength(2))
+    expect(message).not.toHaveBeenCalled()
+
+    held = [
+      listing({ id: 's1', status: 'exited' }),
+      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x', status: 'terminated' }),
+    ]
+    await act(() => result.current.refresh().then(() => undefined))
+
+    expect(message).toHaveBeenCalledTimes(2)
+    expect(message).toHaveBeenCalledWith('clarify · prd-00001-x', { description: 'exited' })
+    expect(message).toHaveBeenCalledWith('ask · idea-00001-x', { description: 'terminated' })
+  })
+
+  /**
+   * The same reading twice is not a second ending: the notification follows the
+   * change of state, so a board that keeps refreshing does not keep announcing
+   * (spec-00003-FR-7).
+   */
+  it('announces an ended session once and not again', async () => {
+    const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
+    let held = [listing()]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.running).toHaveLength(1))
+
+    held = [listing({ status: 'exited' })]
+    await act(() => result.current.refresh().then(() => undefined))
+    await act(() => result.current.refresh().then(() => undefined))
+
+    expect(message).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * spec-00003-AC-7.2 — a session the user stopped is announced like any other
+   * ending, and the end state it is announced with is «terminated».
+   */
+  it('announces a session the user stopped as terminated', async () => {
+    const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
+    let held = [listing()]
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
+    vi.spyOn(api, 'stopSession').mockImplementation(async () => {
+      held = [listing({ status: 'terminated' })]
+      return held[0]!
+    })
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.shownSession?.status).toBe('running'))
+
+    await act(() => result.current.stopSession())
+
+    expect(message).toHaveBeenCalledWith('clarify · prd-00001-x', { description: 'terminated' })
+  })
+
+  /**
+   * spec-00003-AC-7.4 — the agent CLI was not there, so the session failed on the
+   * spawn (spec-00001-FR-16). It never ran, and it is announced the same way: the
+   * end state is «failed».
+   */
+  it('announces a session that failed to start', async () => {
+    const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
+    let held: SessionListing[] = []
+    vi.spyOn(api, 'sessions').mockImplementation(async () => held)
+    const failed = listing({ status: 'failed', error: 'spawn claude ENOENT' })
+    vi.spyOn(api, 'clarify').mockImplementation(async () => {
+      held = [failed]
+      return failed
+    })
+    const { result } = renderHook(() => useBoard())
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+
+    await act(() => result.current.startSession(() => api.clarify('prd-00001-x')))
+
+    expect(message).toHaveBeenCalledWith('clarify · prd-00001-x', { description: 'failed' })
+    // The terminal is on it: what went wrong is shown there (spec-00001-FR-16).
+    expect(result.current.shownSession?.status).toBe('failed')
+    expect(result.current.terminalOpen).toBe(true)
+  })
+
+  /**
+   * A board opened after a session ended shows it as ended and announces nothing:
+   * the first reading is the baseline, not news (spec-00003-AC-9.2).
+   */
+  it('announces nothing for a session that had already ended before it looked', async () => {
+    const message = vi.spyOn(toast, 'message').mockImplementation(() => 'id')
+    vi.spyOn(api, 'sessions').mockResolvedValue([listing({ status: 'exited' })])
+    const { result } = renderHook(() => useBoard())
+
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+    expect(message).not.toHaveBeenCalled()
   })
 })
 

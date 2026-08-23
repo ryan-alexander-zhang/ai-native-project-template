@@ -150,7 +150,7 @@ describe('the api client', () => {
     await api.nextSteps('a')
     await api.doc('a')
     await api.setStatus('a', 'active')
-    await api.session()
+    await api.sessions()
 
     expect(fetchMock.mock.calls.map((call) => (call as unknown as [string])[0])).toEqual([
       '/api/docs/a/transitions',
@@ -162,33 +162,22 @@ describe('the api client', () => {
   })
 
   /**
-   * spec-00003-AC-9.1 — the payload is every session the server holds, and the
-   * one the terminal comes back to is the newest running one (spec-00003-FR-9);
-   * the panel is what picks another (spec-00003-FR-5).
+   * spec-00003-AC-9.1 / AC-4.1 — the payload is every session the server holds,
+   * running and ended alike, and the board is handed all of them: the panel lists
+   * them (spec-00003-FR-4) and choosing between them is its business (FR-5).
+   * (Before the sixteenth round this read picked one session off the list; the
+   * pick is the board's presentation state now, so it moved to `useBoard`.)
    */
-  it('takes the newest running session off the list of every session', async () => {
+  it('reads every session the server holds', async () => {
     mockFetch(200, {
       sessions: [
         { id: 's1', kind: 'ask', agent: 'claude', sourceId: 'spec-00001-a', status: 'running', startedAt: 'a' },
         { id: 's2', kind: 'ask', agent: 'claude', sourceId: 'spec-00002-b', status: 'exited', startedAt: 'b' },
-        { id: 's3', kind: 'clarify', agent: 'claude', sourceId: 'spec-00003-c', status: 'running', startedAt: 'c' },
+        { id: 's3', kind: 'clarify', agent: 'claude', sourceId: 'spec-00003-c', status: 'terminated', startedAt: 'c' },
       ],
     })
 
-    expect((await api.session()).current!.id).toBe('s3')
-  })
-
-  // With nothing running, the newest session there was is still what the panel
-  // shows — how the last one ended is worth seeing (spec-00003-FR-4).
-  it('falls back to the newest ended session when none is running', async () => {
-    mockFetch(200, {
-      sessions: [
-        { id: 's1', kind: 'ask', agent: 'claude', sourceId: 'spec-00001-a', status: 'exited', startedAt: 'a' },
-        { id: 's2', kind: 'ask', agent: 'claude', sourceId: 'spec-00002-b', status: 'terminated', startedAt: 'b' },
-      ],
-    })
-
-    expect((await api.session()).current!.id).toBe('s2')
+    expect((await api.sessions()).map((session) => session.id)).toEqual(['s1', 's2', 's3'])
   })
 
   // spec-00001-FR-49 — the one way out of a session that will not end (issue-00010)

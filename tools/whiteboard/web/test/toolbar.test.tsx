@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DocNode } from '../../src/docRepository.ts'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { Toolbar, type ToolbarProps } from '../src/Toolbar.tsx'
+import { CAP_REACHED, DOC_BUSY, Toolbar, type ToolbarProps } from '../src/Toolbar.tsx'
 
 afterEach(cleanup)
 
@@ -27,7 +27,8 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     relations: [],
     clarifiable: true,
     auditable: false,
-    sessionRunning: false,
+    docBusy: false,
+    capReached: false,
     agents: ['claude'],
     onPickAgent: vi.fn(),
     onPickRelation: vi.fn(),
@@ -295,28 +296,39 @@ describe('the floating toolbar', () => {
     expect(props.onAudit).toHaveBeenCalledTimes(1)
   })
 
-  // spec-00001-AC-18.2 and AC-49.5 — audit is a fourth starting point, so the
-  // one running session locks it on the same terms as the other three.
-  it('disables audit while a session is running and says why', async () => {
-    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' }, auditable: true, sessionRunning: true })
+  // spec-00003-AC-2.4 and spec-00001-AC-49.5 — audit is a fourth starting point,
+  // so this document's own running session locks it on the same terms as the
+  // other three, and for the same stated reason.
+  it('disables audit while this document has a session and says why', async () => {
+    renderToolbar({ node: { ...NODE, id: 'spec-00001-x', type: 'spec' }, auditable: true, docBusy: true })
     const audit = screen.getByRole<HTMLButtonElement>('button', { name: 'Audit' })
 
     expect(audit.disabled).toBe(true)
     await userEvent.hover(audit.parentElement!)
 
-    expect((await screen.findByRole('tooltip')).textContent).toContain('session running')
+    expect((await screen.findByRole('tooltip')).textContent).toContain(DOC_BUSY)
   })
 
-  // spec-00001-AC-18.2 at the entry: one session runs, so none of the three
-  // starting points can begin another.
-  it('disables advance, clarify, and ask while a session is running', () => {
-    renderToolbar({ sessionRunning: true })
+  // spec-00003-AC-2.4 at the entry: this document has a session, so none of its
+  // three starting points can begin another.
+  it('disables advance, clarify, and ask while this document has a session', () => {
+    renderToolbar({ docBusy: true })
 
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
     expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
-    // Accept writes nothing to the session slot, so it stays available.
+    // Accept takes no session slot, so it stays available.
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Accept' }).disabled).toBe(false)
+  })
+
+  // spec-00003-AC-3.1 at the entry: the cap is reached, so a document with no
+  // session of its own cannot start one either.
+  it('disables the starting points of a free document while the cap is reached', () => {
+    renderToolbar({ capReached: true })
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
   })
 
   /**
@@ -325,29 +337,59 @@ describe('the floating toolbar', () => {
    * read the way the «no next step» one is: focus the entry, and it is announced.
    */
   it.each(['Clarify', 'Ask', 'Advance to the next step'])(
-    'says why %s is disabled while a session runs',
+    'says %s is disabled because this document has a session',
     async (name) => {
-      renderToolbar({ sessionRunning: true })
+      renderToolbar({ docBusy: true })
 
       // The disabled button takes no pointer events, so the reason hangs on the
       // wrapper — which is also what makes it reachable by keyboard.
       await userEvent.hover(screen.getByRole('button', { name }).parentElement!)
 
-      expect((await screen.findByRole('tooltip')).textContent).toContain('session running')
+      expect((await screen.findByRole('tooltip')).textContent).toContain(DOC_BUSY)
+    },
+  )
+
+  // spec-00001-AC-49.11 (sixteenth round) — the other reason, on a document that
+  // has no session of its own: every slot is taken.
+  it.each(['Clarify', 'Ask', 'Advance to the next step'])(
+    'says %s is disabled because the cap is reached',
+    async (name) => {
+      renderToolbar({ capReached: true })
+
+      await userEvent.hover(screen.getByRole('button', { name }).parentElement!)
+
+      expect((await screen.findByRole('tooltip')).textContent).toContain(CAP_REACHED)
     },
   )
 
   /**
-   * spec-00001-FR-49 and design-00002 §3: when both reasons hold, «no next step»
-   * is the one shown — it outlives the session, so telling the user only about
-   * the session would promise an entry that never arrives.
+   * spec-00001-FR-49 and design-00002 §3: with both concurrency reasons holding,
+   * this document's own session is the one named — the more specific of the two,
+   * and the one the user can wait out (spec-00003-FR-2).
    */
-  it('prefers no next step over session running when both hold', async () => {
-    renderToolbar({ nextSteps: [], sessionRunning: true })
+  it('prefers this document own session over the cap when both hold', async () => {
+    renderToolbar({ docBusy: true, capReached: true })
+
+    await userEvent.hover(screen.getByRole('button', { name: 'Clarify' }).parentElement!)
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip.textContent).toContain(DOC_BUSY)
+    expect(tooltip.textContent).not.toContain(CAP_REACHED)
+  })
+
+  /**
+   * spec-00001-AC-49.5's priority clause: when «no next step» holds too, it is the
+   * one shown — it outlives every session, so naming a session would promise an
+   * entry that never arrives.
+   */
+  it('prefers no next step over both concurrency reasons', async () => {
+    renderToolbar({ nextSteps: [], docBusy: true, capReached: true })
 
     await userEvent.hover(screen.getByLabelText('Advance to the next step').parentElement!)
 
-    expect((await screen.findByRole('tooltip')).textContent).toContain('no next step')
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip.textContent).toContain('no next step')
+    expect(tooltip.textContent).not.toContain(DOC_BUSY)
   })
 
   // spec-00001-AC-10.2

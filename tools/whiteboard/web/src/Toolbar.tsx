@@ -38,12 +38,17 @@ export interface ToolbarProps {
    */
   auditable: boolean
   /**
-   * Whether the session the board is showing is running: while it is, no entry
-   * here offers to start another. Which starts the server would actually refuse
-   * is the concurrency rules' answer — this document's own session, or the cap
-   * (spec-00003-FR-2, FR-3).
+   * Whether **this** document already has a session running: no second one may
+   * start on it, whatever kind either is (spec-00003-FR-2). Another document's
+   * session never disables these entries (spec-00001-AC-12.8).
    */
-  sessionRunning: boolean
+  docBusy: boolean
+  /**
+   * Whether every session slot is taken: no start of any kind is admitted until
+   * one of them ends (spec-00003-FR-3). Both reasons can hold at once, and the
+   * more specific one is the one shown (spec-00001-FR-49).
+   */
+  capReached: boolean
   /** The agents a session may be run by; a single one is not a choice (spec-00001-FR-55). */
   agents: string[]
   /** The one that will run the next session — the first, until the user picks another. */
@@ -58,6 +63,15 @@ export interface ToolbarProps {
   onAudit: () => void
   onAdvance: (targetType: string) => void
 }
+
+/**
+ * The two reasons a starting point is locked (design-00002 §3): this document
+ * already has a session, or the board is out of slots. They are told apart in
+ * words, because what the user can do about them differs — wait for this
+ * document's session, or wait for any session at all (spec-00003-FR-2, FR-3).
+ */
+export const DOC_BUSY = 'this document already has a running session'
+export const CAP_REACHED = 'the session limit is reached'
 
 /**
  * An entry that is disabled has to say why it is (spec-00001-AC-10.3, AC-49.5):
@@ -88,11 +102,15 @@ function Disabled({ reason, children }: { reason?: string; children: ReactElemen
  * same one can be picked twice running.
  */
 export function Toolbar(props: ToolbarProps) {
-  const { node, transitions, nextSteps, relations, clarifiable, auditable, sessionRunning } = props
+  const { node, transitions, nextSteps, relations, clarifiable, auditable, docBusy, capReached } = props
   const { agents, agent, onPickAgent, onPickRelation } = props
   const { onEdit, onStatus, onAccept, onClarify, onAsk, onAudit, onAdvance } = props
-  // The reason every starting point shares while a session runs (spec-00001-FR-49).
-  const busy = sessionRunning ? 'session running' : undefined
+  // Why every starting point here is locked, in the two words the concurrency
+  // rules speak (spec-00003-FR-2, FR-3). The document's own session wins when
+  // both hold: it is the more specific of the two and it is the one the user can
+  // do something about (spec-00001-FR-49, AC-49.5, AC-49.11).
+  const busy = docBusy ? DOC_BUSY : capReached ? CAP_REACHED : undefined
+  const blocked = docBusy || capReached
 
   return (
     <div
@@ -200,7 +218,7 @@ export function Toolbar(props: ToolbarProps) {
           */}
           {clarifiable ? (
             <Disabled reason={busy}>
-              <Button variant="ghost" size="sm" onClick={onClarify} disabled={sessionRunning}>
+              <Button variant="ghost" size="sm" onClick={onClarify} disabled={blocked}>
                 <MessageCircleQuestionMark className="size-4" aria-hidden />
                 Clarify
               </Button>
@@ -209,7 +227,7 @@ export function Toolbar(props: ToolbarProps) {
 
           {/* Asking is not a review action: any status, any type (spec-00001-FR-47). */}
           <Disabled reason={busy}>
-            <Button variant="ghost" size="sm" onClick={onAsk} disabled={sessionRunning}>
+            <Button variant="ghost" size="sm" onClick={onAsk} disabled={blocked}>
               <CircleHelp className="size-4" aria-hidden />
               Ask
             </Button>
@@ -224,7 +242,7 @@ export function Toolbar(props: ToolbarProps) {
           */}
           {auditable && node.status === 'draft' ? (
             <Disabled reason={busy}>
-              <Button variant="outline" size="sm" onClick={onAudit} disabled={sessionRunning}>
+              <Button variant="outline" size="sm" onClick={onAudit} disabled={blocked}>
                 <ShieldCheck className="size-4" aria-hidden />
                 Audit
               </Button>
@@ -242,7 +260,7 @@ export function Toolbar(props: ToolbarProps) {
             <Disabled reason={busy}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled={sessionRunning}>
+                  <Button variant="ghost" size="sm" aria-label="Advance to the next step" disabled={blocked}>
                     <Plus className="size-4" aria-hidden />
                     Advance
                   </Button>

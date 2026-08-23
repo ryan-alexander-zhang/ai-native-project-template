@@ -99,18 +99,16 @@ export const api = {
   accept: (id: string) => request<ActionResult>('POST', `${at(id)}/review`, { action: 'accept' }),
   nextSteps: (id: string) => request<FlowStep[]>('GET', `${at(id)}/next-steps`),
   /**
-   * The session the terminal is to show, off the list of every session the
-   * server holds (`GET /api/sessions`, design-00001 §7): the newest running one,
-   * or — when nothing runs — the newest there was, so the panel still says how
-   * the last one ended. Several running sessions are all in the payload;
-   * choosing between them is the session panel's business (spec-00003-FR-4,
-   * FR-5), and this is the one a reconnecting board reattaches to
-   * (spec-00003-FR-9).
+   * Every session the server holds — running and ended alike, oldest first
+   * (`GET /api/sessions`, design-00001 §7). The whole list, not a pick off it:
+   * the session panel lists them all (spec-00003-FR-4), the top bar counts them
+   * (FR-6), the node markers read the running ones (FR-10), and a board opening
+   * fresh reattaches to one of them (FR-9). Which one the terminal shows is the
+   * board's own presentation state, never the payload's (FR-5).
    */
-  session: async (): Promise<{ current: SessionInfo | null }> => {
+  sessions: async (): Promise<SessionListing[]> => {
     const { sessions } = await request<{ sessions: SessionListing[] }>('GET', '/api/sessions')
-    const running = sessions.filter((session) => session.status === 'running')
-    return { current: (running.length > 0 ? running : sessions).at(-1) ?? null }
+    return sessions
   },
   // Every session entry may name which agent runs it; leaving it out is what a
   // single-agent config does, and the server then takes the first
