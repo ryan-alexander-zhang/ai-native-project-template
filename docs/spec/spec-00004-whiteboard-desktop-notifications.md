@@ -22,10 +22,9 @@ parent: prd-00001-docs-whiteboard
   （推翻 `decision-00009` §2 第 8 条的范围外维持，已原地追注）。
 - 本 spec 是 `spec-00001` … `spec-00003` 的**并列新 spec**（Sizing and
   Splitting 第 1 条），同 `parent`，不 supersede 任何一份。
-- **与 `spec-00003` 的关系（不就地改它）**：其 §6「板外通知」条目的
-  **桌面通知半边**由本 spec 接管（邮件等其他板外通道仍范围外），该条目
-  已按 `spec-00001` §6 的先例原地追注留存，移除属 `spec-00003` 自己的
-  修订轮、由 plan 轮列任务。事件源不新增：等待输入置位即
+- **与 `spec-00003` 的关系**：其 §6 原「板外通知」条目的**桌面通知半边**
+  由本 spec 接管（邮件等其他板外通道仍范围外）；该条目已经其第十七轮
+  修订轮改写为仅余邮件半边（plan-00019 T2）。事件源不新增：等待输入置位即
   `spec-00003-FR-6` 的判定、结束事件即 `spec-00003-FR-7` 的触发集，页面
   经既有刷新通路获知——**无任何服务端改动**（`decision-00010` §5 站立
   约束）。
@@ -184,10 +183,10 @@ parent: prd-00001-docs-whiteboard
 
 | Design | Doc | Covers |
 | --- | --- | --- |
-| 白板 UI（待修订轮扩展） | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 顶栏开关控件、离场判定口径（可见性与焦点信号）、通知触发与替换标识、点击回跳通路 |
+| 白板 UI（第十七轮已扩展，§13） | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 顶栏开关控件与三态呈现、离场判定口径（可见性与焦点信号）、通知触发/补发/替换标识、点击回跳通路 |
 
-本 spec 无服务端设计改动（`decision-00010` §5）；design-00002 的修订由
-plan 轮列任务并回链本 spec（`informs` 增列）。
+本 spec 无服务端设计改动（`decision-00010` §5）；design-00002 已经
+第十七轮修订轮扩展并回链本 spec（plan-00019 T1）。
 
 ## 6. Out of Scope
 
@@ -212,6 +211,6 @@ plan 轮列任务并回链本 spec（`informs` 增列）。
   [spec-00002-whiteboard-governance](spec-00002-whiteboard-governance.md) ·
   [spec-00003-whiteboard-parallel-sessions](spec-00003-whiteboard-parallel-sessions.md)（事件源）
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
-- Design: [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)（待修订轮回链）
+- Design: [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) §13（第十七轮已回链）
 - Analysis: [analysis-00001-out-of-board-notifications](../analysis/analysis-00001-out-of-board-notifications.md)
 - Decisions: [decision-00010-whiteboard-desktop-notifications](../decision/decision-00010-whiteboard-desktop-notifications.md)（本 spec 的全部取舍）

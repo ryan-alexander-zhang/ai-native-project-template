@@ -405,19 +405,18 @@ parent: prd-00001-docs-whiteboard
 
 | Design | Doc | Covers |
 | --- | --- | --- |
-| 会话通道（待修订轮扩展） | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 会话注册表由单例槽位改多会话、终止/会话 API 携带会话标识、等待输入的静默阈值常数、收尾串行队列、关停终止收尾 |
-| 白板 UI（待修订轮扩展） | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 会话面板、徽标与节点标记、终端切换 |
+| 会话通道（第十六轮已扩展） | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | 会话注册表由单例槽位改多会话、终止/会话 API 携带会话标识、等待输入的静默阈值常数、收尾串行队列、关停终止收尾 |
+| 白板 UI（第十六轮已扩展，§12） | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 会话面板、徽标与节点标记、终端切换 |
 
 本 spec 不新增 design 文档；两份 design 的修订由 plan 轮列为任务并**回链
 本 spec**（`informs` 增列 `spec-00003-whiteboard-parallel-sessions`）。
 
 ## 6. Out of Scope
 
-- 板外通知（浏览器系统通知、邮件等）——`decision-00009` §2 第 8 条维持
-  范围外。**桌面通知半边已由
-  [spec-00004](spec-00004-whiteboard-desktop-notifications.md) 接管**
-  （decision-00010 推翻该维持；邮件等其他通道仍范围外；本条就地留存，
-  移除属本 spec 自己的修订轮）
+- 邮件等其他板外通道——仍范围外（原「板外通知」条目的桌面通知半边已由
+  [spec-00004](spec-00004-whiteboard-desktop-notifications.md) 接管，
+  decision-00010 推翻了 `decision-00009` §2 第 8 条对其的维持；本条即
+  第十七轮修订轮对原条目的改写）
 - 跨服务重启的会话存续（tmux 式 PTY 托管，`decision-00009` §3 否决）
 - 多用户 / 多浏览器并发协作（仍是本地单人白板）
 - 历史会话的检索与管理增强（`spec-00001-FR-54` 现状不变）
@@ -435,7 +434,7 @@ parent: prd-00001-docs-whiteboard
   [spec-00002-whiteboard-governance](spec-00002-whiteboard-governance.md)
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) ·
-  [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)（均待修订轮回链）
+  [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)（第十六轮均已回链）
 - Decisions: [decision-00009-whiteboard-parallel-sessions](../decision/decision-00009-whiteboard-parallel-sessions.md)（本 spec 的各项裁决）·
   [decision-00008-whiteboard-revision-create-and-session-reach](../decision/decision-00008-whiteboard-revision-create-and-session-reach.md) §3（被推翻的否决）·
   [decision-00006-whiteboard-ask-clarify](../decision/decision-00006-whiteboard-ask-clarify.md) §5（实录门槛，已豁免）

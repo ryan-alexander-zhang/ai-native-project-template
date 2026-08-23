@@ -2,7 +2,7 @@
 id: design-00002-whiteboard-ui
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications]
 ---
 
 # Design: Docs 白板界面
@@ -59,7 +59,7 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 
 ```mermaid
 flowchart TB
-  TB[Top bar<br/>标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 主题切换]
+  TB[Top bar<br/>标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 桌面通知开关（第十七轮）· 主题切换]
   subgraph Work[工作区]
     direction LR
     CV[Canvas<br/>React Flow] ---|可拖动分隔| EP[Editor panel<br/>宽度可调]
@@ -142,6 +142,7 @@ row3                                                                            
 | 会话面板 | 无 | 与命令面板同一承载形态的全屏 `Dialog`：逐会话一行「种类图标 · 目标文档 id · agent（配置多于一条时）· 状态 · 发起时间」，运行中在前、已结束（exited/failed/terminated 分别标明）在后；点击一行关闭面板、终端呈现该会话，目标在图上则定位并选中其节点，不在则仅呈现终端 + toast 提示、选中不变（`spec-00003-FR-4`）；无会话时空态文案，入口仍可开 | `Terminal` |
 | 节点会话标记 | 无 | 目标文档节点 `Card` 上的 `Badge`：运行中与等待输入以**不同图标**区分（非颜色可辨）；激活（单击/Enter）即在终端呈现该会话，不触发节点选中语义；会话结束随刷新消失；只作用呈现层（`spec-00003-FR-10`） | `Terminal` `Keyboard` |
 | 会话结束通知 | 无 | `Sonner` 提示条：每会话结束（自然退出/终止/启动失败）各一条，含种类、文档 id 与结束态，逐条堆叠不合并（`spec-00003-FR-7`） | `Terminal` |
+| 桌面通知开关 | 无 | 顶栏 `Button` + **三态呈现**（关闭 / 未生效 / 生效，非颜色可辨）：开启时按 `spec-00004-FR-1` 走权限流程（已授予则静默生效、拒绝则回落关闭并 `toast` 提示到浏览器设置），关闭立即安静；开关布尔持久于浏览器本地，三态推导见 §13（第十七轮） | `Bell` `BellOff` |
 | 新建 | 无 | 顶栏 `Button` + `Dialog`：类型只列流程配置 `entry` 声明者、slug 输入框；确认后编辑器以模板预填打开，保存即建档（`spec-00001-FR-53`，第十一轮）；`entry` 缺失或为空时按钮不呈现 | `FilePlus` |
 | 会话历史 | 无 | 顶栏 `Button` 开历史列表（种类、文档 id、agent、起止、退出状态），点击一条查看转写全文（只读，`spec-00001-FR-54`，第十一轮） | `History` |
 | agent 选择 | 无 | 配置多于一条 agent 时，发起会话的入口旁呈现 `DropdownMenu` 选择（缺省第一条）；仅一条时不呈现（`spec-00001-FR-55`，第十一轮） | `Bot` |
@@ -430,6 +431,7 @@ FR-26/FR-27 及其 AC 需要新的验收行。
 | 等待输入徽标与计数（第十六轮） | `spec-00003-FR-6` 及其 AC |
 | 会话结束与启动失败的提示条（第十六轮） | `spec-00003-FR-7` 及其 AC |
 | 节点会话状态标记（第十六轮） | `spec-00003-FR-10` 及其 AC |
+| 桌面通知开关、离场触发与点击回跳（第十七轮） | `spec-00004-FR-1`…`FR-6` 及其 AC |
 | 推进指令的文法段与产出校验 | `spec-00001-FR-41` 及其 AC |
 | 磁盘变更自动刷新与断连时的沉默 | `spec-00001-FR-42`、`FR-43` 及其 AC |
 | 刷新后呈现状态按 id 保持与就近关闭 | `spec-00001-FR-44` 及其 AC |
@@ -614,7 +616,48 @@ design-00001 §5，API 见 design-00001 §7。控件逐项已并入 §3 的表�
   `stopPropagation`，不触发节点单击的选中语义（`spec-00003-FR-10` 与
   行内 id 跳转的 FR-57 同构约定）。
 
-## 13. Open Questions
+## 13. 桌面通知（第十七轮）
+
+承载 `spec-00004` 的界面侧；取舍全部在案于 `decision-00010`。零服务端
+改动：事件源就是 §12 会话面板同一份会话载荷。触发点两处：结束沿 useBoard
+既有的结束差分（`announce`，以 `seen` 映射 id → status）；**awaiting
+差分为本轮新增**——`announce` 的同一处差分扩展记录每会话的 awaiting
+布尔，`false → true` 的转变即一次新的**等待回合**（页内计数，随转变
+自增），补发与判重都以「该会话上次已通知的回合号」为键
+（`spec-00004-AC-2.3` 的「同一次等待不再补第二条」由此可判）。
+
+- **离场判定**：`document.hidden || !document.hasFocus()`——可见性盖住
+  标签页后台，焦点盖住「窗口可见但在别的窗口干活」（spec-00004 §1 把
+  口径交给本节持有）。监听 `visibilitychange` + `focus`/`blur`；转入
+  离场的瞬间对当前已 awaiting 且回合未通知过的会话补发
+  （`spec-00004-FR-2`）。
+- **通知本体**：`new Notification(title, { tag, body })`——`tag` 取
+  会话 id，天然承载「同一会话后到替换先到」（`spec-00004-FR-6`）；替换
+  时带重新提醒标志（支持的浏览器对结束通知重新提醒，不支持则静默替换
+  ——弱语义）；title/body 只由种类、文档 id、状态拼出，不经手正文。
+  `Bell`/`BellOff` 落地时按所装 lucide-react 版本复验（§11/§12 的既有
+  约定）。
+- **权限路径**（`spec-00004-FR-1`/`AC-1.2`）：权限请求只发生在开关的
+  点击处理器里（用户手势要求恰好同源满足）。请求被**拒绝**时布尔写回
+  false——开关回落为**关闭态**，并以 `toast` 提示到浏览器设置手动开启
+  （载体同 §3 动作被拒行）；权限已是 denied 时点击**不再请求**（浏览器
+  不允许程序化重试，decision-00010 §4），布尔保持 false、同一条 toast
+  提示。
+- **点击回跳**：`notification.onclick` → `window.focus()`（尽力而为，
+  能否前置属浏览器/系统策略）+ 走 §12 会话面板行点击的同一条
+  `showSession` 通路（含目标不在图上的就近处置与会话已不在的提示）。
+  页面关闭后遗留通知的 onclick 随页面消亡——spec-00004 §6 的既定边界，
+  本设计不为其造 SW 通路。
+- **开关三态**（呈现随 `spec-00004` 的三个验收态，缺一即混淆）：本地
+  布尔（与 §2 面板尺寸的持久化同一存放层）与浏览器权限两个输入推导——
+  布尔 false → **关闭态**（用户自己关的或从未开启，`AC-1.3`/`AC-1.5`）；
+  布尔 true ∧ 权限非 granted → **未生效态**（权限被收回，`AC-4.3`——
+  告诉用户是权限死了，不是他关的）；布尔 true ∧ granted → **生效态**。
+  权限被收回时布尔不动，未生效态自然浮现（`spec-00004-FR-4` 的静默
+  降级，无需额外状态）。
+
+## 14. Open Questions
 
 - 本文档当前无未决项（第十五轮审计的两问已由域主裁定，见 spec-00001 §8；
-  就近关闭的裁定已回写 §9；第十六轮的取舍全部由 decision-00009 在案）。
+  就近关闭的裁定已回写 §9；第十六轮的取舍全部由 decision-00009 在案；
+  第十七轮的取舍全部由 decision-00010 在案）。
