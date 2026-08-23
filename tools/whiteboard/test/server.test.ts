@@ -1,12 +1,12 @@
 import type { Server } from 'node:http'
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { taskInstruction } from '../src/advance.ts'
 import { Board } from '../src/server.ts'
 import { ptySpawner, spawnPty } from '../src/pty.ts'
-import type { SessionInfo } from '../src/sessionManager.ts'
+import type { SessionInfo, SpawnPty } from '../src/sessionManager.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import {
   SESSION_WAIT,
@@ -85,6 +85,30 @@ function boardOnRepo(repoRoot: string, docsDir: string, config = testConfig(), s
 
 /** The request function `boardOn` hands back, for helpers that take one. */
 type BoardCall = ReturnType<typeof boardOn>['call']
+
+/**
+ * Stand-in agents whose exit the test fires, in start order. What the commit
+ * queue does depends on the order two wrap-ups reach it in (spec-00003-FR-8), and
+ * a spawned process ends when it ends — so the end is the one thing these tests
+ * hold in their own hands.
+ */
+function scriptedAgents() {
+  const exits: Array<(exitCode: number) => void> = []
+  const spawn: SpawnPty = () => {
+    const listeners: Array<(event: { exitCode: number }) => void> = []
+    exits.push((exitCode) => {
+      for (const listener of listeners) listener({ exitCode })
+    })
+    return {
+      onData: () => {},
+      onExit: (listener) => void listeners.push(listener),
+      write: () => {},
+      resize: () => {},
+      kill: () => {},
+    }
+  }
+  return { spawn, exit: (index: number, exitCode = 0) => exits[index]!(exitCode) }
+}
 
 afterEach(async () => {
   for (const server of servers.splice(0)) server.close()
@@ -1316,6 +1340,8 @@ describe('the terminal socket', () => {
  */
 describe('the docs-change socket', () => {
   const OTHER_IDEA = doc({ id: 'idea-00002-y', type: 'idea', status: 'draft' }, '# Idea Y\n')
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
   /** Longer than the debounce window, so «nothing arrived» has had its chance to. */
   const SETTLE = 400
   /**
@@ -1455,6 +1481,43 @@ describe('the docs-change socket', () => {
     expect(watching.signals).toBe(1)
   })
 
+  /**
+   * spec-00003-AC-8.3 — a batch of endings is one refresh. The session-end signal
+   * goes through the very window a burst of writes goes through (design-00001 §5
+   * 刷新合并, the same ~100ms as §6's watcher debounce), so two wrap-ups running
+   * back to back in the commit queue are announced once; the panel's per-session
+   * notices are the front end's, and are not folded (spec-00003-FR-7).
+   */
+  it('folds two sessions ending in one batch into a single refresh signal', async () => {
+    const agents = scriptedAgents()
+    const open = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, undefined, undefined, agents.spawn)
+    const { board, docsDir, repoRoot } = open
+    await armWatch(board.watcher, docsDir)
+    const watching = await subscribe(open)
+    const first = (await open.call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })).body.id
+    const second = (await open.call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })).body.id
+
+    // What the two agents wrote, and its own signal out of the way: what is
+    // being counted below is the endings, not the writes.
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    appendFileSync(join(docsDir, 'record/r.md'), '\none more line of evidence\n')
+    await vi.waitFor(() => expect(watching.signals).toBeGreaterThanOrEqual(1), SIGNAL_WAIT)
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+    const written = watching.signals
+
+    agents.exit(0)
+    agents.exit(1)
+    await Promise.all([board.sessions.whenFinished(first), board.sessions.whenFinished(second)])
+
+    await vi.waitFor(() => expect(watching.signals).toBe(written + 1), SIGNAL_WAIT)
+    await new Promise((resolve) => setTimeout(resolve, SETTLE))
+    expect(watching.signals).toBe(written + 1)
+    // And by the time that one signal lands, both wrap-ups are in: the graph the
+    // board re-reads is the one after both of them, with nothing left behind.
+    expect(git(repoRoot, 'status', '--porcelain', '--', 'docs').trim()).toBe('')
+    expect((await open.call('GET', '/api/graph')).body.nodes).toHaveLength(2)
+  })
+
   // spec-00001-AC-42.8 — nobody listening is not a failure
   it('carries on with no board connected at all', async () => {
     const { docsDir, call } = await watchingBoard()
@@ -1579,6 +1642,151 @@ describe('when a session ends', () => {
 
     expect(commitCount(repoRoot)).toBe(commits)
     expect(board.sessions.latest()!.outcome!.committed).toBe(false)
+  })
+})
+
+/**
+ * spec-00003-FR-8: every commit the board makes — the four session kinds' wrap-up
+ * commits and the write path's own — runs in one serial queue, so sessions ending
+ * together neither stage each other's files nor swallow one another
+ * (design-00001 §4, §6).
+ *
+ * The agents here are stand-ins whose exit the test fires: what these tests
+ * measure is the order two wrap-ups reach the queue in, and a real process ends
+ * when it ends.
+ */
+describe('several commits at once', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+
+  function scriptedBoard(files: Record<string, string>) {
+    const agents = scriptedAgents()
+    return { ...boardOn(files, undefined, undefined, agents.spawn), exit: agents.exit }
+  }
+
+  /** The files one commit staged, newest commit first at `back = 0`. */
+  function commitFiles(repoRoot: string, back: number): string[] {
+    return git(repoRoot, 'show', '--name-only', '--pretty=', `HEAD~${back}`).trim().split('\n').filter(Boolean)
+  }
+
+  /** What is still uncommitted under docs/ — empty is «nothing was lost». */
+  function dirtyDocs(repoRoot: string): string {
+    return git(repoRoot, 'status', '--porcelain', '--', 'docs').trim()
+  }
+
+  /** Two sessions on two documents, each ready to be ended by the test. */
+  async function twoSessions(call: BoardCall): Promise<[string, string]> {
+    const first = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+    const second = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
+    return [first.body.id, second.body.id]
+  }
+
+  // spec-00003-AC-8.1
+  it('gives two sessions ending one after the other a commit each, staging only its own file', async () => {
+    const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
+      'spec/b.md': DRAFT_SPEC,
+      'record/r.md': ACTIVE_RECORD,
+    })
+    const commits = commitCount(repoRoot)
+    const [first, second] = await twoSessions(call)
+
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    exit(0)
+    await board.sessions.whenFinished(first)
+    appendFileSync(join(docsDir, 'record/r.md'), '\none more line of evidence\n')
+    exit(1)
+    await board.sessions.whenFinished(second)
+
+    expect(commitCount(repoRoot)).toBe(commits + 2)
+    // Each names its own kind and its own document (spec-00001-FR-14), and each
+    // staged set holds that session's file alone.
+    expect(lastCommitMessage(repoRoot)).toBe('wb(ask): record-00001-r')
+    expect(commitFiles(repoRoot, 0)).toEqual(['docs/record/r.md'])
+    expect(git(repoRoot, 'log', '-2', '--pretty=%s').trim().split('\n').at(-1)).toBe('wb(clarify): spec-00001-b')
+    expect(commitFiles(repoRoot, 1)).toEqual(['docs/spec/b.md'])
+  })
+
+  // spec-00003-AC-8.2
+  it('makes one commit when only one of two sessions changed anything under docs', async () => {
+    const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
+      'spec/b.md': DRAFT_SPEC,
+      'record/r.md': ACTIVE_RECORD,
+    })
+    const commits = commitCount(repoRoot)
+    const [first, second] = await twoSessions(call)
+
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    exit(0)
+    exit(1)
+    await Promise.all([board.sessions.whenFinished(first), board.sessions.whenFinished(second)])
+
+    expect(commitCount(repoRoot)).toBe(commits + 1)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
+    // The session that wrote nothing wrapped up all the same, with no commit.
+    const listed = board.sessions.list()
+    expect(listed.find((session) => session.id === second)!.outcome).toEqual({
+      docId: 'record-00001-r',
+      problems: [],
+      committed: false,
+      error: undefined,
+    })
+  })
+
+  // spec-00003-AC-8.4
+  it('keeps a user save and a session wrap-up in two commits, neither swallowing the other', async () => {
+    const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
+      'spec/b.md': DRAFT_SPEC,
+      'idea/a.md': ACTIVE_IDEA,
+    })
+    const commits = commitCount(repoRoot)
+    const { body: session } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+    const { body: opened } = await call('GET', '/api/docs/idea-00001-x')
+
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    // The wrap-up is in flight when the save arrives: the queue orders the two,
+    // and the save's write is part of its own turn, so the wrap-up's difference
+    // cannot include the edited file either.
+    exit(0)
+    const saved = await call('PUT', '/api/docs/idea-00001-x', {
+      content: `${ACTIVE_IDEA}an edit made by hand\n`,
+      baseHash: opened.hash,
+    })
+    await board.sessions.whenFinished(session.id)
+
+    expect(saved.body.committed).toBe(true)
+    expect(commitCount(repoRoot)).toBe(commits + 2)
+    expect(commitFiles(repoRoot, 1)).toEqual(['docs/spec/b.md'])
+    expect(lastCommitMessage(repoRoot)).toBe('wb(edit): idea-00001-x')
+    expect(commitFiles(repoRoot, 0)).toEqual(['docs/idea/a.md'])
+    expect(dirtyDocs(repoRoot)).toBe('')
+  })
+
+  // spec-00003-AC-8.5
+  it('loses nothing when two sessions wrote the same third document, crediting the first to end', async () => {
+    const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
+      'spec/b.md': DRAFT_SPEC,
+      'record/r.md': ACTIVE_RECORD,
+      'idea/a.md': ACTIVE_IDEA,
+    })
+    const commits = commitCount(repoRoot)
+    const [first, second] = await twoSessions(call)
+
+    appendFileSync(join(docsDir, 'idea/a.md'), 'a line from the clarify session\n')
+    appendFileSync(join(docsDir, 'idea/a.md'), 'a line from the ask session\n')
+    exit(0)
+    exit(1)
+    await Promise.all([board.sessions.whenFinished(first), board.sessions.whenFinished(second)])
+
+    // Both lines are in the repo and nothing is left behind: attribution by end
+    // order means the first to end carries the other's line as known noise
+    // (decision-00009 §2 第 9 条), never that a change goes missing.
+    const committed = git(repoRoot, 'show', 'HEAD:docs/idea/a.md')
+    expect(committed).toContain('a line from the clarify session')
+    expect(committed).toContain('a line from the ask session')
+    expect(dirtyDocs(repoRoot)).toBe('')
+    expect(commitCount(repoRoot)).toBeLessThanOrEqual(commits + 2)
+    expect(commitFiles(repoRoot, 0)).toContain('docs/idea/a.md')
+    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
   })
 })
 

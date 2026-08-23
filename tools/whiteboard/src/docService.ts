@@ -136,6 +136,12 @@ export class DocService {
   private readonly bodies = new Map<string, string>()
   private readonly views = new Map<string, ItemsView>()
   private scanned?: RecordScan
+  /**
+   * The tail of the one serial queue every board commit runs in
+   * (spec-00003-FR-8, design-00001 §4 and §6): the four session kinds' wrap-up
+   * commits and the write path's own, one at a time in arrival order.
+   */
+  private queued: Promise<unknown> = Promise.resolve()
 
   constructor(repoRoot: string, docsDir: string, config: FlowConfig, git: GitLayer = new GitLayer(repoRoot)) {
     this.repoRoot = repoRoot
@@ -516,8 +522,30 @@ export class DocService {
     before: DirtySnapshot,
     action: ActionKind = 'advance',
   ): Promise<ActionResult> {
-    const paths = await this.git.changedSince(this.docsPath(), before)
-    return this.git.commit(paths, commitMessage(action, docId))
+    // The difference is taken inside the turn, never before it: read outside,
+    // it would be a reading of a tree another commit in the queue is still
+    // moving — and two sessions ending at once would each stage what the other
+    // has just had committed (spec-00003-AC-8.1, AC-8.5).
+    return this.serially(async () => {
+      const paths = await this.git.changedSince(this.docsPath(), before)
+      return this.git.commit(paths, commitMessage(action, docId))
+    })
+  }
+
+  /**
+   * Run one commit's whole turn — work out what to stage, write if the turn
+   * writes, stage, commit — with no other board commit in flight
+   * (spec-00003-FR-8). A rejected turn is the caller's to read and never the
+   * next turn's reason not to run, which is why the chain is kept on a swallowed
+   * copy of it.
+   */
+  private serially<T>(turn: () => Promise<T>): Promise<T> {
+    const running = this.queued.then(turn)
+    this.queued = running.then(
+      () => {},
+      () => {},
+    )
+    return running
   }
 
   private docsPath(): string {
@@ -554,12 +582,20 @@ export class DocService {
     return this.writeFile(join(this.docsDir, node.path), content, node.id, action)
   }
 
-  /** The write-then-commit every action ends on; the parsed tree goes stale here. */
+  /**
+   * The write-then-commit every action ends on; the parsed tree goes stale here.
+   * Both halves are one turn of the commit queue (spec-00003-AC-8.4): a session
+   * wrapping up in the meantime then either sees this file before it is written
+   * or after it is committed, so neither commit can stage the other's change and
+   * neither swallows the other.
+   */
   private async writeFile(absolute: string, content: string, docId: string, action: ActionKind): Promise<ActionResult> {
-    writeFileSync(absolute, content)
-    this.invalidate()
-    const repoPath = relative(this.repoRoot, absolute).split(/[\\/]/).join('/')
-    return this.git.commit([repoPath], commitMessage(action, docId))
+    return this.serially(async () => {
+      writeFileSync(absolute, content)
+      this.invalidate()
+      const repoPath = relative(this.repoRoot, absolute).split(/[\\/]/).join('/')
+      return this.git.commit([repoPath], commitMessage(action, docId))
+    })
   }
 }
 
