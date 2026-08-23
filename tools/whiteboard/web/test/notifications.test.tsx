@@ -408,6 +408,64 @@ describe('being called back to a session that is waiting', () => {
   })
 
   /**
+   * issue-00018 — the second round of waiting of the same session. The agent
+   * asked, the user answered, the agent worked and went silent again: that is a
+   * new "not waiting → waiting" turn, and spec-00004-FR-2 owes it its own
+   * notification.
+   */
+  it('posts a notification for a second round of waiting of the same session', async () => {
+    enabled()
+    serve()
+    await openBoard()
+    await leave()
+
+    served = [listing({ awaiting: true })]
+    await push()
+    expect(Notice.made).toHaveLength(1)
+
+    // Answered: the agent prints again and the mark comes down.
+    served = [listing({ awaiting: false })]
+    await push()
+    expect(Notice.made).toHaveLength(1)
+
+    // Silent again — a second round, and a second notice.
+    served = [listing({ awaiting: true })]
+    await push()
+
+    expect(Notice.made).toHaveLength(2)
+    expect(Notice.made[1]!.options.body).toBe('awaiting')
+    expect(Notice.made[1]!.options.tag).toBe('s1')
+  })
+
+  /**
+   * issue-00018 — the first round was answered from in front of the board, so
+   * nothing was posted for it (the badge carried it); the user leaves before the
+   * second round, and that round is still owed its notice.
+   */
+  it('posts the second round notice when the first round was answered in front of the board', async () => {
+    enabled()
+    serve()
+    await openBoard()
+
+    // Round one, with the user looking at the board: badge only.
+    served = [listing({ awaiting: true })]
+    await push()
+    expect(Notice.made).toHaveLength(0)
+
+    // Answered, and only then does the user go away.
+    served = [listing({ awaiting: false })]
+    await push()
+    await leave()
+    expect(Notice.made).toHaveLength(0)
+
+    served = [listing({ awaiting: true })]
+    await push()
+
+    expect(Notice.made).toHaveLength(1)
+    expect(Notice.made[0]!.options.body).toBe('awaiting')
+  })
+
+  /**
    * spec-00004-AC-2.4 — two sessions start waiting one after the other, and each
    * gets its own notification (they are told apart by their own tags).
    */
@@ -428,6 +486,43 @@ describe('being called back to a session that is waiting', () => {
     expect(Notice.made).toHaveLength(2)
     expect(Notice.made.map((notice) => notice.options.tag)).toEqual(['s1', 's2'])
     expect(Notice.made[1]!.title).toBe('ask · idea-00001-x')
+  })
+
+  /**
+   * issue-00018 — a refresh that read «not waiting» is still in flight when a
+   * later one reads «waiting». Waiting is not a state a session climbs to and
+   * stays in: the earlier reading has to be folded in before the later one, or
+   * the turn between them is never seen and the session sits waiting with
+   * nobody told.
+   */
+  it('keeps the round when two refreshes land out of order', async () => {
+    enabled()
+    serve()
+    await openBoard()
+    await leave()
+
+    served = [listing({ awaiting: true })]
+    await push()
+    expect(Notice.made).toHaveLength(1)
+
+    // The answered reading, held back on the graph half of the same refresh.
+    let release: (() => void) | undefined
+    vi.spyOn(api, 'graph').mockImplementationOnce(
+      () => new Promise((resolve) => (release = () => resolve(structuredClone(GRAPH)))),
+    )
+    served = [listing({ awaiting: false })]
+    await act(async () => Socket.channel!.signal())
+    await settle()
+
+    // Silent again, and this refresh has nothing holding it up.
+    served = [listing({ awaiting: true })]
+    await push()
+    // The held one lands.
+    await act(async () => void release?.())
+    await settle()
+
+    expect(Notice.made).toHaveLength(2)
+    expect(Notice.made[1]!.options.body).toBe('awaiting')
   })
 })
 
@@ -485,6 +580,36 @@ describe('being told a session has ended', () => {
     expect(Notice.made).toHaveLength(2)
     expect(Notice.made.map((notice) => notice.options.tag)).toEqual(['s1', 's2'])
     expect(Notice.made[1]!.options.body).toBe('failed')
+  })
+
+  /**
+   * issue-00018 — the same reordering, on the ending half of the one diff: a
+   * reading taken while the session still ran, landing after the reading that
+   * says it ended, would put «running» back and let the very next reading
+   * announce the same end a second time (spec-00003-FR-7 is one toast per end).
+   */
+  it('announces an end once when two refreshes land out of order', async () => {
+    enabled()
+    serve([listing()])
+    await openBoard()
+    await leave()
+
+    let release: (() => void) | undefined
+    vi.spyOn(api, 'graph').mockImplementationOnce(
+      () => new Promise((resolve) => (release = () => resolve(structuredClone(GRAPH)))),
+    )
+    served = [listing()]
+    await act(async () => Socket.channel!.signal())
+    await settle()
+
+    served = [listing({ status: 'exited', exitCode: 0 })]
+    await push()
+    await act(async () => void release?.())
+    await settle()
+    await push()
+
+    expect(Notice.made).toHaveLength(1)
+    expect(toast.message).toHaveBeenCalledTimes(1)
   })
 })
 

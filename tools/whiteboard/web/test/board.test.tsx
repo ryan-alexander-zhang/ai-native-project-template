@@ -383,6 +383,26 @@ describe('the board state', () => {
     expect(result.current.placed).toHaveLength(2)
   })
 
+  /**
+   * issue-00018 — the reads queue so their readings are folded in in order, and
+   * a read that failed must not be a queue nobody can get past: the next one
+   * still runs and the board catches up.
+   */
+  it('takes the next read after one that failed', async () => {
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+
+    vi.spyOn(api, 'graph').mockRejectedValueOnce(new Error('graph: unreadable'))
+    await act(async () => {
+      await expect(result.current.refresh()).rejects.toThrow('graph: unreadable')
+    })
+
+    vi.spyOn(api, 'graph').mockResolvedValue({ ...GRAPH, nodes: [GRAPH.nodes[0]!] })
+    await act(async () => void (await result.current.refresh()))
+
+    expect(result.current.graph.nodes).toHaveLength(1)
+  })
+
   // The column order arrives from GET /api/config; laying out before it lands
   // would put every node in the unknown-type bucket (design-00002 §2).
   it('lays out with the column order the config declares', async () => {

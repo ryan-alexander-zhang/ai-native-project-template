@@ -127,6 +127,16 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * every switch would tear the docs-change channel down and dial it again.
    */
   const shownRef = useRef<string | undefined>(undefined)
+  /**
+   * The read in flight, so the next one can queue behind it. Two reads at once
+   * fold their listings into `seen` in whatever order the responses land, and
+   * waiting is not a state a session climbs to and stays in the way a status is:
+   * a «not waiting» reading applied after the «waiting» reading it came before
+   * loses that turn, and a session that then sits waiting never turns again, so
+   * nobody is ever told (issue-00018). Ordered reads are the whole of the fix —
+   * the diff below is right as long as it sees every reading, in order.
+   */
+  const reading = useRef<Promise<unknown>>(Promise.resolve())
 
   // The desktop side of the same two events (spec-00004): it is fed from the
   // diff below and posts nothing while the user is looking at the board.
@@ -202,7 +212,7 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * else, so a refresh keeps the user on the session they were on
    * (spec-00003-AC-5.6).
    */
-  const refresh = useCallback(async () => {
+  const read = useCallback(async () => {
     const [next, listing] = await Promise.all([api.graph(), api.sessions()])
     const first = seen.current === undefined
     announce(listing)
@@ -240,6 +250,17 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     if (viewing.current) await readCoverage()
     return next
   }, [readCoverage])
+
+  /**
+   * The one way in, and one read at a time (see `reading` above). A read that
+   * failed still lets the next one start: the queue carries the turn, not the
+   * answer.
+   */
+  const refresh = useCallback((): Promise<DocGraph> => {
+    const next = reading.current.then(read)
+    reading.current = next.catch(() => undefined)
+    return next
+  }, [read])
 
   /** Hold a document as the selection and read what its toolbar offers. */
   const load = useCallback(async (id: string) => {
