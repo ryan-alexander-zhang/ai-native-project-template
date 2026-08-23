@@ -37,6 +37,8 @@ T1 与 T2 是文档轮，先行且互相独立；T3 依赖 T1；T4 收口。**T1
   （聚焦尽力而为 + 终端呈现 + 定位选中/就近处置/会话已不在的提示）；
   内容最小化。
 - **T4 — 测试与验收收口**：按 `spec-00004-AC-1.1` … `AC-6.3` 全部 21 条
+  （事后注：`spec-00004-AC-2.5` 由 issue-00018 补钉，record 已补列，
+  现为 22 条）
   各落一测，每测带 `// <AC id>` 溯源标注；`npm test`、typecheck、覆盖率
   门不降；写 record（`parent` 指向本 plan，
   `verifies: [spec-00004-whiteboard-desktop-notifications]`）逐 AC 列行，

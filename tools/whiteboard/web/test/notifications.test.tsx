@@ -408,7 +408,7 @@ describe('being called back to a session that is waiting', () => {
   })
 
   /**
-   * issue-00018 — the second round of waiting of the same session. The agent
+   * spec-00004-AC-2.5 (issue-00018) — the second round of waiting of the same session. The agent
    * asked, the user answered, the agent worked and went silent again: that is a
    * new "not waiting → waiting" turn, and spec-00004-FR-2 owes it its own
    * notification.
@@ -438,7 +438,7 @@ describe('being called back to a session that is waiting', () => {
   })
 
   /**
-   * issue-00018 — the first round was answered from in front of the board, so
+   * spec-00004-AC-2.5 (issue-00018) — the first round was answered from in front of the board, so
    * nothing was posted for it (the badge carried it); the user leaves before the
    * second round, and that round is still owed its notice.
    */

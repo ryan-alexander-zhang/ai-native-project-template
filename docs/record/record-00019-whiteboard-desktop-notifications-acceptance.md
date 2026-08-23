@@ -10,7 +10,8 @@ verifies: [spec-00004-whiteboard-desktop-notifications]
 
 对 [plan-00019-whiteboard-desktop-notifications](../plan/plan-00019-whiteboard-desktop-notifications.md)
 的验收。本轮交付整份 `spec-00004-whiteboard-desktop-notifications`
-（6 FR、21 AC）：三态桌面通知开关与权限路径（T3）、离场判定（隐藏或
+（6 FR、22 AC——第 22 条 `spec-00004-AC-2.5` 由 issue-00018 的验收缺口
+补钉，随其修复补入本清单）：三态桌面通知开关与权限路径（T3）、离场判定（隐藏或
 失焦）、等待输入与结束的通知触发（含转入离场的补发、同会话替换）、点击
 回跳；design-00002 §13 与 spec-00003 §6 的文档轮（T1/T2）先行完成。纯
 前端实现，零服务端改动（decision-00010 §5）。清单按 AC 逐条列全，测试
@@ -37,6 +38,7 @@ verifies: [spec-00004-whiteboard-desktop-notifications]
 | spec-00004-AC-2.2 | says nothing when the waiting is lifted (web/test/notifications.test.tsx) | pass |
 | spec-00004-AC-2.3 | catches up on a session already waiting when the page goes away, once (web/test/notifications.test.tsx) | pass |
 | spec-00004-AC-2.4 | posts one notification per session when two start waiting (web/test/notifications.test.tsx) | pass |
+| spec-00004-AC-2.5 | posts a notification for a second round of waiting of the same session (web/test/notifications.test.tsx)；posts the second round notice when the first round was answered in front of the board (web/test/notifications.test.tsx) | pass |
 | spec-00004-AC-3.1 | posts a notification when a session ends while the page is away (web/test/notifications.test.tsx) | pass |
 | spec-00004-AC-3.2 | posts a notification when a session fails to start (web/test/notifications.test.tsx) | pass |
 | spec-00004-AC-3.3 | posts one notification per session when two end (web/test/notifications.test.tsx) | pass |
