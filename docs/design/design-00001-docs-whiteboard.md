@@ -644,10 +644,13 @@ spec-00001-FR-26、FR-27 承接。
 
 ## 8. 代码位置与运行
 
-- 代码放 `tools/whiteboard/`（独立 package.json，不影响模板本体）。
-- 运行：仓库根部 `npm run whiteboard`（根 package.json 脚本代理到
-  `npm start --prefix tools/whiteboard`），读取 `./docs` 与
-  `./whiteboard.config.yaml`。
+- 代码放 `tools/whiteboard/`（独立 package.json，不影响模板本体——仓库
+  根**没有** package.json）。
+- 运行：在 `tools/whiteboard/` 下 `npm run build`（构建 UI 到 dist）后
+  `npm start`（默认端口 4173），读取仓库根的 `./docs` 与
+  `./whiteboard.config.yaml`。（本节原写作「仓库根部 npm run
+  whiteboard」，与现实不符，据实校正——命令表以 tools/whiteboard/README
+  为准。）
 
 ## 9. 治理轮的两处裁定余项（已裁，非未决）
 
