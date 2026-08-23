@@ -1804,6 +1804,9 @@ describe('several commits at once', () => {
     const [first, second] = await twoSessions(call)
 
     appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    // The writer ends first — AC-8.2's own ordering: were the silent session
+    // first, its turn would sweep the writer's file (FR-8's attribution
+    // boundary, pinned by the AC-8.6 test below).
     exit(0)
     exit(1)
     await Promise.all([board.sessions.whenFinished(first), board.sessions.whenFinished(second)])
@@ -1818,6 +1821,31 @@ describe('several commits at once', () => {
       committed: false,
       error: undefined,
     })
+  })
+
+  // spec-00003-AC-8.6
+  it('loses nothing when both sessions wrote before either ended, letting the first sweep the batch', async () => {
+    const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
+      'spec/b.md': DRAFT_SPEC,
+      'record/r.md': ACTIVE_RECORD,
+    })
+    const commits = commitCount(repoRoot)
+    const [first, second] = await twoSessions(call)
+
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
+    appendFileSync(join(docsDir, 'record/r.md'), '\none more line of evidence\n')
+    exit(0)
+    exit(1)
+    await Promise.all([board.sessions.whenFinished(first), board.sessions.whenFinished(second)])
+
+    // Content difference carries no attribution (spec-00003-FR-8's boundary):
+    // the first to end sweeps the other's write, the second finds no residue
+    // and commits nothing — at most two commits, here one, nothing left dirty.
+    expect(dirtyDocs(repoRoot)).toBe('')
+    expect(commitCount(repoRoot)).toBe(commits + 1)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
+    expect(commitFiles(repoRoot, 0).sort()).toEqual(['docs/record/r.md', 'docs/spec/b.md'])
+    expect(board.sessions.list().find((session) => session.id === second)!.outcome!.committed).toBe(false)
   })
 
   // spec-00003-AC-8.4
