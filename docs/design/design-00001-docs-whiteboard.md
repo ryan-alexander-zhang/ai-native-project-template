@@ -443,10 +443,38 @@ stateDiagram-v2
   `rule-00001-BR-18` 的业务语义（「现有最大编号加一」）——保留的号正是
   即将落盘的文档的号。会话结束（产出落盘或无产出）即出保留集。无此保留，
   两个并行推进会拿到同一个号（spec-00003-FR-1）。
-- **等待输入判定**（spec-00003-FR-6）：每会话维护「最近输出时刻」；连续
-  无输出达静默阈值（实现常数，取 10s）且进程存活 → 会话状态附
-  `awaiting: true`，任何新输出或退出即清除。判定只改会话载荷（面板与
-  徽标读它），不触发状态机迁移、不触发 commit——弱语义，允许误报。
+- **等待输入判定**（spec-00003-FR-6；第十八轮改双通路 + 锁存，
+  decision-00011）：每会话维护「最近输出时刻」与一个**锁存位**。
+  **静默通路（主判定）**：连续无输出达静默阈值（实现常数，取 10s）且
+  进程存活 → 会话状态附 `awaiting: true`；锁存期间该计时照常武装，其
+  触发是幂等空操作（无需特判停摆）。**信号通路（锁存）**：`onData` 在
+  解除标志与重臂静默计时**之前**先做序列识别——输出中匹配到
+  `\x1b]777;notify;`（ESC 1 字节 + 12 字符，共 13 字节；onData 交付
+  string，模式全 ASCII、解码不影响切分；只认前缀，标题正文不解析）即
+  `awaiting: true` 并置锁存位；跨块识别用逐会话尾缀缓冲：每块扫描前拼
+  上上一块留下的尾缀，扫描后留「拼接串的**最长**真前缀后缀」（上界 =
+  前缀长度减一 = 12 字节），拆块投递不漏判、缓冲有界；已锁存时再匹配
+  为幂等（标志无翻转即无广播，见 §7 事件来源）。**定序**：含信号序列
+  的输出块只置位、不解除——同块中序列前后的其余字节亦不触发解除（信号
+  识别先于输出解除，spec-00003-FR-6 明文）。**解除**：未锁存时任何新
+  输出或退出即清除（现行弱语义）；已锁存时仅两事件解除——**用户输入**
+  （终端 WS 文本帧转发的那次 `SessionManager.write`，即任一按键、无需
+  提交；服务端自发的写不算：任务指令正文与延迟提交键，§7 / issue-00011）
+  或会话结束；解除即清锁存位并重臂静默计时。未呈现的会话无终端接入、
+  收不到文本帧（design-00002 §12：只有挂载中的 xterm 转发按键），其
+  锁存保持到被呈现并输入。进程已退出（收尾中）不置位，两通路皆然。
+  判定只改会话载荷（面板与徽标读它），不触发状态机迁移、不触发
+  commit——弱语义，允许误报（两条接受的代价见 decision-00011 §4：CLI
+  发信号后不经输入自行续跑则标志错误保持；会话输出内容自带真实
+  OSC 777 字节则误锁存）。锁存位的状态机：
+
+  ```mermaid
+  stateDiagram-v2
+    unlatched --> latched: 输出中匹配到 \x1b]777;notify;（进程存活）
+    latched --> latched: 再次匹配（幂等）/ 任何输出（不解除）
+    latched --> unlatched: 用户输入（write 转发帧）/ 会话结束
+    unlatched --> unlatched: 输出照现行弱语义解除标志并重臂静默
+  ```
 - **刷新合并**：会话收尾的 `/api/events` 广播经一个短去抖窗口（量级
   100ms，与 §6 watcher 推送的去抖同语义）合并——两个「几乎同时」结束的
   会话经串行队列相继收尾，其广播落在同一窗口即只发一次
@@ -559,7 +587,7 @@ GET  /api/sessions/history            → [{id, kind, docId, agent, startedAt, e
 GET  /api/sessions/history/:id        → {meta, transcript}         # 单条元数据 + 转写全文（FR-54；meta 读 <会话 id>.json，transcript 读 <会话 id>.log）
 DELETE /api/sessions/:id              → 200 | 404 该会话不存在或非运行中（已 exited/failed——重复终止同 404，不二次 commit；逐会话判定，spec-00003-FR-5）   # 终止指定会话（FR-49，issue-00010；第十六轮加会话标识，原无标识形态废止）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
 WS   /api/terminal?sessionId=<id>     双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正；第十六轮加 sessionId——终端接入指定会话，尺寸帧只随呈现中的会话连接到达，未呈现的会话自然无帧，spec-00003-FR-5）
-WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。两个来源：docs/ 变更（watcher），以及会话收尾——**无论有无 commit**（FR-12/issue-00013，三触发源由此真正共用一条通路）。同批多会话收尾只广播一次（spec-00003-FR-8，第十六轮）
+WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。三个来源：docs/ 变更（watcher），会话收尾——**无论有无 commit**（FR-12/issue-00013，触发源由此真正共用一条通路），以及等待标志的翻转（onAwaitingChange → watcher.signal，只在标志真变时广播——重复信号因此不重播，spec-00003-FR-6；第十八轮据实补记，spec-00004-FR-2 的「置位经刷新到达页面」依赖它）。同批多会话收尾只广播一次（spec-00003-FR-8，第十六轮）
 GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）；max_sessions 随配置下发（spec-00003-FR-4 的「运行中数/上限」，第十六轮）
 GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
 GET  /api/coverage                    → [{docId, title, verified, failing, uncovered, items: [{id, coverage}]}]   # 全局覆盖率视图（spec-00002-FR-10/FR-11，治理轮）：全仓每份 spec/rule 一行，三态计数 + 逐条目覆盖；不区分文档 status，撞 id 的文档不在列；无可列文档时为 []

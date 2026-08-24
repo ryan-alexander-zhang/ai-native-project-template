@@ -181,6 +181,13 @@ unchanged — the defect is what the page concludes from it.
     waiting from the terminal's content): it is the honest place for it, and it
     is out of bounds this round — `decision-00010` §5 stands on zero server
     changes — and it would still be a heuristic, only a quieter one.
+    (Eighteenth-round note: `decision-00011` later adopted exactly this, and
+    better — latching on the CLI's own OSC 777 notify, an explicit signal
+    rather than a quieter heuristic. The boundary lifted was this round's own
+    scoping; `decision-00010` §5 constrains push services and server-sent
+    desktop notifications, not the session channel. The "once more per return"
+    fallback noted in §6 above goes with the flap — loss accepted by the
+    domain owner, `decision-00011` §2 row 7.)
   - **Clear the mark on coming back** (the plain per-stint reading): simpler by a
     set, but it breaks `spec-00004-AC-2.3` — the user who comes back, sees the
     waiting session, and leaves again without answering would be re-notified.

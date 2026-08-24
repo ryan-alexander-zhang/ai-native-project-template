@@ -71,9 +71,11 @@ parent: prd-00001-docs-whiteboard
   且此刻已有会话处于等待输入时，系统应为每个等待中的会话补发一条。
   等待通知的判重以**离场区间**为界：每会话一次离场区间内至多一条，再弹
   一条须用户已回到页面**且**该会话经历新的置位——不以 `spec-00003-FR-6`
-  标志的逐次翻转为界（该标志遇任何输出即解除、静默即再置位，而 CLI 停
-  在空闲提示符上仍会自行打印，一次等待到达页面即一连串翻转，
-  issue-00020 实测）；真正的新一轮等待必经用户输入，而输入只经白板终端
+  标志的逐次翻转为界（未锁存的标志遇任何输出即解除、静默即再置位，而
+  CLI 停在空闲提示符上仍会自行打印，一次等待到达页面可现一连串翻转，
+  issue-00020 实测；该前提经 `decision-00011` 收窄——锁存后翻转只余
+  信号到达前的窗口与不发该序列的 CLI，判重语义不变、不得因信号通路
+  移除）；真正的新一轮等待必经用户输入，而输入只经白板终端
   到达。多个会话相继转入等待时逐会话各一条；等待解除不通知。
 - **spec-00004-FR-3** (Event) 当会话结束（触发集同 `spec-00003-FR-7`：
   正常退出、失败、含启动失败）、开关生效且页面离场时，系统应弹桌面
@@ -217,7 +219,8 @@ parent: prd-00001-docs-whiteboard
   语义；回到页面时徽标与面板仍如实）
 - 回到页面但**未作答**又离开：期间标志若有新置位，下一次离场区间可再获
   一条同一等待的通知——判重以离场区间为界的已知边界，宁噪勿静
-  （issue-00020 §6）
+  （issue-00020 §6；锁存后该新置位对发信号的 CLI 几乎不再发生，同一
+  等待不再被提醒——损失经域主裁定接受，`decision-00011` §2 第 7 条）
 - 跨窗口去重（多窗口同开重复弹为已知边界，`decision-00010` §2 第 7 条）
 - 邮件等其他板外通道（`spec-00003` §6 原条目的另一半，仍范围外）
 - 逐事件种类的通知偏好细分（一个总开关）
@@ -231,4 +234,5 @@ parent: prd-00001-docs-whiteboard
 - Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)
 - Design: [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) §13（第十七轮已回链）
 - Analysis: [analysis-00001-out-of-board-notifications](../analysis/analysis-00001-out-of-board-notifications.md)
-- Decisions: [decision-00010-whiteboard-desktop-notifications](../decision/decision-00010-whiteboard-desktop-notifications.md)（本 spec 的全部取舍）
+- Decisions: [decision-00010-whiteboard-desktop-notifications](../decision/decision-00010-whiteboard-desktop-notifications.md)（本 spec 的全部取舍）·
+  [decision-00011-whiteboard-explicit-waiting-signal](../decision/decision-00011-whiteboard-explicit-waiting-signal.md)（FR-2 括注前提收窄、§6 损失接受，第十八轮）

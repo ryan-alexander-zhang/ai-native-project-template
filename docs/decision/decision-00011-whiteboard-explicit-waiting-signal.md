@@ -3,7 +3,7 @@ id: decision-00011-whiteboard-explicit-waiting-signal
 type: decision
 status: active
 motivated_by: [spec-00003-whiteboard-parallel-sessions, issue-00020-every-idle-redraw-becomes-another-waiting-notice]
-constrains: [spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, design-00001-docs-whiteboard]
+constrains: [spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, design-00001-docs-whiteboard, design-00002-whiteboard-ui]
 ---
 
 # Decision: 等待输入判定增设显式信号通路（OSC 777 锁存）
@@ -98,6 +98,9 @@ constrains: [spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desk
 - `design-00001-docs-whiteboard`：会话通道一节增补信号识别（含跨输出块
   的序列缓冲）与锁存状态机（修订由 plan 轮列为任务）。
 - `CONTEXT.md`：「等待输入」词条扩义为双通路（随 spec 接收同步）。
-- 原地追注：`decision-00009` §2 第 7 条（细化注记）。
+- 原地追注：`decision-00009` §2 第 7 条（细化注记）；`design-00002` §13
+  （「FR-6 不动」断言随本轮失效，判重语义不变）；`issue-00020` §6
+  （其否决的「De-flap the server」正是本轮采纳的路线——被解除的是该轮
+  自设边界，及「未作答再提醒」兜底随翻摆消失的注记）。
 - 站立约束：信号通路只增不替——静默启发式不得因此移除；标题正文不得
   进入匹配条件。
