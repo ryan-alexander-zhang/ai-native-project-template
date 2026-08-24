@@ -1,7 +1,7 @@
 ---
 id: plan-00020-whiteboard-explicit-waiting-signal
 type: plan
-status: open
+status: resolved
 implements: [spec-00003-whiteboard-parallel-sessions]
 ---
 
