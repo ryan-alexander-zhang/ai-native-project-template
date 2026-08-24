@@ -29,6 +29,15 @@ const SUBMIT = '\r'
 const AWAIT_THRESHOLD_MS = 10_000
 
 /**
+ * The explicit «I am waiting for you» a CLI sends of its own accord: the head of
+ * an OSC 777 terminal notification, ESC plus twelve characters
+ * (spec-00003-FR-6, decision-00011). The prefix alone is the signal — the title
+ * and the body are the CLI's wording, which changes with its version and its
+ * locale, so they are never read.
+ */
+const AWAIT_SIGNAL = '\x1b]777;notify;'
+
+/**
  * How a session stands. `terminated` is the third end state of the sixteenth
  * round (design-00001 §5): a session the user stopped ended on its own wrap-up
  * like any other, but the panel and the history have to say it was stopped
@@ -91,8 +100,9 @@ export interface SessionListing extends SessionInfo {
   startedAt: string
   endedAt?: string
   /**
-   * True while the session has printed nothing for the silence threshold and its
-   * process is still alive — «waiting on the user» (spec-00003-FR-6). Never true
+   * True while the session is read as «waiting on the user» (spec-00003-FR-6):
+   * it has printed nothing for the silence threshold, or it said so itself with
+   * an OSC 777 notification, and its process is still alive. Never true
    * of a session that has ended, whichever way it ended; it is the registry's
    * reading of the session rather than anything the session said, which is why it
    * lives here and not on `SessionInfo`.
@@ -173,6 +183,18 @@ interface Session {
   awaiting?: boolean
   /** The pending silence window, re-armed by every output and cleared by the end. */
   silence?: NodeJS.Timeout
+  /**
+   * Whether the session said outright that it is waiting (spec-00003-FR-6): once
+   * latched, only the user's input or the end takes the mark down, and the output
+   * that follows is read as the redraw noise it is (decision-00011 §2).
+   */
+  latched?: boolean
+  /**
+   * The tail of the last chunk that could still be the start of the signal, so a
+   * sequence split across two chunks is recognised (design-00001 §5). Bounded by
+   * the signal's own length, which is what keeps it from growing.
+   */
+  signalTail: string
 }
 
 export interface SessionManagerOptions {
@@ -273,6 +295,7 @@ export class SessionManager {
       ended,
       announceEnd,
       submits: [],
+      signalTail: '',
     }
     this.sessions.set(info.id, session)
 
@@ -284,6 +307,10 @@ export class SessionManager {
     session.pty.onData((data) => {
       this.publish(session, data)
       this.armSubmit(session)
+      // Recognition before release, in this order and not the other
+      // (spec-00003-FR-6): a chunk carrying the signal only sets and latches,
+      // and the bytes around the sequence in that same chunk clear nothing.
+      this.recognizeSignal(session, data)
       this.armSilence(session)
     })
     session.pty.onExit((event) => this.exit(session, event.exitCode))
@@ -344,17 +371,21 @@ export class SessionManager {
   }
 
   /**
-   * Restart the silence window (spec-00003-FR-6). Any output at all is proof the
-   * session is not waiting on anybody, so this both takes the mark down and arms
-   * the next window; a session whose process is gone is never armed again, which
-   * is the whole of «a process that has exited does not enter the judgment» —
-   * neither its last words nor the wrap-up's silence can mark it
-   * (spec-00003-AC-6.4).
+   * Restart the silence window (spec-00003-FR-6). Output is proof the session is
+   * not waiting on anybody — unless it is latched, see below — so this both takes
+   * the mark down and arms the next window; a session whose process is gone is
+   * never armed again, which is the whole of «a process that has exited does not
+   * enter the judgment» — neither its last words nor the wrap-up's silence can
+   * mark it (spec-00003-AC-6.4).
    */
   private armSilence(session: Session): void {
     clearTimeout(session.silence)
     session.silence = undefined
-    this.setAwaiting(session, false)
+    // Latched, the mark stays up whatever arrives: after the session has said it
+    // is waiting, only the user's input or its end means otherwise. The window
+    // below is armed all the same, and its firing is then the no-op it looks
+    // like — the mark is already up (design-00001 §5).
+    if (!session.latched) this.setAwaiting(session, false)
     if (session.info.status !== 'running') return
     const threshold = this.options.awaitThresholdMs ?? AWAIT_THRESHOLD_MS
     // Unreffed like the submits: a board is not held open by a session's silence.
@@ -373,6 +404,31 @@ export class SessionManager {
   }
 
   /**
+   * The signal path (spec-00003-FR-6, decision-00011): the session saying so
+   * itself, which is worth more than the silence it broke by saying it. Set at
+   * once — no threshold to wait out — and latched, so the idle redraws that
+   * follow cannot flap the mark. A repeat while latched changes nothing, and a
+   * process that has exited is never marked, its last words included
+   * (spec-00003-AC-6.10).
+   */
+  private recognizeSignal(session: Session, data: string): void {
+    if (session.info.status !== 'running') return
+    const scanned = session.signalTail + data
+    if (scanned.includes(AWAIT_SIGNAL)) {
+      session.latched = true
+      this.setAwaiting(session, true)
+    }
+    session.signalTail = carriedTail(scanned)
+  }
+
+  /** Back to the silence path: the latch gone, output speaks for the session again. */
+  private unlatch(session: Session): void {
+    if (!session.latched) return
+    session.latched = false
+    this.armSilence(session)
+  }
+
+  /**
    * Replay what that session has printed so far and follow it from there. Each
    * session keeps its own buffer and its own listeners, so output reaches the
    * terminal watching it and no other (spec-00003-AC-1.2).
@@ -383,9 +439,18 @@ export class SessionManager {
     return { buffer: session.buffer, detach: () => session.listeners.delete(listener) }
   }
 
-  /** spec-00001-FR-12: keystrokes from a terminal reach the CLI of the session it is attached to. */
+  /**
+   * spec-00001-FR-12: keystrokes from a terminal reach the CLI of the session it
+   * is attached to. This is also the one write the latch listens for — any
+   * keypress at all, no submit needed (spec-00003-FR-6, decision-00011 §2):
+   * someone who starts typing and stops is caught again by the silence path.
+   * The server's own writes — the instruction body and the submit keypresses —
+   * do not come through here, and so do not unlatch.
+   */
   write(id: string, data: string): void {
-    this.require(id).pty?.write(data)
+    const session = this.require(id)
+    this.unlatch(session)
+    session.pty?.write(data)
   }
 
   /**
@@ -601,6 +666,7 @@ export class SessionManager {
     clearTimeout(session.silence)
     session.silence = undefined
     session.awaiting = undefined
+    session.latched = false
     const endedAt = new Date().toISOString()
     session.endedAt = endedAt
     this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)
@@ -616,6 +682,19 @@ export class SessionManager {
       })
       .finally(session.announceEnd)
   }
+}
+
+/**
+ * What of the scanned text has to be carried into the next chunk: the longest
+ * proper prefix of the signal that ends the text (design-00001 §5). Bounded by
+ * one less than the signal's length, so the buffer cannot grow with the output.
+ */
+function carriedTail(scanned: string): string {
+  for (let length = Math.min(AWAIT_SIGNAL.length - 1, scanned.length); length > 0; length -= 1) {
+    const tail = scanned.slice(-length)
+    if (AWAIT_SIGNAL.startsWith(tail)) return tail
+  }
+  return ''
 }
 
 function describe(outcome: SessionOutcome): string {

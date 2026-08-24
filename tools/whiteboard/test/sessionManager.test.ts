@@ -643,6 +643,139 @@ describe('waiting on the user', () => {
     // Nothing to announce means nothing for the badge count to change by.
     expect(onAwaitingChange).not.toHaveBeenCalled()
   })
+
+  /** The head of an OSC 777 notification, as the CLI sends it (decision-00011). */
+  const SIGNAL = '\x1b]777;notify;Claude Code;Claude is waiting for your input'
+
+  // spec-00003-AC-6.6 — the session saying so outright beats waiting out the
+  // silence it just broke by saying it.
+  it('marks a session that says it is waiting, mid-output and without the threshold', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    hooks[0]!.data!('thinking about it')
+    vi.advanceTimersByTime(THRESHOLD / 2)
+    expect(awaiting(manager, id)).toBeFalsy()
+
+    hooks[0]!.data!(SIGNAL)
+
+    expect(awaiting(manager, id)).toBe(true)
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00003-AC-6.7 — the latch is what the idle redraws break against: a
+  // status line rewriting itself is not the session carrying on.
+  it('keeps the mark up through the redraws that follow the signal', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    hooks[0]!.data!(SIGNAL)
+    expect(awaiting(manager, id)).toBe(true)
+
+    hooks[0]!.data!('\x1b[2K◐ plugin line')
+    hooks[0]!.data!('\x1b[2K◓ plugin line')
+    // Long enough for the silence window to fire — a no-op on a mark already up
+    // — and for both submit keypresses: the server's own writes do not unlatch,
+    // only the user's (design-00001 §5).
+    vi.advanceTimersByTime(10 * THRESHOLD)
+
+    expect(awaiting(manager, id)).toBe(true)
+    // One flip, so one refresh: the badge count never moved (spec-00003-FR-6).
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00003-AC-6.8 — any keypress at all, no submit: someone who starts
+  // typing is answering, and someone who stops half way is caught by the
+  // silence path again (decision-00011 §2).
+  it('unlatches on a single keystroke and arms the silence path again', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    hooks[0]!.data!(SIGNAL)
+    expect(awaiting(manager, id)).toBe(true)
+
+    manager.write(id, 'y')
+
+    expect(awaiting(manager, id)).toBe(false)
+    expect(onAwaitingChange).toHaveBeenCalledTimes(2)
+    // Stopping half way through the answer is marked again, which is the state
+    // the user is actually in.
+    vi.advanceTimersByTime(THRESHOLD)
+    expect(awaiting(manager, id)).toBe(true)
+  })
+
+  // spec-00003-AC-6.9 — the end takes a latched mark down like any other.
+  it('drops a latched mark when the session ends', async () => {
+    const { manager, hooks } = stubManager()
+    const { id } = manager.start(planFor('ask', 'record-00001-b'))
+    hooks[0]!.data!(SIGNAL)
+    expect(awaiting(manager, id)).toBe(true)
+
+    hooks[0]!.exit!({ exitCode: 0 })
+
+    expect(awaiting(manager, id)).toBeFalsy()
+    // And the latch is gone with it: nothing an ended session prints marks it.
+    hooks[0]!.data!(SIGNAL)
+    vi.advanceTimersByTime(10 * THRESHOLD)
+    expect(awaiting(manager, id)).toBeFalsy()
+    await manager.whenFinished(id)
+  })
+
+  // spec-00003-AC-6.10 — the signal path enters the judgment on the same terms
+  // the silence path does: a process that has exited does not enter it at all.
+  it('never marks a signal in the trailing output of a process that has exited', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager(() => new Promise<SessionOutcome>(() => {}))
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+
+    hooks[0]!.exit!({ exitCode: 0 })
+    hooks[0]!.data!(SIGNAL)
+
+    expect(awaiting(manager, id)).toBeFalsy()
+    expect(onAwaitingChange).not.toHaveBeenCalled()
+  })
+
+  // spec-00003-AC-6.11 — the signal arriving on an already-marked session is
+  // the chunk that would otherwise have cleared the mark, which is why
+  // recognition runs before release: no flap, and nothing to announce.
+  it('turns a silence-set mark into a latched one without a flap', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    vi.advanceTimersByTime(THRESHOLD)
+    expect(awaiting(manager, id)).toBe(true)
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+
+    hooks[0]!.data!(`◒ still here${SIGNAL}`)
+
+    expect(awaiting(manager, id)).toBe(true)
+    // The one announcement is still the silence path's; the count never moved.
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+    // Latched now, so the next redraw does not take it down either.
+    hooks[0]!.data!('\x1b[2K◐ plugin line')
+    expect(awaiting(manager, id)).toBe(true)
+  })
+
+  // spec-00003-AC-6.12
+  it('ignores a repeated signal while latched', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+    hooks[0]!.data!(SIGNAL)
+
+    hooks[0]!.data!(SIGNAL)
+
+    expect(awaiting(manager, id)).toBe(true)
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+  })
+
+  // spec-00003-AC-6.13 — a pty splits its output where it likes, so the
+  // sequence is recognised across the seam it was split on (design-00001 §5).
+  it('recognises a signal split across two chunks', () => {
+    const { manager, hooks, onAwaitingChange } = stubManager()
+    const { id } = manager.start(planFor('clarify', 'spec-00001-a'))
+
+    hooks[0]!.data!('working\x1b]77')
+    expect(awaiting(manager, id)).toBeFalsy()
+    hooks[0]!.data!('7;notify;Claude Code;waiting')
+
+    expect(awaiting(manager, id)).toBe(true)
+    expect(onAwaitingChange).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('exit', () => {
