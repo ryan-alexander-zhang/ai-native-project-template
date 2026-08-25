@@ -1,5 +1,5 @@
 {
-  "exclude": [".codex/", ".understand-anything/", "docs/*/[^A-Z]*"],
+  "exclude": [".codex/", ".understand-anything/", "docs/*/[^A-Z]*", "CONTEXT.md"],
   "vars": {
     "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" }
   },
