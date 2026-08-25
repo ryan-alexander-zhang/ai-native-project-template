@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { findRepoRoot } from '../src/config.ts'
 
@@ -22,5 +24,16 @@ describe('the files a fresh clone has to get', () => {
     expect([...tracked].filter((path) => path === 'tools/whiteboard/web/src/lib/utils.ts')).toEqual([
       'tools/whiteboard/web/src/lib/utils.ts',
     ])
+  })
+
+  // `ainpt update` folds the template into every downstream project with
+  // `git merge-file`, which refuses any file git calls binary — a NUL byte in
+  // the first 8000 bytes. One raw control byte in a tracked source is an
+  // unresolvable conflict in every project that updates (issue-00021).
+  it('tracks only files git can merge as text', () => {
+    const binary = [...tracked].filter((path) =>
+      readFileSync(join(repoRoot, path)).subarray(0, 8000).includes(0),
+    )
+    expect(binary).toEqual([])
   })
 })
