@@ -133,7 +133,7 @@ row3                                                                            
 | 状态切换 | `<select>` | `DropdownMenu`，逐项列出合法目标状态 | `GitBranch` |
 | 接收 | `<button>` | `Button`（default 变体） | `Check` |
 | 澄清 | 工具栏内联 textarea | `Button`，点击即发起澄清会话（终端内逐题提问；第八轮由 decision-00006 改写，原 `Dialog` + `Textarea` 废弃）；仅可澄清类型的节点呈现 | `MessageCircleQuestionMark` |
-| 答疑 | 无 | `Button`（ghost 变体），点击即发起答疑会话（终端内多轮讨论，`spec-00001-FR-47`） | `CircleHelp` |
+| 答疑 | 无 | `Button`（ghost 变体），点击打开问题输入（headless 只读答疑，`spec-00005`；第二十一轮改写，语义以 §14 为准——原「发起终端会话」废止） | `CircleHelp` |
 | 审计 | 无 | `Button`（outline 变体），点击即发起审计会话（终端内对照 README 审查，`spec-00001-FR-50`，第十轮）；仅 `draft` 的可审计类型（spec/rule/design）节点呈现（`spec-00001-FR-51`）；因并发约束禁用时同澄清/答疑（见「发起入口禁用说明」行） | `ShieldCheck` |
 | 终止会话 | 无 | 终端面板头部 `Button`（destructive 变体），仅**当前呈现的会话** running 时可用，作用于当前呈现的会话、逐会话判定（`spec-00001-FR-49`，issue-00010；第十六轮改多会话语义，`spec-00003-FR-5`） | `Square` |
 | 发起入口禁用说明 | 无 | 推进/澄清/答疑/审计因并发约束禁用期间，悬停/聚焦呈现 `Tooltip`——**两种原因文案**：同文档互斥（该文档已有会话）或已达上限（`spec-00003-FR-2`/`FR-3`，第十六轮取代单一「session running」）；与「no next step」并存时后者优先（它不随会话结束消失，`spec-00001-AC-49.5`） | — |
