@@ -107,7 +107,7 @@ export function assertAuditable(node: DocNode, config: FlowConfig): void {
 /**
  * spec-00001-FR-47 with rule-00001-BR-21: ask is not a review action — any type
  * in any status may be asked about. Only an anomalous document may not: its
- * front matter has to be fixed first (spec-00001-AC-47.5).
+ * front matter has to be fixed first (spec-00005-AC-7.2).
  */
 export function assertAskable(node: DocNode): void {
   requireSound(node)

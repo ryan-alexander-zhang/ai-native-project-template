@@ -530,7 +530,7 @@ export class DocService {
    * Commit what an agent session left under docs/ (spec-00001-FR-14): the content
    * that moved since `before`, never the dirt the session inherited. Nothing
    * moved, nothing committed (spec-00001-AC-14.6). `action` is the session's kind
-   * — the commit says which of the three it was (spec-00001-AC-14.7, AC-14.8) —
+   * — the commit says which of the three it was (spec-00001-AC-14.8) —
    * and defaults to the advance every existing caller means.
    */
   async commitSessionChanges(

@@ -2571,6 +2571,7 @@ describe('ask threads', () => {
   const ask = (call: BoardCall, body: Record<string, unknown>) => call('POST', '/api/sessions/ask', body)
 
   // spec-00005-AC-1.1 — the whole of a first call's payload, and no terminal
+  // spec-00001-AC-47.1 — the handoff guard: an ask starts no terminal-form session
   it('starts a headless first call carrying the paths, the read-only nature and the question', async () => {
     const { call, payload, terminals } = askBoard()
 

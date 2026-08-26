@@ -1,7 +1,7 @@
 ---
 id: plan-00021-whiteboard-ask-threads
 type: plan
-status: open
+status: resolved
 implements: [spec-00005-whiteboard-ask-threads]
 ---
 
