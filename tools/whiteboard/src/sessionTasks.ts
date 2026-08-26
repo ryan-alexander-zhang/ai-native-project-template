@@ -20,7 +20,7 @@ export interface ClarifyTask {
   state?: string
 }
 
-/** What an ask session is told; its contract is spec-00001-FR-47. */
+/** What an ask thread's first call is told; its contract is spec-00005-FR-1. */
 export interface AskTask {
   docPath: string
   relatedPaths: string[]
@@ -112,16 +112,21 @@ export function clarifyInstruction(task: ClarifyTask): string {
   ].join('\n')
 }
 
+/**
+ * What an ask thread's first call is told (spec-00005-FR-1). The context lines
+ * are the ones the terminal form carried; the nature of the session is what
+ * changed with it — an ask reads and answers, and revising a document is now the
+ * editor's, an advance's or a clarify's (design-00001 §10.1, decision-00012 §5).
+ * Only the first call carries this: a follow-up resumes the same conversation
+ * and would be paying for the context twice (spec-00005-FR-2).
+ */
 export function askInstruction(task: AskTask): string {
   const { docPath, relatedPaths } = task
   return [
-    'This is an ask session: the owner of one document asks you about it and discusses it with you',
-    'over as many turns as they need.',
+    'This is an ask session: the owner of one document asks you a question about it, and you answer it.',
     ...contextLines(docPath, relatedPaths),
-    'Answer what they ask about this document. Revise documents under the docs tree when they ask you to,',
-    'or when the conversation concludes one should change.',
-    'Never touch a status line — status changes belong to the board, to a transition or a review action.',
-    'Change nothing outside the docs tree.',
+    'Answer the question below. Modify no file — not this document, not another, not anywhere:',
+    '  the answer itself is the whole of what is wanted.',
   ].join('\n')
 }
 

@@ -118,20 +118,20 @@ describe('clarifyInstruction', () => {
 })
 
 describe('askInstruction', () => {
-  it('names the session kind, the document and its context, and rules out status changes', () => {
+  it('names the session kind and the document with its context', () => {
     const instruction = askInstruction({ docPath: 'record/r.md', relatedPaths: ['spec/board.md'] })
 
     expect(instruction).toContain('ask session')
     expect(instruction).toContain('record/r.md')
     expect(instruction).toContain('spec/board.md')
-    expect(instruction).toContain('Never touch a status line')
   })
 
   it('leaves the relation context out when the document has none', () => {
     expect(askInstruction({ docPath: 'record/r.md', relatedPaths: [] })).not.toContain('relation documents')
   })
 
-  // spec-00001-AC-47.3
+  // spec-00005-AC-1.2 — the context lines the terminal form carried, kept whole:
+  // the document and every one of its relation documents, as paths
   it('carries the target path and both its relation document paths', () => {
     const graph = readGraph(
       makeDocsDir({
@@ -150,13 +150,17 @@ describe('askInstruction', () => {
     expect(instruction).toContain('prd/board.md')
   })
 
-  /** spec-00001-FR-47: the session may revise docs, and only the board moves a status. */
-  it('states what the session may do: answer, discuss, revise docs, and never move a status', () => {
+  /**
+   * spec-00005-FR-1: an ask reads and answers. The revising half the terminal
+   * form carried is gone with that form — a revision is now the editor's, an
+   * advance's or a clarify's (decision-00012 §5), and the constraint is stated
+   * to the agent rather than left to the flags alone.
+   */
+  it('states that the session answers and modifies nothing at all', () => {
     const instruction = askInstruction({ docPath: 'record/r.md', relatedPaths: [] })
 
-    expect(instruction).toContain('over as many turns as they need')
-    expect(instruction).toContain('Revise documents under the docs tree')
-    expect(instruction).toContain('status changes belong to the board, to a transition or a review action')
+    expect(instruction).toContain('Modify no file')
+    expect(instruction).not.toContain('Revise documents')
   })
 })
 

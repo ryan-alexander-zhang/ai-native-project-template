@@ -28,6 +28,13 @@ agents:
     cwd: docs
 `
 
+/** The headless declaration of spec-00005-FR-8, appended under the agent above. */
+const HEADLESS = `    headless:
+      first:  [-p, "{question}"]
+      resume: [-p, --resume, "{session}", "{question}"]
+      capture: claude-json
+`
+
 function parse(text: string) {
   return parseFlowConfig(text, 'test.yaml')
 }
@@ -122,6 +129,45 @@ describe('parseFlowConfig', () => {
   it('rejects empty agents', () => {
     expectConfigError(VALID.replace(/agents:\n(  claude:\n)(    .*\n)+/, 'agents: {}\n'), /agents.*at least one/)
   })
+
+  /**
+   * spec-00005-FR-8: an agent may declare the non-interactive form an ask thread
+   * calls. Reading it is what puts that agent in the choice at all; an agent
+   * without one is simply not one an ask can pick (spec-00005-FR-2).
+   */
+  it('reads an agent’s headless declaration', () => {
+    const config = parse(`${VALID}${HEADLESS}`)
+
+    expect(config.agents[0]!.headless).toEqual({
+      first: ['-p', '{question}'],
+      resume: ['-p', '--resume', '{session}', '{question}'],
+      capture: 'claude-json',
+    })
+  })
+
+  it('leaves headless unset for an agent that declares none', () => {
+    expect(parse(VALID).agents[0]!.headless).toBeUndefined()
+  })
+
+  /**
+   * spec-00005-AC-8.1 — an ill-formed declaration refuses to start and names the
+   * entry, in spec-00001-FR-15's own terms. What is checked is what a call
+   * cannot be built without: both forms, the question in each, the resume id in
+   * the resume form and nowhere else, and a capture the code holds.
+   */
+  it('rejects a headless declaration missing a required placeholder', () => {
+    for (const [broken, match] of [
+      [HEADLESS.replace('[-p, "{question}"]', '[-p]'), /agents\.claude\.headless\.first.*\{question\}/],
+      [HEADLESS.replace('"{session}", ', ''), /agents\.claude\.headless\.resume.*\{session\}/],
+      [HEADLESS.replace('first:  [-p, "{question}"]', 'first:  [-p, "{session}", "{question}"]'), /headless\.first.*\{session\}/],
+      [HEADLESS.replace('first:  [-p, "{question}"]', 'first:  []'), /headless\.first.*non-empty list/],
+      [HEADLESS.replace('capture: claude-json', 'capture: whatever'), /headless\.capture.*claude-json.*"whatever"/],
+      ['    headless: not-a-mapping\n', /`agents\.claude\.headless` must be a mapping/],
+    ] as const) {
+      expectConfigError(`${VALID}${broken}`, match)
+    }
+  })
+
 
   it('rejects invalid YAML', () => {
     expectConfigError('types: [\n  unclosed', /invalid YAML/)

@@ -1,7 +1,9 @@
 import { join } from 'node:path'
 import type { AgentConfig } from './config.ts'
 import type { Expectation } from './advance.ts'
+import type { AskResult } from './askStore.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
+import { type SpawnHeadless, capture, headlessArgs, spawnHeadless } from './headless.ts'
 import { writeSessionHistory } from './sessionHistory.ts'
 import { WorkflowError } from './workflow.ts'
 
@@ -46,24 +48,33 @@ const AWAIT_SIGNAL = '\x1b]777;notify;'
 export type SessionStatus = 'running' | 'exited' | 'failed' | 'terminated'
 
 /**
- * The four kinds of agent session, sharing one channel and one registry: the
- * board advances the flow, clarify has the agent question the owner, ask has the
- * owner question the agent, audit has the agent review a draft it did not write.
- * No kind is exclusive of another — the concurrency rules are per target
- * document and per total (spec-00003-FR-1). The kind is what names the session's
- * commit (spec-00001-FR-14).
+ * The four kinds of agent session, sharing one registry: the board advances the
+ * flow, clarify has the agent question the owner, ask has the owner question the
+ * agent, audit has the agent review a draft it did not write. The first three of
+ * those are terminal sessions on a pty; ask is the registry's second form — a
+ * captured headless call with no terminal at all (spec-00005-FR-6,
+ * design-00001 §10.3). The kind is what names a terminal session's commit
+ * (spec-00001-FR-14); an ask makes none.
  */
 export type SessionKind = 'advance' | 'clarify' | 'ask' | 'audit'
 
 /** One session's whole input: what kind it is, what it is about, what it is told. */
 export interface SessionPlan {
   kind: SessionKind
-  /** The document the session was started from — the source of an advance, the subject of the other two. */
+  /** The document the session was started from — the source of an advance, the subject of the other three. */
   sourceId: string
-  /** The first input written to the CLI; each kind builds its own (advance.ts, sessionTasks.ts). */
+  /**
+   * What the CLI is told: the first input written to a terminal session's pty,
+   * and the argv payload of an ask call (design-00001 §10.1). Each kind builds
+   * its own (advance.ts, sessionTasks.ts).
+   */
   instruction: string
   /** An advance alone expects a product to check on exit (spec-00001-FR-17). */
   expectation?: Expectation
+  /** An ask alone: which thread of the document's ask list this call belongs to (spec-00005-FR-2). */
+  threadId?: string
+  /** An ask follow-up alone: the CLI's resume id, which is what makes the call a resume rather than a first. */
+  resumeId?: string
 }
 
 export interface SessionInfo {
@@ -79,7 +90,11 @@ export interface SessionInfo {
   error?: string
   /** Set once the exit hook has run: what the session produced and whether it was committed. */
   outcome?: SessionOutcome
-  /** Why the session's history could not be saved, if it could not (spec-00001-AC-54.3). */
+  /**
+   * Why the session's record could not be saved, if it could not
+   * (spec-00001-AC-54.3): its history, or — for an ask — the answer that was to
+   * be landed on its thread. Either failure blocks nothing; it is a notice.
+   */
   historyError?: string
 }
 
@@ -156,6 +171,8 @@ export class NoSessionError extends Error {
 interface Session {
   info: SessionInfo
   plan: SessionPlan
+  /** The agent entry the session runs; an ask reads its headless declaration at launch. */
+  agent: AgentConfig
   /** The docs/ dirt this session inherited; its own commit is scoped against it. */
   baseline: DirtySnapshot
   startedAt: string
@@ -172,6 +189,11 @@ interface Session {
    */
   transcript: string[]
   pty?: PtyProcess
+  /** What an ask call printed, kept apart so the capture reads stdout alone (design-00001 §10.3). */
+  stdout: string
+  stderr: string
+  /** How the running process is signalled, whichever seam started it. */
+  kill?: () => void
   listeners: Set<(data: string) => void>
   finished: Promise<void>
   /** Resolves once the process has exited and the exit hook has run; a stop waits on it. */
@@ -205,6 +227,12 @@ export interface SessionManagerOptions {
   repoRoot: string
   spawn: SpawnPty
   /**
+   * The second spawn seam (design-00001 §10.1): how an ask call's child process
+   * is started. Beside the pty one and never through it — an ask has no
+   * terminal, and its kill ladder is its own.
+   */
+  spawnHeadless?: SpawnHeadless
+  /**
    * The docs/ dirt as it stands, read once per session before the agent can
    * write (design-00001 §4). A manager given none scopes nothing — every
    * dirty path counts as the session's, which is what a caller with no git
@@ -223,6 +251,11 @@ export interface SessionManagerOptions {
    * signal's own debounce window.
    */
   onAwaitingChange?: () => void
+  /**
+   * Runs when an ask call ends, before its history is written
+   * (design-00001 §10.3): what the call yielded, for the thread to be landed on.
+   */
+  onAskEnd?: (plan: SessionPlan, result: AskResult) => Promise<void>
   /**
    * Runs when a process exits: commits and validates what that session produced.
    * It is handed the session's **own** baseline, because several sessions run at
@@ -264,7 +297,7 @@ export class SessionManager {
    * (spec-00003-AC-3.6).
    */
   start(plan: SessionPlan, agentName?: string): SessionInfo {
-    const agent = this.resolveAgent(agentName)
+    const agent = this.resolveAgent(agentName, plan.kind)
     this.admit(plan)
     const { repoRoot } = this.options
     const startedAt = new Date().toISOString()
@@ -277,8 +310,10 @@ export class SessionManager {
       status: 'running',
     }
     // Before the spawn, never after: from here on anything under docs/ that
-    // moves is the session's doing (spec-00001-AC-14.5).
-    const baseline = this.options.snapshot?.() ?? new Map<string, string>()
+    // moves is the session's doing (spec-00001-AC-14.5). An ask takes none —
+    // it commits nothing, so it has nothing to scope a commit against
+    // (spec-00005-FR-4).
+    const baseline = plan.kind === 'ask' ? new Map<string, string>() : (this.options.snapshot?.() ?? new Map())
     let announceEnd!: () => void
     const ended = new Promise<void>((resolve) => {
       announceEnd = resolve
@@ -286,10 +321,13 @@ export class SessionManager {
     const session: Session = {
       info,
       plan,
+      agent,
       baseline,
       startedAt,
       buffer: '',
       transcript: [],
+      stdout: '',
+      stderr: '',
       listeners: new Set(),
       finished: Promise.resolve(),
       ended,
@@ -298,9 +336,14 @@ export class SessionManager {
       signalTail: '',
     }
     this.sessions.set(info.id, session)
+    // The slot is taken; the process waits. An ask call's record has to be on
+    // disk before there is a process to reconcile it against, so its spawn is
+    // the caller's next step rather than this one's (design-00001 §10.2 写序).
+    if (plan.kind === 'ask') return info
 
     try {
       session.pty = this.options.spawn(agent.command, agent.args, join(repoRoot, agent.cwd ?? '.'))
+      session.kill = () => session.pty?.kill()
     } catch (cause) {
       return this.fail(session, (cause as Error).message)
     }
@@ -326,6 +369,61 @@ export class SessionManager {
   }
 
   /**
+   * The second half of starting an ask call (design-00001 §10.2 写序): the
+   * process, once the caller has the `running` exchange on disk. Split from
+   * `start` because a slot held across that write is what keeps the cap honest —
+   * admission and the record cannot both be first, and a record with no process
+   * is reconcilable while a process with no record is not
+   * (spec-00005-AC-5.3, AC-6.4).
+   */
+  launch(id: string): SessionInfo {
+    const session = this.require(id)
+    const { repoRoot } = this.options
+    const { agent } = session
+    const spawn = this.options.spawnHeadless ?? spawnHeadless
+    // The declared flag set whole, and never the entry's `args`: those are the
+    // interactive form's (design-00001 §10.1). The instruction goes in as one
+    // argv element, so there is no shell and no escaping.
+    const args = headlessArgs(agent.headless!, session.plan.instruction, session.plan.resumeId)
+    try {
+      const child = spawn(agent.command, args, join(repoRoot, agent.cwd ?? '.'))
+      session.kill = () => child.kill()
+      child.onStdout((chunk) => {
+        session.stdout += chunk
+      })
+      child.onStderr((chunk) => {
+        session.stderr += chunk
+      })
+      child.onExit((event) => this.exit(session, event.exitCode))
+    } catch (cause) {
+      // A seam that throws leaves a session admitted with no process, no way to
+      // signal it and no exit to come: it would hold its slot for good and a
+      // shutdown would wait on it for ever. So it takes the ordinary end
+      // instead — a call that never ran is a call that failed, and its exchange
+      // lands `failed` down the one path every ask call ends on.
+      session.stderr += `whiteboard: could not start the agent — ${(cause as Error).message}\n`
+      session.info.error = (cause as Error).message
+      this.exit(session, 1)
+    }
+    return session.info
+  }
+
+  /**
+   * Give up a session that was admitted but never got a process. Its caller
+   * takes the slot before writing the record the process is reconciled against
+   * (design-00001 §10.2 写序), so a write that fails leaves a session running
+   * with nothing behind it — this is how that is undone. It ends `failed`, like
+   * a spawn that never started: the slot goes back at once
+   * (spec-00003-AC-3.7) and the panel still lists what happened.
+   */
+  abandon(id: string, reason: string): void {
+    const session = this.sessions.get(id)
+    if (session?.info.status !== 'running') return
+    this.fail(session, reason)
+    session.announceEnd()
+  }
+
+  /**
    * The two concurrency rules, judged together and in this order
    * (spec-00003-FR-2, FR-3): the target document first, the total second, so a
    * start that breaks both is refused with the more specific reason — the same
@@ -335,10 +433,20 @@ export class SessionManager {
    * reading, spec-00003-AC-2.6), which is what `sourceId` already holds for
    * every kind. A failed session is out of both counts: it holds no slot
    * (spec-00003-AC-3.7) and it is running nothing to be exclusive of.
+   *
+   * An ask takes no document, in both directions (spec-00005-FR-6): it is
+   * refused by nothing running on that document, and nothing running on it is
+   * refused by an ask. The exclusion is therefore judged over the terminal
+   * sessions alone (design-00001 §10.3) — reading it one way only would make the
+   * two halves of AC-6.1 and AC-6.2 contradict each other. The cap counts every
+   * kind (spec-00003-FR-3).
    */
   private admit(plan: SessionPlan): void {
     const running = this.running()
-    if (running.some((session) => session.info.sourceId === plan.sourceId)) {
+    const occupied = running.some(
+      (session) => session.plan.kind !== 'ask' && session.info.sourceId === plan.sourceId,
+    )
+    if (plan.kind !== 'ask' && occupied) {
       throw new SessionBusyError(`${plan.sourceId} already has a running agent session`, 'doc-busy')
     }
     if (running.length >= this.options.maxSessions) {
@@ -434,7 +542,7 @@ export class SessionManager {
    * terminal watching it and no other (spec-00003-AC-1.2).
    */
   attach(id: string, listener: (data: string) => void): { buffer: string; detach: () => void } {
-    const session = this.require(id)
+    const session = this.requireTerminal(id)
     session.listeners.add(listener)
     return { buffer: session.buffer, detach: () => session.listeners.delete(listener) }
   }
@@ -448,7 +556,7 @@ export class SessionManager {
    * do not come through here, and so do not unlatch.
    */
   write(id: string, data: string): void {
-    const session = this.require(id)
+    const session = this.requireTerminal(id)
     this.unlatch(session)
     session.pty?.write(data)
   }
@@ -462,6 +570,9 @@ export class SessionManager {
    */
   resize(id: string, cols: number, rows: number): void {
     const session = this.sessions.get(id)
+    // Refused rather than dropped, unlike the cases below: an ask has no
+    // terminal to be sized at all, and saying so is the point (AC-7.7).
+    if (session?.plan.kind === 'ask') this.requireTerminal(id)
     if (session?.info.status !== 'running') return
     session.pty?.resize(cols, rows)
   }
@@ -513,7 +624,7 @@ export class SessionManager {
 
   /** Signal every running session's process, without waiting on any of them. */
   stop(): void {
-    for (const session of this.running()) session.pty?.kill()
+    for (const session of this.running()) session.kill?.()
   }
 
   /**
@@ -533,7 +644,7 @@ export class SessionManager {
     // Read by the exit hook, which is why it is set before the signal: the same
     // wrap-up runs, and only the end state says the user stopped it.
     session.stopping = true
-    session.pty?.kill()
+    session.kill?.()
     await session.ended
     return session.info
   }
@@ -572,13 +683,28 @@ export class SessionManager {
    * The agent a session runs (spec-00001-FR-55): the one it names, or the first
    * the flow config declares — which is the behaviour of every board before the
    * eleventh round, so a single-agent config is unaffected.
+   *
+   * An ask narrows the choice to the agents that declare a headless form
+   * (spec-00005-FR-2, FR-8): the default is the first of those, and naming one
+   * without a declaration is refused for that reason rather than for not
+   * existing. A config where none declares one answers no ask at all
+   * (spec-00005-AC-7.4).
    */
-  private resolveAgent(name?: string): AgentConfig {
+  private resolveAgent(name: string | undefined, kind: SessionKind): AgentConfig {
     const { agents } = this.options
-    if (name === undefined) return agents[0]!
+    if (name === undefined) {
+      const chosen = kind === 'ask' ? agents.find((agent) => agent.headless !== undefined) : agents[0]
+      if (!chosen) {
+        throw new WorkflowError('no agent in the flow config declares a headless form, so nothing can answer an ask')
+      }
+      return chosen
+    }
     const agent = agents.find((candidate) => candidate.name === name)
     if (!agent) {
       throw new WorkflowError(`${JSON.stringify(name)} is not an agent in the flow config`)
+    }
+    if (kind === 'ask' && agent.headless === undefined) {
+      throw new WorkflowError(`${JSON.stringify(name)} declares no headless form, so it cannot answer an ask`)
     }
     return agent
   }
@@ -596,6 +722,20 @@ export class SessionManager {
   private require(id: string): Session {
     const session = this.sessions.get(id)
     if (!session) throw new NoSessionError(`there is no agent session ${id}`)
+    return session
+  }
+
+  /**
+   * The session behind a terminal channel. An ask call runs no pty at all
+   * (design-00001 §10.3), so attaching to it, typing at it and sizing it are
+   * three refusals of the one thing that is not there (spec-00005-AC-7.7) — and
+   * the socket that carries all three is closed on the first of them.
+   */
+  private requireTerminal(id: string): Session {
+    const session = this.require(id)
+    if (session.plan.kind === 'ask') {
+      throw new NoSessionError(`agent session ${id} is an ask call, which has no terminal`)
+    }
     return session
   }
 
@@ -627,7 +767,7 @@ export class SessionManager {
    * costs the user this record and nothing else, so the failure is a notice in
    * the terminal they are already looking at (spec-00001-AC-54.3).
    */
-  private saveHistory(session: Session, endedAt: string): void {
+  private saveHistory(session: Session, endedAt: string, transcript: string): void {
     try {
       writeSessionHistory(
         this.options.repoRoot,
@@ -641,7 +781,7 @@ export class SessionManager {
           status: session.info.status,
           exitCode: session.info.exitCode,
         },
-        session.transcript.join(''),
+        transcript,
       )
     } catch (cause) {
       const message = (cause as Error).message
@@ -669,18 +809,62 @@ export class SessionManager {
     session.latched = false
     const endedAt = new Date().toISOString()
     session.endedAt = endedAt
-    this.publish(session, `\r\nwhiteboard: session ended with code ${exitCode}\r\n`)
+    session.finished = this.wrapUp(session, endedAt).finally(session.announceEnd)
+  }
+
+  /**
+   * The wrap-up every session ends on, once. A terminal session says so in its
+   * own terminal and hands over its whole transcript; an ask call lands its
+   * answer on the thread first and hands over that answer instead
+   * (design-00001 §10.3), because that is what a person reading the history of
+   * an ask wants to find (spec-00005-AC-5.5). The hook that follows is the same
+   * one for both — the refresh the board hears rides on it — and what it does
+   * with an ask is nothing, since an ask commits nothing (spec-00005-FR-4).
+   */
+  private async wrapUp(session: Session, endedAt: string): Promise<void> {
+    const terminal = session.plan.kind !== 'ask'
+    if (terminal) this.publish(session, `\r\nwhiteboard: session ended with code ${session.info.exitCode}\r\n`)
     // The history records the end state as it is, `terminated` included
     // (design-00001 §7): a restart must not turn a stopped session into one that
     // finished (spec-00001-AC-54.4).
-    this.saveHistory(session, endedAt)
-    session.finished = this.options
-      .onExit(session.plan, session.baseline)
-      .then((outcome) => {
-        session.info.outcome = outcome
-        this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
+    if (terminal) this.saveHistory(session, endedAt, session.transcript.join(''))
+    else await this.landAnswer(session, endedAt)
+    const outcome = await this.options.onExit(session.plan, session.baseline)
+    session.info.outcome = outcome
+    if (terminal) this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
+  }
+
+  /**
+   * An ask call's own wrap-up (design-00001 §10.3): read the answer out of what
+   * the CLI printed, land it on its thread, then write the history. «Answered»
+   * is the one reading — a zero exit whose stdout the capture understands; a
+   * non-zero exit and stdout that will not parse are the same failure, and a
+   * stopped call is neither (spec-00005-FR-3, FR-7).
+   */
+  private async landAnswer(session: Session, endedAt: string): Promise<void> {
+    const answered = session.info.status === 'exited' && session.info.exitCode === 0
+    const captured = answered ? capture(session.stdout) : undefined
+    try {
+      await this.options.onAskEnd?.(session.plan, {
+        outcome: session.info.status === 'terminated' ? 'terminated' : captured ? 'answered' : 'failed',
+        answer: captured?.answer,
+        resumeId: captured?.resumeId,
+        resumed: session.plan.resumeId !== undefined,
       })
-      .finally(session.announceEnd)
+    } catch (cause) {
+      // A disk that will not take the record costs the user that record and
+      // nothing else (the reading spec-00001-AC-54.3 fixes for the history, and
+      // the same one here). Left to reject, it would skip the hook below — so no
+      // board would ever hear the call ended — and go on to bring the process
+      // down as an unhandled rejection.
+      const message = (cause as Error).message
+      session.info.historyError = message
+      session.stderr += `whiteboard: could not save the ask thread — ${message}\n`
+    }
+    // The transcript of an ask call is the answer it captured; with no answer to
+    // capture, what the CLI actually printed is the honest record of the call
+    // (spec-00005-AC-5.5).
+    this.saveHistory(session, endedAt, captured?.answer ?? session.stdout + session.stderr)
   }
 }
 

@@ -117,13 +117,13 @@ describe('start', () => {
     const { manager } = makeManager({ args: ECHO })
 
     const first = manager.start(planFor('clarify', 'spec-00001-a'))
-    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const second = manager.start(planFor('audit', 'record-00001-b'))
     const a = transcript(manager, first.id)
     const b = transcript(manager, second.id)
 
     expect([first.status, second.status]).toEqual(['running', 'running'])
     await vi.waitFor(() => expect(a.text).toContain('got:clarify spec-00001-a'), SESSION_WAIT)
-    await vi.waitFor(() => expect(b.text).toContain('got:ask record-00001-b'), SESSION_WAIT)
+    await vi.waitFor(() => expect(b.text).toContain('got:audit record-00001-b'), SESSION_WAIT)
     manager.write(first.id, 'to a\n')
     manager.write(second.id, 'to b\n')
     await vi.waitFor(() => expect(a.text).toContain('got:to a'), SESSION_WAIT)
@@ -134,13 +134,13 @@ describe('start', () => {
   it('keeps the output and the input of each session to itself', async () => {
     const { manager } = makeManager({ args: ECHO })
     const first = manager.start(planFor('clarify', 'spec-00001-a'))
-    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const second = manager.start(planFor('audit', 'record-00001-b'))
     const a = transcript(manager, first.id)
     const b = transcript(manager, second.id)
     // Each stand-in echoes only once its own instruction has been submitted, so
     // both are known to be listening before anything is typed at one of them.
     await vi.waitFor(() => expect(a.text).toContain('got:clarify spec-00001-a'), SESSION_WAIT)
-    await vi.waitFor(() => expect(b.text).toContain('got:ask record-00001-b'), SESSION_WAIT)
+    await vi.waitFor(() => expect(b.text).toContain('got:audit record-00001-b'), SESSION_WAIT)
 
     manager.write(first.id, 'only for a\n')
 
@@ -152,7 +152,7 @@ describe('start', () => {
   // spec-00003-AC-2.1
   it('refuses a second session on the same document, naming the exclusion, and leaves the first alone', () => {
     const { manager } = makeManager({ args: HOLD })
-    const first = manager.start(planFor('ask', 'spec-00001-a'))
+    const first = manager.start(planFor('audit', 'spec-00001-a'))
 
     expect(refusalOf(() => manager.start(planFor('clarify', 'spec-00001-a'))).reason).toBe('doc-busy')
     expect(manager.latest()).toEqual(first)
@@ -162,7 +162,7 @@ describe('start', () => {
   // spec-00003-AC-2.2
   it('refuses the same document again, adding no session', () => {
     const { manager } = makeManager({ args: HOLD })
-    manager.start(planFor('ask', 'spec-00001-a'))
+    manager.start(planFor('audit', 'spec-00001-a'))
     expect(() => manager.start(planFor('clarify', 'spec-00001-a'))).toThrowError(SessionBusyError)
 
     expect(() => manager.start(planFor('clarify', 'spec-00001-a'))).toThrowError(SessionBusyError)
@@ -197,10 +197,10 @@ describe('start', () => {
   // spec-00003-AC-3.1
   it('refuses a start once the cap is reached, naming the cap, and leaves the running ones alone', () => {
     const { manager } = makeManager({ args: HOLD }, undefined, 2)
-    const first = manager.start(planFor('ask', 'spec-00001-a'))
-    const second = manager.start(planFor('ask', 'spec-00002-b'))
+    const first = manager.start(planFor('audit', 'spec-00001-a'))
+    const second = manager.start(planFor('audit', 'spec-00002-b'))
 
-    expect(refusalOf(() => manager.start(planFor('ask', 'record-00001-c'))).reason).toBe('cap-reached')
+    expect(refusalOf(() => manager.start(planFor('audit', 'record-00001-c'))).reason).toBe('cap-reached')
     expect(manager.list().map((session) => session.id)).toEqual([first.id, second.id])
     expect(manager.list().every((session) => session.status === 'running')).toBe(true)
   })
@@ -212,7 +212,7 @@ describe('start', () => {
    */
   it('names the same-document reason when the cap is reached as well', () => {
     const { manager } = makeManager({ args: HOLD }, undefined, 1)
-    manager.start(planFor('ask', 'spec-00001-a'))
+    manager.start(planFor('audit', 'spec-00001-a'))
 
     expect(refusalOf(() => manager.start(planFor('clarify', 'spec-00001-a'))).reason).toBe('doc-busy')
   })
@@ -220,10 +220,10 @@ describe('start', () => {
   // spec-00003-AC-3.2
   it('refuses again at the cap, adding no session', () => {
     const { manager } = makeManager({ args: HOLD }, undefined, 1)
-    manager.start(planFor('ask', 'spec-00001-a'))
-    expect(() => manager.start(planFor('ask', 'spec-00002-b'))).toThrowError(SessionBusyError)
+    manager.start(planFor('audit', 'spec-00001-a'))
+    expect(() => manager.start(planFor('audit', 'spec-00002-b'))).toThrowError(SessionBusyError)
 
-    expect(() => manager.start(planFor('ask', 'record-00001-c'))).toThrowError(SessionBusyError)
+    expect(() => manager.start(planFor('audit', 'record-00001-c'))).toThrowError(SessionBusyError)
 
     expect(manager.list()).toHaveLength(1)
   })
@@ -231,10 +231,10 @@ describe('start', () => {
   // spec-00003-AC-3.3
   it('admits the next start once one of the capped sessions has ended', async () => {
     const { manager } = makeManager({ args: ['-e', ''] }, undefined, 1)
-    manager.start(planFor('ask', 'spec-00001-a'))
+    manager.start(planFor('audit', 'spec-00001-a'))
     await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
 
-    expect(manager.start(planFor('ask', 'spec-00002-b')).status).toBe('running')
+    expect(manager.start(planFor('audit', 'spec-00002-b')).status).toBe('running')
   })
 
   /**
@@ -245,8 +245,8 @@ describe('start', () => {
   it('gives the last slot to whichever start got there first', () => {
     const { manager } = makeManager({ args: HOLD }, undefined, 1)
 
-    const first = manager.start(planFor('ask', 'spec-00001-a'))
-    const refusal = refusalOf(() => manager.start(planFor('ask', 'spec-00002-b')))
+    const first = manager.start(planFor('audit', 'spec-00001-a'))
+    const refusal = refusalOf(() => manager.start(planFor('audit', 'spec-00002-b')))
 
     expect(refusal.reason).toBe('cap-reached')
     expect(first.status).toBe('running')
@@ -288,9 +288,9 @@ describe('start', () => {
       onExit: async () => OUTCOME,
     })
     managers.push(manager)
-    const failed = manager.start(planFor('ask', 'spec-00001-a'))
+    const failed = manager.start(planFor('audit', 'spec-00001-a'))
 
-    const next = manager.start(planFor('ask', 'record-00001-b'))
+    const next = manager.start(planFor('audit', 'record-00001-b'))
 
     expect(failed.status).toBe('failed')
     expect(next.status).toBe('running')
@@ -305,7 +305,7 @@ describe('start', () => {
    * what tells them apart is the kind on the session and the instruction its
    * caller built. Only an advance expects a target type.
    */
-  it('carries the kind and the instruction of a clarify or ask session', async () => {
+  it('carries the kind and the instruction of a clarify or audit session', async () => {
     const { manager } = makeManager({
       args: ['-e', "process.stdin.on('data', (d) => console.log('got:' + d.toString()))"],
     })
@@ -320,10 +320,10 @@ describe('start', () => {
   })
 
   // The exit hook is handed the plan, so it can tell an advance's product check
-  // from a clarify or ask that was asked for no new document — and that session's
+  // from a clarify or audit that was asked for no new document — and that session's
   // own baseline, which is what scopes its commit (spec-00003-FR-8).
   it('hands the exit hook the plan the session ran on', async () => {
-    const plan = { kind: 'ask' as const, sourceId: 'record-00001-x', instruction: 'answer this' }
+    const plan = { kind: 'audit' as const, sourceId: 'record-00001-x', instruction: 'answer this' }
     const { manager, onExit } = makeManager({ args: ['-e', ''] })
 
     manager.start(plan)
@@ -610,7 +610,7 @@ describe('waiting on the user', () => {
   // nothing is left for the count to be drawn from.
   it('drops the mark when a waiting session ends', async () => {
     const { manager, hooks } = stubManager()
-    const { id } = manager.start(planFor('ask', 'record-00001-b'))
+    const { id } = manager.start(planFor('audit', 'record-00001-b'))
     vi.advanceTimersByTime(THRESHOLD)
     expect(awaiting(manager, id)).toBe(true)
 
@@ -704,7 +704,7 @@ describe('waiting on the user', () => {
   // spec-00003-AC-6.9 — the end takes a latched mark down like any other.
   it('drops a latched mark when the session ends', async () => {
     const { manager, hooks } = stubManager()
-    const { id } = manager.start(planFor('ask', 'record-00001-b'))
+    const { id } = manager.start(planFor('audit', 'record-00001-b'))
     hooks[0]!.data!(SIGNAL)
     expect(awaiting(manager, id)).toBe(true)
 
@@ -864,9 +864,9 @@ describe('attach', () => {
   it('holds two unattached sessions and replays each one its own output', async () => {
     const { manager } = makeManager({ args: ECHO })
     const first = manager.start(planFor('clarify', 'spec-00001-a'))
-    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const second = manager.start(planFor('audit', 'record-00001-b'))
     await vi.waitFor(
-      () => expect(transcript(manager, second.id).text).toContain('got:ask record-00001-b'),
+      () => expect(transcript(manager, second.id).text).toContain('got:audit record-00001-b'),
       SESSION_WAIT,
     )
 
@@ -875,7 +875,7 @@ describe('attach', () => {
 
     expect(manager.list().map((session) => session.status)).toEqual(['running', 'running'])
     await vi.waitFor(() => expect(a.text).toContain('got:clarify spec-00001-a'), SESSION_WAIT)
-    expect(b.text).toContain('got:ask record-00001-b')
+    expect(b.text).toContain('got:audit record-00001-b')
     expect(b.text).not.toContain('spec-00001-a')
   })
 
@@ -886,7 +886,7 @@ describe('attach', () => {
    */
   it('refuses to stop a session it does not know or one that has ended', async () => {
     const { manager } = makeManager({ args: ['-e', ''] })
-    const ended = manager.start(planFor('ask', 'spec-00001-a'))
+    const ended = manager.start(planFor('audit', 'spec-00001-a'))
     await vi.waitFor(() => expect(manager.latest()!.status).toBe('exited'), SESSION_WAIT)
     await manager.whenFinished(ended.id)
 
@@ -898,8 +898,8 @@ describe('attach', () => {
   // state says it was stopped rather than that it ran out (spec-00003-AC-5.3)
   it('stops the session it is given and leaves the other one running', async () => {
     const { manager } = makeManager({ args: HOLD })
-    const first = manager.start(planFor('ask', 'spec-00001-a'))
-    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const first = manager.start(planFor('audit', 'spec-00001-a'))
+    const second = manager.start(planFor('audit', 'record-00001-b'))
 
     const stopped = await manager.terminate(first.id)
 
@@ -922,8 +922,8 @@ describe('attach', () => {
       return OUTCOME
     })
     const { manager } = makeManager({ args: HOLD }, onExit)
-    const first = manager.start(planFor('ask', 'spec-00001-a'))
-    const second = manager.start(planFor('ask', 'record-00001-b'))
+    const first = manager.start(planFor('audit', 'spec-00001-a'))
+    const second = manager.start(planFor('audit', 'record-00001-b'))
 
     await manager.shutdown()
 

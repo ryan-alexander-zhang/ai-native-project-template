@@ -125,3 +125,22 @@ agents:
     # (a write outside docs/ must not land) before it ships in this file.
     args: []
     cwd: docs
+    # The non-interactive form an ask thread calls (spec-00005-FR-8): one
+    # question in, one answer out, the process gone. `{question}` is the whole
+    # payload — the read-only instruction plus the question on a first call, the
+    # follow-up alone on a resume — and `{session}` is the resume id the capture
+    # read off the call before it. `capture` names a reading the code holds; the
+    # only one is `claude-json`, whose `.result` is the answer and whose
+    # `.session_id` is that resume id.
+    #
+    # Verified against this CLI (claude 2.1.246) before it was written here, the
+    # four checks design-00001 §10.1 requires: the stdout of
+    # `-p --output-format json` is one JSON object; its `.result` and
+    # `.session_id` are the answer and the resume id; `--resume` takes that id
+    # and continues the conversation; and `--permission-mode plan` holds — a
+    # call told in so many words to overwrite a file in its working directory
+    # left that file untouched.
+    headless:
+      first:  [-p, --output-format, json, --permission-mode, plan, "{question}"]
+      resume: [-p, --output-format, json, --permission-mode, plan, --resume, "{session}", "{question}"]
+      capture: claude-json

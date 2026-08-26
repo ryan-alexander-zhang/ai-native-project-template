@@ -3,10 +3,12 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { WebSocketServer } from 'ws'
 import { type Expectation, findProduct, markProduct, productProblems, taskInstruction } from './advance.ts'
 import { auditableTypes } from './auditRules.ts'
+import { AskBusyError, AskStore } from './askStore.ts'
 import { clarifiableTypes } from './clarifyRules.ts'
 import type { FlowConfig } from './config.ts'
 import { ConflictError, DocService, GateError } from './docService.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
+import type { SpawnHeadless } from './headless.ts'
 import { listSessionHistory, readSessionHistory } from './sessionHistory.ts'
 import {
   NoSessionError,
@@ -25,6 +27,8 @@ export interface BoardOptions {
   docsDir: string
   config: FlowConfig
   spawn?: SpawnPty
+  /** The second seam an ask call runs on (design-00001 §10.1), settable for the same reason `spawn` is. */
+  spawnHeadless?: SpawnHeadless
   /**
    * The silence a running session is read as «waiting on the user» after
    * (spec-00003-FR-6). An implementation constant, not a config key
@@ -39,6 +43,8 @@ export class Board {
   readonly app: Express
   readonly docs: DocService
   readonly sessions: SessionManager
+  /** The ask lists on disk (spec-00005-FR-5): board state, kept outside git and outside docs/. */
+  readonly asks: AskStore
   /** Live only while the board is listening: a board nobody can connect to has nobody to tell. */
   readonly watcher: DocsWatcher
   private readonly repoRoot: string
@@ -51,9 +57,14 @@ export class Board {
   private lastExpectation?: Expectation
 
   constructor(options: BoardOptions) {
-    const { repoRoot, docsDir, config, spawn = spawnPty, awaitThresholdMs } = options
+    const { repoRoot, docsDir, config, spawn = spawnPty, spawnHeadless, awaitThresholdMs } = options
     this.repoRoot = repoRoot
     this.docs = new DocService(repoRoot, docsDir, config)
+    this.asks = new AskStore(repoRoot)
+    // The registry comes up empty, so a call the last process was killed with
+    // is written off here rather than left saying «in progress» for good
+    // (spec-00005-AC-5.3, design-00001 §10.2).
+    this.asks.reconcile()
     // Everything written from outside the board arrives as this signal, so it is
     // also where the parsed tree goes stale (spec-00001 §7 非功能项).
     this.watcher = new DocsWatcher(docsDir, () => this.docs.invalidate())
@@ -62,6 +73,7 @@ export class Board {
       maxSessions: config.maxSessions,
       repoRoot,
       spawn,
+      spawnHeadless,
       snapshot: () => this.docs.snapshotDocs(),
       awaitThresholdMs,
       // A waiting mark going up or coming down is session state, and session
@@ -70,6 +82,9 @@ export class Board {
       // spec-00003-FR-6). Through `signal` rather than a channel of its own, so
       // it folds into the same window as everything else (design-00001 §5).
       onAwaitingChange: () => this.watcher.signal(),
+      // Every ask plan carries the thread it belongs to; the doc service builds
+      // no other kind of ask plan (design-00001 §10.2).
+      onAskEnd: (plan, result) => this.asks.finish(plan.sourceId, plan.threadId!, result),
       onExit: (plan, baseline) => this.finishSession(plan, baseline),
     })
     this.app = this.buildApp(config)
@@ -120,9 +135,15 @@ export class Board {
    * inherited says nothing about what another may commit (spec-00003-FR-8).
    */
   private async wrapUpSession(plan: SessionPlan, before: DirtySnapshot): Promise<SessionOutcome> {
-    // Clarify, ask and audit were asked for no new document, so there is nothing
-    // to check: their commit is named by the kind and carries the document they
-    // were about (spec-00001-AC-14.7, AC-14.8, AC-50.3).
+    // An ask makes no commit and never enters the commit queue
+    // (spec-00005-FR-4): it wrote nothing, and whatever else is dirty under
+    // docs/ belongs to the session that did write it, on that session's own
+    // terms (spec-00005-AC-4.3). It still comes through here, because this is
+    // where the refresh every session's end sends out is hung.
+    if (plan.kind === 'ask') return { docId: plan.sourceId, problems: [], committed: false }
+    // Clarify and audit were asked for no new document, so there is nothing to
+    // check: their commit is named by the kind and carries the document they
+    // were about (spec-00001-AC-14.8, AC-50.3).
     if (plan.expectation === undefined) {
       const outcome = await this.docs.commitSessionChanges(plan.sourceId, before, plan.kind)
       return { docId: plan.sourceId, problems: [], committed: outcome.committed, error: outcome.error }
@@ -203,15 +224,18 @@ export class Board {
       res.json(entry)
     })
     app.post('/api/sessions', (req, res) => res.json(this.startSession(req.body)))
-    // The other three session kinds: same channel, same concurrency rules
-    // (spec-00003-FR-2, FR-3), each with its own ruling (FR-9, FR-47, FR-51)
-    // made in the doc service.
+    // The two other terminal kinds: same channel, same concurrency rules
+    // (spec-00003-FR-2, FR-3), each with its own ruling (FR-9, FR-51) made in
+    // the doc service.
     app.post('/api/sessions/clarify', (req, res) => {
       res.json(this.sessions.start(this.docs.clarifyPlan(docIdOf(req.body)), agentOf(req.body)))
     })
-    app.post('/api/sessions/ask', (req, res) => {
-      res.json(this.sessions.start(this.docs.askPlan(docIdOf(req.body)), agentOf(req.body)))
-    })
+    // The registry's second form (spec-00005-FR-1): a question, a headless call,
+    // no terminal. The ask list of the document it was asked about is its own
+    // resource — it outlives the document, so it does not hang under
+    // `/api/docs/:id/` (design-00001 §7).
+    app.post('/api/sessions/ask', async (req, res) => res.json(await this.askSession(req.body)))
+    app.get('/api/asks/:id', (req, res) => res.json({ threads: this.asks.read(req.params.id).threads }))
     app.post('/api/sessions/audit', (req, res) => {
       res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body)), agentOf(req.body)))
     })
@@ -225,6 +249,43 @@ export class Board {
 
     app.use(errorHandler)
     return app
+  }
+
+  /**
+   * One question on one document (spec-00005-FR-1 and FR-2). No `threadId` opens
+   * a new thread — a headless first call; one that names a thread is its
+   * follow-up, or the resend of a question that failed or was stopped, and the
+   * form follows the thread's resume id (design-00001 §10.2).
+   *
+   * The order is that section's receipt chain: the document, then the thread's
+   * own serial rule, then the cap and the registry slot, then the record on
+   * disk, and only then the call itself — a refusal anywhere along it writes
+   * nothing (spec-00005-AC-6.4, AC-7.1).
+   */
+  private async askSession(body: unknown): Promise<{ sessionId: string; threadId: string }> {
+    const { docId, question, threadId, resend, agent } = askRequest(body)
+    // Held so a failure *after* the admission can be undone: the slot is taken
+    // inside the callback and the record is written after it, so a write that
+    // fails would otherwise leave a session running with no process to come
+    // (design-00001 §10.2 写序).
+    let admitted: string | undefined
+    try {
+      const opened = await this.asks.open(docId, { question, threadId, resend }, (thread) => {
+        const info = this.sessions.start(
+          this.docs.askPlan(docId, question, thread),
+          // A follow-up runs the agent its thread was opened with: a resume id
+          // is that one CLI's, and no other could take it (spec-00005-FR-2).
+          thread.exchanges.length === 0 ? agent : thread.agent,
+        )
+        admitted = info.id
+        return info
+      })
+      this.sessions.launch(opened.admitted.id)
+      return { sessionId: opened.admitted.id, threadId: opened.thread.id }
+    } catch (cause) {
+      if (admitted) this.sessions.abandon(admitted, (cause as Error).message)
+      throw cause
+    }
   }
 
   /** spec-00001-FR-10 and FR-11: only a step the flow config declares may be started. */
@@ -337,12 +398,47 @@ export class Board {
   }
 }
 
-/** A clarify, ask or audit request names the one document it is about. */
+/** A clarify or audit request names the one document it is about. */
 function docIdOf(body: { docId?: string }): string {
   if (typeof body.docId !== 'string') {
-    throw new WorkflowError('a clarify, ask or audit session needs a docId')
+    throw new WorkflowError('a clarify or audit session needs a docId')
   }
   return body.docId
+}
+
+/**
+ * What an ask request has to carry (design-00001 §7): the document, the question
+ * — an empty one is nothing to ask, and is refused rather than sent
+ * (spec-00005-FR-7) — and, when it is a follow-up or a resend, the thread it
+ * belongs to. `resend` is what tells those two apart: only a resend rewrites the
+ * question it is resending, and the record alone cannot say which was meant.
+ */
+function askRequest(body: unknown): {
+  docId: string
+  question: string
+  threadId?: string
+  resend?: boolean
+  agent?: string
+} {
+  const { docId, question, threadId, resend } = (body ?? {}) as {
+    docId?: unknown
+    question?: unknown
+    threadId?: unknown
+    resend?: unknown
+  }
+  if (typeof docId !== 'string') {
+    throw new WorkflowError('an ask needs a docId')
+  }
+  if (typeof question !== 'string' || question.trim() === '') {
+    throw new WorkflowError('an ask needs a question to put to the agent')
+  }
+  if (threadId !== undefined && typeof threadId !== 'string') {
+    throw new WorkflowError('threadId must name a thread of that document’s ask list')
+  }
+  if (resend !== undefined && typeof resend !== 'boolean') {
+    throw new WorkflowError('resend says whether this question replaces the last one, so it is true or false')
+  }
+  return { docId, question, threadId, resend, agent: agentOf(body as { agent?: unknown }) }
 }
 
 /**
@@ -384,6 +480,7 @@ function parseSize(frame: string): { cols: number; rows: number } | undefined {
 const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [
   [ConflictError, 409],
   [SessionBusyError, 409],
+  [AskBusyError, 409],
   [NoSessionError, 404],
   [WorkflowError, 422],
 ]

@@ -1,9 +1,12 @@
 import type { Server } from 'node:http'
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { taskInstruction } from '../src/advance.ts'
+import type { AskThread } from '../src/askStore.ts'
+import type { AgentConfig } from '../src/config.ts'
+import type { SpawnHeadless } from '../src/headless.ts'
 import { Board } from '../src/server.ts'
 import { ptySpawner, spawnPty } from '../src/pty.ts'
 import type { SessionInfo, SessionListing, SpawnPty } from '../src/sessionManager.ts'
@@ -85,8 +88,11 @@ function boardOnRepo(
   // The silence a session is read as waiting after (spec-00003-FR-6); given only
   // by the tests that turn on it, so nothing else waits out the real threshold.
   awaitThresholdMs?: number,
+  // The seam an ask call runs on (design-00001 §10.1); given only by the tests
+  // that script one, so the rest run the real child process.
+  spawnHeadless?: SpawnHeadless,
 ) {
-  const board = new Board({ repoRoot, docsDir, config, spawn, awaitThresholdMs })
+  const board = new Board({ repoRoot, docsDir, config, spawn, spawnHeadless, awaitThresholdMs })
   const server = board.listen(0)
   servers.push(server)
   // The http server only announces its close once every socket has gone, and a
@@ -573,9 +579,9 @@ describe('sessions', () => {
   // spec-00003-AC-3.8 — a declared cap of one refuses the second start like any cap
   it('refuses a second session outright when the cap is one', async () => {
     const { call } = cappedBoard({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, 1)
-    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+    const { status, body } = await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
 
     expect(status).toBe(409)
     expect(body.reason).toBe('cap-reached')
@@ -611,9 +617,9 @@ describe('sessions', () => {
   // along the edges to its related documents
   it('starts a session on a document related to the one that has a session', async () => {
     const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, HOLD)
-    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+    const { status, body } = await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
 
     expect(status).toBe(200)
     expect(body.status).toBe('running')
@@ -626,9 +632,9 @@ describe('sessions', () => {
   // spec-00001-AC-18.2 — nothing to do with the target document: the cap is full
   it('answers 409 with the cap reason once the cap is reached', async () => {
     const { call } = cappedBoard({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, 1)
-    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+    const { status, body } = await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
 
     expect(status).toBe(409)
     expect(body.reason).toBe('cap-reached')
@@ -639,11 +645,11 @@ describe('sessions', () => {
   // spec-00003-AC-3.3 — a slot freed by an ending session is a slot to start in
   it('starts a session at the cap once one of the running ones has ended', async () => {
     const { call, board } = cappedBoard({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, 1, ['-e', ''])
-    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
     await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
-    expect((await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })).status).toBe(200)
+    expect((await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })).status).toBe(200)
   })
 
   /**
@@ -691,7 +697,7 @@ describe('sessions', () => {
   it('lists every running session so a reconnecting board can find them all', async () => {
     const { call } = boardOn({ 'idea/a.md': ACTIVE_IDEA, 'prd/p.md': RELATED_PRD }, HOLD)
     await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
-    await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+    await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
 
     const { body } = await call('GET', '/api/sessions')
 
@@ -718,8 +724,8 @@ describe('sessions', () => {
       agents.spawn,
       AWAIT_THRESHOLD,
     )
-    await call('POST', '/api/sessions/ask', { docId: 'idea-00001-x' })
-    await call('POST', '/api/sessions/ask', { docId: 'prd-00001-p' })
+    await call('POST', '/api/sessions', { sourceId: 'idea-00001-x', targetType: 'prd' })
+    await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
 
     await vi.waitFor(async () => {
       const { body } = await call('GET', '/api/sessions')
@@ -729,13 +735,13 @@ describe('sessions', () => {
 })
 
 /**
- * The other two session kinds over the wire (spec-00001-FR-9 and FR-47): the same
- * channel, the same one slot, each with its own ruling. Nothing here writes a
- * document — the session's agent does, and the board commits what it left.
+ * The clarify session over the wire (spec-00001-FR-9): the same channel and the
+ * same concurrency rules as an advance, with its own ruling. Nothing here writes
+ * a document — the session's agent does, and the board commits what it left.
  */
-describe('clarify and ask sessions', () => {
+describe('clarify sessions', () => {
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
-  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const DRAFT_DESIGN = doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# Design\n')
   const BROKEN = doc({ id: 'nope', type: 'spec', status: 'draft' }, '# Broken\n')
   const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
   /** An agent that revises the document it was started on, then exits. */
@@ -777,76 +783,60 @@ describe('clarify and ask sessions', () => {
     expect(board.sessions.latest()).toBeNull()
   })
 
-  // spec-00001-AC-47.1 — ask is not a review action: any type, any status
-  it('starts an ask session on an active record', async () => {
-    const { call, board } = boardOn({ 'record/r.md': ACTIVE_RECORD }, HOLD)
-
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
-
-    expect(status).toBe(200)
-    expect(body.kind).toBe('ask')
-    expect(board.sessions.latest()!.status).toBe('running')
-  })
-
-  // spec-00001-AC-47.5
-  it('answers 422 and starts nothing for an anomalous document', async () => {
-    const { call, board } = boardOn({ 'spec/broken.md': BROKEN })
-
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'nope' })
-
-    expect(status).toBe(422)
-    expect(body.error).toMatch(/front matter problems/)
-    expect(board.sessions.latest()).toBeNull()
-  })
-
   // spec-00001-AC-19.2
   it('answers 409 and starts nothing when the target document was deleted', async () => {
     const { call, board, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC })
     rmSync(join(docsDir, 'spec/b.md'))
 
-    for (const path of ['/api/sessions/ask', '/api/sessions/clarify']) {
-      const { status, body } = await call('POST', path, { docId: 'spec-00001-b' })
+    const { status, body } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
 
-      expect(status).toBe(409)
-      expect(body.error).toMatch(/refresh the board/)
-      // The third reason a start is refused (design-00001 §7), told apart from
-      // the two concurrency ones.
-      expect(body.reason).toBe('doc-missing')
-    }
+    expect(status).toBe(409)
+    expect(body.error).toMatch(/refresh the board/)
+    // The third reason a start is refused (design-00001 §7), told apart from the
+    // two concurrency ones.
+    expect(body.reason).toBe('doc-missing')
     expect(board.sessions.latest()).toBeNull()
   })
 
-  // spec-00003-AC-2.1 — the exclusion holds across kinds, on the one document
-  it('answers 409 for an ask on the document a clarify session is running on', async () => {
-    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, HOLD)
-    await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
+  /**
+   * spec-00003-AC-2.1 as the twenty-first round amends its example: an advance
+   * running, a clarify refused on the same document. The Given was an ask
+   * before — an ask takes no document any more, and that direction is now
+   * asserted the other way round by spec-00005-AC-6.2.
+   */
+  it('answers 409 for a clarify on the document an advance session is running on', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
+    await call('POST', '/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' })
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'spec-00001-b' })
+    const { status, body } = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
 
     expect(status).toBe(409)
     expect(body.reason).toBe('doc-busy')
-    expect(board.sessions.latest()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
+    expect(board.sessions.latest()).toMatchObject({ kind: 'advance', sourceId: 'spec-00001-b', status: 'running' })
   })
 
-  // spec-00003-AC-1.1 — two documents, two kinds, both running
-  it('starts an ask on another document while a clarify session runs', async () => {
-    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, HOLD)
+  /**
+   * spec-00003-AC-1.1 as amended: a clarify running on one document, an audit
+   * started on another. The example was an ask, whose form has no terminal at
+   * all now and moved to spec-00005.
+   */
+  it('starts an audit on another document while a clarify session runs', async () => {
+    const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC, 'design/d.md': DRAFT_DESIGN }, HOLD)
     await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'design-00001-d' })
 
     expect(status).toBe(200)
     expect(body.status).toBe('running')
     expect(board.sessions.list().map((session) => [session.kind, session.status])).toEqual([
       ['clarify', 'running'],
-      ['ask', 'running'],
+      ['audit', 'running'],
     ])
   })
 
   it('answers 422 when the request names no document', async () => {
     const { call } = boardOn({ 'spec/b.md': DRAFT_SPEC })
     expect((await call('POST', '/api/sessions/clarify', {})).status).toBe(422)
-    expect((await call('POST', '/api/sessions/ask', {})).status).toBe(422)
   })
 
   // spec-00001-AC-16.3 and AC-16.4
@@ -877,30 +867,6 @@ describe('clarify and ask sessions', () => {
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/b.md'])
   })
 
-  // spec-00001-AC-14.7
-  it('commits what an ask session wrote under docs', async () => {
-    const { call, board, repoRoot } = boardOn({ 'record/r.md': ACTIVE_RECORD }, REVISE('record/r.md'))
-
-    await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
-    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
-    await board.sessions.whenFinished()
-
-    expect(lastCommitMessage(repoRoot)).toBe('wb(ask): record-00001-r')
-  })
-
-  // spec-00001-AC-47.2 — a discussion that concluded nothing changes nothing
-  it('leaves the document and the history alone when an ask session wrote nothing', async () => {
-    const { call, board, repoRoot, docsDir } = boardOn({ 'spec/b.md': DRAFT_SPEC })
-    const commits = commitCount(repoRoot)
-
-    await call('POST', '/api/sessions/ask', { docId: 'spec-00001-b' })
-    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
-    await board.sessions.whenFinished()
-
-    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
-    expect(commitCount(repoRoot)).toBe(commits)
-    expect(board.sessions.latest()!.outcome!.committed).toBe(false)
-  })
 })
 
 /**
@@ -1017,14 +983,15 @@ describe('audit sessions', () => {
     expect(board.sessions.latest()).toMatchObject({ kind: 'clarify', sourceId: 'spec-00001-b', status: 'running' })
   })
 
-  // spec-00003-AC-2.1 the other way round: the audit excludes the rest on its document
-  it('answers 409 for a clarify, an ask and an advance while an audit session is running', async () => {
+  // spec-00003-AC-2.1 the other way round: the audit excludes the rest on its
+  // document — the terminal kinds, that is; an ask is no longer among them
+  // (spec-00005-FR-6)
+  it('answers 409 for a clarify and an advance while an audit session is running', async () => {
     const { call, board } = boardOn({ 'spec/b.md': DRAFT_SPEC }, HOLD)
     await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
 
     for (const [path, request] of [
       ['/api/sessions/clarify', { docId: 'spec-00001-b' }],
-      ['/api/sessions/ask', { docId: 'spec-00001-b' }],
       ['/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' }],
     ] as const) {
       expect((await call('POST', path, request)).status).toBe(409)
@@ -1234,7 +1201,7 @@ describe('terminal size frames', () => {
     const server = board.listen(0)
     servers.push(server)
     watching.push(board)
-    const session = board.sessions.start({ kind: 'ask', sourceId: 'idea-00001-x', instruction: 'answer this' })
+    const session = board.sessions.start({ kind: 'audit', sourceId: 'idea-00001-x', instruction: 'audit this' })
     return { board, sizes, typed, session, port: (server.address() as { port: number }).port }
   }
 
@@ -1293,7 +1260,7 @@ describe('terminal size frames', () => {
     // byte: the Enter is a later press this silent stand-in never triggers, since
     // it prints nothing to say it is ready (issue-00011). The keystroke frame is
     // forwarded exactly as it arrived.
-    await vi.waitFor(() => expect(typed).toEqual(['answer this', '{"cols":9,"rows":9}']))
+    await vi.waitFor(() => expect(typed).toEqual(['audit this', '{"cols":9,"rows":9}']))
     expect(sizes).toEqual([{ cols: 100, rows: 40 }])
     socket.close()
   })
@@ -1307,7 +1274,7 @@ describe('terminal size frames', () => {
     socket.send(sizeFrame(100, 40))
 
     await vi.waitFor(() => expect(sizes).toEqual([{ cols: 100, rows: 40 }]))
-    expect(typed).toEqual(['answer this'])
+    expect(typed).toEqual(['audit this'])
     socket.close()
   })
 })
@@ -1420,7 +1387,7 @@ describe('the terminal socket', () => {
 describe('the docs-change socket', () => {
   const OTHER_IDEA = doc({ id: 'idea-00002-y', type: 'idea', status: 'draft' }, '# Idea Y\n')
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
-  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const DRAFT_DESIGN = doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# Design\n')
   /** Longer than the debounce window, so «nothing arrived» has had its chance to. */
   const SETTLE = 400
   /**
@@ -1569,17 +1536,17 @@ describe('the docs-change socket', () => {
    */
   it('folds two sessions ending in one batch into a single refresh signal', async () => {
     const agents = scriptedAgents()
-    const open = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, undefined, undefined, agents.spawn)
+    const open = boardOn({ 'spec/b.md': DRAFT_SPEC, 'design/d.md': DRAFT_DESIGN }, undefined, undefined, agents.spawn)
     const { board, docsDir, repoRoot } = open
     await armWatch(board.watcher, docsDir)
     const watching = await subscribe(open)
     const first = (await open.call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })).body.id
-    const second = (await open.call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })).body.id
+    const second = (await open.call('POST', '/api/sessions/audit', { docId: 'design-00001-d' })).body.id
 
     // What the two agents wrote, and its own signal out of the way: what is
     // being counted below is the endings, not the writes.
     appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
-    appendFileSync(join(docsDir, 'record/r.md'), '\none more line of evidence\n')
+    appendFileSync(join(docsDir, 'design/d.md'), '\none more line of evidence\n')
     await vi.waitFor(() => expect(watching.signals).toBeGreaterThanOrEqual(1), SIGNAL_WAIT)
     await new Promise((resolve) => setTimeout(resolve, SETTLE))
     const written = watching.signals
@@ -1765,7 +1732,7 @@ describe('when a session ends', () => {
  */
 describe('several commits at once', () => {
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
-  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const DRAFT_DESIGN = doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# Design\n')
 
   function scriptedBoard(files: Record<string, string>) {
     const agents = scriptedAgents()
@@ -1785,7 +1752,7 @@ describe('several commits at once', () => {
   /** Two sessions on two documents, each ready to be ended by the test. */
   async function twoSessions(call: BoardCall): Promise<[string, string]> {
     const first = await call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })
-    const second = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })
+    const second = await call('POST', '/api/sessions/audit', { docId: 'design-00001-d' })
     return [first.body.id, second.body.id]
   }
 
@@ -1793,7 +1760,7 @@ describe('several commits at once', () => {
   it('gives two sessions ending one after the other a commit each, staging only its own file', async () => {
     const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
       'spec/b.md': DRAFT_SPEC,
-      'record/r.md': ACTIVE_RECORD,
+      'design/d.md': DRAFT_DESIGN,
     })
     const commits = commitCount(repoRoot)
     const [first, second] = await twoSessions(call)
@@ -1801,15 +1768,15 @@ describe('several commits at once', () => {
     appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
     exit(0)
     await board.sessions.whenFinished(first)
-    appendFileSync(join(docsDir, 'record/r.md'), '\none more line of evidence\n')
+    appendFileSync(join(docsDir, 'design/d.md'), '\none more line of evidence\n')
     exit(1)
     await board.sessions.whenFinished(second)
 
     expect(commitCount(repoRoot)).toBe(commits + 2)
     // Each names its own kind and its own document (spec-00001-FR-14), and each
     // staged set holds that session's file alone.
-    expect(lastCommitMessage(repoRoot)).toBe('wb(ask): record-00001-r')
-    expect(commitFiles(repoRoot, 0)).toEqual(['docs/record/r.md'])
+    expect(lastCommitMessage(repoRoot)).toBe('wb(audit): design-00001-d')
+    expect(commitFiles(repoRoot, 0)).toEqual(['docs/design/d.md'])
     expect(git(repoRoot, 'log', '-2', '--pretty=%s').trim().split('\n').at(-1)).toBe('wb(clarify): spec-00001-b')
     expect(commitFiles(repoRoot, 1)).toEqual(['docs/spec/b.md'])
   })
@@ -1818,7 +1785,7 @@ describe('several commits at once', () => {
   it('makes one commit when only one of two sessions changed anything under docs', async () => {
     const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
       'spec/b.md': DRAFT_SPEC,
-      'record/r.md': ACTIVE_RECORD,
+      'design/d.md': DRAFT_DESIGN,
     })
     const commits = commitCount(repoRoot)
     const [first, second] = await twoSessions(call)
@@ -1836,7 +1803,7 @@ describe('several commits at once', () => {
     // The session that wrote nothing wrapped up all the same, with no commit.
     const listed = board.sessions.list()
     expect(listed.find((session) => session.id === second)!.outcome).toEqual({
-      docId: 'record-00001-r',
+      docId: 'design-00001-d',
       problems: [],
       committed: false,
       error: undefined,
@@ -1863,13 +1830,13 @@ describe('several commits at once', () => {
   it('loses nothing when both sessions wrote before either ended, letting the first sweep the batch', async () => {
     const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
       'spec/b.md': DRAFT_SPEC,
-      'record/r.md': ACTIVE_RECORD,
+      'design/d.md': DRAFT_DESIGN,
     })
     const commits = commitCount(repoRoot)
     const [first, second] = await twoSessions(call)
 
     appendFileSync(join(docsDir, 'spec/b.md'), '\nasked and answered\n')
-    appendFileSync(join(docsDir, 'record/r.md'), '\none more line of evidence\n')
+    appendFileSync(join(docsDir, 'design/d.md'), '\none more line of evidence\n')
     exit(0)
     exit(1)
     await Promise.all([board.sessions.whenFinished(first), board.sessions.whenFinished(second)])
@@ -1880,7 +1847,7 @@ describe('several commits at once', () => {
     expect(dirtyDocs(repoRoot)).toBe('')
     expect(commitCount(repoRoot)).toBe(commits + 1)
     expect(lastCommitMessage(repoRoot)).toBe('wb(clarify): spec-00001-b')
-    expect(commitFiles(repoRoot, 0).sort()).toEqual(['docs/record/r.md', 'docs/spec/b.md'])
+    expect(commitFiles(repoRoot, 0).sort()).toEqual(['docs/design/d.md', 'docs/spec/b.md'])
     expect(board.sessions.list().find((session) => session.id === second)!.outcome!.committed).toBe(false)
   })
 
@@ -1917,7 +1884,7 @@ describe('several commits at once', () => {
   it('loses nothing when two sessions wrote the same third document, crediting the first to end', async () => {
     const { call, board, repoRoot, docsDir, exit } = scriptedBoard({
       'spec/b.md': DRAFT_SPEC,
-      'record/r.md': ACTIVE_RECORD,
+      'design/d.md': DRAFT_DESIGN,
       'idea/a.md': ACTIVE_IDEA,
     })
     const commits = commitCount(repoRoot)
@@ -1950,16 +1917,16 @@ describe('several commits at once', () => {
  */
 describe('shutting the board down', () => {
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
-  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const DRAFT_DESIGN = doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# Design\n')
 
   /** A board whose two sessions are running and have each written something. */
   async function twoSessionsThatWrote() {
     const agents = scriptedAgents()
-    const open = boardOn({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD }, undefined, undefined, agents.spawn)
+    const open = boardOn({ 'spec/b.md': DRAFT_SPEC, 'design/d.md': DRAFT_DESIGN }, undefined, undefined, agents.spawn)
     const first = (await open.call('POST', '/api/sessions/clarify', { docId: 'spec-00001-b' })).body.id
-    const second = (await open.call('POST', '/api/sessions/ask', { docId: 'record-00001-r' })).body.id
+    const second = (await open.call('POST', '/api/sessions/audit', { docId: 'design-00001-d' })).body.id
     appendFileSync(join(open.docsDir, 'spec/b.md'), '\nasked and answered\n')
-    appendFileSync(join(open.docsDir, 'record/r.md'), '\none more line of evidence\n')
+    appendFileSync(join(open.docsDir, 'design/d.md'), '\none more line of evidence\n')
     return { ...open, sessions: [first, second] as [string, string] }
   }
 
@@ -1979,7 +1946,7 @@ describe('shutting the board down', () => {
     expect(commitCount(open.repoRoot)).toBeGreaterThan(commits)
     expect(commitCount(open.repoRoot)).toBeLessThanOrEqual(commits + 2)
     expect(git(open.repoRoot, 'show', 'HEAD:docs/spec/b.md')).toContain('asked and answered')
-    expect(git(open.repoRoot, 'show', 'HEAD:docs/record/r.md')).toContain('one more line of evidence')
+    expect(git(open.repoRoot, 'show', 'HEAD:docs/design/d.md')).toContain('one more line of evidence')
 
     // A restart is a restart: the registry was memory, so the panel starts empty
     // — and both transcripts are where they are kept (spec-00001-FR-54).
@@ -2342,11 +2309,11 @@ describe('session history', () => {
  */
 describe('the agent a session runs', () => {
   const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
-  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const DRAFT_DESIGN = doc({ id: 'design-00001-d', type: 'design', status: 'draft' }, '# Design\n')
 
   /** A board on a two-agent config whose pty is a stand-in recording what it spawned. */
   function twoAgentBoard() {
-    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': DRAFT_SPEC, 'record/r.md': ACTIVE_RECORD })
+    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': DRAFT_SPEC, 'design/d.md': DRAFT_DESIGN })
     const config = testConfig()
     config.agents = [
       { name: 'claude', command: 'first-cli', args: [], cwd: 'docs' },
@@ -2360,11 +2327,12 @@ describe('the agent a session runs', () => {
     return { ...open, spawned }
   }
 
-  // spec-00001-AC-55.1
-  it('starts an ask session on the agent the request names', async () => {
+  // spec-00001-AC-55.1 — the example was an ask, whose form starts no terminal
+  // any more; the ask half of agent choice is spec-00005-AC-2.3's
+  it('starts an audit session on the agent the request names', async () => {
     const { call, spawned, board } = twoAgentBoard()
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 'other' })
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'design-00001-d', agent: 'other' })
 
     expect(status).toBe(200)
     expect(body.agent).toBe('other')
@@ -2389,7 +2357,7 @@ describe('the agent a session runs', () => {
     for (const [path, request] of [
       ['/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan', agent: 'nope' }],
       ['/api/sessions/clarify', { docId: 'spec-00001-b', agent: 'nope' }],
-      ['/api/sessions/ask', { docId: 'spec-00001-b', agent: 'nope' }],
+      ['/api/sessions/ask', { docId: 'spec-00001-b', question: 'why this way?', agent: 'nope' }],
       ['/api/sessions/audit', { docId: 'spec-00001-b', agent: 'nope' }],
     ] as const) {
       const { status, body } = await call('POST', path, request)
@@ -2403,7 +2371,7 @@ describe('the agent a session runs', () => {
   it('answers 422 for an agent that is not a name at all', async () => {
     const { call, spawned } = twoAgentBoard()
 
-    const { status, body } = await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 3 })
+    const { status, body } = await call('POST', '/api/sessions/audit', { docId: 'design-00001-d', agent: 3 })
 
     expect(status).toBe(422)
     expect(body.error).toMatch(/must name one of the agents/)
@@ -2412,9 +2380,9 @@ describe('the agent a session runs', () => {
 
   // The agent that ran is part of what the history remembers (spec-00001-FR-54)
   it('records which agent ran in the session history', async () => {
-    const { call, board } = boardOn({ 'record/r.md': ACTIVE_RECORD })
+    const { call, board } = boardOn({ 'design/d.md': DRAFT_DESIGN })
 
-    await call('POST', '/api/sessions/ask', { docId: 'record-00001-r', agent: 'claude' })
+    await call('POST', '/api/sessions/audit', { docId: 'design-00001-d', agent: 'claude' })
     await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
     await board.sessions.whenFinished()
 
@@ -2503,5 +2471,761 @@ describe('a product marked anomalous, then fixed on disk', () => {
     }, REFRESH_WAIT)
 
     expect(graph.issues).toEqual([])
+  })
+})
+
+/**
+ * The registry's second form over the wire (spec-00005): a question, a captured
+ * headless call, no terminal anywhere. What is scripted here is the call itself
+ * — what it was spawned with, what it printed and how it ended — because that is
+ * what every one of these rulings is about (design-00001 §10.1).
+ */
+describe('ask threads', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft', parent: 'prd-00001-p' }, '# Spec\n')
+  const RELATED_PRD = doc({ id: 'prd-00001-p', type: 'prd', status: 'active' }, '# Prd\n')
+  const ACTIVE_RECORD = doc({ id: 'record-00001-r', type: 'record', status: 'active' }, '# Record\n')
+  const BROKEN = doc({ id: 'nope', type: 'spec', status: 'draft' }, '# Broken\n')
+  const TREE = { 'spec/b.md': DRAFT_SPEC, 'prd/p.md': RELATED_PRD }
+
+  /** What a `claude-json` call prints: the answer, and the id its follow-up resumes. */
+  const ANSWER = (text: string, resumeId = 'cli-1') => JSON.stringify({ result: text, session_id: resumeId })
+
+  /**
+   * Stand-in headless calls (design-00001 §10.1): what each was spawned with is
+   * recorded, and what it prints and how it ends is the test's to say — an ask
+   * ruling is about the argv and the exit, never about a real CLI.
+   */
+  function scriptedCalls() {
+    const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
+    const ends: Array<(exitCode: number, stdout?: string, stderr?: string) => void> = []
+    const spawnHeadless: SpawnHeadless = (command, args, cwd) => {
+      spawned.push({ command, args, cwd })
+      const outs: Array<(chunk: string) => void> = []
+      const errs: Array<(chunk: string) => void> = []
+      const exits: Array<(event: { exitCode: number }) => void> = []
+      // Once, like a process: whichever ends it — the script or a signal — the
+      // second attempt is nothing, so no wrap-up runs twice.
+      let gone = false
+      const end = (exitCode: number, stdout = '', stderr = '') => {
+        if (gone) return
+        gone = true
+        for (const listener of outs) listener(stdout)
+        for (const listener of errs) listener(stderr)
+        for (const listener of exits) listener({ exitCode })
+      }
+      ends.push(end)
+      return {
+        onStdout: (listener) => void outs.push(listener),
+        onStderr: (listener) => void errs.push(listener),
+        onExit: (listener) => void exits.push(listener),
+        kill: () => end(143),
+      }
+    }
+    return {
+      spawnHeadless,
+      spawned,
+      /** The payload argument of the nth call: the whole of what the CLI was asked. */
+      payload: (index: number) => spawned[index]!.args.at(-1)!,
+      /** End the nth call: what it printed and how it exited, in that order. */
+      end: (index: number, printed: { stdout?: string; stderr?: string; exitCode?: number } = {}) =>
+        ends[index]!(printed.exitCode ?? 0, printed.stdout ?? '', printed.stderr ?? ''),
+    }
+  }
+
+  /** A pty stand-in that records the terminal sessions started, and outlives any test. */
+  function recordingPty() {
+    const started: string[] = []
+    const spawn = (command: string) => {
+      started.push(command)
+      return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
+    }
+    return { spawn, started }
+  }
+
+  /** A board whose ask calls are scripted and whose terminal sessions are recorded. */
+  function askBoard(
+    files: Record<string, string> = TREE,
+    options: {
+      agents?: AgentConfig[]
+      maxSessions?: number
+      awaitThresholdMs?: number
+      /** An existing repo instead of a fresh one: a second board on it is a restart. */
+      on?: { repoRoot: string; docsDir: string }
+    } = {},
+  ) {
+    const { repoRoot, docsDir } = options.on ?? makeRepo(files)
+    const config = testConfig()
+    if (options.agents) config.agents = options.agents
+    if (options.maxSessions) config.maxSessions = options.maxSessions
+    const calls = scriptedCalls()
+    const pty = recordingPty()
+    const open = boardOnRepo(repoRoot, docsDir, config, pty.spawn, options.awaitThresholdMs, calls.spawnHeadless)
+    return { ...open, ...calls, terminals: pty.started }
+  }
+
+  /** The ask list of a document, as the front end reads it (design-00001 §7). */
+  const threadsOf = async (call: BoardCall, docId: string): Promise<AskThread[]> =>
+    (await call('GET', `/api/asks/${docId}`)).body.threads
+
+  /** Submit a question and wait out the call the test then ends itself. */
+  const ask = (call: BoardCall, body: Record<string, unknown>) => call('POST', '/api/sessions/ask', body)
+
+  // spec-00005-AC-1.1 — the whole of a first call's payload, and no terminal
+  it('starts a headless first call carrying the paths, the read-only nature and the question', async () => {
+    const { call, payload, terminals } = askBoard()
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(status).toBe(200)
+    expect(body.threadId).toBe('t-1')
+    expect(payload(0)).toContain('spec/b.md')
+    expect(payload(0)).toContain('prd/p.md')
+    expect(payload(0)).toContain('Modify no file')
+    expect(payload(0).endsWith('why two gates?')).toBe(true)
+    expect(terminals).toEqual([])
+  })
+
+  // spec-00005-AC-1.3 — an ask is bound by neither type nor status
+  it('starts a call on an active record like any other document', async () => {
+    const { call, board, spawned } = askBoard({ 'record/r.md': ACTIVE_RECORD })
+
+    const { status, body } = await ask(call, { docId: 'record-00001-r', question: 'what does this verify?' })
+
+    expect(status).toBe(200)
+    expect(board.sessions.list()[0]).toMatchObject({ id: body.sessionId, kind: 'ask', status: 'running' })
+    expect(spawned).toHaveLength(1)
+  })
+
+  // spec-00005-AC-2.1 — the follow-up resumes that thread's own conversation
+  it('resumes the thread on a follow-up, carrying the question alone', async () => {
+    const { call, board, payload, spawned, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap to check') })
+    await board.sessions.whenFinished(first.body.sessionId)
+
+    await ask(call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+
+    expect(spawned[1]!.args).toContain('cli-1')
+    expect(payload(1)).toBe('and the third?')
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.resumeId).toBe('cli-1')
+    expect(thread!.agent).toBe('claude')
+    expect(thread!.exchanges).toHaveLength(2)
+    expect(thread!.exchanges[0]).toMatchObject({ answer: 'because they are cheap to check', outcome: 'answered' })
+    // Both times are recorded and in order; a scripted call can answer inside
+    // the same millisecond it was asked, so they may be equal.
+    expect(thread!.exchanges[0]!.askedAt).toMatch(/^\d{4}-\d{2}-\d{2}T.+Z$/)
+    expect(thread!.exchanges[0]!.answeredAt! >= thread!.exchanges[0]!.askedAt).toBe(true)
+    expect(thread!.exchanges[1]).toMatchObject({ question: 'and the third?', outcome: 'running' })
+  })
+
+  // spec-00005-AC-2.2 — a new question is a thread of its own, and no resume
+  it('opens a second thread for a new question, whose first call resumes nothing', async () => {
+    const { call, board, spawned, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(first.body.sessionId)
+
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'a different matter entirely' })
+
+    expect(body.threadId).toBe('t-2')
+    expect(spawned[1]!.args).not.toContain('cli-1')
+    expect((await threadsOf(call, 'spec-00001-b')).map((thread) => thread.id)).toEqual(['t-1', 't-2'])
+  })
+
+  /**
+   * spec-00005-AC-2.3 — the choice is narrowed to the agents that declare a
+   * headless form, a new thread may take any of them, and a follow-up takes the
+   * one its thread was opened with: a resume id belongs to that CLI alone.
+   */
+  it('offers only the agents that declare a headless form, and keeps a thread on its own', async () => {
+    const headless = testConfig().agents[0]!.headless
+    const { call, board, spawned, end } = askBoard(TREE, {
+      agents: [
+        { name: 'plain', command: 'node', args: [], cwd: 'docs' },
+        { name: 'first-asker', command: 'node', args: [], cwd: 'docs', headless },
+        { name: 'second-asker', command: 'node', args: [], cwd: 'docs', headless },
+      ],
+    })
+
+    const refused = await ask(call, { docId: 'spec-00001-b', question: 'why?', agent: 'plain' })
+    // No name means the first agent that declares a form, not the first declared.
+    const defaulted = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    const chosen = await ask(call, { docId: 'prd-00001-p', question: 'why now?', agent: 'second-asker' })
+    end(1, { stdout: ANSWER('because it is cheap') })
+    await board.sessions.whenFinished(chosen.body.sessionId)
+    // The follow-up names the other agent all the same: the resume id is the one
+    // that answered's, and no other CLI could take it.
+    await ask(call, { docId: 'prd-00001-p', question: 'go on', threadId: 't-1', agent: 'first-asker' })
+
+    expect(refused.status).toBe(422)
+    expect(refused.body.error).toMatch(/declares no headless form/)
+    expect(spawned).toHaveLength(3)
+    expect(board.sessions.list().map((session) => session.agent)).toEqual([
+      'first-asker',
+      'second-asker',
+      'second-asker',
+    ])
+    expect(defaulted.body.threadId).toBe('t-1')
+  })
+
+  // spec-00005-AC-4.1 — a call over a draft leaves its status alone and commits nothing
+  it('leaves the document and the repository untouched when a call finishes', async () => {
+    const { call, board, repoRoot, docsDir, end } = askBoard()
+    const commits = commitCount(repoRoot)
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(body.sessionId)
+
+    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toBe(DRAFT_SPEC)
+    expect((await call('GET', '/api/graph')).body.nodes.find((n: { id: string }) => n.id === 'spec-00001-b').status).toBe('draft')
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // spec-00005-AC-4.2 — the read-only flag is in the command line that ran, not
+  // left to the agent's own restraint
+  it('runs the declared read-only flags on the actual command line', async () => {
+    const { call, spawned } = askBoard(TREE, {
+      agents: [
+        {
+          name: 'claude',
+          command: 'claude',
+          args: ['--interactive-only'],
+          cwd: 'docs',
+          headless: {
+            first: ['-p', '--permission-mode', 'plan', '{question}'],
+            resume: ['-p', '--permission-mode', 'plan', '--resume', '{session}', '{question}'],
+            capture: 'claude-json',
+          },
+        },
+      ],
+    })
+
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(spawned[0]!.command).toBe('claude')
+    expect(spawned[0]!.args.slice(0, 3)).toEqual(['-p', '--permission-mode', 'plan'])
+    // The entry's own args are the interactive form's, and stay out of it.
+    expect(spawned[0]!.args).not.toContain('--interactive-only')
+  })
+
+  /**
+   * spec-00005-AC-4.3 — an ask ending first takes nothing of what another
+   * session wrote: it makes no commit at all, so the residue is still there for
+   * the advance to carry off on its own terms (spec-00003-FR-8).
+   */
+  it('commits nothing when it ends before an advance that has written under docs', async () => {
+    const { call, board, repoRoot, docsDir, end } = askBoard()
+    const commits = commitCount(repoRoot)
+    await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
+    appendFileSync(join(docsDir, 'prd/p.md'), '\nwritten by the advance\n')
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    end(0, { stdout: ANSWER('because') })
+    await board.sessions.whenFinished(body.sessionId)
+
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(git(repoRoot, 'status', '--porcelain', '--', 'docs')).toContain('prd/p.md')
+  })
+
+  // spec-00005-AC-5.1 — the list outlives the process, and so does the resume id
+  it('serves the questions and answers of an earlier run, and resumes from them', async () => {
+    const before = askBoard()
+    const opened = await ask(before.call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    before.end(0, { stdout: ANSWER('because they are cheap') })
+    await before.board.sessions.whenFinished(opened.body.sessionId)
+
+    // The same repository, a second board: everything the registry held is gone,
+    // and the list is what is left (design-00001 §5, spec-00005-FR-5).
+    const after = askBoard(TREE, { on: { repoRoot: before.repoRoot, docsDir: before.docsDir } })
+    const threads = await threadsOf(after.call, 'spec-00001-b')
+    await ask(after.call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+
+    expect(after.board.sessions.list()).toHaveLength(1)
+    expect(threads[0]!.exchanges[0]).toMatchObject({ question: 'why two gates?', answer: 'because they are cheap' })
+    expect(after.spawned[0]!.args).toContain('cli-1')
+    expect(after.payload(0)).toBe('and the third?')
+  })
+
+  /**
+   * spec-00005-AC-5.2 — the ask list is board state: nothing of it is tracked by
+   * git, and no question or answer reaches a document.
+   */
+  it('keeps the list out of git and out of the docs tree', async () => {
+    const { call, board, repoRoot, docsDir, end } = askBoard()
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(body.sessionId)
+
+    expect(existsSync(join(repoRoot, '.whiteboard/asks/spec-00001-b.json'))).toBe(true)
+    expect(git(repoRoot, 'ls-files')).not.toContain('.whiteboard')
+    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).not.toContain('why two gates?')
+  })
+
+  // spec-00005-AC-5.3 — nothing on disk may say «in progress» when nothing is
+  it('writes off a call the last process was killed with, at the next boot', async () => {
+    const { call, repoRoot, docsDir } = askBoard()
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    expect((await threadsOf(call, 'spec-00001-b'))[0]!.exchanges[0]!.outcome).toBe('running')
+
+    // A crash leaves the file as it stands; the next boot is what reconciles it.
+    const rebooted = boardOnRepo(repoRoot, docsDir)
+
+    expect(rebooted.board.asks.read('spec-00001-b').threads[0]!.exchanges[0]!.outcome).toBe('failed')
+  })
+
+  // spec-00005-AC-5.4 — a normal shutdown stops the call and the question says so
+  it('records a call the shutdown stopped as terminated, ready to be resent', async () => {
+    const { call, board, repoRoot, docsDir } = askBoard()
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    await board.shutdown()
+
+    const rebooted = boardOnRepo(repoRoot, docsDir)
+    const [thread] = rebooted.board.asks.read('spec-00001-b').threads
+    expect(thread!.exchanges).toHaveLength(1)
+    expect(thread!.exchanges[0]!.outcome).toBe('terminated')
+  })
+
+  // spec-00005-AC-5.5 — the history entry of an ask: the metadata, and the
+  // captured answer standing in for a transcript there is none of
+  it('writes a history entry whose transcript is the captured answer', async () => {
+    const { call, board, end } = askBoard()
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap to check') })
+    await board.sessions.whenFinished(body.sessionId)
+
+    const { body: entry } = await call('GET', `/api/sessions/history/${body.sessionId}`)
+
+    expect(entry.meta).toMatchObject({ kind: 'ask', docId: 'spec-00001-b', status: 'exited', exitCode: 0 })
+    expect(entry.transcript).toBe('because they are cheap to check')
+  })
+
+  // spec-00005-AC-6.1 — a running advance on that document refuses no ask
+  it('starts a call on a document an advance session is running on', async () => {
+    const { call } = askBoard()
+    await call('POST', '/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' })
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(status).toBe(200)
+    expect(body.threadId).toBe('t-1')
+  })
+
+  // spec-00005-AC-6.2 — and the other direction: a running ask occupies nothing
+  it('starts an advance on a document a call is running on', async () => {
+    const { call, board } = askBoard()
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    const { status } = await call('POST', '/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' })
+
+    expect(status).toBe(200)
+    expect(board.sessions.list().map((session) => [session.kind, session.status])).toEqual([
+      ['ask', 'running'],
+      ['advance', 'running'],
+    ])
+  })
+
+  // spec-00005-AC-6.3 — questions run in parallel; only follow-ups are serial
+  it('runs two threads of the same document at once', async () => {
+    const { call, board, spawned } = askBoard()
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'and the ordering?' })
+
+    expect(status).toBe(200)
+    expect(body.threadId).toBe('t-2')
+    expect(spawned).toHaveLength(2)
+    expect(board.sessions.list().every((session) => session.status === 'running')).toBe(true)
+  })
+
+  // spec-00005-AC-6.4 — the cap counts asks, and a refused submit writes nothing
+  it('refuses a call at the cap and appends nothing to the list', async () => {
+    const { call, spawned } = askBoard(TREE, { maxSessions: 1 })
+    await call('POST', '/api/sessions', { sourceId: 'prd-00001-p', targetType: 'spec' })
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('cap-reached')
+    expect(spawned).toEqual([])
+    expect(await threadsOf(call, 'spec-00001-b')).toEqual([])
+  })
+
+  /**
+   * spec-00005-AC-6.5 — an ask enters neither path of the waiting judgment: a
+   * headless call has no interactive input to be waiting for, and its silence is
+   * it thinking (spec-00003-FR-6 as spec-00005-FR-6 amends it).
+   */
+  it('never reads a silent call as waiting on the user', async () => {
+    const { call, board } = askBoard(TREE, { awaitThresholdMs: 50 })
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    expect(board.sessions.list()[0]!.status).toBe('running')
+    expect(board.sessions.list()[0]!.awaiting).toBeFalsy()
+    expect((await call('GET', '/api/sessions')).body.sessions[0].awaiting).toBeFalsy()
+  })
+
+  // spec-00005-AC-7.1 — one call at a time per thread, and the refusal says so
+  it('refuses a second submit on a thread whose call is running', async () => {
+    const { call, spawned } = askBoard()
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'again', threadId: 't-1' })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('thread-busy')
+    expect(spawned).toHaveLength(1)
+    expect((await threadsOf(call, 'spec-00001-b'))[0]!.exchanges).toHaveLength(1)
+  })
+
+  // spec-00005-AC-7.2 — an anomalous document offers no entry and takes no request
+  it('refuses a call on an anomalous document and starts nothing', async () => {
+    const { call, board, spawned } = askBoard({ 'spec/broken.md': BROKEN })
+
+    const { status, body } = await ask(call, { docId: 'nope', question: 'what is this?' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/front matter problems/)
+    expect(spawned).toEqual([])
+    expect(board.sessions.list()).toEqual([])
+  })
+
+  // spec-00005-AC-7.4 — with no headless form declared anywhere, there is nothing to ask with
+  it('refuses a call when no agent declares a headless form', async () => {
+    const { call, spawned } = askBoard(TREE, { agents: [{ name: 'plain', command: 'node', args: [], cwd: 'docs' }] })
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/no agent in the flow config declares a headless form/)
+    expect(spawned).toEqual([])
+  })
+
+  /**
+   * spec-00005-AC-7.5 — a call that ended non-zero leaves its question failed and
+   * resendable, the rest of the thread untouched; the resend rewrites that one
+   * question where it stands rather than adding another (design-00001 §10.2).
+   */
+  it('marks a call that failed, keeps the rest of the thread, and resends into a new call', async () => {
+    const { call, board, spawned, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(first.body.sessionId)
+    const followUp = await ask(call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+    end(1, { exitCode: 1, stderr: 'the CLI gave up' })
+    await board.sessions.whenFinished(followUp.body.sessionId)
+
+    const failed = (await threadsOf(call, 'spec-00001-b'))[0]!
+    const { status } = await ask(call, {
+      docId: 'spec-00001-b',
+      question: 'and the third?',
+      threadId: 't-1',
+      resend: true,
+    })
+
+    expect(failed.exchanges[1]!.outcome).toBe('failed')
+    // The continuation is marked rather than swapped for a fresh conversation.
+    expect(failed.resumeInvalid).toBe(true)
+    expect(failed.exchanges[0]).toMatchObject({ answer: 'because they are cheap', outcome: 'answered' })
+    expect(status).toBe(200)
+    expect(spawned).toHaveLength(3)
+    // The resend rewrote the question it resent; the list grew by no retry.
+    expect((await threadsOf(call, 'spec-00001-b'))[0]!.exchanges).toHaveLength(2)
+  })
+
+  /**
+   * Finding 6 — a follow-up after a question that failed is a *new* question,
+   * and appends. Only a resend rewrites, and only the caller knows which was
+   * meant: guessing from the record would file the new question over the old
+   * one, losing what was asked (spec-00005-FR-3's «the list grows by a
+   * question»).
+   */
+  it('appends a new follow-up after a question that failed, rather than overwriting it', async () => {
+    const { call, board, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { exitCode: 1, stderr: 'the CLI gave up' })
+    await board.sessions.whenFinished(first.body.sessionId)
+
+    await ask(call, { docId: 'spec-00001-b', question: 'a different question', threadId: 't-1' })
+
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.exchanges.map((exchange) => [exchange.question, exchange.outcome])).toEqual([
+      ['why two gates?', 'failed'],
+      ['a different question', 'running'],
+    ])
+  })
+
+  // Finding 6 — a resend needs something to resend; the answered question is not it
+  it('refuses a resend on a thread whose last question was answered', async () => {
+    const { call, board, spawned, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(first.body.sessionId)
+
+    const { status, body } = await ask(call, {
+      docId: 'spec-00001-b',
+      question: 'why two gates?',
+      threadId: 't-1',
+      resend: true,
+    })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/no unanswered question to resend/)
+    expect(spawned).toHaveLength(1)
+    expect((await threadsOf(call, 'spec-00001-b'))[0]!.exchanges).toHaveLength(1)
+  })
+
+  // Finding 6 — a resend into a thread mid-run is still the thread's serial rule
+  it('refuses a resend while that thread has a call running', async () => {
+    const { call, spawned } = askBoard()
+    await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    const { status, body } = await ask(call, {
+      docId: 'spec-00001-b',
+      question: 'why two gates?',
+      threadId: 't-1',
+      resend: true,
+    })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('thread-busy')
+    expect(spawned).toHaveLength(1)
+  })
+
+  /**
+   * Finding 7 — the «continuation is gone» mark is about a continuation the CLI
+   * refused, and a call the user stopped says nothing about that. Per
+   * design-00001 §10.2 the criterion is failure alone.
+   */
+  it('leaves the continuation unmarked when the user stops a resumed call', async () => {
+    const { call, board, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(first.body.sessionId)
+    const followUp = await ask(call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+
+    await board.sessions.terminate(followUp.body.sessionId)
+
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.exchanges[1]!.outcome).toBe('terminated')
+    expect(thread!.resumeInvalid).toBeUndefined()
+    expect(thread!.resumeId).toBe('cli-1')
+  })
+
+  /**
+   * Finding 8 — the latest id wins. A CLI is free to hand back a new id for each
+   * resumed print run, and keeping the first would send every later follow-up
+   * back to a conversation that has since moved on.
+   */
+  it('takes the resume id of the latest answered call', async () => {
+    const { call, board, spawned, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap', 'cli-1') })
+    await board.sessions.whenFinished(first.body.sessionId)
+    const followUp = await ask(call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+
+    end(1, { stdout: ANSWER('it is the same gate twice', 'cli-2') })
+    await board.sessions.whenFinished(followUp.body.sessionId)
+    await ask(call, { docId: 'spec-00001-b', question: 'and again?', threadId: 't-1' })
+
+    expect((await threadsOf(call, 'spec-00001-b'))[0]!.resumeId).toBe('cli-2')
+    expect(spawned[2]!.args).toContain('cli-2')
+    expect(spawned[2]!.args).not.toContain('cli-1')
+  })
+
+  /**
+   * Finding 4 — a list that cannot be read must not be written over: read as
+   * empty and written back, it would erase every thread the document has, and
+   * the list is the only copy (spec-00005-FR-5).
+   */
+  it('refuses a submit over an unreadable list, leaving the file as it was', async () => {
+    const { call, repoRoot, spawned } = askBoard()
+    const path = join(repoRoot, '.whiteboard/asks/spec-00001-b.json')
+    mkdirSync(join(repoRoot, '.whiteboard/asks'), { recursive: true })
+    writeFileSync(path, '{ truncated mid-w')
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/cannot be read, so nothing may be written over it/)
+    expect(spawned).toEqual([])
+    expect(readFileSync(path, 'utf8')).toBe('{ truncated mid-w')
+    // The reading path stays forgiving: one broken file costs its list, not the board.
+    expect((await call('GET', '/api/asks/spec-00001-b')).body).toEqual({ threads: [] })
+  })
+
+  /**
+   * Finding 4 — the wrap-up may not write over a list it cannot read either.
+   * This one call's record is lost; every other thread on that file keeps its
+   * own, which is the trade the other way round.
+   */
+  it('skips landing the answer when the list has become unreadable', async () => {
+    const { call, board, repoRoot, end } = askBoard()
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    const path = join(repoRoot, '.whiteboard/asks/spec-00001-b.json')
+    rmSync(path)
+    mkdirSync(path, { recursive: true })
+
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(body.sessionId)
+
+    // The call still wrapped up, and nothing was written over the file.
+    expect(board.sessions.list()[0]!.status).toBe('exited')
+    expect(board.sessions.list()[0]!.outcome).toMatchObject({ docId: 'spec-00001-b', committed: false })
+    expect(statSync(path).isDirectory()).toBe(true)
+  })
+
+  // spec-00005-FR-7 at the request boundary: a body that is no ask at all
+  it('refuses a request whose question, thread or resend is not what it has to be', async () => {
+    const { call, spawned } = askBoard()
+
+    for (const [body, match] of [
+      [{ docId: 'spec-00001-b' }, /needs a question/],
+      [{ docId: 'spec-00001-b', question: '   ' }, /needs a question/],
+      [{ docId: 'spec-00001-b', question: 'why?', threadId: 7 }, /threadId must name a thread/],
+      [{ docId: 'spec-00001-b', question: 'why?', resend: 'yes' }, /resend says whether/],
+    ] as const) {
+      const answer = await call('POST', '/api/sessions/ask', body)
+      expect(answer.status).toBe(422)
+      expect(answer.body.error).toMatch(match)
+    }
+    expect(spawned).toEqual([])
+  })
+
+  // Finding 4 — a file the reconciliation cannot read is left for a person, not rewritten
+  it('leaves an unreadable list alone at boot instead of rewriting it', async () => {
+    const { repoRoot, docsDir } = askBoard()
+    const path = join(repoRoot, '.whiteboard/asks/spec-00001-b.json')
+    mkdirSync(join(repoRoot, '.whiteboard/asks'), { recursive: true })
+    writeFileSync(path, 'not a list at all')
+
+    boardOnRepo(repoRoot, docsDir)
+
+    expect(readFileSync(path, 'utf8')).toBe('not a list at all')
+  })
+
+  /**
+   * Finding 1 — the slot is taken before the record is written, so a write that
+   * fails leaves a session admitted with no process to come. Left as it is, it
+   * would hold its slot for good and a shutdown would wait on it for ever.
+   */
+  it('gives up the admitted session when the list cannot be written', async () => {
+    const { call, board, repoRoot, spawned } = askBoard()
+    // A directory where the file has to go: the write fails, the read does not.
+    mkdirSync(join(repoRoot, '.whiteboard/asks/spec-00001-b.json.tmp'), { recursive: true })
+
+    const { status } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(status).toBe(500)
+    expect(spawned).toEqual([])
+    // Listed as what happened, running nothing, and holding no slot.
+    expect(board.sessions.list().map((session) => session.status)).toEqual(['failed'])
+    await expect(board.shutdown()).resolves.toBeUndefined()
+  })
+
+  /**
+   * Finding 1 — a spawn seam that throws is a call that never ran, and a call
+   * that never ran is a failed one: it goes down the ordinary ask exit path so
+   * its question lands `failed` rather than staying `running` for ever.
+   */
+  it('lands the question as failed when the spawn seam itself throws', async () => {
+    const { repoRoot, docsDir } = makeRepo(TREE)
+    const throwing: SpawnHeadless = () => {
+      throw new Error('agent command not found on PATH: nope')
+    }
+    const { call, board } = boardOnRepo(repoRoot, docsDir, testConfig(), undefined, undefined, throwing)
+
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    await board.sessions.whenFinished(body.sessionId)
+
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.exchanges[0]!.outcome).toBe('failed')
+    expect(board.sessions.list()[0]!.status).toBe('exited')
+    expect((await call('GET', `/api/sessions/history/${body.sessionId}`)).body.transcript).toContain(
+      'could not start the agent',
+    )
+  })
+
+  /**
+   * Finding 3 — landing the answer is a disk write, and a disk that will not
+   * take it costs the user that record and nothing else. Left to reject it would
+   * skip the wrap-up hook, so no board would ever hear the call ended, and then
+   * bring the process down as an unhandled rejection.
+   */
+  it('still finishes the wrap-up when the answer cannot be landed on the thread', async () => {
+    const { call, board, repoRoot, end } = askBoard()
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    // The list still reads; it is the write the wrap-up has to make that is
+    // wedged, which is the failure this is about.
+    mkdirSync(join(repoRoot, '.whiteboard/asks/spec-00001-b.json.tmp'), { recursive: true })
+
+    end(0, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(body.sessionId)
+
+    const session = board.sessions.list()[0]!
+    expect(session.status).toBe('exited')
+    // The hook ran: an ask commits nothing, and says so.
+    expect(session.outcome).toMatchObject({ docId: 'spec-00001-b', committed: false })
+    expect(session.historyError).toBeDefined()
+  })
+
+  /**
+   * spec-00005-AC-7.7 — an ask runs no pty, so terminal attach, input and resize
+   * are three refusals of the one thing that is not there. The socket carries all
+   * three, and it is closed on the first (design-00001 §10.3).
+   */
+  it('refuses terminal attach, input and resize on a call', async () => {
+    const { call, board, port } = askBoard()
+    const { body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal?sessionId=${body.sessionId}`)
+    const closed = new Promise<void>((resolve) => socket.addEventListener('close', () => resolve()))
+
+    await closed
+    expect(() => board.sessions.attach(body.sessionId, () => {})).toThrowError(/has no terminal/)
+    expect(() => board.sessions.write(body.sessionId, 'hello')).toThrowError(/has no terminal/)
+    expect(() => board.sessions.resize(body.sessionId, 80, 24)).toThrowError(/has no terminal/)
+  })
+
+  /**
+   * The list is addressed by document id and that id is the file's whole name,
+   * so the shape is checked before it is ever used as a path — the same guard
+   * the session history reads its filenames through (design-00001 §7).
+   */
+  it('serves an empty list for a document with none, and for an id that is no filename', async () => {
+    const { call } = askBoard()
+
+    expect((await call('GET', '/api/asks/spec-00001-b')).body).toEqual({ threads: [] })
+    expect((await call('GET', `/api/asks/${encodeURIComponent('../sessions/anything')}`)).body).toEqual({ threads: [] })
+  })
+
+  it('refuses a follow-up naming a thread the list does not hold', async () => {
+    const { call, spawned } = askBoard()
+
+    const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'go on', threadId: 't-9' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/is not a thread of the ask list/)
+    expect(spawned).toEqual([])
+  })
+
+  // spec-00005-AC-8.2 — both declared forms run as declared
+  it('runs the declared first form and then the declared resume form', async () => {
+    const { call, board, spawned, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { stdout: ANSWER('because they are cheap', 'cli-9') })
+    await board.sessions.whenFinished(first.body.sessionId)
+
+    await ask(call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+
+    const declared = testConfig().agents[0]!.headless!
+    expect(spawned[0]!.args).toHaveLength(declared.first.length)
+    expect(spawned[1]!.args).toHaveLength(declared.resume.length)
+    expect(spawned[1]!.args).toContain('cli-9')
+    expect(spawned[0]!.args).not.toContain('cli-9')
   })
 })

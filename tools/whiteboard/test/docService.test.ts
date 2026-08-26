@@ -507,12 +507,13 @@ describe('commitSessionChanges', () => {
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/spec/new.md'])
   })
 
-  // spec-00001-AC-14.7 and AC-14.8 at the commit boundary: one commit per session,
-  // named after the kind of session it was.
+  // spec-00001-AC-14.8 at the commit boundary: one commit per session, named
+  // after the kind of session it was. Ask is not among them — since the
+  // twenty-first round it makes no commit at all (spec-00005-FR-4).
   it('names the commit after the session kind', async () => {
     for (const [kind, message] of [
       ['clarify', 'wb(clarify): prd-00001-x'],
-      ['ask', 'wb(ask): prd-00001-x'],
+      ['audit', 'wb(audit): prd-00001-x'],
     ] as const) {
       const { repoRoot, docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
       const before = service.snapshotDocs()
@@ -875,26 +876,44 @@ describe('the resolved gate', () => {
 })
 
 describe('askPlan', () => {
-  // spec-00001-AC-47.1 and AC-47.3
-  it('plans an ask session about a document of any type and status, with its context', () => {
+  const NEW_THREAD = { id: 't-1' }
+
+  // spec-00005-AC-1.2 — the context of a first call: the document, its relation
+  // documents, the read-only nature of the session, and the question after them
+  it('plans a first call carrying the document, its relation paths and the question', () => {
     const { service } = serviceOn({
       'record/r.md': doc({ id: 'record-00001-r', type: 'record', status: 'active', verifies: '[prd-00001-x]' }),
       'prd/a.md': DRAFT_PRD,
     })
 
-    const plan = service.askPlan('record-00001-r')
+    const plan = service.askPlan('record-00001-r', 'why does this verify that?', NEW_THREAD)
 
     expect(plan.kind).toBe('ask')
     expect(plan.sourceId).toBe('record-00001-r')
+    expect(plan.threadId).toBe('t-1')
+    expect(plan.resumeId).toBeUndefined()
     expect(plan.expectation).toBeUndefined()
     expect(plan.instruction).toContain('record/r.md')
     expect(plan.instruction).toContain('prd/a.md')
+    expect(plan.instruction).toContain('Modify no file')
+    expect(plan.instruction.endsWith('why does this verify that?')).toBe(true)
   })
 
-  // spec-00001-AC-47.5
+  // spec-00005-AC-2.1 — a follow-up resumes a conversation that was already told
+  // all of that, so it carries the question and nothing else
+  it('plans a follow-up carrying the question alone, with the thread’s resume id', () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+
+    const plan = service.askPlan('prd-00001-x', 'and what about pricing?', { id: 't-1', resumeId: 'cli-42' })
+
+    expect(plan.resumeId).toBe('cli-42')
+    expect(plan.instruction).toBe('and what about pricing?')
+  })
+
+  // spec-00005-AC-7.2
   it('refuses an anomalous document', () => {
     const { service } = serviceOn({ 'prd/broken.md': doc({ id: 'nope', type: 'prd', status: 'draft' }) })
-    expect(() => service.askPlan('nope')).toThrowError(/front matter problems/)
+    expect(() => service.askPlan('nope', 'why?', NEW_THREAD)).toThrowError(/front matter problems/)
   })
 
   // spec-00001-AC-19.2
@@ -902,7 +921,7 @@ describe('askPlan', () => {
     const { docsDir, service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
     rmSync(join(docsDir, 'prd/a.md'))
 
-    expect(() => service.askPlan('prd-00001-x')).toThrowError(/refresh the board/)
+    expect(() => service.askPlan('prd-00001-x', 'why?', NEW_THREAD)).toThrowError(/refresh the board/)
   })
 })
 

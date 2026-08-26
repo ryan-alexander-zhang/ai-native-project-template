@@ -7,6 +7,15 @@ import { type FlowConfig, parseFlowConfig } from '../src/config.ts'
 import type { DocEdge } from '../src/docRepository.ts'
 import { DEBOUNCE_MS, type DocsWatcher } from '../src/watcher.ts'
 
+/**
+ * A stand-in for an agent CLI's headless form (spec-00005-FR-8): one node
+ * process that prints a `claude-json` answer and exits, which is the whole shape
+ * of a headless call. A first call is handed the payload alone, a resume the
+ * thread's resume id and the follow-up after it, so what it answers says which
+ * of the two forms ran.
+ */
+export const ASK_AGENT = `const [a, b] = process.argv.slice(1); process.stdout.write(JSON.stringify({ result: b === undefined ? 'answered: ' + a : 'resumed ' + a + ': ' + b, session_id: 'resume-1' }))`
+
 const TEST_CONFIG = `
 types:
   idea: { kind: living }
@@ -45,6 +54,10 @@ agents:
     command: node
     args: []
     cwd: docs
+    headless:
+      first:  [-e, ${JSON.stringify(ASK_AGENT)}, "{question}"]
+      resume: [-e, ${JSON.stringify(ASK_AGENT)}, "{session}", "{question}"]
+      capture: claude-json
 `
 
 /** `extra` is appended as further top-level YAML — a `carries` matrix, say. */

@@ -26,6 +26,7 @@ import {
   scanRecords,
 } from './requirements.ts'
 import { itemCoverage, resolvedGaps } from './resolvedGate.ts'
+import { SerialQueue } from './serialQueue.ts'
 import type { SessionPlan } from './sessionManager.ts'
 import { promotedStatus } from './statusRules.ts'
 import {
@@ -90,6 +91,9 @@ export interface ActionResult extends CommitOutcome {
   status?: string
 }
 
+/** The one key of the commit queue: there is one queue, and every commit is in it. */
+const COMMITS = 'commits'
+
 /**
  * One row of the global coverage view (spec-00002-FR-10 and FR-11,
  * design-00001 §7): a spec or a rule, its three counts, and every item with the
@@ -137,11 +141,12 @@ export class DocService {
   private readonly views = new Map<string, ItemsView>()
   private scanned?: RecordScan
   /**
-   * The tail of the one serial queue every board commit runs in
-   * (spec-00003-FR-8, design-00001 §4 and §6): the four session kinds' wrap-up
-   * commits and the write path's own, one at a time in arrival order.
+   * The one serial queue every board commit runs in (spec-00003-FR-8,
+   * design-00001 §4 and §6): the terminal session kinds' wrap-up commits and the
+   * write path's own, one at a time in arrival order. One key, because there is
+   * one queue — the shape is shared with the ask store, the queue is not.
    */
-  private queued: Promise<unknown> = Promise.resolve()
+  private readonly queue = new SerialQueue()
 
   constructor(repoRoot: string, docsDir: string, config: FlowConfig, git: GitLayer = new GitLayer(repoRoot)) {
     this.repoRoot = repoRoot
@@ -472,16 +477,27 @@ export class DocService {
     }
   }
 
-  /** What an ask session for `id` is started with (spec-00001-FR-47): any status, any sound type. */
-  askPlan(id: string): SessionPlan {
+  /**
+   * What one ask call is started with (spec-00005-FR-1 and FR-2): any status,
+   * any sound type — an anomalous document is refused, as the terminal form
+   * refused it. The payload is the whole argv the headless call carries
+   * (design-00001 §10.1): a thread's **first** call gets the read-only
+   * instruction with its context paths and the question after it; a follow-up
+   * gets the question alone, because the conversation it resumes was already
+   * told all of that and would be paying for it twice.
+   */
+  askPlan(id: string, question: string, thread: { id: string; resumeId?: string }): SessionPlan {
     const graph = this.graph()
     const node = this.require(id, graph)
     this.readOrConflict(node)
     assertAskable(node)
+    const instruction = askInstruction({ docPath: node.path, relatedPaths: relatedDocPaths(graph, node.id) })
     return {
       kind: 'ask',
       sourceId: node.id,
-      instruction: askInstruction({ docPath: node.path, relatedPaths: relatedDocPaths(graph, node.id) }),
+      threadId: thread.id,
+      resumeId: thread.resumeId,
+      instruction: thread.resumeId === undefined ? `${instruction}\n\n${question}` : question,
     }
   }
 
@@ -535,17 +551,10 @@ export class DocService {
   /**
    * Run one commit's whole turn — work out what to stage, write if the turn
    * writes, stage, commit — with no other board commit in flight
-   * (spec-00003-FR-8). A rejected turn is the caller's to read and never the
-   * next turn's reason not to run, which is why the chain is kept on a swallowed
-   * copy of it.
+   * (spec-00003-FR-8).
    */
   private serially<T>(turn: () => Promise<T>): Promise<T> {
-    const running = this.queued.then(turn)
-    this.queued = running.then(
-      () => {},
-      () => {},
-    )
-    return running
+    return this.queue.run(COMMITS, turn)
   }
 
   private docsPath(): string {

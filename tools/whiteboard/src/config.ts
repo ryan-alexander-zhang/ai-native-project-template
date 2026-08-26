@@ -2,6 +2,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { clarifiableTypes, isClarifiable } from './clarifyRules.ts'
+import {
+  CAPTURES,
+  type CaptureName,
+  type HeadlessConfig,
+  QUESTION_PLACEHOLDER,
+  SESSION_PLACEHOLDER,
+} from './headless.ts'
 
 export const CONFIG_FILE = 'whiteboard.config.yaml'
 
@@ -17,6 +24,12 @@ export interface AgentConfig {
   command: string
   args: string[]
   cwd?: string
+  /**
+   * The agent's non-interactive form, if it declares one (spec-00005-FR-8). An
+   * agent without it answers no ask: it is simply out of the choice
+   * (spec-00005-FR-2), and the rest of its entry is checked as before.
+   */
+  headless?: HeadlessConfig
 }
 
 export interface FlowConfig {
@@ -216,6 +229,52 @@ function readAgentCwd(value: unknown, at: string): string | undefined {
   return value
 }
 
+function readArgv(value: unknown, at: string): string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.some((arg) => typeof arg !== 'string')) {
+    throw new ConfigError(`config: \`${at}\` must be a non-empty list of strings`)
+  }
+  return value as string[]
+}
+
+/** How many times a placeholder stands in an argv, counted across the whole of it. */
+function placeholders(argv: string[], placeholder: string): number {
+  return argv.join(' ').split(placeholder).length - 1
+}
+
+function requirePlaceholder(argv: string[], placeholder: string, times: number, at: string): void {
+  const found = placeholders(argv, placeholder)
+  if (found !== times) {
+    throw new ConfigError(`config: \`${at}\` must hold ${times} \`${placeholder}\` placeholder, not ${found}`)
+  }
+}
+
+/**
+ * The agent's headless declaration (spec-00005-FR-8, design-00001 §10.1),
+ * checked in the one startup pass everything else is checked in — an ill-formed
+ * one refuses to start and names the entry (spec-00005-AC-8.1). What is checked
+ * is what the call cannot be built without: both forms, the question in each of
+ * them, the resume id in the resume form and nowhere else, and a capture the
+ * code actually holds. A missing declaration is a legal reading — that agent is
+ * simply not one an ask can choose.
+ */
+function readHeadless(value: unknown, at: string): HeadlessConfig | undefined {
+  if (value === undefined || value === null) return undefined
+  const headless = asRecord(value, at)
+  const first = readArgv(headless.first, `${at}.first`)
+  const resume = readArgv(headless.resume, `${at}.resume`)
+  requirePlaceholder(first, QUESTION_PLACEHOLDER, 1, `${at}.first`)
+  requirePlaceholder(resume, QUESTION_PLACEHOLDER, 1, `${at}.resume`)
+  requirePlaceholder(first, SESSION_PLACEHOLDER, 0, `${at}.first`)
+  requirePlaceholder(resume, SESSION_PLACEHOLDER, 1, `${at}.resume`)
+  const { capture } = headless
+  if (typeof capture !== 'string' || !(CAPTURES as readonly string[]).includes(capture)) {
+    throw new ConfigError(
+      `config: \`${at}.capture\` must be one of ${CAPTURES.join(', ')}, got ${JSON.stringify(capture)}`,
+    )
+  }
+  return { first, resume, capture: capture as CaptureName }
+}
+
 function readAgent(name: string, value: unknown): AgentConfig {
   const at = `agents.${name}`
   const agent = asRecord(value, at)
@@ -226,7 +285,13 @@ function readAgent(name: string, value: unknown): AgentConfig {
   if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
     throw new ConfigError(`config: \`${at}.args\` must be a list of strings`)
   }
-  return { name, command: agent.command, args: args as string[], cwd: readAgentCwd(agent.cwd, at) }
+  return {
+    name,
+    command: agent.command,
+    args: args as string[],
+    cwd: readAgentCwd(agent.cwd, at),
+    headless: readHeadless(agent.headless, `${at}.headless`),
+  }
 }
 
 function readAgents(raw: unknown): AgentConfig[] {

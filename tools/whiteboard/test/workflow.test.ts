@@ -206,9 +206,9 @@ describe('assertAuditable', () => {
   })
 })
 
-/** spec-00001-FR-47 with rule-00001-BR-21: ask is not a review action. */
+/** spec-00005-FR-1 with rule-00001-BR-21: ask is not a review action. */
 describe('assertAskable', () => {
-  // spec-00001-AC-47.1 with rule-00001-AC-21.1 — any type, any status
+  // spec-00005-AC-1.3 with rule-00001-AC-21.1 — any type, any status
   it('allows a document of any type in any status', () => {
     for (const front of [
       { id: 'record-00001-x', type: 'record', status: 'active' },
@@ -219,7 +219,7 @@ describe('assertAskable', () => {
     }
   })
 
-  // spec-00001-AC-47.5
+  // spec-00005-AC-7.2
   it('rejects an anomalous document', () => {
     const { node } = single({ id: 'nope', type: 'prd', status: 'draft' })
     expect(() => assertAskable(node)).toThrowError(WorkflowError)
