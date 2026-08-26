@@ -94,8 +94,8 @@ parent: prd-00001-docs-whiteboard
   按种类 commit 对答疑不适用；「会话前快照」的「四种皆然」收窄为
   终端形态三种（答疑不作快照）；「呈现状态」枚举增列编辑器的问题
   列表视图态与定位项。
-- 两份 design 现 `informs` 均未指向本 spec——回链边在各自修订轮
-  （plan-00021 T1）添加，§5 表述的是待建边而非既有边。
+- 两份 design 的 `informs` 回链边已随 plan-00021 T1 的修订轮建立
+  （design-00001 §10、design-00002 §14）。
 - 本 spec 新增术语（拟，接收后进 `CONTEXT.md`）：
   - **答疑线程（Ask Thread）**：一个问题及其追问链——每个新问题开
     一个独立的 agent 会话，追问接续该会话；只读，落盘板外。
@@ -387,8 +387,8 @@ parent: prd-00001-docs-whiteboard
 
 | Design | Doc | Covers |
 | --- | --- | --- |
-| 服务端（待修订轮，回链边届时添加） | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | headless 执行通路（捕获输出，无 PTY）、问题列表存储位置与文件形态、接续标识捕获口径、claude 缺省 headless 声明（含只读旗标集）、注册表第二形态（不占文档、无等待、拒绝终端接入）、正常关停与启动核销、声明的键名与占位语法、`POST /api/sessions/ask` 的语义改造 |
-| 白板 UI（待修订轮，回链边届时添加） | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 浮窗与编辑器双入口、问题输入、编辑器第三视图态（列表、点开、追问、失败重发、缓冲保留）、节点标记的多会话口径与激活分支、面板逐项终止入口、面板与通知点击导航、前端锁与标记推导改造（现按「一文档一会话」建映射） |
+| 服务端（第二十一轮已扩展，§10；回链已建） | [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) | headless 执行通路（捕获输出，无 PTY）、问题列表存储位置与文件形态、接续标识捕获口径、claude 缺省 headless 声明（含只读旗标集）、注册表第二形态（不占文档、无等待、拒绝终端接入）、正常关停与启动核销、声明的键名与占位语法、`POST /api/sessions/ask` 的语义改造 |
+| 白板 UI（第二十一轮已扩展，§14；回链已建） | [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) | 浮窗与编辑器双入口、问题输入、编辑器第三视图态（列表、点开、追问、失败重发、缓冲保留）、节点标记的多会话口径与激活分支、面板逐项终止入口、面板与通知点击导航、前端锁与标记推导改造（原按「一文档一会话」建映射） |
 
 ## 6. Out of Scope
 
@@ -420,8 +420,8 @@ parent: prd-00001-docs-whiteboard
 - Sibling specs: [spec-00001-docs-whiteboard](spec-00001-docs-whiteboard.md)（FR-47 退役交接、FR-14/FR-18/FR-55 触及条目见 §1，属其修订轮）·
   [spec-00003-whiteboard-parallel-sessions](spec-00003-whiteboard-parallel-sessions.md)（注册表复用；FR-1/FR-2/FR-4/FR-5/FR-6/FR-7/FR-8/FR-10 的交接见 §1，属其修订轮）·
   [spec-00004-whiteboard-desktop-notifications](spec-00004-whiteboard-desktop-notifications.md)（结束通知通路；FR-2/FR-5 交接见 §1，属其修订轮）
-- Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)（BR-21 只读改写与 `rule-00001-AC-21.3` 移除待其修订轮）
-- Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) ·
-  [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md)（均待修订轮，回链边届时添加）
+- Rules: [rule-00001-docs-workflow](../rule/rule-00001-docs-workflow.md)（BR-21 只读改写与 `rule-00001-AC-21.3` 退役已随 plan-00021 T2 落地）
+- Design: [design-00001-docs-whiteboard](../design/design-00001-docs-whiteboard.md) §10 ·
+  [design-00002-whiteboard-ui](../design/design-00002-whiteboard-ui.md) §14（均已随 plan-00021 T1 扩展并回链）
 - Decisions: [decision-00012-whiteboard-ask-threads](../decision/decision-00012-whiteboard-ask-threads.md)（本 spec 的全部取舍，同轮接收）·
   [decision-00006-whiteboard-ask-clarify](../decision/decision-00006-whiteboard-ask-clarify.md)（答疑与澄清的方向切分不变；答疑的形态由本 spec 接管）

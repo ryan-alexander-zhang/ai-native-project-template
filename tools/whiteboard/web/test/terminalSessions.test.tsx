@@ -153,7 +153,7 @@ function listing(overrides: Partial<SessionListing> = {}): SessionListing {
 }
 
 const A = listing({ id: 'a', sourceId: 'prd-00001-x' })
-const B = listing({ id: 'b', kind: 'ask', sourceId: 'idea-00001-x' })
+const B = listing({ id: 'b', kind: 'audit', sourceId: 'idea-00001-x' })
 
 function reportResize() {
   ;(globalThis as { reportResize?: () => void }).reportResize?.()
@@ -293,7 +293,7 @@ describe('the terminal panel with several sessions', () => {
     render(<Terminal onClose={vi.fn()} onStop={vi.fn()} session={B} />)
 
     const panel = screen.getByLabelText('Agent session')
-    expect(panel.textContent).toContain('ask')
+    expect(panel.textContent).toContain('audit')
     expect(panel.textContent).toContain('idea-00001-x')
     await waitFor(() => expect(xterms.made).toHaveLength(1))
   })

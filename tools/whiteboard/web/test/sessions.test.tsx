@@ -131,8 +131,12 @@ async function openPanel() {
 }
 
 const rows = () => screen.getAllByRole('listitem')
+
+/** One panel row's own control, told from the stop that sits beside it. */
+function row(list: HTMLElement, index: number): HTMLElement {
+  return within(within(list).getAllByRole('listitem')[index]!).getAllByRole('button')[0]!
+}
 const clarify = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' })
-const ask = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' })
 const advance = () => screen.getByLabelText<HTMLButtonElement>('Advance to the next step')
 
 beforeEach(() => {
@@ -150,9 +154,18 @@ afterEach(() => {
 
 describe('the session panel', () => {
   function renderPanel(sessions: SessionListing[], showAgent = false) {
+    const onStop = vi.fn()
     render(
-      <SessionPanel open onOpenChange={vi.fn()} sessions={sessions} showAgent={showAgent} onPick={vi.fn()} />,
+      <SessionPanel
+        open
+        onOpenChange={vi.fn()}
+        sessions={sessions}
+        showAgent={showAgent}
+        onPick={vi.fn()}
+        onStop={onStop}
+      />,
     )
+    return onStop
   }
 
   /**
@@ -254,10 +267,19 @@ describe('the session panel', () => {
   it('makes every row a control the keyboard can reach and fire', async () => {
     const onPick = vi.fn()
     render(
-      <SessionPanel open onOpenChange={vi.fn()} sessions={[listing()]} showAgent={false} onPick={onPick} />,
+      <SessionPanel
+        open
+        onOpenChange={vi.fn()}
+        sessions={[listing()]}
+        showAgent={false}
+        onPick={onPick}
+        onStop={vi.fn()}
+      />,
     )
 
-    const row = within(screen.getByRole('list', { name: 'Agent sessions' })).getByRole('button')
+    // The row itself, which is the first control of the two it now carries: the
+    // other is that session's stop (spec-00005-FR-7).
+    const row = within(screen.getByRole('list', { name: 'Agent sessions' })).getAllByRole('button')[0]!
     row.focus()
     expect(document.activeElement).toBe(row)
     await userEvent.keyboard('{Enter}')
@@ -350,12 +372,12 @@ describe('picking a session out of the panel', () => {
   it('shows the session and selects its document', async () => {
     serve([
       listing({ id: 's1', sourceId: 'prd-00001-x' }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ])
     await openBoard()
     const list = await openPanel()
 
-    await userEvent.click(within(list).getAllByRole('button')[0]!)
+    await userEvent.click(row(list, 0))
 
     const terminal = await screen.findByLabelText('Agent session')
     expect(terminal.textContent).toContain('prd-00001-x')
@@ -377,7 +399,7 @@ describe('picking a session out of the panel', () => {
     await waitFor(() => expect(screen.getByRole('toolbar', { name: 'Actions for idea-00001-x' })).toBeTruthy())
     const list = await openPanel()
 
-    await userEvent.click(within(list).getAllByRole('button')[1]!)
+    await userEvent.click(row(list, 1))
 
     const terminal = await screen.findByLabelText('Agent session')
     expect(terminal.textContent).toContain('gone-00009-x')
@@ -395,7 +417,7 @@ describe('the session marker on a node', () => {
   it('marks the node and shows that session without selecting the node', async () => {
     serve([
       listing({ id: 's1', kind: 'clarify', sourceId: 'prd-00001-x' }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ])
     await openBoard()
     // The board came up on the newest running session, which is the other one.
@@ -412,7 +434,7 @@ describe('the session marker on a node', () => {
   it('answers Enter on the marker the same way', async () => {
     serve([
       listing({ id: 's1', kind: 'clarify', sourceId: 'prd-00001-x' }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ])
     await openBoard()
 
@@ -488,7 +510,6 @@ describe('the starting points under the concurrency rules', () => {
 
     await waitFor(() => expect(clarify()).toBeTruthy())
     expect(clarify().disabled).toBe(false)
-    expect(ask().disabled).toBe(false)
     expect(advance().disabled).toBe(false)
   })
 

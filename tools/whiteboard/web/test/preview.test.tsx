@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import { api } from '../src/api.ts'
-import { Editor } from '../src/Editor.tsx'
+import { Editor, type EditorMode } from '../src/Editor.tsx'
 import { Preview } from '../src/Preview.tsx'
 import { stripFrontMatter } from '../src/frontMatter.ts'
 
@@ -156,6 +157,16 @@ describe('the preview', () => {
   })
 })
 
+/**
+ * Which view the editor shows is the board's state now, not the editor's
+ * (design-00002 §14) — so a case that switches views holds it here, exactly as
+ * the board does.
+ */
+function Editing({ docId }: { docId: string }) {
+  const [mode, setMode] = useState<EditorMode>('source')
+  return <Editor docId={docId} mode={mode} onMode={setMode} onSaved={vi.fn()} onClose={vi.fn()} />
+}
+
 describe('the editor preview toggle', () => {
   const CONTENT = `${FRONT_MATTER}\n## Context\n\n\`\`\`mermaid\n${FLOWCHART}\n\`\`\`\n`
 
@@ -164,7 +175,7 @@ describe('the editor preview toggle', () => {
   })
 
   async function openEditor() {
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editing docId="prd-00001-x" />)
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('## Context'))
   }
 
@@ -193,7 +204,7 @@ describe('the editor preview toggle', () => {
   // spec-00001-AC-22.8
   it('previews nothing, without error, before the document has loaded', async () => {
     vi.spyOn(api, 'doc').mockReturnValue(new Promise(() => {}))
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editing docId="prd-00001-x" />)
 
     await userEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 

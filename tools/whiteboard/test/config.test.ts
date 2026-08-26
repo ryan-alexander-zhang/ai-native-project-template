@@ -161,6 +161,11 @@ describe('parseFlowConfig', () => {
       [HEADLESS.replace('"{session}", ', ''), /agents\.claude\.headless\.resume.*\{session\}/],
       [HEADLESS.replace('first:  [-p, "{question}"]', 'first:  [-p, "{session}", "{question}"]'), /headless\.first.*\{session\}/],
       [HEADLESS.replace('first:  [-p, "{question}"]', 'first:  []'), /headless\.first.*non-empty list/],
+      // A form that is not a list at all, and one whose elements are not
+      // strings: both would build an argv the spawn cannot run, so both are
+      // refused here rather than at the first call.
+      [HEADLESS.replace('first:  [-p, "{question}"]', 'first:  "-p {question}"'), /headless\.first.*non-empty list/],
+      [HEADLESS.replace('resume: [-p, --resume, "{session}", "{question}"]', 'resume: [-p, 7, "{session}", "{question}"]'), /headless\.resume.*non-empty list/],
       [HEADLESS.replace('capture: claude-json', 'capture: whatever'), /headless\.capture.*claude-json.*"whatever"/],
       ['    headless: not-a-mapping\n', /`agents\.claude\.headless` must be a mapping/],
     ] as const) {

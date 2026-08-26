@@ -3,7 +3,16 @@ import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
-import { ApiError, type CoverageRow, type SessionInfo, type SessionListing, api } from './api.ts'
+import {
+  ApiError,
+  type AskSubmit,
+  type AskThread,
+  type CoverageRow,
+  type SessionInfo,
+  type SessionListing,
+  api,
+} from './api.ts'
+import type { EditorMode } from './Editor.tsx'
 import { connectEvents } from './eventSocket.ts'
 import { prefillFrontMatter } from './frontMatter.ts'
 import { type Placed, layoutGraph } from './layout.ts'
@@ -76,6 +85,11 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   // A single agent is left unnamed: the request then carries no agent field and
   // the server takes the first, as it always did (spec-00001-AC-55.4).
   const [agents, setAgents] = useState<string[]>([])
+  // Of those, the ones that declare a headless form: the whole of an ask's
+  // choice, and — when it is empty — the reason neither ask entry is drawn
+  // (spec-00005-FR-2, AC-7.4). It is read off the same payload the other entries
+  // are, so the board keeps no ruling of its own (spec-00001-FR-56).
+  const [askAgents, setAskAgents] = useState<string[]>([])
   const [agent, setAgent] = useState<string>()
   const [selected, setSelected] = useState<string>()
   // Carried with the document it was read for, so a panel never shows the
@@ -89,6 +103,15 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   // with `editing`, and what tells the editor that saving creates rather than
   // revises (spec-00001-FR-53).
   const [draft, setDraft] = useState<string>()
+  /**
+   * The editor's view state and the thread the ask list is located on — both
+   * presentation state of the board rather than of the editor, since a panel row
+   * and a desktop notification set them from outside (design-00002 §10, §14).
+   * The threads themselves are the payload those two are resolved against.
+   */
+  const [editorMode, setEditorMode] = useState<EditorMode>('source')
+  const [located, setLocated] = useState<string>()
+  const [threads, setThreads] = useState<AskThread[]>([])
   const [terminalOpen, setTerminalOpen] = useState(false)
   // Every session the server holds, and — apart from it — which one the terminal
   // is showing: the pick is presentation state, kept by session id across a
@@ -110,6 +133,14 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   // callback depend on it: a `refresh` rebuilt on every open would tear the
   // docs-change channel down and dial it again (design-00002 §10).
   const viewing = useRef(false)
+  /**
+   * The document whose ask list is open, readable from `refresh` for the same
+   * reason `viewing` is a ref. It is what makes the list the fourth item of the
+   * one refresh path: while it is open the threads are re-read with the graph,
+   * and while it is not, nothing is asked for — without it `running → answered`
+   * would never reach the page (spec-00005-AC-3.3, design-00001 §10.3).
+   */
+  const listed = useRef<string | undefined>(undefined)
   /**
    * How each session was last seen: the status it was in, and whether it was
    * waiting. The refresh signal is the only channel either reaches the board
@@ -199,6 +230,41 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   )
 
   /**
+   * The open ask list, re-read (spec-00005-AC-3.3). The location follows the
+   * same close-nearest rule everything else does: a thread that has gone from
+   * the payload takes only the location with it, and the list state stays
+   * (design-00002 §10).
+   */
+  const readAsks = useCallback(async (): Promise<AskThread[]> => {
+    const docId = listed.current
+    if (docId === undefined) return []
+    try {
+      const next = await api.asks(docId)
+      // The answer is only good for the list it was asked about. Two reads can be
+      // in flight — a refresh's and a switch's — and a slow one landing last
+      // would paint another document's threads, or the closed list's
+      // (design-00002 §10: the list is read while it is open, and this is which
+      // list).
+      if (listed.current !== docId) return []
+      setThreads(next)
+      setLocated((current) =>
+        current !== undefined && next.some((thread) => thread.id === current) ? current : undefined,
+      )
+      return next
+    } catch (error) {
+      // A list that could not be read is a list nobody may be shown: leaving the
+      // last document's threads painted under this document's name is worse than
+      // an empty list with the reason said out loud.
+      if (listed.current === docId) {
+        setThreads([])
+        setLocated(undefined)
+      }
+      toast.error(error instanceof Error ? error.message : String(error))
+      return []
+    }
+  }, [])
+
+  /**
    * The one way the board takes the docs in again (spec-00001-FR-44): all three
    * triggers — a push, an action of the board's own, the end of a session — come
    * through here, so what is kept and what is let go of cannot differ between
@@ -225,8 +291,11 @@ export function useBoard(openSession: (session: SessionListing) => void) {
       // session — the one a reconnecting board reattaches to — or, with nothing
       // running, the newest there was, so the panel still says how it ended
       // (spec-00003-FR-9). Only a running one brings the terminal up with it.
-      const running = runningOf(listing)
-      const pick = (running.length > 0 ? running : listing).at(-1)
+      // An ask is never picked, however new it is: it has no pty and the
+      // terminal is not what it is read in (spec-00005-AC-3.4, AC-3.5).
+      const shown = listing.filter((one) => one.kind !== 'ask')
+      const running = runningOf(shown)
+      const pick = (running.length > 0 ? running : shown).at(-1)
       if (pick !== undefined) {
         shownRef.current = pick.id
         setShownId(pick.id)
@@ -249,8 +318,11 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     // looking at it: the coverage view has no refresh of its own, and the read
     // is the heaviest the board makes (design-00001 §6, spec-00002-AC-10.4).
     if (viewing.current) await readCoverage()
+    // And the fourth, on the same terms: the ask list is re-read while it is
+    // open and not otherwise (spec-00005-AC-3.3, design-00002 §10).
+    await readAsks()
     return next
-  }, [readCoverage])
+  }, [readCoverage, readAsks])
 
   /**
    * The one way in, and one read at a time (see `reading` above). A read that
@@ -320,30 +392,121 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   )
 
   /**
-   * Put a session on the terminal — the one act the session panel and the node
-   * markers both perform (spec-00003-FR-4, FR-10). A session that was put away
-   * brings the panel back up with it; an ended one is shown too, since its
-   * output is still worth reading.
+   * Open a document's ask list, and — when the call that led here is named —
+   * located on the thread that call belongs to. The lookup is by
+   * `runSessionId`: a panel row and a notification hold the registry session id
+   * and nothing else, so the thread is found through the list itself
+   * (design-00001 §10.3).
    */
-  const showSession = useCallback((id: string) => {
-    shownRef.current = id
-    setShownId(id)
-    setTerminalOpen(true)
-  }, [])
+  const showAsks = useCallback(
+    async (docId: string, runSessionId?: string) => {
+      setDraft(undefined)
+      setEditing(docId)
+      setEditorMode('asks')
+      listed.current = docId
+      setLocated(undefined)
+      // Nothing of the last document's list survives the switch: it is held by
+      // document id, and threads painted under another document's name would be
+      // read as this one's (design-00002 §10, the same clearing `edit` does).
+      setThreads([])
+      const next = await readAsks()
+      if (runSessionId === undefined) return
+      setLocated(next.find((thread) => thread.exchanges.some((one) => one.runSessionId === runSessionId))?.id)
+    },
+    [readAsks],
+  )
 
   /**
-   * The one way a session ends on the user's word (spec-00001-FR-49): the one the
-   * terminal is showing, and no other, however many are running
-   * (spec-00003-FR-5, AC-5.3). The board does not assume what the stop did — the
-   * refresh that follows re-reads the listing, which is where the end state, the
-   * counts and the entries all come from. With no session on show there is
-   * nothing to stop.
+   * Go to a session (spec-00003-FR-4, FR-10) — and the way there forks on the
+   * kind (spec-00005-FR-9): a terminal-form session comes up on the terminal,
+   * which brings the panel back with it and shows an ended one too, since its
+   * output is still worth reading; an ask has no terminal at all, and leads to
+   * its document's ask list located on the thread it answered.
+   *
+   * What comes back is whether the board should also go to the document, which
+   * only the terminal path wants: the ask path has said its own piece when it
+   * refuses — the document is not on the board, so there is no editor for the
+   * list to live in and nothing moves (spec-00005-AC-9.4, AC-9.5).
    */
-  const stopSession = useCallback(async () => {
-    const id = shownRef.current
-    if (id === undefined) return
-    await run(() => api.stopSession(id))
-  }, [run])
+  const showSession = useCallback(
+    (id: string): boolean => {
+      const session = sessions.find((one) => one.id === id)
+      if (session === undefined) {
+        toast.error(`no session ${id} on the board`)
+        return false
+      }
+      if (session.kind !== 'ask') {
+        shownRef.current = id
+        setShownId(id)
+        setTerminalOpen(true)
+        return true
+      }
+      if (!graph.nodes.some((node) => node.id === session.sourceId)) {
+        toast.error(`no document ${session.sourceId} on the board`)
+        return false
+      }
+      void showAsks(session.sourceId, session.id)
+      return false
+    },
+    [sessions, graph, showAsks],
+  )
+
+  /**
+   * Which of the editor's three views is on show (spec-00005-FR-9). The ask list
+   * is the only one with a payload behind it, so opening it is what puts the
+   * fourth read on the refresh path and closing it is what takes it off again.
+   */
+  const showEditorMode = useCallback(
+    (docId: string, mode: EditorMode) => {
+      setEditorMode(mode)
+      listed.current = mode === 'asks' ? docId : undefined
+      if (mode === 'asks') void readAsks()
+    },
+    [readAsks],
+  )
+
+  /**
+   * One question (spec-00005-FR-1): a new thread, a follow-up on one, or a
+   * failed question put again. Nothing else happens — no terminal comes up
+   * (FR-3) — and the refresh that follows brings the running call onto the list
+   * and the node's marker.
+   *
+   * What comes back is whether the question went. Every refusal is a toast like
+   * any other action's, but the input that sent it also has to know: it is
+   * holding the user's words, and words thrown away on a refusal are words typed
+   * twice (spec-00005-FR-7).
+   */
+  const ask = useCallback(
+    async (submit: AskSubmit): Promise<boolean> => {
+      try {
+        await api.ask(submit)
+      } catch (error) {
+        toast.error(refusalText(error))
+        return false
+      }
+      await refresh()
+      return true
+    },
+    [refresh],
+  )
+
+  /**
+   * The one way a session ends on the user's word (spec-00001-FR-49): the named
+   * one, and no other, however many are running (spec-00003-FR-5, AC-5.3). The
+   * session panel names the row's; the terminal's own stop names nothing and
+   * means the one on show, and with none on show there is nothing to stop. The
+   * board does not assume what the stop did — the refresh that follows re-reads
+   * the listing, which is where the end state, the counts and the entries all
+   * come from.
+   */
+  const stopSession = useCallback(
+    async (named?: string) => {
+      const id = named ?? shownRef.current
+      if (id === undefined) return
+      await run(() => api.stopSession(id))
+    },
+    [run],
+  )
 
   const advance = useCallback(
     async (sourceId: string, targetType: string) => {
@@ -360,6 +523,12 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   const edit = useCallback((id?: string) => {
     setDraft(undefined)
     setEditing(id)
+    // The view state, the location and the threads all belong to the document
+    // that was open: another one opens on its own text (design-00002 §14).
+    setEditorMode('source')
+    setLocated(undefined)
+    setThreads([])
+    listed.current = undefined
   }, [])
 
   /**
@@ -435,6 +604,10 @@ export function useBoard(openSession: (session: SessionListing) => void) {
         setMaxSessions(config.maxSessions)
         const names = config.agents.map((declared) => declared.name)
         setAgents(names)
+        // An ask can only be put to an agent that says how to run it headlessly
+        // (spec-00005-FR-8); the entries follow this set the way they follow the
+        // clarifiable and auditable ones (spec-00001-FR-56).
+        setAskAgents(config.agents.filter((declared) => declared.headless !== undefined).map((one) => one.name))
         // One agent is no choice at all: it is left unnamed so the request
         // carries no agent field (spec-00001-AC-55.4). More than one, and the
         // first is the one on show until the user picks another.
@@ -466,6 +639,7 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     auditable,
     entry,
     agents,
+    askAgents,
     agent,
     selected,
     selectedNode: graph.nodes.find((node) => node.id === selected),
@@ -474,6 +648,11 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     nextSteps,
     editing,
     draft,
+    // The editor's third view state and what it is located on, held here so a
+    // panel row and a notification can set them (design-00002 §14).
+    editorMode,
+    threads,
+    located,
     terminalOpen,
     sessions,
     // Held by id, resolved from the current listing: a refresh keeps the user on
@@ -503,6 +682,10 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     run,
     startSession,
     showSession,
+    showAsks,
+    showEditorMode,
+    locate: setLocated,
+    ask,
     stopSession,
     advance,
     create,

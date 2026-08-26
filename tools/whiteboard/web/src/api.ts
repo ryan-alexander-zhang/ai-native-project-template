@@ -1,3 +1,4 @@
+import type { AskExchange, AskThread } from '../../src/askStore.ts'
 import type { FlowConfig, FlowStep } from '../../src/config.ts'
 import type { DocContent, DocGraph } from '../../src/docRepository.ts'
 import type { ActionResult, CoverageRow } from '../../src/docService.ts'
@@ -6,6 +7,8 @@ import type { SessionHistoryEntry, SessionHistoryMeta } from '../../src/sessionH
 import type { SessionInfo, SessionListing } from '../../src/sessionManager.ts'
 
 export type {
+  AskExchange,
+  AskThread,
   CoverageRow,
   DocContent,
   DocGraph,
@@ -16,6 +19,20 @@ export type {
   SessionHistoryMeta,
   SessionInfo,
   SessionListing,
+}
+
+/**
+ * What one question carries (design-00001 §7). No `threadId` opens a thread of
+ * its own — a headless first call; one that names a thread is that thread's
+ * follow-up, and `resend` says its last question is being put again rather than
+ * a new one asked (spec-00005-FR-2, FR-7).
+ */
+export interface AskSubmit {
+  docId: string
+  question: string
+  agent?: string
+  threadId?: string
+  resend?: boolean
 }
 
 /**
@@ -116,12 +133,30 @@ export const api = {
   // unspecified agent is an absent field, not a null one.
   advance: (sourceId: string, targetType: string, agent?: string) =>
     request<SessionInfo>('POST', '/api/sessions', { sourceId, targetType, agent }),
-  // Clarify, ask and audit are sessions, not writes: the agent does the
-  // questioning, the answering and the auditing in the terminal
-  // (spec-00001-FR-9, FR-47, FR-50).
+  // Clarify and audit are sessions, not writes: the agent does the questioning
+  // and the auditing in the terminal (spec-00001-FR-9, FR-50).
   clarify: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/clarify', { docId, agent }),
-  ask: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/ask', { docId, agent }),
   audit: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/audit', { docId, agent }),
+  /**
+   * One question on one document (spec-00005-FR-1). It is a session too, but a
+   * headless one: what comes back is the call's registry session and the thread
+   * the question landed on, and there is no terminal to open (FR-3).
+   */
+  ask: (submit: AskSubmit) =>
+    request<{ sessionId: string; threadId: string }>('POST', '/api/sessions/ask', submit),
+  /**
+   * A document's ask list (spec-00005-FR-9). Asked for only while the list is
+   * on show — it is the fourth item of the one refresh path, and a board that is
+   * not showing a list has nothing to do with the answer (design-00002 §10).
+   * A document with no list yet answers with no threads, never an error.
+   */
+  asks: async (docId: string): Promise<AskThread[]> => {
+    const { threads } = await request<{ threads: AskThread[] }>(
+      'GET',
+      `/api/asks/${encodeURIComponent(docId)}`,
+    )
+    return threads
+  },
   // The way out of a session that will not end by itself; what comes back is the
   // session as it finished (spec-00001-FR-49). The session is named: the stop
   // acts on the one the terminal is showing (spec-00003-FR-5).

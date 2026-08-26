@@ -18,6 +18,9 @@ function gate(log: string[], name: string) {
   }
 }
 
+/** How many keys the queue is still carrying work for — its own map, read for this one case. */
+const keys = (queue: SerialQueue) => queue['tails'].size
+
 /** A turn is chained onto the key's tail, so it begins a tick after it is handed over. */
 const flush = () => new Promise((resolve) => setImmediate(resolve))
 
@@ -72,5 +75,34 @@ describe('SerialQueue', () => {
 
     await expect(refused).rejects.toThrowError('refused')
     expect(await queue.run('k', () => 'after')).toBe('after')
+  })
+
+  /**
+   * The keys are their callers' — a document id, and there is no telling how many
+   * documents a long-running board will touch — so a key whose chain has drained
+   * is let go of rather than kept for ever. What is still queued is never
+   * dropped: the second turn below holds the key while the first one's own
+   * cleanup runs.
+   */
+  it('lets a key go once its chain has drained, and keeps one that is still queued', async () => {
+    const log: string[] = []
+    const queue = new SerialQueue()
+    const held = gate(log, 'held')
+
+    const running = [queue.run('k', held.turn), queue.run('k', () => 'after')]
+    await flush()
+    expect(keys(queue)).toBe(1)
+
+    held.release()
+    await Promise.all(running)
+    await flush()
+
+    expect(keys(queue)).toBe(0)
+    // And a key used again after that is a key back in the map, then out again.
+    const next = queue.run('k', () => 'again')
+    expect(keys(queue)).toBe(1)
+    expect(await next).toBe('again')
+    await flush()
+    expect(keys(queue)).toBe(0)
   })
 })

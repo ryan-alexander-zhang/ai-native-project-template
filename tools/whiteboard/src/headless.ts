@@ -47,12 +47,7 @@ export const SESSION_PLACEHOLDER = '{session}'
  * call having failed.
  */
 export function capture(stdout: string): Captured | undefined {
-  let parsed: { result?: unknown; session_id?: unknown; is_error?: unknown }
-  try {
-    parsed = JSON.parse(stdout) as typeof parsed
-  } catch {
-    return undefined
-  }
+  const parsed = claudeJson(stdout)
   // A call claude reports as an error is no answer, whatever it put in
   // `.result` — that field then holds the error, and exiting zero is how the
   // CLI reports an API failure. Read as an answer it would be filed on the
@@ -61,6 +56,63 @@ export function capture(stdout: string): Captured | undefined {
   if (parsed?.is_error === true) return undefined
   if (typeof parsed?.result !== 'string' || typeof parsed.session_id !== 'string') return undefined
   return { answer: parsed.result, resumeId: parsed.session_id }
+}
+
+/**
+ * The parsed reading of a `claude-json` stdout, or nothing when it is not one.
+ * Kept apart from {@link capture} because a call that answered nothing is read
+ * here too — the CLI's own error message is in the same field the answer would
+ * have been (design-00001 §10.1).
+ */
+function claudeJson(stdout: string): { result?: unknown; session_id?: unknown; is_error?: unknown } | undefined {
+  try {
+    return JSON.parse(stdout) as { result?: unknown; session_id?: unknown; is_error?: unknown }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The answer of one finished call, read the way its agent declared it should be
+ * (spec-00005-FR-8). The `capture` key names a reading the code holds, and this
+ * is where the name becomes the reading — so a declaration that names one is
+ * actually run by it, rather than every call being read the one way the code
+ * happened to have (design-00001 §10.1). One case today; a second capture adds
+ * a case here and nothing else.
+ */
+export function readCapture(name: CaptureName, stdout: string): Captured | undefined {
+  switch (name) {
+    case 'claude-json':
+      return capture(stdout)
+  }
+}
+
+/**
+ * Why a call that produced no answer failed, in the words closest to the cause
+ * (design-00001 §10.3): what the CLI itself reported, else the last thing it
+ * said on stderr, else the exit code — which is all there is when a call died
+ * silently. The thread carries this beside the failed question, since a call can
+ * exit zero and still have answered nothing (spec-00005-FR-7).
+ */
+export function failureReason(name: CaptureName, stdout: string, stderr: string, exitCode: number): string {
+  const reported = name === 'claude-json' ? claudeJson(stdout) : undefined
+  if (reported?.is_error === true && typeof reported.result === 'string' && reported.result.trim() !== '') {
+    return trimTail(reported.result)
+  }
+  const said = stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .at(-1)
+  return said === undefined ? `exit ${exitCode}` : trimTail(said)
+}
+
+/** How much of a reason is worth keeping: enough to act on, not a whole log (design-00002 §14). */
+const REASON_LIMIT = 300
+
+function trimTail(text: string): string {
+  const trimmed = text.trim()
+  return trimmed.length <= REASON_LIMIT ? trimmed : `…${trimmed.slice(-REASON_LIMIT)}`
 }
 
 /**

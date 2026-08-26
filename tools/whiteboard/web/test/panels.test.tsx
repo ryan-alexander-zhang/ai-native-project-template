@@ -70,7 +70,7 @@ describe('the editor', () => {
   })
 
   it('opens the whole file, front matter included', async () => {
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editor docId="prd-00001-x" mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={vi.fn()} />)
 
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('status: draft'))
   })
@@ -79,7 +79,7 @@ describe('the editor', () => {
   it('saves the edited text against the hash it opened', async () => {
     const save = vi.spyOn(api, 'save').mockResolvedValue({ committed: true })
     const onSaved = vi.fn()
-    render(<Editor docId="prd-00001-x" onSaved={onSaved} onClose={vi.fn()} />)
+    render(<Editor docId="prd-00001-x" mode="source" onMode={vi.fn()} onSaved={onSaved} onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('# X'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -92,7 +92,7 @@ describe('the editor', () => {
   // spec-00001-AC-5.1 as the user sees it
   it('shows the conflict and tells the user to reopen', async () => {
     vi.spyOn(api, 'save').mockRejectedValue(new ApiError(409, 'prd-00001-x changed on disk since it was opened'))
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editor docId="prd-00001-x" mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('# X'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -106,7 +106,7 @@ describe('the editor', () => {
 
   it('shows any other refusal as it came back', async () => {
     vi.spyOn(api, 'save').mockRejectedValue(new ApiError(500, 'disk is on fire'))
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editor docId="prd-00001-x" mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('# X'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -117,7 +117,7 @@ describe('the editor', () => {
   it('does not save before the document has loaded', async () => {
     const save = vi.spyOn(api, 'save').mockResolvedValue({ committed: true })
     vi.spyOn(api, 'doc').mockReturnValue(new Promise(() => {}))
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editor docId="prd-00001-x" mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -126,7 +126,7 @@ describe('the editor', () => {
 
   it('closes on request', async () => {
     const onClose = vi.fn()
-    render(<Editor docId="prd-00001-x" onSaved={vi.fn()} onClose={onClose} />)
+    render(<Editor docId="prd-00001-x" mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={onClose} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
 

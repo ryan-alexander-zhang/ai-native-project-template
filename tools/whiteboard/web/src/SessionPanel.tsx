@@ -5,11 +5,13 @@ import {
   MessageCircleQuestionMark,
   Plus,
   ShieldCheck,
+  Square,
   TerminalIcon,
 } from 'lucide-react'
 import type { SessionKind } from '../../src/sessionManager.ts'
 import type { SessionListing } from './api.ts'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,13 @@ export interface SessionPanelProps {
    */
   showAgent: boolean
   onPick: (session: SessionListing) => void
+  /**
+   * End a running session from its own row. Offered on every running session
+   * rather than on asks alone: an ask has no terminal panel to be stopped from
+   * (spec-00005-FR-7), and a rule that holds for one kind only would be a second
+   * rule to remember. The terminal panel's own stop stays where it is.
+   */
+  onStop: (session: SessionListing) => void
 }
 
 /** The kind's own icon, the same one its starting point carries (design-00002 §3). */
@@ -71,7 +80,7 @@ function ordered(sessions: SessionListing[]): SessionListing[] {
  * Every row is a real button: Tab reaches it and Enter fires it, which §6's
  * obligation for list rows extends to this fourth list of the same shape.
  */
-export function SessionPanel({ open, onOpenChange, sessions, showAgent, onPick }: SessionPanelProps) {
+export function SessionPanel({ open, onOpenChange, sessions, showAgent, onPick, onStop }: SessionPanelProps) {
   const rows = ordered(sessions)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,11 +102,11 @@ export function SessionPanel({ open, onOpenChange, sessions, showAgent, onPick }
             {rows.map((session) => {
               const Icon = KIND_ICONS[session.kind]
               return (
-                <li key={session.id}>
+                <li key={session.id} className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => onPick(session)}
-                    className="hover:bg-accent flex w-full flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs"
+                    className="hover:bg-accent flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs"
                   >
                     <Icon className="size-3.5 shrink-0" aria-hidden />
                     <Badge variant="secondary" className="text-[10px]">
@@ -119,6 +128,19 @@ export function SessionPanel({ open, onOpenChange, sessions, showAgent, onPick }
                     </span>
                     <span className="text-muted-foreground ml-auto">{stamp(session.startedAt)}</span>
                   </button>
+                  {/* The same icon and the same variant as the terminal panel's
+                      stop: one act, one shape (design-00002 §14). */}
+                  {session.status === 'running' ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      aria-label={`Stop the ${session.kind} session of ${session.sourceId}`}
+                      onClick={() => onStop(session)}
+                    >
+                      <Square className="size-4" aria-hidden />
+                      Stop
+                    </Button>
+                  ) : null}
                 </li>
               )
             })}

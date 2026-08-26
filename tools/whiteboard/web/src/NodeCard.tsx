@@ -1,5 +1,5 @@
 import { Handle } from '@xyflow/react'
-import { Keyboard, TerminalIcon, TriangleAlert } from 'lucide-react'
+import { CircleHelp, Keyboard, TerminalIcon, TriangleAlert } from 'lucide-react'
 import { Fragment } from 'react'
 import type { DocNode } from '../../src/docRepository.ts'
 import type { SessionListing } from './api.ts'
@@ -14,15 +14,35 @@ export interface NodeCardProps {
   kind?: string
   /** Recedes while another node holds the focus (spec-00001-AC-29.2). */
   suppressed?: boolean
-  /** The session running on this document, if one is (spec-00003-FR-10); nothing when none is. */
-  session?: SessionListing
-  /** Put that session on the terminal — the same act as picking it in the session panel. */
+  /**
+   * The sessions running on this document (spec-00003-FR-10 as spec-00005-FR-9
+   * rewrites it): one document may now carry several — one terminal-form
+   * session and any number of asks — and they are one marker, never a count.
+   */
+  sessions?: SessionListing[]
+  /** Go to that session — the same act as picking it in the session panel, kind and all. */
   onShowSession?: (id: string) => void
 }
 
+/**
+ * The one marker's session: a terminal-form one if the document has it, and
+ * otherwise the oldest ask. Which it is decides both the icon and what
+ * activating the marker does — the terminal for the first, the document's ask
+ * list for the second (spec-00005-AC-9.6, AC-9.7).
+ */
+function markerOf(sessions: SessionListing[]): SessionListing | undefined {
+  return sessions.find((one) => one.kind !== 'ask') ?? sessions[0]
+}
+
 /** A document on the canvas: type, status, title, id, and any anomaly. */
-export function NodeCard({ node, selected, kind, suppressed = false, session, onShowSession }: NodeCardProps) {
+export function NodeCard({ node, selected, kind, suppressed = false, sessions = [], onShowSession }: NodeCardProps) {
   const Icon = typeIcon(node.type)
+  const session = markerOf(sessions)
+  // Running, waiting on an answer, or only being asked a question: three
+  // readings, three icons, and the accessible name says which — never colour
+  // alone (design-00002 §14).
+  const state = session === undefined ? '' : session.kind === 'ask' ? 'Ask' : session.awaiting === true ? 'Awaiting input' : 'Running'
+  const Marker = session?.kind === 'ask' ? CircleHelp : session?.awaiting === true ? Keyboard : TerminalIcon
   return (
     <div
       data-testid={`node-${node.id}`}
@@ -74,19 +94,20 @@ export function NodeCard({ node, selected, kind, suppressed = false, session, on
           {node.type ?? '—'}
         </span>
         {/*
-          Slot ⑥ (design-00002 §4): this document has a session running, and this
-          is the way onto its terminal (spec-00003-FR-10). Running and awaiting
-          input are told apart by the icon and by the accessible name, never by
-          colour alone. Activating it is not selecting the node — the gesture is
-          stopped here, on click and on the Enter that fires it, the same
-          convention the inline id jump follows (spec-00001-FR-57): the pointer
-          events go too, or React Flow would drag the node under the press.
+          Slot ⑥ (design-00002 §4): this document has at least one session
+          running, and this is the way to it (spec-00003-FR-10). One marker
+          whatever the number of them — a count would say nothing worth the
+          space (design-00002 §14). Activating it is not selecting the node —
+          the gesture is stopped here, on click and on the Enter that fires it,
+          the same convention the inline id jump follows (spec-00001-FR-57): the
+          pointer events go too, or React Flow would drag the node under the
+          press.
         */}
         {session === undefined ? null : (
           <Badge variant="outline" className="px-1.5 py-0.5" asChild>
             <button
               type="button"
-              aria-label={`${session.awaiting === true ? 'Awaiting input' : 'Running'} session of ${node.id}`}
+              aria-label={`${state} session of ${node.id}`}
               onPointerDown={(event) => event.stopPropagation()}
               onMouseDown={(event) => event.stopPropagation()}
               onKeyDown={(event) => {
@@ -97,11 +118,7 @@ export function NodeCard({ node, selected, kind, suppressed = false, session, on
                 onShowSession?.(session.id)
               }}
             >
-              {session.awaiting === true ? (
-                <Keyboard className="size-3.5" aria-hidden />
-              ) : (
-                <TerminalIcon className="size-3.5" aria-hidden />
-              )}
+              <Marker className="size-3.5" aria-hidden />
             </button>
           </Badge>
         )}

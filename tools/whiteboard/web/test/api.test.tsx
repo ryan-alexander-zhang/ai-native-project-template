@@ -51,14 +51,58 @@ describe('the api client', () => {
     )
   })
 
-  // spec-00001-FR-47
-  it('starts an ask session for the document', async () => {
-    const fetchMock = mockFetch(200, { id: 's1', kind: 'ask', sourceId: 'record-00001-x', status: 'running' })
+  // spec-00005-FR-1 — a question opens a thread of its own; what comes back is
+  // the call's session and the thread it landed on
+  it('puts a question to a document', async () => {
+    const fetchMock = mockFetch(200, { sessionId: 's1', threadId: 't-1' })
 
-    expect(await api.ask('record-00001-x')).toMatchObject({ kind: 'ask' })
+    expect(await api.ask({ docId: 'record-00001-x', question: 'why?' })).toEqual({
+      sessionId: 's1',
+      threadId: 't-1',
+    })
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/sessions/ask',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ docId: 'record-00001-x' }) }),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ docId: 'record-00001-x', question: 'why?' }),
+      }),
+    )
+  })
+
+  // spec-00005-FR-2 and FR-7 — a follow-up names its thread, and a resend says
+  // so rather than being guessed at (design-00001 §7)
+  it('sends a follow-up and a resend on the thread they belong to', async () => {
+    const fetchMock = mockFetch(200, { sessionId: 's2', threadId: 't-1' })
+
+    await api.ask({ docId: 'record-00001-x', question: 'and then?', threadId: 't-1' })
+    await api.ask({ docId: 'record-00001-x', question: 'why?', threadId: 't-1', resend: true })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/sessions/ask',
+      expect.objectContaining({
+        body: JSON.stringify({ docId: 'record-00001-x', question: 'and then?', threadId: 't-1' }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/sessions/ask',
+      expect.objectContaining({
+        body: JSON.stringify({ docId: 'record-00001-x', question: 'why?', threadId: 't-1', resend: true }),
+      }),
+    )
+  })
+
+  // spec-00005-FR-9 — the ask list is its own resource: it outlives the document
+  // it is about, so it hangs under no `/api/docs/:id/` (design-00001 §7)
+  it('reads the ask list of a document', async () => {
+    const threads = [{ id: 't-1', agent: 'claude', exchanges: [] }]
+    const fetchMock = mockFetch(200, { threads })
+
+    expect(await api.asks('record-00001-x')).toEqual(threads)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/asks/record-00001-x',
+      expect.objectContaining({ method: 'GET' }),
     )
   })
 

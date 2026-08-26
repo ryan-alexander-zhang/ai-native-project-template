@@ -30,13 +30,15 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     docBusy: false,
     capReached: false,
     agents: ['claude'],
+    askAgents: ['claude'],
     onPickAgent: vi.fn(),
     onPickRelation: vi.fn(),
     onEdit: vi.fn(),
     onStatus: vi.fn(),
     onAccept: vi.fn(),
     onClarify: vi.fn(),
-    onAsk: vi.fn(),
+    // A question that went: what a submit gets back is whether it did (spec-00005-FR-7).
+    onAsk: vi.fn(async () => true),
     onAudit: vi.fn(),
     onAdvance: vi.fn(),
     ...overrides,
@@ -233,16 +235,71 @@ describe('the floating toolbar', () => {
     expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy()
   })
 
-  // spec-00001-AC-47.1 as the user sees it — any type, any status
-  it('starts an ask session from an active record node', async () => {
+  /**
+   * spec-00005-AC-1.3 as the user sees it — any type, any status: the entry is
+   * on an active record's toolbar too, and it opens the question input rather
+   * than a session (design-00002 §14).
+   */
+  it('opens the question input from an active record node', async () => {
     const props = renderToolbar({
       node: { ...NODE, id: 'record-00001-x', type: 'record', status: 'active' },
       clarifiable: false,
     })
 
     await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await userEvent.type(await screen.findByLabelText('Question'), 'what did this record verify?')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(props.onAsk).toHaveBeenCalledTimes(1)
+    expect(props.onAsk).toHaveBeenCalledWith('what did this record verify?', undefined)
+  })
+
+  /**
+   * spec-00005-FR-6 at the entry — a running session on this document locks the
+   * other starting points, and asking is not one of them: a question holds no
+   * document, and one call per thread is the server's ruling, not the toolbar's.
+   */
+  it('leaves the ask entry alone while this document has a session', () => {
+    renderToolbar({ docBusy: true })
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(false)
+  })
+
+  /**
+   * spec-00003-FR-3 at the entry — an ask takes a session slot like any other
+   * kind, so at the cap there is nothing to run it: the entry is locked and says
+   * which rule holds, exactly as the other starting points do
+   * (spec-00001-AC-49.5).
+   */
+  it('locks the ask entry at the cap and says why', async () => {
+    renderToolbar({ capReached: true })
+    const ask = screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' })
+
+    expect(ask.disabled).toBe(true)
+    await userEvent.hover(ask.parentElement!)
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip.textContent).toContain(CAP_REACHED)
+    expect(tooltip.textContent).not.toContain(DOC_BUSY)
+  })
+
+  // spec-00005-AC-7.4 at the entry — no agent declares a headless form, so there
+  // is nothing to put a question to and the entry is not drawn
+  it('draws no ask entry when no agent declares a headless form', () => {
+    renderToolbar({ askAgents: [] })
+
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy()
+  })
+
+  // design-00002 §14 — an empty question is nothing to ask, so it cannot be sent
+  it('refuses to send an empty question', async () => {
+    const props = renderToolbar()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await screen.findByLabelText('Question')
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Send' }).disabled).toBe(true)
+    expect(props.onAsk).not.toHaveBeenCalled()
   })
 
   // spec-00001-AC-50.1 as the user sees it — the entry is there for each type the
@@ -310,12 +367,11 @@ describe('the floating toolbar', () => {
   })
 
   // spec-00003-AC-2.4 at the entry: this document has a session, so none of its
-  // three starting points can begin another.
-  it('disables advance, clarify, and ask while this document has a session', () => {
+  // starting points can begin another.
+  it('disables advance and clarify while this document has a session', () => {
     renderToolbar({ docBusy: true })
 
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
     expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
     // Accept takes no session slot, so it stays available.
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Accept' }).disabled).toBe(false)
@@ -327,7 +383,6 @@ describe('the floating toolbar', () => {
     renderToolbar({ capReached: true })
 
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
     expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
   })
 
@@ -336,7 +391,7 @@ describe('the floating toolbar', () => {
    * no way to tell a locked board from a broken one (issue-00010). The reason is
    * read the way the «no next step» one is: focus the entry, and it is announced.
    */
-  it.each(['Clarify', 'Ask', 'Advance to the next step'])(
+  it.each(['Clarify', 'Advance to the next step'])(
     'says %s is disabled because this document has a session',
     async (name) => {
       renderToolbar({ docBusy: true })
@@ -351,7 +406,7 @@ describe('the floating toolbar', () => {
 
   // spec-00001-AC-49.11 (sixteenth round) — the other reason, on a document that
   // has no session of its own: every slot is taken.
-  it.each(['Clarify', 'Ask', 'Advance to the next step'])(
+  it.each(['Clarify', 'Advance to the next step'])(
     'says %s is disabled because the cap is reached',
     async (name) => {
       renderToolbar({ capReached: true })

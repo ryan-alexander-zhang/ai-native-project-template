@@ -784,7 +784,8 @@ capture 内建：① `-p --output-format json` 的 stdout 是单个 JSON 对象�
           { "question": "…", "askedAt": "<ISO>",
             "answer": "…", "answeredAt": "<ISO>",
             "outcome": "answered",
-            "runSessionId": "<该次调用的注册表会话 id>" }
+            "runSessionId": "<该次调用的注册表会话 id>",
+            "reason": "<仅失败/终止落：is_error 的 .result，其次 stderr 末行，其次 exit <code>；重发成功即清——T4 评审补记，进程侧 exited/0 保持如实，线程侧自带失败原因>" }
         ]
       }
     ]
@@ -852,6 +853,11 @@ kind=ask 的会话进同一注册表，差异逐条：
   该文档运行中会话时忽略 ask 会话**（两个方向都不占，
   `spec-00005-AC-6.1`/`AC-6.2`）；总上限照记账（`spec-00003-FR-3`）；
   线程内串行由存储层判定（该 threadId 有 `running` exchange 即 409）。
+  受理通过、落盘之后若再有抛出（第二 seam 之前的任何一步），回滚
+  要做两件事：注册表侧核销该会话（failed、还槽），存储侧把刚落的
+  exchange 落成 `failed` 带原因（`resumed` 记 false——没有 CLI 拒绝
+  过任何接续标识，不得标失效）——只核销会话会把 `running` 留在盘上
+  堵死该线程直到重启（T4 评审补记）。
 - **等待判定**：两通路均不武装（不设静默计时、不做 OSC 777 识别）——
   `awaiting` 恒缺席（`spec-00005-AC-6.5`）。
 - **终端**：无缓冲、无 attach——`WS /api/terminal?sessionId=<ask>` 拒绝

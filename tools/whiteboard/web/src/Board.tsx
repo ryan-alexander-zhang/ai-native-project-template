@@ -39,6 +39,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { useDefaultLayout } from 'react-resizable-panels'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { type SessionListing, api } from './api.ts'
+import { AskEntry } from './AskEntry.tsx'
+import { AskList } from './AskList.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
 import { CoverageView } from './CoverageView.tsx'
 import { CreateDialog } from './CreateDialog.tsx'
@@ -66,8 +68,8 @@ type DocNodeData = {
   node: DocNode
   kind?: string
   suppressed?: boolean
-  /** The session running on this document, if one is (spec-00003-FR-10). */
-  session?: SessionListing
+  /** The sessions running on this document, of any kind (spec-00005-FR-9). */
+  sessions?: SessionListing[]
   onShowSession?: (id: string) => void
 }
 
@@ -78,7 +80,7 @@ const nodeTypes = {
       kind={data.kind}
       selected={selected ?? false}
       suppressed={data.suppressed}
-      session={data.session}
+      sessions={data.sessions}
       onShowSession={data.onShowSession}
     />
   ),
@@ -156,13 +158,45 @@ function Canvas() {
     panelIds: ['canvas', 'detail'],
   })
 
-  // Which document each running session is on. One per document at most — the
-  // concurrency rule is exactly that (spec-00003-FR-2) — so a node has one
-  // marker or none, and the same lookup answers whether its entries are locked.
-  const runningOn = useMemo(
-    () => new Map(board.running.map((session) => [session.sourceId, session])),
-    [board.running],
-  )
+  /**
+   * Which running sessions each document has. A **list**, not one apiece: an ask
+   * holds no document, so one document can carry a terminal-form session and any
+   * number of asks at once (spec-00005-FR-6). The same lookup answers what the
+   * node's one marker shows and whether the entries are locked — and the two
+   * read it differently: the marker counts every kind (spec-00005-FR-9), the
+   * lock only the kinds that hold the document (design-00002 §14).
+   */
+  const runningOn = useMemo(() => {
+    const on = new Map<string, SessionListing[]>()
+    for (const session of board.running) {
+      const held = on.get(session.sourceId)
+      if (held === undefined) on.set(session.sourceId, [session])
+      else held.push(session)
+    }
+    return on
+  }, [board.running])
+  const docBusy = (id: string) => (runningOn.get(id) ?? []).some((session) => session.kind !== 'ask')
+
+  /**
+   * The editor's own way to ask, of the same shape as the node's
+   * (design-00002 §14). An anomalous document has none — its editor is where it
+   * is repaired, not where it is questioned (spec-00005-AC-7.3) — and no
+   * document has one while no agent declares a headless form (AC-7.4). A buffer
+   * that is not a document yet is not on the graph, so it has none either.
+   */
+  const editingNode = board.graph.nodes.find((node) => node.id === board.editing)
+  const askEntry =
+    board.askAgents.length > 0 && editingNode?.ok === true ? (
+      // Keyed by the document, so a draft written about one is never submitted
+      // against the next one opened here; the cap locks it exactly as it locks
+      // the node's own entry (spec-00003-FR-3).
+      <AskEntry
+        key={editingNode.id}
+        agents={board.askAgents}
+        disabled={board.running.length >= board.maxSessions}
+        onSubmit={(question, agent) => board.ask({ docId: editingNode.id, question, agent })}
+      />
+    ) : undefined
 
   const nodes = useMemo(() => {
     const laid = toFlowNodes(board.graph, board.placed, board.selected)
@@ -175,7 +209,7 @@ function Canvas() {
           ...data,
           kind: board.kinds[data.node.type ?? ''],
           suppressed: suppressed.has(node.id),
-          session: runningOn.get(node.id),
+          sessions: runningOn.get(node.id),
           onShowSession: board.showSession,
         },
       }
@@ -293,10 +327,13 @@ function Canvas() {
    * board refuses in place with its own toast, the terminal shows it all the
    * same, and the selection and the viewport stay exactly where they were
    * (spec-00003-AC-4.4, spec-00004-AC-5.3).
+   *
+   * An ask goes somewhere else entirely — its document's ask list — and says so
+   * itself when it cannot, which is why the canvas half waits on its word
+   * (spec-00005-FR-9).
    */
   function goToSession(session: SessionListing) {
-    board.showSession(session.id)
-    focus(session.sourceId)
+    if (board.showSession(session.id)) focus(session.sourceId)
   }
 
   /**
@@ -497,12 +534,15 @@ function Canvas() {
                         clarifiable={board.clarifiable.includes(selected.type ?? '')}
                         auditable={board.auditable.includes(selected.type ?? '')}
                         // The two concurrency rules, each read where it holds:
-                        // this document's own session, and the cap on all of
-                        // them (spec-00003-FR-2, FR-3). Another document's
-                        // session locks nothing here (spec-00001-AC-12.8).
-                        docBusy={runningOn.has(selected.id)}
+                        // this document's own terminal-form session, and the cap
+                        // on all of them (spec-00003-FR-2, FR-3). Another
+                        // document's session locks nothing here
+                        // (spec-00001-AC-12.8), and neither does an ask on this
+                        // one (spec-00005-FR-6).
+                        docBusy={docBusy(selected.id)}
                         capReached={board.running.length >= board.maxSessions}
                         agents={board.agents}
+                        askAgents={board.askAgents}
                         agent={board.agent}
                         onPickAgent={board.setAgent}
                         onPickRelation={focus}
@@ -510,7 +550,7 @@ function Canvas() {
                         onStatus={(to) => void board.run(() => api.setStatus(selected.id, to))}
                         onAccept={() => void board.run(() => api.accept(selected.id))}
                         onClarify={() => void board.startSession(() => api.clarify(selected.id, board.agent))}
-                        onAsk={() => void board.startSession(() => api.ask(selected.id, board.agent))}
+                        onAsk={(question, agent) => board.ask({ docId: selected.id, question, agent })}
                         onAudit={() => void board.startSession(() => api.audit(selected.id, board.agent))}
                         onAdvance={(targetType) => void board.advance(selected.id, targetType)}
                       />
@@ -534,6 +574,22 @@ function Canvas() {
                   <Editor
                     docId={board.editing}
                     draft={board.draft}
+                    mode={board.editorMode}
+                    onMode={(mode) => board.showEditorMode(board.editing!, mode)}
+                    ask={askEntry}
+                    asks={
+                      <AskList
+                        threads={board.threads}
+                        located={board.located}
+                        onLocate={board.locate}
+                        onFollowUp={(threadId, question) =>
+                          board.ask({ docId: board.editing!, question, threadId })
+                        }
+                        onResend={(threadId, question) =>
+                          void board.ask({ docId: board.editing!, question, threadId, resend: true })
+                        }
+                      />
+                    }
                     // A creation ends differently from a revision: the document
                     // is new to the board, so it is taken in and selected
                     // (spec-00001-FR-53).
@@ -650,6 +706,9 @@ function Canvas() {
           setSessionsOpen(false)
           goToSession(session)
         }}
+        // The stop stays where the panel is: ending a session is not going to
+        // it, so the list is not closed on the way (spec-00005-FR-7).
+        onStop={(session) => void board.stopSession(session.id)}
       />
       <SessionHistory open={history} onOpenChange={setHistory} />
       <Toaster position="bottom-right" theme={theme.isDark ? 'dark' : 'light'} richColors closeButton />

@@ -1,12 +1,20 @@
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView, basicSetup } from 'codemirror'
-import { Code, Eye, LoaderCircle, Save, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Code, Eye, List, LoaderCircle, Save, X } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError, type DocContent, api } from './api.ts'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Preview } from './Preview.tsx'
+
+/**
+ * The editor's three view states (spec-00005-FR-9): the text, its rendering, and
+ * the document's ask list. Which one is on show is the board's presentation
+ * state rather than the editor's own — a session panel row and a desktop
+ * notification both set it from outside (design-00002 §14).
+ */
+export type EditorMode = 'source' | 'preview' | 'asks'
 
 export interface EditorProps {
   docId: string
@@ -16,19 +24,27 @@ export interface EditorProps {
    * creates the file rather than revising one.
    */
   draft?: string
+  /** Which of the three views is on show, and the way to ask for another. */
+  mode: EditorMode
+  onMode: (mode: EditorMode) => void
+  /**
+   * The question entry, when this document has one: an anomalous document does
+   * not, and neither does any document while no agent declares a headless form
+   * (spec-00005-AC-7.3, AC-7.4).
+   */
+  ask?: ReactNode
+  /** The ask list, which is what the third view state shows. */
+  asks?: ReactNode
   onSaved: () => void
   onClose: () => void
 }
 
-type View = 'source' | 'preview'
-
 /** Edits the whole file, front matter included, and refuses to clobber a changed file. */
-export function Editor({ docId, draft, onSaved, onClose }: EditorProps) {
+export function Editor({ docId, draft, mode, onMode, ask, asks, onSaved, onClose }: EditorProps) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView>(null)
   const [opened, setOpened] = useState<DocContent>()
   const [saving, setSaving] = useState(false)
-  const [mode, setMode] = useState<View>('source')
   const [preview, setPreview] = useState('')
 
   useEffect(() => {
@@ -66,10 +82,14 @@ export function Editor({ docId, draft, onSaved, onClose }: EditorProps) {
     return () => cancelAnimationFrame(handle)
   }, [mode])
 
-  /** Preview renders the live buffer, so switching back keeps unsaved edits. */
-  function show(next: View) {
+  /**
+   * Preview and the ask list render beside the live buffer, never over it: the
+   * editor is only hidden, so coming back finds every unsaved edit where it was
+   * (spec-00001-FR-25, spec-00005-AC-9.2).
+   */
+  function show(next: EditorMode) {
     if (next === 'preview') setPreview(view.current?.state.doc.toString() ?? '')
-    setMode(next)
+    onMode(next)
   }
 
   async function save() {
@@ -106,7 +126,7 @@ export function Editor({ docId, draft, onSaved, onClose }: EditorProps) {
       <header className="flex items-center gap-2 border-b px-3 py-2">
         <span className="truncate font-mono text-xs font-medium">{docId}</span>
 
-        <Tabs value={mode} onValueChange={(value) => show(value as View)} className="ml-2">
+        <Tabs value={mode} onValueChange={(value) => show(value as EditorMode)} className="ml-2">
           <TabsList className="h-7">
             <TabsTrigger value="source" className="text-xs">
               <Code className="size-3.5" aria-hidden />
@@ -116,8 +136,16 @@ export function Editor({ docId, draft, onSaved, onClose }: EditorProps) {
               <Eye className="size-3.5" aria-hidden />
               Preview
             </TabsTrigger>
+            {/* The third view state, beside the other two rather than in a slot
+                of its own (spec-00005-FR-9, spec-00001-FR-31). */}
+            <TabsTrigger value="asks" className="text-xs">
+              <List className="size-3.5" aria-hidden />
+              Questions
+            </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {ask}
 
         <Button size="sm" className="ml-auto" onClick={save} disabled={saving}>
           {saving ? (
@@ -132,12 +160,13 @@ export function Editor({ docId, draft, onSaved, onClose }: EditorProps) {
         </Button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto text-sm" hidden={mode === 'preview'} ref={host} data-testid="editor-host" />
+      <div className="min-h-0 flex-1 overflow-auto text-sm" hidden={mode !== 'source'} ref={host} data-testid="editor-host" />
       {mode === 'preview' ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <Preview markdown={preview} />
         </div>
       ) : null}
+      {mode === 'asks' ? <div className="min-h-0 flex-1 overflow-auto">{asks}</div> : null}
     </section>
   )
 }

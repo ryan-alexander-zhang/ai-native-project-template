@@ -33,6 +33,14 @@ export interface AskExchange {
   answer?: string
   answeredAt?: string
   outcome: AskOutcome
+  /**
+   * Why a question that failed has no answer (design-00001 §10.3). A call can
+   * exit zero and still answer nothing — the CLI reporting its own error, or
+   * output the capture cannot read — so the process's story («exited 0») and the
+   * question's are two stories, and this is the one the list has to tell
+   * (spec-00005-FR-7). Absent on every other outcome.
+   */
+  reason?: string
   /** The registry session of the call, which is what a panel row or a notice is looked up by (design-00001 §10.3). */
   runSessionId: string
 }
@@ -63,6 +71,8 @@ export interface AskList {
 export interface AskResult {
   outcome: Exclude<AskOutcome, 'running'>
   answer?: string
+  /** Why it failed, when it failed (see {@link AskExchange.reason}). */
+  reason?: string
   resumeId?: string
   /** Whether the call carried a resume id, which is what a failure marks the thread on. */
   resumed: boolean
@@ -185,6 +195,10 @@ export class AskStore {
         exchange.answer = result.answer
         exchange.answeredAt = new Date().toISOString()
       }
+      // The reason belongs to this landing and to no other: a question resent
+      // and answered must not still carry why it failed last time.
+      if (result.reason !== undefined) exchange.reason = result.reason
+      else delete exchange.reason
       // Latest id wins, not first: a CLI is free to hand back a **new** id for
       // each resumed print run, and keeping the first would send every later
       // follow-up back to a conversation that has since moved on. The id the
@@ -226,7 +240,10 @@ export class AskStore {
         thread.exchanges.filter((exchange) => exchange.outcome === 'running'),
       )
       if (running.length === 0) continue
-      for (const exchange of running) exchange.outcome = 'failed'
+      for (const exchange of running) {
+        exchange.outcome = 'failed'
+        exchange.reason = 'the service stopped while this call was running'
+      }
       this.write(list)
     }
   }

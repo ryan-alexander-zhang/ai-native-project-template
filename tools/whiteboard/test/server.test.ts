@@ -3228,4 +3228,117 @@ describe('ask threads', () => {
     expect(spawned[1]!.args).toContain('cli-9')
     expect(spawned[0]!.args).not.toContain('cli-9')
   })
+
+  /**
+   * spec-00005-FR-7 — a call can exit **zero** and still have answered nothing:
+   * the CLI reports its own failure in the field the answer would have been
+   * (design-00001 §10.1). The question then says why it has no answer, while the
+   * process's own story stays what it was — it did exit zero, and pretending
+   * otherwise would make the panel lie about the process (design-00001 §10.3).
+   */
+  it('files the CLI’s own error as the question’s reason and leaves the exit honest', async () => {
+    const { call, board, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    end(0, { stdout: JSON.stringify({ result: 'Credit balance too low', session_id: 'cli-1', is_error: true }) })
+    await board.sessions.whenFinished(first.body.sessionId)
+
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.exchanges[0]).toMatchObject({ outcome: 'failed', reason: 'Credit balance too low' })
+    expect(thread!.exchanges[0]!.answer).toBeUndefined()
+    expect(board.sessions.list()[0]).toMatchObject({ status: 'exited', exitCode: 0 })
+  })
+
+  /**
+   * The rest of the same ordering: what the CLI said last on stderr, and — when
+   * it died saying nothing at all — the exit code, which is the only thing there
+   * is to say (design-00001 §10.3).
+   */
+  it('falls back to the last line of stderr, and to the exit code when there is none', async () => {
+    const { call, board, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { exitCode: 1, stdout: 'not json at all', stderr: 'connecting…\nauth: no such profile\n' })
+    await board.sessions.whenFinished(first.body.sessionId)
+    const silent = await ask(call, { docId: 'spec-00001-b', question: 'and the third?' })
+    end(1, { exitCode: 2 })
+    await board.sessions.whenFinished(silent.body.sessionId)
+
+    const threads = await threadsOf(call, 'spec-00001-b')
+    expect(threads[0]!.exchanges[0]).toMatchObject({ outcome: 'failed', reason: 'auth: no such profile' })
+    expect(threads[1]!.exchanges[0]).toMatchObject({ outcome: 'failed', reason: 'exit 2' })
+  })
+
+  /**
+   * A question that was answered carries no reason from the failure before it:
+   * the reason belongs to the landing that wrote it (design-00001 §10.2 — the
+   * resend rewrites the question where it stands).
+   */
+  it('clears the reason when the resend is answered', async () => {
+    const { call, board, end } = askBoard()
+    const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+    end(0, { exitCode: 2 })
+    await board.sessions.whenFinished(first.body.sessionId)
+    const again = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?', threadId: 't-1', resend: true })
+    end(1, { stdout: ANSWER('because they are cheap') })
+    await board.sessions.whenFinished(again.body.sessionId)
+
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.exchanges[0]).toMatchObject({ outcome: 'answered', answer: 'because they are cheap' })
+    expect(thread!.exchanges[0]!.reason).toBeUndefined()
+  })
+
+  /**
+   * design-00001 §10.2 写序 — the record is on disk before the process exists, so
+   * anything that throws past it would leave the question `running` with nothing
+   * to answer it: the thread refuses every submit while a question of its own is
+   * running (spec-00005-AC-7.1), so it would be shut until a restart reconciled
+   * it (AC-5.3). The rollback lands that question `failed` with its reason
+   * instead, and it takes a resend at once (spec-00005-FR-7).
+   */
+  it('lands the question failed when the launch past the record throws', async () => {
+    const { call, board, spawned } = askBoard()
+    const launch = board.sessions.launch.bind(board.sessions)
+    board.sessions.launch = () => {
+      throw new Error('the spawn seam gave out')
+    }
+
+    const refused = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+    expect(refused.status).toBeGreaterThanOrEqual(400)
+    const [thread] = await threadsOf(call, 'spec-00001-b')
+    expect(thread!.exchanges[0]).toMatchObject({ outcome: 'failed', reason: 'the spawn seam gave out' })
+    // The slot went back with it, and the continuation is not in doubt: no CLI
+    // was ever asked, so nothing refused a resume id.
+    expect(board.sessions.list()[0]!.status).toBe('failed')
+    expect(thread!.resumeInvalid).toBeUndefined()
+    expect(spawned).toEqual([])
+
+    board.sessions.launch = launch
+    const resent = await ask(call, {
+      docId: 'spec-00001-b',
+      question: 'why two gates?',
+      threadId: 't-1',
+      resend: true,
+    })
+
+    expect(resent.status).toBe(200)
+    expect(spawned).toHaveLength(1)
+  })
+
+  /**
+   * The other end of the same 写序 window: a stop that lands after the admission
+   * but before the process exists left only its mark, and the mark is honoured
+   * the moment there is something to signal — otherwise the call runs on with
+   * its own session already reading `terminated` (spec-00005-AC-7.6).
+   */
+  it('kills a call whose stop landed before its process existed', async () => {
+    const { board, spawned } = askBoard()
+    const info = board.sessions.start(board.docs.askPlan('spec-00001-b', 'why two gates?', { id: 't-1' }))
+
+    const stopped = board.sessions.terminate(info.id)
+    board.sessions.launch(info.id)
+
+    expect((await stopped).status).toBe('terminated')
+    expect(spawned).toHaveLength(1)
+  })
 })

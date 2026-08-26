@@ -21,8 +21,16 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
   }
 }
 
-const CLAUDE: AgentConfig = { name: 'claude', command: 'claude', args: [] }
-const CODEX: AgentConfig = { name: 'codex', command: 'codex', args: [] }
+/** A headless declaration is what puts an agent in an ask's choice (spec-00005-FR-8). */
+const HEADLESS: AgentConfig['headless'] = {
+  first: ['-p', '{question}'],
+  resume: ['-p', '--resume', '{session}', '{question}'],
+  capture: 'claude-json',
+}
+const CLAUDE: AgentConfig = { name: 'claude', command: 'claude', args: [], headless: { ...HEADLESS } }
+const CODEX: AgentConfig = { name: 'codex', command: 'codex', args: [], headless: { ...HEADLESS } }
+/** The same agent with no headless form: it runs terminal sessions and answers no question. */
+const TERMINAL_ONLY: AgentConfig = { name: 'claude', command: 'claude', args: [] }
 
 /** A started session only needs a socket that answers; the terminal opens one on mount. */
 function stubWebSocket() {
@@ -45,6 +53,8 @@ function serve(payload: Partial<ConfigPayload> = {}, nodes: DocNode[] = [node()]
   vi.spyOn(api, 'nextSteps').mockResolvedValue([{ next: 'spec', carry: 'parent' }])
   vi.spyOn(api, 'sessions').mockResolvedValue([])
   vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
+  vi.spyOn(api, 'doc').mockResolvedValue({ path: 'prd/a.md', content: '# X', hash: 'hash-1' })
+  vi.spyOn(api, 'asks').mockResolvedValue([])
   vi.spyOn(api, 'config').mockResolvedValue({
     types: { prd: 'living', spec: 'living', design: 'living' },
     relations: ['parent'],
@@ -65,7 +75,9 @@ async function selectNode(id = 'prd-00001-x') {
   render(<Board />)
   await waitFor(() => expect(screen.getByTestId(`node-${id}`)).toBeTruthy())
   fireEvent.click(screen.getByTestId(`node-${id}`))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
+  // Edit is on every toolbar, anomalous documents included, so it is what says
+  // the toolbar is up without assuming which entries this case expects.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy())
 }
 
 afterEach(() => {
@@ -97,14 +109,14 @@ describe('the agent picker', () => {
   it('names the first agent on a session it was not asked about', async () => {
     stubWebSocket()
     serve({ agents: [CLAUDE, CODEX] })
-    const ask = vi
-      .spyOn(api, 'ask')
-      .mockResolvedValue({ id: 's1', kind: 'ask', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' })
+    const clarify = vi
+      .spyOn(api, 'clarify')
+      .mockResolvedValue({ id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' })
     await selectNode()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
 
-    expect(ask).toHaveBeenCalledWith('prd-00001-x', 'claude')
+    expect(clarify).toHaveBeenCalledWith('prd-00001-x', 'claude')
   })
 
   // spec-00001-AC-55.1 as the user does it: pick the second, and that is the one
@@ -112,16 +124,16 @@ describe('the agent picker', () => {
   it('sends the agent the user picked', async () => {
     stubWebSocket()
     serve({ agents: [CLAUDE, CODEX] })
-    const ask = vi
-      .spyOn(api, 'ask')
-      .mockResolvedValue({ id: 's1', kind: 'ask', agent: 'codex', sourceId: 'prd-00001-x', status: 'running' })
+    const clarify = vi
+      .spyOn(api, 'clarify')
+      .mockResolvedValue({ id: 's1', kind: 'clarify', agent: 'codex', sourceId: 'prd-00001-x', status: 'running' })
     await selectNode()
 
     await userEvent.click(screen.getByLabelText('Agent'))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'codex' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
 
-    expect(ask).toHaveBeenCalledWith('prd-00001-x', 'codex')
+    expect(clarify).toHaveBeenCalledWith('prd-00001-x', 'codex')
     expect(screen.getByLabelText('Agent').textContent).toContain('codex')
   })
 
@@ -176,14 +188,85 @@ describe('the agent picker', () => {
   it('names no agent at all when there is only one', async () => {
     stubWebSocket()
     serve({ agents: [CLAUDE] })
-    const ask = vi
-      .spyOn(api, 'ask')
-      .mockResolvedValue({ id: 's1', kind: 'ask', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' })
+    const clarify = vi
+      .spyOn(api, 'clarify')
+      .mockResolvedValue({ id: 's1', kind: 'clarify', agent: 'claude', sourceId: 'prd-00001-x', status: 'running' })
     await selectNode()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }))
 
-    expect(ask).toHaveBeenCalledWith('prd-00001-x', undefined)
+    expect(clarify).toHaveBeenCalledWith('prd-00001-x', undefined)
+  })
+})
+
+/**
+ * The ask entry's own choice, which is not the toolbar's: an agent answers a
+ * question only if it declares how to be run headlessly (spec-00005-FR-2).
+ */
+describe('the agent an ask is put to', () => {
+  /** Open the question input from the node's floating toolbar. */
+  async function openAsk() {
+    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    return screen.findByLabelText('Question')
+  }
+
+  /**
+   * spec-00005-AC-2.3 as the user sees it — two agents declared, one of them
+   * headless: the ask's choice is that one, and it is no choice at all, so no
+   * picker is drawn and no agent is named on the wire.
+   */
+  it('narrows the choice to the agents that declare a headless form', async () => {
+    serve({ agents: [{ ...CODEX, headless: undefined }, CLAUDE] })
+    const ask = vi.spyOn(api, 'ask').mockResolvedValue({ sessionId: 's1', threadId: 't-1' })
+    await selectNode()
+
+    const question = await openAsk()
+    await userEvent.type(question, 'why is this a draft?')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(screen.queryByLabelText('Ask agent')).toBeNull()
+    expect(ask).toHaveBeenCalledWith({
+      docId: 'prd-00001-x',
+      question: 'why is this a draft?',
+      agent: undefined,
+    })
+  })
+
+  // spec-00005-AC-2.3, the other half — both declare one, so both are on offer
+  // and the one picked is the one the thread is opened with
+  it('puts the question to the headless agent the user picked', async () => {
+    serve({ agents: [CLAUDE, CODEX] })
+    const ask = vi.spyOn(api, 'ask').mockResolvedValue({ sessionId: 's1', threadId: 't-1' })
+    await selectNode()
+
+    const question = await openAsk()
+    await userEvent.type(question, 'what is missing here?')
+    await userEvent.click(screen.getByLabelText('Ask agent'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'codex' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(ask).toHaveBeenCalledWith({
+      docId: 'prd-00001-x',
+      question: 'what is missing here?',
+      agent: 'codex',
+    })
+  })
+
+  /**
+   * spec-00005-AC-7.4 as the user sees it — no agent declares a headless form,
+   * so there is nothing to answer a question and neither entry is drawn: not on
+   * the node's toolbar, not in the editor's header.
+   */
+  it('draws neither ask entry when no agent declares a headless form', async () => {
+    serve({ agents: [TERMINAL_ONLY] })
+    await selectNode()
+
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Questions' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
   })
 })
 

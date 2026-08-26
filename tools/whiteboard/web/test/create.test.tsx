@@ -213,7 +213,7 @@ describe('a prefilled buffer', () => {
 
   it('reads nothing off disk — there is nothing there yet', async () => {
     const read = vi.spyOn(api, 'doc')
-    render(<Editor docId="idea-00002-x" draft={TEMPLATE} onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editor docId="idea-00002-x" draft={TEMPLATE} mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={vi.fn()} />)
 
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('id: idea-00001'))
     expect(read).not.toHaveBeenCalled()
@@ -222,7 +222,7 @@ describe('a prefilled buffer', () => {
   it('creates on save and says which document it created', async () => {
     const created = vi.spyOn(api, 'createDoc').mockResolvedValue({ committed: true })
     const onSaved = vi.fn()
-    render(<Editor docId="idea-00002-x" draft={TEMPLATE} onSaved={onSaved} onClose={vi.fn()} />)
+    render(<Editor docId="idea-00002-x" draft={TEMPLATE} mode="source" onMode={vi.fn()} onSaved={onSaved} onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('id: idea-00001'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -238,7 +238,7 @@ describe('a prefilled buffer', () => {
     vi.spyOn(api, 'createDoc').mockRejectedValue(
       new ApiError(409, 'idea-00002-x already exists; refresh the board'),
     )
-    render(<Editor docId="idea-00002-x" draft={TEMPLATE} onSaved={vi.fn()} onClose={vi.fn()} />)
+    render(<Editor docId="idea-00002-x" draft={TEMPLATE} mode="source" onMode={vi.fn()} onSaved={vi.fn()} onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('id: idea-00001'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))

@@ -2,7 +2,6 @@ import {
   Bot,
   Check,
   ChevronDown,
-  CircleHelp,
   GitBranch,
   MessageCircleQuestionMark,
   Pencil,
@@ -13,6 +12,7 @@ import {
 import { type ReactElement, createElement } from 'react'
 import type { FlowStep } from '../../src/config.ts'
 import type { DocNode } from '../../src/docRepository.ts'
+import { AskEntry } from './AskEntry.tsx'
 import type { RelationItem } from './canvasModel.ts'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,9 +38,11 @@ export interface ToolbarProps {
    */
   auditable: boolean
   /**
-   * Whether **this** document already has a session running: no second one may
-   * start on it, whatever kind either is (spec-00003-FR-2). Another document's
-   * session never disables these entries (spec-00001-AC-12.8).
+   * Whether **this** document already has a terminal-form session running: no
+   * second one may start on it (spec-00003-FR-2). An ask is counted by neither
+   * side — it holds no document, so it locks nothing and nothing locks it
+   * (spec-00005-FR-6). Another document's session never disables these entries
+   * either (spec-00001-AC-12.8).
    */
   docBusy: boolean
   /**
@@ -51,6 +53,12 @@ export interface ToolbarProps {
   capReached: boolean
   /** The agents a session may be run by; a single one is not a choice (spec-00001-FR-55). */
   agents: string[]
+  /**
+   * Of those, the ones that declare a headless form — the whole of the ask
+   * entry's choice. None of them declaring one means there is nothing to answer
+   * a question, so the entry is not drawn at all (spec-00005-FR-2, AC-7.4).
+   */
+  askAgents: string[]
   /** The one that will run the next session — the first, until the user picks another. */
   agent?: string
   onPickAgent: (name: string) => void
@@ -59,7 +67,8 @@ export interface ToolbarProps {
   onStatus: (to: string) => void
   onAccept: () => void
   onClarify: () => void
-  onAsk: () => void
+  /** Put the question; what comes back says whether it went (see {@link AskEntry}). */
+  onAsk: (question: string, agent?: string) => Promise<boolean>
   onAudit: () => void
   onAdvance: (targetType: string) => void
 }
@@ -103,7 +112,7 @@ function Disabled({ reason, children }: { reason?: string; children: ReactElemen
  */
 export function Toolbar(props: ToolbarProps) {
   const { node, transitions, nextSteps, relations, clarifiable, auditable, docBusy, capReached } = props
-  const { agents, agent, onPickAgent, onPickRelation } = props
+  const { agents, askAgents, agent, onPickAgent, onPickRelation } = props
   const { onEdit, onStatus, onAccept, onClarify, onAsk, onAudit, onAdvance } = props
   // Why every starting point here is locked, in the two words the concurrency
   // rules speak (spec-00003-FR-2, FR-3). The document's own session wins when
@@ -225,13 +234,25 @@ export function Toolbar(props: ToolbarProps) {
             </Disabled>
           ) : null}
 
-          {/* Asking is not a review action: any status, any type (spec-00001-FR-47). */}
-          <Disabled reason={busy}>
-            <Button variant="ghost" size="sm" onClick={onAsk} disabled={blocked}>
-              <CircleHelp className="size-4" aria-hidden />
-              Ask
-            </Button>
-          </Disabled>
+          {/*
+            Asking is not a review action: any status, any type
+            (spec-00005-AC-1.3). The entry keeps the place it always had and
+            changed what it does — it opens the question input rather than a
+            terminal session (design-00002 §14).
+
+            Of the two concurrency reasons only the cap holds here: an ask takes
+            a session slot like any other kind (spec-00003-FR-3), so at the cap
+            there is nothing to run it and the entry says so; but it holds no
+            document, so this document's own session never locks it
+            (spec-00005-FR-6) — one call per thread is the server's ruling and
+            the expanded row's (FR-7). The draft is keyed by the document, so
+            words written about one node can never be submitted against another.
+          */}
+          {askAgents.length > 0 ? (
+            <Disabled reason={capReached ? CAP_REACHED : undefined}>
+              <AskEntry key={node.id} agents={askAgents} onSubmit={onAsk} disabled={capReached} />
+            </Disabled>
+          ) : null}
 
           {/*
             Audit is the gate before review, so unlike clarify the entry follows

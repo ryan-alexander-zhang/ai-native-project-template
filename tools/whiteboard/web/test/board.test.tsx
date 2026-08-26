@@ -9,7 +9,7 @@ import { ANOMALY_TOKEN, statusColour, statusLabel } from '../src/status.ts'
 import { connectTerminal } from '../src/terminalSocket.ts'
 import { useBoard } from '../src/useBoard.ts'
 import { toast } from 'sonner'
-import { ApiError, type SessionListing, api } from '../src/api.ts'
+import { ApiError, type AskThread, type SessionListing, api } from '../src/api.ts'
 import { COLUMN_GAP, NODE_HEIGHT, NODE_WIDTH, ROW_GAP, layoutGraph } from '../src/layout.ts'
 import { toFlowEdges } from '../src/canvasModel.ts'
 
@@ -131,7 +131,7 @@ describe('a node on the canvas', () => {
           onMouseDown={reachedTheNode}
           onKeyDown={reachedTheNode}
         >
-          <NodeCard node={node()} selected={false} session={listing()} onShowSession={vi.fn()} />
+          <NodeCard node={node()} selected={false} sessions={[listing()]} onShowSession={vi.fn()} />
         </div>
       </ReactFlowProvider>,
     )
@@ -150,7 +150,7 @@ describe('a node on the canvas', () => {
   // The marker is not offered a way onto the terminal here, and pressing it is
   // still not an error — a card rendered outside the canvas has no session to show.
   it('takes a press on the marker with nowhere to send it', () => {
-    renderCard({ node: node(), selected: false, session: listing({ awaiting: true }) })
+    renderCard({ node: node(), selected: false, sessions: [listing({ awaiting: true })] })
 
     fireEvent.click(screen.getByLabelText('Awaiting input session of prd-00001-x'))
 
@@ -353,6 +353,17 @@ describe('the layout', () => {
  */
 const GO_TO_SESSION = () => {}
 
+/** One thread of an ask list, as `GET /api/asks/:id` hands it over (design-00001 §10.2). */
+function askThread(id: string): AskThread {
+  return {
+    id,
+    agent: 'claude',
+    exchanges: [
+      { question: 'why?', askedAt: '2026-01-01T00:00:00.000Z', outcome: 'running', runSessionId: 's1' },
+    ],
+  }
+}
+
 describe('the board state', () => {
   beforeEach(() => {
     vi.spyOn(api, 'graph').mockResolvedValue(GRAPH)
@@ -490,6 +501,72 @@ describe('the board state', () => {
   })
 
   /**
+   * The ask list is held by document id (design-00002 §10), and two reads of it
+   * can be in flight at once — a refresh's and a switch's. The answer is only
+   * good for the list it was asked about: a slow one landing last would paint
+   * one document's threads under another document's name.
+   */
+  it('drops an ask list read that lands after the list has moved on', async () => {
+    let releaseFirst!: (threads: AskThread[]) => void
+    vi.spyOn(api, 'asks').mockImplementation((docId) =>
+      docId === 'prd-00001-x'
+        ? new Promise<AskThread[]>((resolve) => {
+            releaseFirst = resolve
+          })
+        : Promise.resolve([askThread('t-idea')]),
+    )
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+
+    // The first document's list is asked for and still in flight; the second's
+    // is asked for and lands.
+    void act(() => void result.current.showAsks('prd-00001-x'))
+    await act(() => result.current.showAsks('idea-00001-x'))
+    expect(result.current.threads.map((one) => one.id)).toEqual(['t-idea'])
+
+    await act(async () => {
+      releaseFirst([askThread('t-prd')])
+      await Promise.resolve()
+    })
+
+    expect(result.current.threads.map((one) => one.id)).toEqual(['t-idea'])
+  })
+
+  /**
+   * The same holding by document id on the way in and on the way down: opening
+   * another document's list starts empty rather than showing the last one's, and
+   * a read that failed leaves nothing painted — an empty list with the reason
+   * said out loud beats another document's threads under this name.
+   */
+  it('starts an ask list empty on a switch, and empties it when the read fails', async () => {
+    let refuseSecond!: (cause: Error) => void
+    vi.spyOn(api, 'asks')
+      .mockResolvedValueOnce([askThread('t-prd')])
+      .mockReturnValueOnce(
+        new Promise<AskThread[]>((_resolve, reject) => {
+          refuseSecond = reject
+        }),
+      )
+    const { result } = renderHook(() => useBoard(GO_TO_SESSION))
+    await waitFor(() => expect(result.current.graph.nodes).toHaveLength(2))
+    await act(() => result.current.showAsks('prd-00001-x'))
+    expect(result.current.threads).toHaveLength(1)
+
+    // The switch itself: the next document's list opens empty, before any answer
+    // about it has come back.
+    void act(() => void result.current.showAsks('idea-00001-x'))
+    await waitFor(() => expect(result.current.threads).toEqual([]))
+
+    await act(async () => {
+      refuseSecond(new Error('no list'))
+      await Promise.resolve()
+    })
+
+    expect(result.current.threads).toEqual([])
+    expect(toast.error).toHaveBeenCalledWith('no list')
+  })
+
+  /**
    * spec-00001-FR-52 as the user sees it (design-00002 §3): the gate's refusal
    * is a list of gaps, and the toast leads with how many there are — the number
    * the user has to work through — before naming them.
@@ -563,11 +640,11 @@ describe('the board state', () => {
   // spec-00003-AC-2.1 — a refused start leaves the running session alone
   it('keeps the session it has when a second start is refused', async () => {
     vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
-    vi.spyOn(api, 'ask').mockRejectedValue(new Error('an agent session is already running'))
+    vi.spyOn(api, 'clarify').mockRejectedValue(new Error('an agent session is already running'))
     const { result } = renderHook(() => useBoard(GO_TO_SESSION))
     await waitFor(() => expect(result.current.shownSession?.id).toBe('s1'))
 
-    await act(() => result.current.startSession(() => api.ask('idea-00001-x')))
+    await act(() => result.current.startSession(() => api.clarify('idea-00001-x')))
 
     expect(result.current.shownSession).toMatchObject({ id: 's1', status: 'running' })
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/already running/))

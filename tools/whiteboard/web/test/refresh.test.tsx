@@ -483,7 +483,7 @@ describe('a board whose channel is down', () => {
 describe('a session that ends with no docs change', () => {
   const RUNNING: SessionListing = {
     id: 's1',
-    kind: 'ask',
+    kind: 'clarify',
     agent: 'claude',
     sourceId: 'spec-00001-x',
     status: 'running',
@@ -494,7 +494,6 @@ describe('a session that ends with no docs change', () => {
   const channel = () => ChannelSocket.opened.find((socket) => socket.url.endsWith('/api/events'))!
 
   const clarify = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' })
-  const ask = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' })
   const advance = () => screen.getByLabelText<HTMLButtonElement>('Advance to the next step')
 
   beforeEach(() => {
@@ -535,7 +534,6 @@ describe('a session that ends with no docs change', () => {
 
     await waitFor(() => expect(within(terminal).getByText('exited')).toBeTruthy(), SETTLED)
     expect(clarify().disabled).toBe(false)
-    expect(ask().disabled).toBe(false)
     expect(advance().disabled).toBe(false)
     expect(screen.queryByRole('button', { name: 'Stop the agent session' })).toBeNull()
   })

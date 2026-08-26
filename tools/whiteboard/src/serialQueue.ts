@@ -16,13 +16,19 @@ export class SerialQueue {
 
   run<T>(key: string, turn: () => T | Promise<T>): Promise<T> {
     const running = (this.tails.get(key) ?? Promise.resolve()).then(turn)
-    this.tails.set(
-      key,
-      running.then(
-        () => {},
-        () => {},
-      ),
+    const chain = running.then(
+      () => {},
+      () => {},
     )
+    this.tails.set(key, chain)
+    // A key whose chain has drained is a key nothing is queued behind: dropping
+    // it keeps the map the size of the work in flight rather than of every key
+    // ever used. The identity check is the whole of the safety — a turn queued
+    // meanwhile has already replaced this tail, and that one is not ours to
+    // delete.
+    void chain.then(() => {
+      if (this.tails.get(key) === chain) this.tails.delete(key)
+    })
     return running
   }
 }

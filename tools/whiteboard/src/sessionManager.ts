@@ -3,7 +3,7 @@ import type { AgentConfig } from './config.ts'
 import type { Expectation } from './advance.ts'
 import type { AskResult } from './askStore.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
-import { type SpawnHeadless, capture, headlessArgs, spawnHeadless } from './headless.ts'
+import { type SpawnHeadless, failureReason, headlessArgs, readCapture, spawnHeadless } from './headless.ts'
 import { writeSessionHistory } from './sessionHistory.ts'
 import { WorkflowError } from './workflow.ts'
 
@@ -395,6 +395,13 @@ export class SessionManager {
         session.stderr += chunk
       })
       child.onExit((event) => this.exit(session, event.exitCode))
+      // A stop that landed between the admission and here found no process to
+      // signal and left only its mark: it is honoured now, or the call would run
+      // on with its session already reading `terminated` (spec-00005-AC-7.6).
+      // After the listeners and not before — a kill this signals may end the
+      // call at once, and an end nobody is listening for is a session that never
+      // wraps up.
+      if (session.stopping) session.kill()
     } catch (cause) {
       // A seam that throws leaves a session admitted with no process, no way to
       // signal it and no exit to come: it would hold its slot for good and a
@@ -842,12 +849,23 @@ export class SessionManager {
    * stopped call is neither (spec-00005-FR-3, FR-7).
    */
   private async landAnswer(session: Session, endedAt: string): Promise<void> {
-    const answered = session.info.status === 'exited' && session.info.exitCode === 0
-    const captured = answered ? capture(session.stdout) : undefined
+    const zero = session.info.status === 'exited' && session.info.exitCode === 0
+    // Read the way this agent declared it should be, rather than the one way the
+    // code happens to hold (design-00001 §10.1).
+    const reading = session.agent.headless!.capture
+    const captured = zero ? readCapture(reading, session.stdout) : undefined
+    const outcome = session.info.status === 'terminated' ? 'terminated' : captured ? 'answered' : 'failed'
     try {
       await this.options.onAskEnd?.(session.plan, {
-        outcome: session.info.status === 'terminated' ? 'terminated' : captured ? 'answered' : 'failed',
+        outcome,
         answer: captured?.answer,
+        // A failed question says why on the thread: «exited 0» is the process's
+        // honest story and says nothing about the question, which is the story
+        // the ask list tells (spec-00005-FR-7, design-00001 §10.3).
+        reason:
+          outcome === 'failed'
+            ? failureReason(reading, session.stdout, session.stderr, session.info.exitCode ?? 1)
+            : undefined,
         resumeId: captured?.resumeId,
         resumed: session.plan.resumeId !== undefined,
       })

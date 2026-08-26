@@ -269,8 +269,10 @@ export class Board {
     // fails would otherwise leave a session running with no process to come
     // (design-00001 §10.2 写序).
     let admitted: string | undefined
+    /** The thread the record went on, once it has: what a rollback has to land. */
+    let opened: string | undefined
     try {
-      const opened = await this.asks.open(docId, { question, threadId, resend }, (thread) => {
+      const started = await this.asks.open(docId, { question, threadId, resend }, (thread) => {
         const info = this.sessions.start(
           this.docs.askPlan(docId, question, thread),
           // A follow-up runs the agent its thread was opened with: a resume id
@@ -278,12 +280,24 @@ export class Board {
           thread.exchanges.length === 0 ? agent : thread.agent,
         )
         admitted = info.id
+        opened = thread.id
         return info
       })
-      this.sessions.launch(opened.admitted.id)
-      return { sessionId: opened.admitted.id, threadId: opened.thread.id }
+      this.sessions.launch(started.admitted.id)
+      return { sessionId: started.admitted.id, threadId: started.thread.id }
     } catch (cause) {
-      if (admitted) this.sessions.abandon(admitted, (cause as Error).message)
+      const message = (cause as Error).message
+      if (admitted) this.sessions.abandon(admitted, message)
+      // The record is written after the slot is taken, so a failure past that
+      // point leaves the question `running` on disk with nothing to answer it —
+      // and a thread with a running question refuses every submit, so it would
+      // be shut until a restart reconciled it (spec-00005-FR-7, AC-5.3). It
+      // lands `failed` here instead, resendable at once. `resumed: false`
+      // deliberately: no CLI was ever asked, so nothing was refused and the
+      // thread's continuation is not in doubt (design-00001 §10.2).
+      if (admitted && opened !== undefined) {
+        await this.asks.finish(docId, opened, { outcome: 'failed', resumed: false, reason: message })
+      }
       throw cause
     }
   }

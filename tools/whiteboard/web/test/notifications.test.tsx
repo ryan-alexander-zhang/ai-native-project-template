@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
-import { type SessionListing, api } from '../src/api.ts'
+import { type AskThread, type SessionListing, api } from '../src/api.ts'
 import { BLOCKED } from '../src/notify.ts'
 
 // Rendering the whole board and pushing a refresh through it is heavier than the
@@ -545,13 +545,13 @@ describe('being called back to a session that is waiting', () => {
     await push()
     served = [
       listing({ id: 's1', sourceId: 'prd-00001-x', awaiting: true }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x', awaiting: true }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x', awaiting: true }),
     ]
     await push()
 
     expect(Notice.made).toHaveLength(2)
     expect(Notice.made.map((notice) => notice.options.tag?.split(':')[0])).toEqual(['s1', 's2'])
-    expect(Notice.made[1]!.title).toBe('ask · idea-00001-x')
+    expect(Notice.made[1]!.title).toBe('audit · idea-00001-x')
   })
 
   /**
@@ -770,7 +770,7 @@ describe('clicking a notification', () => {
     enabled()
     serve([
       listing({ id: 's1', sourceId: 'prd-00001-x' }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ])
     await openBoard()
     // The board came up on the newest running session, which is the other one.
@@ -779,7 +779,7 @@ describe('clicking a notification', () => {
 
     served = [
       listing({ id: 's1', sourceId: 'prd-00001-x', awaiting: true }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ]
     await push()
     await click(Notice.made[0]!)
@@ -798,18 +798,18 @@ describe('clicking a notification', () => {
     enabled()
     serve([
       listing({ id: 's1', sourceId: 'prd-00001-x' }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ])
     await openBoard()
     await leave()
     served = [
       listing({ id: 's1', sourceId: 'prd-00001-x', awaiting: true }),
-      listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' }),
+      listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' }),
     ]
     await push()
     expect(Notice.made).toHaveLength(1)
 
-    served = [listing({ id: 's2', kind: 'ask', sourceId: 'idea-00001-x' })]
+    served = [listing({ id: 's2', kind: 'audit', sourceId: 'idea-00001-x' })]
     await push()
     await click(Notice.made[0]!)
 
@@ -994,5 +994,134 @@ describe('what a notification carries', () => {
     expect(Notice.made).toHaveLength(2)
     expect(Notice.made[0]!.closed).toBe(0)
     expect(Notice.made[1]!.closed).toBe(0)
+  })
+})
+
+/**
+ * The ask half of the notification path (spec-00005). An ask ends like any other
+ * session and is announced the same way; where its click leads is what differs —
+ * there is no terminal to show, so it goes to the thread that call answered
+ * (spec-00005-FR-9).
+ */
+describe('the notification of an ask', () => {
+  const ASK = listing({ id: 's9', kind: 'ask', sourceId: 'prd-00001-x' })
+  const THREAD: AskThread = {
+    id: 't-1',
+    agent: 'claude',
+    exchanges: [
+      {
+        question: 'why is this still a draft?',
+        askedAt: '2026-02-01T09:00:00.000Z',
+        outcome: 'answered',
+        answer: 'it has open questions',
+        answeredAt: '2026-02-01T09:05:00.000Z',
+        runSessionId: 's9',
+      },
+    ],
+  }
+
+  /** The one notification a case has posted, clicked as the user would click it. */
+  async function click(notice: Notice) {
+    await act(async () => void notice.onclick?.())
+    await settle()
+  }
+
+  beforeEach(() => {
+    vi.spyOn(api, 'asks').mockResolvedValue([THREAD])
+    vi.spyOn(api, 'doc').mockResolvedValue({ path: 'prd/a.md', content: '# X\n\nbody\n', hash: 'hash-1' })
+  })
+
+  /**
+   * spec-00005-AC-6.6 — the switch is in effect and the page is away: the ask's
+   * end is announced through the one existing path, and the notice carries the
+   * kind, the document id and the state and nothing else (spec-00004-FR-6).
+   */
+  it('announces the end of an ask like any other session', async () => {
+    enabled()
+    serve([ASK])
+    await openBoard()
+    await leave()
+
+    served = [{ ...ASK, status: 'exited', exitCode: 0 }]
+    await push()
+
+    expect(Notice.made).toHaveLength(1)
+    expect(Notice.made[0]!.title).toBe('ask · prd-00001-x')
+    expect(Notice.made[0]!.options.body).toBe('exited')
+    expect(content(Notice.made[0]!)).not.toContain(SECRET)
+  })
+
+  /**
+   * spec-00005-AC-9.2 — the editor is open on the text with edits that are not
+   * saved: the click puts the ask list on show and locates the thread, and the
+   * buffer is untouched — the view state changed, not the document
+   * (design-00002 §14).
+   */
+  it('opens the located thread and leaves the unsaved buffer alone', async () => {
+    enabled()
+    serve([ASK])
+    const save = vi.spyOn(api, 'save').mockResolvedValue({ committed: true })
+    await openBoard()
+    fireEvent.click(screen.getByTestId('node-prd-00001-x'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy())
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await waitFor(() => expect(screen.getByTestId('editor-host').textContent).toContain('body'))
+    await userEvent.click(screen.getByTestId('editor-host').querySelector('.cm-content')!)
+    await userEvent.keyboard('edited ')
+    await leave()
+
+    served = [{ ...ASK, status: 'exited', exitCode: 0 }]
+    await push()
+    await click(Notice.made[0]!)
+
+    // The list is on show with that thread open, ready to be asked again.
+    await waitFor(() => expect(screen.getByLabelText('Follow-up question on t-1')).toBeTruthy())
+    expect(screen.queryByLabelText('Agent session')).toBeNull()
+    // And the buffer is exactly what it was: switching back and saving proves it.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Source' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(save).toHaveBeenCalledWith('prd-00001-x', expect.stringContaining('edited '), 'hash-1')
+  })
+
+  /**
+   * spec-00005-AC-9.4 — the ask's document has left the board, so there is no
+   * editor for its list to live in: the click says so and the view does not move
+   * (the list itself is still on disk, spec-00005-FR-5).
+   */
+  it('refuses and leaves the view alone when the document has left the board', async () => {
+    enabled()
+    serve([{ ...ASK, sourceId: 'gone-00009-x' }])
+    await openBoard()
+    await leave()
+
+    served = [{ ...ASK, sourceId: 'gone-00009-x', status: 'exited', exitCode: 0 }]
+    await push()
+    await click(Notice.made[0]!)
+
+    expect(toast.error).toHaveBeenCalledWith('no document gone-00009-x on the board')
+    expect(screen.queryByRole('tab', { name: 'Questions' })).toBeNull()
+    expect(screen.queryByLabelText('Agent session')).toBeNull()
+  })
+
+  /**
+   * spec-00005-AC-9.5 — the service restarted, so the ask the notice was about is
+   * not in the listing any more: the click is refused out loud and nothing opens.
+   */
+  it('refuses and leaves the view alone when the session is gone', async () => {
+    enabled()
+    serve([ASK])
+    await openBoard()
+    await leave()
+
+    served = [{ ...ASK, status: 'exited', exitCode: 0 }]
+    await push()
+    expect(Notice.made).toHaveLength(1)
+
+    served = []
+    await push()
+    await click(Notice.made[0]!)
+
+    expect(toast.error).toHaveBeenCalledWith('no session s9 on the board')
+    expect(screen.queryByRole('tab', { name: 'Questions' })).toBeNull()
   })
 })

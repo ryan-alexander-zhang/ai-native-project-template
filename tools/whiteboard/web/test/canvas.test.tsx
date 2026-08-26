@@ -931,26 +931,8 @@ describe('the board', () => {
 
     fireEvent.click(screen.getByTestId('node-idea-00001-x'))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Clarify' })).toBeNull()
-  })
-
-  // spec-00001-AC-47.1 as the user sees it — any type, any status
-  it('starts an ask session from the toolbar and opens the terminal', async () => {
-    stubWebSocket()
-    const ask = vi
-      .spyOn(api, 'ask')
-      .mockImplementation(async () => starts(listing({ kind: 'ask', sourceId: 'idea-00001-x' })))
-    render(<Board />)
-    await waitFor(() => expect(screen.getByTestId('node-idea-00001-x')).toBeTruthy())
-    fireEvent.click(screen.getByTestId('node-idea-00001-x'))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
-
-    await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
-
-    expect(ask).toHaveBeenCalledWith('idea-00001-x', undefined)
-    await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
-    vi.unstubAllGlobals()
   })
 
   // spec-00001-AC-50.1 as the user sees it — one press on a draft spec, and the
@@ -984,13 +966,14 @@ describe('the board', () => {
 
     fireEvent.click(screen.getByTestId('node-spec-00001-x'))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Audit' })).toBeNull()
   })
 
-  // spec-00003-AC-2.4 at the board: this document has a session running, so its
-  // own entries offer to start none.
-  it('disables the three session entries while a session is running', async () => {
+  // spec-00003-AC-2.4 at the board: this document has a terminal-form session
+  // running, so its own entries offer to start none. Asking is not among them —
+  // it holds no document (spec-00005-FR-6, asserted in ask.test.tsx).
+  it('disables the session entries while a session is running', async () => {
     stubWebSocket()
     vi.spyOn(api, 'sessions').mockResolvedValue([listing()])
     render(<Board />)
@@ -1000,7 +983,6 @@ describe('the board', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Clarify' })).toBeTruthy())
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clarify' }).disabled).toBe(true)
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Ask' }).disabled).toBe(true)
     expect(screen.getByLabelText<HTMLButtonElement>('Advance to the next step').disabled).toBe(true)
     vi.unstubAllGlobals()
   })
@@ -1024,7 +1006,9 @@ describe('the board', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Open the session panel' }))
     const rows = await screen.findByRole('list', { name: 'Agent sessions' })
-    await userEvent.click(within(rows).getByRole('button'))
+    // The row itself: a running session's row carries its own stop beside it
+    // (spec-00005-FR-7).
+    await userEvent.click(within(rows).getAllByRole('button')[0]!)
 
     await waitFor(() => expect(screen.getByLabelText('Agent session')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'Stop the agent session' })).toBeTruthy()
