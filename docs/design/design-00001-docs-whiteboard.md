@@ -2,7 +2,7 @@
 id: design-00001-docs-whiteboard
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads]
 ---
 
 # Design: Docs 白板 MVP
@@ -545,7 +545,7 @@ stateDiagram-v2
   **治理轮（spec-00002）加第三项，已由领域负责人裁定**：**全局覆盖率视图打开
   期间**，同一次刷新一并重取 `GET /api/coverage`；视图未打开时**不取**——它是
   最重的一次读取，没人在看就不该跑。三份载荷共用同一条通路，覆盖率视图因此
-  没有自己的刷新机制。后果按 §10 的既有规则落位：行随刷新重新推导，计数当场
+  没有自己的刷新机制。后果按 design-00002 §10 的既有规则落位：行随刷新重新推导，计数当场
   更新（`spec-00002-AC-10.4`）；一份已被删除的文档**整行消失**——这就是「就近
   关闭」用在视图行上（并入 `spec-00001-FR-44` 族）；展开态按**文档 id** 保持
   （`spec-00002-AC-11.5`），所指文档没了则该展开态一并消失。`spec-00002-AC-12.5`
@@ -579,13 +579,14 @@ GET  /api/docs/:id/next-steps         → [{type, carry}]
 GET  /api/sessions                    → {sessions: [{id, kind, sourceId, agent, status, awaiting, startedAt, endedAt?, exitCode?}]}   # 全部会话：运行中 + 本次服务启动以来已结束——会话面板与重连发现的数据源（FR-21、spec-00003-FR-4/FR-9；第十六轮由 {current|null} 改列表）。sourceId 即目标文档 id（沿 SessionInfo 既有字段名，落地时对齐）。status ∈ running|exited|failed|terminated——terminated 第十六轮新增，承载面板与历史的「终止」态（spec-00003-FR-4）；上限只随 /api/config 下发，不在此重复（FR-56 的单一来源原则）
 POST /api/sessions                    {sourceId, targetType, agent?} → {sessionId} | 409 {error, reason: doc-busy|cap-reached|doc-missing} | 422 未知 agent（FR-55）   # 409 的 reason 四个发起端点同形（spec-00003-FR-2/FR-3 的「原因可区分」由它承载）；同文档互斥与上限并存时取 doc-busy（更具体者，spec FR-49 的悬停文案同序）   # 推进会话；任务指令正文单独写入（不带提交字节），提交键为会话首批输出后延迟发出的独立 `\r`（再延迟补发一次；空输入框回车幂等）——同一突发里的 `\r` 会被 cooked 模式的 ICRNL 翻回 LF 或被粘贴检测吞掉（issue-00011）
 POST /api/sessions/clarify            {docId, agent?}              → {sessionId} | 409 同文档已有会话/已达上限/文档已删 | 422 非 draft/非可澄清类型/未知 agent   # 澄清会话（FR-9，第八轮；agent 第十一轮；并发 409 第十六轮）
-POST /api/sessions/ask                {docId, agent?}              → {sessionId} | 409 同文档已有会话/已达上限/文档已删 | 422 异常文档/未知 agent   # 答疑会话（FR-47，第八轮）
+POST /api/sessions/ask                {docId, question, agent?, threadId?} → {sessionId, threadId} | 409 {error, reason: thread-busy|cap-reached|doc-missing}（thread-busy 优先，同 sessions 行「更具体者先」的约定） | 422 异常文档/未知 agent/agent 未声明 headless/问题为空   # 答疑线程调用（spec-00005-FR-1/FR-2/FR-7，第二十一轮改造；原终端答疑形态 FR-47 退役）。无 threadId = 新线程（headless 首调）；带 threadId = 该线程追问或失败/终止问的重发——形态按 §10.2（有 resumeId 走 resume，无则 first）。**无 doc-busy 分支**——答疑不占文档（spec-00005-FR-6）；agent 缺省 = 声明了 headless 的第一条（FR-55 口径按 spec-00005-FR-2 收窄）
+GET  /api/asks/:id                    → {threads}                   # 问题列表（spec-00005-FR-5/FR-9 的数据源）：读 .whiteboard/asks/<docId>.json 与注册表运行态合成，exchange 带 runSessionId（§10.3 反查）；无列表时 {threads: []}。id 形态先校验（沿会话历史的文件名守卫口径）再作路径；不挂 /api/docs/:id/ 下——列表脱离文档存续（文档删除后仍可寻址），与 /api/create 避开路由重叠同例
 POST /api/sessions/audit              {docId, agent?}              → {sessionId} | 409 同文档已有会话/已达上限/文档已删 | 422 非 draft/非可审计类型/异常文档/未知 agent   # 审计会话（FR-50/FR-51，第十轮）
 GET  /api/create?type=<t>             → {idPrefix, template} | 422 非入口类型   # 新建预填：取号 + 模板，不写盘（FR-53；独立路径避开 /api/docs/:id 的路由重叠）
 POST /api/docs                        {id, content}                → 201 {committed} | 409 id 已存在 | 422 非入口类型/id 不合分配前缀或 slug 非法   # 新建的保存（FR-53，第十一轮）：保存才建档——写盘 + commit wb(create)，与 FR-4/FR-5 同一条写管道的创建分支；此后修订走既有 PUT
 GET  /api/sessions/history            → [{id, kind, docId, agent, startedAt, endedAt, status, exitCode?}]   # 历史会话列表（FR-54，第十一轮），读 .whiteboard/sessions/；status/exitCode 沿用会话状态词汇（exited/failed/terminated——第十六轮增，元数据落盘时记下终止，重启后「退出状态」仍如实呈现）
 GET  /api/sessions/history/:id        → {meta, transcript}         # 单条元数据 + 转写全文（FR-54；meta 读 <会话 id>.json，transcript 读 <会话 id>.log）
-DELETE /api/sessions/:id              → 200 | 404 该会话不存在或非运行中（已 exited/failed——重复终止同 404，不二次 commit；逐会话判定，spec-00003-FR-5）   # 终止指定会话（FR-49，issue-00010；第十六轮加会话标识，原无标识形态废止）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界
+DELETE /api/sessions/:id              → 200 | 404 该会话不存在或非运行中（已 exited/failed——重复终止同 404，不二次 commit；逐会话判定，spec-00003-FR-5）   # 终止指定会话（FR-49，issue-00010；第十六轮加会话标识，原无标识形态废止）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界。ask 会话同端点同语义，升级阶梯为第二 seam 自持的 SIGTERM→宽限→SIGKILL（§10.3，第二十一轮）
 WS   /api/terminal?sessionId=<id>     双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正；第十六轮加 sessionId——终端接入指定会话，尺寸帧只随呈现中的会话连接到达，未呈现的会话自然无帧，spec-00003-FR-5）
 WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。三个来源：docs/ 变更（watcher），会话收尾——**无论有无 commit**（FR-12/issue-00013，触发源由此真正共用一条通路），以及等待标志的翻转（onAwaitingChange → watcher.signal，只在标志真变时广播——重复信号因此不重播，spec-00003-FR-6；第十八轮据实补记，spec-00004-FR-2 的「置位经刷新到达页面」依赖它）。同批多会话收尾只广播一次（spec-00003-FR-8，第十六轮）
 GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）；max_sessions 随配置下发（spec-00003-FR-4 的「运行中数/上限」，第十六轮）
@@ -664,7 +665,9 @@ commit 信息格式：`wb(<action>): <doc-id>`，action ∈
 `edit | status | accept | clarify | advance | ask | audit | create`（spec FR-14 的"指明
 动作与文档 id"——AC-14.x 的中文动作词「澄清/答疑」由这些英文 key 承载，
 与既有「接收=accept」同一约定；`clarify` 第八轮起是会话 commit，不再是评审
-写回；`audit` 第十轮加入，其 commit 由 spec AC-50.3 承载）。
+写回；`audit` 第十轮加入，其 commit 由 spec AC-50.3 承载；`ask` 第二十一轮
+起不再产生——答疑无 commit（spec-00005-FR-4，`spec-00001-FR-14` 的答疑
+半句属其修订轮移除），动作词保留以读历史）。
 
 前端的呈现与交互（着色、检索与定位、面板、控件）见
 [design-00002-whiteboard-ui](design-00002-whiteboard-ui.md)；其中检索与定位由
@@ -701,6 +704,171 @@ spec-00001-FR-26、FR-27 承接。
 `spec-00002` 覆盖的两条范围外事项、以及把「id 唯一」写进 `docs/README.md`，
 已由 `spec-00002` §1 指给 plan 轮。
 
-## 10. Open Questions
+## 10. 答疑线程——headless 通路（第二十一轮）
 
-- 本文档当前无未决项。
+承载 `spec-00005` 的服务端侧；取舍全部在案于 `decision-00012`。答疑不再
+起 PTY：一次调用是一个被捕获输出的子进程，一个问题是一条独立会话，
+追问 resume 它。界面侧见 design-00002 §14。
+
+### 10.1 headless 声明（流程配置扩展，spec-00005-FR-8）
+
+`agents` 条目新增**可选**键 `headless`，示例（写进模板自带配置前须过
+10.2 的实测门）：
+
+```yaml
+agents:
+  claude:
+    command: claude
+    args: []
+    cwd: docs
+    headless:
+      first:  [-p, --output-format, json, --permission-mode, plan, "{question}"]
+      resume: [-p, --output-format, json, --permission-mode, plan, --resume, "{session}", "{question}"]
+      capture: claude-json
+```
+
+**上面示例的全部 claude 参数是意向而非已验证事实**（与 §3 写权限约束
+同一纪律）。进入模板自带配置前须实测四项，任一不成立即改声明或改
+capture 内建：① `-p --output-format json` 的 stdout 是单个 JSON 对象；
+② 回答与接续标识的字段名确为 `.result` 与 `.session_id`；③ `--resume`
+接受该值并延续上下文；④ 只读成立——指令要求 agent 改一个 `docs/`
+文件，调用结束后文件不变（`spec-00005-AC-4.2` 的实测形）。未通过不进
+默认配置。
+
+- 校验（并入既有 FR-15 启动校验，违规拒绝启动并点名条目，
+  `spec-00005-AC-8.1`）：`first` 与 `resume` 皆为非空字符串数组；
+  `{question}` 占位在两者中各恰出现一次；`{session}` 在 `resume` 中恰
+  出现一次、在 `first` 中不得出现；`capture` 必须是代码内建集合中的
+  名字（与可澄清类型集同一「代码内建、配置引用」模式）。`headless`
+  缺失 = 该 agent 不进答疑可选集（不校验其余键）。
+- **capture 口径**（接续标识与回答从哪来，spec-00005 §5 委给本节）：
+  内建集合现只有 `claude-json`——回答 = `.result`（纯文本，无控制
+  序列——`spec-00005-FR-3` 的剥离由 capture 层承担：`claude-json`
+  天然满足，将来的文本型 capture 在此层剥离），接续标识 =
+  `.session_id`。stdout 解析失败视同失败态（非零退出同型处置）。
+- **只读旗标（spec-00005-FR-4/AC-4.2）**：claude 取
+  `--permission-mode plan`——预期机制是 print 模式下无人可批准写盘、
+  计划模式的写申请无从放行；该预期属上方实测门第 ④ 项，不作既成
+  事实引用。
+- **`{question}` 携带什么（spec-00005-FR-1/FR-2 的落点）**：**首调**
+  替换为「答疑指令 + 问题文本」整段——指令由 `sessionTasks` 的
+  `askInstruction` 改写而来：保留目标文档路径与全部关系文档路径的
+  上下文行，性质说明改为只读（删去 "Revise documents…" 半句，代之以
+  「回答问题，不修改任何文件」），问题文本附于其后；**接续**只替换为
+  追问文本（`spec-00005-AC-2.1`）。`SessionPlan.instruction` 对 ask
+  的语义随之是「argv 载荷」而非「首笔 PTY 输入」。
+- 命令构造：`command` + headless 声明数组逐项做占位替换后 spawn——
+  **不拼接条目的 `args`**（那是交互形态的参数集，交互旗标误入 print
+  调用逐 CLI 后果不明，headless 声明自持完整旗标）。spawn 走与
+  `SpawnPty` 并列的**第二个注入 seam**（`child_process`，非 pty；
+  `cwd` 沿用条目的 `cwd`），其 kill 升级自持（§10.3）。整段指令作为
+  单个 argv 元素传入，不经 shell——无转义面。
+
+### 10.2 问题列表存储（spec-00005-FR-5）
+
+- 位置：`.whiteboard/asks/<docId>.json`（与 `.whiteboard/sessions/` 的
+  会话历史同侧，仓库 `.gitignore` 既有的 `.whiteboard/` 排除覆盖之，
+  `spec-00005-AC-5.2`）。
+- 形态（一文档一文件；`resumeId` 是 **CLI 的接续标识**——不叫
+  `sessionId`，那个词全文属注册表会话）：
+
+  ```json
+  {
+    "docId": "spec-00005-whiteboard-ask-threads",
+    "threads": [
+      {
+        "id": "t-<取号顺序号>",
+        "agent": "claude",
+        "resumeId": "<capture 出的接续标识，首答成功后回填>",
+        "exchanges": [
+          { "question": "…", "askedAt": "<ISO>",
+            "answer": "…", "answeredAt": "<ISO>",
+            "outcome": "answered",
+            "runSessionId": "<该次调用的注册表会话 id>" }
+        ]
+      }
+    ]
+  }
+  ```
+
+  `outcome ∈ running | answered | failed | terminated`，exchange 的
+  生命周期：
+
+  ```mermaid
+  stateDiagram-v2
+    [*] --> running: 受理通过，先落盘再 spawn
+    running --> answered: 零退出且 capture 出回答
+    running --> failed: 非零退出 / stdout 解析失败 / 启动核销
+    running --> terminated: 面板终止 / 服务正常关停
+    failed --> running: 重发（就地改写该条）
+    terminated --> running: 重发（就地改写该条）
+  ```
+
+- **写序（受理先于落盘，落盘先于 spawn）**：受理链 = 文档校验 → 线程
+  串行判定（该 threadId 有 `running` exchange 即拒） → 上限记账；
+  **全部通过后**才以 `running` 追加（或就地改写）exchange，随后
+  spawn——受理拒绝不碰文件（`spec-00005-AC-6.4`），而落盘先于 spawn
+  是启动核销的前提：崩溃时内存里的记录没有意义。结束时回填
+  `answer/answeredAt/outcome/runSessionId`，首答成功另回填 `resumeId`。
+- **写串行**：同 docId 的一切读-改-写（提交追加、收尾回填、启动核销）
+  与 threadId 取号走**逐 docId 一条串行队列**（与 §4 的 commit 串行
+  队列同型、彼此独立——commit 队列本轮明文不管答疑，§10.3）；写盘经
+  临时文件 + rename 原子替换。无此队列，同文档并行线程（
+  `spec-00005-AC-6.3` 明文要求）的两次收尾会互相吞写。
+- **只增不删计的是「问」**（`spec-00005-FR-3`）：失败/终止问的重发
+  **就地改写同一条 exchange** 的字段，不新增不删除——失败问无回答
+  可丢，`spec-00005-AC-7.5` 的「既有问答完好」指其余各条。
+- **重发的形态分两种**：线程尚无 `resumeId`（首问失败/终止）→ first
+  形态、新会话；线程已有 `resumeId` 的追问重发 → resume 形态，接续
+  保留（一律开 first 会切断线程上下文，违 `spec-00005-FR-2`）。
+  **CLI 拒绝既有 `resumeId` 时（域主裁定，2026-08-26，原 §11
+  OQ-1 取 (b)）**：该追问记失败态、可重发（`spec-00005-FR-7` 照旧
+  ——重发仍以该 `resumeId` 走 resume 再试，**不静默换新会话**），
+  线程同时标注「接续已失效」；失效线程禁的是**新追问**（界面侧引导
+  另开新问，design-00002 §14），一次重发成功即清除标注。
+- **启动核销（spec-00005-AC-5.3）**：服务启动扫一遍 `asks/` 目录，
+  `running` 的 exchange 一律改写为 `failed`——注册表空态起步
+  （`spec-00003-FR-9`），磁盘上不许有幽灵进行中。
+- **正常关停（spec-00005-AC-5.4）**：既有关停路径（§5 关停收尾）对
+  ask 会话同样逐个终止，exchange 记 `terminated`；历史照落，无 commit。
+- 文档删除或改 id：文件保留、不回收；graph 上无该 id 时前端自然无处
+  呈现（`spec-00005-FR-5`，回收属范围外）。追问与重发按 threadId
+  寻址文件内的线程。
+
+### 10.3 注册表第二形态（spec-00005-FR-6/FR-7）
+
+kind=ask 的会话进同一注册表，差异逐条：
+
+- **受理**：跳过「目标文档无运行中会话」检查，且**非 ask 的受理在数
+  该文档运行中会话时忽略 ask 会话**（两个方向都不占，
+  `spec-00005-AC-6.1`/`AC-6.2`）；总上限照记账（`spec-00003-FR-3`）；
+  线程内串行由存储层判定（该 threadId 有 `running` exchange 即 409）。
+- **等待判定**：两通路均不武装（不设静默计时、不做 OSC 777 识别）——
+  `awaiting` 恒缺席（`spec-00005-AC-6.5`）。
+- **终端**：无缓冲、无 attach——`WS /api/terminal?sessionId=<ask>` 拒绝
+  连接（`spec-00005-AC-7.7` 的接入/输入/尺寸三拒此一处全断：输入与
+  尺寸帧只在该 WS 上存在）。
+- **终止**：`DELETE /api/sessions/:id` 照常——对第二 seam 的子进程走
+  自持的信号升级（SIGTERM→宽限→SIGKILL，issue-00012 的机制平移；无
+  SIGHUP 语义——那是 pty seam 的阶梯），exchange 记 `terminated`
+  （`spec-00005-AC-7.6`）。
+- **收尾**（exit/终止/失败，恰一次——§5 的「`pty.onExit` 只触发一次」
+  对 ask 读作第二 seam 的 exit 回调，保证同型）：capture 解析 → 存储
+  回填 → 历史落盘（`.json` 元数据照旧；`.log` 转写 = 捕获的回答文本，
+  无可解析回答时 = 捕获的 stdout/stderr 原文，`spec-00005-AC-5.5`）→
+  **无快照、无 commit、不进 commit 串行队列**（`spec-00005-FR-4`）→
+  `/api/events` 广播照常。
+- **刷新重取扩一项**（§6 与 design-00002 §10 的重取清单）：问题列表
+  视图打开期间，前端刷新一并重取 `GET /api/asks/:id`；未打开不取——
+  与覆盖率视图同一口径。无此项，`running → answered` 的翻转永远到不了
+  页面（`spec-00005-AC-3.3` 依赖它）。
+- **会话与线程的反查**：`/api/sessions` 载荷不加字段（kind=ask 即
+  headless 形态，终端答疑已退役）；面板行与通知只持注册表会话 id，
+  前端由 `sourceId` 取 `GET /api/asks/:id`、按 exchange 的
+  `runSessionId` 反查线程——design-00002 §14 的定位由此可实现。
+
+## 11. Open Questions
+
+- 本文档当前无未决项（第二十一轮的取舍全部由 decision-00012 在案；
+  接续失效的出路已由域主裁定取「诚实标注」并回写 §10.2，2026-08-26；
+  claude headless 声明的参数按 §10.1 的实测门落地）。
