@@ -60,4 +60,7 @@ unreferenced rule row is an unverified rule.
 
 ## Note
 
-Records are time-based and evidence-based.
+Records are time-based and evidence-based. A record, once accepted (`active`),
+is evidence: it is not revised — corrections and later findings go into a new
+record (which may `verifies` the same items). No writing path — manual edit,
+the revision round, or a co-write session — exempts this.

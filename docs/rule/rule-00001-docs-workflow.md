@@ -2,7 +2,7 @@
 id: rule-00001-docs-workflow
 type: rule
 status: active
-informs: [spec-00001-docs-whiteboard]
+informs: [spec-00001-docs-whiteboard, spec-00006-whiteboard-co-write]
 ---
 
 # Rule: docs 工作流
@@ -12,7 +12,8 @@ informs: [spec-00001-docs-whiteboard]
 
 ## 1. Applicability
 
-- Applies to: `docs/**/*.md` 中带 id front matter 的文档的状态、评审与阶段推进。
+- Applies to: `docs/**/*.md` 中带 id front matter 的文档的状态、评审、写作
+  动作与阶段推进。
 - Does not apply to: 各文件夹的 `README.md` 与 `TEMPLATE.md`、repo 根部的规范
   文档（`DOCUMENT.md` 等）。
 
@@ -26,6 +27,7 @@ informs: [spec-00001-docs-whiteboard]
 | 终态 | 不再允许任何流转的状态 |
 | 下一步候选 | 从某类型文档可直接推进出的下一阶段文档类型 |
 | 交付范围 | 一个 plan 声明的、其完成所须验证的需求条目集合（见 BR-24） |
+| 落地写入 | 共写会话收束时随该次 commit 进入仓库的文件变更（见 BR-30） |
 
 ## 3. Rules
 
@@ -81,9 +83,10 @@ Hit policy: `UNIQUE`
   `rule`、`design` 五种类型——承载意图与决策的文档才有业务问题可问；其余类型
   承载事实、结果或执行，不适用。On violation: 澄清被拒绝。
 - **rule-00001-BR-21** (Definition) 答疑：就一份文档提出问题以理解其内容，
-  可就同一问题追问；只读——不修订文档，修订走编辑、推进或澄清；不是评审
-  动作，适用于任意类型与任意状态，不改变文档状态。（第二十一轮改写为只读
-  形态，`decision-00012`；原「按对话结论修订文档」半句随终端答疑退役移除。）
+  可就同一问题追问；只读——不修订文档，修订走编辑、推进、澄清、审计或
+  共写（BR-28，`decision-00015` 增）；不是评审动作，适用于任意类型与任意状态，
+  不改变文档状态。（第二十一轮改写为只读形态，`decision-00012`；原「按对话
+  结论修订文档」半句随终端答疑退役移除。）
 - **rule-00001-BR-22** (Definition) 审计：与接收、澄清并列的第三种评审动作
   ——由未撰写该文档的一方对照其类型文件夹的 README 审查结构与文法，再审内容
   本身；缺失的规则、用例与 GWT、未经确认的读数、无法确认的值，未决者逐条
@@ -112,7 +115,8 @@ Hit policy: `UNIQUE`
   `prompt`、`report`（`decision-00014` 增，补齐出生通路）——idea 与 prd
   是产品流的起点（项目从 idea 进入产品流，或跳过 idea 直接从 prd 开始，
   `docs/README.md` 的既有约定）；其余八种在产品流（BR-13…BR-17）中不是
-  任何类型的下一步候选，无推进通路可走，入口是它们唯一的出生方式：
+  任何类型的下一步候选，无推进通路可走，入口是它们的出生方式（`reference`
+  另可由共写会话新建，BR-30）：
   design 与 analysis 承载先于任何 spec 的思考（design 的 `informs` 可留空
   待拾取、analysis 的 `parent` 可为空——各自文件夹 README 的既有约定）；
   decision 以 `motivated_by` 回指促成它的文档，新建时无来源可指则按
@@ -126,6 +130,22 @@ Hit policy: `UNIQUE`
   关系：推进来的带、新建的不带。
 - **rule-00001-BR-27** (Constraint) 非入口类型不得新建——它们经产品流推进
   （BR-13…BR-17）产生，携带指回来源的关系。On violation: 新建被拒绝。
+- **rule-00001-BR-28** (Definition) 共写：对一份文档发起的多轮协作写作
+  会话——agent 按用户在对话中给出的意图与材料，起草或改写该文档内容
+  （写域边界见 BR-30）；适用于任意类型；不是评审动作，不改变文档状态。
+  材料的给法：对话中粘贴、报仓内文档 id、给仓库外绝对路径或 URL（仓外
+  读取的授权由所选 CLI 承载，见 `spec-00006-FR-7`）。会话之间的载体只有
+  文档本身，材料不构成会话间记忆——材料价值经正文或 `reference` 文档
+  沉淀，落地形态见 `spec-00006-FR-1`。（`decision-00015` 增。）
+- **rule-00001-BR-29** (Constraint) 共写只可对 `draft` 文档、或 `open`
+  状态的 work item 发起——`active` 的 living doc 须先经修订轮（BR-3）
+  转回 `draft`；`resolved`、`wontfix` 与 `archived` 的文档不可共写。
+  On violation: 发起被拒绝。
+- **rule-00001-BR-30** (Constraint) 共写会话的落地写入仅限目标文档与新建
+  的 `reference` 文档——新建 `reference` 按 BR-26 的新建语义产生（id 按
+  BR-18 取号、正文自 `reference` 模板起草、初始 status 为 `draft`）；
+  目标文档 front matter 的 `id` 与 `status` 不得改动。On violation:
+  越界写入不得落地，其余在域内的写入照常落地。
 
 ## 4. Acceptance (GWT)
 
@@ -378,7 +398,57 @@ Hit policy: `UNIQUE`
   Given 任意仓库状态
   When 请求新建一个 `spec`（非入口类型）
   Then 新建被拒绝
+- **rule-00001-AC-28.1** (rule-00001-BR-28)
+  Given 一份 `draft` 的 decision 文档
+  When 对它发起共写并在对话中给出修改意图
+  Then 会话按意图改写其正文，状态仍为 `draft`
+- **rule-00001-AC-28.2** (rule-00001-BR-28)
+  Given 一份 `open` 的 plan 文档
+  When 对它发起共写并在对话中给出修改意图
+  Then 会话按意图改写其正文，状态仍为 `open`
+- **rule-00001-AC-28.3** (rule-00001-BR-28)
+  Given 发起共写时以粘贴文本、仓内文档 id、仓库外 URL 各给一份材料
+  When 会话启动并完成仓外授权
+  Then 三份材料均进入会话的任务输入
+- **rule-00001-AC-29.1** (rule-00001-BR-29)
+  Given 一份 `draft` 的 report 文档
+  When 发起共写
+  Then 共写成立
+- **rule-00001-AC-29.2** (rule-00001-BR-29)
+  Given 一份 `open` 的 issue 文档
+  When 发起共写
+  Then 共写成立
+- **rule-00001-AC-29.3** (rule-00001-BR-29)
+  Given 一份 `active` 的 design 文档
+  When 发起共写
+  Then 发起被拒绝
+- **rule-00001-AC-29.4** (rule-00001-BR-29)
+  Given 一份 `resolved` 的 task 文档
+  When 发起共写
+  Then 发起被拒绝
+- **rule-00001-AC-30.1** (rule-00001-BR-30)
+  Given 一个共写会话的产出改写了目标文档并新建了一份合式的 `reference`
+  文档
+  When 会话收束落地
+  Then 两份写入均落地
+- **rule-00001-AC-30.2** (rule-00001-BR-30)
+  Given 一个共写会话的产出试图写入目标之外的另一份既有文档
+  When 会话收束落地
+  Then 该越界写入不落地，目标文档的域内写入照常落地
+- **rule-00001-AC-30.3** (rule-00001-BR-30)
+  Given 一个共写会话的产出试图新建一份非 `reference` 类型的文档
+  When 会话收束落地
+  Then 该新建不落地
+- **rule-00001-AC-30.4** (rule-00001-BR-30)
+  Given 一个共写会话新建的 `reference` 的 id 未按 BR-18 取号（与既有 id
+  冲突）
+  When 会话收束落地
+  Then 该 `reference` 不落地，域内其余写入照常落地
+- **rule-00001-AC-30.5** (rule-00001-BR-30)
+  Given 一个共写会话的产出改动了目标文档 front matter 的 `status`
+  When 会话收束落地
+  Then 该改动不落地，正文改动照常落地
 
 ## Links
 
-- Consumed by: spec-00001-docs-whiteboard
+- Consumed by: spec-00001-docs-whiteboard、spec-00006-whiteboard-co-write
