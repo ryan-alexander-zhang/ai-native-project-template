@@ -23,8 +23,12 @@ export interface Expectation {
  * own README, said in the instruction rather than only linked, because the
  * board parses the body against it and reports what drifts (FR-40). A type
  * with no item grammar has no entry, and the instruction says nothing.
+ *
+ * Shared with the cowrite instruction (spec-00006-FR-1), which restates the same
+ * grammar for the same reason — one wording, so the two sessions cannot be told
+ * different things about the type they are both writing.
  */
-const ITEM_GRAMMAR: Record<string, string[]> = {
+export const ITEM_GRAMMAR: Record<string, string[]> = {
   spec: [
     'Requirement items take one of two shapes, each starting its own line:',
     '  a list item `- **spec-<n>-FR-<i>** (<EARS type>) <text>`, its continuation lines indented; or',

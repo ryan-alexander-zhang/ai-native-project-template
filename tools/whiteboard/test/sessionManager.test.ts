@@ -959,3 +959,229 @@ describe('attach', () => {
     expect(manager.whenFinished('nope')).resolves.toBeUndefined()
   })
 })
+
+/**
+ * The fifth kind in the registry (spec-00006-FR-1, design-00001 §11): the same
+ * pty seam, the same concurrency rules, the same wrap-up — what is its own is the
+ * content baseline it takes, the deferred start the create form needs, and the
+ * hand-edit note (spec-00006-FR-5).
+ */
+describe('cowrite sessions', () => {
+  const COWRITE: SessionPlan = {
+    kind: 'cowrite',
+    sourceId: 'prd-00001-x',
+    instruction: 'write this document with the owner',
+    cowrite: { targetPath: 'prd/a.md', preId: 'prd-00001-x', preStatus: 'draft' },
+  }
+
+  /** A manager on a stand-in pty that records what is spawned and everything written into it. */
+  function recording(contentSnapshot?: () => Map<string, string | null>) {
+    const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
+    const written: string[] = []
+    const exits: Array<(exitCode: number) => void> = []
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: ['--interactive'], cwd: 'docs' }],
+      maxSessions: 3,
+      repoRoot,
+      contentSnapshot,
+      spawn: (command, args, cwd) => {
+        spawned.push({ command, args, cwd })
+        const listeners: Array<(event: { exitCode: number }) => void> = []
+        exits.push((exitCode) => {
+          for (const listener of listeners) listener({ exitCode })
+        })
+        return {
+          onData: () => {},
+          onExit: (listener) => void listeners.push(listener),
+          write: (data) => void written.push(data),
+          resize: () => {},
+          kill: () => {},
+        }
+      },
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    return { manager, spawned, written, exit: (index = 0, exitCode = 0) => exits[index]!(exitCode) }
+  }
+
+  /**
+   * design-00001 §11.2's ordering: the slot is taken with no process behind it, so
+   * the caller can file the document in between — and the cap has already ruled
+   * (spec-00006-AC-2.6).
+   */
+  it('takes the slot without spawning anything, and spawns only when the terminal is launched', () => {
+    const { manager, spawned, written } = recording()
+
+    const info = manager.startDeferred(COWRITE)
+
+    expect(info.status).toBe('running')
+    expect(spawned).toEqual([])
+    expect(manager.list()).toHaveLength(1)
+
+    manager.launchTerminal(info.id)
+
+    expect(spawned).toHaveLength(1)
+    expect(written).toEqual([COWRITE.instruction])
+  })
+
+  /**
+   * spec-00006-AC-7.1's testable server half (design-00001 §11.1): the entry's own
+   * interactive argv, spawned unchanged — no permission-bypass flag is appended,
+   * because the whole point is that the CLI keeps asking the user.
+   */
+  // spec-00006-AC-7.1
+  it('spawns the agent entry’s interactive form unchanged, with no flag of its own added', () => {
+    const { manager, spawned } = recording()
+
+    manager.start(COWRITE)
+
+    expect(spawned[0]!.args).toEqual(['--interactive'])
+  })
+
+  // The content baseline of design-00001 §11.3: taken at the start, for this kind
+  // alone, and carried on the plan the exit hook is handed.
+  it('reads the content snapshot at the start and hands it on the plan', () => {
+    const snapshot = new Map<string, string | null>([['docs/idea/b.md', 'inherited dirt\n']])
+    const { manager } = recording(() => snapshot)
+    const plan = { ...COWRITE }
+
+    manager.start(plan)
+
+    expect(plan.contentBaseline).toBe(snapshot)
+  })
+
+  it('takes no content snapshot for the other kinds', () => {
+    const contentSnapshot = vi.fn(() => new Map<string, string | null>())
+    const { manager } = recording(contentSnapshot)
+
+    manager.start(planFor('audit', 'spec-00001-a'))
+
+    expect(contentSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('reads an empty baseline when no content snapshot was wired in', () => {
+    const { manager } = recording()
+    const plan = { ...COWRITE }
+
+    manager.start(plan)
+
+    expect(plan.contentBaseline).toEqual(new Map())
+  })
+
+  // spec-00006-FR-10's reading: the lock is the running session, nothing else
+  it('reports the document as being cowritten only while the session runs', () => {
+    const { manager, exit } = recording()
+
+    manager.start(COWRITE)
+
+    expect(manager.isCowriting('prd-00001-x')).toBe(true)
+    expect(manager.isCowriting('prd-00002-other')).toBe(false)
+
+    exit()
+
+    expect(manager.isCowriting('prd-00001-x')).toBe(false)
+  })
+
+  // spec-00003-FR-2 with the fifth kind in its enumeration (spec-00006 §1)
+  it('is exclusive with the other terminal kinds on the same document', () => {
+    const { manager } = recording()
+    manager.start(COWRITE)
+
+    expect(refusalOf(() => manager.start(planFor('clarify', 'prd-00001-x'))).reason).toBe('doc-busy')
+    expect(refusalOf(() => manager.start({ ...COWRITE })).reason).toBe('doc-busy')
+  })
+
+  // spec-00006-AC-5.1's server half: the note rides ahead of the frame, once
+  it('writes the hand-edit note ahead of the next printable frame, and only once', () => {
+    const { manager, written } = recording()
+    const info = manager.start(COWRITE)
+
+    manager.noteHandEdit('prd-00001-x')
+    manager.write(info.id, 'have another look')
+    manager.write(info.id, 'and again')
+
+    expect(written).toEqual([
+      COWRITE.instruction,
+      '[用户已手改目标文档，动笔前须重读] ',
+      'have another look',
+      'and again',
+    ])
+  })
+
+  /**
+   * spec-00006-AC-5.3 (the issue-00011 class): an arrow key, a bare Enter, an
+   * Escape and an OSC report are no place to splice text into — the note waits,
+   * and the frame goes through untouched.
+   */
+  // spec-00006-AC-5.3
+  it('defers the note past a control-only frame without consuming it', () => {
+    const { manager, written } = recording()
+    const info = manager.start(COWRITE)
+
+    manager.noteHandEdit('prd-00001-x')
+    for (const frame of ['\x1b[A', '\r', '\x1b', '\x1b]11;rgb:0/0/0\x07', '\x03']) manager.write(info.id, frame)
+
+    expect(written).toEqual([COWRITE.instruction, '\x1b[A', '\r', '\x1b', '\x1b]11;rgb:0/0/0\x07', '\x03'])
+
+    manager.write(info.id, '/continue')
+
+    expect(written.at(-2)).toBe('[用户已手改目标文档，动笔前须重读] ')
+    expect(written.at(-1)).toBe('/continue')
+  })
+
+  // spec-00006-AC-5.2 — the note dies with the session, the hand edit having landed
+  // in its own edit commit already
+  it('lets the note die with a session the user never typed into again', async () => {
+    const { manager, written, exit } = recording()
+    const info = manager.start(COWRITE)
+
+    manager.noteHandEdit('prd-00001-x')
+    exit()
+    await manager.whenFinished(info.id)
+
+    expect(written).toEqual([COWRITE.instruction])
+  })
+
+  it('has nowhere to put a note for a document no cowrite session is running on', () => {
+    const { manager, written } = recording()
+    const info = manager.start(planFor('audit', 'spec-00001-a'))
+
+    manager.noteHandEdit('spec-00001-a')
+    manager.write(info.id, 'typing')
+
+    expect(written).toEqual(['audit spec-00001-a', 'typing'])
+  })
+
+  /**
+   * The first exemption of design-00001 §11.3: the still-running sessions'
+   * baselines. The session that is collapsing has already ended, so it is not
+   * among them and exempts nothing of its own (spec-00006-AC-6.5).
+   */
+  it('hands over the baselines of the sessions that are still running', () => {
+    const first = new Map([['docs/idea/b.md', 'digest-1']])
+    const second = new Map([['docs/prd/a.md', 'digest-2']])
+    const snapshots = [first, second]
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
+      maxSessions: 3,
+      repoRoot,
+      snapshot: () => snapshots.shift() ?? new Map(),
+      spawn: () => ({
+        onData: () => {},
+        onExit: () => {},
+        write: () => {},
+        resize: () => {},
+        kill: () => {},
+      }),
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+
+    manager.start(planFor('advance', 'idea-00001-a'))
+    manager.start({ ...COWRITE })
+
+    expect(manager.runningBaselines()).toEqual([first, second])
+  })
+})

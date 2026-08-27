@@ -370,6 +370,22 @@ export function frontMatterId(content: string): string | undefined {
   }
 }
 
+/**
+ * The status a raw file declares, read the way {@link frontMatterId} reads the id
+ * — before the file is a document in the graph. The editor's cowrite guard
+ * compares this against what is on disk: `id` and `status` are one partition, and
+ * a whole-file overwrite is how a save could move either of them behind the
+ * status lock (spec-00006-FR-10, design-00001 §11.4).
+ */
+export function frontMatterStatus(content: string): string | undefined {
+  try {
+    const { status } = matter(content).data as { status?: unknown }
+    return typeof status === 'string' ? status : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function findNode(graph: DocGraph, id: string): DocNode | undefined {
   return graph.nodes.find((node) => node.id === id)
 }

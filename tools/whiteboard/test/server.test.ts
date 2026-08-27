@@ -3343,3 +3343,465 @@ describe('ask threads', () => {
     expect(spawned).toHaveLength(1)
   })
 })
+
+/**
+ * The fifth session kind over the HTTP surface (spec-00006-FR-1, FR-2, FR-5 and
+ * FR-10, design-00001 §11.2): one entry in two forms — a document that is already
+ * on disk, and one this very request files first.
+ */
+describe('cowrite sessions', () => {
+  const DRAFT_INTEGRATION = doc({ id: 'integration-00001-cli', type: 'integration', status: 'draft' }, '# CLI\n')
+  const IDEA_TEMPLATE = '---\nid: idea-00000-slug\ntype: idea\nstatus: draft\n---\n\n# Title\n'
+  const HOLD = ['-e', 'setTimeout(() => {}, 5000)']
+
+  /** A stand-in pty that records what was spawned and everything written into it. */
+  function pens() {
+    const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
+    const written: string[] = []
+    const exits: Array<(exitCode: number) => void> = []
+    const spawn: SpawnPty = (command, args, cwd) => {
+      spawned.push({ command, args, cwd })
+      const listeners: Array<(event: { exitCode: number }) => void> = []
+      let gone = false
+      const end = (exitCode: number) => {
+        if (gone) return
+        gone = true
+        for (const listener of listeners) listener({ exitCode })
+      }
+      exits.push(end)
+      return {
+        onData: () => {},
+        onExit: (listener) => void listeners.push(listener),
+        write: (data) => void written.push(data),
+        resize: () => {},
+        kill: () => end(0),
+      }
+    }
+    return { spawn, spawned, written, exit: (index = 0, exitCode = 0) => exits[index]!(exitCode) }
+  }
+
+  /** A board whose flow config declares the types a cowrite round is about. */
+  function cowriteBoard(
+    files: Record<string, string>,
+    options: { args?: string[]; spawn?: SpawnPty; maxSessions?: number; second?: string[] } = {},
+  ) {
+    const { repoRoot, docsDir } = makeRepo(files)
+    const config = testConfig()
+    Object.assign(config.types, { reference: 'living', integration: 'living', report: 'living' })
+    config.agents[0] = { ...config.agents[0]!, args: options.args ?? ['-e', ''] }
+    if (options.second) config.agents.push({ name: 'second', command: 'node', args: options.second, cwd: 'docs' })
+    if (options.maxSessions !== undefined) config.maxSessions = options.maxSessions
+    return boardOnRepo(repoRoot, docsDir, config, options.spawn ?? spawnPty)
+  }
+
+  // spec-00006-AC-1.1 — the session starts, and the instruction carries the scope
+  it('starts a cowrite session on a draft integration document and tells it what it may write', async () => {
+    const { spawn, written } = pens()
+    const { call, board } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION }, { spawn })
+
+    const { status, body } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+
+    expect(status).toBe(200)
+    expect(body.docId).toBe('integration-00001-cli')
+    expect(board.sessions.latest()).toMatchObject({
+      id: body.sessionId,
+      kind: 'cowrite',
+      sourceId: 'integration-00001-cli',
+      status: 'running',
+    })
+    expect(written[0]).toContain('integration/cli.md')
+    expect(written[0]).toContain('integration/README.md')
+    expect(written[0]).toContain('never its front matter id or status line')
+    expect(written[0]).toContain('reference/TEMPLATE.md')
+  })
+
+  // spec-00006-AC-1.3 — the agent choice of spec-00001-FR-55, on the fifth kind
+  it('runs the second configured agent when the request names it', async () => {
+    const { spawn, spawned } = pens()
+    const { call } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION }, { spawn, second: ['--second'] })
+
+    const { status } = await call('POST', '/api/sessions/cowrite', {
+      docId: 'integration-00001-cli',
+      agent: 'second',
+    })
+
+    expect(status).toBe(200)
+    expect(spawned[0]!.args).toEqual(['--second'])
+  })
+
+  it('answers 422 for an unknown agent and starts nothing', async () => {
+    const { call, board } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION })
+
+    const { status } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli', agent: 'nope' })
+
+    expect(status).toBe(422)
+    expect(board.sessions.latest()).toBeNull()
+  })
+
+  // spec-00006-AC-3.1 and AC-3.2 over the entry: the materials reach the task input
+  // rule-00001-AC-28.3
+  it('carries every kind of material into the first task input', async () => {
+    const { spawn, written } = pens()
+    const { call } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION, 'idea/a.md': DRAFT_IDEA }, { spawn })
+
+    await call('POST', '/api/sessions/cowrite', {
+      docId: 'integration-00001-cli',
+      materials: {
+        text: 'the owner pasted this',
+        docIds: ['idea-00001-x'],
+        paths: ['/Users/owner/case.md'],
+        urls: ['https://example.test/case'],
+      },
+    })
+
+    expect(written[0]).toContain('the owner pasted this')
+    expect(written[0]).toContain('idea-00001-x at idea/a.md')
+    expect(written[0]).toContain('/Users/owner/case.md')
+    expect(written[0]).toContain('https://example.test/case')
+  })
+
+  // spec-00006-AC-3.3
+  it('starts the session with no materials segment when none was given', async () => {
+    const { spawn, written } = pens()
+    const { call } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION }, { spawn })
+
+    expect((await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })).status).toBe(200)
+    expect(written[0]).not.toContain('The materials the owner gave you')
+  })
+
+  it('answers 422 for a request that names neither a document nor a create, or both', async () => {
+    const { call, board } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION })
+
+    for (const request of [{}, { docId: 'integration-00001-cli', create: { type: 'idea', slug: 'both' } }]) {
+      const { status, body } = await call('POST', '/api/sessions/cowrite', request)
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/either the docId/)
+    }
+    expect(board.sessions.latest()).toBeNull()
+  })
+
+  it('answers 422 for materials that are not text and lists of strings', async () => {
+    const { call } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION })
+
+    for (const materials of [{ text: 7 }, { urls: 'https://example.test' }, { docIds: [7] }]) {
+      expect((await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli', materials })).status).toBe(422)
+    }
+  })
+
+  it('answers 422 for a create that names no type and slug, and for a docId that is not one', async () => {
+    const { call } = cowriteBoard({})
+    expect((await call('POST', '/api/sessions/cowrite', { create: {} })).status).toBe(422)
+    expect((await call('POST', '/api/sessions/cowrite', { docId: 7 })).status).toBe(422)
+  })
+
+  /**
+   * The other half of spec-00006-FR-2's all or nothing: a write that fails leaves
+   * no half-filed document behind, and the slot it had taken goes straight back
+   * (spec-00003-AC-3.7).
+   */
+  it('files nothing and holds no slot when the document cannot be written to disk', async () => {
+    const { call, board, docsDir } = cowriteBoard({ 'idea/TEMPLATE.md': IDEA_TEMPLATE })
+    chmodSync(join(docsDir, 'idea'), 0o500)
+
+    const { status } = await call('POST', '/api/sessions/cowrite', { create: { type: 'idea', slug: 'co-written' } })
+
+    chmodSync(join(docsDir, 'idea'), 0o700)
+    expect(status).toBe(500)
+    expect(existsSync(join(docsDir, 'idea/idea-00001-co-written.md'))).toBe(false)
+    expect(board.sessions.list()).toMatchObject([{ kind: 'cowrite', status: 'failed' }])
+  })
+
+  // spec-00006-AC-9.1 over the entry — the refusal is the reception's, not the UI's
+  it('answers 422 for an active document and starts nothing', async () => {
+    const { call, board } = cowriteBoard({ 'idea/a.md': ACTIVE_IDEA })
+
+    const { status, body } = await call('POST', '/api/sessions/cowrite', { docId: 'idea-00001-x' })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/rule-00001-BR-29/)
+    expect(board.sessions.latest()).toBeNull()
+  })
+
+  // spec-00006-AC-2.1 — confirm and the document is filed, committed, and cowritten
+  it('files the document from its template, commits it, and starts the session on it', async () => {
+    const { spawn, written } = pens()
+    const { call, board, repoRoot, docsDir } = cowriteBoard({ 'idea/TEMPLATE.md': IDEA_TEMPLATE }, { spawn })
+
+    const { status, body } = await call('POST', '/api/sessions/cowrite', {
+      create: { type: 'idea', slug: 'co-written' },
+    })
+
+    expect(status).toBe(200)
+    expect(body.docId).toBe('idea-00001-co-written')
+    expect(readFileSync(join(docsDir, 'idea/idea-00001-co-written.md'), 'utf8')).toContain('id: idea-00001-co-written')
+    expect(lastCommitMessage(repoRoot)).toBe('wb(create): idea-00001-co-written')
+    expect(board.sessions.latest()).toMatchObject({ kind: 'cowrite', sourceId: 'idea-00001-co-written' })
+    expect(written[0]).toContain('idea/idea-00001-co-written.md')
+  })
+
+  // spec-00006-AC-2.2, AC-2.3 and AC-2.4 — any one of the three refuses the whole thing
+  it('files nothing and starts nothing when the slug, the type or the id refuses the create', async () => {
+    const { call, board, repoRoot, docsDir } = cowriteBoard({
+      'idea/TEMPLATE.md': IDEA_TEMPLATE,
+      'idea/idea-00001-taken.md': '# no front matter at all\n',
+    })
+    const commits = commitCount(repoRoot)
+
+    for (const [create, expected] of [
+      [{ type: 'idea', slug: 'Not A Slug' }, 422],
+      [{ type: 'spec', slug: 'not-an-entry-type' }, 422],
+      [{ type: 'idea', slug: 'taken' }, 409],
+    ] as const) {
+      expect((await call('POST', '/api/sessions/cowrite', { create })).status).toBe(expected)
+    }
+    expect(board.sessions.list()).toEqual([])
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(existsSync(join(docsDir, 'idea/idea-00002-taken.md'))).toBe(false)
+  })
+
+  /**
+   * The create's **commit** failing is not the same as its write failing
+   * (spec-00006-FR-2 by way of spec-00001-FR-20): the document is on disk, so it
+   * can be cowritten — the session goes ahead and the error rides along.
+   */
+  it('keeps the document and starts the session when the create commit fails', async () => {
+    const { spawn } = pens()
+    const { call, board, repoRoot, docsDir } = cowriteBoard({ 'idea/TEMPLATE.md': IDEA_TEMPLATE }, { spawn })
+    // A lock left behind is the ordinary way a git write fails from underneath the
+    // board: no index can be taken while it is there.
+    const lock = join(repoRoot, '.git/index.lock')
+    writeFileSync(lock, '')
+
+    const { status, body } = await call('POST', '/api/sessions/cowrite', {
+      create: { type: 'idea', slug: 'co-written' },
+    })
+
+    rmSync(lock)
+    expect(status).toBe(200)
+    expect(body.error).toMatch(/index\.lock/)
+    expect(existsSync(join(docsDir, 'idea/idea-00001-co-written.md'))).toBe(true)
+    expect(board.sessions.latest()).toMatchObject({ kind: 'cowrite', status: 'running' })
+  })
+
+  // spec-00006-AC-2.5 — the blank mode is untouched: the template prefills the
+  // editor, the save files the document, and no session starts
+  it('leaves the blank create path exactly as it was', async () => {
+    const { call, board, repoRoot } = cowriteBoard({ 'idea/TEMPLATE.md': IDEA_TEMPLATE })
+
+    const prefill = await call('GET', '/api/create?type=idea')
+    expect(prefill.body.idPrefix).toBe('idea-00001-')
+    const created = await call('POST', '/api/docs', {
+      id: 'idea-00001-by-hand',
+      content: IDEA_TEMPLATE.replace('idea-00000-slug', 'idea-00001-by-hand'),
+    })
+
+    expect(created.status).toBe(201)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(create): idea-00001-by-hand')
+    expect(board.sessions.list()).toEqual([])
+  })
+
+  // spec-00006-AC-2.6 — the cap refuses before anything is filed
+  it('files no document when the session cap refuses the create', async () => {
+    const { call, board, repoRoot, docsDir } = cowriteBoard(
+      { 'idea/TEMPLATE.md': IDEA_TEMPLATE, 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }) },
+      { args: HOLD, maxSessions: 1 },
+    )
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    const commits = commitCount(repoRoot)
+
+    const { status, body } = await call('POST', '/api/sessions/cowrite', {
+      create: { type: 'idea', slug: 'co-written' },
+    })
+
+    expect(status).toBe(409)
+    expect(body.reason).toBe('cap-reached')
+    expect(existsSync(join(docsDir, 'idea/idea-00001-co-written.md'))).toBe(false)
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(board.sessions.list()).toHaveLength(1)
+  })
+
+  // spec-00006-AC-2.7 — the refused create held no slot of its own
+  it('admits the same create once the running session has ended', async () => {
+    const { call, board, docsDir } = cowriteBoard(
+      { 'idea/TEMPLATE.md': IDEA_TEMPLATE, 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }) },
+      { args: HOLD, maxSessions: 1 },
+    )
+    const { body: audit } = await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    expect((await call('POST', '/api/sessions/cowrite', { create: { type: 'idea', slug: 'co-written' } })).status).toBe(409)
+
+    await call('DELETE', `/api/sessions/${audit.id}`)
+    const { status, body } = await call('POST', '/api/sessions/cowrite', { create: { type: 'idea', slug: 'co-written' } })
+
+    expect(status).toBe(200)
+    expect(body.docId).toBe('idea-00001-co-written')
+    expect(existsSync(join(docsDir, 'idea/idea-00001-co-written.md'))).toBe(true)
+    expect(board.sessions.latest()!.kind).toBe('cowrite')
+  })
+
+  // spec-00006-AC-10.1 and AC-10.3 — the status lock, and the editor bypass closed
+  it('refuses a status change, an accept and an identity-moving save while the session runs', async () => {
+    const { call } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION }, { args: HOLD })
+    await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    const { body: opened } = await call('GET', '/api/docs/integration-00001-cli')
+
+    for (const [path, request] of [
+      ['/api/docs/integration-00001-cli/status', { to: 'active' }],
+      ['/api/docs/integration-00001-cli/review', { action: 'accept' }],
+    ] as const) {
+      const { status, body } = await call('POST', path, request)
+      expect(status).toBe(409)
+      expect(body.reason).toBe('doc-busy')
+    }
+    const save = await call('PUT', '/api/docs/integration-00001-cli', {
+      content: opened.content.replace('status: draft', 'status: active'),
+      baseHash: opened.hash,
+    })
+
+    expect(save.status).toBe(409)
+    expect(save.body.reason).toBe('doc-busy')
+  })
+
+  // spec-00006-AC-10.2 — the lock is the session, so the gates rule as usual after it
+  it('evaluates the review gate as usual once the cowrite session has ended', async () => {
+    const { call, board } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION })
+    const { body: started } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished(started.sessionId)
+
+    const { status, body } = await call('POST', '/api/docs/integration-00001-cli/review', { action: 'accept' })
+
+    expect(status).toBe(200)
+    expect(body.status).toBe('active')
+  })
+
+  /**
+   * spec-00006-AC-10.4 and AC-5.1: the body-only save lands as its own edit
+   * commit, and the note it leaves rides ahead of the owner's next printable
+   * frame (design-00001 §11.4). The frame goes in the way the terminal socket
+   * puts it in — `sessions.write` is that handler's own call.
+   */
+  // spec-00006-AC-5.1
+  it('commits a body-only save and hands its note to the next printable frame', async () => {
+    const { spawn, written } = pens()
+    const { call, board, repoRoot } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION }, { spawn })
+    const { body: started } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    const { body: opened } = await call('GET', '/api/docs/integration-00001-cli')
+
+    const save = await call('PUT', '/api/docs/integration-00001-cli', {
+      content: `${opened.content}the owner typed this\n`,
+      baseHash: opened.hash,
+    })
+    board.sessions.write(started.sessionId, 'look again please')
+
+    expect(save.status).toBe(200)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(edit): integration-00001-cli')
+    expect(written.at(-2)).toBe('[用户已手改目标文档，动笔前须重读] ')
+    expect(written.at(-1)).toBe('look again please')
+  })
+
+  // spec-00006-AC-5.2 — the hand edit landed in its own commit; the collapse adds none
+  it('makes no collapse commit for a session whose only change was the owner’s own save', async () => {
+    const { spawn, exit } = pens()
+    const { call, board, repoRoot } = cowriteBoard({ 'integration/cli.md': DRAFT_INTEGRATION }, { spawn })
+    const { body: started } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    const { body: opened } = await call('GET', '/api/docs/integration-00001-cli')
+    await call('PUT', '/api/docs/integration-00001-cli', {
+      content: `${opened.content}the owner typed this\n`,
+      baseHash: opened.hash,
+    })
+    const commits = commitCount(repoRoot)
+
+    exit()
+    await board.sessions.whenFinished(started.sessionId)
+
+    expect(commitCount(repoRoot)).toBe(commits)
+    expect(board.sessions.latest()!.outcome).toMatchObject({ docId: 'integration-00001-cli', committed: false })
+  })
+
+  /**
+   * spec-00006-AC-8.1 and AC-6.1 end to end, on a real agent process: the target
+   * and the well-formed reference land in one commit named for the kind and the
+   * document, and the rewrite of another document is put back
+   * (rule-00001-AC-30.1, AC-30.2).
+   */
+  // spec-00006-AC-8.1
+  // rule-00001-AC-28.1
+  it('commits the target and its new reference in one commit, restoring what fell outside', async () => {
+    const { call, board, repoRoot, docsDir } = cowriteBoard(
+      { 'integration/cli.md': DRAFT_INTEGRATION, 'idea/a.md': DRAFT_IDEA },
+      {
+        args: [
+          '-e',
+          `const fs = require('fs');
+           fs.appendFileSync('integration/cli.md', '\\nwritten together\\n');
+           fs.mkdirSync('reference', { recursive: true });
+           fs.writeFileSync('reference/reference-00001-cases.md', ${JSON.stringify(
+             doc({ id: 'reference-00001-cases', type: 'reference', status: 'draft' }, '# Cases\n'),
+           )});
+           fs.appendFileSync('idea/a.md', '\\nout of scope\\n');`,
+        ],
+      },
+    )
+
+    const { body: started } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    await vi.waitFor(() => expect(board.sessions.latest()!.status).toBe('exited'), SESSION_WAIT)
+    await board.sessions.whenFinished(started.sessionId)
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(cowrite): integration-00001-cli')
+    expect(lastCommitFiles(repoRoot).sort()).toEqual([
+      'docs/integration/cli.md',
+      'docs/reference/reference-00001-cases.md',
+    ])
+    expect(readFileSync(join(docsDir, 'integration/cli.md'), 'utf8')).toContain('status: draft')
+    expect(readFileSync(join(docsDir, 'idea/a.md'), 'utf8')).toBe(DRAFT_IDEA)
+  })
+
+  // spec-00006-AC-8.3 — the commit says nothing about how the session ended
+  it('commits the filtered changes the same way when the owner stops the session mid-write', async () => {
+    const { call, board, repoRoot, docsDir } = cowriteBoard(
+      { 'integration/cli.md': DRAFT_INTEGRATION },
+      {
+        args: [
+          '-e',
+          `require('fs').appendFileSync('integration/cli.md', '\\nhalf a sen');
+           require('fs').mkdirSync('spec', { recursive: true });
+           require('fs').writeFileSync('spec/invented.md', 'out of scope\\n');
+           setTimeout(() => {}, 5000);`,
+        ],
+      },
+    )
+    const { body: started } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    await vi.waitFor(
+      () => expect(readFileSync(join(docsDir, 'integration/cli.md'), 'utf8')).toContain('half a sen'),
+      SESSION_WAIT,
+    )
+
+    await call('DELETE', `/api/sessions/${started.sessionId}`)
+    await board.sessions.whenFinished(started.sessionId)
+
+    expect(board.sessions.latest()!.status).toBe('terminated')
+    expect(lastCommitMessage(repoRoot)).toBe('wb(cowrite): integration-00001-cli')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/integration/cli.md'])
+    expect(existsSync(join(docsDir, 'spec/invented.md'))).toBe(false)
+  })
+
+  // spec-00006-AC-6.5 through the board's own wiring: the running session's
+  // product is left for its own wrap-up
+  it('leaves what another running session wrote to that session', async () => {
+    const { spawn, exit } = pens()
+    const { call, board, repoRoot, docsDir } = cowriteBoard(
+      { 'integration/cli.md': DRAFT_INTEGRATION, 'spec/b.md': doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }) },
+      { spawn },
+    )
+    const { body: started } = await call('POST', '/api/sessions/cowrite', { docId: 'integration-00001-cli' })
+    await call('POST', '/api/sessions/audit', { docId: 'spec-00001-b' })
+    appendFileSync(join(docsDir, 'spec/b.md'), '\nthe audit session wrote this\n')
+    appendFileSync(join(docsDir, 'integration/cli.md'), '\nwritten together\n')
+
+    exit(0)
+    await board.sessions.whenFinished(started.sessionId)
+
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/integration/cli.md'])
+    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toContain('the audit session wrote this')
+  })
+})

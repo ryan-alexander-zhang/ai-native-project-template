@@ -6,7 +6,8 @@ import { auditableTypes } from './auditRules.ts'
 import { AskBusyError, AskStore } from './askStore.ts'
 import { clarifiableTypes } from './clarifyRules.ts'
 import type { FlowConfig } from './config.ts'
-import { ConflictError, DocService, GateError } from './docService.ts'
+import { type CowriteMaterials, REFERENCE_TYPE } from './cowrite.ts'
+import { type ActionResult, ConflictError, DocService, GateError } from './docService.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
 import type { SpawnHeadless } from './headless.ts'
 import { listSessionHistory, readSessionHistory } from './sessionHistory.ts'
@@ -75,6 +76,9 @@ export class Board {
       spawn,
       spawnHeadless,
       snapshot: () => this.docs.snapshotDocs(),
+      // The second, content-holding snapshot a cowrite session takes: its
+      // collapse filter restores what it filters (design-00001 §11.3).
+      contentSnapshot: () => this.docs.contentSnapshotDocs(),
       awaitThresholdMs,
       // A waiting mark going up or coming down is session state, and session
       // state reaches a board the one way all of it does: the refresh signal,
@@ -87,6 +91,10 @@ export class Board {
       onAskEnd: (plan, result) => this.asks.finish(plan.sourceId, plan.threadId!, result),
       onExit: (plan, baseline) => this.finishSession(plan, baseline),
     })
+    // The status lock of spec-00006-FR-10: the registry knows which documents are
+    // being cowritten, the write paths are where the refusal belongs, and this is
+    // the one wire between them (design-00001 §11.4).
+    this.docs.attachCowriteProbe((docId) => this.sessions.isCowriting(docId))
     this.app = this.buildApp(config)
   }
 
@@ -141,6 +149,22 @@ export class Board {
     // terms (spec-00005-AC-4.3). It still comes through here, because this is
     // where the refresh every session's end sends out is hung.
     if (plan.kind === 'ask') return { docId: plan.sourceId, problems: [], committed: false }
+    // A cowrite commits through a filter of its own (spec-00006-FR-6 and FR-8):
+    // only the target document and the well-formed new references land, and every
+    // other change under docs/ is put back. The two readings only the registry can
+    // take go in here — the baselines of the sessions still running, whose
+    // products are exempt from the restore, and the reference numbers they hold
+    // (design-00001 §11.3). It never reaches the branch below: that one stages
+    // whatever moved.
+    if (plan.kind === 'cowrite') {
+      const outcome = await this.docs.commitCowriteChanges(
+        plan,
+        before,
+        this.sessions.runningBaselines(),
+        this.sessions.reservedNumbers(REFERENCE_TYPE),
+      )
+      return { docId: plan.sourceId, problems: outcome.problems, committed: outcome.committed, error: outcome.error }
+    }
     // Clarify and audit were asked for no new document, so there is nothing to
     // check: their commit is named by the kind and carries the document they
     // were about (spec-00001-AC-14.8, AC-50.3).
@@ -202,7 +226,12 @@ export class Board {
     app.get('/api/docs/:id/next-steps', (req, res) => res.json(this.docs.nextSteps(req.params.id)))
 
     app.put('/api/docs/:id', async (req, res) => {
-      res.json(await this.docs.save(req.params.id, req.body.content, req.body.baseHash))
+      const result = await this.docs.save(req.params.id, req.body.content, req.body.baseHash)
+      // The hand-edit note (spec-00006-FR-5): after the save has landed, never
+      // before — a refused save is no hand edit, and the note is about a change
+      // the agent can go and read (design-00001 §11.4).
+      this.sessions.noteHandEdit(req.params.id)
+      res.json(result)
     })
     app.post('/api/docs/:id/status', async (req, res) => {
       res.json(await this.docs.changeStatus(req.params.id, req.body.to))
@@ -239,6 +268,10 @@ export class Board {
     app.post('/api/sessions/audit', (req, res) => {
       res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body)), agentOf(req.body)))
     })
+    // The fifth kind, on one entry in two forms (design-00001 §11.2): a document
+    // that is already on disk, or one this very request files first
+    // (spec-00006-FR-1, FR-2).
+    app.post('/api/sessions/cowrite', async (req, res) => res.json(await this.cowriteSession(req.body)))
     // The way out of a session that will not end by itself (spec-00001-FR-49);
     // the wrap-up it answers with has already run. The session is named, because
     // the stop acts on the one the terminal is showing and the refusal is judged
@@ -300,6 +333,41 @@ export class Board {
       }
       throw cause
     }
+  }
+
+  /**
+   * One cowrite session, on the document the request names or on the one it asks
+   * to be created (spec-00006-FR-1 and FR-2, design-00001 §11.2).
+   *
+   * The create form's order is that section's ruling — the slot **before** the
+   * file: the three create rejections and the agent are judged first, on nothing
+   * but the graph; the slot is taken next, so a cap refusal has written nothing
+   * (spec-00006-AC-2.6) and has taken nothing that outlives it (AC-2.7); the
+   * document is filed after that; and the process starts last. A write that fails
+   * gives the slot back at once, and a **commit** that fails keeps the file and
+   * rides along as an error — the document is on disk, so the session goes ahead
+   * (spec-00001-FR-20).
+   */
+  private async cowriteSession(body: unknown): Promise<{ sessionId: string; docId: string; error?: string }> {
+    const { docId, create, agent, materials } = cowriteRequest(body)
+    const reserved = this.sessions.reservedNumbers(REFERENCE_TYPE)
+    if (docId !== undefined) {
+      const info = this.sessions.start(this.docs.cowritePlan(docId, materials, reserved), agent)
+      return { sessionId: info.id, docId }
+    }
+    const created = this.docs.cowriteCreatePlan(create!.type, create!.slug, materials, reserved)
+    const info = this.sessions.startDeferred(created.plan, agent)
+    let commit: ActionResult
+    try {
+      commit = (await this.docs.createForCowrite(create!.type, create!.slug)).commit
+    } catch (cause) {
+      // Nothing was filed, so nothing is left running on it: the slot goes back
+      // and the refusal is the caller's answer (spec-00006-FR-2's all or nothing).
+      this.sessions.abandon(info.id, (cause as Error).message)
+      throw cause
+    }
+    this.sessions.launchTerminal(info.id)
+    return { sessionId: info.id, docId: created.docId, ...(commit.error === undefined ? {} : { error: commit.error }) }
   }
 
   /** spec-00001-FR-10 and FR-11: only a step the flow config declares may be started. */
@@ -453,6 +521,69 @@ function askRequest(body: unknown): {
     throw new WorkflowError('resend says whether this question replaces the last one, so it is true or false')
   }
   return { docId, question, threadId, resend, agent: agentOf(body as { agent?: unknown }) }
+}
+
+/**
+ * What a cowrite request has to carry (design-00001 §11.2): the document it is
+ * about, **or** the type and slug of one to be created — the two are exclusive,
+ * and neither or both is no request at all. `materials` is optional and is
+ * shape-checked here, so nothing that is not text, ids, paths or URLs reaches the
+ * instruction (spec-00006-FR-3).
+ */
+function cowriteRequest(body: unknown): {
+  docId?: string
+  create?: { type: string; slug: string }
+  agent?: string
+  materials?: CowriteMaterials
+} {
+  const { docId, create, materials } = (body ?? {}) as { docId?: unknown; create?: unknown; materials?: unknown }
+  if (docId !== undefined && typeof docId !== 'string') {
+    throw new WorkflowError('docId names the document to cowrite')
+  }
+  if ((docId === undefined) === (create === undefined)) {
+    throw new WorkflowError('a cowrite names either the docId to write, or the create to file first — one of the two')
+  }
+  return {
+    docId,
+    create: create === undefined ? undefined : createOf(create),
+    agent: agentOf(body as { agent?: unknown }),
+    materials: materialsOf(materials),
+  }
+}
+
+/** The type and slug the create form gives (spec-00006-FR-2); the number is the board's. */
+function createOf(value: unknown): { type: string; slug: string } {
+  const { type, slug } = (value ?? {}) as { type?: unknown; slug?: unknown }
+  if (typeof type !== 'string' || typeof slug !== 'string') {
+    throw new WorkflowError('create needs the type of document to file and the slug of its id')
+  }
+  return { type, slug }
+}
+
+/**
+ * The materials, as the four fields of design-00001 §11.1 and nothing else: the
+ * pasted text a string, the three lists lists of strings. Anything else is
+ * refused rather than dropped — a material the agent will never be told about is
+ * worse than a refusal that says so.
+ */
+function materialsOf(value: unknown): CowriteMaterials | undefined {
+  if (value === undefined || value === null) return undefined
+  const { text, docIds, paths, urls } = (value ?? {}) as Record<string, unknown>
+  if (text !== undefined && typeof text !== 'string') {
+    throw new WorkflowError('materials.text is the text the owner pasted, as one string')
+  }
+  const lists = { docIds, paths, urls }
+  for (const [field, list] of Object.entries(lists)) {
+    if (list !== undefined && (!Array.isArray(list) || list.some((item) => typeof item !== 'string'))) {
+      throw new WorkflowError(`materials.${field} must be a list of strings`)
+    }
+  }
+  return {
+    text,
+    docIds: docIds as string[] | undefined,
+    paths: paths as string[] | undefined,
+    urls: urls as string[] | undefined,
+  }
 }
 
 /**

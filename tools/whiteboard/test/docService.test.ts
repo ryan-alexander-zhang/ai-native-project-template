@@ -3,9 +3,20 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ConflictError, DocService, GateError } from '../src/docService.ts'
 import { contentHash } from '../src/docRepository.ts'
+import { type CommitOutcome, GitLayer } from '../src/gitLayer.ts'
+import { SessionBusyError, type SessionPlan } from '../src/sessionManager.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import { WorkflowError } from '../src/workflow.ts'
-import { commitCount, doc, git, lastCommitFiles, lastCommitMessage, makeRepo, testConfig } from './helpers.ts'
+import {
+  commitCount,
+  cowriteConfig,
+  doc,
+  git,
+  lastCommitFiles,
+  lastCommitMessage,
+  makeRepo,
+  testConfig,
+} from './helpers.ts'
 
 const config = testConfig()
 const DRAFT_PRD = doc({ id: 'prd-00001-x', type: 'prd', status: 'draft' }, '# X\n\nbody\n')
@@ -1511,5 +1522,594 @@ describe('a write addressed by a colliding id', () => {
     })
 
     expect(service.newDocument('idea').idPrefix).toBe('idea-00004-')
+  })
+})
+
+/**
+ * The fifth session kind's own reception (spec-00006-FR-1, FR-2 and FR-9): the
+ * ruling of rule-00001-BR-29, the instruction built from the target as it stands,
+ * and the create form that files its own target.
+ */
+describe('cowritePlan', () => {
+  const DRAFT_REPORT = doc({ id: 'report-00001-r', type: 'report', status: 'draft' }, '# Report\n')
+  const OPEN_ISSUE = doc({ id: 'issue-00001-i', type: 'issue', status: 'open' }, '# Issue\n')
+
+  function cowriteServiceOn(files: Record<string, string>) {
+    const { repoRoot, docsDir } = makeRepo(files)
+    return { repoRoot, docsDir, service: new DocService(repoRoot, docsDir, cowriteConfig()) }
+  }
+
+  // rule-00001-AC-29.1
+  it('builds a plan for a draft report, carrying the target as it stands', () => {
+    const { service } = cowriteServiceOn({ 'report/r.md': DRAFT_REPORT })
+
+    const plan = service.cowritePlan('report-00001-r')
+
+    expect(plan.kind).toBe('cowrite')
+    expect(plan.sourceId).toBe('report-00001-r')
+    expect(plan.cowrite).toEqual({ targetPath: 'report/r.md', preId: 'report-00001-r', preStatus: 'draft' })
+    expect(plan.instruction).toContain('report/README.md')
+  })
+
+  // rule-00001-AC-29.2
+  it('builds a plan for an open work item, and remembers that status as the one to keep', () => {
+    const { service } = cowriteServiceOn({ 'issue/i.md': OPEN_ISSUE })
+
+    expect(service.cowritePlan('issue-00001-i').cowrite!.preStatus).toBe('open')
+  })
+
+  // spec-00006-AC-9.1 — the entry is offered whatever the status is; the refusal is here
+  // rule-00001-AC-29.3
+  it('refuses an active living document and says why', () => {
+    const { service } = cowriteServiceOn({
+      'design/d.md': doc({ id: 'design-00001-d', type: 'design', status: 'active' }, '# Design\n'),
+    })
+
+    expect(() => service.cowritePlan('design-00001-d')).toThrowError(/rule-00001-BR-29/)
+    expect(() => service.cowritePlan('design-00001-d')).toThrowError(/is active/)
+  })
+
+  // spec-00006-AC-9.2
+  // rule-00001-AC-29.4
+  it('refuses a resolved work item', () => {
+    const { service } = cowriteServiceOn({
+      'task/t.md': doc({ id: 'task-00001-t', type: 'task', status: 'resolved' }, '# Task\n'),
+    })
+
+    expect(() => service.cowritePlan('task-00001-t')).toThrowError(WorkflowError)
+  })
+
+  it('refuses an anomalous document', () => {
+    const { service } = cowriteServiceOn({ 'report/broken.md': doc({ id: 'nope', type: 'report', status: 'draft' }) })
+
+    expect(() => service.cowritePlan('nope')).toThrowError(/front matter problems/)
+  })
+
+  // spec-00001-AC-19.3 — the deleted target refuses the fifth kind of start too
+  it('refuses with a doc-missing conflict when the target is gone from disk', () => {
+    const { docsDir, service } = cowriteServiceOn({ 'report/r.md': DRAFT_REPORT })
+    service.graph()
+    rmSync(join(docsDir, 'report/r.md'))
+
+    const refusal = (() => {
+      try {
+        service.cowritePlan('report-00001-r')
+      } catch (error) {
+        return error as ConflictError
+      }
+      throw new Error('the start was admitted')
+    })()
+
+    expect(refusal).toBeInstanceOf(ConflictError)
+    expect(refusal.reason).toBe('doc-missing')
+  })
+
+  // The numbering the instruction offers counts the running sessions' reservations
+  // as taken (spec-00003-FR-1's reading of rule-00001-BR-18).
+  it('starts the reference numbering above the existing and the reserved numbers', () => {
+    const { service } = cowriteServiceOn({
+      'report/r.md': DRAFT_REPORT,
+      'reference/a.md': doc({ id: 'reference-00002-a', type: 'reference', status: 'draft' }, '# A\n'),
+    })
+
+    expect(service.cowritePlan('report-00001-r').instruction).toContain('reference-00003-')
+    expect(service.cowritePlan('report-00001-r', undefined, [7]).instruction).toContain('reference-00008-')
+  })
+
+  it('carries the materials it was given into the instruction', () => {
+    const { service } = cowriteServiceOn({ 'report/r.md': DRAFT_REPORT, 'prd/a.md': DRAFT_PRD })
+
+    const plan = service.cowritePlan('report-00001-r', { text: 'pasted', docIds: ['prd-00001-x'] })
+
+    expect(plan.instruction).toContain('pasted')
+    expect(plan.instruction).toContain('prd-00001-x at prd/a.md')
+  })
+})
+
+/**
+ * The create form of spec-00006-FR-2: the three rejections of spec-00001-FR-53
+ * judged before anything is written, then the document filed from its template and
+ * committed — no editor save in the middle (design-00001 §11.2).
+ */
+describe('the cowrite create form', () => {
+  const TEMPLATE = '---\nid: idea-00000-slug\ntype: idea\nstatus: draft\nparent:\n---\n\n# Title\n\n## 1. Context\n'
+
+  function createServiceOn(files: Record<string, string> = {}) {
+    const { repoRoot, docsDir } = makeRepo({ 'idea/TEMPLATE.md': TEMPLATE, ...files })
+    return { repoRoot, docsDir, service: new DocService(repoRoot, docsDir, cowriteConfig()) }
+  }
+
+  // spec-00006-AC-2.1 — the plan half: nothing is on disk when the plan is built
+  it('plans the document it will file, without writing anything', () => {
+    const { docsDir, service } = createServiceOn()
+
+    const planned = service.cowriteCreatePlan('idea', 'co-written')
+
+    expect(planned.docId).toBe('idea-00001-co-written')
+    expect(planned.plan.cowrite).toEqual({
+      targetPath: 'idea/idea-00001-co-written.md',
+      preId: 'idea-00001-co-written',
+      preStatus: 'draft',
+    })
+    expect(existsSync(join(docsDir, 'idea/idea-00001-co-written.md'))).toBe(false)
+  })
+
+  // spec-00006-AC-2.1 — the file half: the type's template, prefilled, in one create commit
+  it('files the document from the template and commits it as a create', async () => {
+    const { repoRoot, docsDir, service } = createServiceOn()
+
+    const created = await service.createForCowrite('idea', 'co-written')
+
+    expect(created).toMatchObject({ id: 'idea-00001-co-written', path: 'idea/idea-00001-co-written.md' })
+    expect(created.commit.committed).toBe(true)
+    expect(onDisk(docsDir, 'idea/idea-00001-co-written.md')).toContain('id: idea-00001-co-written')
+    expect(onDisk(docsDir, 'idea/idea-00001-co-written.md')).toContain('status: draft')
+    expect(onDisk(docsDir, 'idea/idea-00001-co-written.md')).toContain('## 1. Context')
+    expect(lastCommitMessage(repoRoot)).toBe('wb(create): idea-00001-co-written')
+  })
+
+  // spec-00006-AC-2.2
+  it('refuses a slug that is not lower-case hyphenated, and files nothing', async () => {
+    const { docsDir, service } = createServiceOn()
+
+    expect(() => service.cowriteCreatePlan('idea', 'Co Written')).toThrowError(WorkflowError)
+    await expect(service.createForCowrite('idea', 'Co Written')).rejects.toThrowError(WorkflowError)
+    expect(existsSync(join(docsDir, 'idea'))).toBe(true)
+    expect(readFileSync(join(docsDir, 'idea/TEMPLATE.md'), 'utf8')).toBe(TEMPLATE)
+  })
+
+  // spec-00006-AC-2.4
+  it('refuses a type that is not a flow entry type', async () => {
+    const { service } = createServiceOn()
+
+    expect(() => service.cowriteCreatePlan('spec', 'co-written')).toThrowError(/not a flow entry type/)
+    await expect(service.createForCowrite('spec', 'co-written')).rejects.toThrowError(WorkflowError)
+  })
+
+  // spec-00006-AC-2.3 — a file the graph could not read as a document still holds its id
+  it('refuses an id that is already taken on disk', async () => {
+    const { service } = createServiceOn({ 'idea/idea-00001-taken.md': '# no front matter at all\n' })
+
+    expect(() => service.cowriteCreatePlan('idea', 'taken')).toThrowError(ConflictError)
+    await expect(service.createForCowrite('idea', 'taken')).rejects.toThrowError(/already exists/)
+  })
+
+  // A folder with no template is a repo missing that convention, not a reason to
+  // refuse: the document still has to carry its three front matter lines.
+  it('files a document with the minimal front matter when the type has no template', async () => {
+    const { repoRoot, docsDir } = makeRepo({})
+    const service = new DocService(repoRoot, docsDir, cowriteConfig())
+
+    await service.createForCowrite('prd', 'from-nothing')
+
+    expect(onDisk(docsDir, 'prd/prd-00001-from-nothing.md')).toBe(
+      '---\nid: prd-00001-from-nothing\ntype: prd\nstatus: draft\n---\n\n',
+    )
+  })
+})
+
+/**
+ * The status lock and the editor bypass (spec-00006-FR-10, design-00001 §11.4):
+ * while a cowrite session runs on a document, nothing promotes it and nothing
+ * rewrites its identity behind the session's back — the body is another matter,
+ * and that is the turn-taking the round is about.
+ */
+describe('the cowrite status lock', () => {
+  function lockedServiceOn(files: Record<string, string>, busy: string[]) {
+    const { repoRoot, docsDir } = makeRepo(files)
+    const service = new DocService(repoRoot, docsDir, cowriteConfig())
+    service.attachCowriteProbe((docId) => busy.includes(docId))
+    return { repoRoot, docsDir, service }
+  }
+
+  // spec-00006-AC-10.1
+  it('refuses a status change and an accept with doc-busy while the session runs', async () => {
+    const { docsDir, service } = lockedServiceOn({ 'prd/a.md': DRAFT_PRD }, ['prd-00001-x'])
+
+    for (const action of [service.changeStatus('prd-00001-x', 'active'), service.review('prd-00001-x', { action: 'accept' })]) {
+      const refusal = await action.catch((error) => error)
+      expect(refusal).toBeInstanceOf(SessionBusyError)
+      expect(refusal.reason).toBe('doc-busy')
+      expect(refusal.message).toMatch(/running cowrite session/)
+    }
+    expect(onDisk(docsDir, 'prd/a.md')).toBe(DRAFT_PRD)
+  })
+
+  // spec-00006-AC-10.2 — the lock is the session, so it lifts when the session ends
+  it('evaluates the review gates as usual once no session is running on the document', async () => {
+    const busy: string[] = ['prd-00001-x']
+    const { docsDir, service } = lockedServiceOn({ 'prd/a.md': DRAFT_PRD }, busy)
+    busy.length = 0
+
+    expect(await service.review('prd-00001-x', { action: 'accept' })).toMatchObject({ status: 'active' })
+    expect(onDisk(docsDir, 'prd/a.md')).toContain('status: active')
+  })
+
+  // spec-00006-AC-10.3 — a whole-file overwrite is how a save could move the status
+  it('refuses a save that moves the front matter status or id', async () => {
+    const { docsDir, service } = lockedServiceOn({ 'prd/a.md': DRAFT_PRD }, ['prd-00001-x'])
+    const base = service.read('prd-00001-x')
+
+    for (const content of [
+      DRAFT_PRD.replace('status: draft', 'status: active'),
+      DRAFT_PRD.replace('id: prd-00001-x', 'id: prd-00001-renamed'),
+    ]) {
+      const refusal = await service.save('prd-00001-x', content, base.hash).catch((error) => error)
+      expect(refusal).toBeInstanceOf(SessionBusyError)
+      expect(refusal.reason).toBe('doc-busy')
+    }
+    expect(onDisk(docsDir, 'prd/a.md')).toBe(DRAFT_PRD)
+  })
+
+  // spec-00006-AC-10.4 — the body is the round's turn-taking, and it commits as an edit
+  it('lets a body-only save through and commits it as an edit', async () => {
+    const { repoRoot, docsDir, service } = lockedServiceOn({ 'prd/a.md': DRAFT_PRD }, ['prd-00001-x'])
+    const base = service.read('prd-00001-x')
+
+    const result = await service.save('prd-00001-x', `${DRAFT_PRD}the owner typed this\n`, base.hash)
+
+    expect(result.committed).toBe(true)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(edit): prd-00001-x')
+    expect(onDisk(docsDir, 'prd/a.md')).toContain('the owner typed this')
+  })
+
+  it('leaves every write path alone when no probe was ever attached', async () => {
+    const { service } = serviceOn({ 'prd/a.md': DRAFT_PRD })
+
+    expect(await service.changeStatus('prd-00001-x', 'active')).toMatchObject({ status: 'active' })
+  })
+})
+
+/**
+ * The collapse filter (spec-00006-FR-6 and FR-8, rule-00001-BR-30's enforcement
+ * layer, design-00001 §11.3): of everything that moved under docs/ since the
+ * session's own snapshot, the target document and the well-formed new references
+ * are committed, and everything else is put back — bar the two exemptions.
+ */
+describe('commitCowriteChanges', () => {
+  const DRAFT_IDEA = doc({ id: 'idea-00001-y', type: 'idea', status: 'draft' }, '# Y\n\nas committed\n')
+  const REFERENCE = (id: string) => doc({ id, type: 'reference', status: 'draft' }, `# ${id}\n`)
+
+  function cowriteServiceOn(files: Record<string, string>, git?: GitLayer) {
+    const { repoRoot, docsDir } = makeRepo(files)
+    return { repoRoot, docsDir, service: new DocService(repoRoot, docsDir, cowriteConfig(), git) }
+  }
+
+  /** The two snapshots the registry takes at a cowrite start, and the plan they ride on. */
+  function admit(service: DocService, docId: string, targetPath: string, preStatus = 'draft') {
+    return {
+      before: service.snapshotDocs(),
+      plan: {
+        kind: 'cowrite',
+        sourceId: docId,
+        instruction: '',
+        cowrite: { targetPath, preId: docId, preStatus },
+        contentBaseline: service.contentSnapshotDocs(),
+      } satisfies SessionPlan,
+    }
+  }
+
+  function write(docsDir: string, relPath: string, content: string): void {
+    mkdirSync(join(docsDir, relPath, '..'), { recursive: true })
+    writeFileSync(join(docsDir, relPath), content)
+  }
+
+  // spec-00006-AC-6.1
+  // rule-00001-AC-30.2
+  it('commits the target and restores a rewrite of another existing document', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}out of scope\n`)
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(outcome.committed).toBe(true)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(cowrite): prd-00001-x')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(DRAFT_IDEA)
+  })
+
+  // spec-00006-AC-6.1 for a path that was already dirty: the snapshot's own text
+  // is what it goes back to, since HEAD is not what the session inherited
+  it('restores an out-of-scope path to the text the session inherited', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}dirty before the session\n`)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}the session wrote over it\n`)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(`${DRAFT_IDEA}dirty before the session\n`)
+  })
+
+  it('deletes again a path the session inherited as deleted', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    rmSync(join(docsDir, 'idea/b.md'))
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'idea/b.md', 'the session brought it back\n')
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, 'idea/b.md'))).toBe(false)
+  })
+
+  it('brings back a document the session deleted', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    rmSync(join(docsDir, 'idea/b.md'))
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(DRAFT_IDEA)
+  })
+
+  // spec-00006-AC-6.2
+  // rule-00001-AC-30.3
+  it('deletes a new document of a type other than reference', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'spec/invented.md', doc({ id: 'spec-00001-z', type: 'spec', status: 'draft' }, '# Z\n'))
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, 'spec/invented.md'))).toBe(false)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+
+  // spec-00006-AC-6.4
+  // rule-00001-AC-30.5
+  it('puts the target’s front matter status back and commits the body it wrote', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD.replace('status: draft', 'status: active')}written together\n`)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'prd/a.md')).toContain('status: draft')
+    expect(onDisk(docsDir, 'prd/a.md')).toContain('written together')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+    expect(git(repoRoot, 'show', 'HEAD:docs/prd/a.md')).toContain('status: draft')
+  })
+
+  // rule-00001-AC-28.2 — an open work item is cowritten and stays open
+  it('keeps an open work item open, whatever the session wrote into its status line', async () => {
+    const OPEN_PLAN = doc({ id: 'plan-00002-o', type: 'plan', status: 'open' }, '# Plan\n')
+    const { docsDir, service } = cowriteServiceOn({ 'plan/o.md': OPEN_PLAN })
+    const { before, plan } = admit(service, 'plan-00002-o', 'plan/o.md', 'open')
+    write(docsDir, 'plan/o.md', `${OPEN_PLAN.replace('status: open', 'status: resolved')}written together\n`)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'plan/o.md')).toContain('status: open')
+    expect(onDisk(docsDir, 'plan/o.md')).toContain('written together')
+  })
+
+  it('puts the target’s front matter id back', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', DRAFT_PRD.replace('id: prd-00001-x', 'id: prd-00002-renamed'))
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'prd/a.md')).toContain('id: prd-00001-x')
+  })
+
+  it('reports a target whose front matter block the session removed, and commits it all the same', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', '# X\n\nno front matter left\n')
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(outcome.problems.some((problem) => /front matter block is gone/.test(problem))).toBe(true)
+    expect(outcome.problems.some((problem) => /front matter is missing/.test(problem))).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+
+  // spec-00006-AC-6.5 — another running session's product is left for its own wrap-up
+  it('neither restores nor stages a path another running session has moved', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    const otherBaseline = service.snapshotDocs()
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}the advance session is writing here\n`)
+
+    await service.commitCowriteChanges(plan, before, [otherBaseline])
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(`${DRAFT_IDEA}the advance session is writing here\n`)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+
+  // spec-00006-AC-6.6 — the file spec-00001-FR-20 keeps is not the filter's to destroy
+  it('leaves a path whose own commit failed exactly where it is', async () => {
+    class NoCommits extends GitLayer {
+      override async commit(): Promise<CommitOutcome> {
+        return { committed: false, error: 'the index is locked' }
+      }
+    }
+    const { repoRoot, docsDir } = makeRepo({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const service = new DocService(repoRoot, docsDir, cowriteConfig(), new NoCommits(repoRoot))
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    const base = service.read('idea-00001-y')
+    const kept = `${DRAFT_IDEA}the owner saved this and the commit failed\n`
+    expect((await service.save('idea-00001-y', kept, base.hash)).committed).toBe(false)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(kept)
+    expect(git(repoRoot, 'status', '--porcelain', '--', 'docs/idea/b.md')).toMatch(/idea\/b\.md/)
+  })
+
+  // spec-00006-AC-6.7 — a deletion is no landed write BR-30 authorises
+  it('stages no deletion when the target is gone, and lands the rest of the scope', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    rmSync(join(docsDir, 'prd/a.md'))
+    write(docsDir, 'reference/reference-00001-notes.md', REFERENCE('reference-00001-notes'))
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(outcome.problems.some((problem) => /no longer on disk/.test(problem))).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/reference/reference-00001-notes.md'])
+    expect(existsSync(join(docsDir, 'prd/a.md'))).toBe(false)
+  })
+
+  // spec-00006-AC-8.1
+  // rule-00001-AC-30.1
+  it('commits the target and a well-formed new reference in one commit, the status kept', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'reference/reference-00001-notes.md', REFERENCE('reference-00001-notes'))
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(outcome).toMatchObject({ committed: true, problems: [] })
+    expect(lastCommitMessage(repoRoot)).toBe('wb(cowrite): prd-00001-x')
+    expect(lastCommitFiles(repoRoot).sort()).toEqual([
+      'docs/prd/a.md',
+      'docs/reference/reference-00001-notes.md',
+    ])
+    expect(onDisk(docsDir, 'prd/a.md')).toContain('status: draft')
+  })
+
+  // spec-00006-AC-8.4 — the numbering is judged over the set, so both land
+  it('commits several well-formed references taking a contiguous run of numbers', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({
+      'prd/a.md': DRAFT_PRD,
+      'reference/old.md': REFERENCE('reference-00001-old'),
+    })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'reference/reference-00002-a.md', REFERENCE('reference-00002-a'))
+    write(docsDir, 'reference/reference-00003-b.md', REFERENCE('reference-00003-b'))
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(lastCommitFiles(repoRoot).sort()).toEqual([
+      'docs/reference/reference-00002-a.md',
+      'docs/reference/reference-00003-b.md',
+    ])
+  })
+
+  // spec-00006-AC-8.2
+  it('makes no commit when the session left nothing behind', async () => {
+    const { repoRoot, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const commits = commitCount(repoRoot)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+
+    expect(await service.commitCowriteChanges(plan, before)).toEqual({ committed: false, problems: [] })
+    expect(commitCount(repoRoot)).toBe(commits)
+  })
+
+  // spec-00006-AC-6.3 — the parallel session that collapsed first has landed its
+  // number, so the one that collapses second no longer sits in the run
+  it('filters a reference whose number a document that landed first has taken', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({
+      'prd/a.md': DRAFT_PRD,
+      'reference/reference-00001-first.md': REFERENCE('reference-00001-first'),
+    })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'reference/reference-00001-second.md', REFERENCE('reference-00001-second'))
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, 'reference/reference-00001-second.md'))).toBe(false)
+    expect(outcome.problems.some((problem) => /did not land/.test(problem))).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+
+  // rule-00001-AC-30.4 — an id another document already declares does not land
+  it('filters a reference whose id another document declares, and lands the rest', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({
+      'prd/a.md': DRAFT_PRD,
+      'reference/legacy.md': REFERENCE('reference-00001-notes'),
+    })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'reference/reference-00001-notes.md', REFERENCE('reference-00001-notes'))
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, 'reference/reference-00001-notes.md'))).toBe(false)
+    expect(outcome.problems.some((problem) => /already the id of another document/.test(problem))).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+
+  // The reserved numbers of the sessions still running count as existing
+  // (spec-00003-FR-1's reading of rule-00001-BR-18)
+  it('filters a reference that took a number a running session holds', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'reference/reference-00001-notes.md', REFERENCE('reference-00001-notes'))
+
+    await service.commitCowriteChanges(plan, before, [], [1])
+
+    expect(existsSync(join(docsDir, 'reference/reference-00001-notes.md'))).toBe(false)
+  })
+
+  // The second birth path of rule-00001-BR-26 is a birth, not a licence over the
+  // folder: an existing reference the session rewrote is out of scope
+  it('restores an existing reference the session rewrote', async () => {
+    const { docsDir, service } = cowriteServiceOn({
+      'prd/a.md': DRAFT_PRD,
+      'reference/reference-00001-old.md': REFERENCE('reference-00001-old'),
+    })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'reference/reference-00001-old.md', `${REFERENCE('reference-00001-old')}rewritten\n`)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'reference/reference-00001-old.md')).toBe(REFERENCE('reference-00001-old'))
+  })
+
+  it('deletes a file under reference/ that is no document at all', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'reference/notes.txt', 'loose notes\n')
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, 'reference/notes.txt'))).toBe(false)
+    expect(outcome.committed).toBe(false)
+  })
+
+  // spec-00006-AC-8.3 — the commit does not distinguish a stop from a natural end;
+  // there is one wrap-up, and a half-written product is a finding, not a refusal
+  it('commits the filtered changes the same way when the session was stopped mid-write', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}half a sen`)
+    write(docsDir, 'reference/reference-00001-half.md', '---\nid: reference-00001-half\n')
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(lastCommitMessage(repoRoot)).toBe('wb(cowrite): prd-00001-x')
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+    expect(existsSync(join(docsDir, 'reference/reference-00001-half.md'))).toBe(false)
+    expect(outcome.problems).not.toEqual([])
   })
 })

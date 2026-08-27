@@ -2,7 +2,8 @@ import { join } from 'node:path'
 import type { AgentConfig } from './config.ts'
 import type { Expectation } from './advance.ts'
 import type { AskResult } from './askStore.ts'
-import type { DirtySnapshot } from './gitLayer.ts'
+import { HAND_EDIT_NOTE } from './cowrite.ts'
+import type { ContentSnapshot, DirtySnapshot } from './gitLayer.ts'
 import { type SpawnHeadless, failureReason, headlessArgs, readCapture, spawnHeadless } from './headless.ts'
 import { writeSessionHistory } from './sessionHistory.ts'
 import { WorkflowError } from './workflow.ts'
@@ -48,15 +49,16 @@ const AWAIT_SIGNAL = '\x1b]777;notify;'
 export type SessionStatus = 'running' | 'exited' | 'failed' | 'terminated'
 
 /**
- * The four kinds of agent session, sharing one registry: the board advances the
+ * The five kinds of agent session, sharing one registry: the board advances the
  * flow, clarify has the agent question the owner, ask has the owner question the
- * agent, audit has the agent review a draft it did not write. The first three of
- * those are terminal sessions on a pty; ask is the registry's second form — a
- * captured headless call with no terminal at all (spec-00005-FR-6,
- * design-00001 §10.3). The kind is what names a terminal session's commit
- * (spec-00001-FR-14); an ask makes none.
+ * agent, audit has the agent review a draft it did not write, and cowrite has the
+ * two of them write one document together (spec-00006-FR-1). All of them but ask
+ * are terminal sessions on a pty; ask is the registry's second form — a captured
+ * headless call with no terminal at all (spec-00005-FR-6, design-00001 §10.3).
+ * The kind is what names a terminal session's commit (spec-00001-FR-14); an ask
+ * makes none.
  */
-export type SessionKind = 'advance' | 'clarify' | 'ask' | 'audit'
+export type SessionKind = 'advance' | 'clarify' | 'ask' | 'audit' | 'cowrite'
 
 /** One session's whole input: what kind it is, what it is about, what it is told. */
 export interface SessionPlan {
@@ -75,6 +77,22 @@ export interface SessionPlan {
   threadId?: string
   /** An ask follow-up alone: the CLI's resume id, which is what makes the call a resume rather than a first. */
   resumeId?: string
+  /**
+   * A cowrite alone: the target as it stood when the session was admitted
+   * (design-00001 §11.3, §11.4). The path is what the collapse filter addresses
+   * the target by, and the two front matter values are what its guard puts back
+   * — read at plan time, because by the time the session ends the file on disk is
+   * whatever the agent left (spec-00006-AC-6.4).
+   */
+  cowrite?: { targetPath: string; preId: string; preStatus: string }
+  /**
+   * A cowrite alone: the whole text of every path that was already dirty when it
+   * started (design-00001 §11.3). Filled in by the manager rather than by the
+   * caller — the reading has to happen after admission and before the spawn, like
+   * the digest baseline beside it — and it is what the filter restores a path
+   * from that this session should never have touched (spec-00006-FR-6).
+   */
+  contentBaseline?: ContentSnapshot
 }
 
 export interface SessionInfo {
@@ -217,6 +235,14 @@ interface Session {
    * the signal's own length, which is what keeps it from growing.
    */
   signalTail: string
+  /**
+   * A cowrite whose target the user has edited by hand and saved, with the note
+   * not yet handed over (spec-00006-FR-5): it rides ahead of the next printable
+   * frame the user sends, and until one arrives it waits. A session that ends
+   * first takes the note with it — the hand edit is already committed by the
+   * write path, so nothing is lost (design-00001 §11.4).
+   */
+  pendingNote?: boolean
 }
 
 export interface SessionManagerOptions {
@@ -239,6 +265,13 @@ export interface SessionManagerOptions {
    * layer behind it means.
    */
   snapshot?: () => DirtySnapshot
+  /**
+   * The whole text of the docs/ dirt as it stands, read once before a **cowrite**
+   * session can write (design-00001 §11.3): the baseline its collapse filter
+   * restores from. A manager given none restores nothing from the snapshot and
+   * falls back to HEAD, which is what a caller with no git layer behind it means.
+   */
+  contentSnapshot?: () => ContentSnapshot
   /** Overrides `SUBMIT_DELAY_MS`, so a test need not wait out the real one. */
   submitDelayMs?: number
   /** Overrides `AWAIT_THRESHOLD_MS`, so a test need not wait out the real silence. */
@@ -297,9 +330,25 @@ export class SessionManager {
    * (spec-00003-AC-3.6).
    */
   start(plan: SessionPlan, agentName?: string): SessionInfo {
+    const info = this.startDeferred(plan, agentName)
+    // The slot is taken; the process waits. An ask call's record has to be on
+    // disk before there is a process to reconcile it against, so its spawn is
+    // the caller's next step rather than this one's (design-00001 §10.2 写序).
+    if (plan.kind === 'ask') return info
+    return this.launchTerminal(info.id)
+  }
+
+  /**
+   * Admission alone: the agent resolved, the concurrency rules judged, the slot
+   * taken and both baselines read — and no process (design-00001 §10.2 写序,
+   * §11.2 create 形的受理次序). Two callers hold a slot across a write of their
+   * own before the spawn: an ask, whose record has to be on disk first, and a
+   * cowrite that is creating its own target, which must not file a document if
+   * the cap refuses it (spec-00006-AC-2.6).
+   */
+  startDeferred(plan: SessionPlan, agentName?: string): SessionInfo {
     const agent = this.resolveAgent(agentName, plan.kind)
     this.admit(plan)
-    const { repoRoot } = this.options
     const startedAt = new Date().toISOString()
     const info: SessionInfo = {
       id: this.nextId(startedAt),
@@ -314,6 +363,10 @@ export class SessionManager {
     // it commits nothing, so it has nothing to scope a commit against
     // (spec-00005-FR-4).
     const baseline = plan.kind === 'ask' ? new Map<string, string>() : (this.options.snapshot?.() ?? new Map())
+    // A cowrite's filter restores what it filters, so the digests above are not
+    // enough for it: the whole text of the same dirt is read in the same window,
+    // and on the plan, which is what the exit hook is handed (design-00001 §11.3).
+    if (plan.kind === 'cowrite') plan.contentBaseline = this.options.contentSnapshot?.() ?? new Map()
     let announceEnd!: () => void
     const ended = new Promise<void>((resolve) => {
       announceEnd = resolve
@@ -336,11 +389,20 @@ export class SessionManager {
       signalTail: '',
     }
     this.sessions.set(info.id, session)
-    // The slot is taken; the process waits. An ask call's record has to be on
-    // disk before there is a process to reconcile it against, so its spawn is
-    // the caller's next step rather than this one's (design-00001 §10.2 写序).
-    if (plan.kind === 'ask') return info
+    return info
+  }
 
+  /**
+   * The second half of starting a session on a terminal: the pty, its handlers
+   * and the first input (spec-00001-FR-11). Split from the admission above so a
+   * cowrite that creates its own target can file the document between the two —
+   * the slot first, the file second, the process last (design-00001 §11.2), which
+   * is what makes the create either whole or nothing (spec-00006-FR-2).
+   */
+  launchTerminal(id: string): SessionInfo {
+    const session = this.requireTerminal(id)
+    const { repoRoot } = this.options
+    const { agent, info, plan } = session
     try {
       session.pty = this.options.spawn(agent.command, agent.args, join(repoRoot, agent.cwd ?? '.'))
       session.kill = () => session.pty?.kill()
@@ -565,7 +627,58 @@ export class SessionManager {
   write(id: string, data: string): void {
     const session = this.requireTerminal(id)
     this.unlatch(session)
+    // The hand-edit note goes in ahead of the frame that carries printable
+    // characters, and only such a frame consumes it (spec-00006-FR-5,
+    // design-00001 §11.4): before a slash command, an Escape, an arrow key or a
+    // bare Enter it would be the concatenation defect issue-00011 fixed. Written
+    // straight to the pty rather than through here, so the latch reading above
+    // stays keyed to the user's own frame (decision-00011's exclusion list).
+    if (session.pendingNote === true && printable(data)) {
+      session.pty?.write(HAND_EDIT_NOTE)
+      session.pendingNote = undefined
+    }
     session.pty?.write(data)
+  }
+
+  /**
+   * The user saved a hand edit of a document a cowrite session is writing
+   * (spec-00006-FR-5): the note waits on that session until the user's next
+   * printable frame takes it. Called after the save has landed, so a refused save
+   * leaves no note; a document with no running cowrite has nowhere to put one,
+   * which is the ordinary case and no error.
+   */
+  noteHandEdit(docId: string): void {
+    for (const session of this.cowritesOn(docId)) session.pendingNote = true
+  }
+
+  /**
+   * Whether a cowrite session is running on that document (spec-00006-FR-10): the
+   * status lock and the editor's front matter guard both ask this, and both refuse
+   * with `doc-busy` when the answer is yes. Ended sessions are not running, so the
+   * lock lifts by itself (spec-00006-AC-10.2).
+   */
+  isCowriting(docId: string): boolean {
+    return this.cowritesOn(docId).length > 0
+  }
+
+  private cowritesOn(docId: string): Session[] {
+    return this.running().filter(
+      (session) => session.plan.kind === 'cowrite' && session.info.sourceId === docId,
+    )
+  }
+
+  /**
+   * The baselines of the sessions that are still running (design-00001 §11.3):
+   * what a cowrite's collapse filter reads the first exemption off — a path that
+   * moved since another running session's snapshot is that session's product, and
+   * is left where it is for that session's own wrap-up (spec-00006-AC-6.5). The
+   * session that is collapsing has already ended, so it is not in this list and
+   * exempts nothing of its own; an ask holds no baseline to speak of.
+   */
+  runningBaselines(): DirtySnapshot[] {
+    return this.running()
+      .filter((session) => session.plan.kind !== 'ask')
+      .map((session) => session.baseline)
   }
 
   /**
@@ -897,6 +1010,26 @@ function carriedTail(scanned: string): string {
     if (AWAIT_SIGNAL.startsWith(tail)) return tail
   }
   return ''
+}
+
+/** A CSI sequence: what an arrow key, a mouse report and most of a TUI's chatter are. */
+const CSI_SEQUENCE = /\x1b\[[0-9;?]*[@-~]/g
+
+/** An OSC sequence, terminated by BEL or ST — or by nothing yet, mid-frame. */
+const OSC_SEQUENCE = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g
+
+/** The control bytes, Escape and Enter among them (design-00001 §11.4). */
+const CONTROL_BYTES = /[\x00-\x1f\x7f]/g
+
+/**
+ * Whether a terminal frame carries printable content — the one thing the
+ * hand-edit note rides ahead of (spec-00006-FR-5). The sequences come off first
+ * and the bare control bytes after them, so what is left is what the user
+ * actually typed: an arrow key, an Escape and an empty Enter leave nothing, and
+ * the note waits for a frame that leaves something (spec-00006-AC-5.3).
+ */
+function printable(frame: string): boolean {
+  return frame.replace(OSC_SEQUENCE, '').replace(CSI_SEQUENCE, '').replace(CONTROL_BYTES, '').length > 0
 }
 
 function describe(outcome: SessionOutcome): string {

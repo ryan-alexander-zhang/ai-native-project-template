@@ -65,6 +65,23 @@ export function testConfig(extra = ''): FlowConfig {
   return parseFlowConfig(`${TEST_CONFIG}${extra}`, 'test-config')
 }
 
+/**
+ * The test config with the types a cowrite session's own acceptance names
+ * (spec-00006, rule-00001-BR-29): `reference`, which is the one type a session may
+ * file a new document of (rule-00001-BR-30) and which the collapse filter judges
+ * against the flow config like any other; and `integration` and `report`, two of
+ * the types that had no agent path at all before the fifth kind (spec-00006-S3).
+ * None of them is a flow entry type, and none is clarifiable, so nothing else in
+ * the config moves with them.
+ */
+export function cowriteConfig(): FlowConfig {
+  const config = testConfig()
+  config.types.reference = 'living'
+  config.types.integration = 'living'
+  config.types.report = 'living'
+  return config
+}
+
 /** Create a temporary docs tree; keys are paths relative to the docs dir. */
 export function makeDocsDir(files: Record<string, string>): string {
   const docsDir = join(mkdtempSync(join(tmpdir(), 'wb-docs-')), 'docs')

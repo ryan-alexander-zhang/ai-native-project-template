@@ -3,6 +3,7 @@ import {
   CircleHelp,
   type LucideIcon,
   MessageCircleQuestionMark,
+  NotebookPen,
   Plus,
   ShieldCheck,
   Square,
@@ -48,6 +49,7 @@ const KIND_ICONS: Record<SessionKind, LucideIcon> = {
   clarify: MessageCircleQuestionMark,
   ask: CircleHelp,
   audit: ShieldCheck,
+  cowrite: NotebookPen,
 }
 
 /**

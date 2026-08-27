@@ -1,15 +1,16 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { type SimpleGit, simpleGit } from 'simple-git'
 
 /**
  * The action a commit names (spec-00001-FR-14, format per design-00001 §7). The
- * last four are the session kinds: one commit per session, named by the kind it
- * was (spec-00001-AC-14.4, AC-14.7, AC-14.8, AC-50.3).
+ * last five are the session kinds: one commit per session, named by the kind it
+ * was (spec-00001-AC-14.4, AC-14.7, AC-14.8, AC-50.3; cowrite is the
+ * twenty-second round's, spec-00006-FR-8).
  */
-export type ActionKind = 'edit' | 'status' | 'accept' | 'create' | 'advance' | 'clarify' | 'ask' | 'audit'
+export type ActionKind = 'edit' | 'status' | 'accept' | 'create' | 'advance' | 'clarify' | 'ask' | 'audit' | 'cowrite'
 
 /**
  * What the dirty files under a directory held at one moment: repo-relative path
@@ -17,6 +18,14 @@ export type ActionKind = 'edit' | 'status' | 'accept' | 'create' | 'advance' | '
  * one taken before it started (design-00001 §4).
  */
 export type DirtySnapshot = ReadonlyMap<string, string>
+
+/**
+ * The full text of every dirty file under a directory at one moment — a cowrite
+ * session's snapshot stores content, not digests, because its collapse filter
+ * restores what it filters (design-00001 §11.3). `null` records a path that was
+ * dirty by deletion: restoring it means deleting it again.
+ */
+export type ContentSnapshot = ReadonlyMap<string, string | null>
 
 /** The digest of a path that is not there — a deletion is a content too. */
 const ABSENT = 'absent'
@@ -91,6 +100,68 @@ export class GitLayer {
   async changedSince(dir: string, before: DirtySnapshot): Promise<string[]> {
     const paths = await this.changedPaths(dir)
     return paths.filter((path) => before.get(path) !== this.digest(path))
+  }
+
+  /**
+   * The dirty files under `dir` right now, with the **whole text** of each — the
+   * baseline a cowrite session's collapse filter restores from
+   * (design-00001 §11.3): a digest says a path moved, and restoring needs what
+   * it moved from. Synchronous for the same reason {@link snapshot} is, and
+   * bounded the same way: the dirt as it stands when the session starts.
+   *
+   * A path that is dirty by deletion is recorded as `null`, which restores by
+   * deleting it again; a clean path is not here at all, because HEAD is its
+   * restore basis.
+   */
+  contentSnapshot(dir: string): ContentSnapshot {
+    const snapshot = new Map<string, string | null>()
+    for (const path of this.dirtyPaths(dir)) snapshot.set(path, this.readText(path))
+    return snapshot
+  }
+
+  /** Put a snapshotted path back as it was: its text, or its absence (design-00001 §11.3). */
+  restoreContent(path: string, text: string | null): void {
+    if (text === null) {
+      rmSync(join(this.repoRoot, path), { force: true })
+      return
+    }
+    writeFileSync(join(this.repoRoot, path), text)
+  }
+
+  /**
+   * Restore a path the snapshot never held — it was clean when the session
+   * started, so HEAD is what it held (design-00001 §11.3). A path HEAD does not
+   * carry either is one the session created outside its write scope: deleting it
+   * is the restore.
+   */
+  restoreFromHead(path: string): void {
+    try {
+      this.run(['checkout', 'HEAD', '--', path])
+    } catch {
+      rmSync(join(this.repoRoot, path), { force: true })
+    }
+  }
+
+  /** Whether HEAD carries that path — what tells a file the session created from one it rewrote. */
+  inHead(path: string): boolean {
+    try {
+      this.run(['cat-file', '-e', `HEAD:${path}`])
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private run(args: string[]): string {
+    return execFileSync('git', args, { cwd: this.repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  }
+
+  private readText(path: string): string | null {
+    try {
+      return readFileSync(join(this.repoRoot, path), 'utf8')
+    } catch {
+      return null
+    }
   }
 
   private dirtyPaths(dir: string): string[] {

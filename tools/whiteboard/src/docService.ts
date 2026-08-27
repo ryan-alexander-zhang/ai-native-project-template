@@ -1,6 +1,17 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
+import { ITEM_GRAMMAR } from './advance.ts'
 import type { FlowConfig, FlowStep } from './config.ts'
+import {
+  type CowriteMaterials,
+  REFERENCE_TYPE,
+  type ReferenceCandidate,
+  cowriteInstruction,
+  guardFrontMatter,
+  judgeReferences,
+  materialLines,
+  prefilledTemplate,
+} from './cowrite.ts'
 import {
   type DocContent,
   type DocGraph,
@@ -10,12 +21,20 @@ import {
   declaredId,
   findNode,
   frontMatterId,
+  frontMatterStatus,
   parseDocId,
   readDocBody,
   readDocContent,
   readGraph,
 } from './docRepository.ts'
-import { type ActionKind, type CommitOutcome, type DirtySnapshot, GitLayer, commitMessage } from './gitLayer.ts'
+import {
+  type ActionKind,
+  type CommitOutcome,
+  type ContentSnapshot,
+  type DirtySnapshot,
+  GitLayer,
+  commitMessage,
+} from './gitLayer.ts'
 import {
   type Coverage,
   type DocBody,
@@ -27,7 +46,7 @@ import {
 } from './requirements.ts'
 import { itemCoverage, resolvedGaps } from './resolvedGate.ts'
 import { SerialQueue } from './serialQueue.ts'
-import type { SessionPlan } from './sessionManager.ts'
+import { SessionBusyError, type SessionPlan } from './sessionManager.ts'
 import { promotedStatus } from './statusRules.ts'
 import {
   askInstruction,
@@ -47,6 +66,7 @@ import {
   assertAskable,
   assertAuditable,
   assertClarifiable,
+  assertCowritable,
   assertEntryType,
   hasOpenQuestions,
   idPrefix,
@@ -147,6 +167,21 @@ export class DocService {
    * one queue — the shape is shared with the ask store, the queue is not.
    */
   private readonly queue = new SerialQueue()
+  /**
+   * The paths a board write put on disk and could not commit
+   * (spec-00001-FR-20's retention). A cowrite's collapse filter leaves them alone
+   * — restoring one would destroy the file that requirement keeps
+   * (spec-00006-AC-6.6, design-00001 §11.3 (b)) — and a later commit of the same
+   * path clears it, because the retention is over the moment it lands.
+   */
+  private readonly uncommitted = new Set<string>()
+  /**
+   * Whether a document has a running cowrite session (spec-00006-FR-10). The
+   * registry is the one that knows, and the board wires it in — the ruling itself
+   * belongs here, in front of every write path the lock covers
+   * (design-00001 §11.4). A service nobody wired it into locks nothing.
+   */
+  private cowriteProbe: (docId: string) => boolean = () => false
 
   constructor(repoRoot: string, docsDir: string, config: FlowConfig, git: GitLayer = new GitLayer(repoRoot)) {
     this.repoRoot = repoRoot
@@ -158,6 +193,11 @@ export class DocService {
   graph(): DocGraph {
     this.cached ??= readGraph(this.docsDir, this.config)
     return this.cached
+  }
+
+  /** How the write paths ask whether a document is being cowritten (spec-00006-FR-10). */
+  attachCowriteProbe(probe: (docId: string) => boolean): void {
+    this.cowriteProbe = probe
   }
 
   /**
@@ -273,7 +313,44 @@ export class DocService {
     if (current.hash !== baseHash) {
       throw new ConflictError(`${id} changed on disk since it was opened`)
     }
+    this.assertIdentityKept(id, content, current.content)
     return this.write(node, content, 'edit')
+  }
+
+  /**
+   * The editor bypass, closed (spec-00006-FR-10, design-00001 §11.4): a
+   * whole-file overwrite could move the front matter `id` or `status` of a
+   * document a cowrite session is writing, which is exactly what the status lock
+   * refuses on its own paths. A body-only save is the turn-taking the round is
+   * about and goes through untouched (spec-00006-AC-10.4).
+   */
+  private assertIdentityKept(id: string, content: string, current: string): void {
+    if (!this.cowriteProbe(id)) return
+    const moved =
+      frontMatterId(content) !== frontMatterId(current) ||
+      frontMatterStatus(content) !== frontMatterStatus(current)
+    if (moved) {
+      throw new SessionBusyError(
+        `${id} has a running cowrite session, so a save may not change its front matter id or status`,
+        'doc-busy',
+      )
+    }
+  }
+
+  /**
+   * The status lock (spec-00006-FR-10): while a cowrite session is running on a
+   * document, the actions that would promote it or rewrite its identity are
+   * refused — 409, because it is the document's current state the request
+   * collides with, and the same reason word the start refusals carry
+   * (design-00001 §11.4). Judged before the ruling chain, so nothing is even
+   * evaluated on a document that is being written.
+   */
+  private assertNotCowriting(id: string, action: string): void {
+    if (!this.cowriteProbe(id)) return
+    throw new SessionBusyError(
+      `${id} has a running cowrite session, so it takes no ${action} until it ends`,
+      'doc-busy',
+    )
   }
 
   /**
@@ -347,6 +424,7 @@ export class DocService {
    * makes a refusal leave neither a half-written file nor a commit.
    */
   async changeStatus(id: string, to: string): Promise<ActionResult> {
+    this.assertNotCowriting(id, 'status change')
     const graph = this.graph()
     const node = this.require(id, graph)
     const current = this.readOrConflict(node)
@@ -443,6 +521,7 @@ export class DocService {
     if (input.action !== 'accept') {
       throw new WorkflowError(`${JSON.stringify(input.action)} is not a review action`)
     }
+    this.assertNotCowriting(id, 'review action')
     const node = this.require(id)
     const current = this.readOrConflict(node)
     const accepted = applyAccept(current.content, node, this.config)
@@ -519,11 +598,137 @@ export class DocService {
   }
 
   /**
+   * What a cowrite session for `id` is started with (spec-00006-FR-1 and FR-9):
+   * refused unless the document is still on disk (FR-19, spec-00001-AC-19.3) and
+   * its status is one cowrite may be started on (rule-00001-BR-29). Every type is
+   * eligible — cowrite writes a body, and every type has one.
+   *
+   * `reservedReferences` are the reference numbers running sessions already hold
+   * (spec-00003-FR-1): the instruction's starting number counts them as taken,
+   * the same reading the collapse filter takes of them (design-00001 §11.3).
+   */
+  cowritePlan(id: string, materials?: CowriteMaterials, reservedReferences: readonly number[] = []): SessionPlan {
+    const graph = this.graph()
+    const node = this.require(id, graph)
+    this.readOrConflict(node)
+    assertCowritable(node, this.config)
+    return this.cowriteSessionPlan(
+      { docId: node.id, path: node.path, type: node.type!, status: node.status! },
+      materials,
+      reservedReferences,
+    )
+  }
+
+  /**
+   * What a cowrite session that files its own target is started with
+   * (spec-00006-FR-2): the three create rejections of spec-00001-FR-53 judged
+   * here and now — the type is a flow entry type, the slug is a slug, the id is
+   * free — and the plan built from values that are not on disk yet. Nothing is
+   * written: the file comes after the slot is taken (design-00001 §11.2), and a
+   * refusal here has taken nothing to give back (spec-00006-AC-2.2 … AC-2.4).
+   */
+  cowriteCreatePlan(
+    type: string,
+    slug: string,
+    materials?: CowriteMaterials,
+    reservedReferences: readonly number[] = [],
+  ): { plan: SessionPlan; docId: string } {
+    const { id, path } = this.newCowriteDoc(type, slug)
+    return {
+      docId: id,
+      // A new document is `draft` by rule-00001-BR-26, which is what the guard of
+      // the collapse filter will hold its front matter to.
+      plan: this.cowriteSessionPlan({ docId: id, path, type, status: 'draft' }, materials, reservedReferences),
+    }
+  }
+
+  /**
+   * File the document a create-form cowrite is about to be started on
+   * (spec-00006-FR-2): that type's `TEMPLATE.md` with the front matter prefilled,
+   * written and committed as a create — the same commit `POST /api/docs` makes,
+   * because it is the same act with the editor left out. The three rejections are
+   * judged again here, so nothing writes a document this method was handed
+   * wrongly; they are the graph's readings and cost nothing to repeat.
+   *
+   * A write that fails leaves no file behind — the create is whole or nothing —
+   * while a **commit** that fails keeps the file and reports the error, which is
+   * the retention spec-00001-FR-20 already fixes: the document is on disk, so the
+   * session can be cowritten on it.
+   */
+  async createForCowrite(type: string, slug: string): Promise<{ id: string; path: string; commit: ActionResult }> {
+    const { id, path } = this.newCowriteDoc(type, slug)
+    const absolute = join(this.docsDir, path)
+    mkdirSync(dirname(absolute), { recursive: true })
+    try {
+      const content = prefilledTemplate(this.template(type), id, type)
+      return { id, path, commit: await this.writeFile(absolute, content, id, 'create') }
+    } catch (cause) {
+      // Half a file is an orphan document, and FR-2 promises none: the disk goes
+      // back to having no such document at all.
+      rmSync(absolute, { force: true })
+      throw cause
+    }
+  }
+
+  /**
+   * The id a create-form cowrite would file, and the path it would file it at —
+   * or the refusal that stops it (spec-00006-FR-2 with spec-00001-FR-53). The
+   * number is allocated here rather than given, so the id can only collide with a
+   * file the graph could not read as a document; both readings are taken all the
+   * same, for the reason design-00001 §2 gives — a colliding document is keyed by
+   * its path, and a document filed away from its canonical path is invisible to
+   * `existsSync`.
+   */
+  private newCowriteDoc(type: string, slug: string): { id: string; path: string } {
+    assertEntryType(type, this.config)
+    const graph = this.graph()
+    const id = `${idPrefix(type, allocateNumber(graph, type))}${slug}`
+    if (!parseDocId(id)) {
+      throw new WorkflowError(`${JSON.stringify(slug)} is not a lower-case hyphenated slug, so ${id} is not an id`)
+    }
+    const relPath = `${type}/${id}.md`
+    if (graph.nodes.some((node) => declaredId(node) === id) || existsSync(join(this.docsDir, relPath))) {
+      throw new ConflictError(`${id} already exists; refresh the board`)
+    }
+    return { id, path: relPath }
+  }
+
+  /** The plan both cowrite forms share; the target is described rather than looked up. */
+  private cowriteSessionPlan(
+    target: { docId: string; path: string; type: string; status: string },
+    materials: CowriteMaterials | undefined,
+    reservedReferences: readonly number[],
+  ): SessionPlan {
+    return {
+      kind: 'cowrite',
+      sourceId: target.docId,
+      instruction: cowriteInstruction({
+        docPath: target.path,
+        docType: target.type,
+        readmePath: typeReadmePath(target.type),
+        grammar: ITEM_GRAMMAR[target.type],
+        referenceStart: allocateNumber(this.graph(), REFERENCE_TYPE, reservedReferences),
+        materialLines: materialLines(materials, this.graph()),
+      }),
+      cowrite: { targetPath: target.path, preId: target.docId, preStatus: target.status },
+    }
+  }
+
+  /**
    * What docs/ already held in dirt, to be taken before an agent session starts:
    * the baseline its commit is scoped against (spec-00001-AC-14.5, issue-00008).
    */
   snapshotDocs(): DirtySnapshot {
     return this.git.snapshot(this.docsPath())
+  }
+
+  /**
+   * The whole text of that same dirt, for a cowrite session alone
+   * (design-00001 §11.3): its collapse filter restores what it filters, and a
+   * digest cannot be written back.
+   */
+  contentSnapshotDocs(): ContentSnapshot {
+    return this.git.contentSnapshot(this.docsPath())
   }
 
   /**
@@ -545,6 +750,176 @@ export class DocService {
     return this.serially(async () => {
       const paths = await this.git.changedSince(this.docsPath(), before)
       return this.git.commit(paths, commitMessage(action, docId))
+    })
+  }
+
+  /**
+   * The collapse of a cowrite session (spec-00006-FR-6 and FR-8,
+   * rule-00001-BR-30's enforcement layer, design-00001 §11.3): of everything that
+   * moved under docs/ since this session's own snapshot, the target document and
+   * the well-formed new references are staged and committed, and the rest is put
+   * back. Filter, staging and commit are **one turn of the commit queue** — the
+   * user actions ahead of it in the queue have committed already, so their writes
+   * are clean paths by the time this reads them and are never mistaken for the
+   * session's (spec-00006-FR-6's timing).
+   *
+   * `otherBaselines` are the still-running sessions' snapshots, and
+   * `reservedReferences` the numbers they hold; both are readings of the registry
+   * the caller alone can take. Nothing staged, nothing committed
+   * (spec-00006-AC-8.2). The filter is irreversible and runs before the commit: a
+   * commit that then fails leaves the in-scope changes in the working tree, which
+   * is spec-00001-FR-20's retention, and the out-of-scope evidence is already gone
+   * (design-00001 §11.3 边界声明).
+   */
+  async commitCowriteChanges(
+    plan: SessionPlan,
+    before: DirtySnapshot,
+    otherBaselines: readonly DirtySnapshot[] = [],
+    reservedReferences: readonly number[] = [],
+  ): Promise<{ committed: boolean; error?: string; problems: string[] }> {
+    const cowrite = plan.cowrite!
+    return this.serially(async () => {
+      const docsPath = this.docsPath()
+      const paths = await this.git.changedSince(docsPath, before)
+      const problems: string[] = []
+      const staged: string[] = []
+      const targetPath = `${docsPath}/${cowrite.targetPath}`
+      if (paths.includes(targetPath)) {
+        // Before the fresh read below, so what that read sees of the target is
+        // the front matter the guard leaves (design-00001 §11.3 步骤 1).
+        this.collapseTarget(targetPath, cowrite, staged, problems)
+      }
+      // Read again rather than off the cache: the watcher's debounce window may
+      // not have invalidated it yet, and every judgment below is of the tree as
+      // it stands at the collapse (design-00001 §11.3 撞 id 判定的三个读法).
+      this.invalidate()
+      const graph = this.graph()
+      const candidates = paths
+        .filter((path) => path !== targetPath && this.isNewReference(path, docsPath, before))
+        .map((path) => ({ path, node: this.nodeAt(graph, path, docsPath) }))
+      this.collapseReferences(candidates, graph, reservedReferences, staged, problems)
+      const exempt = await this.exemptions(docsPath, otherBaselines)
+      for (const path of paths) {
+        if (path === targetPath || candidates.some((candidate) => candidate.path === path)) continue
+        // The two exemptions, judged before any restore (design-00001 §11.3 (3)):
+        // another running session's product is left for that session's own
+        // wrap-up (spec-00006-AC-6.5), and a path the write path could not commit
+        // is left where spec-00001-FR-20 keeps it (spec-00006-AC-6.6).
+        if (exempt.has(path) || this.uncommitted.has(path)) continue
+        this.restore(path, plan.contentBaseline)
+      }
+      problems.push(...this.productProblems(graph, staged, docsPath))
+      const outcome = await this.git.commit(staged, commitMessage('cowrite', plan.sourceId))
+      return { ...outcome, problems }
+    })
+  }
+
+  /**
+   * The target document (design-00001 §11.3 步骤 1): staged, its front matter
+   * `id` and `status` put back to what they were when the session started — the
+   * body it wrote stays (spec-00006-AC-6.4, rule-00001-AC-30.5). A target that is
+   * no longer on disk is the one case nothing is staged for: a deletion is no
+   * landed write BR-30 authorises, the working tree is left as it is, and the
+   * situation is a finding for the diagnostics to carry (spec-00006-AC-6.7).
+   */
+  private collapseTarget(
+    targetPath: string,
+    cowrite: NonNullable<SessionPlan['cowrite']>,
+    staged: string[],
+    problems: string[],
+  ): void {
+    const absolute = join(this.docsDir, cowrite.targetPath)
+    if (!existsSync(absolute)) {
+      problems.push(`${cowrite.targetPath} is no longer on disk, so its deletion was not staged`)
+      return
+    }
+    const guarded = guardFrontMatter(readFileSync(absolute, 'utf8'), cowrite.preId, cowrite.preStatus)
+    writeFileSync(absolute, guarded.content)
+    if (guarded.problem !== undefined) problems.push(`${cowrite.targetPath}: ${guarded.problem}`)
+    staged.push(targetPath)
+  }
+
+  /** The new references, judged as one set and then staged or deleted (spec-00006-FR-6). */
+  private collapseReferences(
+    candidates: readonly ReferenceCandidate[],
+    graph: DocGraph,
+    reservedReferences: readonly number[],
+    staged: string[],
+    problems: string[],
+  ): void {
+    const own = new Set(candidates.map((candidate) => candidate.node?.path))
+    const others = graph.nodes.filter((node) => !own.has(node.path))
+    const highest = Math.max(
+      0,
+      ...others
+        .map((node) => parseDocId(declaredId(node)))
+        .flatMap((parsed) => (parsed?.type === REFERENCE_TYPE ? [parsed.number] : [])),
+      ...reservedReferences,
+    )
+    const verdict = judgeReferences(candidates, new Set(others.map((node) => declaredId(node))), highest)
+    staged.push(...verdict.wellFormed)
+    for (const { path, reason } of verdict.rejected) {
+      // It was not there when the session started, so deleting it *is* the
+      // restore (design-00001 §11.3 步骤 2).
+      rmSync(join(this.repoRoot, path), { force: true })
+      problems.push(`${path} did not land: ${reason}`)
+    }
+  }
+
+  /** Paths another running session has moved since its own snapshot (spec-00006-AC-6.5). */
+  private async exemptions(docsPath: string, baselines: readonly DirtySnapshot[]): Promise<Set<string>> {
+    const exempt = new Set<string>()
+    for (const baseline of baselines) {
+      for (const path of await this.git.changedSince(docsPath, baseline)) exempt.add(path)
+    }
+    return exempt
+  }
+
+  /**
+   * A path this session created under `docs/reference/`: not in the dirt it
+   * inherited, and not in HEAD either. A reference the session **rewrote** is no
+   * new document and takes the ordinary out-of-scope treatment — the second birth
+   * path of rule-00001-BR-26 is a birth, not a licence over the folder.
+   */
+  private isNewReference(path: string, docsPath: string, before: DirtySnapshot): boolean {
+    return path.startsWith(`${docsPath}/${REFERENCE_TYPE}/`) && !before.has(path) && !this.git.inHead(path)
+  }
+
+  /** The node the fresh read made of that repo-relative path, if it made one. */
+  private nodeAt(graph: DocGraph, path: string, docsPath: string): DocNode | undefined {
+    const relPath = path.slice(`${docsPath}/`.length)
+    return graph.nodes.find((node) => node.path === relPath)
+  }
+
+  /**
+   * Put a path back the way design-00001 §11.3 (3) sets out: the snapshot's text
+   * if it held any, its absence if it recorded a deletion, HEAD if the path was
+   * clean when the session started — and, when HEAD does not carry it either, by
+   * deleting the file the session created out of scope. None of this is committed.
+   */
+  private restore(path: string, baseline: ContentSnapshot | undefined): void {
+    if (baseline?.has(path) === true) {
+      this.git.restoreContent(path, baseline.get(path)!)
+      return
+    }
+    this.git.restoreFromHead(path)
+  }
+
+  /**
+   * The product validation of spec-00006-FR-8 (spec-00001-FR-17's reading): the
+   * front matter and item-grammar findings of what is being committed, reported
+   * and blocking nothing (spec-00001-FR-40).
+   */
+  private productProblems(graph: DocGraph, staged: readonly string[], docsPath: string): string[] {
+    return staged.flatMap((path) => {
+      const node = this.nodeAt(graph, path, docsPath)
+      if (!node) return []
+      return [
+        ...node.problems.map((problem) => `${node.path}: ${problem}`),
+        ...graph.diagnostics
+          .filter((diagnostic) => diagnostic.docId === node.id)
+          .map((diagnostic) => `${node.path}: ${diagnostic.kind} at line ${diagnostic.line ?? 0}`),
+      ]
     })
   }
 
@@ -603,7 +978,13 @@ export class DocService {
       writeFileSync(absolute, content)
       this.invalidate()
       const repoPath = relative(this.repoRoot, absolute).split(/[\\/]/).join('/')
-      return this.git.commit([repoPath], commitMessage(action, docId))
+      const outcome = await this.git.commit([repoPath], commitMessage(action, docId))
+      // The file is kept whatever git said (spec-00001-FR-20), and a cowrite
+      // collapse must not restore it away — so a write with no commit behind it
+      // is remembered until one lands (design-00001 §11.3 (b)).
+      if (outcome.committed) this.uncommitted.delete(repoPath)
+      else this.uncommitted.add(repoPath)
+      return outcome
     })
   }
 }

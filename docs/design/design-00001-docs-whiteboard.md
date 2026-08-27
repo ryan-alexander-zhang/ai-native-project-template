@@ -942,7 +942,9 @@ kind=ask 的会话进同一注册表，差异逐条：
 ```
 POST /api/sessions/cowrite   {docId, agent?, materials?}
 POST /api/sessions/cowrite   {create: {type, slug}, agent?, materials?}
-  → {sessionId, docId} | 409 {error, reason: doc-busy|cap-reached|doc-missing|id 已存在} | 422 状态不合法（BR-29）/异常文档/非入口类型/slug 非法/未知 agent
+  → {sessionId, docId, error?} | 409 {error, reason: doc-busy|cap-reached|doc-missing|id 已存在} | 422 状态不合法（BR-29）/异常文档/非入口类型/slug 非法/未知 agent
+  # error? 是 create 形建档 commit 失败的呈现通道（spec-00001-FR-20：文件保留、
+  # 会话照常接续）——T3 据实校正，本行原无该字段。
 ```
 
 - **一个端点两个形态**（`docId` 与 `create` 互斥，二者皆无或皆有即

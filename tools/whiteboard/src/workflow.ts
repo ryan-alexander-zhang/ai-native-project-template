@@ -105,6 +105,25 @@ export function assertAuditable(node: DocNode, config: FlowConfig): void {
 }
 
 /**
+ * spec-00006-FR-9 with rule-00001-BR-29: cowrite starts a session, so the ruling
+ * is all there is to decide here — a `draft` document of any type, or a work item
+ * that is `open`. `active` goes through a revision round first (BR-3), and
+ * `resolved`, `wontfix` and `archived` are not written into at all. No type is
+ * excluded: cowrite is not a review action, and every type has a body to write
+ * (rule-00001-BR-28). The refusal names the rule and the status it found, because
+ * the entry is offered whatever the status is (spec-00001-FR-9's precedent).
+ */
+export function assertCowritable(node: DocNode, config: FlowConfig): void {
+  const kind = kindOf(node, config)
+  const legal = node.status === 'draft' || (kind === 'work' && node.status === 'open')
+  if (!legal) {
+    throw new WorkflowError(
+      `cowrite applies to a draft document, or an open work item (rule-00001-BR-29); ${node.id} is ${node.status}`,
+    )
+  }
+}
+
+/**
  * spec-00001-FR-47 with rule-00001-BR-21: ask is not a review action — any type
  * in any status may be asked about. Only an anomalous document may not: its
  * front matter has to be fixed first (spec-00005-AC-7.2).
