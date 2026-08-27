@@ -29,6 +29,7 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     auditable: false,
     docBusy: false,
     capReached: false,
+    cowriting: false,
     agents: ['claude'],
     askAgents: ['claude'],
     onPickAgent: vi.fn(),
@@ -39,6 +40,9 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
     onClarify: vi.fn(),
     // A question that went: what a submit gets back is whether it did (spec-00005-FR-7).
     onAsk: vi.fn(async () => true),
+    knownDoc: () => true,
+    // A cowrite that started: a submit gets back whether it did (spec-00006-FR-9).
+    onCowrite: vi.fn(async () => true),
     onAudit: vi.fn(),
     onAdvance: vi.fn(),
     ...overrides,

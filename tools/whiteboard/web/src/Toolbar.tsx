@@ -11,8 +11,10 @@ import {
 } from 'lucide-react'
 import { type ReactElement, createElement } from 'react'
 import type { FlowStep } from '../../src/config.ts'
+import type { CowriteMaterials } from '../../src/cowrite.ts'
 import type { DocNode } from '../../src/docRepository.ts'
 import { AskEntry } from './AskEntry.tsx'
+import { CowriteEntry } from './CowriteEntry.tsx'
 import type { RelationItem } from './canvasModel.ts'
 import { Button } from '@/components/ui/button'
 import {
@@ -51,6 +53,13 @@ export interface ToolbarProps {
    * more specific one is the one shown (spec-00001-FR-49).
    */
   capReached: boolean
+  /**
+   * Whether a cowrite session is running on **this** document (spec-00006-FR-10):
+   * while it is, the status change and the review action are refused, so they are
+   * disabled here with a reason of their own. The server refuses them too, with
+   * 409 `doc-busy` (design-00002 §15).
+   */
+  cowriting: boolean
   /** The agents a session may be run by; a single one is not a choice (spec-00001-FR-55). */
   agents: string[]
   /**
@@ -69,6 +78,10 @@ export interface ToolbarProps {
   onClarify: () => void
   /** Put the question; what comes back says whether it went (see {@link AskEntry}). */
   onAsk: (question: string, agent?: string) => Promise<boolean>
+  /** Whether the board has a document of this id — what a material line is checked against. */
+  knownDoc: (id: string) => boolean
+  /** Start co-writing this document; what comes back says whether it started. */
+  onCowrite: (materials: CowriteMaterials | undefined, agent?: string) => Promise<boolean>
   onAudit: () => void
   onAdvance: (targetType: string) => void
 }
@@ -81,6 +94,15 @@ export interface ToolbarProps {
  */
 export const DOC_BUSY = 'this document already has a running session'
 export const CAP_REACHED = 'the session limit is reached'
+
+/**
+ * The third reason, and the only one that locks controls which start nothing:
+ * while a cowrite session holds this document, its status may not be changed and
+ * its review may not be run (spec-00006-FR-10, design-00002 §15). It is worded
+ * apart from the two above because what the user can do about it is different
+ * again — end the co-write, or let it end.
+ */
+export const CO_WRITING = 'this document is being co-written'
 
 /**
  * An entry that is disabled has to say why it is (spec-00001-AC-10.3, AC-49.5):
@@ -112,14 +134,17 @@ function Disabled({ reason, children }: { reason?: string; children: ReactElemen
  */
 export function Toolbar(props: ToolbarProps) {
   const { node, transitions, nextSteps, relations, clarifiable, auditable, docBusy, capReached } = props
-  const { agents, askAgents, agent, onPickAgent, onPickRelation } = props
-  const { onEdit, onStatus, onAccept, onClarify, onAsk, onAudit, onAdvance } = props
+  const { cowriting, agents, askAgents, agent, onPickAgent, onPickRelation } = props
+  const { onEdit, onStatus, onAccept, onClarify, onAsk, knownDoc, onCowrite, onAudit, onAdvance } = props
   // Why every starting point here is locked, in the two words the concurrency
   // rules speak (spec-00003-FR-2, FR-3). The document's own session wins when
   // both hold: it is the more specific of the two and it is the one the user can
   // do something about (spec-00001-FR-49, AC-49.5, AC-49.11).
   const busy = docBusy ? DOC_BUSY : capReached ? CAP_REACHED : undefined
   const blocked = docBusy || capReached
+  // Why the two controls that start nothing are locked: the document is being
+  // co-written, which is a refusal on the server too (spec-00006-FR-10).
+  const locked = cowriting ? CO_WRITING : undefined
 
   return (
     <div
@@ -195,27 +220,51 @@ export function Toolbar(props: ToolbarProps) {
 
       {node.ok ? (
         <>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" aria-label="Change status">
-                <GitBranch className="size-4" aria-hidden />
-                {node.status}
-                <ChevronDown className="size-3 opacity-60" aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {transitions.map((to) => (
-                <DropdownMenuItem key={to} onSelect={() => onStatus(to)}>
-                  {to}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/*
+            The cowrite entry sits with the other writing entry, and unlike every
+            starting point beside it, it is not conditioned on the status: the
+            refusal of an illegal target comes at the submit (spec-00006-FR-9).
+            Its two concurrency reasons are the same two every other entry reads.
+          */}
+          <Disabled reason={busy}>
+            <CowriteEntry
+              // Keyed by the document, so materials gathered about one node can
+              // never be submitted against another (design-00002 §15).
+              key={node.id}
+              agents={agents}
+              known={knownDoc}
+              onSubmit={onCowrite}
+              disabled={blocked}
+            />
+          </Disabled>
 
-          <Button size="sm" onClick={onAccept}>
-            <Check className="size-4" aria-hidden />
-            Accept
-          </Button>
+          {/* The two controls a running cowrite locks, each with the third
+              reason and neither of them a starting point (spec-00006-FR-10). */}
+          <Disabled reason={locked}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" aria-label="Change status" disabled={cowriting}>
+                  <GitBranch className="size-4" aria-hidden />
+                  {node.status}
+                  <ChevronDown className="size-3 opacity-60" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {transitions.map((to) => (
+                  <DropdownMenuItem key={to} onSelect={() => onStatus(to)}>
+                    {to}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </Disabled>
+
+          <Disabled reason={locked}>
+            <Button size="sm" onClick={onAccept} disabled={cowriting}>
+              <Check className="size-4" aria-hidden />
+              Accept
+            </Button>
+          </Disabled>
 
           {/*
             Clarify sits inside the review group beside accept and is shown for a

@@ -8,6 +8,8 @@ import {
   type AskSubmit,
   type AskThread,
   type CoverageRow,
+  type CowriteSubmit,
+  type DocContent,
   type SessionInfo,
   type SessionListing,
   api,
@@ -126,6 +128,14 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   // moment after opening looks like.
   const [coverageOpen, setCoverageOpen] = useState(false)
   const [coverage, setCoverage] = useState<CoverageRow[]>()
+  /**
+   * What the cowrite target says on disk, re-read with each refresh while its
+   * editor is open — the fifth conditional read of the one refresh path
+   * (design-00002 §10). Carried with the document it was read for, so another
+   * document's editor is never handed it; what the editor does with it is
+   * spec-00006-FR-4's, not this hook's.
+   */
+  const [disk, setDisk] = useState<{ docId: string; content: DocContent }>()
 
   // Column order comes from the config; the layout is meaningless without it.
   const typeOrder = useRef<string[]>([])
@@ -141,6 +151,13 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * would never reach the page (spec-00005-AC-3.3, design-00001 §10.3).
    */
   const listed = useRef<string | undefined>(undefined)
+  /**
+   * The cowrite target whose editor is open — the whole condition of the fifth
+   * read, and a ref for the same reason `viewing` is one: a `refresh` rebuilt
+   * whenever it changed would tear the docs-change channel down and dial it
+   * again (design-00002 §10, §15).
+   */
+  const cowriting = useRef<string | undefined>(undefined)
   /**
    * How each session was last seen: the status it was in, and whether it was
    * waiting. The refresh signal is the only channel either reaches the board
@@ -265,6 +282,33 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   }, [])
 
   /**
+   * The cowrite target's text on disk (spec-00006-FR-4). Asked for only while
+   * that document's editor is open, like the coverage view's read and the ask
+   * list's: not in a cowrite, nothing is asked for.
+   *
+   * A target that has left the graph is the close-nearest case of design-00002
+   * §10: its editor goes and nothing else does — the session is still in the
+   * registry and its terminal, with the stop in its header, stays exactly where
+   * it was.
+   */
+  const readCowriteTarget = useCallback(async (next: DocGraph) => {
+    const docId = cowriting.current
+    if (docId === undefined) return
+    if (!next.nodes.some((node) => node.id === docId)) {
+      setEditing(undefined)
+      setDisk(undefined)
+      return
+    }
+    try {
+      setDisk({ docId, content: await api.doc(docId) })
+    } catch (error) {
+      // The buffer is left alone: a read that failed is a reload that did not
+      // happen, and the reason is worth saying out loud (design-00002 §15).
+      toast.error(error instanceof Error ? error.message : String(error))
+    }
+  }, [])
+
+  /**
    * The one way the board takes the docs in again (spec-00001-FR-44): all three
    * triggers — a push, an action of the board's own, the end of a session — come
    * through here, so what is kept and what is let go of cannot differ between
@@ -321,8 +365,13 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     // And the fourth, on the same terms: the ask list is re-read while it is
     // open and not otherwise (spec-00005-AC-3.3, design-00002 §10).
     await readAsks()
+    // And the fifth, on the same terms again: while a cowrite session's target
+    // is open in the editor, its text on disk comes with the graph, and the
+    // editor decides what to do with it — reload a clean buffer, keep a dirty
+    // one (spec-00006-FR-4, design-00002 §10, §15).
+    await readCowriteTarget(next)
     return next
-  }, [readCoverage, readAsks])
+  }, [readCoverage, readAsks, readCowriteTarget])
 
   /**
    * The one way in, and one read at a time (see `reading` above). A read that
@@ -491,6 +540,49 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   )
 
   /**
+   * One cowrite launch, in either of its forms (spec-00006-FR-1, FR-2): on a
+   * document already on disk, or on one the server files first — which is why the
+   * document the workspace opens on comes back with the answer rather than being
+   * assumed here.
+   *
+   * Success is the workspace of design-00002 §15: the target's editor, its view
+   * state forced to Source over whatever that document was last left on, and the
+   * terminal switched to this session — the deliberate exception to «only the
+   * first session presents itself», since AC-4.1 asks for both on screen at once.
+   *
+   * What comes back is whether it went: every refusal is a toast, and the input
+   * that sent it also has to know, because it is holding materials that would
+   * otherwise have to be gathered twice (spec-00006-FR-9, AC-9.1).
+   */
+  const cowrite = useCallback(
+    async (submit: CowriteSubmit): Promise<boolean> => {
+      let started: { sessionId: string; docId: string; error?: string }
+      try {
+        started = await api.cowrite(submit)
+      } catch (error) {
+        toast.error(refusalText(error))
+        return false
+      }
+      // The create form alone: the document is filed and the session is away,
+      // and only its commit failed — the file is kept and the failure is a
+      // notice, not a refusal (spec-00001-FR-20, design-00001 §11.2).
+      if (started.error !== undefined) toast.error(started.error)
+      setDraft(undefined)
+      setEditing(started.docId)
+      setEditorMode('source')
+      setLocated(undefined)
+      setThreads([])
+      listed.current = undefined
+      shownRef.current = started.sessionId
+      setShownId(started.sessionId)
+      setTerminalOpen(true)
+      await refresh()
+      return true
+    },
+    [refresh],
+  )
+
+  /**
    * The one way a session ends on the user's word (spec-00001-FR-49): the named
    * one, and no other, however many are running (spec-00003-FR-5, AC-5.3). The
    * session panel names the row's; the terminal's own stop names nothing and
@@ -586,6 +678,16 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     }
   }, [graph, selected])
 
+  // Which document the fifth read is for: the one in the editor, and only while
+  // a cowrite session is running on it (spec-00006-FR-4). The moment there is
+  // none — the session ended, another document was opened — the disk text goes
+  // with it and the editor is back to its ordinary behaviour (AC-4.4).
+  useEffect(() => {
+    const held = sessions.some((one) => !ended(one) && one.kind === 'cowrite' && one.sourceId === editing)
+    cowriting.current = held ? editing : undefined
+    if (!held) setDisk(undefined)
+  }, [sessions, editing])
+
   // The first read of everything. Sessions outlive the browser, so this read is
   // also where a board opening fresh finds the ones still running and reattaches
   // to one of them — `refresh` above holds that (spec-00003-FR-9).
@@ -648,6 +750,9 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     nextSteps,
     editing,
     draft,
+    // The cowrite target's text on disk, and only ever for the document the
+    // editor is on (spec-00006-FR-4).
+    disk: disk !== undefined && disk.docId === editing ? disk.content : undefined,
     // The editor's third view state and what it is located on, held here so a
     // panel row and a notification can set them (design-00002 §14).
     editorMode,
@@ -686,6 +791,7 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     showEditorMode,
     locate: setLocated,
     ask,
+    cowrite,
     stopSession,
     advance,
     create,

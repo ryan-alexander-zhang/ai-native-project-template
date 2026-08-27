@@ -1,5 +1,6 @@
 import type { AskExchange, AskThread } from '../../src/askStore.ts'
 import type { FlowConfig, FlowStep } from '../../src/config.ts'
+import type { CowriteMaterials } from '../../src/cowrite.ts'
 import type { DocContent, DocGraph } from '../../src/docRepository.ts'
 import type { ActionResult, CoverageRow } from '../../src/docService.ts'
 import type { ItemsView } from '../../src/requirements.ts'
@@ -10,6 +11,7 @@ export type {
   AskExchange,
   AskThread,
   CoverageRow,
+  CowriteMaterials,
   DocContent,
   DocGraph,
   FlowConfig,
@@ -33,6 +35,19 @@ export interface AskSubmit {
   agent?: string
   threadId?: string
   resend?: boolean
+}
+
+/**
+ * What one cowrite launch carries (design-00001 §11.2): the document it writes,
+ * **or** the type and slug of one to be filed first — the two forms are
+ * exclusive. The materials are optional in both: empty materials are a launch
+ * like any other, unlike an empty question (spec-00006-AC-3.3).
+ */
+export interface CowriteSubmit {
+  docId?: string
+  create?: { type: string; slug: string }
+  agent?: string
+  materials?: CowriteMaterials
 }
 
 /**
@@ -144,6 +159,15 @@ export const api = {
    */
   ask: (submit: AskSubmit) =>
     request<{ sessionId: string; threadId: string }>('POST', '/api/sessions/ask', submit),
+  /**
+   * One cowrite session (spec-00006-FR-1, FR-2). What comes back is the session
+   * and the document it is on — which the create form only learns here, since the
+   * number is the server's — and, for that form alone, the `error` of a filing
+   * whose commit failed: the file is on disk and the session goes ahead, so it is
+   * a notice rather than a refusal (spec-00001-FR-20, design-00001 §11.2).
+   */
+  cowrite: (submit: CowriteSubmit) =>
+    request<{ sessionId: string; docId: string; error?: string }>('POST', '/api/sessions/cowrite', submit),
   /**
    * A document's ask list (spec-00005-FR-9). Asked for only while the list is
    * on show — it is the fourth item of the one refresh path, and a board that is

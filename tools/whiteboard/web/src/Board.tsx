@@ -176,6 +176,14 @@ function Canvas() {
     return on
   }, [board.running])
   const docBusy = (id: string) => (runningOn.get(id) ?? []).some((session) => session.kind !== 'ask')
+  /**
+   * The cowrite session holding a document, if one is (spec-00006-FR-4, FR-10):
+   * the same lookup answers what the status lock disables and what the editor
+   * does — and the two read it differently, the lock only needing that there is
+   * one, the editor also needing whether it is waiting on the user.
+   */
+  const cowriteOn = (id: string) => (runningOn.get(id) ?? []).find((session) => session.kind === 'cowrite')
+  const knownDoc = (id: string) => board.graph.nodes.some((node) => node.id === id)
 
   /**
    * The editor's own way to ask, of the same shape as the node's
@@ -185,6 +193,9 @@ function Canvas() {
    * that is not a document yet is not on the graph, so it has none either.
    */
   const editingNode = board.graph.nodes.find((node) => node.id === board.editing)
+  // The cowrite session on the document in the editor, which is what puts the
+  // buffer under the reload rule and the lock (spec-00006-FR-4).
+  const editorCowrite = board.editing === undefined ? undefined : cowriteOn(board.editing)
   const askEntry =
     board.askAgents.length > 0 && editingNode?.ok === true ? (
       // Keyed by the document, so a draft written about one is never submitted
@@ -551,6 +562,13 @@ function Canvas() {
                         onAccept={() => void board.run(() => api.accept(selected.id))}
                         onClarify={() => void board.startSession(() => api.clarify(selected.id, board.agent))}
                         onAsk={(question, agent) => board.ask({ docId: selected.id, question, agent })}
+                        // The status lock's one reading, and the entry's own
+                        // materials check against the board (spec-00006-FR-10, FR-3).
+                        cowriting={cowriteOn(selected.id) !== undefined}
+                        knownDoc={knownDoc}
+                        onCowrite={(materials, agent) =>
+                          board.cowrite({ docId: selected.id, materials, agent })
+                        }
                         onAudit={() => void board.startSession(() => api.audit(selected.id, board.agent))}
                         onAdvance={(targetType) => void board.advance(selected.id, targetType)}
                       />
@@ -590,6 +608,12 @@ function Canvas() {
                         }
                       />
                     }
+                    // The workspace half of a cowrite (spec-00006-FR-4): the
+                    // target's text on disk, re-read with each refresh, and the
+                    // lock while the agent has the pen — a running session that
+                    // is not waiting on the user.
+                    disk={board.disk}
+                    readOnly={editorCowrite !== undefined && editorCowrite.awaiting !== true}
                     // A creation ends differently from a revision: the document
                     // is new to the board, so it is taken in and selected
                     // (spec-00001-FR-53).
@@ -652,11 +676,16 @@ function Canvas() {
           focus(id)
         }}
       />
+      {/* The blank mode is what it always was; the cowrite mode files the
+          document and starts the session in one call (spec-00006-FR-2). */}
       <CreateDialog
         types={board.entry}
+        agents={board.agents}
+        knownDoc={knownDoc}
         open={creating}
         onOpenChange={setCreating}
         onCreate={(type, slug) => void board.create(type, slug)}
+        onCowrite={(type, slug, materials, agent) => board.cowrite({ create: { type, slug }, materials, agent })}
       />
       <CoverageView
         open={board.coverageOpen}
