@@ -261,6 +261,26 @@ describe('the api client', () => {
     expect(error.gaps).toBeUndefined()
   })
 
+  /**
+   * design-00001 §7 — a refusal that has a reason word carries it, and the board
+   * needs it: two 409s on a save mean quite different things, and only this tells
+   * the co-write lock from a file that moved under the buffer
+   * (spec-00006-AC-10.3). A refusal with no reason grows none.
+   */
+  it('carries the reason word a refusal names, and none where there is none', async () => {
+    mockFetch(409, { error: 'prd-00001-x has a running cowrite session', reason: 'doc-busy' })
+
+    const busy = await api.save('prd-00001-x', 'body', 'hash-1').catch((thrown) => thrown)
+
+    expect(busy.reason).toBe('doc-busy')
+
+    mockFetch(409, { error: 'prd-00001-x changed on disk since it was opened' })
+
+    const moved = await api.save('prd-00001-x', 'body', 'hash-1').catch((thrown) => thrown)
+
+    expect(moved.reason).toBeUndefined()
+  })
+
   it('falls back to the status text when the body carries no error', async () => {
     mockFetch(500, {})
     await expect(api.graph()).rejects.toThrowError('Error')

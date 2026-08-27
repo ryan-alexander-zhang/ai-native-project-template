@@ -912,7 +912,8 @@ describe('attach', () => {
    * spec-00003-AC-9.3 — a shutdown wraps up every running session, and one whose
    * wrap-up throws must not cost the others theirs: they are settled, not raced
    * (spec-00003-FR-9). The failing hook is the first to run, so what is checked
-   * is that the shutdown carried on past it.
+   * is that the shutdown carried on past it — and that the failure was recorded on
+   * the session it happened to rather than thrown away.
    */
   it('wraps up every session on a shutdown even when one wrap-up throws', async () => {
     let calls = 0
@@ -929,7 +930,11 @@ describe('attach', () => {
 
     expect(manager.list().map((session) => session.status)).toEqual(['terminated', 'terminated'])
     expect(onExit).toHaveBeenCalledTimes(2)
-    expect(manager.list().find((session) => session.id === first.id)!.outcome).toBeUndefined()
+    expect(manager.list().find((session) => session.id === first.id)!.outcome).toEqual({
+      problems: ['the commit failed'],
+      committed: false,
+      error: 'the commit failed',
+    })
     expect(manager.list().find((session) => session.id === second.id)!.outcome).toEqual(OUTCOME)
   })
 
@@ -1026,6 +1031,45 @@ describe('cowrite sessions', () => {
   })
 
   /**
+   * The race `launch` names, on the terminal seam this time: the create form holds
+   * its slot across the file write, so a terminate or a shutdown can land before
+   * there is any pty to signal. Left unread, the mark would spawn a process nobody
+   * kills and a shutdown would wait on its exit for ever.
+   */
+  it('kills the pty at once when a stop landed before it was spawned', async () => {
+    const { repoRoot } = makeRepo({})
+    let killed = 0
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
+      maxSessions: 3,
+      repoRoot,
+      // A pty that ends when it is killed, which is what a real one does.
+      spawn: () => {
+        const exits: Array<(event: { exitCode: number }) => void> = []
+        return {
+          onData: () => {},
+          onExit: (listener) => void exits.push(listener),
+          write: () => {},
+          resize: () => {},
+          kill: () => {
+            killed += 1
+            for (const listener of exits) listener({ exitCode: 143 })
+          },
+        }
+      },
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    const info = manager.startDeferred({ ...COWRITE })
+
+    const stopped = manager.terminate(info.id)
+    manager.launchTerminal(info.id)
+
+    expect((await stopped).status).toBe('terminated')
+    expect(killed).toBe(1)
+  })
+
+  /**
    * spec-00006-AC-7.1's testable server half (design-00001 §11.1): the entry's own
    * interactive argv, spawned unchanged — no permission-bypass flag is appended,
    * because the whole point is that the CLI keeps asking the user.
@@ -1083,7 +1127,7 @@ describe('cowrite sessions', () => {
     manager.write(info.id, 'n')
 
     expect(statusOf()).toBe('running')
-    expect(manager.isCowriting('prd-00001-x')).toBe(true)
+    expect(manager.cowriteOn('prd-00001-x')).toBeDefined()
 
     // Still interactive: the next frame reaches the CLI as if nothing had been asked.
     manager.write(info.id, 'carry on without that one')
@@ -1127,18 +1171,24 @@ describe('cowrite sessions', () => {
     expect(plan.contentBaseline).toEqual(new Map())
   })
 
-  // spec-00006-FR-10's reading: the lock is the running session, nothing else
+  // spec-00006-FR-10's reading: the lock is the running session, nothing else —
+  // and what it answers with is the front matter the session was admitted on,
+  // which is what the editor's guard holds a save to (design-00001 §11.4)
   it('reports the document as being cowritten only while the session runs', () => {
     const { manager, exit } = recording()
 
     manager.start(COWRITE)
 
-    expect(manager.isCowriting('prd-00001-x')).toBe(true)
-    expect(manager.isCowriting('prd-00002-other')).toBe(false)
+    expect(manager.cowriteOn('prd-00001-x')).toEqual({
+      targetPath: 'prd/a.md',
+      preId: 'prd-00001-x',
+      preStatus: 'draft',
+    })
+    expect(manager.cowriteOn('prd-00002-other')).toBeUndefined()
 
     exit()
 
-    expect(manager.isCowriting('prd-00001-x')).toBe(false)
+    expect(manager.cowriteOn('prd-00001-x')).toBeUndefined()
   })
 
   // spec-00003-FR-2 with the fifth kind in its enumeration (spec-00006 §1)
@@ -1169,23 +1219,85 @@ describe('cowrite sessions', () => {
 
   /**
    * spec-00006-AC-5.3 (the issue-00011 class): an arrow key, a bare Enter, an
-   * Escape and an OSC report are no place to splice text into — the note waits,
-   * and the frame goes through untouched.
+   * Escape, an OSC report, an SS3 function key and an SGR mouse report are no
+   * place to splice text into — the note waits, and the frame goes through
+   * untouched.
    */
   // spec-00006-AC-5.3
   it('defers the note past a control-only frame without consuming it', () => {
     const { manager, written } = recording()
     const info = manager.start(COWRITE)
+    const control = ['\x1b[A', '\r', '\x1b', '\x1b]11;rgb:0/0/0\x07', '\x03', '\x1bOA', '\x1bOP', '\x1b[<0;12;5M']
 
     manager.noteHandEdit('prd-00001-x')
-    for (const frame of ['\x1b[A', '\r', '\x1b', '\x1b]11;rgb:0/0/0\x07', '\x03']) manager.write(info.id, frame)
+    for (const frame of control) manager.write(info.id, frame)
 
-    expect(written).toEqual([COWRITE.instruction, '\x1b[A', '\r', '\x1b', '\x1b]11;rgb:0/0/0\x07', '\x03'])
+    expect(written).toEqual([COWRITE.instruction, ...control])
 
-    manager.write(info.id, '/continue')
+    manager.write(info.id, 'have another look')
 
     expect(written.at(-2)).toBe('[用户已手改目标文档，动笔前须重读] ')
-    expect(written.at(-1)).toBe('/continue')
+    expect(written.at(-1)).toBe('have another look')
+  })
+
+  /**
+   * The splice the note may never make (design-00001 §11.4, the issue-00011
+   * class): the user is mid-word, so the note would land inside what they are
+   * typing — `please rewri` + the note + `t`. It waits for the line to be
+   * submitted and goes in ahead of the next frame that starts a fresh one.
+   */
+  // spec-00006-AC-5.3
+  it('defers the note through a half-typed line and goes in after the submit', () => {
+    const { manager, written } = recording()
+    const info = manager.start(COWRITE)
+    manager.write(info.id, 'please rewri')
+
+    manager.noteHandEdit('prd-00001-x')
+    manager.write(info.id, 't')
+    manager.write(info.id, '\r')
+
+    expect(written).toEqual([COWRITE.instruction, 'please rewri', 't', '\r'])
+
+    manager.write(info.id, 'and now this')
+
+    expect(written.at(-2)).toBe('[用户已手改目标文档，动笔前须重读] ')
+    expect(written.at(-1)).toBe('and now this')
+  })
+
+  /**
+   * A slash command is the CLI's own vocabulary, and a note in front of the `/`
+   * makes it plain text — or worse, part of the command name (design-00001 §11.4).
+   * The frame goes through whole and the note waits, even at the start of an empty
+   * line.
+   */
+  // spec-00006-AC-5.3
+  it('defers the note past a slash command at the start of the line', () => {
+    const { manager, written } = recording()
+    const info = manager.start(COWRITE)
+
+    manager.noteHandEdit('prd-00001-x')
+    manager.write(info.id, '/continue')
+
+    expect(written).toEqual([COWRITE.instruction, '/continue'])
+  })
+
+  // The ordinary case the two above are the exceptions to: a printable frame at
+  // the start of an empty line takes the note (spec-00006-AC-5.1)
+  it('injects the note ahead of a plain printable frame at the start of the line', () => {
+    const { manager, written } = recording()
+    const info = manager.start(COWRITE)
+    // A submitted line is an empty line again, whatever was typed into it.
+    manager.write(info.id, 'a first turn\r')
+
+    manager.noteHandEdit('prd-00001-x')
+    manager.write(info.id, 'look again')
+
+    expect(written).toEqual([
+      COWRITE.instruction,
+      'a first turn\r',
+      '[用户已手改目标文档，动笔前须重读] ',
+      'look again',
+    ])
   })
 
   // spec-00006-AC-5.2 — the note dies with the session, the hand edit having landed
@@ -1212,11 +1324,61 @@ describe('cowrite sessions', () => {
   })
 
   /**
-   * The first exemption of design-00001 §11.3: the still-running sessions'
-   * baselines. The session that is collapsing has already ended, so it is not
-   * among them and exempts nothing of its own (spec-00006-AC-6.5).
+   * The wrap-up hook is the collapse filter and the commit under it — a lot of
+   * disk and git, any of which may throw. Left to reject it would be an unhandled
+   * rejection out of an exit handler and would take the board down with every
+   * other session on it, so the failure is recorded on the session and said in its
+   * terminal instead (spec-00001-FR-20's spirit, spec-00006-FR-8's reporting).
    */
-  it('hands over the baselines of the sessions that are still running', () => {
+  it('records a wrap-up that threw and leaves the registry standing', async () => {
+    const { repoRoot } = makeRepo({})
+    const exits: Array<(event: { exitCode: number }) => void> = []
+    let seen = ''
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
+      maxSessions: 3,
+      repoRoot,
+      spawn: () => ({
+        onData: () => {},
+        onExit: (listener) => void exits.push(listener),
+        write: () => {},
+        resize: () => {},
+        kill: () => {},
+      }),
+      onExit: async () => {
+        throw new Error('the collapse filter fell over')
+      },
+    })
+    managers.push(manager)
+    const info = manager.start({ ...COWRITE })
+    manager.attach(info.id, (data) => {
+      seen += data
+    })
+
+    exits[0]!({ exitCode: 0 })
+    await manager.whenFinished(info.id)
+
+    const listed = manager.list().find((session) => session.id === info.id)!
+    expect(listed.status).toBe('exited')
+    expect(listed.outcome).toEqual({
+      problems: ['the collapse filter fell over'],
+      committed: false,
+      error: 'the collapse filter fell over',
+    })
+    expect(seen).toContain('the wrap-up failed — the collapse filter fell over')
+    // The registry is still answering, which is the whole point of the guard.
+    expect(manager.start(planFor('audit', 'spec-00001-a')).status).toBe('running')
+  })
+
+  /**
+   * The first exemption of design-00001 §11.3: what the still-running sessions
+   * have claimed — the kind, the document, an advance's expectation and a
+   * cowrite's target and baseline. Paths are not in here: resolving a document id
+   * to its file is the doc service's reading (spec-00006-AC-6.5). The session that
+   * is collapsing has already ended, so it is not among them and claims nothing of
+   * its own.
+   */
+  it('hands over the claims of the sessions that are still running', () => {
     const first = new Map([['docs/idea/b.md', 'digest-1']])
     const second = new Map([['docs/prd/a.md', 'digest-2']])
     const snapshots = [first, second]
@@ -1237,9 +1399,26 @@ describe('cowrite sessions', () => {
     })
     managers.push(manager)
 
-    manager.start(planFor('advance', 'idea-00001-a'))
+    manager.start(ADVANCE)
     manager.start({ ...COWRITE })
 
-    expect(manager.runningBaselines()).toEqual([first, second])
+    expect(manager.runningClaims()).toEqual([
+      {
+        kind: 'advance',
+        sourceId: 'idea-00001-x',
+        targetPath: undefined,
+        targetType: 'prd',
+        idPrefix: 'prd-00002-',
+        baseline: first,
+      },
+      {
+        kind: 'cowrite',
+        sourceId: 'prd-00001-x',
+        targetPath: 'prd/a.md',
+        targetType: undefined,
+        idPrefix: undefined,
+        baseline: second,
+      },
+    ])
   })
 })

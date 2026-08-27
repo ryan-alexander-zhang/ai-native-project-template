@@ -91,8 +91,10 @@ export function MaterialsInput({ children, ...fields }: MaterialsFields & { chil
       />
       {unusable.length === 0 ? null : (
         <ul aria-label="Unusable materials" className="text-destructive flex flex-col gap-0.5 text-xs">
-          {unusable.map((one) => (
-            <li key={one.line}>
+          {/* Keyed by position as well as by text: the same unusable line typed
+              twice is two entries, and one key for both drops one of them. */}
+          {unusable.map((one, index) => (
+            <li key={`${index}-${one.line}`}>
               <span className="font-mono">{one.line}</span> — {one.reason}
             </li>
           ))}

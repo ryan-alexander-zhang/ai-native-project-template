@@ -95,6 +95,27 @@ export interface SessionPlan {
   contentBaseline?: ContentSnapshot
 }
 
+/**
+ * What one still-running session may write, as the registry can state it
+ * (design-00001 §11.3). Paths are not in here: resolving a document id to the
+ * file it lives in is the doc service's reading, and the registry holds no graph.
+ */
+export interface SessionClaim {
+  kind: SessionKind
+  /** The document the session is about; its file is claimed whichever kind this is. */
+  sourceId: string
+  /** A cowrite alone: the target it writes, relative to the docs tree. */
+  targetPath?: string
+  /** An advance alone: the type folder its product is filed in, and the id prefix it must carry. */
+  targetType?: string
+  idPrefix?: string
+  /**
+   * The docs/ dirt that session inherited — what tells a reference **another**
+   * cowrite created from one that was already there when it started.
+   */
+  baseline: DirtySnapshot
+}
+
 export interface SessionInfo {
   id: string
   kind: SessionKind
@@ -243,6 +264,14 @@ interface Session {
    * write path, so nothing is lost (design-00001 §11.4).
    */
   pendingNote?: boolean
+  /**
+   * Whether the CLI's input line holds printable characters the user has not
+   * submitted yet, tracked from their own frames alone (design-00001 §11.4). The
+   * note may only go in on an **empty** line: spliced into a half-typed one it
+   * would land inside the word being typed, which is the issue-00011 defect over
+   * again (spec-00006-AC-5.3).
+   */
+  lineFilled?: boolean
 }
 
 export interface SessionManagerOptions {
@@ -419,6 +448,13 @@ export class SessionManager {
       this.armSilence(session)
     })
     session.pty.onExit((event) => this.exit(session, event.exitCode))
+    // A stop that landed between the admission and here — the create form holds
+    // its slot across a file write, so a terminate or a shutdown can arrive in
+    // that window — found no process to signal and left only its mark: it is
+    // honoured now, or this pty would run on with nobody to kill it and the
+    // shutdown would wait on it for ever. After the handlers and not before, for
+    // the reason `launch` gives: an end nobody is listening for never wraps up.
+    if (session.stopping) session.kill()
     // The clock starts at the spawn, not at the first output: a CLI that prints
     // nothing at all is as silent as one that stopped printing (spec-00003-FR-6).
     this.armSilence(session)
@@ -627,17 +663,35 @@ export class SessionManager {
   write(id: string, data: string): void {
     const session = this.requireTerminal(id)
     this.unlatch(session)
-    // The hand-edit note goes in ahead of the frame that carries printable
-    // characters, and only such a frame consumes it (spec-00006-FR-5,
-    // design-00001 §11.4): before a slash command, an Escape, an arrow key or a
-    // bare Enter it would be the concatenation defect issue-00011 fixed. Written
-    // straight to the pty rather than through here, so the latch reading above
-    // stays keyed to the user's own frame (decision-00011's exclusion list).
-    if (session.pendingNote === true && printable(data)) {
+    // The hand-edit note goes in ahead of a frame that carries printable
+    // characters **at the start of an empty input line**, and only such a frame
+    // consumes it (spec-00006-FR-5, design-00001 §11.4). Three things are no
+    // place to splice text into, and each defers without consuming the note:
+    // a frame with nothing printable in it — an Escape, an arrow key, a bare
+    // Enter; a frame arriving mid-word, where the note would land inside what the
+    // user is typing; and a frame that opens a slash command, where it would be
+    // read as part of the command name. All three are the concatenation defect
+    // issue-00011 fixed. Written straight to the pty rather than through here, so
+    // the latch reading above stays keyed to the user's own frame
+    // (decision-00011's exclusion list).
+    if (session.pendingNote === true && this.noteFits(session, data)) {
       session.pty?.write(HAND_EDIT_NOTE)
       session.pendingNote = undefined
     }
+    // The line state follows the frame that was just judged, never precedes it:
+    // what the note needs to know is what the line held *before* this frame.
+    session.lineFilled = lineFilledAfter(session.lineFilled ?? false, data)
     session.pty?.write(data)
+  }
+
+  /**
+   * Whether this frame is a place the note may go (design-00001 §11.4): it
+   * carries printable content, the input line is empty, and what it opens with is
+   * not the `/` of a slash command.
+   */
+  private noteFits(session: Session, frame: string): boolean {
+    const first = firstPrintable(frame)
+    return first !== undefined && session.lineFilled !== true && first !== '/'
   }
 
   /**
@@ -652,13 +706,17 @@ export class SessionManager {
   }
 
   /**
-   * Whether a cowrite session is running on that document (spec-00006-FR-10): the
-   * status lock and the editor's front matter guard both ask this, and both refuse
-   * with `doc-busy` when the answer is yes. Ended sessions are not running, so the
-   * lock lifts by itself (spec-00006-AC-10.2).
+   * The cowrite session running on that document, as the front matter it is held
+   * to (spec-00006-FR-10): the status lock reads its mere presence and refuses
+   * with `doc-busy`, and the editor's guard reads the two values — the identity
+   * the session was admitted on, which is the fixed thing a save has to still
+   * declare. The **disk** is no reading for that: the agent moves it mid-session,
+   * and a save judged against it would let the moved status stand
+   * (design-00001 §11.4). Ended sessions are not running, so the lock lifts by
+   * itself (spec-00006-AC-10.2).
    */
-  isCowriting(docId: string): boolean {
-    return this.cowritesOn(docId).length > 0
+  cowriteOn(docId: string): { preId: string; preStatus: string } | undefined {
+    return this.cowritesOn(docId)[0]?.plan.cowrite
   }
 
   private cowritesOn(docId: string): Session[] {
@@ -668,17 +726,33 @@ export class SessionManager {
   }
 
   /**
-   * The baselines of the sessions that are still running (design-00001 §11.3):
-   * what a cowrite's collapse filter reads the first exemption off — a path that
-   * moved since another running session's snapshot is that session's product, and
-   * is left where it is for that session's own wrap-up (spec-00006-AC-6.5). The
-   * session that is collapsing has already ended, so it is not in this list and
-   * exempts nothing of its own; an ask holds no baseline to speak of.
+   * What the sessions that are still running have claimed (design-00001 §11.3):
+   * the first exemption of a cowrite's collapse filter — another session's own
+   * product is left where it is for that session's own wrap-up
+   * (spec-00006-AC-6.5).
+   *
+   * The claim is what each kind may write, never «everything that moved since its
+   * snapshot»: that reading exempts this session's own strays too, so one
+   * concurrent session would switch the whole filter off. The registry is the one
+   * that holds the values a claim is computed from — the kind, the document, an
+   * advance's expectation and a cowrite's target and baseline — and the doc
+   * service turns them into paths, since only it can resolve a document id to the
+   * file it lives in.
+   *
+   * The session that is collapsing has already ended, so it is not in this list
+   * and claims nothing of its own; an ask writes nothing and claims nothing.
    */
-  runningBaselines(): DirtySnapshot[] {
+  runningClaims(): SessionClaim[] {
     return this.running()
       .filter((session) => session.plan.kind !== 'ask')
-      .map((session) => session.baseline)
+      .map((session) => ({
+        kind: session.plan.kind,
+        sourceId: session.plan.sourceId,
+        targetPath: session.plan.cowrite?.targetPath,
+        targetType: session.plan.expectation?.targetType,
+        idPrefix: session.plan.expectation?.idPrefix,
+        baseline: session.baseline,
+      }))
   }
 
   /**
@@ -949,9 +1023,20 @@ export class SessionManager {
     // finished (spec-00001-AC-54.4).
     if (terminal) this.saveHistory(session, endedAt, session.transcript.join(''))
     else await this.landAnswer(session, endedAt)
-    const outcome = await this.options.onExit(session.plan, session.baseline)
-    session.info.outcome = outcome
-    if (terminal) this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
+    // The hook is the commit and, for a cowrite, the collapse filter: a lot of
+    // disk and git, any of which may throw. Left to reject it would be an
+    // unhandled rejection out of an exit handler — the board's own process, with
+    // every other session still running on it — so the failure is recorded on the
+    // session and said in its terminal instead, and the end stands either way.
+    try {
+      const outcome = await this.options.onExit(session.plan, session.baseline)
+      session.info.outcome = outcome
+      if (terminal) this.publish(session, `whiteboard: ${describe(outcome)}\r\n`)
+    } catch (cause) {
+      const message = (cause as Error).message
+      session.info.outcome = { problems: [message], committed: false, error: message }
+      if (terminal) this.publish(session, `whiteboard: the wrap-up failed — ${message}\r\n`)
+    }
   }
 
   /**
@@ -1012,8 +1097,21 @@ function carriedTail(scanned: string): string {
   return ''
 }
 
-/** A CSI sequence: what an arrow key, a mouse report and most of a TUI's chatter are. */
-const CSI_SEQUENCE = /\x1b\[[0-9;?]*[@-~]/g
+/**
+ * A CSI sequence: what an arrow key, a mouse report and most of a TUI's chatter
+ * are. The parameter bytes include `<=>` as well as the digits and separators —
+ * an SGR mouse report is `\x1b[<0;12;5M`, and a class of parameter left out here
+ * is a frame read as printable text (spec-00006-AC-5.3).
+ */
+const CSI_SEQUENCE = /\x1b\[[0-9;?<=>]*[@-~]/g
+
+/**
+ * An SS3 sequence: the other single-key escape a terminal sends — F1 to F4, and
+ * the arrow keys of a CLI that put the keypad in application mode. Two bytes and
+ * a printable character, which is exactly why it has to come off before the
+ * control bytes do: `\x1bOA` would otherwise leave `OA` behind.
+ */
+const SS3_SEQUENCE = /\x1bO[ -~]/g
 
 /** An OSC sequence, terminated by BEL or ST — or by nothing yet, mid-frame. */
 const OSC_SEQUENCE = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g
@@ -1021,15 +1119,33 @@ const OSC_SEQUENCE = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g
 /** The control bytes, Escape and Enter among them (design-00001 §11.4). */
 const CONTROL_BYTES = /[\x00-\x1f\x7f]/g
 
+/** The frame with its escape sequences off, so what is left is the keys themselves. */
+function keys(frame: string): string {
+  return frame.replace(OSC_SEQUENCE, '').replace(SS3_SEQUENCE, '').replace(CSI_SEQUENCE, '')
+}
+
 /**
- * Whether a terminal frame carries printable content — the one thing the
- * hand-edit note rides ahead of (spec-00006-FR-5). The sequences come off first
- * and the bare control bytes after them, so what is left is what the user
- * actually typed: an arrow key, an Escape and an empty Enter leave nothing, and
- * the note waits for a frame that leaves something (spec-00006-AC-5.3).
+ * The first character a terminal frame would put on the input line, or nothing
+ * when it would put none — the reading the hand-edit note rides on
+ * (spec-00006-FR-5). The sequences come off first and the bare control bytes
+ * after them, so what is left is what the user actually typed: an arrow key, an
+ * Escape and an empty Enter leave nothing, and the note waits for a frame that
+ * leaves something (spec-00006-AC-5.3).
  */
-function printable(frame: string): boolean {
-  return frame.replace(OSC_SEQUENCE, '').replace(CSI_SEQUENCE, '').replace(CONTROL_BYTES, '').length > 0
+function firstPrintable(frame: string): string | undefined {
+  return keys(frame).replace(CONTROL_BYTES, '')[0]
+}
+
+/**
+ * The input line after this frame (design-00001 §11.4): a submit empties it, and
+ * printable characters typed after the last submit fill it. Read off the user's
+ * own frames, which are the only writes that reach `write`.
+ */
+function lineFilledAfter(before: boolean, frame: string): boolean {
+  const typed = keys(frame)
+  const submit = Math.max(typed.lastIndexOf('\r'), typed.lastIndexOf('\n'))
+  const tail = typed.slice(submit + 1).replace(CONTROL_BYTES, '')
+  return submit === -1 ? before || tail.length > 0 : tail.length > 0
 }
 
 function describe(outcome: SessionOutcome): string {

@@ -81,12 +81,21 @@ export class ApiError extends Error {
    * their presence is what tells the gate's 422 from any other.
    */
   readonly gaps?: string[]
+  /**
+   * The word the server put on a refusal that has one (design-00001 §7):
+   * `doc-busy`, `cap-reached`, `doc-missing`. Two refusals answer 409 for quite
+   * different reasons — a file that moved under the buffer and a document a
+   * cowrite session holds — and only this tells them apart, so the way out the
+   * board offers is the right one (spec-00006-AC-10.3).
+   */
+  readonly reason?: string
 
-  constructor(status: number, message: string, gaps?: string[]) {
+  constructor(status: number, message: string, gaps?: string[], reason?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.gaps = gaps
+    this.reason = reason
   }
 }
 
@@ -98,7 +107,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
   const payload = await response.json()
   if (!response.ok) {
-    throw new ApiError(response.status, payload.error ?? response.statusText, payload.gaps)
+    throw new ApiError(response.status, payload.error ?? response.statusText, payload.gaps, payload.reason)
   }
   return payload as T
 }

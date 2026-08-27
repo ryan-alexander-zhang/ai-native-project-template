@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { type SimpleGit, simpleGit } from 'simple-git'
 
 /**
@@ -119,13 +119,31 @@ export class GitLayer {
     return snapshot
   }
 
-  /** Put a snapshotted path back as it was: its text, or its absence (design-00001 §11.3). */
+  /**
+   * The text a path holds right now, or `null` when it holds none — what tells a
+   * snapshotted path that is back to its snapshot content from one that is not.
+   * A path git no longer reports as dirty may still have moved: an agent that
+   * reverted a pre-session edit to HEAD leaves nothing for `changedSince` to see
+   * (design-00001 §11.3).
+   */
+  currentText(path: string): string | null {
+    return this.readText(path)
+  }
+
+  /**
+   * Put a snapshotted path back as it was: its text, or its absence
+   * (design-00001 §11.3). The directory is made first — the session may have
+   * removed the whole folder along with the file, and a restore that cannot
+   * write is a restore that did not happen.
+   */
   restoreContent(path: string, text: string | null): void {
+    const absolute = join(this.repoRoot, path)
     if (text === null) {
-      rmSync(join(this.repoRoot, path), { force: true })
+      rmSync(absolute, { force: true })
       return
     }
-    writeFileSync(join(this.repoRoot, path), text)
+    mkdirSync(dirname(absolute), { recursive: true })
+    writeFileSync(absolute, text)
   }
 
   /**
@@ -133,13 +151,19 @@ export class GitLayer {
    * started, so HEAD is what it held (design-00001 §11.3). A path HEAD does not
    * carry either is one the session created outside its write scope: deleting it
    * is the restore.
+   *
+   * The deletion is conditioned on HEAD **not** carrying the path, never on the
+   * checkout merely having failed: a git call that fell over for a reason of its
+   * own — a locked index, a transient error — would otherwise delete a document
+   * that is committed. A checkout that fails on a path HEAD does carry is raised,
+   * so the caller reports it and leaves the file where it is.
    */
   restoreFromHead(path: string): void {
-    try {
-      this.run(['checkout', 'HEAD', '--', path])
-    } catch {
+    if (!this.inHead(path)) {
       rmSync(join(this.repoRoot, path), { force: true })
+      return
     }
+    this.run(['checkout', 'HEAD', '--', path])
   }
 
   /** Whether HEAD carries that path — what tells a file the session created from one it rewrote. */

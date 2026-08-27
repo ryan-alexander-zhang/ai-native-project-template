@@ -94,7 +94,7 @@ export class Board {
     // The status lock of spec-00006-FR-10: the registry knows which documents are
     // being cowritten, the write paths are where the refusal belongs, and this is
     // the one wire between them (design-00001 §11.4).
-    this.docs.attachCowriteProbe((docId) => this.sessions.isCowriting(docId))
+    this.docs.attachCowriteProbe((docId) => this.sessions.cowriteOn(docId))
     this.app = this.buildApp(config)
   }
 
@@ -152,15 +152,15 @@ export class Board {
     // A cowrite commits through a filter of its own (spec-00006-FR-6 and FR-8):
     // only the target document and the well-formed new references land, and every
     // other change under docs/ is put back. The two readings only the registry can
-    // take go in here — the baselines of the sessions still running, whose
-    // products are exempt from the restore, and the reference numbers they hold
+    // take go in here — the claims of the sessions still running, whose products
+    // are exempt from the restore, and the reference numbers they hold
     // (design-00001 §11.3). It never reaches the branch below: that one stages
     // whatever moved.
     if (plan.kind === 'cowrite') {
       const outcome = await this.docs.commitCowriteChanges(
         plan,
         before,
-        this.sessions.runningBaselines(),
+        this.sessions.runningClaims(),
         this.sessions.reservedNumbers(REFERENCE_TYPE),
       )
       return { docId: plan.sourceId, problems: outcome.problems, committed: outcome.committed, error: outcome.error }
@@ -359,7 +359,10 @@ export class Board {
     const info = this.sessions.startDeferred(created.plan, agent)
     let commit: ActionResult
     try {
-      commit = (await this.docs.createForCowrite(create!.type, create!.slug)).commit
+      // The target the plan already allocated, threaded rather than worked out
+      // again: the document the session was admitted on is the document that
+      // lands (design-00001 §11.2).
+      commit = await this.docs.createForCowrite({ id: created.docId, path: created.path, type: create!.type })
     } catch (cause) {
       // Nothing was filed, so nothing is left running on it: the slot goes back
       // and the refusal is the caller's answer (spec-00006-FR-2's all or nothing).

@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ConflictError, DocService, GateError } from '../src/docService.ts'
 import { contentHash } from '../src/docRepository.ts'
-import { type CommitOutcome, GitLayer } from '../src/gitLayer.ts'
-import { SessionBusyError, type SessionPlan } from '../src/sessionManager.ts'
+import { type CommitOutcome, type DirtySnapshot, GitLayer } from '../src/gitLayer.ts'
+import { SessionBusyError, type SessionClaim, type SessionPlan } from '../src/sessionManager.ts'
 import { clarifyStatePath } from '../src/sessionTasks.ts'
 import { WorkflowError } from '../src/workflow.ts'
 import {
@@ -1657,41 +1657,98 @@ describe('the cowrite create form', () => {
   // spec-00006-AC-2.1 — the file half: the type's template, prefilled, in one create commit
   it('files the document from the template and commits it as a create', async () => {
     const { repoRoot, docsDir, service } = createServiceOn()
+    const planned = service.cowriteCreatePlan('idea', 'co-written')
 
-    const created = await service.createForCowrite('idea', 'co-written')
+    const commit = await service.createForCowrite({ id: planned.docId, path: planned.path, type: 'idea' })
 
-    expect(created).toMatchObject({ id: 'idea-00001-co-written', path: 'idea/idea-00001-co-written.md' })
-    expect(created.commit.committed).toBe(true)
+    expect(planned.path).toBe('idea/idea-00001-co-written.md')
+    expect(commit.committed).toBe(true)
     expect(onDisk(docsDir, 'idea/idea-00001-co-written.md')).toContain('id: idea-00001-co-written')
     expect(onDisk(docsDir, 'idea/idea-00001-co-written.md')).toContain('status: draft')
     expect(onDisk(docsDir, 'idea/idea-00001-co-written.md')).toContain('## 1. Context')
     expect(lastCommitMessage(repoRoot)).toBe('wb(create): idea-00001-co-written')
   })
 
-  // spec-00006-AC-2.2
-  it('refuses a slug that is not lower-case hyphenated, and files nothing', async () => {
+  // spec-00006-AC-2.2 — the rejections are the plan's, and the plan is what the
+  // filing is threaded from, so a refusal here never reaches a write
+  it('refuses a slug that is not lower-case hyphenated, and files nothing', () => {
     const { docsDir, service } = createServiceOn()
 
     expect(() => service.cowriteCreatePlan('idea', 'Co Written')).toThrowError(WorkflowError)
-    await expect(service.createForCowrite('idea', 'Co Written')).rejects.toThrowError(WorkflowError)
     expect(existsSync(join(docsDir, 'idea'))).toBe(true)
     expect(readFileSync(join(docsDir, 'idea/TEMPLATE.md'), 'utf8')).toBe(TEMPLATE)
   })
 
   // spec-00006-AC-2.4
-  it('refuses a type that is not a flow entry type', async () => {
+  it('refuses a type that is not a flow entry type', () => {
     const { service } = createServiceOn()
 
     expect(() => service.cowriteCreatePlan('spec', 'co-written')).toThrowError(/not a flow entry type/)
-    await expect(service.createForCowrite('spec', 'co-written')).rejects.toThrowError(WorkflowError)
   })
 
   // spec-00006-AC-2.3 — a file the graph could not read as a document still holds its id
-  it('refuses an id that is already taken on disk', async () => {
+  it('refuses an id that is already taken on disk', () => {
     const { service } = createServiceOn({ 'idea/idea-00001-taken.md': '# no front matter at all\n' })
 
     expect(() => service.cowriteCreatePlan('idea', 'taken')).toThrowError(ConflictError)
-    await expect(service.createForCowrite('idea', 'taken')).rejects.toThrowError(/already exists/)
+  })
+
+  /**
+   * The one thing the prefill can get wrong: a template whose `id` line the fill
+   * did not reach leaves a document whose front matter disagrees with its own file
+   * name, which is anomalous the moment it lands (spec-00001-FR-2). It is asserted
+   * rather than trusted, and the half-written file goes back off the disk.
+   */
+  it('refuses a prefilled template that does not declare the id, and files nothing', async () => {
+    // A template whose front matter will not parse: the id line is filled in the
+    // right place and still declares nothing, because the block around it is
+    // broken YAML.
+    const { docsDir, service } = createServiceOn({
+      'prd/TEMPLATE.md': '---\nid: prd-00000-slug\ntype: prd\nparent: [unclosed\n---\n\n# Title\n',
+    })
+    const planned = service.cowriteCreatePlan('prd', 'from-broken')
+
+    await expect(
+      service.createForCowrite({ id: planned.docId, path: planned.path, type: 'prd' }),
+    ).rejects.toThrowError(/does not declare id: prd-00001-from-broken/)
+    expect(existsSync(join(docsDir, 'prd/prd-00001-from-broken.md'))).toBe(false)
+  })
+
+  /**
+   * The number is allocated once, by the plan, and threaded into the filing: the
+   * document the session was admitted on is the document that lands
+   * (design-00001 §11.2).
+   */
+  it('files the very id the plan allocated', async () => {
+    const { docsDir, service } = createServiceOn({
+      'idea/idea-00001-first.md': doc({ id: 'idea-00001-first', type: 'idea', status: 'draft' }),
+    })
+    const planned = service.cowriteCreatePlan('idea', 'second')
+
+    await service.createForCowrite({ id: planned.docId, path: planned.path, type: 'idea' })
+
+    expect(planned.docId).toBe('idea-00002-second')
+    expect(existsSync(join(docsDir, 'idea/idea-00002-second.md'))).toBe(true)
+  })
+
+  /**
+   * A `reference` target has itself taken a reference number, and nothing is on
+   * disk when the instruction is built: the numbering it offers has to start
+   * **past** the target's own, or the session's first document would collide with
+   * the document it is writing (rule-00001-BR-18).
+   */
+  it('starts the reference numbering past a reference target’s own number', () => {
+    const config = cowriteConfig()
+    config.entry.push('reference')
+    const { repoRoot, docsDir } = makeRepo({
+      'reference/reference-00001-old.md': doc({ id: 'reference-00001-old', type: 'reference', status: 'draft' }),
+    })
+    const service = new DocService(repoRoot, docsDir, config)
+
+    const planned = service.cowriteCreatePlan('reference', 'target')
+
+    expect(planned.docId).toBe('reference-00002-target')
+    expect(planned.plan.instruction).toContain('reference-00003-')
   })
 
   // A folder with no template is a repo missing that convention, not a reason to
@@ -1699,8 +1756,9 @@ describe('the cowrite create form', () => {
   it('files a document with the minimal front matter when the type has no template', async () => {
     const { repoRoot, docsDir } = makeRepo({})
     const service = new DocService(repoRoot, docsDir, cowriteConfig())
+    const planned = service.cowriteCreatePlan('prd', 'from-nothing')
 
-    await service.createForCowrite('prd', 'from-nothing')
+    await service.createForCowrite({ id: planned.docId, path: planned.path, type: 'prd' })
 
     expect(onDisk(docsDir, 'prd/prd-00001-from-nothing.md')).toBe(
       '---\nid: prd-00001-from-nothing\ntype: prd\nstatus: draft\n---\n\n',
@@ -1718,7 +1776,11 @@ describe('the cowrite status lock', () => {
   function lockedServiceOn(files: Record<string, string>, busy: string[]) {
     const { repoRoot, docsDir } = makeRepo(files)
     const service = new DocService(repoRoot, docsDir, cowriteConfig())
-    service.attachCowriteProbe((docId) => busy.includes(docId))
+    // The probe answers with the front matter the session was admitted on, which
+    // is what a save's identity is held to (design-00001 §11.4).
+    service.attachCowriteProbe((docId) =>
+      busy.includes(docId) ? { preId: docId, preStatus: 'draft' } : undefined,
+    )
     return { repoRoot, docsDir, service }
   }
 
@@ -1759,6 +1821,26 @@ describe('the cowrite status lock', () => {
       expect(refusal.reason).toBe('doc-busy')
     }
     expect(onDisk(docsDir, 'prd/a.md')).toBe(DRAFT_PRD)
+  })
+
+  /**
+   * spec-00006-AC-10.3, the moving-reference case: the agent has already written
+   * `status: active` into the file and the clean buffer reloaded it, so a
+   * body-only save now carries that status. Judged against the **disk** it would
+   * pass and land the promotion nobody made; judged against the two values the
+   * session was admitted on it is the identity move it is.
+   */
+  // spec-00006-AC-10.3
+  it('refuses a save carrying a status the agent moved, however the disk reads now', async () => {
+    const MOVED = `${DRAFT_PRD.replace('status: draft', 'status: active')}the agent wrote this\n`
+    const { docsDir, service } = lockedServiceOn({ 'prd/a.md': MOVED }, ['prd-00001-x'])
+    const base = service.read('prd-00001-x')
+
+    const refusal = await service.save('prd-00001-x', `${MOVED}and the owner this\n`, base.hash).catch((e) => e)
+
+    expect(refusal).toBeInstanceOf(SessionBusyError)
+    expect(refusal.reason).toBe('doc-busy')
+    expect(onDisk(docsDir, 'prd/a.md')).toBe(MOVED)
   })
 
   // spec-00006-AC-10.4 — the body is the round's turn-taking, and it commits as an edit
@@ -1812,6 +1894,15 @@ describe('commitCowriteChanges', () => {
   function write(docsDir: string, relPath: string, content: string): void {
     mkdirSync(join(docsDir, relPath, '..'), { recursive: true })
     writeFileSync(join(docsDir, relPath), content)
+  }
+
+  /**
+   * One still-running session's claim, as `SessionManager.runningClaims` states it
+   * (design-00001 §11.3). The baseline defaults to empty dirt — a session that
+   * started on a clean tree — which is the ordinary case.
+   */
+  function claim(fields: Omit<SessionClaim, 'baseline'> & { baseline?: DirtySnapshot }): SessionClaim {
+    return { baseline: new Map(), ...fields }
   }
 
   // spec-00006-AC-6.1
@@ -1929,18 +2020,150 @@ describe('commitCowriteChanges', () => {
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
   })
 
-  // spec-00006-AC-6.5 — another running session's product is left for its own wrap-up
-  it('neither restores nor stages a path another running session has moved', async () => {
+  /**
+   * spec-00006-AC-6.5 — another running session's product is left for its own
+   * wrap-up. The exemption is that session's **claim**, worked out from the
+   * registry: an advance claims what it files under its target type's folder
+   * carrying the id prefix its expectation fixed.
+   */
+  // spec-00006-AC-6.5
+  it('neither restores nor stages the product another running advance is writing', async () => {
     const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
     const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
-    const otherBaseline = service.snapshotDocs()
+    const advance = claim({ kind: 'advance', sourceId: 'idea-00001-y', targetType: 'spec', idPrefix: 'spec-00002-' })
     write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
-    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}the advance session is writing here\n`)
+    write(docsDir, 'spec/spec-00002-new.md', doc({ id: 'spec-00002-new', type: 'spec', status: 'draft' }, '# New\n'))
 
-    await service.commitCowriteChanges(plan, before, [otherBaseline])
+    await service.commitCowriteChanges(plan, before, [advance])
 
-    expect(onDisk(docsDir, 'idea/b.md')).toBe(`${DRAFT_IDEA}the advance session is writing here\n`)
+    expect(existsSync(join(docsDir, 'spec/spec-00002-new.md'))).toBe(true)
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+  })
+
+  // The other half of the same claim: every kind claims the file of the document
+  // it is about, which is what a clarify and an audit write (design-00001 §11.3)
+  it('leaves the document another running audit is writing where it is', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    const audit = claim({ kind: 'audit', sourceId: 'idea-00001-y' })
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}the audit session wrote this\n`)
+
+    await service.commitCowriteChanges(plan, before, [audit])
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(`${DRAFT_IDEA}the audit session wrote this\n`)
+  })
+
+  /**
+   * The reading the claim replaced: «everything that moved since the other
+   * session's snapshot» is a reading of the disk, and the disk holds this
+   * session's own strays too — so one concurrent session of any kind would exempt
+   * them all and switch the whole filter off (design-00001 §11.3).
+   */
+  it('restores its own stray write while another session is running', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    const audit = claim({ kind: 'audit', sourceId: 'prd-00009-elsewhere' })
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}this session had no business here\n`)
+
+    await service.commitCowriteChanges(plan, before, [audit])
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(DRAFT_IDEA)
+  })
+
+  /**
+   * A concurrent cowrite's brand-new reference (design-00001 §11.3): it is under
+   * `reference/`, it is not in HEAD and it is not in this session's dirt, so the
+   * classification alone would take it for this session's own candidate — staged
+   * into the wrong commit, or deleted from under a session that is still writing
+   * it. The exemption is judged first, so it is neither.
+   */
+  it('neither stages nor deletes a reference another running cowrite created', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    const other = claim({ kind: 'cowrite', sourceId: 'idea-00001-y', targetPath: 'idea/b.md' })
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'reference/reference-00001-theirs.md', REFERENCE('reference-00001-theirs'))
+
+    const outcome = await service.commitCowriteChanges(plan, before, [other])
+
+    expect(existsSync(join(docsDir, 'reference/reference-00001-theirs.md'))).toBe(true)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
+    expect(outcome.problems).toEqual([])
+  })
+
+  /**
+   * The hole the git reading alone leaves (spec-00006-FR-6): the owner had unsaved
+   * edits to another document when the session started, and the agent wrote that
+   * document back to exactly what HEAD holds. Git now calls the path clean, so
+   * `changedSince` never names it — and the owner's edits exist nowhere but in the
+   * content baseline. The filter walks that baseline too, and puts them back.
+   */
+  it('restores a path the session reverted to its committed content', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const kept = `${DRAFT_IDEA}the owner had not saved this yet\n`
+    write(docsDir, 'idea/b.md', kept)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    // Back to HEAD, byte for byte: no git reading of the tree can see this move.
+    write(docsDir, 'idea/b.md', DRAFT_IDEA)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(kept)
+  })
+
+  // The same walk must not restore a path that is genuinely back where it started:
+  // a session that touched a file and undid its own change left nothing to put back
+  it('leaves a path the session put back to the text it inherited', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const inherited = `${DRAFT_IDEA}dirty before the session\n`
+    write(docsDir, 'idea/b.md', inherited)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(inherited)
+    expect(outcome.problems).toEqual([])
+  })
+
+  /**
+   * A restore that cannot run is reported and nothing more (spec-00006-FR-8): the
+   * file is left as the session wrote it, because a filter that cannot put a path
+   * back must not go on to destroy it — and one path must not bring the whole
+   * collapse down.
+   */
+  it('reports a restore that failed and leaves that file as the session wrote it', async () => {
+    class NoRestore extends GitLayer {
+      override restoreFromHead(): void {
+        throw new Error('the index is locked')
+      }
+    }
+    const { repoRoot, docsDir } = makeRepo({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const service = new DocService(repoRoot, docsDir, cowriteConfig(), new NoRestore(repoRoot))
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    write(docsDir, 'idea/b.md', `${DRAFT_IDEA}out of scope\n`)
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(outcome.problems).toEqual(['docs/idea/b.md could not be put back: the index is locked'])
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(`${DRAFT_IDEA}out of scope\n`)
+    expect(outcome.committed).toBe(true)
+  })
+
+  // The directory may have gone with the file (design-00001 §11.3): the restore
+  // makes it again rather than falling over on an ENOENT
+  it('restores an inherited path whose whole directory the session removed', async () => {
+    const { docsDir, service } = cowriteServiceOn({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const kept = `${DRAFT_IDEA}the owner had not saved this yet\n`
+    write(docsDir, 'idea/b.md', kept)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    rmSync(join(docsDir, 'idea'), { recursive: true })
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(kept)
+    expect(outcome.problems).toEqual([])
   })
 
   // spec-00006-AC-6.6 — the file spec-00001-FR-20 keeps is not the filter's to destroy
@@ -1961,6 +2184,40 @@ describe('commitCowriteChanges', () => {
 
     expect(onDisk(docsDir, 'idea/b.md')).toBe(kept)
     expect(git(repoRoot, 'status', '--porcelain', '--', 'docs/idea/b.md')).toMatch(/idea\/b\.md/)
+  })
+
+  /**
+   * The retention is over the moment the path lands (design-00001 §11.3 (b)): the
+   * write path kept a file its own commit could not take, a later commit staged it,
+   * and from then on it is an ordinary committed document — so a cowrite that
+   * writes it out of scope has it restored like any other. A retention that never
+   * cleared would leave that stray write in the working tree for good.
+   */
+  it('stops exempting a retained path once a later commit has staged it', async () => {
+    class FailsFirst extends GitLayer {
+      private first = true
+      override async commit(paths: string[], message: string): Promise<CommitOutcome> {
+        if (!this.first) return super.commit(paths, message)
+        this.first = false
+        return { committed: false, error: 'the index is locked' }
+      }
+    }
+    const { repoRoot, docsDir } = makeRepo({ 'prd/a.md': DRAFT_PRD, 'idea/b.md': DRAFT_IDEA })
+    const service = new DocService(repoRoot, docsDir, cowriteConfig(), new FailsFirst(repoRoot))
+    const owned = `${DRAFT_IDEA}the owner saved this and the commit failed\n`
+    const base = service.read('idea-00001-y')
+    const beforeRetry = service.snapshotDocs()
+    expect((await service.save('idea-00001-y', owned, base.hash)).committed).toBe(false)
+
+    // The path lands on the next commit that stages it — a session's, not a write
+    // path's — and the retention has nothing left to protect.
+    expect((await service.commitSessionChanges('idea-00001-y', beforeRetry, 'clarify')).committed).toBe(true)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'idea/b.md', `${owned}and this session had no business here\n`)
+
+    await service.commitCowriteChanges(plan, before)
+
+    expect(onDisk(docsDir, 'idea/b.md')).toBe(owned)
   })
 
   // spec-00006-AC-6.7 — a deletion is no landed write BR-30 authorises
@@ -2012,6 +2269,39 @@ describe('commitCowriteChanges', () => {
       'docs/reference/reference-00002-a.md',
       'docs/reference/reference-00003-b.md',
     ])
+  })
+
+  /**
+   * spec-00006-AC-6.3 with AC-8.4, the two-session case whole: both cowrites were
+   * admitted at the same moment and told to start at 00002, and this one collapses
+   * second — the other's `reference-00002-theirs` has landed already. A taken
+   * number is a per-file reading, so only the colliding candidate dies; the rest of
+   * this session's run is judged against the maximum that now includes what landed,
+   * and 00003 is exactly one above it.
+   */
+  // spec-00006-AC-6.3
+  // spec-00006-AC-8.4
+  it('drops only the reference whose number landed first, and lands the rest of the run', async () => {
+    const { repoRoot, docsDir, service } = cowriteServiceOn({
+      'prd/a.md': DRAFT_PRD,
+      'reference/reference-00001-old.md': REFERENCE('reference-00001-old'),
+    })
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'reference/reference-00002-mine.md', REFERENCE('reference-00002-mine'))
+    write(docsDir, 'reference/reference-00003-mine.md', REFERENCE('reference-00003-mine'))
+    // The other session's document, committed while this one was still writing.
+    write(docsDir, 'reference/reference-00002-theirs.md', REFERENCE('reference-00002-theirs'))
+    git(repoRoot, 'add', 'docs/reference/reference-00002-theirs.md')
+    git(repoRoot, 'commit', '-q', '-m', 'wb(cowrite): idea-00001-y')
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, 'reference/reference-00002-mine.md'))).toBe(false)
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/reference/reference-00003-mine.md'])
+    expect(outcome.problems).toEqual([
+      'docs/reference/reference-00002-mine.md did not land: its number is already taken by another reference document',
+    ])
+    expect(existsSync(join(docsDir, 'reference/reference-00002-theirs.md'))).toBe(true)
   })
 
   // spec-00006-AC-8.2

@@ -128,9 +128,16 @@ function numberOf(count: number): string {
 }
 
 const FRONT_MATTER_FENCE = '---'
-const ID_LINE = /^id:\s/
-const TYPE_LINE = /^type:\s/
-const STATUS_LINE = /^status:\s/
+/**
+ * The three key lines, read the way `workflow.ts` reads them: the colon may carry
+ * no space after it. A narrower pattern would miss the `status:draft` an agent
+ * wrote and **insert a second** `status` line beside it, which is a front matter
+ * with two of the same key — the very anomaly the guard exists to prevent
+ * (spec-00006-AC-6.4).
+ */
+const ID_LINE = /^id\s*:/
+const TYPE_LINE = /^type\s*:/
+const STATUS_LINE = /^status\s*:/
 
 /**
  * The front matter guard of design-00001 §11.4: the target document's `id` and
@@ -180,8 +187,20 @@ export function prefilledTemplate(template: string, id: string, type: string): s
   ]).join('\n')
 }
 
+/**
+ * Where the front matter block closes, or -1 when the file opens with none. The
+ * fences are compared **normalised** — a leading BOM and a trailing CR off — so a
+ * CRLF file and a BOM-led one are not read as bodies with no front matter at all,
+ * which would have the guard report a block that is right there (design-00001
+ * §11.3 步骤 1).
+ */
 function frontMatterEnd(lines: string[]): number {
-  return lines[0] === FRONT_MATTER_FENCE ? lines.indexOf(FRONT_MATTER_FENCE, 1) : -1
+  if (fence(lines[0] ?? '') !== FRONT_MATTER_FENCE) return -1
+  return lines.findIndex((line, index) => index > 0 && fence(line) === FRONT_MATTER_FENCE)
+}
+
+function fence(line: string): string {
+  return line.replace(/^\uFEFF/, '').trimEnd()
 }
 
 /**
@@ -226,25 +245,37 @@ export interface ReferenceVerdict {
  * Whether the references a cowrite session created are 合式, judged as the set
  * they are (spec-00006-FR-6, design-00001 §11.3): the per-file readings first —
  * front matter that parses, `type: reference`, `status: draft`, the canonical
- * path `reference/<id>.md`, an id of legal form that no other document declares
- * — and then the numbering, which is a property of the set and of nothing else.
- * `highest` is the greatest reference number that exists at the moment of the
- * collapse, the registry's reserved numbers folded in and these candidates left
- * out; the set has to run on from it one by one, or reading BR-18 per file would
+ * path `reference/<id>.md`, an id of legal form that no other document declares,
+ * and a **number** no other reference has taken — and then the numbering of what
+ * survives them, which is a property of the set and of nothing else. `highest` is
+ * the greatest reference number that exists at the moment of the collapse, the
+ * registry's reserved numbers folded in and these candidates left out; the
+ * survivors have to run on from it one by one, or reading BR-18 per file would
  * make the second document of a session illegal by construction.
  *
- * A set whose numbering does not hold is rejected whole: no member of it is the
- * one that took the wrong number.
+ * The order is the whole point of the two-session case (spec-00006-AC-6.3): two
+ * cowrites admitted at the same moment are handed the same starting number, and
+ * the one that collapses second finds the first one's documents already landed.
+ * A taken number is a **per-file** reading, so only the colliding candidate dies
+ * and the rest of the session's run is judged against the fresh maximum — which
+ * now counts what landed. Whole-set rejection is left for the survivors that are
+ * non-contiguous among themselves: no one member of such a set is the one that
+ * took the wrong number.
  */
 export function judgeReferences(
   candidates: readonly ReferenceCandidate[],
   taken: ReadonlySet<string>,
   highest: number,
 ): ReferenceVerdict {
+  const takenNumbers = new Set(
+    [...taken]
+      .map((id) => parseDocId(id))
+      .flatMap((parsed) => (parsed?.type === REFERENCE_TYPE ? [parsed.number] : [])),
+  )
   const rejected: Array<{ path: string; reason: string }> = []
   const sound: Array<{ path: string; number: number }> = []
   for (const candidate of candidates) {
-    const reason = malformed(candidate, taken)
+    const reason = malformed(candidate, taken, takenNumbers)
     if (reason !== undefined) rejected.push({ path: candidate.path, reason })
     else sound.push({ path: candidate.path, number: parseDocId(declaredId(candidate.node!))!.number })
   }
@@ -264,16 +295,27 @@ export function judgeReferences(
 }
 
 /** Why this file is no well-formed reference, or nothing when it is one. */
-function malformed(candidate: ReferenceCandidate, taken: ReadonlySet<string>): string | undefined {
+function malformed(
+  candidate: ReferenceCandidate,
+  taken: ReadonlySet<string>,
+  takenNumbers: ReadonlySet<number>,
+): string | undefined {
   const { node } = candidate
   if (!node) return 'it is no document the board can read'
   const id = declaredId(node)
   if (node.type !== REFERENCE_TYPE) return `its type is ${JSON.stringify(node.type)}, not ${REFERENCE_TYPE}`
   if (node.status !== 'draft') return `its status is ${JSON.stringify(node.status)}, not draft`
-  if (!parseDocId(id)) return `its id ${JSON.stringify(id)} is not <type>-<nnnnn>-<slug>`
+  const parsed = parseDocId(id)
+  if (!parsed) return `its id ${JSON.stringify(id)} is not <type>-<nnnnn>-<slug>`
   if (node.path !== `${REFERENCE_TYPE}/${id}.md`) {
     return `it is at ${node.path} rather than at its canonical ${REFERENCE_TYPE}/${id}.md`
   }
   if (taken.has(id)) return `${id} is already the id of another document`
+  // Another slug on the same number is a different id and no collision, so this
+  // reading is its own: rule-00001-BR-18 hands each document a number nobody
+  // else holds, and the session that collapsed first already took this one.
+  if (takenNumbers.has(parsed.number)) {
+    return `its number is already taken by another ${REFERENCE_TYPE} document`
+  }
   return undefined
 }

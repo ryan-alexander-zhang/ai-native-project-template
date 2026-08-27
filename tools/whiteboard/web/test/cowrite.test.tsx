@@ -334,6 +334,22 @@ describe('the cowrite entry', () => {
     expect(cowrite).not.toHaveBeenCalled()
   })
 
+  // The same line typed twice is two entries: keyed by its text alone, one of the
+  // two would be dropped and the count under the box would disagree with the box
+  it('names a line it cannot use once for every time it was typed', async () => {
+    serve()
+    await openBoard()
+    await openLaunch()
+
+    await userEvent.type(screen.getByLabelText('Material references'), 'the notes I made\nthe notes I made')
+
+    const named = within(screen.getByRole('list', { name: 'Unusable materials' })).getAllByRole('listitem')
+    expect(named.map((one) => one.textContent)).toEqual([
+      'the notes I made — not a document id, an absolute path or a URL',
+      'the notes I made — not a document id, an absolute path or a URL',
+    ])
+  })
+
   // spec-00001-FR-55 in its cowrite reading (spec-00006-AC-1.3's front end): the
   // agent is a choice only where the config declares more than one
   it('sends the agent the user picked', async () => {
@@ -540,6 +556,77 @@ describe('the cowrite workspace', () => {
       }),
     )
     expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  /**
+   * spec-00006-AC-10.3's front-end half: a `doc-busy` 409 is the co-write lock, and
+   * reopening the document picks nothing up — the refusal is about the session, not
+   * about the file having moved. The two 409s a save can meet get the two ways out
+   * they actually have.
+   */
+  it('says the lock rather than «reopen it» when the save meets the co-write lock', async () => {
+    serve([listing({ awaiting: true })])
+    vi.spyOn(api, 'save').mockRejectedValue(
+      new ApiError(409, 'prd-00001-x has a running cowrite session', undefined, 'doc-busy'),
+    )
+    await openBoard()
+    await openEditor()
+    await typeInBuffer('X')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('prd-00001-x has a running cowrite session', {
+        description: CO_WRITE_LOCK,
+      }),
+    )
+  })
+
+  /**
+   * The hash a save was made against is the hash of nothing once it lands: a
+   * second save carrying it would meet the conflict check as though somebody else
+   * had written the file (spec-00001-FR-5). The buffer's base version is read back
+   * from disk, and the disk-moved notice is settled by the same read (AC-4.5).
+   */
+  it('saves twice in a row, the second one against the hash the first left', async () => {
+    serve([listing({ awaiting: true })])
+    const save = vi.spyOn(api, 'save').mockImplementation(async () => {
+      onDisk = { path: 'prd/a.md', content: `${onDisk.content}X`, hash: 'hash-2' }
+      return { committed: true }
+    })
+    await openBoard()
+    await openEditor()
+    await typeInBuffer('X')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await settle()
+    await typeInBuffer('Y')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await settle()
+
+    expect(save.mock.calls.map((call) => call[2])).toEqual(['hash-1', 'hash-2'])
+  })
+
+  /**
+   * The notice is about **this** document's disk moving under **this** buffer
+   * (AC-4.5): left standing it would follow the reader onto the next document they
+   * open and say something untrue of it.
+   */
+  it('clears the disk-moved notice when another document is opened', async () => {
+    serve([listing({ awaiting: true })])
+    await openBoard()
+    await openEditor()
+    await typeInBuffer('X')
+    onDisk = { path: 'prd/a.md', content: '# PRD\n\nwhat the agent wrote\n', hash: 'hash-2' }
+    await push()
+    await waitFor(() => expect(screen.getByText(DISK_MOVED)).toBeTruthy(), SETTLED)
+
+    fireEvent.click(screen.getByTestId('node-spec-00001-x'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy(), SETTLED)
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => expect(screen.getByLabelText('Editing spec-00001-x')).toBeTruthy(), SETTLED)
+    expect(screen.queryByText(DISK_MOVED)).toBeNull()
   })
 
   /**

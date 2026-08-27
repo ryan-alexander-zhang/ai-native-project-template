@@ -198,6 +198,42 @@ describe('guardFrontMatter', () => {
   it('reports a file whose front matter block was never closed', () => {
     expect(guardFrontMatter(`---\nid: prd-00001-x\n`, 'prd-00001-x', 'draft').problem).toBeDefined()
   })
+
+  /**
+   * The fences are compared normalised: a CRLF file whose fence reads `---\r` and a
+   * BOM-led one whose first line reads `\uFEFF---` both carry a front matter block,
+   * and reading them as bodies with none would have the guard report a block that
+   * is right there — leaving the status the session moved exactly where it moved it.
+   */
+  it('reads the front matter of a CRLF file and of one led by a byte order mark', () => {
+    const crlf = doc({ id: 'prd-00001-x', type: 'prd', status: 'active' }, BODY).replace(/\n/g, '\r\n')
+    const bom = `\uFEFF${doc({ id: 'prd-00001-x', type: 'prd', status: 'active' }, BODY)}`
+
+    for (const written of [crlf, bom]) {
+      const guarded = guardFrontMatter(written, 'prd-00001-x', 'draft')
+
+      expect(guarded.problem).toBeUndefined()
+      expect(guarded.content).toContain('status: draft')
+      expect(guarded.content).not.toContain('status: active')
+      expect(guarded.content).toContain('the agent wrote this')
+    }
+  })
+
+  /**
+   * `status:draft` with no space is the same key, and the guard has to replace that
+   * line rather than insert a second one beside it: a front matter carrying two
+   * `status` keys is the anomaly this guard exists to prevent.
+   */
+  it('replaces a key line whose colon carries no space, rather than adding a second', () => {
+    const written = `---\nid:prd-00007-renamed\ntype: prd\nstatus:active\n---\n\n${BODY}`
+
+    const guarded = guardFrontMatter(written, 'prd-00001-x', 'draft')
+
+    expect(guarded.content).toContain('id: prd-00001-x')
+    expect(guarded.content).toContain('status: draft')
+    expect(guarded.content.split('\n').filter((line) => /^status/.test(line))).toHaveLength(1)
+    expect(guarded.content.split('\n').filter((line) => /^id/.test(line))).toHaveLength(1)
+  })
 })
 
 describe('prefilledTemplate', () => {
@@ -220,6 +256,17 @@ describe('prefilledTemplate', () => {
 
     expect(filled.startsWith('---\nid: idea-00003-board\ntype: idea\nstatus: draft\n---\n')).toBe(true)
     expect(filled).toContain('# Title')
+  })
+
+  // The same normalisation the guard reads its fences by: a CRLF template has a
+  // front matter block, and prepending a second one would leave two.
+  it('fills the front matter of a CRLF template in place, rather than prepending another', () => {
+    const template = '---\r\nid: idea-00000-slug\r\ntype: idea\r\nstatus: draft\r\n---\r\n\r\n# Title\r\n'
+
+    const filled = prefilledTemplate(template, 'idea-00003-board', 'idea')
+
+    expect(filled).toContain('id: idea-00003-board')
+    expect(filled.split('---')).toHaveLength(3)
   })
 
   it('fills lines a template leaves out altogether', () => {
@@ -298,6 +345,41 @@ describe('judgeReferences', () => {
 
     expect(verdict.wellFormed).toEqual([])
     expect(verdict.rejected[0]!.reason).toMatch(/already the id of another document/)
+  })
+
+  /**
+   * spec-00006-AC-6.3 read with AC-8.4: two cowrites admitted at the same moment
+   * are handed the same starting number, and the one judged second finds the
+   * other's document already landed. A taken **number** is a per-file reading — the
+   * ids differ, since each session chose its own slug — so only the colliding
+   * candidate dies, and the survivors are then judged against the maximum that
+   * counts what landed. Whole-set rejection would kill a run that is perfectly
+   * legal from 00010 on.
+   */
+  // spec-00006-AC-6.3
+  // spec-00006-AC-8.4
+  it('rejects only the candidate whose number is taken, and passes the survivors as a run', () => {
+    const verdict = judgeReferences(
+      [candidate('reference-00009-mine'), candidate('reference-00010-mine')],
+      new Set(['reference-00009-theirs']),
+      9,
+    )
+
+    expect(verdict.wellFormed).toEqual(['docs/reference/reference-00010-mine.md'])
+    expect(verdict.rejected).toEqual([
+      {
+        path: 'docs/reference/reference-00009-mine.md',
+        reason: 'its number is already taken by another reference document',
+      },
+    ])
+  })
+
+  // A taken number is only a reference's: another type's document numbered the same
+  // is no collision at all (rule-00001-BR-18 counts per type)
+  it('is unmoved by another type of document carrying the same number', () => {
+    const verdict = judgeReferences([candidate('reference-00004-a')], new Set(['prd-00004-x']), 3)
+
+    expect(verdict.wellFormed).toEqual(['docs/reference/reference-00004-a.md'])
   })
 
   // The numbering belongs to the set, so a set that took the wrong numbers is

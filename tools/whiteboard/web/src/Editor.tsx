@@ -88,6 +88,10 @@ export function Editor({ docId, draft, mode, onMode, ask, asks, disk, readOnly =
   const editable = useMemo(() => new Compartment(), [])
 
   useEffect(() => {
+    // The notice is about **this** document's disk moving under **this** buffer
+    // (AC-4.5), so it goes when the buffer does: left standing, it would follow
+    // the reader onto the next document they open and say something untrue of it.
+    setMoved(false)
     // A new document has nothing to read: the buffer it opens with is the
     // prefill, and there is no base version to be in conflict with.
     if (draft !== undefined) {
@@ -170,6 +174,14 @@ export function Editor({ docId, draft, mode, onMode, ask, asks, disk, readOnly =
       } else {
         await api.save(docId, content, opened.hash)
         toast.success(`saved ${docId}`)
+        // The hash the save was made against is now the hash of nothing: the file
+        // on disk has moved on, and a second save carrying the old one would meet
+        // the conflict check as though somebody else had written the file. Read
+        // back, so the buffer's base version is what is actually there — and the
+        // notice about the disk having moved is settled by the same read.
+        const saved = await api.doc(docId)
+        setOpened(saved)
+        setMoved(false)
       }
       // What was saved is what the buffer is now in step with, so a cowrite
       // reload of the same text is not read as a change to be refused
@@ -179,8 +191,14 @@ export function Editor({ docId, draft, mode, onMode, ask, asks, disk, readOnly =
     } catch (error) {
       const conflict = error instanceof ApiError && error.status === 409
       // A conflict is a different problem on each path, so it gets a different
-      // way out: the file moved under a revision, the id is taken for a create.
-      const wayOut = draft === undefined ? 'reopen it to pick up the change' : 'pick another slug'
+      // way out: the co-write lock is about the session and reopening picks up
+      // nothing, the file moved under a revision, the id is taken for a create.
+      const wayOut =
+        error instanceof ApiError && error.reason === 'doc-busy'
+          ? CO_WRITE_LOCK
+          : draft === undefined
+            ? 'reopen it to pick up the change'
+            : 'pick another slug'
       toast.error(error instanceof Error ? error.message : String(error), {
         description: conflict ? wayOut : undefined,
       })

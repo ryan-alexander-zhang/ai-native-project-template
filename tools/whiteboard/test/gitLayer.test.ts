@@ -62,6 +62,18 @@ describe('restoreContent', () => {
 
     expect(existsSync(join(docsDir, 'prd/a.md'))).toBe(false)
   })
+
+  // The session may have taken the folder with the file: a restore that cannot
+  // write is a restore that did not happen, and the ENOENT would come back out of
+  // the collapse filter (design-00001 §11.3).
+  it('makes the directory again when the session removed it along with the file', () => {
+    const { docsDir, git } = layerOn({ 'prd/a.md': PRD, 'idea/b.md': IDEA })
+    rmSync(join(docsDir, 'idea'), { recursive: true })
+
+    git.restoreContent('docs/idea/b.md', IDEA)
+
+    expect(readFileSync(join(docsDir, 'idea/b.md'), 'utf8')).toBe(IDEA)
+  })
 })
 
 describe('restoreFromHead', () => {
@@ -92,6 +104,25 @@ describe('restoreFromHead', () => {
     git.restoreFromHead('docs/prd/invented.md')
 
     expect(existsSync(join(docsDir, 'prd/invented.md'))).toBe(false)
+  })
+
+  /**
+   * The deletion is conditioned on HEAD not carrying the path, never on the git
+   * call merely having failed: a checkout that falls over for a reason of its own
+   * — a locked index, a repository mid-operation — must not delete a document that
+   * is committed. Here the repository has no HEAD at all, so every git call in the
+   * restore fails, and the tracked file is left rather than destroyed.
+   */
+  it('raises rather than deleting when HEAD carries the path and the checkout fails', () => {
+    const { repoRoot, docsDir, git } = layerOn({ 'prd/a.md': PRD })
+    writeFileSync(join(docsDir, 'prd/a.md'), 'out of scope\n')
+    // A locked index: the checkout cannot run, while HEAD still answers for the
+    // path. The two failures are not the same thing, and only the second one is a
+    // licence to delete.
+    writeFileSync(join(repoRoot, '.git/index.lock'), '')
+
+    expect(() => git.restoreFromHead('docs/prd/a.md')).toThrowError()
+    expect(readFileSync(join(docsDir, 'prd/a.md'), 'utf8')).toBe('out of scope\n')
   })
 })
 
