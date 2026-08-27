@@ -107,15 +107,23 @@ Hit policy: `UNIQUE`
   缺口。交付范围为空的 plan 不受本约束（照常流转）。On violation: 流转被
   拒绝，拒绝理由逐条点名缺口条目。
 - **rule-00001-BR-26** (Definition) 流程入口类型与新建：流程入口类型恰为
-  `idea`、`prd`、`design` 与 `analysis`（第十四轮增后二者）——idea 与 prd
+  `idea`、`prd`、`design`、`analysis`（design 与 analysis 第十四轮增，
+  `plan-00016`）与 `decision`、`integration`、`reference`、`operation`、
+  `prompt`、`report`（`decision-00014` 增，补齐出生通路）——idea 与 prd
   是产品流的起点（项目从 idea 进入产品流，或跳过 idea 直接从 prd 开始，
-  `docs/README.md` 的既有约定）；design 与 analysis 是**无上游的思考承载
-  类型**，可先于任何 spec 存在（design 的 `informs` 可留空待拾取、analysis
-  的 `parent` 可为空——各自文件夹 README 的既有约定），故同样不必经推进
-  产生。流程入口类型的文档可不经推进直接**新建**：id 按 BR-18 取号、slug
-  自取，正文自该类型模板起草，初始 status 为 `draft`。入口身份不把该类型
-  移出产品流的下一步候选（design 仍是 BR-15 的 next）——两条通路的差别只
-  在是否携带指回来源的关系：推进来的带、新建的不带。
+  `docs/README.md` 的既有约定）；其余八种在产品流（BR-13…BR-17）中不是
+  任何类型的下一步候选，无推进通路可走，入口是它们唯一的出生方式：
+  design 与 analysis 承载先于任何 spec 的思考（design 的 `informs` 可留空
+  待拾取、analysis 的 `parent` 可为空——各自文件夹 README 的既有约定）；
+  decision 以 `motivated_by` 回指促成它的文档，新建时无来源可指则按
+  `docs/README.md` 的空字段约定省略——来源可以是一次评审对话（decision
+  文件夹 README 的既有约定）；operation 以 `implements` 指向它执行的
+  decision 或 design（其文件夹 README 的既有约定），而二者均无下一步候选
+  （BR-17），故 operation 同样无法经推进产生。流程入口类型的文档可不经
+  推进直接**新建**：id 按 BR-18 取号、slug 自取，正文自该类型模板起草，
+  初始 status 为 `draft`。入口身份不把该类型移出产品流的下一步候选
+  （design 仍是 BR-15 的 next）——两条通路的差别只在是否携带指回来源的
+  关系：推进来的带、新建的不带。
 - **rule-00001-BR-27** (Constraint) 非入口类型不得新建——它们经产品流推进
   （BR-13…BR-17）产生，携带指回来源的关系。On violation: 新建被拒绝。
 
@@ -356,6 +364,16 @@ Hit policy: `UNIQUE`
   When 新建一个 design
   Then 新文档 id 为 `design-00003-<slug>`，status 为 `draft`，正文自
   design 模板起草
+- **rule-00001-AC-26.3** (rule-00001-BR-26)
+  Given 一次评审对话促成了一个取舍，没有任何文档可作为其来源
+  When 新建一个 decision
+  Then 新文档 status 为 `draft`，front matter 不出现 `motivated_by` 字段，
+  文档仍合式
+- **rule-00001-AC-26.4** (rule-00001-BR-26)
+  Given 仓库中存在一份 `active` 的 spec
+  When 新建一个 design（而非自该 spec 推进出 design）
+  Then 新文档的 `informs` 不指向该 spec——新建不携带指回来源的关系，
+  与经 BR-15 推进出的 design 相区别
 - **rule-00001-AC-27.1** (rule-00001-BR-27)
   Given 任意仓库状态
   When 请求新建一个 `spec`（非入口类型）

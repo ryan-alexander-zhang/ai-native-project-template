@@ -31,9 +31,9 @@ types:
 
 # Flow entry types (rule-00001-BR-26, spec-00001-FR-53): the types the board's
 # create entry offers. Every name must be a declared type; omit or empty = no
-# create entry on the board. design and analysis are situational folders —
-# projects that do not use them should drop them from this list.
-entry: [idea, prd, design, analysis]
+# create entry on the board. Several of these are situational folders —
+# projects that do not use them should drop those from this list.
+entry: [idea, prd, design, analysis, decision, integration, reference, operation, prompt, report]
 
 # Session concurrency cap (spec-00003-FR-3): how many agent sessions may run at
 # once. Omit it and the board runs with the default 3; anything that is not a

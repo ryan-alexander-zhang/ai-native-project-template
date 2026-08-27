@@ -14,7 +14,8 @@ constrains: [<id>, ...]                       # docs this choice binds that don'
 
 <The situation that forces a choice: what is broken, missing, or ambiguous
 today, stated as observable facts rather than preferences. Cite the doc,
-requirement id, or issue that surfaced it.>
+requirement id, or issue that surfaced it — or name the review conversation
+when no doc exists (then omit `motivated_by`).>
 
 ## 2. 决定
 

@@ -253,11 +253,12 @@ _Avoid_：回退、降级、促回
 
 **流程入口类型（Entry Type）**：
 可不经推进直接新建、由此进入流程的类型（「入口」取广义：作图的起点，
-不限于产品流三段），恰为 idea、prd、design 与 analysis
-（`rule-00001-BR-26` 持有，第十四轮增后二者）：前两者是产品流的起点，
-后两者是无上游的思考承载类型（design 可先于 spec 存在、`informs` 留空待
-拾取）；流程配置以 `entry` 列表为其机器可读形态；非入口类型的新建被拒
-（`rule-00001-BR-27`）。
+不限于产品流三段），恰为 idea、prd、design、analysis、decision、
+integration、reference、operation、prompt、report（`rule-00001-BR-26`
+持有，design/analysis 第十四轮增，后六者 `decision-00014` 增）：idea 与
+prd 是产品流的起点，其余八种在产品流中不是任何类型的下一步候选、无推进
+通路可走，入口是其唯一出生方式；流程配置以 `entry` 列表为其机器可读
+形态；非入口类型的新建被拒（`rule-00001-BR-27`）。
 _Avoid_：根类型、起始类型、入口类型（省称——全称含「流程」）
 
 **新建（Create）**：
