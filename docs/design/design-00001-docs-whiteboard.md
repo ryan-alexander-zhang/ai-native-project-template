@@ -992,7 +992,7 @@ POST /api/sessions/cowrite   {create: {type, slug}, agent?, materials?}
     R -->|是| W{合式?}
     W -->|是| ST
     W -->|否| DEL[删除（复原）]
-    R -->|否| EX{豁免?<br/>其他运行中会话的<br/>快照后差集路径 /<br/>白板写管道的<br/>未竟提交}
+    R -->|否| EX{豁免?<br/>其他运行中会话的<br/>认领路径 /<br/>白板写管道的<br/>未竟提交}
     EX -->|是| SKIP[不动·不暂存]
     EX -->|否| RV[复原：快照全文 /<br/>git checkout /<br/>新文件删除]
   ```
@@ -1067,8 +1067,11 @@ POST /api/sessions/cowrite   {create: {type, slug}, agent?, materials?}
   会话结束后照常。
 - **编辑器旁路封堵（域主裁定）**：`PUT /api/docs/:id` 是整文件覆写、
   能绕过状态锁改 front matter——目标文档有运行中 `cowrite` 会话且新
-  内容的 front matter `id` 或 `status` 与盘上不一致时，PUT 以 409
-  拒绝（消息点名会话）；正文手改照常（那正是轮流持笔）。异常节点
+  内容的 front matter `id` 或 `status` 与**会话受理时刻记下的
+  `preId`/`preStatus`** 不一致时，PUT 以 409 拒绝（消息点名会话；
+  比对锚定受理值而非盘上现值——agent 已改盘上 status 后，按盘上比会
+  放过一次把非法状态坐实的保存，核验轮据实校正）；正文手改照常
+  （那正是轮流持笔）。异常节点
   不可共写，front matter 修复通路不受影响。**会话中的手改保存照常
   走写管道、一动作一 commit（`wb(edit)`）**——`spec-00006-AC-5.2`
   的「手改落地」由该 commit 承载，收束 commit 只含收束时仍脏的
