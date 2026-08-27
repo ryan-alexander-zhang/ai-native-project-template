@@ -1039,6 +1039,64 @@ describe('cowrite sessions', () => {
     expect(spawned[0]!.args).toEqual(['--interactive'])
   })
 
+  /**
+   * spec-00006-AC-7.2 — the second refusal is no more the board's business than
+   * the first. A permission prompt is output like any other and the denial is a
+   * keystroke like any other, so nothing in the manager reads either one: the
+   * session runs on, takes the next thing typed into it, and ends when the agent
+   * ends. Its own stand-in, because this is the one cowrite test that needs the
+   * pty to speak back.
+   */
+  // spec-00006-AC-7.2
+  it('keeps a session running and taking keystrokes after a second denied outside read', async () => {
+    const written: string[] = []
+    const hooks: { data?: (data: string) => void; exit?: (event: { exitCode: number }) => void } = {}
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command: 'node', args: ['--interactive'], cwd: 'docs' }],
+      maxSessions: 3,
+      repoRoot,
+      // The submit presses that follow the CLI's first output are the
+      // instruction's own business (issue-00011); parked past this test's life so
+      // that what the prompts and the denials wrote is all there is to read.
+      submitDelayMs: 60_000,
+      spawn: () => ({
+        onData: (listener) => void (hooks.data = listener),
+        onExit: (listener) => void (hooks.exit = listener),
+        write: (data) => void written.push(data),
+        resize: () => {},
+        kill: () => {},
+      }),
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    const info = manager.start(COWRITE)
+    const statusOf = () => manager.list().find((session) => session.id === info.id)!.status
+    const PROMPT = 'Read /Users/owner/notes/case.md, outside the repo? (y/n)'
+
+    hooks.data!(PROMPT)
+    manager.write(info.id, 'n')
+
+    expect(statusOf()).toBe('running')
+
+    hooks.data!(PROMPT)
+    manager.write(info.id, 'n')
+
+    expect(statusOf()).toBe('running')
+    expect(manager.isCowriting('prd-00001-x')).toBe(true)
+
+    // Still interactive: the next frame reaches the CLI as if nothing had been asked.
+    manager.write(info.id, 'carry on without that one')
+
+    expect(written).toEqual([COWRITE.instruction, 'n', 'n', 'carry on without that one'])
+
+    hooks.exit!({ exitCode: 0 })
+    await manager.whenFinished(info.id)
+
+    expect(statusOf()).toBe('exited')
+    expect(manager.list().find((session) => session.id === info.id)!.exitCode).toBe(0)
+  })
+
   // The content baseline of design-00001 §11.3: taken at the start, for this kind
   // alone, and carried on the plan the exit hook is handed.
   it('reads the content snapshot at the start and hands it on the plan', () => {
