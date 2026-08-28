@@ -408,7 +408,7 @@ Hit policy: `UNIQUE`
   Then 会话按意图改写其正文，状态仍为 `open`
 - **rule-00001-AC-28.3** (rule-00001-BR-28)
   Given 发起共写时以粘贴文本、仓内文档 id、仓库外 URL 各给一份材料
-  When 会话启动并完成仓外授权
+  When 会话启动
   Then 三份材料均进入会话的任务输入
 - **rule-00001-AC-29.1** (rule-00001-BR-29)
   Given 一份 `draft` 的 report 文档
@@ -448,6 +448,10 @@ Hit policy: `UNIQUE`
   Given 一个共写会话的产出改动了目标文档 front matter 的 `status`
   When 会话收束落地
   Then 该改动不落地，正文改动照常落地
+
+## Open Questions
+
+无。
 
 ## Links
 

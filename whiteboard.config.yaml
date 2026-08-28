@@ -124,8 +124,15 @@ agents:
     # Any CLI added here must first be verified against spec-00001-AC-13.2
     # (a write outside docs/ must not land) before it ships in this file — and,
     # since the co-write round, in the co-write form too (spec-00006-FR-7,
-    # design-00001 §11.5): an out-of-repo read raises the CLI's own permission
-    # prompt in the terminal, and a denial leaves the session alive.
+    # design-00001 §11.5): out-of-repo reads are decided by the CLI's own
+    # permission mechanism — the board never pre-authorises a read, answers a
+    # prompt, or suppresses one. Whether a prompt appears at all is that CLI
+    # version's own policy; if one does appear and the owner denies it, the
+    # session stays alive.
+    # Verified in the co-write form against claude 2.1.250 (2026-08-28): no
+    # out-of-domain write landed (the agent refused per the instruction, so the
+    # collapse filter had nothing to catch), and the CLI's classifier
+    # auto-allowed out-of-repo reads with no prompt shown.
     args: []
     cwd: docs
     # The non-interactive form an ask thread calls (spec-00005-FR-8): one
