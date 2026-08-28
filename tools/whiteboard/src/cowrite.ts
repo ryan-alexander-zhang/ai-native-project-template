@@ -69,9 +69,9 @@ export function materialLines(materials: CowriteMaterials | undefined, graph: Do
     ...(outside.length === 0
       ? []
       : [
-          'Reading anything outside this repository goes through your own permission mechanism, asking the',
-          '  owner right here in this terminal: the board neither pre-authorises it nor answers for them, and',
-          '  a refusal or an unreachable material ends nothing — carry on with the rest.',
+          'Reading anything outside this repository goes through your own permission mechanism, and whether',
+          '  it asks the owner is that mechanism’s own policy: the board neither pre-authorises the read nor',
+          '  answers for them, and a refusal or an unreachable material ends nothing — carry on with the rest.',
         ]),
   ]
 }
