@@ -76,7 +76,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#   Anchored: a bare `lib/` matches at every depth and swallowed
+#   tools/whiteboard/web/src/lib/ (issue-00017). setuptools writes this one at
+#   the repo root, which is all this rule ever meant.
+/lib/
 lib64/
 parts/
 sdist/
@@ -278,6 +281,19 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Node
+#   Dependencies, build output, and test artifacts
+node_modules/
+.npm
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+#   Vite build output and coverage reports (the `dist/` and `coverage.*` entries
+#   above cover Python builds and Go profiles, not these paths)
+tools/*/dist/
+coverage/
+.vite/
+
 # Project
 #   File lock
 .idea-number.lock
@@ -297,3 +313,6 @@ __marimo__/
 *.bak
 *.orig
 *.rej
+
+#   Whiteboard clarify session state (spec-00001-FR-46)
+.whiteboard/

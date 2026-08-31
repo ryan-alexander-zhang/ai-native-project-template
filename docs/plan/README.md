@@ -14,11 +14,16 @@ Add more when useful.
 
 ## Relations
 
-- `implements` — **required**: the `spec` and/or `design` this plan makes real, or
-  the `report` whose findings a remediation plan works through. It is the only
-  thing tying a plan to what it builds.
+- `implements` — **required**: the `spec`, `rule`, and/or `design` this plan makes
+  real, or the `report` whose findings a remediation plan works through. It is the
+  only thing tying a plan to what it builds. Requirement-item ids
+  (`spec-<n>-FR-<i>` / `rule-<n>-BR-<i>`) declare the plan's **delivery scope**
+  (`rule-00001-BR-24`); a whole spec/rule doc id puts every item of that doc in
+  scope. Prefer item ids when the plan delivers a slice of a larger spec.
 - A feature-sized plan reaching `resolved` needs a [`record`](../record/README.md)
-  whose `verifies` lists the requirement ids it checked.
+  whose `parent` points at this plan and whose `verifies` lists the requirement
+  ids it checked. The board refuses `open → resolved` while any item in the
+  delivery scope is not fully verified by such records (`rule-00001-BR-25`).
 
 ## Exclude
 

@@ -22,7 +22,8 @@ informs: [<spec-id | design-id | plan-id>, ...]   # the docs these rules are inp
 
 ## 3. Rules
 
-- **rule-00001-BR-1** (Definition) <how a value is derived>
+- **rule-00001-BR-1** (Definition) <how a value is derived — a derived number
+  states rounding direction and precision>
 - **rule-00001-BR-2** (Constraint) <what must never be true>. On violation:
   <what the business does>
 
@@ -32,7 +33,7 @@ Hit policy: `UNIQUE`
 
 | # | <input> | <input> | <outcome> |
 | --- | --- | --- | --- |
-| **rule-00001-BR-3** | … | … | … |
+| **rule-00001-BR-3** | (30, 60] | … | … |
 | **rule-00001-BR-4** | … | … | … |
 | **rule-00001-BR-5** | *(otherwise)* | | … |
 

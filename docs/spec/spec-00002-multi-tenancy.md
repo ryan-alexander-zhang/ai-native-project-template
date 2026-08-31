@@ -45,134 +45,134 @@ silo **seam** 预留在范围内（FR-17），其路由实现不在。
 
 ### 3.1 隔离与传播
 
-- **spec-00002-FR-1**（Ubiquitous）系统应在每条耐久行写入 `tenant_id`（`NOT NULL`），并在出站 Kafka 记录写 `ce_tenantid`。
-- **spec-00002-FR-2**（Event-driven）当命令在信任边界被接收，系统应把解析出的租户绑入 `CommandContext.tenantId`，
+- **spec-00002-FR-1** (Ubiquitous) 系统应在每条耐久行写入 `tenant_id`（`NOT NULL`），并在出站 Kafka 记录写 `ce_tenantid`。
+- **spec-00002-FR-2** (Event-driven) 当命令在信任边界被接收，系统应把解析出的租户绑入 `CommandContext.tenantId`，
   并贯穿 `root/deriveChild/of(envelope)`、发布器盖章、`EventEnvelope` 扩展属性直至 `ce_tenantid`。
-- **spec-00002-FR-3**（Ubiquitous）`TenantContext` 应在 trusted boundary 一次写入、请求内不可变、只承载单个 `TenantId`；
+- **spec-00002-FR-3** (Ubiquitous) `TenantContext` 应在 trusted boundary 一次写入、请求内不可变、只承载单个 `TenantId`；
   业务代码不得写入（对齐 decision-00012）。
-- **spec-00002-FR-4**（Unwanted）若消费端 `reconstruct` 收到带 `ce_tenantid` 的记录，系统**不得**丢弃该 header，
+- **spec-00002-FR-4** (Unwanted) 若消费端 `reconstruct` 收到带 `ce_tenantid` 的记录，系统**不得**丢弃该 header，
   应重建 `EventEnvelope` 租户并以 `TenantContext.runAs(tenant, …)` 包住处理。
 
 ### 3.2 空值与唯一键（正确性）
 
-- **spec-00002-FR-5**（Ubiquitous）`tenant_id` 应恒非空、默认 `__root__`；`TenantId` 校验应拒绝以 `__` 开头的用户租户。
-- **spec-00002-FR-6**（Ubiquitous）租户应仅进入**租户相对键**（`process_instance(tenant_id,process_type,business_key)`、
+- **spec-00002-FR-5** (Ubiquitous) `tenant_id` 应恒非空、默认 `__root__`；`TenantId` 校验应拒绝以 `__` 开头的用户租户。
+- **spec-00002-FR-6** (Ubiquitous) 租户应仅进入**租户相对键**（`process_instance(tenant_id,process_type,business_key)`、
   web `idempotency`/`nonce`/`rate_limit` 的 PK），**不进**框架生成的全局唯一 id 去重键（`event_id`/`ce_id`/`correlation_id` 等）。
 
 ### 3.3 强制隔离（三后端 × RLS 边界）
 
-- **spec-00002-FR-7**（Where MyBatis-Plus 后端）系统应以原生 `TenantLineInnerInterceptor` 自动注入租户谓词与 INSERT 列，
+- **spec-00002-FR-7** (Where MyBatis-Plus 后端) 系统应以原生 `TenantLineInnerInterceptor` 自动注入租户谓词与 INSERT 列，
   并 `ignoreTable` 排除 `shedlock` 与消息管道表。
-- **spec-00002-FR-8**（Where PostgreSQL 后端）系统应对**请求作用域表**（领域表/读模型/`process_instance` 请求侧检索）启用 RLS；
+- **spec-00002-FR-8** (Where PostgreSQL 后端) 系统应对**请求作用域表**（领域表/读模型/`process_instance` 请求侧检索）启用 RLS；
   H2/MySQL 无 RLS，退回手工 `TenantPredicate`。
-- **spec-00002-FR-9**（Where PostgreSQL RLS 后端）请求作用域事务应在事务内 `SET LOCAL app.tenant = <resolved>`；
+- **spec-00002-FR-9** (Where PostgreSQL RLS 后端) 请求作用域事务应在事务内 `SET LOCAL app.tenant = <resolved>`；
   该设置为事务作用域，连接归还池后**不得**残留到下一个借用者（禁用 `SET SESSION`）。
-- **spec-00002-FR-10**（Unwanted）若后台 relay/claim/cleanup 轮询运行，系统应以**独立 BYPASSRLS 角色**连接、
+- **spec-00002-FR-10** (Unwanted) 若后台 relay/claim/cleanup 轮询运行，系统应以**独立 BYPASSRLS 角色**连接、
   **不** `SET app.tenant`，从而跨租户全表扫描消息管道表（管道表不建 RLS）；该角色不得用于请求作用域领域访问。
 
 ### 3.4 策略、开关、一致性、观测
 
-- **spec-00002-FR-11**（Where 多租户开启）当请求解析不出租户时，`MissingTenantPolicy` 默认 `REJECT`（400/401）；
+- **spec-00002-FR-11** (Where 多租户开启) 当请求解析不出租户时，`MissingTenantPolicy` 默认 `REJECT`（400/401）；
   全仓库共用单一哨兵 `__root__`（operation-log 链已对齐）。
-- **spec-00002-FR-12**（Where 多租户开启）当**基础设施**要盖章或过滤 `tenant_id` 而当前线程无绑定时，
+- **spec-00002-FR-12** (Where 多租户开启) 当**基础设施**要盖章或过滤 `tenant_id` 而当前线程无绑定时，
   系统应抛 `MissingTenantException`，**不得**回退哨兵。该决策应收口在 `TenantContext.effective()` 单点，
   调用点不得各自决定回退值。多租户关闭时同一入口回退 `__root__`（N=1）。
-- **spec-00002-FR-13**（Where 多租户开启）系统应为自动装配的 executor 提供租户传播（`TaskDecorator`），
+- **spec-00002-FR-13** (Where 多租户开启) 系统应为自动装配的 executor 提供租户传播（`TaskDecorator`），
   并在消费方已自带 `TaskDecorator` 时让位（Spring Boot 仅在唯一 bean 时应用，注册第二个会静默废掉对方）。
   提交时无绑定不得凭空造租户。
-- **spec-00002-FR-14**（Where 多租户开启）系统**不应**把客户端可控的请求头作为默认租户来源：
+- **spec-00002-FR-14** (Where 多租户开启) 系统**不应**把客户端可控的请求头作为默认租户来源：
   无自定义 `TenantResolver` 且未显式 `trust-header=true` 时应拒绝启动，并在错误中给出安全接法。
-- **spec-00002-FR-15**（Where 多租户开启）消费的集成事件缺 `ce_tenantid` 时应按格式错误永久失败（死信），
+- **spec-00002-FR-15** (Where 多租户开启) 消费的集成事件缺 `ce_tenantid` 时应按格式错误永久失败（死信），
   不得归属哨兵；多租户关闭时应容忍缺失以兼容前租户时代的消息。
-- **spec-00002-FR-16**（Ubiquitous）`exclude-paths` 应按容器派发路径匹配，使路径穿越无法借用排除前缀
+- **spec-00002-FR-16** (Ubiquitous) `exclude-paths` 应按容器派发路径匹配，使路径穿越无法借用排除前缀
   跳过租户解析。
-- **spec-00002-FR-17**（Optional/预留）系统应把请求作用域数据源暴露为**单一可替换 bean**（读 `TenantContext`），
+- **spec-00002-FR-17** (Optional/预留) 系统应把请求作用域数据源暴露为**单一可替换 bean**（读 `TenantContext`），
   使将来的 `TenantRoutingDataSource`（silo）无需改 mapper 即可替入；MVP 提供单库 pass-through。
-- **spec-00002-FR-18**（Ubiquitous）系统应把租户作为维度加入 span（`tenant.id`）、MDC（`tenant`）；租户与 trace 分离传播。
+- **spec-00002-FR-18** (Ubiquitous) 系统应把租户作为维度加入 span（`tenant.id`）、MDC（`tenant`）；租户与 trace 分离传播。
 
 **Acceptance（GWT）**
 
-- **spec-00002-AC-5.1**（spec-00002-FR-5，NULL 陷阱）
+- **spec-00002-AC-5.1** (spec-00002-FR-5) NULL 陷阱：
   Given `process_instance` / web `idempotency` 复合唯一键、`tenant_id = __root__`
   When 同租户重复写同一 `business_key` / `Idempotency-Key`
   Then 唯一约束生效、拒绝重复；断言库中不存在 `tenant_id IS NULL` 行
-- **spec-00002-AC-6.1**（spec-00002-FR-6，键判据）
+- **spec-00002-AC-6.1** (spec-00002-FR-6) 键判据：
   Given 租户 A 与 B
   When 各写相同 `business_key` 与相同 `Idempotency-Key`
   Then 两者互不冲突、互不返回对方缓存响应；而相同 `event_id` 仍全局唯一去重
-- **spec-00002-AC-2.1**（spec-00002-FR-1 / spec-00002-FR-2，端到端传播）
+- **spec-00002-AC-2.1** (spec-00002-FR-1) 另覆盖 spec-00002-FR-2。端到端传播：
   Given 租户 A 的一条命令
   When 经 outbox 行 → Kafka → 消费端
   Then outbox 行 `tenant_id`、`ce_tenantid`、消费端 `CommandContext.tenantId` 三者一致为 A
-- **spec-00002-AC-4.1**（spec-00002-FR-4，consumer 存活）
+- **spec-00002-AC-4.1** (spec-00002-FR-4) consumer 存活：
   Given 一条带 `ce_tenantid=A` 的记录
   When 消费端 `reconstruct`
   Then `EventEnvelope` 租户为 A、处理在 `runAs(A)` 内，下游写入 `tenant_id=A`
-- **spec-00002-AC-3.1**（spec-00002-FR-3，一次写入不可变）
+- **spec-00002-AC-3.1** (spec-00002-FR-3) 一次写入不可变：
   Given 请求在 trusted boundary 已绑定租户 A
   When 业务代码尝试再次写入 `TenantContext`（改写为 B 或重复写 A）
   Then 写入被拒绝（编译期不可达或运行期抛错），请求余下部分 `effective()` 恒为 A
-- **spec-00002-AC-8.1**（spec-00002-FR-7 / spec-00002-FR-8，读隔离，参数化 MP/JDBC/RLS 三组）
+- **spec-00002-AC-8.1** (spec-00002-FR-7) 另覆盖 spec-00002-FR-8。读隔离 参数化 MP JDBC RLS 三组：
   Given 库中同时存在 A、B 的行
   When 以租户 A 上下文查询
   Then 只返回 A 的行（MyBatis-Plus 拦截器 / 手工谓词 / PostgreSQL RLS 各验一组）
-- **spec-00002-AC-9.1**（spec-00002-FR-9，连接池不泄漏）
+- **spec-00002-AC-9.1** (spec-00002-FR-9) 连接池不泄漏：
   Given RLS 开启、一个被复用的池连接
   When 先服务租户 A 的事务、归还、再服务租户 B
   Then B 的事务只见 B 行；A 的 `app.tenant` 不残留（`SET LOCAL` 随事务结束失效）
-- **spec-00002-AC-8.2**（spec-00002-FR-8，RLS 兜底漏写谓词）
+- **spec-00002-AC-8.2** (spec-00002-FR-8) RLS 兜底漏写谓词：
   Given PostgreSQL RLS、一条请求侧 SQL 故意漏写租户谓词
   When 以租户 A 执行
   Then DB 仍只返回 A 行（策略拒绝跨租户），不依赖应用层谓词
-- **spec-00002-AC-10.1**（spec-00002-FR-10，后台跨租户）
+- **spec-00002-AC-10.1** (spec-00002-FR-10) 后台跨租户：
   Given 多租户库、A/B 均有待投递 outbox 行
   When 单一全局 relay 轮询
   Then BYPASSRLS 角色扫到 A、B 全部行，并各自把 `tenant_id` 盖到 `ce_tenantid`
-- **spec-00002-AC-11.1**（spec-00002-FR-11，缺租户）
+- **spec-00002-AC-11.1** (spec-00002-FR-11) 缺租户：
   Given `tenancy.enabled=true`
   When 请求无法解析租户
   Then 按 `REJECT` 拒绝（400/401），无任何写入或读取落到共享桶
-- **spec-00002-AC-11.2**（spec-00002-FR-11，关闭模式）
+- **spec-00002-AC-11.2** (spec-00002-FR-11) 关闭模式：
   Given `tenancy.enabled=false`
   When 正常读写与投递
   Then 所有行 `tenant_id=__root__`，行为等价于引入多租户前
-- **spec-00002-AC-12.1**（spec-00002-FR-12，边缘之下 fail-closed）
+- **spec-00002-AC-12.1** (spec-00002-FR-12) 边缘之下 fail-closed：
   Given `tenancy.enabled=true`，三行分属两个租户，当前线程无绑定
   When 经 MyBatis-Plus 查询已列入 `tenant-tables` 的表
   Then 根因为 `MissingTenantException`；**不得**返回空结果集（空集与"该租户无数据"无法区分）
-- **spec-00002-AC-13.1**（spec-00002-FR-13，跨线程）
+- **spec-00002-AC-13.1** (spec-00002-FR-13) 跨线程：
   Given `tenancy.enabled=true`，请求已绑定租户 A
   When 工作交给自动装配的 executor
   Then 工作线程上 `effective()` 得到 A；任务结束后该池线程不残留任何绑定
-- **spec-00002-AC-14.1**（spec-00002-FR-14，不可信默认）
+- **spec-00002-AC-14.1** (spec-00002-FR-14) 不可信默认：
   Given `tenancy.enabled=true`，无 `TenantResolver` bean，未设 `trust-header`
   When 启动应用
   Then 启动失败，错误指明"从认证主体解析"与"由不可绕过的边缘重写该头"两种接法
-- **spec-00002-AC-15.1**（spec-00002-FR-15，开启时死信）
+- **spec-00002-AC-15.1** (spec-00002-FR-15) 开启时死信：
   Given `tenancy.enabled=true`
   When 消费一条缺 `ce_tenantid` 的集成事件
   Then 按格式错误永久失败进死信，不重试、不归属 `__root__`
-- **spec-00002-AC-15.2**（spec-00002-FR-15，关闭时容忍）
+- **spec-00002-AC-15.2** (spec-00002-FR-15) 关闭时容忍：
   Given `tenancy.enabled=false`
   When 消费同一条缺 `ce_tenantid` 的集成事件
   Then 正常处理，落 `tenant_id=__root__`
-- **spec-00002-AC-16.1**（spec-00002-FR-16，穿越）
+- **spec-00002-AC-16.1** (spec-00002-FR-16) 穿越：
   Given `exclude-paths = /actuator/**`
   When 请求 `/actuator/../orders`（容器派发到 `/orders`）
   Then 过滤器**不**跳过，照常解析并按策略处置
-- **spec-00002-AC-17.1**（spec-00002-FR-17，seam 可替换）
+- **spec-00002-AC-17.1** (spec-00002-FR-17) seam 可替换：
   Given MVP 的单库 pass-through 数据源 bean
   When 以一个读 `TenantContext` 的替身实现覆盖该 bean
   Then 应用照常启动、请求路由到替身，且没有任何 mapper 或仓储代码改动
-- **spec-00002-AC-18.1**（spec-00002-FR-18，维度就位）
+- **spec-00002-AC-18.1** (spec-00002-FR-18) 维度就位：
   Given `tenancy.enabled=true`、请求绑定租户 A
   When 处理请求
   Then span 带 `tenant.id=A`、日志 MDC 带 `tenant=A`
-- **spec-00002-AC-18.2**（spec-00002-FR-18，与 trace 分离）
+- **spec-00002-AC-18.2** (spec-00002-FR-18) 与 trace 分离：
   Given 同一租户 A 的两个请求分属不同 trace，以及同一 trace 内跨租户的后台动作
   When 检查遥测
   Then 租户维度不随 trace 传播、也不被 trace 覆盖：前者两个 trace 同为 A，后者租户按各自绑定取值
-- **spec-00002-AC-1.2**（spec-00002-FR-1，迁移）
+- **spec-00002-AC-1.2** (spec-00002-FR-1) 迁移：
   Given 存量单租户库
   When 执行 `ADD COLUMN tenant_id NOT NULL DEFAULT '__root__'`（仅租户相对键表升级唯一约束）
   Then 既有数据不破坏、复合唯一约束在哨兵下成立

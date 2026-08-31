@@ -19,11 +19,16 @@ Write the document description or comment after the front matter.
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
+- An `id` is **unique across the whole repo**: no two documents may declare the same one. Allocating the next free number per type (`rule-00001-BR-18`) is what keeps a new document from colliding; a collision that already exists is surfaced by the whiteboard as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]` and set the old doc to `archived`.
 - `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
+- A **substantive revision** of an `active` `spec`, `rule`, or `design` goes
+  through the **revision round** (`rule-00001-BR-3`): demote it to `draft` on
+  the board, revise, audit, and re-accept — never edit the `active` file in
+  place. Typo-level fixes are exempt; when in doubt, it is substantive.
 - Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
 - There are exactly two requirement id namespaces, and both carry their doc id:
   - `spec` owns **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.
@@ -38,12 +43,23 @@ Write the document description or comment after the front matter.
   - A field the document's type does not carry must not appear at all.
   - **Declare each edge once**, on the document that depends on the other. Do not
     write the inverse edge on the far end; derive it by reading or by script.
-  - `constrains` is the exception that proves the rule: it points downstream, so it
-    only lists documents that are bound by the choice but do not point back at it.
-    When a doc already declares `implements: [<the decision>]`, that edge exists —
+  - Three fields are the exception, because they point **downstream** and are
+    therefore declared on the upstream doc: `informs`, `constrains`, and `blocks`.
+    A `design` carries `informs: [<the spec it feeds>]`; an `issue` carries
+    `blocks: [<the plan it holds up>]`; a `decision` carries `constrains: [...]`.
+    Each still declares its edge once — just from the other end.
+  - `constrains` additionally lists only documents that do not point back at it:
+    when a doc already declares `implements: [<the decision>]`, that edge exists —
     do not repeat it in the decision's `constrains`.
   - Every listed id is a **full** `<type>-<nnnnn>-<slug>` id of a document that
-    exists. Never a bare `plan-00007`.
+    exists. Never a bare `plan-00007`. Two fields may additionally name
+    **requirement-item ids** (`spec-<nnnnn>-FR-<i>`, `rule-<nnnnn>-BR-<i>`, or
+    an `AC-<i>.<j>`) of items that exist: a `record`'s `verifies` (what it
+    checked), and a `plan`'s `implements` — item ids there declare the plan's
+    **delivery scope** (`rule-00001-BR-24`): the items whose acceptance must be
+    verified by that plan's records before the plan may turn `resolved`
+    (`rule-00001-BR-25`). An AC id in `implements` puts its owning item in
+    scope; a whole spec/rule doc id puts every item of that doc in scope.
 
 ## Relations
 

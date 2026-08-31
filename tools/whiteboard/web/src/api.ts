@@ -1,0 +1,207 @@
+import type { AskExchange, AskThread } from '../../src/askStore.ts'
+import type { FlowConfig, FlowStep } from '../../src/config.ts'
+import type { CowriteMaterials } from '../../src/cowrite.ts'
+import type { DocContent, DocGraph } from '../../src/docRepository.ts'
+import type { ActionResult, CoverageRow } from '../../src/docService.ts'
+import type { ItemsView } from '../../src/requirements.ts'
+import type { SessionHistoryEntry, SessionHistoryMeta } from '../../src/sessionHistory.ts'
+import type { SessionInfo, SessionListing } from '../../src/sessionManager.ts'
+
+export type {
+  AskExchange,
+  AskThread,
+  CoverageRow,
+  CowriteMaterials,
+  DocContent,
+  DocGraph,
+  FlowConfig,
+  FlowStep,
+  ItemsView,
+  SessionHistoryEntry,
+  SessionHistoryMeta,
+  SessionInfo,
+  SessionListing,
+}
+
+/**
+ * What one question carries (design-00001 §7). No `threadId` opens a thread of
+ * its own — a headless first call; one that names a thread is that thread's
+ * follow-up, and `resend` says its last question is being put again rather than
+ * a new one asked (spec-00005-FR-2, FR-7).
+ */
+export interface AskSubmit {
+  docId: string
+  question: string
+  agent?: string
+  threadId?: string
+  resend?: boolean
+}
+
+/**
+ * What one cowrite launch carries (design-00001 §11.2): the document it writes,
+ * **or** the type and slug of one to be filed first — the two forms are
+ * exclusive. The materials are optional in both: empty materials are a launch
+ * like any other, unlike an empty question (spec-00006-AC-3.3).
+ */
+export interface CowriteSubmit {
+  docId?: string
+  create?: { type: string; slug: string }
+  agent?: string
+  materials?: CowriteMaterials
+}
+
+/**
+ * What `GET /api/config` hands the board: the effective flow config, plus the
+ * two type sets the code — not the config file — owns (spec-00001-FR-56). The
+ * board keeps no copy of either: what it shows follows this payload, so the
+ * front end and the server cannot drift apart (spec-00001-AC-56.2).
+ */
+export type ConfigPayload = FlowConfig & {
+  clarifiable: string[]
+  auditable: string[]
+}
+
+/**
+ * The prefill of a new document: the id prefix `rule-00001-BR-18` allocated and
+ * the type's template, neither of which is on disk yet — creating happens on
+ * save (spec-00001-FR-53).
+ */
+export interface CreatePrefill {
+  idPrefix: string
+  template: string
+}
+
+
+/** A refused action; `status` is what the board shows the user (409 conflict, 422 rejected). */
+export class ApiError extends Error {
+  readonly status: number
+  /**
+   * The gaps a `resolved` gate refusal names one by one — item ids, or ids it
+   * could not resolve (spec-00001-FR-52). Only that refusal carries them, so
+   * their presence is what tells the gate's 422 from any other.
+   */
+  readonly gaps?: string[]
+  /**
+   * The word the server put on a refusal that has one (design-00001 §7):
+   * `doc-busy`, `cap-reached`, `doc-missing`. Two refusals answer 409 for quite
+   * different reasons — a file that moved under the buffer and a document a
+   * cowrite session holds — and only this tells them apart, so the way out the
+   * board offers is the right one (spec-00006-AC-10.3).
+   */
+  readonly reason?: string
+
+  constructor(status: number, message: string, gaps?: string[], reason?: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.gaps = gaps
+    this.reason = reason
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const payload = await response.json()
+  if (!response.ok) {
+    throw new ApiError(response.status, payload.error ?? response.statusText, payload.gaps, payload.reason)
+  }
+  return payload as T
+}
+
+/**
+ * A document's own path segment. What addresses a document is its **node key**,
+ * which is its id only while the front matter carries one: an anomalous
+ * document is keyed by its file path (spec-00001-FR-2), and so is each side of
+ * an id collision (spec-00002-FR-8). A path carries slashes, and a slash left
+ * raw in the URL becomes another path segment, so the request never reaches the
+ * document — the defect of issue-00016. Express 5 hands `%2F` back to `:id` as
+ * a slash, so the encoding is the whole fix and the routes are untouched.
+ */
+function at(key: string): string {
+  return `/api/docs/${encodeURIComponent(key)}`
+}
+
+export const api = {
+  graph: () => request<DocGraph>('GET', '/api/graph'),
+  // The global coverage view's one read (spec-00002-FR-10). Asked for only while
+  // the view is open: it is the heaviest read the board has (design-00001 §6).
+  coverage: () => request<CoverageRow[]>('GET', '/api/coverage'),
+  config: () => request<ConfigPayload>('GET', '/api/config'),
+  doc: (id: string) => request<DocContent>('GET', at(id)),
+  items: (id: string) => request<ItemsView>('GET', `${at(id)}/items`),
+  save: (id: string, content: string, baseHash: string) =>
+    request<ActionResult>('PUT', at(id), { content, baseHash }),
+  transitions: (id: string) => request<string[]>('GET', `${at(id)}/transitions`),
+  setStatus: (id: string, to: string) => request<ActionResult>('POST', `${at(id)}/status`, { to }),
+  accept: (id: string) => request<ActionResult>('POST', `${at(id)}/review`, { action: 'accept' }),
+  nextSteps: (id: string) => request<FlowStep[]>('GET', `${at(id)}/next-steps`),
+  /**
+   * Every session the server holds — running and ended alike, oldest first
+   * (`GET /api/sessions`, design-00001 §7). The whole list, not a pick off it:
+   * the session panel lists them all (spec-00003-FR-4), the top bar counts them
+   * (FR-6), the node markers read the running ones (FR-10), and a board opening
+   * fresh reattaches to one of them (FR-9). Which one the terminal shows is the
+   * board's own presentation state, never the payload's (FR-5).
+   */
+  sessions: async (): Promise<SessionListing[]> => {
+    const { sessions } = await request<{ sessions: SessionListing[] }>('GET', '/api/sessions')
+    return sessions
+  },
+  // Every session entry may name which agent runs it; leaving it out is what a
+  // single-agent config does, and the server then takes the first
+  // (spec-00001-FR-55). `undefined` drops out of the body on its own, so an
+  // unspecified agent is an absent field, not a null one.
+  advance: (sourceId: string, targetType: string, agent?: string) =>
+    request<SessionInfo>('POST', '/api/sessions', { sourceId, targetType, agent }),
+  // Clarify and audit are sessions, not writes: the agent does the questioning
+  // and the auditing in the terminal (spec-00001-FR-9, FR-50).
+  clarify: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/clarify', { docId, agent }),
+  audit: (docId: string, agent?: string) => request<SessionInfo>('POST', '/api/sessions/audit', { docId, agent }),
+  /**
+   * One question on one document (spec-00005-FR-1). It is a session too, but a
+   * headless one: what comes back is the call's registry session and the thread
+   * the question landed on, and there is no terminal to open (FR-3).
+   */
+  ask: (submit: AskSubmit) =>
+    request<{ sessionId: string; threadId: string }>('POST', '/api/sessions/ask', submit),
+  /**
+   * One cowrite session (spec-00006-FR-1, FR-2). What comes back is the session
+   * and the document it is on — which the create form only learns here, since the
+   * number is the server's — and, for that form alone, the `error` of a filing
+   * whose commit failed: the file is on disk and the session goes ahead, so it is
+   * a notice rather than a refusal (spec-00001-FR-20, design-00001 §11.2).
+   */
+  cowrite: (submit: CowriteSubmit) =>
+    request<{ sessionId: string; docId: string; error?: string }>('POST', '/api/sessions/cowrite', submit),
+  /**
+   * A document's ask list (spec-00005-FR-9). Asked for only while the list is
+   * on show — it is the fourth item of the one refresh path, and a board that is
+   * not showing a list has nothing to do with the answer (design-00002 §10).
+   * A document with no list yet answers with no threads, never an error.
+   */
+  asks: async (docId: string): Promise<AskThread[]> => {
+    const { threads } = await request<{ threads: AskThread[] }>(
+      'GET',
+      `/api/asks/${encodeURIComponent(docId)}`,
+    )
+    return threads
+  },
+  // The way out of a session that will not end by itself; what comes back is the
+  // session as it finished (spec-00001-FR-49). The session is named: the stop
+  // acts on the one the terminal is showing (spec-00003-FR-5).
+  stopSession: (id: string) => request<SessionInfo>('DELETE', `/api/sessions/${encodeURIComponent(id)}`),
+  // Creating is two steps, and only the second one writes: the prefill takes a
+  // number and a template, the save creates the file (spec-00001-FR-53). The
+  // path is its own rather than under `/api/docs/:id` — there is no id yet.
+  createPrefill: (type: string) =>
+    request<CreatePrefill>('GET', `/api/create?type=${encodeURIComponent(type)}`),
+  createDoc: (id: string, content: string) => request<ActionResult>('POST', '/api/docs', { id, content }),
+  // The sessions that have already ended, and any one of them read whole
+  // (spec-00001-FR-54).
+  sessionHistory: () => request<SessionHistoryMeta[]>('GET', '/api/sessions/history'),
+  sessionTranscript: (id: string) => request<SessionHistoryEntry>('GET', `/api/sessions/history/${id}`),
+}

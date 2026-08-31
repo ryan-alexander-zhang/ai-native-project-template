@@ -1,0 +1,170 @@
+import { Handle } from '@xyflow/react'
+import { CircleHelp, Keyboard, TerminalIcon, TriangleAlert } from 'lucide-react'
+import { Fragment } from 'react'
+import type { DocNode } from '../../src/docRepository.ts'
+import type { SessionListing } from './api.ts'
+import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { SIDES, SIDE_POSITION, handleId } from './canvasModel.ts'
+import { kindColour, statusColour, statusLabel, typeIcon } from './status.ts'
+
+export interface NodeCardProps {
+  node: DocNode
+  selected: boolean
+  kind?: string
+  /** Recedes while another node holds the focus (spec-00001-AC-29.2). */
+  suppressed?: boolean
+  /**
+   * The sessions running on this document (spec-00003-FR-10 as spec-00005-FR-9
+   * rewrites it): one document may now carry several — one terminal-form
+   * session and any number of asks — and they are one marker, never a count.
+   */
+  sessions?: SessionListing[]
+  /** Go to that session — the same act as picking it in the session panel, kind and all. */
+  onShowSession?: (id: string) => void
+}
+
+/**
+ * The one marker's session: a terminal-form one if the document has it, and
+ * otherwise the oldest ask. Which it is decides both the icon and what
+ * activating the marker does — the terminal for the first, the document's ask
+ * list for the second (spec-00005-AC-9.6, AC-9.7).
+ */
+function markerOf(sessions: SessionListing[]): SessionListing | undefined {
+  return sessions.find((one) => one.kind !== 'ask') ?? sessions[0]
+}
+
+/** A document on the canvas: type, status, title, id, and any anomaly. */
+export function NodeCard({ node, selected, kind, suppressed = false, sessions = [], onShowSession }: NodeCardProps) {
+  const Icon = typeIcon(node.type)
+  const session = markerOf(sessions)
+  // Running, waiting on an answer, or only being asked a question: three
+  // readings, three icons, and the accessible name says which — never colour
+  // alone (design-00002 §14).
+  const state = session === undefined ? '' : session.kind === 'ask' ? 'Ask' : session.awaiting === true ? 'Awaiting input' : 'Running'
+  const Marker = session?.kind === 'ask' ? CircleHelp : session?.awaiting === true ? Keyboard : TerminalIcon
+  return (
+    <div
+      data-testid={`node-${node.id}`}
+      className={`bg-card text-card-foreground flex h-[92px] w-[240px] flex-col gap-1 overflow-hidden rounded-xl border-2 px-3 py-2 shadow-sm transition-shadow ${
+        selected ? 'ring-ring/50 shadow-md ring-2' : ''
+      } ${suppressed ? 'node--suppressed' : ''}`}
+      style={{ borderColor: node.ok ? kindColour(kind) : 'var(--destructive)' }}
+    >
+      {/*
+        A custom node owns the connection contract too: without handles React
+        Flow drops every edge that touches it (issue-00002). They are hidden
+        with opacity, never `display: none` — an unlaid-out handle cannot be
+        measured, which brings the same defect back.
+
+        The three connect flags are set here rather than left to the canvas.
+        `<ReactFlow nodesConnectable={false}>` only passes a flag down to the
+        node component, which a custom node must forward. And `isConnectable`
+        alone is not enough: `Handle` defaults `isConnectableStart` and
+        `isConnectableEnd` independently, and the pointer-down guard reads
+        `isConnectableStart` — so without all three the drag stays armed and
+        only the CSS class goes away.
+      */}
+      {SIDES.map((side) => (
+        <Fragment key={side}>
+          <Handle
+            type="source"
+            id={handleId('source', side)}
+            position={SIDE_POSITION[side]}
+            isConnectable={false}
+            isConnectableStart={false}
+            isConnectableEnd={false}
+            className="opacity-0"
+          />
+          <Handle
+            type="target"
+            id={handleId('target', side)}
+            position={SIDE_POSITION[side]}
+            isConnectable={false}
+            isConnectableStart={false}
+            isConnectableEnd={false}
+            className="opacity-0"
+          />
+        </Fragment>
+      ))}
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground flex items-center gap-1.5 text-[11px] tracking-wide uppercase">
+          <Icon className="size-3.5" aria-hidden />
+          {node.type ?? '—'}
+        </span>
+        {/*
+          Slot ⑥ (design-00002 §4): this document has at least one session
+          running, and this is the way to it (spec-00003-FR-10). One marker
+          whatever the number of them — a count would say nothing worth the
+          space (design-00002 §14). Activating it is not selecting the node —
+          the gesture is stopped here, on click and on the Enter that fires it,
+          the same convention the inline id jump follows (spec-00001-FR-57): the
+          pointer events go too, or React Flow would drag the node under the
+          press.
+        */}
+        {session === undefined ? null : (
+          <Badge variant="outline" className="px-1.5 py-0.5" asChild>
+            <button
+              type="button"
+              aria-label={`${state} session of ${node.id}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+              }}
+              onClick={(event) => {
+                event.stopPropagation()
+                onShowSession?.(session.id)
+              }}
+            >
+              <Marker className="size-3.5" aria-hidden />
+            </button>
+          </Badge>
+        )}
+        <Badge
+          className="border-transparent text-[10px] text-white"
+          style={{ backgroundColor: statusColour(node) }}
+        >
+          {statusLabel(node)}
+        </Badge>
+      </div>
+
+      <div className="line-clamp-2 text-[13px] leading-tight font-semibold">{node.title}</div>
+      {/*
+        The key, and — for a node that collides on its id — the id it collides
+        on beside it (spec-00002-AC-8.1, design-00002 §4). Both have to be
+        there: without the path there is no telling the two files apart, and
+        without the id there is no seeing what they collided on.
+      */}
+      <div className="text-muted-foreground truncate font-mono text-[10px]">
+        {node.id}
+        {node.duplicateOf === undefined ? null : (
+          <span className="text-destructive ml-1.5">{node.duplicateOf}</span>
+        )}
+      </div>
+
+      {node.ok ? null : (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Front matter problems of ${node.id}`}
+              className="text-destructive mt-auto flex items-center gap-1 self-start text-[11px] underline-offset-2 hover:underline"
+            >
+              <TriangleAlert className="size-3.5" aria-hidden />
+              {node.problems.length} problem{node.problems.length === 1 ? '' : 's'}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 text-xs">
+            <ul className="list-disc space-y-1 pl-4">
+              {node.problems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
+      )}
+    </div>
+  )
+}

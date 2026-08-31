@@ -42,69 +42,69 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 
 **S1 注解捕获**
 
-- **spec-00001-FR-1**（Event）当带 `@OperationLog` 的 command 正常返回时，系统应恰好记录一条
+- **spec-00001-FR-1** (Event) 当带 `@OperationLog` 的 command 正常返回时，系统应恰好记录一条
   `outcome=SUCCEEDED, completion=COMMITTED` 的 entry，且与业务变更同事务提交。
-- **spec-00001-FR-2**（Optional）当注解声明了 `rejectedWhen` 谓词且其对结果投影为真时，系统应把该次正常返回记为
+- **spec-00001-FR-2** (Optional) 当注解声明了 `rejectedWhen` 谓词且其对结果投影为真时，系统应把该次正常返回记为
   `REJECTED, COMMITTED`。
-- **spec-00001-FR-3**（Unwanted）若带 `@OperationLog` 的 command 抛异常且 `recordFailure=true`，则系统应记录一条
+- **spec-00001-FR-3** (Unwanted) 若带 `@OperationLog` 的 command 抛异常且 `recordFailure=true`，则系统应记录一条
   `REJECTED/FAILED`（由 `FailureClassifier` 判定），并**重新抛出原异常**。
-- **spec-00001-FR-4**（Ubiquitous）系统应只在启动期编译并校验注解模板；非法模板阻止启动。
+- **spec-00001-FR-4** (Ubiquitous) 系统应只在启动期编译并校验注解模板；非法模板阻止启动。
 
 **S2 Definition 捕获**
 
-- **spec-00001-FR-5**（Event）当 Definition 的 `prepare` 在成功路径执行时，系统应在业务事务内**只捕获一次**
+- **spec-00001-FR-5** (Event) 当 Definition 的 `prepare` 在成功路径执行时，系统应在业务事务内**只捕获一次**
   allowlisted before projection。
-- **spec-00001-FR-6**（Event）当 `complete(result)` 返回 draft 时，系统应经同一 normalize/validate/redact/freeze
+- **spec-00001-FR-6** (Event) 当 `complete(result)` 返回 draft 时，系统应经同一 normalize/validate/redact/freeze
   pipeline 落库（与等价注解一致）。
-- **spec-00001-FR-7**（Optional）当 `complete`/`failed` 返回 empty 时，系统应不记录任何 entry（`RecordResult.SKIPPED`）。
-- **spec-00001-FR-8**（Unwanted）若同一 input type 同时匹配注解与 Definition、或有重复 Definition、或泛型不可判定，
+- **spec-00001-FR-7** (Optional) 当 `complete`/`failed` 返回 empty 时，系统应不记录任何 entry（`RecordResult.SKIPPED`）。
+- **spec-00001-FR-8** (Unwanted) 若同一 input type 同时匹配注解与 Definition、或有重复 Definition、或泛型不可判定，
   则系统应在启动期失败。
 
 **S3 direct-API 记录**
 
-- **spec-00001-FR-9**（Event）当调用 `OperationLogs.record(draft)` 且存在当前事务时，系统应把 append 加入该事务。
-- **spec-00001-FR-10**（Unwanted）若无当前事务，则系统应记 `completion=UNKNOWN`，不冒充原子性。
-- **spec-00001-FR-11**（Ubiquitous）系统应要求调用方显式提供 actor、可信 tenant/source、target、outcome；可重试调用须提供稳定 `idempotencyKey`。
+- **spec-00001-FR-9** (Event) 当调用 `OperationLogs.record(draft)` 且存在当前事务时，系统应把 append 加入该事务。
+- **spec-00001-FR-10** (Unwanted) 若无当前事务，则系统应记 `completion=UNKNOWN`，不冒充原子性。
+- **spec-00001-FR-11** (Ubiquitous) 系统应要求调用方显式提供 actor、可信 tenant/source、target、outcome；可重试调用须提供稳定 `idempotencyKey`。
 
 **Acceptance（GWT）**
 
-- **spec-00001-AC-1.1**（spec-00001-FR-1）
+- **spec-00001-AC-1.1** (spec-00001-FR-1)
   Given 一个带 `@OperationLog` 的 command 与已提交的业务变更
   When 它正常返回
   Then 存在恰好一条 `SUCCEEDED+COMMITTED` entry，actor/target/code/causality 正确，且与业务行同事务
-- **spec-00001-AC-1.2**（spec-00001-FR-1）
+- **spec-00001-AC-1.2** (spec-00001-FR-1)
   Given 同上
   When 业务事务因其它原因回滚
   Then 不存在虚假的 `SUCCEEDED` entry
-- **spec-00001-AC-2.1**（spec-00001-FR-2）
+- **spec-00001-AC-2.1** (spec-00001-FR-2)
   Given 一个带 `rejectedWhen` 谓词的注解 command
   When 它正常返回且谓词对结果投影为真
   Then 存在一条 `REJECTED+COMMITTED` entry，与业务事务一起提交
-- **spec-00001-AC-3.1**（spec-00001-FR-3）
+- **spec-00001-AC-3.1** (spec-00001-FR-3)
   Given `recordFailure=true` 的注解 command
   When handler 抛技术异常导致回滚
   Then 存在一条 `FAILED+ROLLED_BACK` entry，且原异常被重新抛出、未被替换
-- **spec-00001-AC-4.1**（spec-00001-FR-4）
+- **spec-00001-AC-4.1** (spec-00001-FR-4)
   Given 一个含非法属性路径 / 未知根对象的注解模板
   When 应用启动
   Then 启动失败并给出可定位的模板编译错误
-- **spec-00001-AC-5.1**（spec-00001-FR-5, spec-00001-FR-6）
+- **spec-00001-AC-5.1** (spec-00001-FR-5) 另覆盖 spec-00001-FR-6。
   Given 一个改地址的 Definition
   When 命令成功
   Then before projection 只执行一次，entry 的 `changes` 只含 allowlist 的实际变化，并与等价注解走同一 pipeline
-- **spec-00001-AC-7.1**（spec-00001-FR-7）
+- **spec-00001-AC-7.1** (spec-00001-FR-7)
   Given 一个在无变化时返回 empty 的 Definition
   When 命令成功但无可记录变化
   Then 不产生任何 entry，`record(...)` 结果为 `SKIPPED`
-- **spec-00001-AC-8.1**（spec-00001-FR-8）
+- **spec-00001-AC-8.1** (spec-00001-FR-8)
   Given 同一 input type 既有注解又有 Definition
   When 应用启动
   Then 启动失败并给出可定位的冲突信息
-- **spec-00001-AC-9.1**（spec-00001-FR-9, spec-00001-FR-10）
+- **spec-00001-AC-9.1** (spec-00001-FR-9) 另覆盖 spec-00001-FR-10。
   Given 一个 `@Transactional` batch 与一个无事务 CLI 动作
   When 各自 `record(draft)`
   Then 前者 `completion=COMMITTED` 与业务同事务，后者 `completion=UNKNOWN`
-- **spec-00001-AC-11.1**（spec-00001-FR-11）
+- **spec-00001-AC-11.1** (spec-00001-FR-11)
   Given 一个会重跑的 batch 动作，为每条记录提供稳定 `idempotencyKey`
   When 该动作重跑
   Then 不产生重复 entry，`record(...)` 返回 `DUPLICATE(existingRecordId)`
@@ -113,66 +113,66 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 
 面向整个组件、不属单个 story 的系统要求（幂等、事务、隐私、租户、尺寸、方言）。
 
-- **spec-00001-FR-12**（Unwanted）若同一 `(tenant, source, messageId, operationCode, outcome, completion)` 被重投，
+- **spec-00001-FR-12** (Unwanted) 若同一 `(tenant, source, messageId, operationCode, outcome, completion)` 被重投，
   则系统应至多产生一条 entry，并返回既有 `recordId`。
-- **spec-00001-FR-13**（Complex）当成功路径 append 命中唯一键冲突时（在业务事务内），系统应使用方言原生
+- **spec-00001-FR-13** (Complex) 当成功路径 append 命中唯一键冲突时（在业务事务内），系统应使用方言原生
   `ON CONFLICT DO NOTHING` / `SAVEPOINT` 收敛而**不 abort 业务事务**；仅失败路径的隔离事务可用 catch-异常收敛。
-- **spec-00001-FR-14**（Unwanted）若成功路径 append 发生非重复键（genuine）错误，则系统应回滚业务事务（fail-closed）。
-- **spec-00001-FR-15**（Unwanted）若异常/回滚路径记录失败，则系统应保留并重抛原业务异常，并输出 failure-loss metric+alert。
-- **spec-00001-FR-16**（Ubiquitous）系统应默认拒绝记录任何字段（消费方逐项 allowlist），且 secret/token/凭据/生物信息
+- **spec-00001-FR-14** (Unwanted) 若成功路径 append 发生非重复键（genuine）错误，则系统应回滚业务事务（fail-closed）。
+- **spec-00001-FR-15** (Unwanted) 若异常/回滚路径记录失败，则系统应保留并重抛原业务异常，并输出 failure-loss metric+alert。
+- **spec-00001-FR-16** (Ubiquitous) 系统应默认拒绝记录任何字段（消费方逐项 allowlist），且 secret/token/凭据/生物信息
   永不入库；summary/label/value 入库前去除 CR/LF；failure 只存 `code/category/safeSummary`。
-- **spec-00001-FR-17**（Where 多租户开启）系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
-- **spec-00001-FR-18**（Unwanted）若渲染后的 summary/changes/details/单值/总 payload 超过配置预算，则系统应按策略拒绝或截断并可观测。
-- **spec-00001-FR-19**（Ubiquitous）系统应在 `-jdbc` 与 `-mybatis-plus` 两后端 × H2/MySQL/PostgreSQL 三方言下，
+- **spec-00001-FR-17** (Where 多租户开启) 系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
+- **spec-00001-FR-18** (Unwanted) 若渲染后的 summary/changes/details/单值/总 payload 超过配置预算，则系统应按策略拒绝或截断并可观测。
+- **spec-00001-FR-19** (Ubiquitous) 系统应在 `-jdbc` 与 `-mybatis-plus` 两后端 × H2/MySQL/PostgreSQL 三方言下，
   唯一约束、幂等收敛、时间序与分页排序行为等价。
-- **spec-00001-FR-20**（Ubiquitous）系统不应引入任何 ambient/ThreadLocal 每命令状态；成功与失败两路各持不可变局部对象。
+- **spec-00001-FR-20** (Ubiquitous) 系统不应引入任何 ambient/ThreadLocal 每命令状态；成功与失败两路各持不可变局部对象。
 
 **Acceptance（GWT）**
-- **spec-00001-AC-12.1**（spec-00001-FR-12）
+- **spec-00001-AC-12.1** (spec-00001-FR-12)
   Given 一条已提交的 `SUCCEEDED+COMMITTED` entry
   When 同 result kind 的命令被重投
   Then 不产生第二条记录，`record(...)` 返回 `DUPLICATE(existingRecordId)`
-- **spec-00001-AC-12.2**（spec-00001-FR-12）
+- **spec-00001-AC-12.2** (spec-00001-FR-12)
   Given 一条命令首次 `FAILED+ROLLED_BACK`
   When 重投后 `SUCCEEDED+COMMITTED`
   Then 保留两条各自收敛的 entry（result kind 不同）
-- **spec-00001-AC-13.1**（spec-00001-FR-13）
+- **spec-00001-AC-13.1** (spec-00001-FR-13)
   Given PostgreSQL、成功路径、同 idempotency_key 已存在
   When 重投在业务事务内 append
   Then 业务事务成功提交、业务变更不丢失、无虚假 `FAILED`，日志收敛为 DUPLICATE
-- **spec-00001-AC-14.1**（spec-00001-FR-14）
+- **spec-00001-AC-14.1** (spec-00001-FR-14)
   Given 成功路径 sink 注入一个 genuine 写错误
   When 命令处理
   Then 业务事务回滚，异常契约稳定
-- **spec-00001-AC-15.1**（spec-00001-FR-15）
+- **spec-00001-AC-15.1** (spec-00001-FR-15)
   Given 一个 handler 抛出业务异常、且失败路径的隔离事务写入被注入错误
   When 命令处理
   Then 抛给调用方的仍是原业务异常（未被记录异常替换或包装），且 failure-loss metric 计数 +1 并触发 alert
-- **spec-00001-AC-16.1**（spec-00001-FR-16）
+- **spec-00001-AC-16.1** (spec-00001-FR-16)
   Given 一个含 token/密码/原始异常的输入
   When 记录
   Then entry 不含 secret/token/stack/SQL/完整对象；只有 allowlist 字段落库
-- **spec-00001-AC-17.1**（spec-00001-FR-17）
+- **spec-00001-AC-17.1** (spec-00001-FR-17)
   Given 多租户开启
   When 查询未带 tenant
   Then 请求被拒绝（criteria 强制 tenant），且不存在跨 tenant 结果
-- **spec-00001-AC-18.1**（spec-00001-FR-18，拒绝策略）
+- **spec-00001-AC-18.1** (spec-00001-FR-18) 拒绝策略：
   Given 预算策略为 `REJECT`，一个渲染后恰好超出 summary 预算 1 字符的输入
   When 记录
   Then 不写入 entry，调用方得到可定位的超预算错误，且预算违规计数可观测
-- **spec-00001-AC-18.2**（spec-00001-FR-18，截断策略与边界）
+- **spec-00001-AC-18.2** (spec-00001-FR-18) 截断策略与边界：
   Given 预算策略为 `TRUNCATE`
   When 分别记录恰好等于预算与超出预算 1 字符的两个输入
   Then 前者原样落库、后者被截断并带截断标记，两者都可观测
-- **spec-00001-AC-19.1**（spec-00001-FR-19）
+- **spec-00001-AC-19.1** (spec-00001-FR-19)
   Given 后端 × 方言 参数化测试矩阵
   When 跑同一组用例
   Then 唯一约束/幂等/排序结果在 6 组合下一致
-- **spec-00001-AC-20.1**（spec-00001-FR-20）
+- **spec-00001-AC-20.1** (spec-00001-FR-20)
   Given 同一线程上先后处理两条命令，第一条走成功路径、第二条走失败路径
   When 第二条命令处理完毕
   Then 两条各自持有的记录状态互不可见，线程上不残留任何每命令绑定（ThreadLocal 清点为空）
-- **spec-00001-AC-20.2**（spec-00001-FR-20）
+- **spec-00001-AC-20.2** (spec-00001-FR-20)
   Given 一条命令在其 handler 内嵌套派发另一条带 `@OperationLog` 的命令
   When 内层命令完成
   Then 内外两条各记一条 entry、字段互不串写，外层状态不被内层覆盖

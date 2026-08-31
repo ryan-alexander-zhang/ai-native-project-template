@@ -1,0 +1,156 @@
+# Docs whiteboard flow config — the machine-readable carrier of rule-00001-docs-workflow.
+# Carries the type split (BR-1) and the product flow (BR-13…BR-17), and — since
+# spec-00002 — the relation matrix (`carries`) that holds each folder README's
+# "Relations" section.
+# The status transition table (BR-2…BR-9), the clarifiable set (BR-20), the
+# auditable set (BR-23), the resolved gate (BR-24, BR-25), the Open Questions
+# promotion gate and the archive `supersedes` gate (spec-00002-FR-1, FR-3), and
+# the "`parent` is single-valued" rule of docs/README.md are all built into the
+# code and are not configured here.
+
+# The declaration order below IS the whiteboard's column order, left to right
+# (decision-00002-whiteboard-layout §2). Reordering these lines reorders the
+# board; add a new type at the position you want its column to appear.
+types:
+  idea: { kind: living }
+  prd: { kind: living }
+  analysis: { kind: living }
+  reference: { kind: living }
+  integration: { kind: living }
+  spec: { kind: living }
+  rule: { kind: living }
+  decision: { kind: living }
+  design: { kind: living }
+  plan: { kind: work }
+  task: { kind: work }
+  issue: { kind: work }
+  record: { kind: living }
+  report: { kind: living }
+  operation: { kind: living }
+  prompt: { kind: living }
+
+# Flow entry types (rule-00001-BR-26, spec-00001-FR-53): the types the board's
+# create entry offers. Every name must be a declared type; omit or empty = no
+# create entry on the board. Several of these are situational folders —
+# projects that do not use them should drop those from this list.
+entry: [idea, prd, design, analysis, decision, integration, reference, operation, prompt, report]
+
+# Session concurrency cap (spec-00003-FR-3): how many agent sessions may run at
+# once. Omit it and the board runs with the default 3; anything that is not a
+# positive integer refuses to start the board.
+max_sessions: 3
+
+relations:
+  - parent
+  - implements
+  - informs
+  - motivated_by
+  - constrains
+  - blocks
+  - verifies
+  - supersedes
+
+# The relation matrix (spec-00002-FR-5): type -> the relation fields a document of
+# that type may declare. This is the only thing that answers "does this relation
+# field belong to this type"; the board reads it instead of the prose in each
+# folder's README, and every list below is copied from that README's "Relations"
+# section. A field a document declares outside its type's list produces a
+# `relation-field` parse diagnostic (FR-7) — never a node anomaly, and nothing
+# downstream changes.
+#
+# `carries` is `flow[].carry` one level up: `carry` is per step ("which relation
+# this step brings along"), `carries` is per type ("which relation fields this
+# type carries"). Same verb, no second vocabulary.
+#
+# An empty list means the type carries no relation field at all (idea and prompt
+# have no Relations section). A type left out of this block entirely is NOT
+# checked — opting in is per type. Drop the whole block and the check is off,
+# and the board still starts (FR-6).
+#
+# `supersedes` is deliberately absent from every list: docs/README.md grants it to
+# every type (a replacement doc always carries it), so it is allowed globally and
+# never checked against this matrix. Listing it sixteen times would carry no
+# information and would go stale the first time a type is added without it.
+carries:
+  idea: []
+  prd: [parent]
+  analysis: [parent, informs]
+  reference: [informs]
+  integration: [informs]
+  spec: [parent]
+  rule: [informs]
+  decision: [motivated_by, constrains]
+  design: [informs]
+  plan: [implements]
+  task: [parent]
+  issue: [blocks]
+  record: [parent, verifies]
+  report: [informs]
+  operation: [implements]
+  prompt: []
+
+flow:
+  idea:
+    - { next: prd, carry: parent }
+    - { next: spec, carry: parent }
+  prd:
+    - { next: spec, carry: parent }
+  spec:
+    - { next: rule, carry: informs }
+    - { next: design, carry: informs }
+    - { next: plan, carry: implements }
+  plan:
+    - { next: task, carry: parent }
+    - { next: issue, carry: blocks }
+    - { next: record, carry: parent }
+
+# Focus lines (spec-00001-FR-48): one line per clarifiable type, the questioning
+# weight a clarify session leans on. The clarifiable set — idea, prd, spec, rule,
+# design (rule-00001-BR-20) — is built into the code, and the shared questioning
+# skeleton with it; this file owns only the one line per type, so the weight is
+# yours to retune at any time. A clarifiable type with no line here, or a line
+# given to any other type, refuses to start the board.
+focus:
+  idea: Whether it is worth doing and for whom — how real the pain is, who is hit, and the cost of not doing it. Ask nothing a prd or spec would settle (features, scope cuts, mechanisms); stop once the go/no-go toward a prd is settled.
+  prd: Actors, scope, and the value trade-off — who it serves, what this version keeps out, and why it goes first. Ask nothing a spec would settle (requirement mechanics, acceptance details); stop once the scope is firm enough to write a spec.
+  spec: FR boundaries and acceptance gaps — failure paths, edge inputs, and an observable criterion for every FR. Ask nothing a design would settle (module shape, technology choices); stop once every FR carries a decidable acceptance.
+  rule: The branches the decision table misses — value combinations across dimensions, the default row, and who wins on conflict. Ask nothing about system behaviour (that belongs to the consuming spec); stop once every rule is decidable.
+  design: Structural trade-offs and failure modes — the rejected options, the module boundaries, and how the system behaves when it breaks. Ask nothing a plan would settle (task order, effort); stop once the structure is buildable without silent choices.
+
+agents:
+  claude:
+    command: claude
+    # Write-scope constraint: the session runs with docs/ as its working directory.
+    # Any CLI added here must first be verified against spec-00001-AC-13.2
+    # (a write outside docs/ must not land) before it ships in this file — and,
+    # since the co-write round, in the co-write form too (spec-00006-FR-7,
+    # design-00001 §11.5): out-of-repo reads are decided by the CLI's own
+    # permission mechanism — the board never pre-authorises a read, answers a
+    # prompt, or suppresses one. Whether a prompt appears at all is that CLI
+    # version's own policy; if one does appear and the owner denies it, the
+    # session stays alive.
+    # Verified in the co-write form against claude 2.1.250 (2026-08-28): no
+    # out-of-domain write landed (the agent refused per the instruction, so the
+    # collapse filter had nothing to catch), and the CLI's classifier
+    # auto-allowed out-of-repo reads with no prompt shown.
+    args: []
+    cwd: docs
+    # The non-interactive form an ask thread calls (spec-00005-FR-8): one
+    # question in, one answer out, the process gone. `{question}` is the whole
+    # payload — the read-only instruction plus the question on a first call, the
+    # follow-up alone on a resume — and `{session}` is the resume id the capture
+    # read off the call before it. `capture` names a reading the code holds; the
+    # only one is `claude-json`, whose `.result` is the answer and whose
+    # `.session_id` is that resume id.
+    #
+    # Verified against this CLI (claude 2.1.246) before it was written here, the
+    # four checks design-00001 §10.1 requires: the stdout of
+    # `-p --output-format json` is one JSON object; its `.result` and
+    # `.session_id` are the answer and the resume id; `--resume` takes that id
+    # and continues the conversation; and `--permission-mode plan` holds — a
+    # call told in so many words to overwrite a file in its working directory
+    # left that file untouched.
+    headless:
+      first:  [-p, --output-format, json, --permission-mode, plan, "{question}"]
+      resume: [-p, --output-format, json, --permission-mode, plan, --resume, "{session}", "{question}"]
+      capture: claude-json

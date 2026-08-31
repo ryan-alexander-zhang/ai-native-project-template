@@ -1,11 +1,16 @@
 # References
 
 This directory stores external reference materials.
+Use `TEMPLATE.md` for front matter.
 
 ## Naming
 
-- filenames should start with a datetime in `YYYYMMDDHHMMSS` format, followed by `-<slug>.md`
-- example: `20260525202015-api-provider-docs-summary.md`
+- `reference-<five-digit-number>-<slug>.md`, the standard id format from
+  [docs/README.md](../README.md) — for example
+  `reference-00001-api-provider-docs-summary.md`.
+- A reference is a `living` doc like any other (`rule-00001-BR-1`) and appears
+  on the board, so it carries the same `id` / `type` / `status` front matter.
+  Record when the material was captured in the body, not in the filename.
 
 ## Must Include
 
@@ -15,6 +20,10 @@ This directory stores external reference materials.
 - benchmark research
 
 Add more when useful.
+
+## Relations
+
+- `informs` — the `spec` / `design` / `plan` docs this material is input for.
 
 ## Exclude
 

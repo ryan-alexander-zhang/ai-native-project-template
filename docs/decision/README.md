@@ -22,8 +22,10 @@ Add more when useful.
 ## Relations
 
 - `motivated_by` — what created the need for the choice: usually an `analysis`,
-  `report`, `spec`, `prd`, or `idea`.
-- `constrains` — the `spec` / `design` / `plan` / `operation` docs the choice binds,
+  `report`, `spec`, `prd`, or `idea`. A decision surfaced by a review
+  conversation, with no doc to cite, omits the field (`docs/README.md`'s
+  empty-field rule) and names the conversation in §1 instead.
+- `constrains` — the `prd` / `spec` / `rule` / `design` / `plan` / `operation` docs the choice binds,
   minus any that already declare `implements: [<this decision>]`. When a new doc
   later falls under an `active` decision, add it here: the list is metadata about
   reach, not content, so updating it is not an amendment to the decision.
