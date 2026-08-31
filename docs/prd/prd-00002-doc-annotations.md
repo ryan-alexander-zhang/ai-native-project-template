@@ -28,7 +28,7 @@ parent: idea-00003-doc-annotations
 
 - **文档负责人**（唯一人类角色）：阅读时加标注、改删未提交标注、统一提交、
   查看进展、确认连带修改请求、对修订结果照旧行使评审动作。
-- **agent**（本地 CLI）：question 以 headless 只读作答；issue 由一个修订
+- **agent**（本地 CLI）：question 以 headless 只读作答；issue 由一个共写
   会话逐条修订目标文档。
 
 ## 范围
@@ -86,7 +86,7 @@ parent: idea-00003-doc-annotations
    锚文本改了）不算标注失效：呈现以原文引用兜底，定位退化为「原文已变更」
    提示，不中断处理。
 9. **落盘与留痕**：标注本身与逐条进展落 `.whiteboard/`，与答疑线程同口径，
-   不入 git；issue 引发的文档修改靠修订会话既有的 commit 留痕。
+   不入 git；issue 引发的文档修改靠共写会话既有的 commit 留痕。
 
 ## 用户体验期望
 
