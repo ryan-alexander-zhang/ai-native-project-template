@@ -16,8 +16,8 @@ status: active
 模块中定义流程输入、状态和协调策略。正文不使用 Order、Inventory、Payment 等业务类型定义框架契约；这些类型只在
 §十三的非规范性 Sample 中展示消费方法。
 
-本文承接 [[analysis-00007-saga-process-manager]] 与 [[analysis-00009-saga-implementation-deep-dive]]，并取代
-[[design-00001-aipersimmon-ddd-and-scaffold]] 中 `aipersimmon-ddd-saga`、`aipersimmon-ddd-saga-spring`、
+本文承接 [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md) 与 [analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md)，并取代
+[design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) 中 `aipersimmon-ddd-saga`、`aipersimmon-ddd-saga-spring`、
 `SagaState`、`SagaStore` 和独立 `DeadlineScheduler` 的目标形态。
 
 ## 一、结论
@@ -134,7 +134,7 @@ com.aipersimmon.ddd.processmanager
     └── ProcessSerializationException.java
 ```
 
-每个 package 按 [[design-00001-aipersimmon-ddd-and-scaffold]] 约定提供 `package-info.java`。
+每个 package 按 [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) 约定提供 `package-info.java`。
 
 ### 3.3 身份与状态元数据
 
@@ -274,7 +274,7 @@ effect 在**推进事务内、决策时刻**被创建并持久化（§4.3 第 5�
 ```
 
 `PublishIntegrationEvent` 类 effect 天然满足本契约：outbox 早已在**写行时**铸 eventId 并在重投时原样复用，effect relay
-的命令侧只是补齐这个「发送一条已被赋予身份的消息」的对等入口。据此 [[decision-00013-command-context-and-causation-propagation]]
+的命令侧只是补齐这个「发送一条已被赋予身份的消息」的对等入口。据此 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)
 需增补：**消息 id 的合法铸造权威由「仅 bus」扩展为「bus（同步根/子命令）+ durable runtime（staged effect）」两个**，
 业务代码与 payload 仍绝不自造 id——本文只是新增第二个基础设施铸造权威，不放开业务侧。
 
@@ -733,11 +733,11 @@ PENDING -> IN_FLIGHT -> DELIVERED
   `process_transition`（复用现有 `input_message_id`/`input_payload` 列与 `UNIQUE(instance_id, input_message_id)` 去重，
   不新增表），且**不推进** state/step，并向调用方返回 parked 结果。
   既不静默丢消息，也不让传输层对一个卡住的实例持续重投形成 backpressure。已经提交的 PENDING/IN_FLIGHT effect 仍可完成。
-- **parked 输入的重放是一条持久队列，不是 resume 调用栈里的一步**（[[issue-00103-parked-input-replay-is-not-crash-safe]]）：
+- **parked 输入的重放是一条持久队列，不是 resume 调用栈里的一步**（[issue-00103-parked-input-replay-is-not-crash-safe](../issue/issue-00103-parked-input-replay-is-not-crash-safe.md)）：
   `replayed_at IS NULL` 的 PARKED 行即「还欠一次重放」。这是 transition 行唯一在插入后被写过的字段，
   它记录那条**输入的处置**、不改写行所记录的决策。重放由**第三个 worker**（parked-input worker，与 effect relay /
   deadline worker 并列）排空：只挑**活跃**实例，按 `transition_seq`（不是 `created_at`，见
-  [[issue-00037-parked-input-replay-order-non-monotonic]]）顺序交回 `handle`，**每条 advance 提交后**才写标记。
+  [issue-00037-parked-input-replay-order-non-monotonic](../issue/issue-00037-parked-input-replay-order-non-monotonic.md)）顺序交回 `handle`，**每条 advance 提交后**才写标记。
   于是崩溃只会导致再重放一次（由 `UNIQUE(instance_id, 'parked:'+id)` 去重成 no-op），不会导致遗漏。
   两节点同时排空同一实例无需租约：任一节点都必须先走完第 k 条才能碰到第 k+1 条（`handle` 阻塞在实例行锁上），
   故到达顺序在重叠下仍然成立。重放抛异常时以 `suspensionSource=PARKED_INPUT` 挂起实例——与 effect/deadline
@@ -760,7 +760,7 @@ public interface ProcessEffectDispatcher {
 
 - `CommandEffectDispatcher` → `CommandBus.sendAs(...)`：**进程内**同步派发到本地 handler，仅适用于协调方与目标 BC 同进程。
 - `IntegrationEventEffectDispatcher` → `IntegrationEvents.publish(...)`：经 outbox → broker 派发，用于目标 BC 是**独立微服务**
-  的跨进程协调；对端入站 adapter（ACL）把集成事件翻译成本地 command（[[decision-00013-command-context-and-causation-propagation]]）。
+  的跨进程协调；对端入站 adapter（ACL）把集成事件翻译成本地 command（[decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）。
 
 同一种 `ProcessEffectKind` 只能有一个 dispatcher；缺失或重复时启动失败。消费方按目标 BC 的部署形态（同进程 / 微服务）
 在 Definition 里选择产出 `DispatchCommand` 还是 `PublishIntegrationEvent`——见 §3.5 部署边界与 §13 sample 的两条通路。
@@ -791,7 +791,7 @@ deadline worker
 - deadline messageId 由 `deadlineId + generation` 确定性生成。
 - deadline transition 与 `FIRED` 状态必须原子提交；宕机后允许安全重试。**`FIRED` 在同一事务内、
   `handle` 之前落**：原子性不变，但这样一来「本次触发让流程结束」时，下面的终态回收不会把一个
-  确实触发过的 timer 改写成 CANCELLED（[[issue-00104-an-ended-instance-keeps-its-timers-forever]]）。
+  确实触发过的 timer 改写成 CANCELLED（[issue-00104-an-ended-instance-keeps-its-timers-forever](../issue/issue-00104-an-ended-instance-keeps-its-timers-forever.md)）。
 - 已终态实例、已取消或旧 generation 的 deadline 是可审计 no-op。
 - **终态实例不留活着的 timer**：决策进入终态时，在**同一个推进事务**内回收该实例所有
   `PENDING`/`IN_FLIGHT` 的 deadline（含每次 start 武装的 max-lifetime 兜底）。staged effect **不**受影响——
@@ -818,7 +818,7 @@ deadline worker
 
 - `revision` 乐观锁保证同一实例每次只有一个 transition 提交。
 - revision 冲突时，runtime 回滚、重新加载并重新执行 Definition；重试次数有小上限，超过后交还消息层重投。
-  **但只在推进拥有自己的事务时才重试**（[[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]）：
+  **但只在推进拥有自己的事务时才重试**（[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried](../issue/issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried.md)）：
   加入调用方事务时，第一次尝试的回滚已经把共享事务标记 rollback-only（唯一键冲突在 PostgreSQL 上更是直接 aborted），
   第二次尝试只可能再失败、并用一个新异常盖掉第一手原因。此时让冲突上抛，
   由调用方回滚 + 传输层重投充当那次重试。propagation 保持 `REQUIRED` 不改成 `REQUIRES_NEW`——
@@ -875,7 +875,7 @@ JDBC runtime 同时版本化：
 两个 redrive 都是**单事务**，只做「effect/deadline 回到 PENDING + 审计 transition + 必要时 resume」；
 parked 输入的重放不在其中，由 §4.6 的 parked-input worker 从持久队列排空。理由是姿态性的：
 **一次重放的债务不能只存在于操作员那次调用的调用栈里**，否则 resume 提交后崩溃就永久丢失该输入
-（[[issue-00103-parked-input-replay-is-not-crash-safe]]）。代价是重放延迟一个 poll 间隔，
+（[issue-00103-parked-input-replay-is-not-crash-safe](../issue/issue-00103-parked-input-replay-is-not-crash-safe.md)）。代价是重放延迟一个 poll 间隔，
 与 effect/deadline 的既有形状一致。
 
 ## 五、`aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`（现并入 `-process-manager-engine` 的自动装配）
@@ -1195,21 +1195,21 @@ Business Process Port，而不是 runtime 内核。
 
 以下决策继续有效：
 
-- [[decision-00006-integration-event-transport-selection]]：outbox + at-least-once + inbox 幂等。
-- [[decision-00008-event-subscriber-layer-placement]]：Integration Event listener 在 adapter，流程协调在 application/provider。
-- [[decision-00009-event-type-markers-and-handler-contracts]]：不新增通用 Integration Event handler marker。
-- [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]：Command/Handler/Bus 保持显式接口。
-- [[decision-00014-cloudevents-integration-event-contract]]：Integration Event logical type/version 继续有效。
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)：outbox + at-least-once + inbox 幂等。
+- [decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md)：Integration Event listener 在 adapter，流程协调在 application/provider。
+- [decision-00009-event-type-markers-and-handler-contracts](../decision/decision-00009-event-type-markers-and-handler-contracts.md)：不新增通用 Integration Event handler marker。
+- [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)：Command/Handler/Bus 保持显式接口。
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)：Integration Event logical type/version 继续有效。
 
 本文触发的决策增补（已落地）：
 
-- [[decision-00016-durable-runtime-staged-message-identity]]（patch of
-  [[decision-00013-command-context-and-causation-propagation]]）：id 的合法**铸造权威**由「仅 `CommandBus`」扩展为
+- [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md)（patch of
+  [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）：id 的合法**铸造权威**由「仅 `CommandBus`」扩展为
   「`CommandBus`（同步根/子命令）+ durable runtime（staged effect，身份在推进事务内确定性铸造并持久化）」；`CommandBus`
   新增 `sendAs(cmd, messageContext)` 逐字派发入口（§3.5），仅供基础设施调用，ArchUnit 守卫。decision-00013 核心命题
   （元数据显式传播、不污染 payload、业务代码不自造 id、禁 ambient）不变。
 
-[[design-00001-aipersimmon-ddd-and-scaffold]] 的 §5.12–5.13 与生产化开放项已经改为指向本文；其中仍出现的
+[design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) 的 §5.12–5.13 与生产化开放项已经改为指向本文；其中仍出现的
 `-saga/-saga-spring` 只记录已交付脚手架基线，不再代表目标 API。
 
 ## 十三、Sample：订单履约 Process Manager
@@ -1258,7 +1258,7 @@ payment-service/                         # 独立部署单元，另一个进程/
 - `ordering-process-native` 是 JDBC provider，依赖 `aipersimmon-ddd-process-manager` 并实现 Definition/codec。
 - `ordering-adapter` 承载入站反腐层：把 Payment 服务发回的集成事件（`EventEnvelope<E>`）经
   `CommandContext.of(envelope)` 翻成 `OrderFulfilmentInput`，调用 `ProcessRuntime.handle`（遵守
-  [[decision-00013-command-context-and-causation-propagation]]）。
+  [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）。
 - `ordering-domain` 不依赖 Process Manager；`OrderLifecyclePolicy` 仍由 `Order` 聚合调用。
 - 若 Inventory 日后也拆成微服务，只需把 `ReserveStock/ReleaseStock` 从 `DispatchCommand` 改成
   `PublishIntegrationEvent`、并加一个入站 adapter——Definition 的业务决策与 `OrderFulfilmentInput` 不变。
@@ -1419,11 +1419,11 @@ Sample 中必须保持：
 
 内部：
 
-- [[analysis-00007-saga-process-manager]]。
-- [[analysis-00009-saga-implementation-deep-dive]]。
-- [[design-00001-aipersimmon-ddd-and-scaffold]]。
-- `docs/reference/axon-framework/20260708161438-ddd-notes.md`。
-- `docs/reference/domain-driven-hexagon/20260708161438-ddd-notes.md`。
+- [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md)。
+- [analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md)。
+- [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md)。
+- `docs/reference/reference-00001-axon-framework.md`。
+- `docs/reference/reference-00005-domain-driven-hexagon.md`。
 - `aipersimmon-ddd/aipersimmon-ddd-cqrs/`。
 - `aipersimmon-ddd/aipersimmon-ddd-application/`。
 - `aipersimmon-ddd/aipersimmon-ddd-integration/`。

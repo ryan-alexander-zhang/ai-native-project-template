@@ -9,7 +9,7 @@ status: active
 回答一个常见的架构争论：**Domain Event 和 Integration Event 真的需要区分吗？有没有大厂最佳实践？**
 本分析给出判定轴、行业依据，以及落到本模板（`lang/java/ddd`）的务实建议。
 
-配套阅读：[[analysis-00001-domain-event-publishing]]（领域事件的发布/消费机制与可插拔 publisher 实现）。
+配套阅读：[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)（领域事件的发布/消费机制与可插拔 publisher 实现）。
 
 ## 结论先行
 
@@ -52,7 +52,7 @@ status: active
   最具体、最常被引用的落地样本。明确分两层：`DomainEvent`（进程内，MediatR，同一事务 / scope）
   vs `IntegrationEvent`（跨服务，走 event bus / RabbitMQ / Azure Service Bus，最终一致），
   并配 `IntegrationEventLog` = **Outbox**。想看代码范本首选这个。
-- **Kamil Grzybek —— modular-monolith-with-ddd**（见 `docs/reference/modular-monolith-with-ddd/`）：
+- **Kamil Grzybek —— modular-monolith-with-ddd**（见 `docs/reference/reference-00007-modular-monolith-with-ddd.md`）：
   同样两级 + Outbox/Inbox，单体内的权威范例。
 - **Confluent / Kafka 生态**：把"**事件即 API / 契约**"做到极致——Schema Registry + Avro/Protobuf +
   向后兼容策略。本质就是在大规模贯彻"集成事件是版本化契约"，只是不用 DDD 术语。
@@ -67,7 +67,7 @@ status: active
 | --- | --- | --- |
 | modular-monolith-with-ddd | ✅ 类型层面分两级 | 手写 Outbox + Inbox；独立 IntegrationEvents 契约程序集 |
 | spring-modulith-with-ddd | 部分：进程内复用领域事件，**外发时**才翻译 | `EventExternalizationConfiguration.mapping()` + `@Externalized` |
-| ddd-by-examples-library | ❌ 只有领域事件 | store-and-forward publisher（见 [[analysis-00001-domain-event-publishing]]） |
+| ddd-by-examples-library | ❌ 只有领域事件 | store-and-forward publisher（见 [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)） |
 | ddd-by-examples-factory | ❌ 仅进程内同步领域事件 | `DemandEventsPropagation` 同步扇出，无 broker |
 | axon-framework | 事件即真相源（ES） | `EventBus` / `EventStore`；跨界另配 |
 | 其余（clean-architecture / domain-driven-hexagon / jmolecules） | ❌ 进程内领域事件为主 | 无集成事件 / outbox 故事 |
@@ -84,11 +84,11 @@ status: active
      只在 `@Externalized` + `mapping()` 外发时翻译成集成事件；
    - 一旦某消费方要独立部署 / 异构语言 → 为它定义显式集成事件契约 + 版本化。
 3. **别预先拆**：没有独立生命周期的第二个消费者时，两套类型是 YAGNI。
-4. **跨进程一定配 Outbox** 保证不丢（发布机制见 [[analysis-00001-domain-event-publishing]]）。
+4. **跨进程一定配 Outbox** 保证不丢（发布机制见 [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)）。
 5. 集成事件内容遵循 Fowler：默认瘦事件（ID + 最小数据），确需减少回查时才升级为 event-carried state transfer。
 
 ## 相关参考
 
-- [[analysis-00001-domain-event-publishing]] —— 发布 / 消费机制与可插拔 publisher 实现。
-- `docs/reference/modular-monolith-with-ddd/` —— 两级事件 + Outbox/Inbox。
-- `docs/reference/spring-modulith-with-ddd/` —— 事件外化 `mapping()` + `@Externalized`。
+- [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) —— 发布 / 消费机制与可插拔 publisher 实现。
+- `docs/reference/reference-00007-modular-monolith-with-ddd.md` —— 两级事件 + Outbox/Inbox。
+- `docs/reference/reference-00008-spring-modulith-with-ddd.md` —— 事件外化 `mapping()` + `@Externalized`。

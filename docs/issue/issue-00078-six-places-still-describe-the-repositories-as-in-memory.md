@@ -93,10 +93,10 @@ void noSourceStillCallsThePersistenceAdaptersInMemory() throws IOException {
 - README `:141` 由枚举端点改为声明"没有 `confirm`"，这正是那段本来要说的，且不会随端点增减失效。
 - 验证：`mvn -o compile` 与 `mvn -o spotless:check` 通过；134 条非 Docker 测试全绿。
   本 issue 无行为变更，故无新增回归测试；防再犯的结构断言（禁止 persistence 包自称 in-memory）
-  留待与 [[issue-00089-the-generated-project-links-a-document-it-does-not-have]] 的文档检查合并实现。
+  留待与 [issue-00089-the-generated-project-links-a-document-it-does-not-have](issue-00089-the-generated-project-links-a-document-it-does-not-have.md) 的文档检查合并实现。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00072-demo-seed-data-ships-in-a-production-migration]]（同一次内存→PostgreSQL 迁移留下的另一处债）
-- [[issue-00089-the-generated-project-links-a-document-it-does-not-have]]（另一类文档缺陷）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md)（同一次内存→PostgreSQL 迁移留下的另一处债）
+- [issue-00089-the-generated-project-links-a-document-it-does-not-have](issue-00089-the-generated-project-links-a-document-it-does-not-have.md)（另一类文档缺陷）

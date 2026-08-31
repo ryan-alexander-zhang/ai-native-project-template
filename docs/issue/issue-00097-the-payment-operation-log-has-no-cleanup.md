@@ -12,7 +12,7 @@ blocks: [report-00002-scaffold-ddd-review]
 - **等级：Low（增长缓慢且不影响正确性；但它是 scaffold 新引入的第一张消费者侧幂等表，
   而"幂等日志需要保留期"恰恰是最容易被漏掉、且漏掉之后最难补的一件事）**。
 - 本 issue **不是**评审时发现的，而是修
-  [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]] 时新引入的缺口：
+  [issue-00069-payment-idempotency-claim-is-outside-the-transaction](issue-00069-payment-idempotency-claim-is-outside-the-transaction.md) 时新引入的缺口：
   该修复把 `PaymentOperations` 从 `ConcurrentHashMap` 换成了
   `payment_operations` 表（`V6__payment_operations.sql`），
   **而没有配套的清理机制**。内存实现随进程重启自然清空，表不会。
@@ -51,7 +51,7 @@ blocks: [report-00002-scaffold-ddd-review]
 ## 复现（test-first）
 
 无法用行为测试复现（增长本身不是错误）。用一条结构断言，与
-[[issue-00072-demo-seed-data-ships-in-a-production-migration]] 的
+[issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md) 的
 `MigrationContentTest` 同一手法：
 
 ```java
@@ -138,7 +138,7 @@ and the rows would grow forever
 **一个后续**：本修复给 mapper 加的方法最初叫 `deleteRecordedBefore`，
 这个名字让 SpotBugs 把整个 mapper 接口判为可变类型，进而把**所有持有它的类**判红——
 包括本次没改过的 `MyBatisPaymentOperations`。`mvn verify` 因此在 `f350e03` 之后一度是红的。
-见 [[issue-00098-a-mapper-method-name-turns-spotbugs-against-its-callers]]，已改名 `purgeRecordedBefore` 修复。
+见 [issue-00098-a-mapper-method-name-turns-spotbugs-against-its-callers](issue-00098-a-mapper-method-name-turns-spotbugs-against-its-callers.md)，已改名 `purgeRecordedBefore` 修复。
 
 验证：`mvn -o test -pl payment/payment-infrastructure -am` 绿；
 `mvn -o test -pl start -am -Dtest=ApplicationSmokeTest,PaymentOperationAtomicityTest,TableRetentionTest` 5 条全绿
@@ -146,6 +146,6 @@ and the rows would grow forever
 
 ## 关联
 
-- [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]]（这张表的由来）
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00072-demo-seed-data-ships-in-a-production-migration]]（同一类结构断言护栏）
+- [issue-00069-payment-idempotency-claim-is-outside-the-transaction](issue-00069-payment-idempotency-claim-is-outside-the-transaction.md)（这张表的由来）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md)（同一类结构断言护栏）

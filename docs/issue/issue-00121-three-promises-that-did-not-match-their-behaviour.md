@@ -86,7 +86,7 @@ core 的 90% 变异门禁直接把构建打回（89%）。补完后 core 与 app
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 2 档）
-- 同一个系统性主题的上一批：[[issue-00107-silent-degradations-become-loud-failures]]
-- 按类名匹配异常的教训：[[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction]]
-- 聚合与事件记录的契约：[[design-00011-aggregate-persistence-contract]]
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 2 档）
+- 同一个系统性主题的上一批：[issue-00107-silent-degradations-become-loud-failures](issue-00107-silent-degradations-become-loud-failures.md)
+- 按类名匹配异常的教训：[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction](issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction.md)
+- 聚合与事件记录的契约：[design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)

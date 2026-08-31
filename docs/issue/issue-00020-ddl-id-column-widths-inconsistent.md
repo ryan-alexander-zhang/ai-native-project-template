@@ -48,4 +48,4 @@ PostgreSQL 与 H2 的两份 DDL(starter 主 + 各自测试副本,共 5 文件)�
 
 ## 关联
 
-- [[plan-00003-durable-process-manager-implementation]]
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

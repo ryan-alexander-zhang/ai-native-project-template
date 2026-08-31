@@ -65,5 +65,5 @@ status: resolved
 
 ## 关联
 
-- 租户信任模型的框架侧问题：[[issue-00133-tenant-isolation-trusts-whoever-is-in-the-process]]
-- 同一"fail-open"教训的前一轮：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]
+- 租户信任模型的框架侧问题：[issue-00133-tenant-isolation-trusts-whoever-is-in-the-process](issue-00133-tenant-isolation-trusts-whoever-is-in-the-process.md)
+- 同一"fail-open"教训的前一轮：[issue-00099-tenant-isolation-fails-open-below-the-edge](issue-00099-tenant-isolation-fails-open-below-the-edge.md)

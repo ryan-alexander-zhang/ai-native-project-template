@@ -2,20 +2,19 @@
 id: design-00002-web-layer
 type: design
 status: active
-informs: [decision-00007-web-api-response-envelope]
 ---
 
 # aipersimmon-ddd Web 层构件族设计:`-web` / `-web-spring` / `-web-store-{redis,jdbc}`
 
-把 [[decision-00007-web-api-response-envelope]] 定的策略落成**可实现的模块设计**。决策(做什么/为什么)与
-证据(15+ 大厂 + IETF 标准,见 [[analysis-00008-web-api-response-envelope]])不在此重复;本文给**怎么做**:
+把 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) 定的策略落成**可实现的模块设计**。决策(做什么/为什么)与
+证据(15+ 大厂 + IETF 标准,见 [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md))不在此重复;本文给**怎么做**:
 模块划分、依赖图、SPI 签名、包结构、config 属性、装配条件、线上契约与测试策略。
 
-严守 [[analysis-00006-ddd-building-blocks-library]] 的纯/脏分离,并**照搬 outbox 的"契约 + 可换存储 +
-确定性装配"骨架**(见 [[design-00001-aipersimmon-ddd-and-scaffold]] §5.8)。本设计是 design-00001 §5 之外的
+严守 [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) 的纯/脏分离,并**照搬 outbox 的"契约 + 可换存储 +
+确定性装配"骨架**(见 [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) §5.8)。本设计是 design-00001 §5 之外的
 新增量,design-00001 §三依赖图与 §5 清单应加一处指针引用本文。
 
-> **增补(traceId → requestId 正名)**:[[design-00005-observability-and-distributed-tracing]] 落地后,本文的 §5.2 "traceId"
+> **增补(traceId → requestId 正名)**:[design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md) 落地后,本文的 §5.2 "traceId"
 > 已正名为 **requestId**:`TraceIdFilter`→`RequestIdFilter`、header `X-Trace-Id`→`X-Request-Id`、MDC/`ApiError` 字段 `traceId`→
 > `requestId`、config 前缀 `aipersimmon.ddd.web.trace.*`→`request-id.*`。它就是"边缘请求关联 id"(不是 OTEL trace)。**另外**,
 > `ApiError` 新增一个 `traceId` 字段承载**真正的 OTEL trace-id**:仅当装了 `aipersimmon-ddd-observability-otel-spring-boot-starter`
@@ -27,7 +26,7 @@ informs: [decision-00007-web-api-response-envelope]
 | 分类 | 条目 |
 | --- | --- |
 | **v1 纳入** | ①响应/错误线上契约(无信封 + RFC 9457 ProblemDetail);②`@RestControllerAdvice` 异常映射(400/404/409/422/429);③traceId;④分页值对象 + 序列化;⑤i18n;⑥幂等键(opt-in);⑦防重放(opt-in);⑧限流 429(opt-in);⑨可换存储 redis/jdbc |
-| **未来项**(该做,非反最佳实践) | CORS(用 Spring 原生 / 网关,构件不封装);401/403→ProblemDetail(需 Spring Security,`@ConditionalOnClass` 条件化增量,见 [[decision-00007-web-api-response-envelope]] §六) |
+| **未来项**(该做,非反最佳实践) | CORS(用 Spring 原生 / 网关,构件不封装);401/403→ProblemDetail(需 Spring Security,`@ConditionalOnClass` 条件化增量,见 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §六) |
 | **明确不做**(反最佳实践) | 通用 `{code,message,data}` 成功信封;恒返 200;通用 `ApiRequest` 外壳 |
 
 ## 二、贯穿性设计约束
@@ -92,7 +91,7 @@ com.aipersimmon.ddd.web
 - **`ProblemDescriptor`(record)+ `ProblemRegistry` / `ProblemCatalog`**:错误身份(`-core` 的 `ErrorCode`)与
   HTTP 传输**组合**,不是继承。`ProblemDescriptor` 是纯传输定义;`ProblemRegistry` 在边界把 `ErrorCode` 解析成它
   (per-code override,否则 `ErrorCategory` 的 `DefaultProblemFamilies` family)。为何不用 `ProblemType extends ErrorCode`
-  见 [[design-00003-exception-model]] §4.7。
+  见 [design-00003-exception-model](design-00003-exception-model.md) §4.7。
 
   ```java
   public record ProblemDescriptor(     // 纯传输,不含 code、不 extends ErrorCode
@@ -170,7 +169,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
   | `RateLimitExceededException`(§5.5) | 429 | 带 `Retry-After` + `RateLimit-*` |
   | 兜底 `Exception` | 500 | 不泄漏堆栈(承 Zalando #177) |
 
-- 状态默认由 **`registry.resolve(code)` 的 descriptor 决定**(per-code override,否则 category family);上表为无码兜底。**业务规则默认 422**、**409 收窄给冲突/并发/状态机**的取舍依据见 [[design-00003-exception-model]] §6.1;身份/传输组合的理由见 §4.7。
+- 状态默认由 **`registry.resolve(code)` 的 descriptor 决定**(per-code override,否则 category family);上表为无码兜底。**业务规则默认 422**、**409 收窄给冲突/并发/状态机**的取舍依据见 [design-00003-exception-model](design-00003-exception-model.md) §6.1;身份/传输组合的理由见 §4.7。
 - **不依赖** `spring.mvc.problemdetails.enabled`——本 advice 显式接管,保证扩展成员与 i18n 一致。
 
 ### 5.2 traceId(默认开)
@@ -343,11 +342,11 @@ Content-Type: application/problem+json
 
 内部:
 
-- [[decision-00007-web-api-response-envelope]] —— 本设计的决策来源(策略、六个遗留问题、opt-in+可插拔原则、未来项)。
-- [[analysis-00008-web-api-response-envelope]] —— 15+ 大厂 + IETF 标准证据底座(响应/错误/分页/命名/版本/幂等/防重放/限流)。
-- [[analysis-00006-ddd-building-blocks-library]] —— 纯/脏分离硬约束、模块清单。
-- [[design-00003-exception-model]] —— 向内的延伸:本文定的 RFC 9457 `code`/`type`/`errors` 由它从领域异常贯通产出(修 §八 示例当前产不出的断裂)。
-- [[design-00001-aipersimmon-ddd-and-scaffold]] —— 库总设计;§5.8 outbox 的"契约+可换存储+确定性装配"骨架为本设计蓝本(§三依赖图与 §5 清单需加指针引用本文)。
+- [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) —— 本设计的决策来源(策略、六个遗留问题、opt-in+可插拔原则、未来项)。
+- [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) —— 15+ 大厂 + IETF 标准证据底座(响应/错误/分页/命名/版本/幂等/防重放/限流)。
+- [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) —— 纯/脏分离硬约束、模块清单。
+- [design-00003-exception-model](design-00003-exception-model.md) —— 向内的延伸:本文定的 RFC 9457 `code`/`type`/`errors` 由它从领域异常贯通产出(修 §八 示例当前产不出的断裂)。
+- [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) —— 库总设计;§5.8 outbox 的"契约+可换存储+确定性装配"骨架为本设计蓝本(§三依赖图与 §5 清单需加指针引用本文)。
 
 外部(一手):
 

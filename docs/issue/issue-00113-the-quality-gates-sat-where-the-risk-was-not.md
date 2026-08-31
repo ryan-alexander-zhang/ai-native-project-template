@@ -114,10 +114,10 @@ pom 说的是"声明了什么"，字节码说的是"实际够到了什么"，而
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 架构层「4567 行零直接测试」那条、§3 第 12 项）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 架构层「4567 行零直接测试」那条、§3 第 12 项）
 - PIT 找出的三条未测路径中，有一条是第 10 项刚引入的：
-  [[issue-00111-the-relay-waited-for-each-send-in-turn]]
+  [issue-00111-the-relay-waited-for-each-send-in-turn](issue-00111-the-relay-waited-for-each-send-in-turn.md)
 - 内存 store 的"不替代 SQL 实现"边界，与端口 javadoc 里那条"没消除的重复"同源：
-  [[decision-00020-outbox-engine-over-one-store-port]]
-- 按类型而非按名字匹配异常的教训：[[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction]]
-- 门禁形状的既有先例：[[design-00007-code-quality-gates]]
+  [decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md)
+- 按类型而非按名字匹配异常的教训：[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction](issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction.md)
+- 门禁形状的既有先例：[design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md)

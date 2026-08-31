@@ -1,14 +1,16 @@
 ---
-id: 20260708161438-ddd-by-examples-library
+id: reference-00004-ddd-by-examples-library
 type: reference
-role: main
 status: active
+informs: [analysis-00001-domain-event-publishing, analysis-00003-aggregate-first-vs-layer-first, analysis-00005-structure-2-event-flow-and-cqrs]
 ---
 
 # ddd-by-examples/library — DDD reference notes
 
 Distilled reference for the Java DDD template. Source is reference-only (see
 THIRDPARTY.md). Facts verified against the repo on 2026-07-08.
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

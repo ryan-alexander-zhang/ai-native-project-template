@@ -18,7 +18,7 @@ blocks: [report-00001-ddd-framework-review]
   - `AggregateIdIsTimeOrderedTest.java:39`
 
   写法一致：`"aipersimmon.ddd.outbox.poll-delay-ms=3600000"`，意图是"让后台 relay 在测试期间不要跑"。
-- 库侧对同一写法的判决见 [[issue-00059-outbox-relay-tests-race-the-startup-poll]]（已 `resolved`）：
+- 库侧对同一写法的判决见 [issue-00059-outbox-relay-tests-race-the-startup-poll](issue-00059-outbox-relay-tests-race-the-startup-poll.md)（已 `resolved`）：
   `@Scheduled(fixedDelay)` 是**先执行、再等待**，把 delay 调大只推迟第二次轮询，启动时那一次照跑。
 - 库已在 `e4d6596` 给出正确的杠杆：把调度从 relay 里拆出为
   `OutboxRelayScheduler`（`aipersimmon-ddd-outbox-mybatis-plus/.../OutboxRelayScheduler.java:22-37`，
@@ -26,7 +26,7 @@ blocks: [report-00001-ddd-framework-review]
   `aipersimmon.ddd.outbox.relay.enabled`（`AipersimmonDddOutboxMybatisPlusAutoConfiguration.java:157`）
   条件化它。库自己的 7 个测试类已全部改用新杠杆，**样例的 4 处没有一起改**。
 - 同一批测试类里还有 `aipersimmon.ddd.process-manager.jdbc.*` 的 1h 设置，那是另一个根因，
-  见 [[issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind]]；
+  见 [issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind](issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind.md)；
   process-manager 侧的正确杠杆同样是 `effect-relay.enabled` / `deadline-worker.enabled`
   （`AipersimmonDddProcessManagerAutoConfiguration.java:261,302` 的 `@ConditionalOnProperty`）。
 
@@ -86,6 +86,6 @@ blocks: [report-00001-ddd-framework-review]
 
 ## 关联
 
-- [[issue-00059-outbox-relay-tests-race-the-startup-poll]]（同一反模式的库侧实例，已修）
-- [[issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind]]（同一批测试类的另一处失效）
-- [[plan-00015-scaffold-depth-and-evaluability]]（批次 E2）
+- [issue-00059-outbox-relay-tests-race-the-startup-poll](issue-00059-outbox-relay-tests-race-the-startup-poll.md)（同一反模式的库侧实例，已修）
+- [issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind](issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind.md)（同一批测试类的另一处失效）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（批次 E2）

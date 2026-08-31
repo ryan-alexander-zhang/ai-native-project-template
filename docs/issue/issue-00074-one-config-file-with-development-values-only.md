@@ -102,13 +102,13 @@ server:
 4. `README.md` 的 Build and run 一节加一句：默认是 `dev` profile；
    生产形态见 `application-prod.yml` 与它要求的环境变量清单。
 
-与 [[issue-00072-demo-seed-data-ships-in-a-production-migration]] 一起做：
+与 [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md) 一起做：
 种子数据的 `db/dev` location 正好落在 dev profile 里。
 
 ## 验证结果
 
 已修。按修复方案拆三层，与
-[[issue-00072-demo-seed-data-ships-in-a-production-migration]] 同批。
+[issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md) 同批。
 
 - `application.yml` 只留**决策**（outbox 租约算术、inbox 保留期、tenancy 策略、flyway components、
   序列化器、routing），高质量注释原样保留；`application-dev.yml` 收 compose lifecycle、
@@ -147,13 +147,13 @@ server:
 不起 Kafka 容器（关掉 relay 与 consumer bridge），避免为一个配置解析测试再付一对容器（issue-00092）。
 
 第 4 条 README 已写：新增「Configuration profiles」小节 + 三层对照表 + 必需环境变量清单。
-实施该条时撞出 [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]]。
+实施该条时撞出 [issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects](issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects.md)。
 
 验证：`mvn -o test -pl start -am` 全绿，62 个测试 0 失败。
 负向对照：移除探针配置后 `/actuator/health/readiness` 返回 **404**，与本 issue 复现段的预言一致。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00072-demo-seed-data-ships-in-a-production-migration]]（同一次 profile 拆分）
-- [[issue-00045-web-handler-maps-unknown-route-to-500]]（actuator 进入 classpath 的由来）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md)（同一次 profile 拆分）
+- [issue-00045-web-handler-maps-unknown-route-to-500](issue-00045-web-handler-maps-unknown-route-to-500.md)（actuator 进入 classpath 的由来）

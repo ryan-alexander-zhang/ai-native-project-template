@@ -43,4 +43,4 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[plan-00003-durable-process-manager-implementation]]
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

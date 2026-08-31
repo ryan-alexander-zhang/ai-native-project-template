@@ -145,6 +145,6 @@ filter.shouldNotFilter(request);
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]
-- 决策：[[decision-00018-multi-tenancy-boundaries]]（命题 3 与 13 已据此修订）
-- 设计：[[design-00009-multi-tenancy-tenant-id]]、规格：[[spec-00002-multi-tenancy]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)
+- 决策：[decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)（命题 3 与 13 已据此修订）
+- 设计：[design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)、规格：[spec-00002-multi-tenancy](../spec/spec-00002-multi-tenancy.md)

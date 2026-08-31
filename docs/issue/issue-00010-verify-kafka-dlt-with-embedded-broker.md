@@ -13,7 +13,7 @@ blocks: [issue-00003-messaging-delivery-reliability]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-[[issue-00003-messaging-delivery-reliability]] 的 Kafka 错误处理/退避/DLT recoverer 装配正确,但其 **AC-5** 明确要求
+[issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) 的 Kafka 错误处理/退避/DLT recoverer 装配正确,但其 **AC-5** 明确要求
 "以 Testcontainers(Postgres + Kafka)验证",而 H3 实际只用 H2 + mock recoverer(不接触 broker),却在落地进度里声称
 "AC-1..AC-5 达成"。这是 over-claim:没有真实 broker 端到端,就不能宣称 AC-3/AC-5 已验证。
 
@@ -51,5 +51,5 @@ blocks: [issue-00003-messaging-delivery-reliability]
 
 ## 关联
 
-- [[issue-00003-messaging-delivery-reliability]] —— H3 的所属 issue;AC-5 在此如实收紧,DLT 目的地在此修正。
-- [[issue-00008-strict-inbound-cloudevents-validation]] —— poison 的一种(未知类型)即永久失败 → DLT,同一 not-retryable 装配。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— H3 的所属 issue;AC-5 在此如实收紧,DLT 目的地在此修正。
+- [issue-00008-strict-inbound-cloudevents-validation](issue-00008-strict-inbound-cloudevents-validation.md) —— poison 的一种(未知类型)即永久失败 → DLT,同一 not-retryable 装配。

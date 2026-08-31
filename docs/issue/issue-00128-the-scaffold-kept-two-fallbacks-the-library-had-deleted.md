@@ -7,7 +7,7 @@ status: resolved
 # 脚手架留着两处库里已经删掉的兜底
 
 不属 `report-00003`，是 2026-07-30 脚手架对齐核查里查出来的，见
-[[issue-00119-ten-majors-were-never-scheduled]] 收尾时列的遗留。
+[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md) 收尾时列的遗留。
 
 ## 症状
 
@@ -69,6 +69,6 @@ spotless 在跑到验收测试之前就把构建打回了，于是"0 命中"看�
 
 ## 关联
 
-- 库里做同一件事的那一轮：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]
-- 发现它的那次对齐核查记在：[[issue-00119-ten-majors-were-never-scheduled]]
+- 库里做同一件事的那一轮：[issue-00099-tenant-isolation-fails-open-below-the-edge](issue-00099-tenant-isolation-fails-open-below-the-edge.md)
+- 发现它的那次对齐核查记在：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)
 - 样例不是设计权威，但它是别人抄的第一份代码——这正是它值得修的理由

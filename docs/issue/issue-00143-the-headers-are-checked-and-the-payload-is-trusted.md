@@ -72,4 +72,4 @@ DLT。修复前它先退避数轮。
 
 ## 关联
 
-- 失败码可空性矛盾（同为契约两侧失配）：[[issue-00131-one-side-allowed-null-the-other-side-threw]]
+- 失败码可空性矛盾（同为契约两侧失配）：[issue-00131-one-side-allowed-null-the-other-side-threw](issue-00131-one-side-allowed-null-the-other-side-threw.md)

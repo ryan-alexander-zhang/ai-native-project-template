@@ -2,6 +2,8 @@
 id: decision-00012-no-ambient-per-command-state
 type: decision
 status: active
+motivated_by: [analysis-00005-structure-2-event-flow-and-cqrs, analysis-00006-ddd-building-blocks-library]
+constrains: [spec-00001-operation-log-component, spec-00002-multi-tenancy, design-00001-aipersimmon-ddd-and-scaffold]
 ---
 
 # 禁止 ambient 每命令状态:领域事件在 save 处排空,移除 `AggregateCollector`/ThreadLocal
@@ -9,10 +11,10 @@ status: active
 固化"命令执行期间的**每命令状态**(touched 聚合、后续要传播的调用元数据)该放哪、怎么传"。
 起因是既有的 `ThreadLocalAggregateCollector`:一个**单例端口**却持有每命令可变状态,只能靠线程绑定
 求并发安全。本决策废除这条线程域机制,并把领域事件的排空改到**聚合被保存处**。承接
-[[decision-00009-event-type-markers-and-handler-contracts]] 与
-[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]] 的"显式契约优先"取向,
-并**supersede**下列文档中关于 `AggregateCollector` 的描述:[[design-00001-aipersimmon-ddd-and-scaffold]] §5.10/§5.11、
-[[analysis-00006-ddd-building-blocks-library]] §五及模块表、[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]] 规则二表格。
+[decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 与
+[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md) 的"显式契约优先"取向,
+并**supersede**下列文档中关于 `AggregateCollector` 的描述:[design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md) §5.10/§5.11、
+[analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) §五及模块表、[decision-00021-command-handler-reuse-and-cross-aggregate-placement](decision-00021-command-handler-reuse-and-cross-aggregate-placement.md) 规则二表格。
 
 ## 结论先行
 
@@ -25,7 +27,7 @@ status: active
 
 ## Context
 
-原设计(见 [[analysis-00005-structure-2-event-flow-and-cqrs]] §5 的务实点、[[analysis-00006-ddd-building-blocks-library]] §五)为解决
+原设计(见 [analysis-00005-structure-2-event-flow-and-cqrs](../analysis/analysis-00005-structure-2-event-flow-and-cqrs.md) §5 的务实点、[analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) §五)为解决
 "JDBC/MyBatis 没有 EF 式 ChangeTracker,拦截器不知道该 drain 哪些聚合"这一问题,引入了
 `AggregateCollector`:repo/handler 保存时 `register(aggregate)`,`TransactionCommandInterceptor` 在 handler
 返回后从 `collected()` 集中排空事件、`clear()`。因为 collector 是**单例 bean 却要存每命令可变状态**,
@@ -72,7 +74,7 @@ collector 存在的唯一理由是回答"该 drain 哪些聚合"。但 repositor
 
 ### 命题三 —— 与既有"显式优先"判据同源
 
-[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]] 选"编译期强制的类型契约"而非"被动注解";
+[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md) 选"编译期强制的类型契约"而非"被动注解";
 本决策选"显式对象 + 显式传参"而非"隐式线程状态"。二者是同一取向在**状态传播**维度的延伸:让依赖显现在
 签名与类型上,而非藏进容器魔法。
 
@@ -82,7 +84,7 @@ collector 存在的唯一理由是回答"该 drain 哪些聚合"。但 repositor
 - `aipersimmon-ddd-cqrs-spring`:移除 `ThreadLocalAggregateCollector` 与 collector bean;
   `TransactionCommandInterceptor` 仅注入 `UnitOfWork`;package-info 更新。
 - `aipersimmon-ddd-application`:`DomainEvents` 新增 `publishAndClear` 默认方法(排空的复用入口)。
-- **文档订正**:design-00001 §5.10/§5.11、analysis-00006 §五及模块表、decision-00010 规则二表格中
+- **文档订正**:design-00001 §5.10/§5.11、analysis-00006 §五及模块表、decision-00021 规则二表格中
   `AggregateCollector`/`ThreadLocalAggregateCollector` 的描述改为"save 处排空",并指向本决策。
 - **对后续设计的约束(同一原则的推论,尚未落地,留待各自决策)**:
   - 入站集成事件的调用元数据不得走线程域补齐;若需在进程内桥接,应以**类型化信封**显式携带(payload + 元数据)。
@@ -99,7 +101,7 @@ collector 存在的唯一理由是回答"该 drain 哪些聚合"。但 repositor
 - `aipersimmon-ddd/aipersimmon-ddd-cqrs-spring/.../TransactionCommandInterceptor.java` —— 仅事务边界。
 - `aipersimmon-ddd/aipersimmon-ddd-core/.../AbstractAggregateRoot.java` —— 聚合自带事件登记/清空。
 - `aipersimmon-ddd/aipersimmon-ddd-cqrs-spring/.../CqrsPipelineTest.java` —— 改造后端到端 4/4,回滚不投递。
-- [[decision-00009-event-type-markers-and-handler-contracts]]、[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]、[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]、[[analysis-00005-structure-2-event-flow-and-cqrs]]、[[analysis-00006-ddd-building-blocks-library]]。
+- [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md)、[decision-00021-command-handler-reuse-and-cross-aggregate-placement](decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)、[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)、[analysis-00005-structure-2-event-flow-and-cqrs](../analysis/analysis-00005-structure-2-event-flow-and-cqrs.md)、[analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md)。
 
 外部:
 

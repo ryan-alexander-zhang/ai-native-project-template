@@ -147,6 +147,6 @@ aDetailContainingTheSeparatorRoundTripsInsteadOfShiftingTheFields
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[design-00004-durable-process-manager-runtime]]（payload codec 与版本契约）
-- [[issue-00009-version-evolution-semantics]]
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（payload codec 与版本契约）
+- [issue-00009-version-evolution-semantics](issue-00009-version-evolution-semantics.md)

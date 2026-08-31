@@ -7,7 +7,7 @@ blocks: [design-00004-durable-process-manager-runtime]
 
 # 样例 `OrderFulfilmentDefinition.react()` 只按输入类型分派、忽略当前 Business Step,乱序事实即误推进
 
-> 样例(scaffold)属演示、非设计权威([[samples-not-reference]]);但本缺陷相对该类**自身声明的契约**(javadoc `:36-51` 宣称补偿有序)为真,值得作为样例补强项记录。
+> 样例(scaffold)属演示、非设计权威(samples-not-reference);但本缺陷相对该类**自身声明的契约**(javadoc `:36-51` 宣称补偿有序)为真,值得作为样例补强项记录。
 
 ## 问题(现状,file:line 为证)
 
@@ -42,7 +42,7 @@ blocks: [design-00004-durable-process-manager-runtime]
 - **ignore**:幂等 no-op(保持当前 lifecycle 与 step、无 effect)。因 runtime 是 at-least-once 且把 `react` 抛异常当**毒消息无限重投**(`withRetry` 仅捕获 `StaleProcessRevisionException | DuplicateKeyException`),故一切重复/乱序事实**只 ignore、绝不抛**——正是这一点关掉了三个乱序 bug。
 - **reject**:仅 `OrderPlaced`(start-only 输入,正常路径永不进 `react`,抛出不会毒化任何真实重投)。
 
-覆盖完整状态矩阵的单测共 14 例(happy path、两条补偿分支、乱序/重复 ignore、`OrderPlaced` reject、证据 id 来源与互异)。证据 id 一并按 [[issue-00042-process-evidence-ids-fabricated-from-business-keys]] 改为取因果 envelope id。
+覆盖完整状态矩阵的单测共 14 例(happy path、两条补偿分支、乱序/重复 ignore、`OrderPlaced` reject、证据 id 来源与互异)。证据 id 一并按 [issue-00042-process-evidence-ids-fabricated-from-business-keys](issue-00042-process-evidence-ids-fabricated-from-business-keys.md) 改为取因果 envelope id。
 
 ## 验证结果
 
@@ -52,7 +52,7 @@ blocks: [design-00004-durable-process-manager-runtime]
 
 ## 关联
 
-- [[design-00004-durable-process-manager-runtime]]
-- [[analysis-00012-multi-module-process-manager-layering]]
-- [[issue-00042-process-evidence-ids-fabricated-from-business-keys]]
-- [[samples-not-reference]]
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)
+- [analysis-00012-multi-module-process-manager-layering](../analysis/analysis-00012-multi-module-process-manager-layering.md)
+- [issue-00042-process-evidence-ids-fabricated-from-business-keys](issue-00042-process-evidence-ids-fabricated-from-business-keys.md)
+- samples-not-reference

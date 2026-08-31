@@ -32,7 +32,7 @@ blocks: [report-00002-scaffold-ddd-review]
   **C. `PaymentOperations.find`**
   - `PaymentOperations.java:35` 定义、`InMemoryPaymentOperations.java:36-39` 实现、**零调用**。
   - 它本应用于"重投递时重发已记录的结果"，见
-    [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]]。
+    [issue-00069-payment-idempotency-claim-is-outside-the-transaction](issue-00069-payment-idempotency-claim-is-outside-the-transaction.md)。
 
 - 对照：README 的能力表（`:66-87`）逐行列出"构件 → 示例 → 验证测试"，
   上述三项都不在表内——**表本身是诚实的**。落差在于领域代码给人的印象是"这些都能用"。
@@ -84,7 +84,7 @@ void everyAggregateStateIsReachableFromSomeUseCase() {
   注意 `ReviewDecisionRef` 的 `approved` 字段目前恒为 `true`，
   `ApproveReviewHandler.java:44`，它本来就是为这条路径准备的）。
   这一条几乎不需要新代码，只是把已有零件接上。**优先做这条。**
-- **C. `find`**：随 [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]] 一起用起来。
+- **C. `find`**：随 [issue-00069-payment-idempotency-claim-is-outside-the-transaction](issue-00069-payment-idempotency-claim-is-outside-the-transaction.md) 一起用起来。
 
 ## 验证结果
 
@@ -115,11 +115,11 @@ void everyAggregateStateIsReachableFromSomeUseCase() {
 `ExceptionContractTest` 现在从 HTTP 外部覆盖了那个 409。
 （退货流程本身仍未演示，`ShipOrder` 的 javadoc 写明了这是建模生命周期的终点。）
 
-**C. `PaymentOperations.find`**：已由 [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]] 用起来，本轮无事。
+**C. `PaymentOperations.find`**：已由 [issue-00069-payment-idempotency-claim-is-outside-the-transaction](issue-00069-payment-idempotency-claim-is-outside-the-transaction.md) 用起来，本轮无事。
 
 **测试全部加进已有的测试类**（`ReviewFlowTest` / `ExceptionContractTest` / `CreditLimitTest`），
 不新建 `@SpringBootTest`——`TestContextCountTest` 仍是 17，没有多起一对容器
-（[[issue-00092-each-test-context-starts-its-own-container-pair]]）。
+（[issue-00092-each-test-context-starts-its-own-container-pair](issue-00092-each-test-context-starts-its-own-container-pair.md)）。
 
 **两条负向对照，都实测过，而且都证明了断言的针对性**：
 
@@ -148,6 +148,6 @@ ExceptionContractTest.cancellingAShippedOrderRenders409AndAsksForAReturnInstead:
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]]（C 项的正确用法）
-- [[issue-00070-ready-for-fulfilment-is-never-persisted]]（另一处"建了但到不了"，那处是状态，这处是行为）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00069-payment-idempotency-claim-is-outside-the-transaction](issue-00069-payment-idempotency-claim-is-outside-the-transaction.md)（C 项的正确用法）
+- [issue-00070-ready-for-fulfilment-is-never-persisted](issue-00070-ready-for-fulfilment-is-never-persisted.md)（另一处"建了但到不了"，那处是状态，这处是行为）

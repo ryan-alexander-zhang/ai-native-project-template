@@ -2,13 +2,13 @@
 id: analysis-00033-samples-strong-consistency-seata
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S10 强一致性：Seata 跨服务分布式事务
 
 对应 sample：`aipersimmon-ddd-samples/s10-strong-consistency-seata`（两个服务 + 一个端到端测试模块，
-两个数据库，一个 seata-server）。场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。
+两个数据库，一个 seata-server）。场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 

@@ -2,15 +2,15 @@
 id: analysis-00028-samples-one-trace-across-the-boundary
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S15 可观测性：跨边界追一次请求（寄宿 S4）
 
 对应 sample：`aipersimmon-ddd-samples/s04-integration-events-across-services`（与
-[[analysis-00025-samples-integration-events-across-services]]、
-[[analysis-00027-samples-multi-tenancy-end-to-end]] 同一份代码）。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00025-samples-integration-events-across-services](analysis-00025-samples-integration-events-across-services.md)、
+[analysis-00027-samples-multi-tenancy-end-to-end](analysis-00027-samples-multi-tenancy-end-to-end.md) 同一份代码）。场景清单见
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位与一处标题修正
 

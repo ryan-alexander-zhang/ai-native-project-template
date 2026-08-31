@@ -58,8 +58,8 @@ try {
 - 同一条 catch 还掩盖了第二个问题的反面：**非** `DomainException` 的失败
   （`OptimisticLockingFailureException` 等）**不**被捕获，于是不发失败事件、
   流程永久停在 `AWAITING_STOCK`——那是
-  [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] 与
-  [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]。
+  [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md) 与
+  [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md)。
   **同一个 catch 块，两个方向都错**：该回滚的没回滚，该上报的没上报。
 
 ## 根因（第一性）
@@ -120,7 +120,7 @@ void aMidLineFailureLeavesNoStockDeducted() {
    因为它不需要与任何数据改动原子（没有改动了）。
 2. **纯决策 + 单次落库**：把 handler 重构成"先算出完整结果，再一次性落库"——
    一次加载全部 `Stock` 进 `Map<Sku, Stock>`（顺带修掉
-   [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] 的重复加载），
+   [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md) 的重复加载），
    在内存里完成全部 `reserve`，任何一行失败就**在写任何东西之前**转入失败分支。
    这样 catch 里根本没有已提交的改动要撤销，现有结构可以保留。
    **这个方案最贴合本项目的风格**——`ProcessDefinition` 已经是"纯决策、副作用外置"的形状。
@@ -133,13 +133,13 @@ void aMidLineFailureLeavesNoStockDeducted() {
 - **改掉类注释**里 "even before the transaction rolls back" 那句——
   它描述的兜底当前不存在，修复后应改为准确描述新机制；
 - 一并处理非 `DomainException` 的逸出路径（见
-  [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]]），
+  [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md)），
   否则修好了"该回滚的"，"该上报的"还是漏。
 
 ## 验证结果
 
 已修。采用**修复方案 2（纯决策 + 单次落库）**，如本 issue 所判断，它最贴合本项目风格，
-并按 relation 所述**一并修掉** [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]。
+并按 relation 所述**一并修掉** [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md)。
 
 - `ReserveStockHandler.handle` 拆成两段，中间一条硬边界：
   - **DECIDE**：把每个 SKU 加载进 `Map<Sku, Stock>`（`computeIfAbsent`，**每个聚合至多一次**），
@@ -163,7 +163,7 @@ void aMidLineFailureLeavesNoStockDeducted() {
 catch 吞掉、事务提交。负向对照实测：SKU 从 10 变成 **4**，6 件永久搁浅、无 `Reservation` 可释放。
 
 顺带更正本 issue 的一处分析：`stealBStockOnSecondRead()` 那个装饰器方案不必要；
-而 [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] 判断重复 SKU 会引发
+而 [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md) 判断重复 SKU 会引发
 `OptimisticLockingFailureException` 也不成立——第二次加载拿到的是**已更新**的版本号（同事务可见自己的写），
 所以不是乐观锁失败，而是本 issue 的这条泄漏路径。两个 issue 指向的是同一个 bug，
 只是 00076 推断的失败形态错了。
@@ -178,13 +178,13 @@ catch 吞掉、事务提交。负向对照实测：SKU 从 10 变成 **4**，6 �
 
 **未纳入本次范围**：技术异常逸出后流程停在 `AWAITING_STOCK` 的问题。两段式之后它的**数据**
 后果已经正确（回滚、无部分扣减），剩下的"等不到答复"属于
-[[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] 的 deadline 兜底，
+[issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md) 的 deadline 兜底，
 不在这里顺手扩大。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]]（同一个 catch 块的另一个方向）
-- [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]（同一处的重复加载；方案 2 一并修掉）
-- [[issue-00051-aggregates-have-no-optimistic-locking]]（乐观锁本身工作正常）
-- [[issue-00027]]（outbox 与聚合同事务的原始保证，本 issue 是它的一个反例场景）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md)（同一个 catch 块的另一个方向）
+- [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md)（同一处的重复加载；方案 2 一并修掉）
+- [issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)（乐观锁本身工作正常）
+- [issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md)（outbox 与聚合同事务的原始保证，本 issue 是它的一个反例场景）

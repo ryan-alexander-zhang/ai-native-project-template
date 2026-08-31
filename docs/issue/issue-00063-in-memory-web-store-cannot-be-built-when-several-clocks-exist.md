@@ -56,7 +56,7 @@ blocks: [plan-00015-scaffold-depth-and-evaluability]
    `-web-store-jdbc` 用的是有名字的 `aipersimmonDddWebStoreClock`（`:26`），是对的写法；
    其余六处不是。这不属于本 issue 的最小修复，但它是同一个坑的土壤。
 6. **排除的伪根因**：不是 `-web-store-jdbc` 没引入（引入了，见
-   [[issue-00062-web-store-module-does-not-displace-the-in-memory-stores]]，它没能顶掉兜底才让兜底被构造）；
+   [issue-00062-web-store-module-does-not-displace-the-in-memory-stores](issue-00062-web-store-module-does-not-displace-the-in-memory-stores.md)，它没能顶掉兜底才让兜底被构造）；
    不是 `Clock` bean 缺失（恰恰相反，太多）。
 
 ## 复现（test-first）
@@ -95,7 +95,7 @@ clock.getIfUnique(Clock::systemUTC)
 
 ## 关联
 
-- [[issue-00062-web-store-module-does-not-displace-the-in-memory-stores]]（同一次触发暴露；先后关系见上）
-- [[issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap]]（D2 把 in-memory 定位为"开发默认"，
+- [issue-00062-web-store-module-does-not-displace-the-in-memory-stores](issue-00062-web-store-module-does-not-displace-the-in-memory-stores.md)（同一次触发暴露；先后关系见上）
+- [issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap](issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap.md)（D2 把 in-memory 定位为"开发默认"，
   本缺陷让这个默认在真实应用里不可用）
-- [[plan-00015-scaffold-depth-and-evaluability]]（F2 因此受阻）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（F2 因此受阻）

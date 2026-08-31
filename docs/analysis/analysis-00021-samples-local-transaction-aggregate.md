@@ -2,13 +2,13 @@
 id: analysis-00021-samples-local-transaction-aggregate
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S8 本地事务：聚合边界、乐观锁与冲突重试
 
 对应 sample：`aipersimmon-ddd-samples/s08-local-transaction-aggregate`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 

@@ -11,8 +11,8 @@ blocks: [report-00002-scaffold-ddd-review]
 
 - **等级：Medium（`mvn verify` 是本 scaffold 对外承诺的质量门，而它在 `f350e03` 之后是红的；
   更要紧的是报错指向的类根本没被改过，误导性与
-  [[issue-00095-a-partial-reactor-build-silently-tests-stale-siblings]] 同级）**。
-- 由 [[issue-00097-the-payment-operation-log-has-no-cleanup]] 的实施引入。
+  [issue-00095-a-partial-reactor-build-silently-tests-stale-siblings](issue-00095-a-partial-reactor-build-silently-tests-stale-siblings.md) 同级）**。
+- 由 [issue-00097-the-payment-operation-log-has-no-cleanup](issue-00097-the-payment-operation-log-has-no-cleanup.md) 的实施引入。
   那次改动给 `PaymentOperationMapper` 加了一个方法：
 
 ```java
@@ -71,7 +71,7 @@ mvn -o clean verify -pl payment/payment-infrastructure -am -DskipTests   # BUILD
 ```
 
 **注意 `clean` 是必需的**：不带 `clean` 时增量编译会让整轮验证假绿，
-同一轮里 [[issue-00085-ordering-carries-sku-as-a-bare-string]] 也踩到了这一点。
+同一轮里 [issue-00085-ordering-carries-sku-as-a-bare-string](issue-00085-ordering-carries-sku-as-a-bare-string.md) 也踩到了这一点。
 
 ## 修复
 
@@ -96,6 +96,6 @@ mvn -o clean verify -pl payment/payment-infrastructure -am -DskipTests   # BUILD
 
 ## 关联
 
-- [[issue-00097-the-payment-operation-log-has-no-cleanup]]（引入它的那次修复）
-- [[issue-00085-ordering-carries-sku-as-a-bare-string]]（同一轮的另一处"不带 `clean` 就假绿"）
-- [[report-00002-scaffold-ddd-review]]
+- [issue-00097-the-payment-operation-log-has-no-cleanup](issue-00097-the-payment-operation-log-has-no-cleanup.md)（引入它的那次修复）
+- [issue-00085-ordering-carries-sku-as-a-bare-string](issue-00085-ordering-carries-sku-as-a-bare-string.md)（同一轮的另一处"不带 `clean` 就假绿"）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)

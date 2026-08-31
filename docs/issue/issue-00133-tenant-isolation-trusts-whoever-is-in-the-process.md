@@ -71,4 +71,4 @@ status: resolved
 
 ## 关联
 
-- allow-list 缺守卫（scaffold 侧）：[[issue-00132-a-table-nobody-registered-is-visible-to-everyone]]
+- allow-list 缺守卫（scaffold 侧）：[issue-00132-a-table-nobody-registered-is-visible-to-everyone](issue-00132-a-table-nobody-registered-is-visible-to-everyone.md)

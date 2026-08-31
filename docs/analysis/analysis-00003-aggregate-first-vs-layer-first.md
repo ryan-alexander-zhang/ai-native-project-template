@@ -66,16 +66,16 @@ Both keep **package-per-aggregate** and package-private domain internals
 - **ddd-by-examples/library** → **A (aggregate-first)**: the `lending` context is
   split per aggregate (`lending/patron`, `lending/book`, …) and *inside each* live
   `model` / `application` / `infrastructure` / `web`.
-  (`docs/reference/ddd-by-examples-library/`)
+  (`docs/reference/reference-00004-ddd-by-examples-library.md`)
 - **Sairyss/domain-driven-hexagon** → **A**: vertical slice, one folder per use
   case containing its controller/DTO/command/handler.
-  (`docs/reference/domain-driven-hexagon/`)
+  (`docs/reference/reference-00005-domain-driven-hexagon.md`)
 - **Alibaba COLA** → **B (layer-first)**: top-level `adapter` / `app` / `domain` /
   `infrastructure`, with the domain (and other layers) sub-grouped by aggregate.
   (https://github.com/alibaba/COLA)
 - **kgrzybek/modular-monolith-with-ddd** → **B within a module**: each module
   (BC) has Domain / Application / Infrastructure as its internal split.
-  (`docs/reference/modular-monolith-with-ddd/`)
+  (`docs/reference/reference-00007-modular-monolith-with-ddd.md`)
 - **bc-and-layer-samples/structure-2** → **B**: layer = Maven module,
   aggregate = sub-package inside each layer module. Chosen because it makes the
   layer boundary a *compile-time* Maven boundary (see analysis-00004).
@@ -99,8 +99,8 @@ modules lean **B**.
 
 ## Sources
 
-- `docs/reference/ddd-by-examples-library/`, `docs/reference/domain-driven-hexagon/`,
-  `docs/reference/modular-monolith-with-ddd/`
+- `docs/reference/reference-00004-ddd-by-examples-library.md`, `docs/reference/reference-00005-domain-driven-hexagon.md`,
+  `docs/reference/reference-00007-modular-monolith-with-ddd.md`
 - Alibaba COLA — https://github.com/alibaba/COLA
 - Robert C. Martin — Common Closure Principle (package cohesion)
 - Related: `analysis-00004-bounded-context-module-structure`,

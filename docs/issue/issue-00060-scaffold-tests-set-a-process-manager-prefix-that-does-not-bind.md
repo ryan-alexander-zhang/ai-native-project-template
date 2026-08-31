@@ -105,6 +105,6 @@ class ProcessManagerPropertyBindingTest {
 
 ## 关联
 
-- [[issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever]]（同一批测试类里的另一处
+- [issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever](issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever.md)（同一批测试类里的另一处
   调度控制失效，根因不同）
-- [[plan-00015-scaffold-depth-and-evaluability]]（批次 E1）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（批次 E1）

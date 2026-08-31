@@ -2,7 +2,7 @@
 
 External code and specs used **for reference only** — not vendored into this
 repo, not a build dependency. Keep clones **outside** the repo so they do not
-pollute version control. Distilled notes live under `docs/reference/<slug>/`.
+pollute version control. Distilled notes live at `docs/reference/reference-<nnnnn>-<slug>.md`.
 
 Add one section per third-party reference. Record only what a contributor needs
 to find and pin the source; the working notes live under `docs/reference/`.
@@ -21,7 +21,7 @@ commits verified 2026-07-08.
 | License | MIT · Java · 5.8k★ |
 | Local clone | `../ddd-refs/library` (outside this repo) |
 | Official docs | `docs/big-picture.md`, `docs/example-mapping.md`, `docs/design-level.md` (in-repo) |
-| Distilled excerpts | [`docs/reference/ddd-by-examples-library/`](docs/reference/ddd-by-examples-library/) |
+| Distilled excerpts | [`docs/reference/reference-00004-ddd-by-examples-library.md`](docs/reference/reference-00004-ddd-by-examples-library.md) |
 
 Library lending system: DDD end-to-end from Event Storming to code —
 policy/specification objects, `Either`-returning aggregates, CQRS-lite read
@@ -41,7 +41,7 @@ git -C ../ddd-refs/library checkout 98d7004b5aef366ba5d661ae0cb544af1cfd33f1
 | License | MIT · Java · 1.4k★ |
 | Local clone | `../ddd-refs/factory` (outside this repo) |
 | Official docs | none external — README + embedded Event Storming boards |
-| Distilled excerpts | [`docs/reference/ddd-by-examples-factory/`](docs/reference/ddd-by-examples-factory/) |
+| Distilled excerpts | [`docs/reference/reference-00003-ddd-by-examples-factory.md`](docs/reference/reference-00003-ddd-by-examples-factory.md) |
 
 Manufacturing-factory domain on a Gradle multi-module modular monolith:
 framework-free `*-model` vs `*-adapters`, selective hexagon, "three lanes"
@@ -61,7 +61,7 @@ git -C ../ddd-refs/factory checkout 95c751ccefb879e02ecc959c712caa31f4cd9bcf
 | License | Apache-2.0 · Java · 1.5k★ |
 | Local clone | `../ddd-refs/jmolecules` (outside this repo) |
 | Official docs | https://jmolecules.org · coordinates `org.jmolecules` |
-| Distilled excerpts | [`docs/reference/jmolecules/`](docs/reference/jmolecules/) |
+| Distilled excerpts | [`docs/reference/reference-00006-jmolecules.md`](docs/reference/reference-00006-jmolecules.md) |
 
 DDD-as-code: annotations + type interfaces (`@AggregateRoot`, `@ValueObject`,
 `Association<T,ID>`) with ByteBuddy/Spring/JPA/Jackson integrations and ArchUnit
@@ -81,7 +81,7 @@ git -C ../ddd-refs/jmolecules checkout 20d2636beba2e3cb8f0a9b62c07e3606c49da84f
 | License | MIT · Java · 279★ |
 | Local clone | `../ddd-refs/spring-modulith-with-ddd` (outside this repo) |
 | Official docs | itnext.io blog series (see reference notes) |
-| Distilled excerpts | [`docs/reference/spring-modulith-with-ddd/`](docs/reference/spring-modulith-with-ddd/) |
+| Distilled excerpts | [`docs/reference/reference-00008-spring-modulith-with-ddd.md`](docs/reference/reference-00008-spring-modulith-with-ddd.md) |
 
 Spring Modulith modular monolith (its own stack: Spring Boot 4 / Spring
 Modulith 2 + jMolecules). Ahead of this repo's samples, which currently run
@@ -103,7 +103,7 @@ git -C ../ddd-refs/spring-modulith-with-ddd checkout bbbabe06d3af9ddd78c5699ca7b
 | License | Apache-2.0 · Java · 3.6k★ |
 | Local clone | `../ddd-refs/AxonFramework` (outside this repo) |
 | Official docs | https://docs.axoniq.io |
-| Distilled excerpts | [`docs/reference/axon-framework/`](docs/reference/axon-framework/) |
+| Distilled excerpts | [`docs/reference/reference-00001-axon-framework.md`](docs/reference/reference-00001-axon-framework.md) |
 
 CQRS/Event-Sourcing framework: aggregate programming model, command/event/query
 buses, projections, sagas. Reference for the *patterns*; see the "when not to
@@ -123,7 +123,7 @@ git -C ../ddd-refs/AxonFramework checkout 120cca303b0b2bc4d74d81c75fbb78e13fe841
 | License | MIT · C# · 13.8k★ |
 | Local clone | `../ddd-refs/modular-monolith-with-ddd` (outside this repo) |
 | Official docs | kamilgrzybek.com (modular-monolith-primer, outbox-pattern) |
-| Distilled excerpts | [`docs/reference/modular-monolith-with-ddd/`](docs/reference/modular-monolith-with-ddd/) |
+| Distilled excerpts | [`docs/reference/reference-00007-modular-monolith-with-ddd.md`](docs/reference/reference-00007-modular-monolith-with-ddd.md) |
 
 .NET reference (patterns mapped to Java): module-per-context with a single
 facade, schema-per-module, command/query bus with a Logging→Validation→UnitOfWork
@@ -143,7 +143,7 @@ git -C ../ddd-refs/modular-monolith-with-ddd checkout 91c8ef24b4cb6ef558c95d8267
 | License | MIT · TypeScript · 14.8k★ |
 | Local clone | `../ddd-refs/domain-driven-hexagon` (outside this repo) |
 | Official docs | the README is the reference article |
-| Distilled excerpts | [`docs/reference/domain-driven-hexagon/`](docs/reference/domain-driven-hexagon/) |
+| Distilled excerpts | [`docs/reference/reference-00005-domain-driven-hexagon.md`](docs/reference/reference-00005-domain-driven-hexagon.md) |
 
 TypeScript/NestJS tutorial (vocabulary mapped to Java): Explicit Architecture,
 building-block responsibilities, vertical-slice-per-use-case, validate-vs-guard,
@@ -163,7 +163,7 @@ git -C ../ddd-refs/domain-driven-hexagon checkout 5c2d15a7e2d69e83dfddf28468ee9f
 | License | MIT · C# · 18.3k★ |
 | Local clone | `../ddd-refs/CleanArchitecture` (outside this repo) |
 | Official docs | https://ardalis.github.io/CleanArchitecture |
-| Distilled excerpts | [`docs/reference/clean-architecture/`](docs/reference/clean-architecture/) |
+| Distilled excerpts | [`docs/reference/reference-00002-clean-architecture.md`](docs/reference/reference-00002-clean-architecture.md) |
 
 .NET Clean Architecture template (patterns mapped to Java): dependency-rule
 project layout, explicit use-case layer, Result-as-value, repository-per-aggregate

@@ -47,6 +47,6 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[issue-00017-cancelled-deadline-can-still-fire]]
-- [[process-manager-schema-copies]]
-- [[plan-00003-durable-process-manager-implementation]]
+- [issue-00017-cancelled-deadline-can-still-fire](issue-00017-cancelled-deadline-can-still-fire.md)
+- process-manager-schema-copies
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

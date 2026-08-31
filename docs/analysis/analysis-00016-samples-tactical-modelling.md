@@ -2,14 +2,14 @@
 id: analysis-00016-samples-tactical-modelling
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S16 战术建模：实体、值对象、聚合与规则原语
 
 对应 sample：`aipersimmon-ddd-samples/s16-tactical-modelling`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]，模板与工程约定见
-[[analysis-00015-samples-http-command-query]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)，模板与工程约定见
+[analysis-00015-samples-http-command-query](analysis-00015-samples-http-command-query.md)。
 
 ## 0. 本篇定位
 

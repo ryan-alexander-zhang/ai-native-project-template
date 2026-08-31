@@ -2,13 +2,13 @@
 id: analysis-00041-samples-add-bounded-context
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S24 在既有服务里新建一个限界上下文
 
 对应 sample：`aipersimmon-ddd-samples/s24-add-bounded-context`（一个部署单元、三个上下文 + 共享内核、44 个用例）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -27,7 +27,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 | 第一条集成用事件还是同步调用 | **两个都要**，按"答案是用来决定还是只用来记录"分 | §5 |
 | 何时该独立成部署单元、什么必须先改 | 界面不用改；**事务不能再跨过那次调用**；要有"没答案"的策略 | §6 |
 
-一条库的 issue：[[issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules]]（P2，
+一条库的 issue：[issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules](../issue/issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules.md)（P2，
 规则集内部冲突，本篇被它逼着做了本地绕法）。
 
 ## 1. 新上下文是一个包，不是一个模块
@@ -113,7 +113,7 @@ Jackson module（那是基础设施不是语言，属于组合根）；任何背
 
 值得注意的是**库自己已经解过一次同样的问题，只差值对象这一对**：`domainEventsShouldStayInDomain`
 （内部事实留在 domain）与 `integrationEventsShouldResideInApi`（已发布的事实住在 api）就是这个区分。
-详见 [[issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules]]。
+详见 [issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules](../issue/issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules.md)。
 
 ## 4. 表前缀：唯一能机械回答"分得开吗"的东西
 

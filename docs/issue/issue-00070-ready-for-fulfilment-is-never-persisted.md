@@ -115,7 +115,7 @@ README 的「Intentional design decisions」一节（`README.md:155-160`）把
 客户可以在 inventory 还在干活时取消，而 inventory 随后为一张已不存在的订单回 `StockReserved`。
 不处理的话有两个后果：`BeginFulfilment` 撞上 `CANCELLED` 订单被聚合拒绝、效果中继重试到死信；
 且那份库存永远回不来（补偿路径只从支付失败进入）——
-与 [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] 同一类泄漏，从反方向到达。
+与 [issue-00094-a-swallowed-domain-exception-leaks-stock-permanently](issue-00094-a-swallowed-domain-exception-leaks-stock-permanently.md) 同一类泄漏，从反方向到达。
 
 处理方式利用了既有机制：`OrderCancelledEvent` 本来就经 `OrderFulfilmentStarter` 变成流程的
 `OrderCancelled` 输入，此前在 `AWAITING_STOCK` 走 `ignore`。现在：
@@ -158,6 +158,6 @@ README 的「Intentional design decisions」一节（`README.md:155-160`）把
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]]（订单卡住时无法自助取消，两者叠加后果最重）
-- [[design-00004-durable-process-manager-runtime]]
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md)（订单卡住时无法自助取消，两者叠加后果最重）
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)

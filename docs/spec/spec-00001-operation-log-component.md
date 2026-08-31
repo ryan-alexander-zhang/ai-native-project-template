@@ -9,22 +9,22 @@ status: active
 > 一句话：让消费方以**注解 / 类型安全 Definition / direct-API** 三种方式记录同一种面向业务阅读者的操作日志，
 > 归一到统一模型、统一事务/幂等/脱敏语义，并落到可互换的 JDBC / MyBatis-Plus 存储后端。
 
-技术设计在 [[design-00008-operation-log-component]]（本 spec 不内联设计）；决策边界见
-[[decision-00017-operation-log-component-boundaries]]；预研见 [[analysis-00013-operation-log-component]]。
+技术设计在 [design-00008-operation-log-component](../design/design-00008-operation-log-component.md)（本 spec 不内联设计）；决策边界见
+[decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md)；预研见 [analysis-00013-operation-log-component](../analysis/analysis-00013-operation-log-component.md)。
 
 **MVP 范围** = design-00008 的 P1 + P1b + P2（三入口闭环 + 双存储后端 + 注解捕获）。查询读端口
 （`OperationLogReader`）、method-AOP adapter、中心平台 exporter、Audit Log profile 均**不在本 spec**（P3+）。
 
 ## 1. Context
 
-- 采用 [[decision-00017-operation-log-component-boundaries]] 固化的术语：**Operation Log**（业务可读操作历史，≠ Audit
+- 采用 [decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md) 固化的术语：**Operation Log**（业务可读操作历史，≠ Audit
   Log ≠ Technical Log ≠ Domain Event）、**Operation Outcome**（`SUCCEEDED/REJECTED/FAILED`）、**Transaction
   Completion**（`COMMITTED/ROLLED_BACK/NOT_STARTED/UNKNOWN`，与 outcome 正交）、**Actor / Target / OperationChange**。
-- 本 spec 落地前，这些术语需并入 `CONTEXT.md`（见 [[plan-00010-operation-log-implementation]] 任务 T0）。
-- 受约束于 [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]（注解仅元数据）、
-  [[decision-00012-no-ambient-per-command-state]]（无 ambient 状态）、
-  [[decision-00013-command-context-and-causation-propagation]]（不扩展 `CommandContext`）、
-  [[decision-00016-durable-runtime-staged-message-identity]]（at-least-once 幂等）、[[design-00003-exception-model]]（异常分类）。
+- 本 spec 落地前，这些术语需并入 `CONTEXT.md`（见 [plan-00010-operation-log-implementation](../plan/plan-00010-operation-log-implementation.md) 任务 T0）。
+- 受约束于 [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)（注解仅元数据）、
+  [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)（无 ambient 状态）、
+  [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)（不扩展 `CommandContext`）、
+  [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md)（at-least-once 幂等）、[design-00003-exception-model](../design/design-00003-exception-model.md)（异常分类）。
 
 ## 2. Stories
 
@@ -88,10 +88,14 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
   Given 一个含非法属性路径 / 未知根对象的注解模板
   When 应用启动
   Then 启动失败并给出可定位的模板编译错误
-- **spec-00001-AC-5.1** (spec-00001-FR-5) 另覆盖 spec-00001-FR-6。
+- **spec-00001-AC-5.1** (spec-00001-FR-5)
   Given 一个改地址的 Definition
   When 命令成功
   Then before projection 只执行一次，entry 的 `changes` 只含 allowlist 的实际变化，并与等价注解走同一 pipeline
+- **spec-00001-AC-6.1** (spec-00001-FR-6)
+  Given 一个改地址的 Definition，其 `complete(result)` 返回 draft
+  When 命令成功
+  Then 该 draft 经 normalize/validate/redact/freeze pipeline 落库，结果与等价注解一致
 - **spec-00001-AC-7.1** (spec-00001-FR-7)
   Given 一个在无变化时返回 empty 的 Definition
   When 命令成功但无可记录变化
@@ -100,10 +104,14 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
   Given 同一 input type 既有注解又有 Definition
   When 应用启动
   Then 启动失败并给出可定位的冲突信息
-- **spec-00001-AC-9.1** (spec-00001-FR-9) 另覆盖 spec-00001-FR-10。
+- **spec-00001-AC-9.1** (spec-00001-FR-9)
   Given 一个 `@Transactional` batch 与一个无事务 CLI 动作
   When 各自 `record(draft)`
   Then 前者 `completion=COMMITTED` 与业务同事务，后者 `completion=UNKNOWN`
+- **spec-00001-AC-10.1** (spec-00001-FR-10)
+  Given 一个无当前事务的 CLI 动作
+  When `record(draft)`
+  Then entry 记 `completion=UNKNOWN`，不冒充原子性
 - **spec-00001-AC-11.1** (spec-00001-FR-11)
   Given 一个会重跑的 batch 动作，为每条记录提供稳定 `idempotencyKey`
   When 该动作重跑
@@ -121,7 +129,7 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 - **spec-00001-FR-15** (Unwanted) 若异常/回滚路径记录失败，则系统应保留并重抛原业务异常，并输出 failure-loss metric+alert。
 - **spec-00001-FR-16** (Ubiquitous) 系统应默认拒绝记录任何字段（消费方逐项 allowlist），且 secret/token/凭据/生物信息
   永不入库；summary/label/value 入库前去除 CR/LF；failure 只存 `code/category/safeSummary`。
-- **spec-00001-FR-17** (Where 多租户开启) 系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
+- **spec-00001-FR-17** (Optional) 在多租户开启时，系统应在写入、唯一键与所有读取强制携带可信 tenant；非多租户模式规范化为 `__root__`。
 - **spec-00001-FR-18** (Unwanted) 若渲染后的 summary/changes/details/单值/总 payload 超过配置预算，则系统应按策略拒绝或截断并可观测。
 - **spec-00001-FR-19** (Ubiquitous) 系统应在 `-jdbc` 与 `-mybatis-plus` 两后端 × H2/MySQL/PostgreSQL 三方言下，
   唯一约束、幂等收敛、时间序与分页排序行为等价。
@@ -156,11 +164,13 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
   Given 多租户开启
   When 查询未带 tenant
   Then 请求被拒绝（criteria 强制 tenant），且不存在跨 tenant 结果
-- **spec-00001-AC-18.1** (spec-00001-FR-18) 拒绝策略：
+- **spec-00001-AC-18.1** (spec-00001-FR-18)
+  拒绝策略：
   Given 预算策略为 `REJECT`，一个渲染后恰好超出 summary 预算 1 字符的输入
   When 记录
   Then 不写入 entry，调用方得到可定位的超预算错误，且预算违规计数可观测
-- **spec-00001-AC-18.2** (spec-00001-FR-18) 截断策略与边界：
+- **spec-00001-AC-18.2** (spec-00001-FR-18)
+  截断策略与边界：
   Given 预算策略为 `TRUNCATE`
   When 分别记录恰好等于预算与超出预算 1 字符的两个输入
   Then 前者原样落库、后者被截断并带截断标记，两者都可观测
@@ -179,7 +189,7 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 
 ## 4. Technical Design
 
-默认外置：技术设计见 [[design-00008-operation-log-component]]（模型、端口、生命周期、interceptor 时序、DDL、模板、事务）。
+默认外置：技术设计见 [design-00008-operation-log-component](../design/design-00008-operation-log-component.md)（模型、端口、生命周期、interceptor 时序、DDL、模板、事务）。
 下列仅为 spec 级索引：
 
 ### 4.1 API（消费方可见）
@@ -213,10 +223,10 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 
 ## 6. Non-Functional
 - 无高基数 metric（label 仅 `operationCode`/`outcome`/`sinkType`）；`recordId`/`correlationId` 关联技术日志与 span。
-- 质量门：按 `TESTING.md` / [[design-00007-code-quality-gates]]，覆盖率/静态分析/mutation/集成测试达标；core 模块 framework-free（ArchUnit 守护）。
+- 质量门：按 `TESTING.md` / [design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md)，覆盖率/静态分析/mutation/集成测试达标；core 模块 framework-free（ArchUnit 守护）。
 
 ## Links
-- Design: [[design-00008-operation-log-component]]
-- Decision: [[decision-00017-operation-log-component-boundaries]]
-- Plan: [[plan-00010-operation-log-implementation]]
-- Analysis: [[analysis-00013-operation-log-component]]
+- Design: [design-00008-operation-log-component](../design/design-00008-operation-log-component.md)
+- Decision: [decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md)
+- Plan: [plan-00010-operation-log-implementation](../plan/plan-00010-operation-log-implementation.md)
+- Analysis: [analysis-00013-operation-log-component](../analysis/analysis-00013-operation-log-component.md)

@@ -13,7 +13,7 @@ implements: [design-00009-multi-tenancy-tenant-id]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[design-00009-multi-tenancy-tenant-id]] / [[decision-00018-multi-tenancy-boundaries]] / [[spec-00002-multi-tenancy]]
+把 [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md) / [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md) / [spec-00002-multi-tenancy](../spec/spec-00002-multi-tenancy.md)
 落成代码：pool 判别列 `tenant_id`，租户经**与 decision-00013 同一条传播脊柱**（`CommandContext` → `EventEnvelope` →
 `ce_tenantid` header → 耐久行列 → 消费端重建）端到端流动，读侧与基础设施强制按租户隔离；单租户是 N=1 的同一套 schema。
 
@@ -33,7 +33,7 @@ implements: [design-00009-multi-tenancy-tenant-id]
 
 ## 一、Design
 
-详见 [[design-00009-multi-tenancy-tenant-id]]。落地关键：**这是 decision-00013 传播脊柱的增量**——它已铺好
+详见 [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)。落地关键：**这是 decision-00013 传播脊柱的增量**——它已铺好
 `CommandContext`↔`EventEnvelope`↔`OutboxMessage`↔`IntegrationEventHeaders` 的 correlation/causation 通道，本计划沿同一
 通道再加一个 `tenantId` 字段/属性/header/列。
 
@@ -197,7 +197,7 @@ observability / archunit / flyway。
   `aipersimmon-ddd-tenancy` + `-spring` 骨架（pom + `package-info` + reactor `<modules>` + BOM），空 auto-config 占位。
 - **T0b** `[repo]` ✅ **对齐 decision-00013 已完成**：已加「增补(新增 tenantId)」注记（照其删 traceId / 加 sendAs 先例），
   把 `tenantId` 纳入 `CommandContext` 及 §3 出站脊柱（`EventEnvelope`/`OutboxMessage`/`IntegrationEventHeaders`）语义，
-  指向 [[decision-00018-multi-tenancy-boundaries]]，并显式区分于 operation-log 的"功能字段禁入"约束。
+  指向 [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)，并显式区分于 operation-log 的"功能字段禁入"约束。
 
 ### P1 · 租户原语（tenancy core + spring）
 
@@ -267,6 +267,6 @@ observability / archunit / flyway。
 6. **T18 双租户矩阵全绿** = 完成。
 
 ## 四、关联
-- 决策 [[decision-00018-multi-tenancy-boundaries]]（+ 待增补 [[decision-00013-command-context-and-causation-propagation]]）
-- 设计 [[design-00009-multi-tenancy-tenant-id]]、Spec [[spec-00002-multi-tenancy]]、术语 `CONTEXT.md`
-- 复用/对齐 [[plan-00010-operation-log-implementation]]（`OperationTenantResolver` → `TenantContext`）
+- 决策 [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)（+ 待增补 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）
+- 设计 [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)、Spec [spec-00002-multi-tenancy](../spec/spec-00002-multi-tenancy.md)、术语 `CONTEXT.md`
+- 复用/对齐 [plan-00010-operation-log-implementation](plan-00010-operation-log-implementation.md)（`OperationTenantResolver` → `TenantContext`）

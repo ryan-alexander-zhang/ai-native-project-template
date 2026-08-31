@@ -50,5 +50,5 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[plan-00003-durable-process-manager-implementation]]
-- 死代码清理与 [[issue-00015-re-suspend-clobbers-resume-lifecycle]] 的 `findForUpdate` 收口同向。
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)
+- 死代码清理与 [issue-00015-re-suspend-clobbers-resume-lifecycle](issue-00015-re-suspend-clobbers-resume-lifecycle.md) 的 `findForUpdate` 收口同向。

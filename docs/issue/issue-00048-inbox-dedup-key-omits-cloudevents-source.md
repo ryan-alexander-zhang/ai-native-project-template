@@ -47,8 +47,8 @@ blocks: [plan-00006-middleware-integration]
 
 ## 关联
 
-- [[plan-00006-middleware-integration]]
-- [[decision-00014-cloudevents-integration-event-contract]](CloudEvents:id 同源唯一,id+source 全局唯一)
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)(CloudEvents:id 同源唯一,id+source 全局唯一)
 
 ## 核查结论(在当前 HEAD 复核)
 
@@ -79,7 +79,7 @@ Flyway 校验和变更的代价只落在可丢弃的本地库上;这是在「留
 
 顺带把 `-inbox-jdbc` / `-inbox-mybatis-plus` 测试里**手工枚举**借用迁移的 `schema-locations` 改成
 `classpath*:.../V*.sql` 模式。这两个模块和 kafka 一样是**借用**它不拥有的 schema,枚举式引用正是
-[[issue-00056-kafka-tests-pin-a-stale-inbox-schema]] 的成因;本次若不改,下一个 V3 会在这里重演。
+[issue-00056-kafka-tests-pin-a-stale-inbox-schema](issue-00056-kafka-tests-pin-a-stale-inbox-schema.md) 的成因;本次若不改,下一个 V3 会在这里重演。
 
 ## 验证结果
 

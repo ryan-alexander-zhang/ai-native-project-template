@@ -24,7 +24,7 @@ for (Line line : command.lines()) { Stock s = stockFor(line.sku()); s.reserve(q)
   两行同 SKU 时：第一次 `save` 把 version 推到 N+1；第二个对象仍持 version N，
   它的 `save` 匹配 0 行 → `OptimisticLockingFailureException`。
 - 该异常**不是** `DomainException`，逃出 `:90` 的 catch ⇒ **不发 `StockReservationFailed`**
-  ⇒ 走 [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] 的挂死路径。
+  ⇒ 走 [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md) 的挂死路径。
 - 目前不出事的唯一原因在**另一个上下文**里：`Order` 的
   `OrderHasDistinctSkus` 不变量（`OrderHasDistinctSkus.java:14-23`，由 `Order.place` 的
   `checkInvariant` 强制，`Order.java:86`）保证了 `OrderReadyForFulfilment` 的 lines 不重复。
@@ -79,7 +79,7 @@ void aReserveStockWithARepeatedSkuIsRejectedCleanly() {
    这同时把加载次数从 2N 降到 N，并让"同一事务里同一聚合只有一个实例"成为结构性保证而非巧合。
 3. **收窄失败语义**：`ReserveStockHandler` 的 catch 目前只认 `DomainException`，
    使得"业务失败"可恢复、"技术失败"静默挂死。应当明确区分并让两者都对流程可见——
-   与 [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] 的修复一并考虑。
+   与 [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md) 的修复一并考虑。
 
 顺带：`ReserveStockHandler` 的类注释（`:34-45`）详细论证了那个"刻意的多聚合事务"，
 论证是成立的；但它没有提到**同一聚合不得在一个事务里被加载两次**这条隐含前提。
@@ -87,7 +87,7 @@ void aReserveStockWithARepeatedSkuIsRejectedCleanly() {
 
 ## 验证结果
 
-已修。三层修复全做，与 [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] 同一次改动
+已修。三层修复全做，与 [issue-00094-a-swallowed-domain-exception-leaks-stock-permanently](issue-00094-a-swallowed-domain-exception-leaks-stock-permanently.md) 同一次改动
 （方案 2 一并覆盖，如两个 issue 互相预判的那样）。
 
 - **第 1 层（命令自保）**：`ReserveStock` 紧凑构造器按 `Line::sku` 分组求和，
@@ -118,7 +118,7 @@ void aReserveStockWithARepeatedSkuIsRejectedCleanly() {
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]]（本 issue 是逃出 catch 的一条具体路径）
-- [[issue-00051-aggregates-have-no-optimistic-locking]]（version 机制本身；此处它工作正常）
-- [[decision-00015-cross-context-sync-query-via-gateway-acl]]（ACL 的职责边界）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md)（本 issue 是逃出 catch 的一条具体路径）
+- [issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)（version 机制本身；此处它工作正常）
+- [decision-00015-cross-context-sync-query-via-gateway-acl](../decision/decision-00015-cross-context-sync-query-via-gateway-acl.md)（ACL 的职责边界）

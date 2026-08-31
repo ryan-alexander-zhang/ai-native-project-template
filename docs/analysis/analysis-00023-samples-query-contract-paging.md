@@ -2,13 +2,13 @@
 id: analysis-00023-samples-query-contract-paging
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S20 读侧查询契约：分页、排序、过滤
 
 对应 sample：`aipersimmon-ddd-samples/s20-query-contract-paging`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -168,11 +168,11 @@ MyBatis-Plus 的 `eq(boolean condition, ...)` 重载：条件不成立那个谓�
 
 这里有一个和 S19 呼应的细节：这三个都是 `ApplicationException`，而 `ApplicationExceptionAdvice` 给
 `ApplicationException` 的**兜底状态是 422**——它们之所以出来是 400，是因为**码的 category 说了话**。
-状态码跟着 `ErrorCode` 走，不跟着"哪一层抛的"走（[[analysis-00022-samples-validation-layers]] §5）。
+状态码跟着 `ErrorCode` 走，不跟着"哪一层抛的"走（[analysis-00022-samples-validation-layers](analysis-00022-samples-validation-layers.md) §5）。
 
 **为什么 `size` 上限在 `PageRequest` 而不是只在 HTTP 参数上。** 命令总线会校验它派发的每一个命令；
 **查询总线不装任何拦截器**（库确实提供 `QueryInterceptor` 这个接口，但不注册任何实现——注意
-`QueryBus` 的 javadoc 在这点上是过时的，见 [[analysis-00015-samples-http-command-query]] §9 第 1 条）。
+`QueryBus` 的 javadoc 在这点上是过时的，见 [analysis-00015-samples-http-command-query](analysis-00015-samples-http-command-query.md) §9 第 1 条）。
 所以调用方和查询处理器之间没有任何东西会代替谁做检查：**只在 web 边界执行的读契约，就是定时导出任务、
 运维工具和下一个适配器都没有的读契约**。而无上限的列表不是外观问题，它是一次请求读全表。
 

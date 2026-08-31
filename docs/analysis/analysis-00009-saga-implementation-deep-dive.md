@@ -2,18 +2,17 @@
 id: analysis-00009-saga-implementation-deep-dive
 type: analysis
 status: active
-informs: [analysis-00007-saga-process-manager]
 ---
 
 # Saga 已落地实现深度剖析:原理、数据模型、能力边界与 Seata 对照
 
-承接 [[analysis-00007-saga-process-manager]](该文回答"要不要、以什么形态提供 saga、何时升级引擎"的**设计取舍**)。
+承接 [analysis-00007-saga-process-manager](analysis-00007-saga-process-manager.md)(该文回答"要不要、以什么形态提供 saga、何时升级引擎"的**设计取舍**)。
 本文转向**已经落地的 `aipersimmon-ddd-saga` / `-saga-spring` 实现本身**:它到底怎么工作、怎么持久化、
 实现了哪些能力、缺了哪些,以及与工业级状态机型实现(Seata SAGA)的数据模型差距。
 
-配套阅读:[[analysis-00006-ddd-building-blocks-library]](构件库纯/脏分离方法论)、
-[[analysis-00001-domain-event-publishing]](事件发布 / outbox,saga 可靠推进的底座)、
-[[analysis-00002-domain-vs-integration-events]](跨 BC 用集成事件)。
+配套阅读:[analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md)(构件库纯/脏分离方法论)、
+[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)(事件发布 / outbox,saga 可靠推进的底座)、
+[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)(跨 BC 用集成事件)。
 
 ## 结论先行
 
@@ -35,7 +34,7 @@ informs: [analysis-00007-saga-process-manager]
 | `aipersimmon-ddd-saga` | **纯契约**:标记 + 状态基类 + 端口 | `-core` | 无(framework-free) |
 | `aipersimmon-ddd-saga-spring` | **适配器**:JDBC 持久化 + 超时调度 + 自动装配 | `-saga` | Spring / JDBC |
 
-设计原则与全库一致(见 [[analysis-00006-ddd-building-blocks-library]]):业务只依赖抽象契约,
+设计原则与全库一致(见 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md)):业务只依赖抽象契约,
 底层实现(内存定时器 / 数据库轮询 / durable 引擎)可替换而不动 saga 逻辑。
 
 ## 二、核心契约(`aipersimmon-ddd-saga`)
@@ -227,7 +226,7 @@ seata_state_inst          状态实例(每执行一个节点一行:service_name/
 | **Temporal / Cadence** | durable execution(workflow-as-code) | 几乎补齐所有缺口(重试/超时/持久/版本/UI) |
 | **Camunda 8 / Zeebe** | BPMN 可视化 + 补偿事件 | 图形化编排 + 运维面 |
 
-选型建议见 [[analysis-00007-saga-process-manager]] §四/§七(按信号逐级升级,契约保持引擎无关)。
+选型建议见 [analysis-00007-saga-process-manager](analysis-00007-saga-process-manager.md) §四/§七(按信号逐级升级,契约保持引擎无关)。
 
 ## 十一、落地建议
 
@@ -242,10 +241,10 @@ seata_state_inst          状态实例(每执行一个节点一行:service_name/
 
 内部:
 
-- [[analysis-00007-saga-process-manager]] —— saga 设计取舍(是否提供 / 何形态 / 何时升级引擎),本文的上游。
-- [[analysis-00006-ddd-building-blocks-library]] —— 构件库纯/脏分离、参考不依赖方法论。
-- [[analysis-00001-domain-event-publishing]] —— 事件发布 / outbox(saga 可靠推进底座)。
-- [[analysis-00002-domain-vs-integration-events]] —— 跨 BC 集成事件契约。
+- [analysis-00007-saga-process-manager](analysis-00007-saga-process-manager.md) —— saga 设计取舍(是否提供 / 何形态 / 何时升级引擎),本文的上游。
+- [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) —— 构件库纯/脏分离、参考不依赖方法论。
+- [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) —— 事件发布 / outbox(saga 可靠推进底座)。
+- [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md) —— 跨 BC 集成事件契约。
 - 实现源码:`aipersimmon-ddd/aipersimmon-ddd-saga`、`aipersimmon-ddd-saga-spring`、
   scaffold 示例 `aipersimmon-ddd-scaffold-samples/orchestrate-with-saga`、`aipersimmon-ddd/README.md`。
 

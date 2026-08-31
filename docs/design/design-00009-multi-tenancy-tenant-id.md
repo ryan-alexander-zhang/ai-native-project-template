@@ -2,7 +2,7 @@
 id: design-00009-multi-tenancy-tenant-id
 type: design
 status: active
-informs: [decision-00018-multi-tenancy-boundaries]
+informs: [spec-00002-multi-tenancy]
 ---
 
 # 多租户设计：`tenant_id` 判别列、租户原语组件与端到端传播
@@ -12,11 +12,11 @@ informs: [decision-00018-multi-tenancy-boundaries]
 织入现有写路径、消息与耐久基础设施。
 
 设计遵循框架既有约定：租户是**元数据，永远随命令/信封旁路传播，绝不进入业务 payload**
-（沿用 [[decision-00013-command-context-and-causation-propagation]]、[[decision-00014-cloudevents-integration-event-contract]]）；
+（沿用 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)、[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)）；
 新原语按 observability 的拆法分为 framework-free 内核 + Spring 装配
-（沿用 [[design-00005-observability-and-distributed-tracing]]）。
+（沿用 [design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md)）。
 
-本文是结构设计。§十三的取舍已由 [[decision-00018-multi-tenancy-boundaries]] 固化；本文提供机制细节，ADR 提供决策与取舍。
+本文是结构设计。§十三的取舍已由 [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md) 固化；本文提供机制细节，ADR 提供决策与取舍。
 下一步产出 spec/plan、再编码。
 
 ---
@@ -63,7 +63,7 @@ informs: [decision-00018-multi-tenancy-boundaries]
 - `Tenants`：哨兵与工厂。`Tenants.ROOT`（哨兵默认租户，字面量如 `__root__`，或固定 UUID）、`Tenants.of(String)`。
 - `TenantContext`：**ThreadLocal 持有者**，类比 MDC。`current()` / `set(TenantId)` / `runAs(TenantId, Supplier)` / `clear()`。
   这是读侧仓储与基础设施实现读取环境租户的唯一入口。**不开放可变属性池、不做通用变量袋**（沿用
-  [[decision-00012-no-ambient-per-command-state]] 的克制）。
+  [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md) 的克制）。
   - **`effective()`：缺绑定决策的唯一收口点**（`issue-00099`）。凡是盖章或过滤 `tenant_id` 的基础设施都调用它，
     不再各自 `orElse(ROOT)`：有绑定用之；多租户关且无绑定 → `Tenants.ROOT`；多租户开且无绑定 →
     抛 `MissingTenantException`。**不提供**无条件抛出的 `require()`——与 `effective()` 同概念两个名字。
@@ -150,7 +150,7 @@ public record CommandContext(String tenantId, String messageId, String correlati
 - **所有表都加 `tenant_id` 数据列**（用于 header 盖章 / 观测 / RLS 过滤），但**是否入唯一键**按上表判据区分。
 - `aipersimmon_process_instance` 的检索索引应以 `tenant_id` 为前导列（Salesforce 式），保证按租户扫描高效。
 - `shedlock` 是 ShedLock 契约表（固定列名），**不加 `tenant_id`**；pool 模型下它只服务 outbox cleanup
-  （relay 已改为每行租约、多实例并发轮询，见 §八与 [[issue-00108-a-killed-relay-instance-stops-all-delivery]]）。
+  （relay 已改为每行租约、多实例并发轮询，见 §八与 [issue-00108-a-killed-relay-instance-stops-all-delivery](../issue/issue-00108-a-killed-relay-instance-stops-all-delivery.md)）。
 - web-store-redis 无 DDL → key 前缀加租户段：`aipersimmon:web:{tenant}:idem:` 等。
 
 存储端口（`ProcessInstanceStore` 等）与 `ProcessInstanceCriteria` 新增 `tenant` 维度；耐久行携带 `tenant_id`
@@ -247,7 +247,7 @@ pool 模型下，租户只是行上的数据：
   （400/401），绝不悄悄回退到共享桶；`SYSTEM`（回退哨兵）仅供受控内部/迁移场景显式选用。
 - **`aipersimmon.ddd.tenancy.trust-header`（默认 `false`）**（`issue-00099`）：是否信任 `header` 指定的请求头。
   多租户开启 + 无自定义 `TenantResolver` + 未 opt-in → **拒绝启动**（`UntrustedTenantHeaderException` +
-  FailureAnalyzer 给出两种安全接法）。理由见 [[decision-00018-multi-tenancy-boundaries]] 命题 13c。
+  FailureAnalyzer 给出两种安全接法）。理由见 [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md) 命题 13c。
 - **跨线程传播**：`TenantContextTaskDecorator`（tenancy-spring 提供，`@ConditionalOnMissingBean(TaskDecorator)`）。
   Spring Boot 只在恰好一个 `TaskDecorator` bean 时应用它，故消费方自带 decorator 时本 bean 主动让位——
   否则会静默把对方的也一起废掉；这种情形下消费方须把租户传播组合进自己的 decorator。

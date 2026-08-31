@@ -115,7 +115,7 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-cqrs`、`aipersimmon-ddd-web`（`ProblemCatalog` / `ProblemRegistry` /
 `DefaultProblemFamilies`）、`aipersimmon-ddd-openapi-spring-boot-starter`。**寄宿 S14**。
 
-**文档**：[[analysis-00015-samples-http-command-query]]（模板篇，已完成）。
+**文档**：[analysis-00015-samples-http-command-query](analysis-00015-samples-http-command-query.md)（模板篇，已完成）。
 
 ### S2 HTTP 写接口的幂等提交与重放防护（P0）
 
@@ -143,7 +143,7 @@ sample 内演示，不单独建目录。
 关系库版本作为有库服务的替代在文档里对比）、`aipersimmon-ddd-web-spring-boot-starter`。
 **注意 `RequestSignatureVerifier` 库里没有任何实现，必须自己写**，否则防重放静默失效。
 
-**文档**：[[analysis-00017-samples-http-idempotency]]（已完成）。
+**文档**：[analysis-00017-samples-http-idempotency](analysis-00017-samples-http-idempotency.md)（已完成）。
 
 ### S3 领域事件的发布与消费（同进程）（P0）
 
@@ -166,7 +166,7 @@ sample 内演示，不单独建目录。
 **预计涉及的组件**：`aipersimmon-ddd-core`（`AbstractAggregateRoot`）、
 `aipersimmon-ddd-events-spring-boot-starter`、`aipersimmon-ddd-persistence-mybatis-plus`。
 
-**文档**：[[analysis-00020-samples-domain-events-in-process]]（已完成）。
+**文档**：[analysis-00020-samples-domain-events-in-process](analysis-00020-samples-domain-events-in-process.md)（已完成）。
 
 ### S4 集成事件跨服务：outbox 发布 + Kafka + inbox 消费（P0，双服务）
 
@@ -196,14 +196,14 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-starter-messaging-kafka`、`aipersimmon-ddd-flyway-spring-boot-starter`。
 **寄宿 S13、S15**。
 
-**文档**：[[analysis-00025-samples-integration-events-across-services]]（已完成）。落地时发现两件事：消费侧的
+**文档**：[analysis-00025-samples-integration-events-across-services](analysis-00025-samples-integration-events-across-services.md)（已完成）。落地时发现两件事：消费侧的
 去重**由库的消费桥负责**（`KafkaIntegrationEventListener:152`），handler 再查一遍会让每条消息静默跳过；以及只
 消费的服务会被发布侧的启动检查误报，见
-[[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]。
+[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher](../issue/issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher.md)。
 
 **S13 与 S15 已寄宿完成**（同一份代码，各有自己的文档）：
-[[analysis-00027-samples-multi-tenancy-end-to-end]]、
-[[analysis-00028-samples-one-trace-across-the-boundary]]。
+[analysis-00027-samples-multi-tenancy-end-to-end](analysis-00027-samples-multi-tenancy-end-to-end.md)、
+[analysis-00028-samples-one-trace-across-the-boundary](analysis-00028-samples-one-trace-across-the-boundary.md)。
 
 ### S5 消费外部系统的消息（非本体系事件格式）（P0）
 
@@ -225,7 +225,7 @@ sample 内演示，不单独建目录。
 `aipersimmon-ddd-cqrs`、`aipersimmon-ddd-messaging-kafka`（或原生 spring-kafka listener
 手动进 inbox）。
 
-**文档**：[[analysis-00029-samples-external-messages-inbound]]（已完成，单模块，**故意不装**
+**文档**：[analysis-00029-samples-external-messages-inbound](analysis-00029-samples-external-messages-inbound.md)（已完成，单模块，**故意不装**
 `-starter-messaging-kafka`）。落地时的主要发现：**"幂等键从哪来"这一问要先问这条消息需不需要键**——绝对状态 +
 每实体单调 revision 的消息，排序守卫已经让重投按内容成为 no-op，**一个去重键都不需要**（测试断言 inbox 零行）；
 只有**相对语义**（降 10%）的消息必须要，而键**只能由上游提供**，payload hash / `(topic,partition,offset)` / 到达
@@ -257,7 +257,7 @@ sample 内演示，不单独建目录。
 （`CommandPrecheck`）、`aipersimmon-ddd-web`（problem 的客户端解读）、
 `aipersimmon-ddd-starter`（无库服务）；HTTP 客户端为三方选型。
 
-**文档**：[[analysis-00030-samples-synchronous-call-between-services]]（已完成，两个服务模块）。落地时把"何时该同步"
+**文档**：[analysis-00030-samples-synchronous-call-between-services](analysis-00030-samples-synchronous-call-between-services.md)（已完成，两个服务模块）。落地时把"何时该同步"
 的判据收敛成一句：**同步调用能拿到"判断"，永远拿不到"预留"**——需要对方持有东西就是 S9/S10，不是一次提问。另外
 三条上面没问到的：被调方**拒绝必须是 200 + `approved:false`**（用 4xx 会让调用方分不清业务拒绝与自己发错了），
 调用方把对方的 **4xx 也翻译成"没有答案"**（4xx 意味着本服务有缺陷，不该说成客户订单被拒），以及 `ErrorCategory`
@@ -291,7 +291,7 @@ precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最�
 `aipersimmon-ddd-web` + 关系库边界存储（当时 `-web-store-jdbc`，现 `-web-store-mybatis-plus`）（回调幂等/验签/防重放）、
 `aipersimmon-ddd-process-manager`（悬挂态推进，视深度）。
 
-**文档**：[[analysis-00031-samples-third-party-integration]]（已完成，两个模块：我们的支付服务 + 一个不受控的
+**文档**：[analysis-00031-samples-third-party-integration](analysis-00031-samples-third-party-integration.md)（已完成，两个模块：我们的支付服务 + 一个不受控的
 网关 stub；process-manager 没用上，悬挂态用聚合状态 + 定时对账推进，编排引擎留给 S9）。落地结论：**出站真的走
 了库的 outbox**（`@Externalized("gateway:charges")` + 自己的 `EventDestinations` 与 `OutboxDispatcher`），换来
 同事务落库、租约、退避、死信；代价三条——一个应用只有一个 dispatcher（所以要自己组合回进程内那条腿，否则 LOCAL
@@ -304,7 +304,7 @@ precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最�
 13ms，把一笔还没发出去的付款永久打标（打标是粘性的）——改设计而不是改测试，**对缺席要有耐心**，由此 `stale-after`
 有下界。布局分歧一处：回调 controller 放在 `infrastructure.gateway` 而不是 `interfaces`（它不是我们的 API，是
 出站调用的返回路径），换来两个方向共用一张 code 表，整包 package-private。八个负向对照全部单跑实测，其中
-`nonce.enabled=false` 那一轮查出库的问题 → [[issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable]]。
+`nonce.enabled=false` 那一轮查出库的问题 → [issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable](../issue/issue-00162-nonce-dedup-off-makes-a-nonce-bound-signature-unverifiable.md)。
 
 ### S8 本地事务：聚合边界、乐观锁与冲突重试（P0）
 
@@ -354,7 +354,7 @@ precheck 抛异常短路掉它后面的探针 precheck。第二个症状我最�
 `aipersimmon-ddd-process-manager-engine`、`aipersimmon-ddd-process-manager-mybatis-plus`、
 以及 S4 的全部事件链路组件。
 
-**文档**：[[analysis-00032-samples-eventual-consistency-process-manager]]（已完成，单模块三聚合：座位/钱包/订单，
+**文档**：[analysis-00032-samples-eventual-consistency-process-manager](analysis-00032-samples-eventual-consistency-process-manager.md)（已完成，单模块三聚合：座位/钱包/订单，
 业务域是卖一张票）。落地结论：选**编排**的判据是"补偿有顺序（先退钱→再放座→最后取消），有顺序的东西必须有个地方
 住"，代价是参与者的 handler 知道存在协调者。**补偿不是回滚**用钱包分录表钉死：退款是**另一条 credit**
 （`refund-of:<那笔 debit>`），两条永久留在流水上；放座是 `released_at` 而不是 DELETE；出票之后是**不可回头点**，
@@ -368,9 +368,9 @@ handler 原样交回当 cause，重投产生逐字节相同的 input id 被 runt
 且 24 个用例只有 1 红（那条补偿分支）。运维介入走完整条 DEAD→SUSPENDED→改数据→`redriveEffect`→恢复→出票；
 `redriveEffect` 只接受 DEAD（我最初拿它模拟重投，报错才发现）。什么时候该换 Temporal：state 里开始出现计数器和
 待办列表就已越界。两个库的问题：
-[[issue-00163-process-manager-worker-enabled-removes-the-bean-the-outbox-keeps]]（同名属性在 outbox 是停调度、
+[issue-00163-process-manager-worker-enabled-removes-the-bean-the-outbox-keeps](../issue/issue-00163-process-manager-worker-enabled-removes-the-bean-the-outbox-keeps.md)（同名属性在 outbox 是停调度、
 在 pm 是删 bean，测试没法手动驱动）、
-[[issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended]]（挂起原因只说"哪件事"，"为什么"只在
+[issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended](../issue/issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended.md)（挂起原因只说"哪件事"，"为什么"只在
 effect 行的 last_error 里，没有端口能读）。
 
 ### S10 强一致性：Seata 跨服务分布式事务（P0，双服务，完整可运行）
@@ -397,7 +397,7 @@ effect 行的 last_error 里，没有端口能读）。
 `aipersimmon-ddd-persistence-mybatis-plus`、`aipersimmon-ddd-outbox-mybatis-plus`；Seata 为
 三方依赖，sample 自带 seata-server + 多库 compose 与 `undo_log` 迁移。
 
-**文档**：[[analysis-00033-samples-strong-consistency-seata]]（已完成，三模块：account-service +
+**文档**：[analysis-00033-samples-strong-consistency-seata](analysis-00033-samples-strong-consistency-seata.md)（已完成，三模块：account-service +
 points-service + 一个端到端测试模块，两个库、一个真 seata-server，29 个用例）。**§3.1 的阻塞前提已验证通过**：
 AT 与本库的两层 SQL 改写（乐观锁的 `WHERE version = ?` + 租户行的 `AND tenant_id = ?`）能共存，所以主线用 AT，
 TCC 作为可度量的对照而不是退路。证据是直接读 `undo_log.rollback_info`：前后镜像都把 `version` 当普通列捕获
@@ -440,7 +440,7 @@ package 互吞、两个 `application.yaml` 一个赢、两个 `V1__*.sql` 撞版
 `aipersimmon-ddd-operation-log`（非注解入口记录）、`aipersimmon-ddd-tenancy`；调度与互斥为
 三方选型。
 
-**文档**：[[analysis-00024-samples-scheduled-and-batch-entries]]（已完成）。落地时修正了上面
+**文档**：[analysis-00024-samples-scheduled-and-batch-entries](analysis-00024-samples-scheduled-and-batch-entries.md)（已完成）。落地时修正了上面
 "多实例部署时的调度互斥"这条的隐含前提：**互斥不属于调度，属于工作**——库自己的 outbox relay 让每个
 实例都跑调度、按行领取，并在 javadoc 里说明了锁调度为何是更差的交换。因此三方调度锁（ShedLock 等）
 不是本篇的答案，也不是库需要的东西。
@@ -465,7 +465,7 @@ package 互吞、两个 `application.yaml` 一个赢、两个 `V1__*.sql` 撞版
 **预计涉及的组件**：`aipersimmon-ddd-cqrs`（`QueryBus`、`Projection`）、
 `aipersimmon-ddd-inbox-mybatis-plus`（投影更新的幂等）、S3/S4 的事件链路组件。
 
-**文档**：[[analysis-00034-samples-cqrs-read-model]]（已完成，两个服务：catalog 发布 / ordering 持有投影，
+**文档**：[analysis-00034-samples-cqrs-read-model](analysis-00034-samples-cqrs-read-model.md)（已完成，两个服务：catalog 发布 / ordering 持有投影，
 38 个用例，无第三个联测模块——理由写在 sample 父 POM 里：S10 那种 harness 是因为"一个全局事务跨两个资源"没法
 单服务观测，而这里被测的是线上记录的形状，两侧各自对着契约测就够，沿用 S4 的做法）。**什么时候不该上投影**：
 S20 就是对照且是常见情况（直接查写表 + 游标分页），判据不是"查询变慢"而是**"查询需要本上下文不拥有的数据"**
@@ -481,7 +481,7 @@ S20 就是对照且是常见情况（直接查写表 + 游标分页），判据�
 离开读路径、被放大后出现在你控制不了频率的事件的写路径上。**§7 被负向对照改写过**：我原本说"同事务才有
 read-your-own-writes"，控制 1 跑出 0 红证明该说法未被测到且在本形状下是错的（总线自己开事务、外无包裹，
 `AFTER_COMMIT` 仍在 `send` 返回前同步跑完）；阶段真正决定的是**故障往哪边传**，那 1 红的测试是因此才补的。
-库的问题：没有新的，独立复现了 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]；
+库的问题：没有新的，独立复现了 [issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher](../issue/issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher.md)；
 另记两条非缺陷交互：两个框架组件 ⇒ 两个 `Clock` bean 无 primary（按类型注入启动失败，应用要自己声明名为
 `clock` 的 bean 按名字解析），以及 `Projection` 注解 javadoc 的 "in the same transaction" 比现实窄
 （跨服务驱动的投影不可能同事务）。
@@ -500,7 +500,7 @@ read-your-own-writes"，控制 1 跑出 0 红证明该说法未被测到且在�
 **预计涉及的组件**：`aipersimmon-ddd-tenancy`、`aipersimmon-ddd-tenancy-mybatis-plus`、
 `aipersimmon-ddd-tenancy-spring-boot-starter`、`aipersimmon-ddd-mybatis-plus-spring-boot-starter`。
 
-**文档**：[[analysis-00027-samples-multi-tenancy-end-to-end]]（已完成，寄宿 S4 的两个服务）。落地时补了三条上面
+**文档**：[analysis-00027-samples-multi-tenancy-end-to-end](analysis-00027-samples-multi-tenancy-end-to-end.md)（已完成，寄宿 S4 的两个服务）。落地时补了三条上面
 没问到的：**allow-list fail open**，所以库有启动期自检（漏登记一张带 `tenant_id` 的表就一个谓词都不加）；
 **隔离要落在唯一键里，不只落在谓词里**——把表从 `tenant-tables` 里删掉后不是静默泄漏而是
 `TooManyResultsException` 无限重试导致分区停滞，而这份"响"只因为主键是 `(tenant_id, sku)` 复合的；以及 inbox
@@ -526,7 +526,7 @@ FailureAnalyzer 指路），`Actor resolve()` 无参且 javadoc 要求只从可�
 `aipersimmon-ddd-operation-log-cqrs-spring-boot-starter`、
 `aipersimmon-ddd-operation-log-mybatis-plus`。
 
-**文档**：[[analysis-00038-samples-operation-log]]（sample：`aipersimmon-ddd-samples/s01-http-command-query`，
+**文档**：[analysis-00038-samples-operation-log](analysis-00038-samples-operation-log.md)（sample：`aipersimmon-ddd-samples/s01-http-command-query`，
 S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S13 与 S15 随宿主 S4 交付了，S14 一直没有，
 2026-08-04 之前 samples 树里没有任何模块依赖过这个组件。五问全部以实测作答，四点要回填进本清单：
 
@@ -564,7 +564,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 **预计涉及的组件**：`aipersimmon-ddd-observability`、`aipersimmon-ddd-observability-otel`、
 `aipersimmon-ddd-observability-otel-spring-boot-starter`。
 
-**文档**：[[analysis-00028-samples-one-trace-across-the-boundary]]（已完成，寄宿 S4 的两个服务）。落地时修正了上面
+**文档**：[analysis-00028-samples-one-trace-across-the-boundary](analysis-00028-samples-one-trace-across-the-boundary.md)（已完成，寄宿 S4 的两个服务）。落地时修正了上面
 的标题前提：**它不是"一条完整 trace"，也不该是**——outbox 那跳库开的是一个 link 回去的**新 trace**（库自己的
 `ConnectedTraceEndToEndTest` 断言 `assertNotEquals` 两个 trace id），所以下游报出的 trace id 不是那次 HTTP
 请求的；端到端逐字节相同的是 **correlationId**，且不需要任何后端。另外两条：调用方手里的 `X-Request-Id` 与消息层
@@ -595,7 +595,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 `core/annotation/*`、`IdGenerator`）、`aipersimmon-ddd-archunit`。`-id-spring-boot-starter` 归 S1：
 本篇是纯领域模块，不引 Spring。
 
-**文档**：[[analysis-00016-samples-tactical-modelling]]（已完成）。
+**文档**：[analysis-00016-samples-tactical-modelling](analysis-00016-samples-tactical-modelling.md)（已完成）。
 
 ### S17 聚合与数据表的映射（P0）
 
@@ -617,7 +617,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 
 **预计涉及的组件**：`aipersimmon-ddd-persistence-mybatis-plus`、`aipersimmon-ddd-core`。
 
-**文档**：[[analysis-00018-samples-aggregate-persistence-mapping]]（已完成）。
+**文档**：[analysis-00018-samples-aggregate-persistence-mapping](analysis-00018-samples-aggregate-persistence-mapping.md)（已完成）。
 
 ### S18 分层测试策略（P0）
 
@@ -641,7 +641,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 **预计涉及的组件**：`aipersimmon-ddd-test`、`aipersimmon-ddd-test-support`、
 `aipersimmon-ddd-archunit`。
 
-**文档**：[[analysis-00019-samples-testing-strategy]]（已完成）。
+**文档**：[analysis-00019-samples-testing-strategy](analysis-00019-samples-testing-strategy.md)（已完成）。
 
 ### S19 校验的三层分工（P0）
 
@@ -663,7 +663,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 **预计涉及的组件**：`aipersimmon-ddd-cqrs`（`CommandPrecheck`）、`aipersimmon-ddd-core`
 （`Invariant`、`Specification`）、`aipersimmon-ddd-web`。
 
-**文档**：[[analysis-00022-samples-validation-layers]]（已完成）。
+**文档**：[analysis-00022-samples-validation-layers](analysis-00022-samples-validation-layers.md)（已完成）。
 
 ### S20 读侧查询契约：分页、排序、过滤（P0）
 
@@ -684,7 +684,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 `ReadModel`）、`aipersimmon-ddd-web-spring-boot-starter`（游标序列化）、
 `aipersimmon-ddd-persistence-mybatis-plus`。
 
-**文档**：[[analysis-00023-samples-query-contract-paging]]（已完成）。落地时修正了上面第三条问法：
+**文档**：[analysis-00023-samples-query-contract-paging](analysis-00023-samples-query-contract-paging.md)（已完成）。落地时修正了上面第三条问法：
 按 `IdGenerator` 的不透明契约，稳定排序依赖的是**排序键全序**，时间有序 id 只提供索引局部性，不是
 可以拿来当业务排序的承诺。
 
@@ -708,7 +708,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 **预计涉及的组件**：`aipersimmon-ddd-integration`（`EventUpcaster`、`EventType`、
 事件目录登记）、S4 的全部链路组件。
 
-**文档**：[[analysis-00026-samples-event-contract-evolution]]（已完成）。落地时补了三条上面没问到、
+**文档**：[analysis-00026-samples-event-contract-evolution](analysis-00026-samples-event-contract-evolution.md)（已完成）。落地时补了三条上面没问到、
 但比已问到的更容易翻车的：**发布方的 outbox 积压带着旧版次继续发**（所以"何时可删 v1"是
 `max(topic 保留期, 积压排空, 死信重放窗口)`，中间那项消费方看不见）；**灰度期双发两个版次＝同一事实生效
 两次**，inbox 救不了；**只删 upcaster 而留着退役类＝旧记录静默消失**（删类是死信，响）。另外把"加字段"
@@ -737,7 +737,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 `aipersimmon-ddd-outbox-spring-boot-starter`、`aipersimmon-ddd-inbox-mybatis-plus`、
 `aipersimmon-ddd-flyway-spring-boot-starter`、关系库边界存储（清理调度）。
 
-**文档**：[[analysis-00035-samples-operability-deadletters-retention]]（sample：
+**文档**：[analysis-00035-samples-operability-deadletters-retention](analysis-00035-samples-operability-deadletters-retention.md)（sample：
 `aipersimmon-ddd-samples/s22-operability-deadletters-retention`，两个服务，42 个用例）。上面七问全部
 以实测作答，另外四点要回填进本清单：
 
@@ -753,7 +753,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 4. **"启动失败 vs WARN"没有统一规则，只有统一的判据**：这个缺失之后还有东西能发现它吗？不能就必须是启动
    失败（发布进死胡同就是这类：relay 会把事件标成已发送，没有异常/死信/lag）；能就 WARN 加严格开关。
 
-新开 issue：[[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]]（死信的 `last_error` 只
+新开 issue：[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half](../issue/issue-00165-a-dead-letters-last-error-drops-the-only-useful-half.md)（死信的 `last_error` 只
 记最外层异常，最常见的发布失败因此记成 `KafkaException: Send failed`，topic 名与真因全丢）。
 
 ### S23 Schema 演进与数据迁移（P1）
@@ -768,7 +768,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 **预计涉及的组件**：`aipersimmon-ddd-flyway-spring-boot-starter`、
 `aipersimmon-ddd-persistence-mybatis-plus`。
 
-**文档**：[[analysis-00036-samples-schema-migration]]（sample：`aipersimmon-ddd-samples/s23-schema-migration`，
+**文档**：[analysis-00036-samples-schema-migration](analysis-00036-samples-schema-migration.md)（sample：`aipersimmon-ddd-samples/s23-schema-migration`，
 一个部署单元、两个上下文，26 个用例）。六问全部以实测作答，四点要回填进本清单：
 
 1. **"谁先跑"的答案背后有个坑**：库那个 `FlywayMigrationStrategy` 是 `@ConditionalOnMissingBean`，
@@ -800,7 +800,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 **预计涉及的组件**：`aipersimmon-ddd-archunit`（上下文隔离规则）、`aipersimmon-ddd-core`、
 `aipersimmon-ddd-integration`。
 
-**文档**：[[analysis-00041-samples-add-bounded-context]]（sample：`s24-add-bounded-context`，三个上下文 +
+**文档**：[analysis-00041-samples-add-bounded-context](analysis-00041-samples-add-bounded-context.md)（sample：`s24-add-bounded-context`，三个上下文 +
 共享内核，44 个用例）。本条的交付物是**六条规则**，其余都是把规则说清楚的工作示例——因为文档能说的和两年后
 还成立的差得最远。
 
@@ -839,7 +839,7 @@ S1 原有 15 个用例 + 本篇 21 个 = 36 个）。**本篇是补交**——S1
 9. **五个负向对照里有四个的红来自本篇自己加的规则，库的规则那四次全绿。** 这是本条最该带走的结论：
    **"只经 api 依赖"是必要的，远不是充分的。**
 
-库的问题：[[issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules]]（P2，规则集内部冲突：
+库的问题：[issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules](../issue/issue-00170-a-published-value-object-cannot-satisfy-both-archunit-rules.md)（P2，规则集内部冲突：
 一个发布出去的值对象无法同时满足 `domainBuildingBlocksShouldResideInDomain` 与 `BoundedContextRules`，
 于是 `CouponCode` / `Money` 只能不标 `@ValueObject` 并连带失去不可变性检查；库自己在事件上已解过同样的
 问题，只差值对象这一对）。
@@ -859,7 +859,7 @@ UUIDv7 主键、租户判别列、框架表。遗留表是自增主键、没有�
 **预计涉及的组件**：`aipersimmon-ddd-persistence-jdbc`（更贴近遗留 SQL；该模块后已删除）、
 `aipersimmon-ddd-outbox-jdbc`（后已删除，改用 `-outbox-mybatis-plus`）、`aipersimmon-ddd-core`、`aipersimmon-ddd-application`。
 
-**文档**：[[analysis-00042-samples-strangler-legacy-adoption]]（sample：`s25-strangler-legacy-adoption`，
+**文档**：[analysis-00042-samples-strangler-legacy-adoption](analysis-00042-samples-strangler-legacy-adoption.md)（sample：`s25-strangler-legacy-adoption`，
 一个单体 + 一个切出来的聚合，48 个用例）。**本条是本清单的最后一个场景。**
 
 **与本条建议组件的一处刻意偏离**：本条建议当时的 `-persistence-jdbc` / `-outbox-jdbc`，理由是"更贴近遗留 SQL"。
@@ -905,7 +905,7 @@ sample 的遗留侧**一个框架模块都不用**（纯 `JdbcTemplate` + 手写
 9. **把路由改回 `LEGACY_ONLY` → 12 红 / 48**：每条规则、每次拒绝、发布出去的那个事实，全部消失。
    这是整次抽取的价值写成一个数。
 
-库的问题：[[issue-00171-the-write-path-against-a-schema-the-library-did-not-design]]（P2，第 3、4 点那两处：
+库的问题：[issue-00171-the-write-path-against-a-schema-the-library-did-not-design](../issue/issue-00171-the-write-path-against-a-schema-the-library-did-not-design.md)（P2，第 3、4 点那两处：
 行为都正确、异常信息都指向错的原因，而这恰好是遗留表必然踩的两处；建议在 insert 路径加同样的前置检查，
 并在 `version == 0` 的语义旁补一句"为既有表加列时默认值必须是 1"）。
 
@@ -922,7 +922,7 @@ sample 的遗留侧**一个框架模块都不用**（纯 `JdbcTemplate` + 手写
 **预计涉及的组件**：`aipersimmon-ddd-cqrs`（`QueryInterceptor`）、
 `aipersimmon-ddd-web-store-redis`（租户前缀先例）；Redis 客户端为三方选型。
 
-**文档**：[[analysis-00037-samples-read-side-caching]]（sample：`aipersimmon-ddd-samples/s26-read-side-caching`，
+**文档**：[analysis-00037-samples-read-side-caching](analysis-00037-samples-read-side-caching.md)（sample：`aipersimmon-ddd-samples/s26-read-side-caching`，
 一个部署单元、58 个用例）。清单里的问题全部以实测作答，**其中一条问错了、一条我自己写错过**，
 连同另外三点要回填进本清单：
 
@@ -949,9 +949,9 @@ sample 的遗留侧**一个框架模块都不用**（纯 `JdbcTemplate` + 手写
    仪表盘上它看起来像终于开始起作用。所以必须有一个刻意的比对（读条目、算真值、比对）并给它挂告警，
    命中率单独看什么都决定不了。
 
-另发现库的两个问题：[[issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener]]（P2，
+另发现库的两个问题：[issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener](../issue/issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener.md)（P2，
 三条 ArchUnit 规则看不见 `@TransactionalEventListener`，一进一出天然对照量出）与
-[[issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has]]（P3，端口 javadoc 否认自己有
+[issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has](../issue/issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has.md)（P3，端口 javadoc 否认自己有
 拦截器链）。缓存本身无从指摘库——库在这条路上没有代码。
 
 ### S27 软删除、数据保留与擦除（P1）
@@ -967,7 +967,7 @@ sample 的遗留侧**一个框架模块都不用**（纯 `JdbcTemplate` + 手写
 **预计涉及的组件**：`aipersimmon-ddd-persistence-mybatis-plus`、
 `aipersimmon-ddd-operation-log-mybatis-plus`、`aipersimmon-ddd-inbox-mybatis-plus`。
 
-**文档**：[[analysis-00039-samples-soft-delete-and-erasure]]（sample：`aipersimmon-ddd-samples/s27-soft-delete-and-erasure`，
+**文档**：[analysis-00039-samples-soft-delete-and-erasure](analysis-00039-samples-soft-delete-and-erasure.md)（sample：`aipersimmon-ddd-samples/s27-soft-delete-and-erasure`，
 一个部署单元、42 个用例）。六问全部以实测作答，五点要回填进本清单：
 
 1. **判据不是技术性的**：有没有业务规则读它？有没有人会撤销它？有没有人会要一份清单？三个都否 → 基础设施
@@ -996,7 +996,7 @@ sample 的遗留侧**一个框架模块都不用**（纯 `JdbcTemplate` + 手写
    值。这也是能扛住合规审查的**代理键论证**：拿邮箱做主键的话擦除就等于删行，连带删掉每条审计与账目对它
    的引用，义务与"证明履行了义务"直接冲突。
 
-库的问题：[[issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected]]（P2，
+库的问题：[issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected](../issue/issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected.md)（P2，
 `DefaultFailureClassifier` 没有 `ApplicationException` 分支，于是每一次 404/409 在审计表里都是
 `FAILED`/`unexpected` 且自带的 `ErrorCode` 被丢掉；三行可修）。
 
@@ -1013,7 +1013,7 @@ process-manager 当作业队列用。
 **预计涉及的组件**：`aipersimmon-ddd-cqrs`、`aipersimmon-ddd-web-spring-boot-starter`、
 `aipersimmon-ddd-core`（作业聚合）；对照 `aipersimmon-ddd-process-manager`。
 
-**文档**：[[analysis-00040-samples-long-running-endpoints]]（sample：`s28-long-running-endpoints`，
+**文档**：[analysis-00040-samples-long-running-endpoints](analysis-00040-samples-long-running-endpoints.md)（sample：`s28-long-running-endpoints`，
 77 个用例）。
 
 1. **同步接口的上限不在任何超时上，在连接池上。** 通常被引用的是负载均衡器的 60 秒或客户端读超时，
@@ -1041,7 +1041,7 @@ process-manager 当作业队列用。
 5. **认领是全篇唯一故意不走聚合的写入**，因为乐观锁是为"本不该有人进入的竞争"造的，而 N 个 worker 本来
    就该抢。代价：手写 SQL 与版本化写入共存的**前提**是那条 SQL 必须自己 `version = version + 1`——否则
    一次在认领前读到作业的取消照样提交，作业变 CANCELLED 而 worker 正把它跑完，**而且不抛任何异常**。
-   这条前提库里一处都没写过 → [[issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version]]
+   这条前提库里一处都没写过 → [issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version](../issue/issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version.md)
    （P2，文档，三句话）。另外：停住的 worker 要靠**显式 owner 栅栏**拦而不能靠乐观锁（版本冲突会被重试，
    而重试会覆盖新主人的成果）；而心跳**不能**动 version，否则 worker 会把自己栅在外面。
 6. **取消是一个请求，不是一个状态。** 从外面强加会产出"产物在磁盘上而状态是 CANCELLED"的作业。推论是
@@ -1073,7 +1073,7 @@ process-manager 当作业队列用。
 解析时改写早已完成，它看到的是普通最终 SQL。
 
 所以 S10 主线用 AT；TCC 仍然写进 sample，但作为**可度量的对照**（AT 锁住行整个业务事务 vs TCC 在 Try
-提交后放开）而不是退路。详见 [[analysis-00033-samples-strong-consistency-seata]] §1。
+提交后放开）而不是退路。详见 [analysis-00033-samples-strong-consistency-seata](analysis-00033-samples-strong-consistency-seata.md) §1。
 
 顺带确定的一条部署约束：**`undo_log` 不能由应用迁移创建**——Seata 在 `DataSourceProxy.init` 里无条件检查
 它，而那发生在 DataSource bean 构造期间，早于 Flyway / `spring.sql.init` / 本库的 flyway components。

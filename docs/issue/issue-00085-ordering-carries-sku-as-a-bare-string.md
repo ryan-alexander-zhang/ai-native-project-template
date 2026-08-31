@@ -132,6 +132,6 @@ maven-compiler-plugin 的增量判断就认为 test 无需重编，于是 20 处
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[decision-00005-package-per-aggregate]]
-- [[issue-00086-customer-is-an-aggregate-nothing-writes]]（另一处"外来概念如何在本上下文建模"）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [decision-00005-package-per-aggregate](../decision/decision-00005-package-per-aggregate.md)
+- [issue-00086-customer-is-an-aggregate-nothing-writes](issue-00086-customer-is-an-aggregate-nothing-writes.md)（另一处"外来概念如何在本上下文建模"）

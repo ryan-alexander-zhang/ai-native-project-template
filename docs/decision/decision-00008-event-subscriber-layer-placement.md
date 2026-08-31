@@ -2,12 +2,13 @@
 id: decision-00008-event-subscriber-layer-placement
 type: decision
 status: active
+motivated_by: [analysis-00009-saga-implementation-deep-dive]
 ---
 
 # 事件订阅者的分层归属:领域事件归 application、集成事件归 adapter 并转 command
 
-固化"事件的**订阅侧**放哪一层"的规则。承接 [[analysis-00002-domain-vs-integration-events]]
-(为何区分两类事件)与 [[analysis-00009-saga-implementation-deep-dive]] §四/§五(saga 的事件驱动)。
+固化"事件的**订阅侧**放哪一层"的规则。承接 [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)
+(为何区分两类事件)与 [analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md) §四/§五(saga 的事件驱动)。
 每条主张都由 `docs/reference/` 笔记原文支撑(见 **Sources**)。
 
 ## Context
@@ -74,7 +75,7 @@ status: active
 **(C2) 推进 saga 的集成事件 → 递交给 process manager(saga 反应后自行发 command)**
 
 - saga/process manager 是 event-driven 的协调者:它**订阅事件**、反应后**派发 command**。把要喂给 saga 的
-  集成事件包成 command 是多此一举——command 是 saga 的**产物**,不是它的输入。这与 [[analysis-00009-saga-implementation-deep-dive]] §四(saga 反应 occurrence、发出 command)一致,亦即 Axon `@SagaEventHandler` 反应事件 + `CommandGateway.send` 的模型。
+  集成事件包成 command 是多此一举——command 是 saga 的**产物**,不是它的输入。这与 [analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md) §四(saga 反应 occurrence、发出 command)一致,亦即 Axon `@SagaEventHandler` 反应事件 + `CommandGateway.send` 的模型。
 
 **两种情形当前 sample 均已体现**(`aipersimmon-ddd-scaffold/multi-module`):
 
@@ -115,7 +116,7 @@ C1、C2 不是本项目自创,业界都有明确正名与框架实现;当前 sam
 
 - **结构一致**:C1 的 `inventory-adapter/OrderPlacedListener` = Eventuate/Grzybek 的 message→command 一比一;C2 的 `ordering-adapter/OrderFulfilment` + `OrderFulfilmentProcessManager` = Axon `@SagaEventHandler` + `CommandGateway` 的手搓版。
 - **差异一(刻意)**:Axon 里 saga 用 `@SagaEventHandler(associationProperty=...)` 直接订阅事件、框架自动按关联属性路由;本项目多一个 adapter 先把 `StockReserved` 解包成 `orderId` 再喂给 process manager——即 **adapter 手工干了 `associationProperty` 自动做的事**,以此让 process manager 不认传输/契约类型(签名是 `onStockReserved(String)`),保持传输无关、可脱离中间件单测。
-- **差异二(可记录的省略)**:modular-monolith / Eventuate / NServiceBus 都强调入站配 **Inbox / Idempotent Consumer**。本项目 `OrderPlacedListener`、`OrderFulfilment` 这两个 `@EventListener` **未配 inbox**——因其当前是**进程内同步**投递(不重复投递);而**跨进程 Kafka 路径**上 `messaging-kafka` 的 `KafkaIntegrationEventListener` **已用 `Inbox` 按事件 id 去重**(见 [[analysis-00009-saga-implementation-deep-dive]] §五)。故幂等在跨进程传输上补齐、在进程内直投上省略——符合各自语义,但在此点明。
+- **差异二(可记录的省略)**:modular-monolith / Eventuate / NServiceBus 都强调入站配 **Inbox / Idempotent Consumer**。本项目 `OrderPlacedListener`、`OrderFulfilment` 这两个 `@EventListener` **未配 inbox**——因其当前是**进程内同步**投递(不重复投递);而**跨进程 Kafka 路径**上 `messaging-kafka` 的 `KafkaIntegrationEventListener` **已用 `Inbox` 按事件 id 去重**(见 [analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md) §五)。故幂等在跨进程传输上补齐、在进程内直投上省略——符合各自语义,但在此点明。
 
 ### 命题 D —— "adapter 无理由依赖 domain" 的前提
 
@@ -129,7 +130,7 @@ C1、C2 不是本项目自创,业界都有明确正名与框架实现;当前 sam
 ## Consequences
 
 - `ordering-adapter` 去掉对 `ordering-domain` 的依赖(pom + import),入站 web/messaging 两类适配器范式统一。
-- 需要一个 **application 层的领域事件订阅示范**(见 [[issue-00001-move-domain-event-listener-to-application]] 方案 1)。
+- 需要一个 **application 层的领域事件订阅示范**(见 [issue-00001-move-domain-event-listener-to-application](../issue/issue-00001-move-domain-event-listener-to-application.md) 方案 1)。
 - saga 启动的时序保证不变:领域事件 `OrderPlacedEvent` 仍是进程内、同事务、同步发布,application 订阅者
   在同一事务内启动 saga,先于任何跨上下文响应。
 - **已加 ArchUnit 规则固化本决策的分层归位,并作为一等公民并入 `all()`**(`aipersimmon-ddd-archunit`
@@ -145,7 +146,7 @@ C1、C2 不是本项目自创,业界都有明确正名与框架实现;当前 sam
     库里的 `adapterShouldNotDependOnDomain()` 同理保持 opt-in、不入 `all()`。
 - **`modulith` / `microservice` 两个脚手架已彻底移除 ArchUnit**(删除各自的 `ArchitectureTest` 与
   `PackageInfoTest`,并从 pom 去掉 `aipersimmon-ddd-archunit` 依赖)。原因:这两者的领域事件监听器仍在 adapter
-  (见 [[issue-00001-move-domain-event-listener-to-application]] 未做项),若继续跑 `all()` 会被新规则打挂;
+  (见 [issue-00001-move-domain-event-listener-to-application](../issue/issue-00001-move-domain-event-listener-to-application.md) 未做项),若继续跑 `all()` 会被新规则打挂;
   当前**聚焦 multi-module 作示范**,故让这两者暂不引入 ArchUnit,而非为迁就它们把规则降级为 opt-in。
   后续若把这两者的领域事件订阅也迁到 application 层,可再重新引入 `all()`。
 - 顺带修正一处既有规则盲点:`domainEventsShouldStayInDomain()` 原只认 `DomainEvent` **接口**,现改为
@@ -156,13 +157,13 @@ C1、C2 不是本项目自创,业界都有明确正名与框架实现;当前 sam
 
 内部(蒸馏笔记与既有文档):
 
-- `docs/reference/clean-architecture/20260708161438-ddd-notes.md` —— 依赖向内;领域事件 handler 置于 Core。
-- `docs/reference/domain-driven-hexagon/20260708161438-ddd-notes.md` —— 依赖向内;入站适配器映射到 Command/Query;ACL。
-- `docs/reference/spring-modulith-with-ddd/20260708161438-ddd-notes.md` —— 订阅者是 application `@Service` + `@ApplicationModuleListener`。
-- `docs/reference/ddd-by-examples-library/20260708161438-ddd-notes.md` —— 事件处理器在 `…/application/…`;仓储端口在 domain、实现在 infrastructure。
-- `docs/reference/ddd-by-examples-factory/20260708161438-ddd-notes.md` —— 领域事件传播在 app 层。
-- `docs/reference/modular-monolith-with-ddd/20260708161438-ddd-notes.md` —— 入站集成事件 → 内部 command;domain 事件进程内 / 集成事件跨模块。
-- [[analysis-00002-domain-vs-integration-events]]、[[analysis-00009-saga-implementation-deep-dive]]、[[decision-00006-integration-event-transport-selection]]。
+- `docs/reference/reference-00002-clean-architecture.md` —— 依赖向内;领域事件 handler 置于 Core。
+- `docs/reference/reference-00005-domain-driven-hexagon.md` —— 依赖向内;入站适配器映射到 Command/Query;ACL。
+- `docs/reference/reference-00008-spring-modulith-with-ddd.md` —— 订阅者是 application `@Service` + `@ApplicationModuleListener`。
+- `docs/reference/reference-00004-ddd-by-examples-library.md` —— 事件处理器在 `…/application/…`;仓储端口在 domain、实现在 infrastructure。
+- `docs/reference/reference-00003-ddd-by-examples-factory.md` —— 领域事件传播在 app 层。
+- `docs/reference/reference-00007-modular-monolith-with-ddd.md` —— 入站集成事件 → 内部 command;domain 事件进程内 / 集成事件跨模块。
+- [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)、[analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md)、[decision-00006-integration-event-transport-selection](decision-00006-integration-event-transport-selection.md)。
 
 外部:
 

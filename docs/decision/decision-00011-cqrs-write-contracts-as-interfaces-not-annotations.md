@@ -2,13 +2,14 @@
 id: decision-00011-cqrs-write-contracts-as-interfaces-not-annotations
 type: decision
 status: active
+constrains: [spec-00001-operation-log-component, design-00008-operation-log-component]
 ---
 
 # CQRS 写侧契约用接口、查询侧标记用注解:不提供 `@Command`
 
 固化"`Command` / `CommandHandler` 该做成**接口**还是像 jMolecules `ddd-core` 那样再配一个**语义注解**"。
-承接 [[decision-00009-event-type-markers-and-handler-contracts]](事件侧"哪些用接口、哪些用注解"的同类抉择)
-与 [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]](handler 是命令总线上的入口点),
+承接 [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md)(事件侧"哪些用接口、哪些用注解"的同类抉择)
+与 [decision-00021-command-handler-reuse-and-cross-aggregate-placement](decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)(handler 是命令总线上的入口点),
 并回答"要不要照搬 jMolecules `jmolecules-cqrs-architecture` 的 `@Command` 标记"。每条主张由库内既有设计与
 `docs/reference/` 原文支撑(见 **Sources**)。
 
@@ -36,7 +37,7 @@ record PlaceOrder(...) implements Command<String> {}                        // s
 ```
 
 jMolecules 的 `@Command` 之所以能是注解,正因其 CQRS 派发是**反射式 / 无类型**的,结果类型不在类型系统里表达。
-两条路线并非改名,而是两种建模哲学——与 [[decision-00009-event-type-markers-and-handler-contracts]] 中
+两条路线并非改名,而是两种建模哲学——与 [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 中
 "`@Externalized` vs 独立 `IntegrationEvent` 类型"是同构的抉择。
 
 ## Decision
@@ -78,7 +79,7 @@ jMolecules `@Command` 能成立恰因其派发无类型;本库选择了更强的
 
 ### 命题三 —— "注解保持 domain 无框架依赖"这条不适用于命令
 
-事件侧 [[decision-00009-event-type-markers-and-handler-contracts]] 命题一给过 domain 用注解的理由:domain 层
+事件侧 [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 命题一给过 domain 用注解的理由:domain 层
 import 什么都不引。但**命令住在 application 层**,其职责本就是依赖 CQRS 契约——耦合 `Command<R>` 是 intended,
 与 handler `implements CommandHandler` 同理。这里没有需要保护的"领域纯净度",故"注解=零耦合"的动机在写侧落空。
 
@@ -88,7 +89,7 @@ import 什么都不引。但**命令住在 application 层**,其职责本就是�
   一致性——纯维护成本、零能力增益。
 - **可发现性本就够且更强**:`implements Command<String>` 至少与 `@Command` 一样自解释,且是**编译器强制**的
   (`send()` 不了非 `Command`);被动注解做不到。工具侧也已够用——`AiPersimmonDddRules` 的
-  `commandHandlersShouldNotDependOnOtherCommandHandlers`(见 [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]])
+  `commandHandlersShouldNotDependOnOtherCommandHandlers`(见 [decision-00021-command-handler-reuse-and-cross-aggregate-placement](decision-00021-command-handler-reuse-and-cross-aggregate-placement.md))
   正是靠 `CommandHandler` **接口**识别 handler,无需注解。
 
 ### 何时重开(引入 `@Command` 的正当条件)
@@ -107,7 +108,7 @@ import 什么都不引。但**命令住在 application 层**,其职责本就是�
 - 写侧契约维持接口现状,**不新增** `@Command` / `@CommandHandler`;命令 / 处理器身份继续由类型承担。
 - 查询侧 `@Projection` / `@ReadModel` 维持注解不变。
 - 判据"标签→注解、类型化契约→接口"可作为库内后续"接口 vs 注解"抉择的默认裁决;与
-  [[decision-00009-event-type-markers-and-handler-contracts]] 的事件侧非对称结论同源(命令 1:1 有返回值→类型化接口;
+  [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 的事件侧非对称结论同源(命令 1:1 有返回值→类型化接口;
   领域事件订阅是一等 application 概念→注解)。
 - 若将来满足"重开条件",按叠加元数据方式引入注解,并同步新增按注解判定的 ArchUnit 规则;在此之前无待办。
 
@@ -115,15 +116,15 @@ import 什么都不引。但**命令住在 application 层**,其职责本就是�
 
 内部:
 
-- `docs/reference/jmolecules/20260708161438-ddd-notes.md` —— `jmolecules-cqrs-architecture` 的
+- `docs/reference/reference-00006-jmolecules.md` —— `jmolecules-cqrs-architecture` 的
   `@Command` / `@CommandDispatcher` / `@CommandHandler` / `@QueryModel`(纯 marker 注解)。
-- `docs/reference/axon-framework/20260708161438-ddd-notes.md` —— 消息三分:command(intent、单处理器、有返回值)
+- `docs/reference/reference-00001-axon-framework.md` —— 消息三分:command(intent、单处理器、有返回值)
   与 event(facts、多处理器)的非对称,支撑写侧类型化 `CommandHandler<C,R>`。
 - `aipersimmon-ddd/aipersimmon-ddd-cqrs/` —— `Command`/`CommandHandler`/`CommandBus`/`CommandInterceptor` 为接口,
   `@Projection`/`@ReadModel` 为注解(同包内的接口/注解划分实证)。
 - `aipersimmon-ddd/aipersimmon-ddd-archunit/` —— `commandHandlersShouldNotDependOnOtherCommandHandlers` 靠
   `CommandHandler` 接口识别 handler。
-- [[decision-00009-event-type-markers-and-handler-contracts]]、[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]。
+- [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md)、[decision-00021-command-handler-reuse-and-cross-aggregate-placement](decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)。
 
 外部:
 

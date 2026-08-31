@@ -3,12 +3,13 @@ id: decision-00016-durable-runtime-staged-message-identity
 type: decision
 status: active
 motivated_by: [decision-00013-command-context-and-causation-propagation]
+constrains: [design-00004-durable-process-manager-runtime, spec-00001-operation-log-component, spec-00002-multi-tenancy]
 ---
 
 # 增补：durable runtime 是 staged effect 的合法消息身份铸造方；`CommandBus` 新增 `sendAs`
 
-本文是对 [[decision-00013-command-context-and-causation-propagation]] 的**增补(patch)**，由
-[[design-00004-durable-process-manager-runtime]](durable Process Manager runtime)触发。decision-00013 的核心命题
+本文是对 [decision-00013-command-context-and-causation-propagation](decision-00013-command-context-and-causation-propagation.md) 的**增补(patch)**，由
+[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)(durable Process Manager runtime)触发。decision-00013 的核心命题
 **全部保留**；本文只放宽其中一条关于「谁铸造消息 id」的表述，并补一个配套派发入口。
 
 ## 结论先行
@@ -26,7 +27,7 @@ decision-00013 §1 写道:「id 由 bus 铸造(`root(id, trace)` / `deriveChild(
 这条在当时的语境里是对的:一条同步命令的**创建**与**发送**是同一时刻——`CommandBus.send(...)` 那一刻既建立了消息、也
 (唯一一次)发送了它,所以「在 send 时铸造 id」天然成立,`RegistryCommandBus` 每次 `idGenerator.get()` 也就够用。
 
-[[design-00004-durable-process-manager-runtime]] 引入了一种此前不存在的消息流:**durable 暂存后重投的命令(staged
+[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) 引入了一种此前不存在的消息流:**durable 暂存后重投的命令(staged
 effect)**。它打破了「创建 == 发送」的隐含前提:
 
 1. effect 在**推进事务内、决策时刻**被创建并持久化(design-00004 §4.3);
@@ -35,7 +36,7 @@ effect)**。它打破了「创建 == 发送」的隐含前提:
 创建与发送在时间上和事务上都分离了。若沿用「发送时铸 id」,relay 每次重投都会拿到一个**新的随机 messageId**,下游会把
 同一条 effect 的多次重投看成多条不同命令,去重失效 → 重复扣款/重复扣库存。因此对 staged effect,身份必须在**创建点**
 铸造、在每次发送时原样携带。这正是既有 **outbox** 对集成事件早已采用的做法(写行时铸 `eventId`、重投原样复用,见
-[[decision-00006-integration-event-transport-selection]]);缺口只在**命令**通道——命令此前从不被 durable 暂存后重投。
+[decision-00006-integration-event-transport-selection](decision-00006-integration-event-transport-selection.md));缺口只在**命令**通道——命令此前从不被 durable 暂存后重投。
 
 ## Decision
 
@@ -69,7 +70,7 @@ effect)**。它打破了「创建 == 发送」的隐含前提:
 
 5. **传输身份 ≠ 业务幂等键(互补)。** `messageId = effectId` 是**传输层**身份,让 relay 的重投对每种 effect 统一、廉价
    地可去重;不可逆业务动作(扣款、扣库存)仍必须由聚合持有的**业务操作 id**(如 `paymentOperationId`)自行幂等——即便
-   经另一路径触达也不重复。两层并存,互不替代(承接 [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]
+   经另一路径触达也不重复。两层并存,互不替代(承接 [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)
    「元数据在 payload 之外」:effectId 走 context、业务操作 id 才是 payload 里的领域字段)。
 
 ## Rationale
@@ -79,7 +80,7 @@ effect)**。它打破了「创建 == 发送」的隐含前提:
 - **命题二 —— 这是把 outbox 的既有范式推广到命令通道,不是发明新机制。** 集成事件早已「写行铸 id、重投复用」;
   `sendAs` 只是补齐命令侧的对等入口,使两条 effect 通路(§design-00004 §3.5)对称。
 - **命题三 —— decision-00013 的精神不变。** 那条决策要防的是 payload 污染与 ambient id(承接
-  [[decision-00012-no-ambient-per-command-state]])。runtime 确定性铸造 + 持久化 + 逐字搬运,既非 ambient(显式随
+  [decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md))。runtime 确定性铸造 + 持久化 + 逐字搬运,既非 ambient(显式随
   `CommandContext` 传递)、也不进 payload;业务 Definition 更不创建 id(runtime 按 transition 派生)。故不变式原样成立。
 - **为何不复用 `send(cmd, cause)`。** 它的语义是「以 cause 派生**新**子消息」,会 `deriveChild(idGenerator.get())`,
   无法令 `messageId = effectId`;且同签名不同语义会造成重载陷阱。必须是独立命名的 `sendAs`。
@@ -92,16 +93,16 @@ effect)**。它打破了「创建 == 发送」的隐含前提:
 - 存储后端(当时 `aipersimmon-ddd-process-manager-jdbc`,现 `-process-manager-mybatis-plus`):effect relay 的 `CommandEffectDispatcher` 从 effect 行重建 `CommandContext`
   并经 `sendAs` 派发;`IntegrationEventEffectDispatcher` 沿用 `IntegrationEvents.publish`(其身份 outbox 早已负责)。
 - 下游去重:以 `messageId = effectId` 作 inbox 键(接收端)与/或业务操作 id(发送端)幂等,二者按 §Decision 5 分层。
-- 与 [[decision-00013-command-context-and-causation-propagation]] 的关系:本文**只增补 §1 的「唯一铸造方」表述**,其余
+- 与 [decision-00013-command-context-and-causation-propagation](decision-00013-command-context-and-causation-propagation.md) 的关系:本文**只增补 §1 的「唯一铸造方」表述**,其余
   命题(handle/send 显式携带 context、出站盖章、入站交付完整信封、不新增 handler 契约、模块依赖无环)全部继续有效。
 
 ## Sources
 
 内部：
 
-- [[decision-00013-command-context-and-causation-propagation]] —— 被增补的父决策。
-- [[design-00004-durable-process-manager-runtime]] §3.5 —— 触发本增补的派发身份契约。
-- [[decision-00006-integration-event-transport-selection]] —— outbox「写行铸 id、重投复用」的既有范式。
-- [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]、[[decision-00012-no-ambient-per-command-state]]
+- [decision-00013-command-context-and-causation-propagation](decision-00013-command-context-and-causation-propagation.md) —— 被增补的父决策。
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) §3.5 —— 触发本增补的派发身份契约。
+- [decision-00006-integration-event-transport-selection](decision-00006-integration-event-transport-selection.md) —— outbox「写行铸 id、重投复用」的既有范式。
+- [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)、[decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md)
   —— 元数据在 payload 之外、禁 ambient(本文不变式的来源)。
 </content>

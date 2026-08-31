@@ -76,5 +76,5 @@ AC-1 / AC-2 达成,本 issue `resolved`。
 
 ## 关联
 
-- [[issue-00003-messaging-delivery-reliability]] —— inbox 幂等与 outbox DLQ 的三层分离;本 issue 收口 MyBatis 实体
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— inbox 幂等与 outbox DLQ 的三层分离;本 issue 收口 MyBatis 实体
   身份声明与复合主键一致。

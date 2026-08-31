@@ -72,7 +72,7 @@ handler 与拦截器改为**首次派发时**读取（`Supplier<List<...>>`，�
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 5 档）
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 5 档）
 - 指向这扇门的那条规则：`CqrsRules.commandHandlersShouldNotDependOnOtherCommandHandlers`
-- 同一轮里另一条"对照暴露空测试"：[[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]
+- 同一轮里另一条"对照暴露空测试"：[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in](issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in.md)
 - 启动期校验与装配分离的既有形状：`ProcessManagerStartupValidator`

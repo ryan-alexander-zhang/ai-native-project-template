@@ -13,8 +13,8 @@ implements: [design-00004-durable-process-manager-runtime]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[design-00004-durable-process-manager-runtime]](身份契约增补见
-[[decision-00016-durable-runtime-staged-message-identity]])落成代码:三个与业务无关的构件模块
+把 [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)(身份契约增补见
+[decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md))落成代码:三个与业务无关的构件模块
 `aipersimmon-ddd-process-manager` / `-process-manager-jdbc` / `-process-manager-jdbc-spring-boot-starter`,
 并 clean-slate 移除旧 `aipersimmon-ddd-saga` / `-saga-spring`。
 
@@ -146,7 +146,7 @@ implements: [design-00004-durable-process-manager-runtime]
 
 ## Design
 
-细节见 [[design-00004-durable-process-manager-runtime]]。相位依赖:
+细节见 [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)。相位依赖:
 
 ```mermaid
 flowchart TD

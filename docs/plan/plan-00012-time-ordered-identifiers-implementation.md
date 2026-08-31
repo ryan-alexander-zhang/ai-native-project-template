@@ -13,7 +13,7 @@ implements: [design-00010-time-ordered-identifiers]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[design-00010-time-ordered-identifiers]] / [[decision-00019-time-ordered-uuidv7-identifiers]] 落成代码：一个
+把 [design-00010-time-ordered-identifiers](../design/design-00010-time-ordered-identifiers.md) / [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md) 落成代码：一个
 framework-free 的 `IdGenerator` SPI（`aipersimmon-ddd-core`，零依赖），一个库支撑的 UUIDv7 默认实现（新模块
 `aipersimmon-ddd-id` + autoconfig），以及把现有五处 `UUID.randomUUID()` 铸造点统一收口到注入的 `IdGenerator`。
 沿用 observability 的既有拆法：**SPI 在 framework-free 模块 / 实现在带依赖的 impl 模块 / 经 autoconfig 装配**。
@@ -26,7 +26,7 @@ framework-free 的 `IdGenerator` SPI（`aipersimmon-ddd-core`，零依赖），�
 **铁律**：
 1. **core 保持零第三方运行时依赖**：`IdGenerator` 是纯接口、无 Spring/JDBC/uuid 库依赖（enforcer + ArchUnit 守护不变）。
 2. **前向兼容、零 DDL 迁移**：不改任何列/唯一键；v4 老行与 v7 新行合法共存、各自全局唯一。
-3. **回退等价**（⚠ **已于 2026-07-26 被推翻，见 [[issue-00053-id-generator-silently-degrades-to-uuidv4]]**：
+3. **回退等价**（⚠ **已于 2026-07-26 被推翻，见 [issue-00053-id-generator-silently-degrades-to-uuidv4](../issue/issue-00053-id-generator-silently-degrades-to-uuidv4.md)**：
    该 fallback 使「漏配依赖」与「有意简约装配」在类型上不可区分，等于让本计划要消除的随机主键写放大可以静默
    复现。`aipersimmon-ddd-id` 现为 6 个装配模块的 `compile` 依赖，六处 fallback 已删除，缺 `IdGenerator` 时
    启动失败。本条以下描述仅作历史记录。）：每个消费 autoconfig 用 `ObjectProvider<IdGenerator>`——present 用之，absent 保留现有
@@ -34,12 +34,12 @@ framework-free 的 `IdGenerator` SPI（`aipersimmon-ddd-core`，零依赖），�
 4. **不改身份语义**：id 皆不透明 String，无 `UUID.fromString` 解析假设被引入到业务/框架路径（测试断言不得依赖 v4 随机性，
    也不得反过来把 v7 的时间有序当作契约向消费方暴露）。
 5. **选 v7、不选 ULID**：保持 36 字符 UUID 形态、对 `UUID.randomUUID().toString()` 无缝替换；用库的**同毫秒单调**变体。
-6. **不涵盖**（非目标，保留现状）：`tenant_id`（低基数、要窄+不可变，见 [[decision-00018-multi-tenancy-boundaries]] 命题四）、
+6. **不涵盖**（非目标，保留现状）：`tenant_id`（低基数、要窄+不可变，见 [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md) 命题四）、
    web `RequestIdFilter` 的 `requestId`、lease `WorkerId`、客户端提供的 web idempotency/nonce/bucket key、消费方聚合业务键。
 
 ## 一、Design
 
-详见 [[design-00010-time-ordered-identifiers]]。落地关键：**这是一次算法替换，不是结构改造**——五处铸造点多数已是可注入
+详见 [design-00010-time-ordered-identifiers](../design/design-00010-time-ordered-identifiers.md)。落地关键：**这是一次算法替换，不是结构改造**——五处铸造点多数已是可注入
 `Supplier<String>`（`RegistryCommandBus.idGenerator`、process-manager `randomIds()`、operation-log recordId supplier），
 只有 `OutboxWriter`（jdbc + mp）与 `SpringIntegrationEvents` 现为内联 `UUID.randomUUID()`，需先提为可注入依赖再收口。
 
@@ -136,8 +136,8 @@ reactor 收录新模块。
 5. **T10 二态矩阵全绿** = 完成（T11 为可选佐证，不阻塞）。
 
 ## 四、关联
-- 决策 [[decision-00019-time-ordered-uuidv7-identifiers]]（承接 [[decision-00013-command-context-and-causation-propagation]]
-  的 id 铸造点、[[decision-00016-durable-runtime-staged-message-identity]] 的 staged 身份）
-- 设计 [[design-00010-time-ordered-identifiers]]
-- 正交于多租户 [[decision-00018-multi-tenancy-boundaries]] / [[plan-00011-multi-tenancy-implementation]]（`tenant_id` 明确不用 UUIDv7）
+- 决策 [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)（承接 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)
+  的 id 铸造点、[decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md) 的 staged 身份）
+- 设计 [design-00010-time-ordered-identifiers](../design/design-00010-time-ordered-identifiers.md)
+- 正交于多租户 [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md) / [plan-00011-multi-tenancy-implementation](plan-00011-multi-tenancy-implementation.md)（`tenant_id` 明确不用 UUIDv7）
 - 复用装配拆法：observability（SPI in framework-free / impl in impl module / autoconfig）

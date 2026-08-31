@@ -2,6 +2,7 @@
 id: decision-00005-package-per-aggregate
 type: decision
 status: active
+motivated_by: [analysis-00003-aggregate-first-vs-layer-first, analysis-00004-bounded-context-module-structure]
 ---
 
 # Package per aggregate, with aggregate internals package-private
@@ -128,11 +129,11 @@ Reference implementations (`docs/reference/`):
   aggregate (`lending/patron`, `lending/book`, `lending/dailysheet`,
   `lending/patronprofile`), and the aggregate roots are **package-private**
   (`Patron` has a package-private constructor). This is package-per-aggregate +
-  package-private protection, exactly. (`docs/reference/ddd-by-examples-library/`)
+  package-private protection, exactly. (`docs/reference/reference-00004-ddd-by-examples-library.md`)
 - **ddd-by-examples/factory** — sub-domains as sub-packages; aggregate roots,
   entities, and repository ports are all **package-private**, boundaries enforced
   by "package-private visibility plus module boundaries, not just annotations".
-  (`docs/reference/ddd-by-examples-factory/`)
+  (`docs/reference/reference-00003-ddd-by-examples-factory.md`)
 
 External / big-tech:
 
@@ -147,7 +148,7 @@ External / big-tech:
   consistency boundary reached only through its root, and aggregates reference one
   another **by identity** — the two rules that package-per-aggregate + package-private
   internals encode structurally. (Also listed in
-  `docs/reference/domain-driven-hexagon/`.)
+  `docs/reference/reference-00005-domain-driven-hexagon.md`.)
 
 ## Consequences
 
@@ -172,8 +173,8 @@ External / big-tech:
 
 ## Sources
 
-- `docs/reference/ddd-by-examples-library/`, `docs/reference/ddd-by-examples-factory/`,
-  `docs/reference/domain-driven-hexagon/`
+- `docs/reference/reference-00004-ddd-by-examples-library.md`, `docs/reference/reference-00003-ddd-by-examples-factory.md`,
+  `docs/reference/reference-00005-domain-driven-hexagon.md`
 - Alibaba Cloud — An In-Depth Understanding of Aggregation in DDD —
   https://www.alibabacloud.com/blog/an-in-depth-understanding-of-aggregation-in-domain-driven-design_598034
 - Alibaba COLA — https://github.com/alibaba/COLA

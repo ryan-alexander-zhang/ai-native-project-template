@@ -62,7 +62,7 @@ static final ArchRule anAggregateRootMustBeWritable =
 ## 修复
 
 三条路，取决于本 issue 与
-[[issue-00071-credit-limit-is-checked-but-not-enforced]] 的联合决定——**两者应一起定**：
+[issue-00071-credit-limit-is-checked-but-not-enforced](issue-00071-credit-limit-is-checked-but-not-enforced.md) 的联合决定——**两者应一起定**：
 
 1. **让它成为真聚合**（若采纳 issue-00071 的强一致方案）：
    `Customer` 增加"已用额度"状态与 `reserveCredit` / `releaseCredit` 行为，
@@ -81,7 +81,7 @@ static final ArchRule anAggregateRootMustBeWritable =
 ## 验证结果
 
 已修。**采用方案 1（让它成为真聚合）**，作为
-[[issue-00071-credit-limit-is-checked-but-not-enforced]] 强一致决定的另一面，一次改动同修两个。
+[issue-00071-credit-limit-is-checked-but-not-enforced](issue-00071-credit-limit-is-checked-but-not-enforced.md) 强一致决定的另一面，一次改动同修两个。
 
 `Customer` 现在有：可变状态（`usedCredit`）、要守的不变量（`used + amount <= limit`）、
 生命周期行为（`reserveCredit` / `releaseCredit`）、写入路径（`Customers.save`）、
@@ -111,7 +111,7 @@ version 列（`V5`，撤销 `V3` 的豁免）。本 issue 列的"没有一致性
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00071-credit-limit-is-checked-but-not-enforced]]（同一根因的另一面，应一起决策）
-- [[decision-00015-cross-context-sync-query-via-gateway-acl]]（方案 3 的既有范式）
-- [[design-00011-aggregate-persistence-contract]]
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00071-credit-limit-is-checked-but-not-enforced](issue-00071-credit-limit-is-checked-but-not-enforced.md)（同一根因的另一面，应一起决策）
+- [decision-00015-cross-context-sync-query-via-gateway-acl](../decision/decision-00015-cross-context-sync-query-via-gateway-acl.md)（方案 3 的既有范式）
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)

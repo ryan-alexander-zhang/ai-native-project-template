@@ -2,13 +2,14 @@
 id: decision-00009-event-type-markers-and-handler-contracts
 type: decision
 status: active
+motivated_by: [analysis-00002-domain-vs-integration-events, analysis-00009-saga-implementation-deep-dive]
 ---
 
 # 事件类型标记与三种 Handler 的契约形态
 
 固化"事件用什么**类型标记**、以及领域事件/集成事件的**处理器**各是什么契约、放哪一层"。
-承接 [[decision-00008-event-subscriber-layer-placement]](订阅者的分层归属)与
-[[analysis-00002-domain-vs-integration-events]](为何区分两类事件),并回答"要不要照搬
+承接 [decision-00008-event-subscriber-layer-placement](decision-00008-event-subscriber-layer-placement.md)(订阅者的分层归属)与
+[analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)(为何区分两类事件),并回答"要不要照搬
 jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/reference/` 原文支撑(见 **Sources**)。
 
 ## 结论先行
@@ -55,7 +56,7 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 - `IntegrationEvent`(独立类型):对外是**独立、版本化**的契约,与内部领域事件解耦,各自演进。
 
 对限界上下文 / 微服务模板,独立类型更合适——集成事件是**版本化契约**(向后兼容演进、破坏性变更升 version),
-见 [[analysis-00002-domain-vs-integration-events]]。证据:
+见 [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)。证据:
 - `modular-monolith-with-ddd`:*"A separate **IntegrationEvents** assembly per module publishes only the event contracts others may depend on — never implementation."* / *"A module depends only on other modules' integration-event contracts."*
 - `modular-monolith-with-ddd`:*"Application (CQRS handlers, **domain events**, **integration events**, internal commands)"*(二者并列为不同类型)。
 
@@ -74,7 +75,7 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 - **订阅者是一等的 application 概念**,理应有显式标记——参考一致把领域事件处理器放在 application/Core:
   - `ddd-by-examples-library`:*"Cross-context integration via **event handlers** — `book/application/CreateAvailableBookOnInstanceAddedEventHandler` … `PatronEventsHandler`."*
   - `clean-architecture`:*"handlers co-located in `Core/.../Handlers`"*。
-- **可强制性**:注解让 [[decision-00008-event-subscriber-layer-placement]] 的 ArchUnit 规则
+- **可强制性**:注解让 [decision-00008-event-subscriber-layer-placement](decision-00008-event-subscriber-layer-placement.md) 的 ArchUnit 规则
   (`domainEventListenersShouldResideInApplicationOrDomain`)按注解精确定位,不依赖命名约定或参数反射。
 - **与本库标记哲学一致**:core 已有 `@AggregateRoot` 等角色标记、architecture 已有 `@DomainLayer` 等分层标记;
   `@DomainEventHandler` 是同一路数的"意图显式、工具可读"标记。
@@ -85,7 +86,7 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 
 ### 命题三 —— 不要 `@IntegrationEventHandler`;集成事件用普通 CQRS `CommandHandler`
 
-集成事件消费落在 adapter,翻译成 command,由普通命令处理器处理(承接 [[decision-00008-event-subscriber-layer-placement]] 命题 C1):
+集成事件消费落在 adapter,翻译成 command,由普通命令处理器处理(承接 [decision-00008-event-subscriber-layer-placement](decision-00008-event-subscriber-layer-placement.md) 命题 C1):
 - `modular-monolith-with-ddd`:*"a worker reads unprocessed rows, **runs an internal command per event**"*——处理器是 `ICommandHandler<TCommand>`,**不是**某种 IntegrationEventHandler。
 - `domain-driven-hexagon`:*"Multiple entry adapters per use case are normal (http/cli/message/graphql), each **mapping to the same Command/Query**."*
 
@@ -100,27 +101,27 @@ jMolecules 的 `jmolecules-events` 那套标记"。每条主张由 `docs/referen
 - **集成事件消费**是**传输/边界关注点**(adapter + 消息框架),其身份由**位置与类型**自证,且下游是普通 command 处理 → 不需要注解。
 
 > 写侧"接口 vs 注解"的同类抉择(为何 `Command`/`CommandHandler` 是接口、不设 `@Command`),
-> 见 [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]——同一条判据:标签→注解,带类型的派发契约→接口。
+> 见 [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)——同一条判据:标签→注解,带类型的派发契约→接口。
 
 ## Consequences
 
 - 保留/明确 `DomainEvent`(core)与 `IntegrationEvent`(integration)两个 marker 接口;不引入 `@Externalized`、`@DomainEventPublisher`。
 - **新增 `@DomainEventHandler` 注解**(application 层构建块),并让相关 ArchUnit 规则按其定位。
 - 集成事件入站:adapter listener(引用 `IntegrationEvent`)→ 翻译成 command → 普通 `CommandHandler`;不新增集成事件处理器契约。
-- 命名承接 [[decision-00008-event-subscriber-layer-placement]]:领域事件订阅者用 `<动作>On<事件>` 或 `<主题>EventsHandler`,并标注 `@DomainEventHandler`。
+- 命名承接 [decision-00008-event-subscriber-layer-placement](decision-00008-event-subscriber-layer-placement.md):领域事件订阅者用 `<动作>On<事件>` 或 `<主题>EventsHandler`,并标注 `@DomainEventHandler`。
 - 待办:在库中落地 `@DomainEventHandler`;`AiPersimmonDddRules` 增加/对齐按注解判定的规则。
 
 ## Sources
 
 内部:
 
-- `docs/reference/jmolecules/20260708161438-ddd-notes.md` —— `jmolecules-events` 的 `@DomainEvent`/`@DomainEventPublisher`/`@DomainEventHandler`/`@Externalized`。
-- `docs/reference/modular-monolith-with-ddd/20260708161438-ddd-notes.md` —— 独立 IntegrationEvents 契约;inbox→internal command;domain vs integration events 并列。
-- `docs/reference/domain-driven-hexagon/20260708161438-ddd-notes.md` —— 入站适配器映射到同一 Command/Query。
-- `docs/reference/ddd-by-examples-library/20260708161438-ddd-notes.md` —— 事件处理器置于 `…/application/…`。
-- `docs/reference/clean-architecture/20260708161438-ddd-notes.md` —— handlers 置于 Core/Handlers。
-- `docs/reference/axon-framework/20260708161438-ddd-notes.md` —— "commands (one handler), events (many)" 非对称。
-- [[decision-00008-event-subscriber-layer-placement]]、[[analysis-00002-domain-vs-integration-events]]、[[analysis-00009-saga-implementation-deep-dive]]、[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]。
+- `docs/reference/reference-00006-jmolecules.md` —— `jmolecules-events` 的 `@DomainEvent`/`@DomainEventPublisher`/`@DomainEventHandler`/`@Externalized`。
+- `docs/reference/reference-00007-modular-monolith-with-ddd.md` —— 独立 IntegrationEvents 契约;inbox→internal command;domain vs integration events 并列。
+- `docs/reference/reference-00005-domain-driven-hexagon.md` —— 入站适配器映射到同一 Command/Query。
+- `docs/reference/reference-00004-ddd-by-examples-library.md` —— 事件处理器置于 `…/application/…`。
+- `docs/reference/reference-00002-clean-architecture.md` —— handlers 置于 Core/Handlers。
+- `docs/reference/reference-00001-axon-framework.md` —— "commands (one handler), events (many)" 非对称。
+- [decision-00008-event-subscriber-layer-placement](decision-00008-event-subscriber-layer-placement.md)、[analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)、[analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md)、[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)。
 
 外部:
 

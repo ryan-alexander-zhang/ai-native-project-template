@@ -10,12 +10,12 @@ status: active
 本文回答一个具体问题——**当前 DDD 脚手架为领域事件、集成事件提供的发送与消费方式共有多少种**——
 并逐一给出对应的类/接口与文件位置、同步/异步语义。
 
-配套阅读:[[analysis-00001-domain-event-publishing]](领域事件发布/消费机制、可插拔 publisher）、
-[[analysis-00002-domain-vs-integration-events]](两类事件的判定轴与大厂实践）、
-[[analysis-00005-structure-2-event-flow-and-cqrs]](事件驱动完整链路 Outbox→Broker→Inbox + CQRS-lite）。
+配套阅读:[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)(领域事件发布/消费机制、可插拔 publisher）、
+[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)(两类事件的判定轴与大厂实践）、
+[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md)(事件驱动完整链路 Outbox→Broker→Inbox + CQRS-lite）。
 
 > 本文只清点**事件**(异步)的收发。跨 BC 的**同步调用**(非事件——读对方当前状态、快速失败）
-> 是另一条通道,形状与边界见 [[decision-00015-cross-context-sync-query-via-gateway-acl]]。
+> 是另一条通道,形状与边界见 [decision-00015-cross-context-sync-query-via-gateway-acl](../decision/decision-00015-cross-context-sync-query-via-gateway-acl.md)。
 
 ## 结论先行
 
@@ -96,7 +96,7 @@ Outbox 行由 `OutboxRelay`(`@Scheduled` 轮询)取出,交给以下 `OutboxDispa
 
 `OutboxRelay` 的生产级加固(JDBC 与 MyBatis-Plus 两套语义一致):**排序** `ORDER BY created_at, id`;**DLQ** `attempts < max-attempts`(默认 10);
 **只有聚合队头可领**避免同聚合后续事件越过卡住的那条;**每行一个租约**(`lease_owner`/`lease_token`/`lease_until`),
-多实例并发轮询各领互不相交的行,被杀实例的行在租约到期后自动可再领(见 [[issue-00108-a-killed-relay-instance-stops-all-delivery]])。
+多实例并发轮询各领互不相交的行,被杀实例的行在租约到期后自动可再领(见 [issue-00108-a-killed-relay-instance-stops-all-delivery](../issue/issue-00108-a-killed-relay-instance-stops-all-delivery.md))。
 配套 `OutboxCleanup`(`@Scheduled` + ShedLock,保留期默认 7 天,opt-in)——ShedLock 现在只用于它。
 
 ### 2.3 消费:2 种接收方式 + Inbox 幂等
@@ -135,9 +135,9 @@ Outbox 行由 `OutboxRelay`(`@Scheduled` 轮询)取出,交给以下 `OutboxDispa
 
 ## Sources
 
-- 领域事件发布/消费与可插拔 publisher 语义:[[analysis-00001-domain-event-publishing]]
-- 两类事件"概念上永远区分"的判定轴与大厂实践:[[analysis-00002-domain-vs-integration-events]]
-- Outbox→Broker→Inbox 完整链路与 CQRS-lite 读侧:[[analysis-00005-structure-2-event-flow-and-cqrs]]
+- 领域事件发布/消费与可插拔 publisher 语义:[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)
+- 两类事件"概念上永远区分"的判定轴与大厂实践:[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)
+- Outbox→Broker→Inbox 完整链路与 CQRS-lite 读侧:[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md)
 - 库源码(逐文件,已读):`aipersimmon-ddd/` 下 `-core` / `-application` / `-integration` / `-cqrs` / `-cqrs-spring` /
   `-events-spring` / `-outbox` / `-outbox-mybatis-plus` / `-inbox-mybatis-plus` /
   `-messaging-kafka` / `-archunit` 各模块。

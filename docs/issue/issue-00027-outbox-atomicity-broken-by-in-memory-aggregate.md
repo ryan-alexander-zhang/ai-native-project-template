@@ -40,7 +40,7 @@ INSERT 一并回滚)。因此该缺陷的失败测试与其修复(见下)是同�
 
 **把三个聚合持久化到与 outbox 同一个 Postgres**(JDBC 仓储替换 `InMemory*`),command handler 在单个
 `@Transactional`(或 CQRS unit-of-work 的 DB 事务)内执行,使"聚合 INSERT/UPDATE + outbox INSERT"同事务提交。
-这正是既有 [[plan-00006-middleware-integration]] 六.显式排除里记为后续 `plan-00007`("聚合落 PostgreSQL")的工作——
+这正是既有 [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md) 六.显式排除里记为后续 `plan-00007`("聚合落 PostgreSQL")的工作——
 本 issue 表明它**不是锦上添花,而是 outbox(方式二/三)有任何意义的前提**。
 
 在完成前,应明确:当前 `multi-module` 的 outbox/Kafka 可靠性是**名义上的**——传输层可靠,但源头"聚合↔事件"这一步
@@ -48,14 +48,14 @@ INSERT 一并回滚)。因此该缺陷的失败测试与其修复(见下)是同�
 
 ## 解决（resolved）
 
-[[plan-00007-aggregate-persistence-mybatis-plus]] 已落地：四个聚合改为 MyBatis-Plus 持久化到同一个 PostgreSQL
+[plan-00007-aggregate-persistence-mybatis-plus](../plan/plan-00007-aggregate-persistence-mybatis-plus.md) 已落地：四个聚合改为 MyBatis-Plus 持久化到同一个 PostgreSQL
 （per-BC schema），command handler 复用既有 `TransactionCommandInterceptor` 事务，聚合写与 outbox 写同库同事务原子提交。
 新增 `OutboxAtomicityTest`（事务内 handler 之后抛错 → 断言 `ordering.orders` 与 `aipersimmon_outbox` 计数皆 0，一起回滚）
 守护本缺陷——正是本文 §复现 所说"内存态写不出、落库后才可写"的那个回归。全 reactor 19 tests 绿。
 
 ## 关联
 
-- [[plan-00007-aggregate-persistence-mybatis-plus]]（本 issue 的解决）
-- [[plan-00006-middleware-integration]](暴露现场;六.已记为 plan-00007 前置)
-- [[decision-00006-integration-event-transport-selection]](Context 第 1 条:outbox 同事务原子性)
-- [[decision-00016-durable-runtime-staged-message-identity]]
+- [plan-00007-aggregate-persistence-mybatis-plus](../plan/plan-00007-aggregate-persistence-mybatis-plus.md)（本 issue 的解决）
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)(暴露现场;六.已记为 plan-00007 前置)
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)(Context 第 1 条:outbox 同事务原子性)
+- [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md)

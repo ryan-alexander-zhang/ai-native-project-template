@@ -1,13 +1,13 @@
 ---
 id: design-00012-module-naming-and-spring-freedom
 type: design
-status: active
+status: draft
 informs: [plan-00014-adoption-threshold-and-architecture-simplification]
 ---
 
 # 模块命名规则与「Spring 自由」的可执行边界
 
-> **补充（[[issue-00114-one-name-per-role-and-what-the-module-count-actually-measures]]）：模块数是发布粒度，不是消费方的认知负担。**
+> **补充（[issue-00114-one-name-per-role-and-what-the-module-count-actually-measures](../issue/issue-00114-one-name-per-role-and-what-the-module-count-actually-measures.md)）：模块数是发布粒度，不是消费方的认知负担。**
 > report-00003 把 47 个 pom 对 2.8 万行称为过度碎片化、建议收敛到约 20。驳回：48 个按角色是
 > 13 后端 + 12 装配 + 12 契约 + 4 工具 + 4 打包束 + 3 engine，砍到 20 只有两条路——
 > 合并 jdbc/mybatis 后端（会让只用 JDBC 的应用背上 MyBatis-Plus，违反"自选恰好一个存储 starter"），
@@ -17,12 +17,12 @@ informs: [plan-00014-adoption-threshold-and-architecture-simplification]
 > `ModuleNamingChecks` 已从正则改为 DOM 解析——注释掉的依赖不再被误报为违规。
 
 
-承接 [[plan-00014-adoption-threshold-and-architecture-simplification]] 的 C5（报告 P1-2）。发布 Maven
+承接 [plan-00014-adoption-threshold-and-architecture-simplification](../plan/plan-00014-adoption-threshold-and-architecture-simplification.md) 的 C5（报告 P1-2）。发布 Maven
 archetype 之前是最后一个免费重命名窗口，所以规则必须现在定下来并**变成断言**，否则半年后必然再次漂移。
 
 ## 一、报告的规则按字面执行不可行
 
-[[report-00001-ddd-framework-review]] P1-2 提出三段式：
+[report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md) P1-2 提出三段式：
 
 ```
 aipersimmon-ddd-<domain>                        纯契约，零 Spring
@@ -70,7 +70,7 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
 - `-id` 不含任何契约（`IdGenerator` 接口在 `core`），它只是「默认实现 + 装配」。领域层依赖 `core`，不依赖 `-id`。
 - 两个 `-engine` 是**存储无关的运行时**，不是契约：契约在 `-operation-log` / `-process-manager`（均零 Spring）。
   领域层依赖后者。（后来 outbox 也照此分层，见
-  [[decision-00020-outbox-engine-over-one-store-port]]，故现在是三个 `-engine`。）
+  [decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md)，故现在是三个 `-engine`。）
 
 它们的问题不是违反不变量，而是**名字没有传达自己是什么**。这是一个可用性问题，不是正确性问题——要分开处理。
 
@@ -121,7 +121,7 @@ aipersimmon-ddd-<domain>-spring-boot-starter    带 AutoConfiguration.imports �
   改成 `-spring-boot-starter` 是错的（它们含大量实现代码），改成 `-<backend>` 也是错的（它们与后端无关）。
   **保留 `-engine`，并把它写进 3.1 的后缀表**，使其从「例外」变成「规则的一部分」。
   这条裁定后来被兑现了一次：outbox 的 relay 在两个后端各存一份，抽成第三个 `-engine`
-  （[[decision-00020-outbox-engine-over-one-store-port]]）——后缀是规则而非例外，所以新模块无需再裁定一次。
+  （[decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md)）——后缀是规则而非例外，所以新模块无需再裁定一次。
 
 ### 3.3 一个需要裁定的边界：`-cqrs-spring` 含实现代码
 
@@ -200,6 +200,6 @@ OTel **绑定**是另一件事。因此样例的 aipersimmon 编译依赖是 **1
 
 ## 关联
 
-- [[plan-00014-adoption-threshold-and-architecture-simplification]]（C5）
-- [[report-00001-ddd-framework-review]]（P1-2，本设计修正了其规则表述）
-- [[design-00011-aggregate-persistence-contract]]（`-mybatis-plus` 装配座的来源）
+- [plan-00014-adoption-threshold-and-architecture-simplification](../plan/plan-00014-adoption-threshold-and-architecture-simplification.md)（C5）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P1-2，本设计修正了其规则表述）
+- [design-00011-aggregate-persistence-contract](design-00011-aggregate-persistence-contract.md)（`-mybatis-plus` 装配座的来源）

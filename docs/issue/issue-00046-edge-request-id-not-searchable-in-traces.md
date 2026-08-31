@@ -52,6 +52,6 @@ OTel 开启导出到 SigNoz,`curl -H 'X-Request-Id: abc' -XPOST /orders …`;在
 
 ## 关联
 
-- [[design-00005-observability-and-distributed-tracing]](边缘 id ↔ trace 关联)
-- [[record-00001-multi-module-ddd-integration-verification]](第 5 项 可观测性,含本条证据)
+- [design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md)(边缘 id ↔ trace 关联)
+- [record-00001-multi-module-ddd-integration-verification](../record/record-00001-multi-module-ddd-integration-verification.md)(第 5 项 可观测性,含本条证据)
 - 后续(未做):日志作为遥测信号进 SigNoz 并带 trace_id/requestId(observability starter 接 OTel logback appender;样例补 console pattern)—— 见 record 第 2 类日志讨论。

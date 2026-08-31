@@ -2,14 +2,14 @@
 id: analysis-00018-samples-aggregate-persistence-mapping
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S17 聚合与数据表的映射
 
 对应 sample：`aipersimmon-ddd-samples/s17-aggregate-persistence-mapping`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]；模型本身怎么建见
-[[analysis-00016-samples-tactical-modelling]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；模型本身怎么建见
+[analysis-00016-samples-tactical-modelling](analysis-00016-samples-tactical-modelling.md)。
 
 ## 0. 本篇定位
 

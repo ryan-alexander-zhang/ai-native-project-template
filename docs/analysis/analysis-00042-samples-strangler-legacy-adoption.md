@@ -2,13 +2,13 @@
 id: analysis-00042-samples-strangler-legacy-adoption
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S25 遗留系统绞杀式接入
 
 对应 sample：`aipersimmon-ddd-samples/s25-strangler-legacy-adoption`（一个部署单元、一个单体 + 一个被切出来的聚合、
-48 个用例）。场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]；本篇是这一系列的最后一个场景。
+48 个用例）。场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；本篇是这一系列的最后一个场景。
 
 ## 0. 本篇定位
 
@@ -25,7 +25,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 | 遗留代码怎么被 ACL 包住 | 一条 ArchUnit 规则。模式名什么都不买，规则买全部 | §5 |
 | 迁移完成的判据、旧路径何时删 | 四个条件，**从代码和 schema 里算出来**，不是开会 | §6 |
 
-**一条库的 issue**：[[issue-00171-the-write-path-against-a-schema-the-library-did-not-design]]（P2，两处
+**一条库的 issue**：[issue-00171-the-write-path-against-a-schema-the-library-did-not-design](../issue/issue-00171-the-write-path-against-a-schema-the-library-did-not-design.md)（P2，两处
 行为都正确但异常信息指向错的原因，而这两处恰好是遗留表必然踩的两处）。
 
 **与清单建议组件的一处偏离，是刻意的**：清单建议用当时的 `-persistence-jdbc` / `-outbox-jdbc`（两者后来都删了，库只留 MyBatis-Plus 后端），理由是"更贴近遗留 SQL"。
@@ -118,7 +118,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 实测（负向对照 1，把 `DEFAULT 1` 改回 0）：**2 红 / 48**，关键那条抛 `DuplicateEntityException`，而它列出的两个
 可能原因在这里**都不成立**——没有并发创建，工厂也没忘 `restoreVersion`（它老实还原了列里的 0）。
 
-两处都开进了 [[issue-00171-the-write-path-against-a-schema-the-library-did-not-design]]：行为都对，信息都指错方向，
+两处都开进了 [issue-00171-the-write-path-against-a-schema-the-library-did-not-design](../issue/issue-00171-the-write-path-against-a-schema-the-library-did-not-design.md)：行为都对，信息都指错方向，
 而这恰好是遗留表必然踩的两处。
 
 ### 3.3 顺带一处：ORM 不认识的列类型

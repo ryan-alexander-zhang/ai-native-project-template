@@ -59,7 +59,7 @@ blocks: [report-00001-ddd-framework-review]
   批次 A 先在样例仓储的 `save()` 末尾调用 `domainEvents.publishAndClear(order)`，把 4 处 handler 里的手工调用
   **收口到仓储一处**，并同步修正 `DomainEvents` / `TransactionCommandInterceptor` 的 Javadoc（去掉 "or the handler"
   这个歧义授权）。
-- 批次 B 由 [[design-00011-aggregate-persistence-contract]] 的仓储基类把「save + publish」变成一次调用，
+- 批次 B 由 [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md) 的仓储基类把「save + publish」变成一次调用，
   连「仓储里也可能忘」都消除。
 
 **注意改动面**：`TransactionCommandInterceptor`（新增提交前校验 + Javadoc）、`DomainEvents` Javadoc、
@@ -79,12 +79,12 @@ blocks: [report-00001-ddd-framework-review]
 `PaymentCompensationFlowTest` 依赖领域事件驱动整条跨上下文流程走到终态——若收口丢了事件，这些测试会立刻变红。
 
 **本阶段有意不实现报告 P0-2 的方案 B（提交前兜底扫描）**：一旦发布收口进仓储 `save()`，「被 save 过的聚合」
-其事件集合恒为空，该检查退化为恒真断言。理由记录在 [[plan-00013-phase-one-correctness-remediation]]。
+其事件集合恒为空，该检查退化为恒真断言。理由记录在 [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)。
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（P0-2，本 issue 的来源）
-- [[plan-00013-phase-one-correctness-remediation]]
-- [[design-00011-aggregate-persistence-contract]]
-- [[issue-00051-aggregates-have-no-optimistic-locking]]（同一处仓储调用点，批次 A 一并修）
-- [[analysis-00001-domain-event-publishing]]（当前「在 save 处 drain」这一选择的原始分析）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P0-2，本 issue 的来源）
+- [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)
+- [issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)（同一处仓储调用点，批次 A 一并修）
+- [analysis-00001-domain-event-publishing](../analysis/analysis-00001-domain-event-publishing.md)（当前「在 save 处 drain」这一选择的原始分析）

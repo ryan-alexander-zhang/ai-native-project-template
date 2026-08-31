@@ -80,8 +80,8 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§1 C5）
-- 设计：[[design-00004-durable-process-manager-runtime]] §4.7 已同步
-- 同批：[[issue-00103-parked-input-replay-is-not-crash-safe]]、
-  [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]
-- 先例：[[issue-00017-cancelled-deadline-can-still-fire]]（IN_FLIGHT 也要能被 cancel 的栅栏，本次沿用其理由）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§1 C5）
+- 设计：[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) §4.7 已同步
+- 同批：[issue-00103-parked-input-replay-is-not-crash-safe](issue-00103-parked-input-replay-is-not-crash-safe.md)、
+  [issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried](issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried.md)
+- 先例：[issue-00017-cancelled-deadline-can-still-fire](issue-00017-cancelled-deadline-can-still-fire.md)（IN_FLIGHT 也要能被 cancel 的栅栏，本次沿用其理由）

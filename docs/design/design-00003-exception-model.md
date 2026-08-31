@@ -2,18 +2,17 @@
 id: design-00003-exception-model
 type: design
 status: active
-informs: [decision-00010-exception-model]
 ---
 
 # aipersimmon-ddd 异常/错误体系:完整设计
 
-把 [[decision-00010-exception-model]] 拍板的策略、以及 [[analysis-00010-exception-model]] 列出的缺口,
-落成**可实现的、贯穿领域→应用→接口→基础设施四层的错误体系设计**。传输层线上契约(无信封 + RFC 9457)沿用 [[decision-00007-web-api-response-envelope]] /
-[[design-00002-web-layer]],**本文不改线上格式**;本文补的是缺口的另一半——**错误在进程内如何被建模、
-如何携带稳定机器码、如何从领域一路贯通到边界**。(异步**消息投递可靠性**——重试/退避/死信——不属本设计,独立追踪见 [[issue-00003-messaging-delivery-reliability]]。)
+把 [decision-00010-exception-model](../decision/decision-00010-exception-model.md) 拍板的策略、以及 [analysis-00010-exception-model](../analysis/analysis-00010-exception-model.md) 列出的缺口,
+落成**可实现的、贯穿领域→应用→接口→基础设施四层的错误体系设计**。传输层线上契约(无信封 + RFC 9457)沿用 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) /
+[design-00002-web-layer](design-00002-web-layer.md),**本文不改线上格式**;本文补的是缺口的另一半——**错误在进程内如何被建模、
+如何携带稳定机器码、如何从领域一路贯通到边界**。(异步**消息投递可靠性**——重试/退避/死信——不属本设计,独立追踪见 [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md)。)
 
-严守 [[analysis-00006-ddd-building-blocks-library]] 的两条铁律:**依赖一律指向内/下**、**纯净层
-framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §5 与 [[design-00002-web-layer]]
+严守 [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) 的两条铁律:**依赖一律指向内/下**、**纯净层
+framework-free**。本设计是 [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) §5 与 [design-00002-web-layer](design-00002-web-layer.md)
 的增量,不替代它们。
 
 > 前提:仓内代码是**开发中的脚手架,不是 truth**。下文"现状"仅作对比;"设计"即目标,该改的照改。
@@ -23,14 +22,14 @@ framework-free**。本设计是 [[design-00001-aipersimmon-ddd-and-scaffold]] §
 | 分类 | 条目 |
 | --- | --- |
 | **纳入** | ①`-core` 贯穿式错误码抽象 `ErrorCode`;②`DomainException`/`ApplicationException` 携带错误码 + 语义子类;③`Invariant` 一等抽象 + `AbstractAggregateRoot.checkInvariant`;④错误码→`ProblemDescriptor`(category family + per-code override)→ProblemDetail 的贯通桥接(§4.7);⑤完整异常→HTTP 映射(含 `ConstraintViolationException`);⑥i18n bundle 交付 + filter 路径接入;⑦Guard-vs-Validate 分工成文;⑧401/403 条件化补齐 |
-| **不属本设计** | 异步**消息投递可靠性**(重试上限/退避/死信 DLQ)——投递面而非错误建模面,见 [[issue-00003-messaging-delivery-reliability]] |
+| **不属本设计** | 异步**消息投递可靠性**(重试上限/退避/死信 DLQ)——投递面而非错误建模面,见 [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md) |
 | **不做**(见 §十一) | 在 `-core` 引入 `Result`/`Either` 或 Vavr 依赖;通用异常基类大而全的字段(错误上下文 map 等);把 HTTP 状态码泄漏进 `-core` |
-| **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC 错误码目录思路(传输映射形态改为 §4.7 的 family + override 组合)、filter 层 429/401 出口(均来自 [[design-00002-web-layer]]) |
+| **沿用不改** | RFC 9457 线上格式、扩展成员 `code`/`traceId`/`errors`、per-BC 错误码目录思路(传输映射形态改为 §4.7 的 family + override 组合)、filter 层 429/401 出口(均来自 [design-00002-web-layer](design-00002-web-layer.md)) |
 
 ## 二、贯穿性设计约束
 
 1. **错误码是"从内到外"的一等契约**。业务逻辑**抛出的那一刻**就带上稳定机器码(`ordering.credit-exceeded`),
-   原样透传到 ProblemDetail 的 `code` 扩展成员。这是解 [[analysis-00010-exception-model]] §五"断裂"的核心。
+   原样透传到 ProblemDetail 的 `code` 扩展成员。这是解 [analysis-00010-exception-model](../analysis/analysis-00010-exception-model.md) §五"断裂"的核心。
 2. **HTTP 语义绝不进 `-core`/`-application`**。纯层只认 `ErrorCode`(一个字符串码 + 可选语义类别),
    **状态码由 `-web`/`-web-spring` 决定**。方向永远是 `-web → -core`,绝不反向。
 3. **异常用于"异常/不变量违反";边缘输入用非异常校验**(Guard vs Validate,§八)。
@@ -174,7 +173,7 @@ protected final void checkInvariant(Invariant rule) {
 ```
 
 - `errorCode` 用 `transient`,与 `AbstractAggregateRoot` 现有 `transient` 事件表约定一致,避免误序列化。
-- **`-core` 仍零依赖**(仅 test junit)——这是 [[analysis-00006-ddd-building-blocks-library]] 的验收红线,本设计不破坏。
+- **`-core` 仍零依赖**(仅 test junit)——这是 [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) 的验收红线,本设计不破坏。
 - `IllegalStateTransitionException` 保留,新增可选 `ErrorCode` 构造。
 
 ### 4.2 `-application`(→ `-core`)
@@ -217,7 +216,7 @@ public interface ProblemRegistry {       // 对任意带码错误总能解析出
 - **为何这样分**:`ErrorCode`(身份)与 `ProblemDescriptor`(传输)拆成两个类型、`ErrorCategory` 提供 family 默认、
   个别码 override 专属 type——对齐参考项目的边界映射(Ardalis.Result category→HTTP、hexagon `@ControllerAdvice`)与
   大厂 code-first(Google `reason`、Stripe `code`),同时保住 RFC 9457 的 `type` 语义。详见 §4.7。
-- `ApiException` 改为携带 `ErrorCode`(与带码 `DomainException` 同路解析);`ApiError`/`FieldError` 形态不变(见 [[design-00002-web-layer]] §5)。
+- `ApiException` 改为携带 `ErrorCode`(与带码 `DomainException` 同路解析);`ApiError`/`FieldError` 形态不变(见 [design-00002-web-layer](design-00002-web-layer.md) §5)。
 
 ### 4.4 基数与 fail-fast
 
@@ -275,7 +274,7 @@ public interface ProblemRegistry {       // 对任意带码错误总能解析出
 
 - 约束是**硬不变量**(必须永真,违反 = 异常)且**聚合内可自足判定** → `Invariant`;
 - 需要**返回丰富结果**(不只 pass/fail,还要带 allowance 数据或一次收集多条拒绝原因),或规则**随可注入策略/配置变化** → 决策型 / 注入型 `Policy`(边界局部用 `Either`,或把策略对象注入聚合方法);
-- "**事件 → 命令**"的跨聚合编排 → Saga / Process(含义③),两者都不是,不塞进聚合(见 [[analysis-00005-structure-2-event-flow-and-cqrs]])。
+- "**事件 → 命令**"的跨聚合编排 → Saga / Process(含义③),两者都不是,不塞进聚合(见 [analysis-00005-structure-2-event-flow-and-cqrs](../analysis/analysis-00005-structure-2-event-flow-and-cqrs.md))。
 
 ### 4.7 错误身份 vs 传输映射:为何组合(`ErrorCode → ProblemDescriptor`)而非继承
 
@@ -303,7 +302,7 @@ flowchart LR
 ```
 
 带码路径**总能解析出 descriptor**(override 优先,否则 family),故带码错误的 `type` 永远有意义、绝不 `about:blank`。
-于是 [[design-00002-web-layer]] §八 的旗舰示例**可复现**:领域抛
+于是 [design-00002-web-layer](design-00002-web-layer.md) §八 的旗舰示例**可复现**:领域抛
 `new CreditExceededException(OrderingErrorCode.CREDIT_EXCEEDED, "...")`(纯 `ErrorCode`,`DOMAIN_RULE`)→ advice
 `registry.resolve` 命中 `OrderingProblemCatalog` 的 override → 输出带 `code:"ordering.credit-exceeded"`、
 `type:"/problems/insufficient-credit"` 的 422;未 override 的码(如 `ordering.duplicate-sku`)则输出 family
@@ -339,14 +338,14 @@ flowchart LR
 - **409 Conflict**(§15.5.10):请求**与目标资源的当前状态冲突**——**收窄**给:乐观锁/并发(gRPC `ABORTED`)、重复创建(`ALREADY_EXISTS`)、状态机非法迁移(`IllegalStateTransitionException`)。**不**用作一般业务规则的默认。
 - **400 Bad Request**:仅报文畸形/类型错 + 字段级校验(`errors[]`)。Google AIP/gRPC 把 `FAILED_PRECONDITION` 也归 400——本模板既已选 RFC 9457 + `errors[]`,取 **422 派**更精确。
 - 心智模型(gRPC 最干净):`INVALID_ARGUMENT`→400、`FAILED_PRECONDITION`→422(本模板)、`ABORTED`/`ALREADY_EXISTS`→409、`NOT_FOUND`→404。
-- 决策见 [[decision-00010-exception-model]] §四。
+- 决策见 [decision-00010-exception-model](../decision/decision-00010-exception-model.md) §四。
 
 ## 七、i18n(交付 bundle,解 #4)
 
 - `-web-spring` 交付**默认英文 bundle** `messages/aipersimmon-web-errors.properties`(键 = family/override 的 `ProblemDescriptor.titleKey()`,如 `problem.domain-rule-violation.title` +
   校验 code),`i18n.basename` 可覆盖/追加;消费者按 BC 加自己的 bundle。
 - `ProblemHttpResponseWriter`(filter 路径)**也接入 `MessageSource`**,不再只用 status reason phrase —— 与 advice 路径一致。
-- `Accept-Language` 决定 locale,缺省英文(承 [[design-00002-web-layer]] §5.4)。
+- `Accept-Language` 决定 locale,缺省英文(承 [design-00002-web-layer](design-00002-web-layer.md) §5.4)。
 
 ## 八、Guard vs Validate 分工(成文)
 
@@ -369,13 +368,13 @@ flowchart LR
 - `-web-spring` 增一个 `@ConditionalOnClass(name = "org.springframework.security...")` 的配置:提供
   `AuthenticationEntryPoint` / `AccessDeniedHandler`,把 401/403 也写成 `application/problem+json`
   (`/problems/unauthorized`、`/problems/forbidden`)。
-- 不引入 spring-security 硬依赖(承 [[decision-00007-web-api-response-envelope]] §六:"仅当 classpath 有 spring-security 时激活")。
+- 不引入 spring-security 硬依赖(承 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §六:"仅当 classpath 有 spring-security 时激活")。
 
 ## 十、明确取舍:为什么默认不上 `Result`/`Either`
 
 参考项目里 ddd-by-examples-library(Vavr `Either`)、clean-architecture(`Ardalis.Result`)、
-domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-structure-2-event-flow-and-cqrs]] 也提过 Result。
-本设计的取舍(类比 [[decision-00007-web-api-response-envelope]] 的"明确不做"):
+domain-driven-hexagon 都倾向函数式错误值;本仓 [analysis-00005-structure-2-event-flow-and-cqrs](../analysis/analysis-00005-structure-2-event-flow-and-cqrs.md) 也提过 Result。
+本设计的取舍(类比 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) 的"明确不做"):
 
 **先厘清一个常见的混淆**:"不上 Result" ≠ "因为 `-core` 要零依赖"。`Result` 并不等于 Vavr——完全可以零依赖地写成一个
 `sealed interface Result<T> permits Success, Failure`。所以零依赖红线只否决 **Vavr 这个依赖**,并不能单独否决 **Result 这个模式**。
@@ -394,7 +393,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
   `Policy`),或零依赖地自定义 `Result`,只要**不进 `-core` 公共 API**。库不阻止,也不内建。`Policy`(函数式)与 `Invariant`(断言)的形态差异与选型见 **§4.6**。
 - **分布式消息边界的例外**(参考不依赖):若未来接入 Axon 一类分布式 command/query 总线,异常跨进程会被泛化成
   `CommandExecutionException`、丢失类型信息;此时应在**边界**把领域异常转成**结构化失败结果**(稳定 code + 参数),聚合内部仍可 coded throw。
-  本仓当前不依赖 Axon(见 [[analysis-00007-saga-process-manager]] "参考不依赖"),故仅作为接入时的边界指引,不改默认口径。
+  本仓当前不依赖 Axon(见 [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md) "参考不依赖"),故仅作为接入时的边界指引,不改默认口径。
 - 这不是"反最佳实践",是**成本/一致性权衡**;若未来重估(例如团队愿意用零依赖 `Result` + linter 强制处理),应走独立 decision。
 
 ## 十一、脚手架落地改动(code 不是 truth,照改)
@@ -408,7 +407,7 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 | `-cqrs-spring` | 把 `OptimisticLockingFailureException` 翻译为 `ConcurrencyConflictException` |
 | **scaffold(ordering)** | `OrderingProblemCatalog`(implements `ProblemCatalog`)**只 override** `CREDIT_EXCEEDED`→`/problems/insufficient-credit`,其余码走 category family;`CreditExceededException` 携 `CREDIT_EXCEEDED`;聚合内**够格**不变量(无重复 SKU)用 `checkInvariant(OrderHasDistinctSkus)`,**琐碎守卫**(空/超上限)用 coded `throw`(§4.5);"unknown order/customer" 改抛 `EntityNotFoundException`(取代 `NoSuchElementException` 临时手法) |
 
-**验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [[design-00002-web-layer]] §八 的 **422** ProblemDetail
+**验收锚点**:改完后,对一个信用超限的下单请求,脚手架应原样产出 [design-00002-web-layer](design-00002-web-layer.md) §八 的 **422** ProblemDetail
 (带 `code:"ordering.credit-exceeded"` + `type`)。当前产不出来即为未完成。
 
 ## 十二、后果
@@ -416,16 +415,16 @@ domain-driven-hexagon 都倾向函数式错误值;本仓 [[analysis-00005-struct
 - **正向**:错误码从领域一路贯通到边界,`code`/`type` 对领域异常首次可达;规则成一等对象,可测可组合;
   校验/并发/未找到有稳定语义与状态码;i18n 真正可用。纯/脏与依赖向内不变,无新范式。
 - **负向 / 治理**:`ErrorCode` 的 `code` 与 `ProblemDescriptor` 的 `typeUri` **一旦发布即成对外契约**,变更须走版本
-  (承 [[decision-00007-web-api-response-envelope]] §Consequences);错误码枚举跨 BC 增长需命名前缀治理;
+  (承 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §Consequences);错误码枚举跨 BC 增长需命名前缀治理;
   `-application` 新增两个语义子类,消费者需知晓其映射。
 - **迁移**:所有新增构造都是**加法**(旧 message-only 构造保留),存量代码不强制一次性改;但脚手架作为示范应改齐。
 
 ## 关联
 
-- [[decision-00010-exception-model]] —— 本设计落地的决策来源(策略、取舍、被拒选项)。
-- [[analysis-00010-exception-model]] —— 本设计的缺口来源与验收清单。
-- [[analysis-00008-web-api-response-envelope]] —— 线上错误契约的大厂/标准对照(本文沿用其结论,不改格式)。
-- [[analysis-00006-ddd-building-blocks-library]] —— 纯/脏分离与依赖向内铁律,约束 `ErrorCode` 只能落 `-core`。
-- [[analysis-00005-structure-2-event-flow-and-cqrs]] —— Result/受控异常意图出处(本文对 Result 给出取舍)。
-- [[decision-00007-web-api-response-envelope]] —— `code`/`type`/i18n/401-403 推迟等决策来源。
-- [[design-00001-aipersimmon-ddd-and-scaffold]] / [[design-00002-web-layer]] —— 被本文增量扩展的既有设计。
+- [decision-00010-exception-model](../decision/decision-00010-exception-model.md) —— 本设计落地的决策来源(策略、取舍、被拒选项)。
+- [analysis-00010-exception-model](../analysis/analysis-00010-exception-model.md) —— 本设计的缺口来源与验收清单。
+- [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) —— 线上错误契约的大厂/标准对照(本文沿用其结论,不改格式)。
+- [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) —— 纯/脏分离与依赖向内铁律,约束 `ErrorCode` 只能落 `-core`。
+- [analysis-00005-structure-2-event-flow-and-cqrs](../analysis/analysis-00005-structure-2-event-flow-and-cqrs.md) —— Result/受控异常意图出处(本文对 Result 给出取舍)。
+- [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) —— `code`/`type`/i18n/401-403 推迟等决策来源。
+- [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) / [design-00002-web-layer](design-00002-web-layer.md) —— 被本文增量扩展的既有设计。

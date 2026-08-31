@@ -56,7 +56,7 @@ blocks: [report-00001-ddd-framework-review]
 - 不改 `OrderId` / `Orders` / DDL（`VARCHAR(64)` 已足够容纳 36 字符 UUID）。
 
 **注意改动面**：`PlaceOrderHandler`、inventory 侧对应 handler、`IdGenerator` Javadoc。与
-[[issue-00051-aggregates-have-no-optimistic-locking]] 同批修改样例聚合表，DDL 迁移可合并为一个。
+[issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md) 同批修改样例聚合表，DDL 迁移可合并为一个。
 
 ## 验证结果（已修复）
 
@@ -72,9 +72,9 @@ blocks: [report-00001-ddd-framework-review]
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（P0-4，本 issue 的来源）
-- [[plan-00013-phase-one-correctness-remediation]]
-- [[issue-00053-id-generator-silently-degrades-to-uuidv4]]（同源：时间有序 id 的覆盖面与可见性）
-- [[decision-00019-time-ordered-uuidv7-identifiers]] / [[design-00010-time-ordered-identifiers]]
-- [[plan-00012-time-ordered-identifiers-implementation]]（其收口范围有意只覆盖框架铸造点，本 issue 补上消费方一侧）
-- [[samples-not-reference]]（样例不是设计权威——但它**是**使用者的第一手范本，因此仍须正确）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P0-4，本 issue 的来源）
+- [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)
+- [issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md)（同源：时间有序 id 的覆盖面与可见性）
+- [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md) / [design-00010-time-ordered-identifiers](../design/design-00010-time-ordered-identifiers.md)
+- [plan-00012-time-ordered-identifiers-implementation](../plan/plan-00012-time-ordered-identifiers-implementation.md)（其收口范围有意只覆盖框架铸造点，本 issue 补上消费方一侧）
+- samples-not-reference（样例不是设计权威——但它**是**使用者的第一手范本，因此仍须正确）

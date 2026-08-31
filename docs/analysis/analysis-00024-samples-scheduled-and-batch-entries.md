@@ -2,13 +2,13 @@
 id: analysis-00024-samples-scheduled-and-batch-entries
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S11 非 HTTP 入口：定时任务 / 批处理（入口适配器总论）
 
 对应 sample：`aipersimmon-ddd-samples/s11-scheduled-and-batch-entries`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -56,7 +56,7 @@ sample 用两个测试把前两条钉成事实：同样的行、同样的时刻�
 
 ## 3. 扫描是咨询性的，聚合才是权威
 
-这是本篇与 [[analysis-00022-samples-validation-layers]]（S19 的 `CommandPrecheck`）同形的一课。
+这是本篇与 [analysis-00022-samples-validation-layers](analysis-00022-samples-validation-layers.md)（S19 的 `CommandPrecheck`）同形的一课。
 
 `ExpiredOrders.findExpired` 返回的是"**刚才看起来**已过期"的 id 列表。从这次调用到某个 id 真正被处理
 之间，世界会动：客户付款了、运维手工关了、另一个实例扫到了同一行。所以：

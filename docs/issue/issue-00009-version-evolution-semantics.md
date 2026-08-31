@@ -7,7 +7,7 @@ blocks: [decision-00014-cloudevents-integration-event-contract]
 
 # `@EventType` 版本演进语义与 `(type, version)` 精确键自相矛盾(文档漏改)
 
-[[issue-00005-integration-event-logical-type-resolution]] 收口时把注册表键定为 **`(name, version)` 精确匹配**
+[issue-00005-integration-event-logical-type-resolution](issue-00005-integration-event-logical-type-resolution.md) 收口时把注册表键定为 **`(name, version)` 精确匹配**
 (§边界收口 #3),但注解与 ADR 的**文字**仍停留在早先"按 name 解析、版本是元数据"的模型,声称"同一 `name` 的 v1/v2
 解析到同一个类、one handler 服务所有兼容修订"。这与代码相互矛盾。
 
@@ -47,5 +47,5 @@ blocks: [decision-00014-cloudevents-integration-event-contract]
 
 ## 关联
 
-- [[decision-00014-cloudevents-integration-event-contract]] —— `(type, version)` 契约键的来源;本 patch 对齐其措辞。
-- [[issue-00005-integration-event-logical-type-resolution]] —— 引入 `(type, version)` 键;§修复 #1 的遗留措辞在此更正。
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) —— `(type, version)` 契约键的来源;本 patch 对齐其措辞。
+- [issue-00005-integration-event-logical-type-resolution](issue-00005-integration-event-logical-type-resolution.md) —— 引入 `(type, version)` 键;§修复 #1 的遗留措辞在此更正。

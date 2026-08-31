@@ -56,7 +56,7 @@ curl localhost:8080/orders/<id>
 3. **真根因**：这个项目对"文档可能漂"这件事有很强的意识，并为此建了机制——
    README 的「能力→示例→**验证测试**」表（`:66-87`）把每条断言都绑到了一个测试上，
    而且那张表**逐行核对下来只有一行是错的**（见
-   [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]]）。
+   [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md)）。
    机制是有效的。quickstart 恰恰是**唯一没有被纳入这个机制**的一段——
    它给的不是"某能力由某测试验证"，而是"你现在应该敲什么"，没有对应的测试形态。
 4. **排除的伪根因**：不是配置写错了。8090、REJECT、`__root__` 种子**三者都是对的选择**，
@@ -112,7 +112,7 @@ curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
    `application.yml` 的 `server.port`——一条正则即可。
 
 顺带（可选）：把 kafka-ui 移进一个 compose profile
-（见 [[issue-00088-dependency-and-image-versions-escape-the-boms]] 的修复第 3 条），
+（见 [issue-00088-dependency-and-image-versions-escape-the-boms](issue-00088-dependency-and-image-versions-escape-the-boms.md) 的修复第 3 条），
 8080 就不再有东西监听，将来同类错误会立刻表现为"连接被拒绝"而不是一个 HTML 页面。
 
 ## 验证结果
@@ -125,7 +125,7 @@ curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
   Build and run 一节同时更正了另一处不实描述——SigNoz 并非随 `spring-boot:run` 启动，
   它在 `observability` profile 后面，需要 out-of-band 拉起。
 - **顺带消除了一条歧路**：kafka-ui 已移进 compose 的 `tools` profile
-  （[[issue-00088-dependency-and-image-versions-escape-the-boms]]），
+  （[issue-00088-dependency-and-image-versions-escape-the-boms](issue-00088-dependency-and-image-versions-escape-the-boms.md)），
   8080 默认不再被监听，将来打错端口会直接连接被拒，而不是拿到一个 HTML 页面。
 - **已做（修复第 4 条，本 issue 因此 resolved）**：`ReadmeQuickstartTest` 落地，两条断言：
   - `theQuickstartPlacesAnOrderAndReadsItBack` —— **从 README 解析**（不复制）第一条 curl 的
@@ -136,7 +136,7 @@ curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
     不用正则去啃 YAML）。这补上了随机端口测不到的那一项。
 - **C 的答案在此期间变了**：修复第 2、3 条当时写的是 `-H 'X-Tenant-Id: __root__'`，
   而那个 header 值是**必然被拒**的——见
-  [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]]。
+  [issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects](issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects.md)。
   quickstart 现在用 `demo`（种子同时播在 `__root__` 与 `demo` 两个租户下）。
   **这条测试如果早存在，issue-00096 当天就会被抓到**，这也正是本 issue 第 4 条的价值所在。
 - 负向对照：把 README 改回 `__root__` + 8080，两条断言同时红，
@@ -146,8 +146,8 @@ curl -H 'X-Tenant-Id: __root__' localhost:8090/orders/<id>
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00072-demo-seed-data-ships-in-a-production-migration]]（种子数据的位置，与 C 同源）
-- [[issue-00088-dependency-and-image-versions-escape-the-boms]]（kafka-ui 的 8080 占用）
-- [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]]（另一类文档漂移）
-- [[decision-00018-multi-tenancy-boundaries]]（`__root__` 哨兵与 missing-policy）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md)（种子数据的位置，与 C 同源）
+- [issue-00088-dependency-and-image-versions-escape-the-boms](issue-00088-dependency-and-image-versions-escape-the-boms.md)（kafka-ui 的 8080 占用）
+- [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md)（另一类文档漂移）
+- [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)（`__root__` 哨兵与 missing-policy）

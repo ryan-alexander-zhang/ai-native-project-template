@@ -118,7 +118,7 @@ jdbc 侧在类初始化时改写成 `?`。**一份拷贝不会和自己漂开**�
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 8 档）
-- 平局会饿死，同一形状的先例：[[issue-00122-the-four-process-tables-grew-forever]]
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 8 档）
+- 平局会饿死，同一形状的先例：[issue-00122-the-four-process-tables-grew-forever](issue-00122-the-four-process-tables-grew-forever.md)
 - 被本档纠正的注释也在 `issue-00122` 里
-- 对照必须断言 revert 落地：[[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]、[[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]
+- 对照必须断言 revert 落地：[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut](issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut.md)、[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in](issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in.md)

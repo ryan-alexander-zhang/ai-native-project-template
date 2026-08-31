@@ -101,6 +101,6 @@ blocks: [report-00001-ddd-framework-review]
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]
-- [[plan-00014-adoption-threshold-and-architecture-simplification]]（在 D 批实施过程中发现）
-- [[issue-00056-kafka-tests-pin-a-stale-inbox-schema]]（同类：测试夹具对框架行为的假设与实际不符）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)
+- [plan-00014-adoption-threshold-and-architecture-simplification](../plan/plan-00014-adoption-threshold-and-architecture-simplification.md)（在 D 批实施过程中发现）
+- [issue-00056-kafka-tests-pin-a-stale-inbox-schema](issue-00056-kafka-tests-pin-a-stale-inbox-schema.md)（同类：测试夹具对框架行为的假设与实际不符）

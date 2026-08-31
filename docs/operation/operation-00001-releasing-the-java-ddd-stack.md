@@ -2,7 +2,6 @@
 id: operation-00001-releasing-the-java-ddd-stack
 type: operation
 status: active
-implements: []
 ---
 
 # 发布 Java DDD 栈

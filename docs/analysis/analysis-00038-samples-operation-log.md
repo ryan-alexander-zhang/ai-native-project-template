@@ -2,13 +2,13 @@
 id: analysis-00038-samples-operation-log
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S14 操作日志（寄宿 S1）
 
 对应 sample：`aipersimmon-ddd-samples/s01-http-command-query`（S1 原有 15 个用例 + 本篇新增 21 个 = 36 个）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]；组件设计见 [[analysis-00013-operation-log-component]]。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；组件设计见 [analysis-00013-operation-log-component](analysis-00013-operation-log-component.md)。
 
 ## 0. 本篇定位与一处进度更正
 

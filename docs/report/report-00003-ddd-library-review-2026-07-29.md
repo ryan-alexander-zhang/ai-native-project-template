@@ -302,7 +302,7 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 后续所有工作的单位都是 §3 的编号，所以 §2 里那 10 条**从来没有人给它们排过期**，
 也不是被评估后搁置的。收尾时的小结进一步写成"§2 遗留项也已清空"，让它们在协作里彻底不可见。
 
-**已由 [[issue-00119-ten-majors-were-never-scheduled]] 逐条回读代码核实并排期**：
+**已由 [issue-00119-ten-majors-were-never-scheduled](../issue/issue-00119-ten-majors-were-never-scheduled.md) 逐条回读代码核实并排期**：
 11 条真开着、1 条已修但本报告没划、2 条半修/陈旧。其中至少三条与已做的项同级
 （MariaDB 方言、pm 零保留、`domainEvents()` 活视图）。
 差别的成因不是优先级判断，而是注意力——第 6 项抽出 outbox-engine 之后，
@@ -312,23 +312,23 @@ deadline 代际栅栏、租约 fencing；operation-log 的 outcome×completion �
 
 ## 关联
 
-- 父：[[report-00001-ddd-framework-review]]（第一次库评审）
-- 兄弟：[[report-00002-scaffold-ddd-review]]（脚手架评审，30 个 issue 已全部 resolved）
-- 子：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]、
-  [[issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test]]、
-  [[issue-00101-idempotency-records-instead-of-claiming]]、
-  [[issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction]]、
-  [[issue-00103-parked-input-replay-is-not-crash-safe]]、
-  [[issue-00104-an-ended-instance-keeps-its-timers-forever]]、
-  [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]、
-  [[issue-00106-an-empty-flyway-component-list-created-every-table]]、
-  [[issue-00107-silent-degradations-become-loud-failures]]、
-  [[issue-00108-a-killed-relay-instance-stops-all-delivery]]、
-  [[issue-00109-a-vanished-route-turned-an-externalized-event-local]]、
-  [[issue-00110-the-outbox-had-no-metrics-at-all]]、
-  [[issue-00119-ten-majors-were-never-scheduled]]（§2 未排期条目的清点与排期，**open**）、
-  [[issue-00120-mariadb-was-support-nobody-had-declared]]、
-  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]、
-  [[issue-00122-the-four-process-tables-grew-forever]]、
-  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]、
-  [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]
+- 父：[report-00001-ddd-framework-review](report-00001-ddd-framework-review.md)（第一次库评审）
+- 兄弟：[report-00002-scaffold-ddd-review](report-00002-scaffold-ddd-review.md)（脚手架评审，30 个 issue 已全部 resolved）
+- 子：[issue-00099-tenant-isolation-fails-open-below-the-edge](../issue/issue-00099-tenant-isolation-fails-open-below-the-edge.md)、
+  [issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test](../issue/issue-00100-a-scheduled-purge-steals-the-lock-from-its-own-test.md)、
+  [issue-00101-idempotency-records-instead-of-claiming](../issue/issue-00101-idempotency-records-instead-of-claiming.md)、
+  [issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction](../issue/issue-00102-failed-operations-are-not-recorded-under-an-outer-transaction.md)、
+  [issue-00103-parked-input-replay-is-not-crash-safe](../issue/issue-00103-parked-input-replay-is-not-crash-safe.md)、
+  [issue-00104-an-ended-instance-keeps-its-timers-forever](../issue/issue-00104-an-ended-instance-keeps-its-timers-forever.md)、
+  [issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried](../issue/issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried.md)、
+  [issue-00106-an-empty-flyway-component-list-created-every-table](../issue/issue-00106-an-empty-flyway-component-list-created-every-table.md)、
+  [issue-00107-silent-degradations-become-loud-failures](../issue/issue-00107-silent-degradations-become-loud-failures.md)、
+  [issue-00108-a-killed-relay-instance-stops-all-delivery](../issue/issue-00108-a-killed-relay-instance-stops-all-delivery.md)、
+  [issue-00109-a-vanished-route-turned-an-externalized-event-local](../issue/issue-00109-a-vanished-route-turned-an-externalized-event-local.md)、
+  [issue-00110-the-outbox-had-no-metrics-at-all](../issue/issue-00110-the-outbox-had-no-metrics-at-all.md)、
+  [issue-00119-ten-majors-were-never-scheduled](../issue/issue-00119-ten-majors-were-never-scheduled.md)（§2 未排期条目的清点与排期，**open**）、
+  [issue-00120-mariadb-was-support-nobody-had-declared](../issue/issue-00120-mariadb-was-support-nobody-had-declared.md)、
+  [issue-00121-three-promises-that-did-not-match-their-behaviour](../issue/issue-00121-three-promises-that-did-not-match-their-behaviour.md)、
+  [issue-00122-the-four-process-tables-grew-forever](../issue/issue-00122-the-four-process-tables-grew-forever.md)、
+  [issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in](../issue/issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in.md)、
+  [issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut](../issue/issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut.md)

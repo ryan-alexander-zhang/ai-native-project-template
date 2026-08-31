@@ -67,4 +67,4 @@ start/terminal 输入与 `PlaceOrder`/`ConfirmOrder` 的 correlationId 互不相
 
 ## 关联
 
-- [[issue-00136-the-second-process-pays-the-boilerplate-again]]
+- [issue-00136-the-second-process-pays-the-boilerplate-again](issue-00136-the-second-process-pays-the-boilerplate-again.md)

@@ -79,6 +79,6 @@ assertNull(retry.getHeaders().getLocation());   // 当前行为
 
 ## 关联
 
-- [[issue-00062-web-store-module-does-not-displace-the-in-memory-stores]] ·
-  [[issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist]]（同一次落地 F2 时发现的三件事）
-- [[plan-00015-scaffold-depth-and-evaluability]]（F2）
+- [issue-00062-web-store-module-does-not-displace-the-in-memory-stores](issue-00062-web-store-module-does-not-displace-the-in-memory-stores.md) ·
+  [issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist](issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist.md)（同一次落地 F2 时发现的三件事）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（F2）

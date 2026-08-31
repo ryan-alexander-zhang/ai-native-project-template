@@ -89,12 +89,12 @@ CREATE INDEX reservations_by_order     ON inventory.reservations (tenant_id, ord
 并在 `OrderListMapper` 的注释里补一句：游标分页的**正确性**来自 UUIDv7，
 **性能**来自这条复合索引——两者缺一不可。这句话是本 issue 真正要留下的东西。
 
-`V4` 可与 [[issue-00091-the-order-lines-foreign-key-omits-the-tenant]] 合并为同一个迁移。
+`V4` 可与 [issue-00091-the-order-lines-foreign-key-omits-the-tenant](issue-00091-the-order-lines-foreign-key-omits-the-tenant.md) 合并为同一个迁移。
 
 ## 验证结果
 
 已修。四条索引落在 `V4__tenant_scoped_keys_and_indexes.sql`（与
-[[issue-00091-the-order-lines-foreign-key-omits-the-tenant]] 合并为同一个迁移，如本 issue 所建议）。
+[issue-00091-the-order-lines-foreign-key-omits-the-tenant](issue-00091-the-order-lines-foreign-key-omits-the-tenant.md) 合并为同一个迁移，如本 issue 所建议）。
 
 - 索引按修复方案原样落地：`orders_by_customer_newest_first (tenant_id, customer_id, id DESC)`、
   `order_lines_by_order`、`reservation_lines_by_reservation`、`reservations_by_order`。
@@ -126,7 +126,7 @@ CREATE INDEX reservations_by_order     ON inventory.reservations (tenant_id, ord
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00091-the-order-lines-foreign-key-omits-the-tenant]]（同一个 V4 迁移）
-- [[decision-00019-time-ordered-uuidv7-identifiers]]（游标可以是 id 的前提）
-- [[issue-00090-order-lines-are-rewritten-on-every-save]]（DELETE 热路径，受本索引直接影响）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00091-the-order-lines-foreign-key-omits-the-tenant](issue-00091-the-order-lines-foreign-key-omits-the-tenant.md)（同一个 V4 迁移）
+- [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)（游标可以是 id 的前提）
+- [issue-00090-order-lines-are-rewritten-on-every-save](issue-00090-order-lines-are-rewritten-on-every-save.md)（DELETE 热路径，受本索引直接影响）

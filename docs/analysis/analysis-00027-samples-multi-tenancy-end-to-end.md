@@ -2,15 +2,15 @@
 id: analysis-00027-samples-multi-tenancy-end-to-end
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S13 多租户端到端传播（寄宿 S4）
 
 对应 sample：`aipersimmon-ddd-samples/s04-integration-events-across-services`（两个服务模块，与
-[[analysis-00025-samples-integration-events-across-services]] 同一份代码）。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。同样寄宿在 S4 的 trace 一篇是
-[[analysis-00028-samples-one-trace-across-the-boundary]]。
+[analysis-00025-samples-integration-events-across-services](analysis-00025-samples-integration-events-across-services.md) 同一份代码）。场景清单见
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。同样寄宿在 S4 的 trace 一篇是
+[analysis-00028-samples-one-trace-across-the-boundary](analysis-00028-samples-one-trace-across-the-boundary.md)。
 
 ## 0. 本篇定位
 

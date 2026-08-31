@@ -88,5 +88,5 @@ AC-1 ~ AC-3 达成,本 issue `resolved`。
 
 ## 关联
 
-- [[issue-00003-messaging-delivery-reliability]] —— 本 issue 纠正其 relay「dispatch 与 mark-sent 同 try」的误判。
-- [[issue-00011-bound-outbox-kafka-send-await]]、[[issue-00012-dead-letter-move-failure-backoff]] —— 同批 relay 加固。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 本 issue 纠正其 relay「dispatch 与 mark-sent 同 try」的误判。
+- [issue-00011-bound-outbox-kafka-send-await](issue-00011-bound-outbox-kafka-send-await.md)、[issue-00012-dead-letter-move-failure-backoff](issue-00012-dead-letter-move-failure-backoff.md) —— 同批 relay 加固。

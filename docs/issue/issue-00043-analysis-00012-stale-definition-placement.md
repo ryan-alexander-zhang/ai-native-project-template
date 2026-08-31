@@ -51,5 +51,5 @@ blocks: [analysis-00012-multi-module-process-manager-layering]
 
 ## 关联
 
-- [[analysis-00012-multi-module-process-manager-layering]]（本文件；漂移出现在其 §1/§6/§7 的叙事与已落地代码之间）
-- [[issue-00035-order-fulfilment-definition-ignores-step]]（同一 `OrderFulfilmentDefinition`，provider 模块内的状态机缺陷）
+- [analysis-00012-multi-module-process-manager-layering](../analysis/analysis-00012-multi-module-process-manager-layering.md)（本文件；漂移出现在其 §1/§6/§7 的叙事与已落地代码之间）
+- [issue-00035-order-fulfilment-definition-ignores-step](issue-00035-order-fulfilment-definition-ignores-step.md)（同一 `OrderFulfilmentDefinition`，provider 模块内的状态机缺陷）

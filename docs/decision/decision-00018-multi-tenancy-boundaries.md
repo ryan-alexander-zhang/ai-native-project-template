@@ -2,17 +2,19 @@
 id: decision-00018-multi-tenancy-boundaries
 type: decision
 status: active
+motivated_by: [issue-00099-tenant-isolation-fails-open-below-the-edge]
+constrains: [spec-00002-multi-tenancy, design-00009-multi-tenancy-tenant-id, design-00005-observability-and-distributed-tracing]
 ---
 
 # 多租户：隔离模型、传播、唯一键与强制隔离边界
 
 固化 `aipersimmon-ddd` **原生多租户能力**在编码前必须团队背书的决策：用哪种隔离模型、租户如何跨写路径与消息传播、
-`tenant_id` 的空值与唯一键约束、以及如何在两类存储后端上强制隔离。承接结构设计 [[design-00009-multi-tenancy-tenant-id]]
+`tenant_id` 的空值与唯一键约束、以及如何在两类存储后端上强制隔离。承接结构设计 [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)
 （本 ADR 只固化"决策与取舍"，机制细节以 design-00009 为准，不在此重复）。
 
-本 ADR 受既有决策约束：[[decision-00012-no-ambient-per-command-state]]、
-[[decision-00013-command-context-and-causation-propagation]]、[[decision-00014-cloudevents-integration-event-contract]]、
-[[decision-00016-durable-runtime-staged-message-identity]]、[[design-00005-observability-and-distributed-tracing]]。
+本 ADR 受既有决策约束：[decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md)、
+[decision-00013-command-context-and-causation-propagation](decision-00013-command-context-and-causation-propagation.md)、[decision-00014-cloudevents-integration-event-contract](decision-00014-cloudevents-integration-event-contract.md)、
+[decision-00016-durable-runtime-staged-message-identity](decision-00016-durable-runtime-staged-message-identity.md)、[design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md)。
 
 ## 结论先行
 
@@ -37,7 +39,7 @@ design-00009 的四路代码勘察确认框架当前对多租户**零支持**（
 2. 租户必须像 trace 一样端到端存活。框架已有一套"跨异步中继 + 跨 Kafka 网线"的范式（`StoreAndForwardTracer` 的
    capture/restore + 耐久行 `traceparent/trace_state` 列），租户照抄即可，无需另造机制。
 
-本 ADR 把 design-00009 §十三列出的 6 项取舍固化为决策，并正面处理与 [[decision-00012-no-ambient-per-command-state]]
+本 ADR 把 design-00009 §十三列出的 6 项取舍固化为决策，并正面处理与 [decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md)
 的张力（见 D5、命题一）。
 
 ## Decision
@@ -59,10 +61,10 @@ design-00009 的四路代码勘察确认框架当前对多租户**零支持**（
 ### B. 传播与环境状态边界
 
 4. **写侧权威载体是 `CommandContext.tenantId`。** 新增字段随 `root/deriveChild/of(envelope)` 传播（对齐
-   [[decision-00013-command-context-and-causation-propagation]]），发布器从它盖章。跨进程用 `EventEnvelope` 新增
-   CloudEvents 扩展属性 + Kafka `ce_tenantid` header（对齐 [[decision-00014-cloudevents-integration-event-contract]]）；
+   [decision-00013-command-context-and-causation-propagation](decision-00013-command-context-and-causation-propagation.md)），发布器从它盖章。跨进程用 `EventEnvelope` 新增
+   CloudEvents 扩展属性 + Kafka `ce_tenantid` header（对齐 [decision-00014-cloudevents-integration-event-contract](decision-00014-cloudevents-integration-event-contract.md)）；
    消费端 `reconstruct` **必须读回** `ce_tenantid`，否则静默丢失。
-5. **`TenantContext`（ThreadLocal）受严格约束，与 [[decision-00012-no-ambient-per-command-state]] 不冲突。**
+5. **`TenantContext`（ThreadLocal）受严格约束，与 [decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md) 不冲突。**
    它**不是**每命令可变变量池：在 trusted boundary（边缘 Filter / 消费入口）**一次写入、请求内不可变、只承载单个
    `TenantId`**，业务代码不得写入。它的用途仅限于（a）边缘→`CommandContext` 的绑定，（b）读侧与基础设施实现的
    隔离谓词来源（那里没有 `CommandContext` 可穿）。租户是"身份"而非"业务状态"，语义等同 operation-log 的 Actor
@@ -157,7 +159,8 @@ UUIDv7/ULID 的正确用武之地是框架的 per-row 生成 id（当前为 `UUI
   冲突（命题二）。否决，改用哨兵 `__root__`。
 - **读侧 QueryContext + 查询拦截器链（方案 B）**：与命令侧对称但改动大，MVP 收益不足。降级为演进项。
 
-## 待 spec 明确的运维细节（不阻塞本 ADR）
+## 已由 spec 裁定的运维细节（不阻塞本 ADR）
 
 RLS 的 `SET LOCAL app.tenant` 与连接池（事务边界、连接归还清理）交互；后台 BYPASSRLS 角色的最小权限集；
 silo seam 的路由 DataSource bean 形态与 `TenantContext` 生命周期。
+这三项已由 [spec-00002-multi-tenancy](../spec/spec-00002-multi-tenancy.md) §4（4.1 / 4.2 / 4.3）逐项裁定，本 ADR 不再重复其取值。

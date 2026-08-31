@@ -60,6 +60,6 @@ DELETE ... WHERE tenant_id = ? AND bucket_key = ? AND window_start < ?   -- ? = 
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 4 档）
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 4 档）
 - 冷桶的清理仍未做，属第 6 档（web-store 三张表无清理路径）
-- 同一轮里另一次"顺手扫描造成的竞争"：[[issue-00122-the-four-process-tables-grew-forever]]
+- 同一轮里另一次"顺手扫描造成的竞争"：[issue-00122-the-four-process-tables-grew-forever](issue-00122-the-four-process-tables-grew-forever.md)

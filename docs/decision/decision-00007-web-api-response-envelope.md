@@ -2,15 +2,17 @@
 id: decision-00007-web-api-response-envelope
 type: decision
 status: active
+motivated_by: [analysis-00008-web-api-response-envelope]
+constrains: [design-00002-web-layer, design-00003-exception-model]
 ---
 
 # Web 层封装:无通用信封 + RFC 9457,横切能力全做但都 opt-in + 可插拔
 
 固化 `aipersimmon-ddd` 的入站 HTTP(interface)层封装策略。选型依据(15+ 大厂对比 + 多份
-IETF/跨语言标准,逐条附一手证据)见 [[analysis-00008-web-api-response-envelope]];本文只记**决策与
+IETF/跨语言标准,逐条附一手证据)见 [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md);本文只记**决策与
 取舍**,拍板该分析 §八 遗留的六个问题(含**防重放攻击**),并把幂等、防重放、限流等横切能力
 **纳入**——但每项都是**开关控制 + 可插拔实现**(内存 / JDBC / Redis)。落位严守
-[[analysis-00006-ddd-building-blocks-library]] 的"纯/脏分离",与 `-cqrs`/`-cqrs-spring`、
+[analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) 的"纯/脏分离",与 `-cqrs`/`-cqrs-spring`、
 outbox 的"契约 + 可换存储"同构。
 
 > **修订说明(v2):** 初版曾把"签名请求防重放"判为"不进构件核心"——经复议**推翻**:Web 层横切标配
@@ -24,7 +26,7 @@ outbox 的"契约 + 可换存储"同构。
 `-cqrs-spring`/`-integration`/`-events-spring`/outbox·inbox·messaging/`-archunit`/`-bom`,
 **唯独没有负责入站 HTTP 适配的模块**。用户诉求是补 `ApiResponse`/`ApiRequest` 之类封装。
 
-核心张力([[analysis-00008-web-api-response-envelope]] §三~§四给了证据):
+核心张力([analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) §三~§四给了证据):
 
 1. **成功响应要不要通用信封**?15 家大厂里 12 家**不套** `{code,message,data}`,直接返资源、
    用 HTTP 状态码表达结果(PayPal 明文禁止 2xx 返错误体);只有 Slack(`{ok}`)与中国部分厂商
@@ -62,7 +64,7 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 
 | 模块 | 层 / 性质 | 依赖 | 内容 |
 | --- | --- | --- | --- |
-| `aipersimmon-ddd-web` | interface 契约,**framework-free** | `-core`(极薄) | `ProblemDescriptor` + `ProblemRegistry`(错误码→传输映射,身份与传输组合;见 [[design-00003-exception-model]] §4.7);`ApiError`/字段错误语义模型(对齐 9457,不绑 Spring);`Page<T>`/`Slice<T>`/`Cursor` 分页值对象;**横切 SPI**:`IdempotencyStore`、`ReplayGuard`(nonce)、`RateLimiter`、`RequestSignatureVerifier` |
+| `aipersimmon-ddd-web` | interface 契约,**framework-free** | `-core`(极薄) | `ProblemDescriptor` + `ProblemRegistry`(错误码→传输映射,身份与传输组合;见 [design-00003-exception-model](../design/design-00003-exception-model.md) §4.7);`ApiError`/字段错误语义模型(对齐 9457,不绑 Spring);`Page<T>`/`Slice<T>`/`Cursor` 分页值对象;**横切 SPI**:`IdempotencyStore`、`ReplayGuard`(nonce)、`RateLimiter`、`RequestSignatureVerifier` |
 | `aipersimmon-ddd-web-spring` | interface 实现,脏 starter | `-web` + Spring Web | 共享 `@RestControllerAdvice`(异常 → `ProblemDetail`,含 400/404/409/422/429);`traceId` filter;分页序列化;i18n(`MessageSource`);各横切能力的 filter + **开关** + 默认**内存** SPI 实现 |
 | `aipersimmon-ddd-web-store-redis` | infrastructure,可选后端 | `-web` + Redis | Redis 实现 `IdempotencyStore`/`ReplayGuard`/`RateLimiter`(TTL、原子 `INCR`、令牌桶 Lua) |
 | `aipersimmon-ddd-web-store-mybatis-plus` | infrastructure,可选后端 | `-web` + MyBatis-Plus | 关系库实现同一批 SPI(表 + 过期清理);与 Redis 同 SPI 可互换。当时叫 `-web-store-jdbc` |
@@ -97,16 +99,16 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 **不在本期范围**:CORS(用 Spring 原生 `CorsConfigurationSource` / 网关,构件不重复封装)、
 401/403→ProblemDetail(移出 v1,见 §六未来项)。
 
-### 四、拍板 [[analysis-00008-web-api-response-envelope]] §八 的六个遗留问题
+### 四、拍板 [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) §八 的六个遗留问题
 
 | # | 遗留问题 | 决策 | 依据 |
 | --- | --- | --- | --- |
 | 1 | 字段命名默认 | **camelCase**,全局可经 `@JsonNaming` 一处切换 | 顺 Spring/Jackson 与 Java 字段名,零配置;Google(JSON)/Microsoft/Adyen 亦用。命名阵营本就分裂,重点是"定一个默认并全局一致" |
 | 2 | 版本策略 | **URL 路径 `/v{major}/`**(仅大版本,如 `/v1/`) | 最直观,对齐 Google/PayPal/Adyen/Shopify;Zalando 反 URL 版本属少数派 |
 | 3 | 幂等键是否进 v1 | **v1 提供支持点但默认关闭**(opt-in);不设为强制 | YAGNI;与 inbox 幂等边界见下方 Consequences。Stripe/PayPal/Adyen 均有,故保留 hook |
-| 4 | 模块命名 | **`-web` / `-web-spring`** | 与 `-cqrs`/`-cqrs-spring`、`-events-spring` 命名对称;避开 `-integration`(已指集成事件契约,见 [[analysis-00002-domain-vs-integration-events]])与 `interface`(与 Java 关键字/分层名歧义)。`-rest`/`-rest-spring` 为落选备选 |
-| 5 | 错误码目录组织 | **按 BC 归属的 `ErrorCode` 枚举(纯身份)+ `ProblemCatalog` 只 override 够格专属 type 的码**;其余码走 `ErrorCategory` 的 family 默认;`type` 稳定(相对 URI)、状态与消息 key 由 `ProblemDescriptor` 承载(i18n) | 身份(`ErrorCode`)与传输(`ProblemDescriptor`)组合而非继承,契约不随领域码膨胀;i18n 走 starter 的 `MessageSource`,`type` 相对 URI 对齐 Zalando。**此项细化/取代早先"枚举 implements ProblemType"的表述**,见 [[design-00003-exception-model]] §4.7 |
-| 6 | 防重放攻击落位与范围 | **全做,opt-in + 可插拔(见 §三/§五)**:签名请求与 webhook 两种防重放都提供为 `-web-spring` 可选能力,时间窗默认 **5 分钟**,可选 nonce 单次去重走可换 store。默认关 | 是 Web 层安全标配;架构约束是"默认关 + 可插拔",而非"不做"([[analysis-00008-web-api-response-envelope]] §六B) |
+| 4 | 模块命名 | **`-web` / `-web-spring`** | 与 `-cqrs`/`-cqrs-spring`、`-events-spring` 命名对称;避开 `-integration`(已指集成事件契约,见 [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md))与 `interface`(与 Java 关键字/分层名歧义)。`-rest`/`-rest-spring` 为落选备选 |
+| 5 | 错误码目录组织 | **按 BC 归属的 `ErrorCode` 枚举(纯身份)+ `ProblemCatalog` 只 override 够格专属 type 的码**;其余码走 `ErrorCategory` 的 family 默认;`type` 稳定(相对 URI)、状态与消息 key 由 `ProblemDescriptor` 承载(i18n) | 身份(`ErrorCode`)与传输(`ProblemDescriptor`)组合而非继承,契约不随领域码膨胀;i18n 走 starter 的 `MessageSource`,`type` 相对 URI 对齐 Zalando。**此项细化/取代早先"枚举 implements ProblemType"的表述**,见 [design-00003-exception-model](../design/design-00003-exception-model.md) §4.7 |
+| 6 | 防重放攻击落位与范围 | **全做,opt-in + 可插拔(见 §三/§五)**:签名请求与 webhook 两种防重放都提供为 `-web-spring` 可选能力,时间窗默认 **5 分钟**,可选 nonce 单次去重走可换 store。默认关 | 是 Web 层安全标配;架构约束是"默认关 + 可插拔",而非"不做"([analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) §六B) |
 
 ### 五、安全:防重放(replay)≠ 幂等(idempotency)——分三层,都做但不混淆
 
@@ -116,7 +118,7 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 | --- | --- | --- | --- | --- |
 | **防重放(安全)** | 攻击者重发**已签名的合法请求** | 签名 + 时间戳(+ nonce)+ 时间窗拒绝 | 鉴权 / 网关层,或 webhook 接收端 | `-web-spring` **可选**能力,默认关;nonce 去重走可换 store |
 | **幂等(可靠性)** | 合法请求因重试**重复生效** | `Idempotency-Key` 存首次结果并回放 | 应用 / 数据层 | `-web-spring` **可选**,默认关;store 可换(问题 3) |
-| **事件去重(可靠性)** | at-least-once 投递的**事件重复消费** | inbox 消费端去重 | 消费端基础设施 | 已有 [[analysis-00006-ddd-building-blocks-library]] 的 inbox |
+| **事件去重(可靠性)** | at-least-once 投递的**事件重复消费** | inbox 消费端去重 | 消费端基础设施 | 已有 [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) 的 inbox |
 
 **防重放决策细节:**
 
@@ -137,7 +139,7 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 - **401/403 → Problem Details**:移出 v1。原因是它需要引入 Spring Security 依赖,且有一处非平凡的坑——
   `spring.mvc.problemdetails.enabled` **只覆盖经 DispatcherServlet 的 MVC 异常**,而 Security 的 401/403 在
   **过滤器链**里先发生,**不会**自动变 problem+json,需自定义 `AuthenticationEntryPoint`/`AccessDeniedHandler`。
-  代价是"错误格式在 auth 边界不统一"(承接 [[analysis-00008-web-api-response-envelope]] §六C);将来若做,应作为
+  代价是"错误格式在 auth 边界不统一"(承接 [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) §六C);将来若做,应作为
   **仅当 classpath 有 spring-security 时激活**的条件化增量(`@ConditionalOnClass`),对不引 Security 的用户零成本。
 
 ## 明确不做(仅此三项)
@@ -156,7 +158,7 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 - 保住 HTTP 状态码语义:缓存/条件请求、网关限流熔断、客户端 `raise_for_status()`、按状态码告警全部按标准工作。
 - 错误对齐唯一有 IETF 背书 + Spring 原生支持的格式,零成本、可互操作,不新增第 16 种私有错误体。
 - 落位与既有 starter 对称(`-web` 纯 + `-web-spring` 脏 + `-web-store-*` 可换),不破坏
-  [[analysis-00006-ddd-building-blocks-library]] 的 domain framework-free 硬约束。
+  [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) 的 domain framework-free 硬约束。
 - 分页值对象在纯层、序列化在 starter,cursor 为主、offset 兼容,契合大厂新接口趋势。
 - **本期横切能力零强加**:幂等/防重放/限流都在,默认关、逐项开关;需状态者共用一套
   SPI + 可换存储(内存/JDBC/Redis),既不绑死 Redis 也不逼单机用户装 Redis。CORS/401-403 收敛为未来项(§六),
@@ -184,11 +186,11 @@ framework-free 契约 `aipersimmon-ddd-web`(纯)+ Spring starter `aipersimmon-dd
 
 内部:
 
-- [[analysis-00008-web-api-response-envelope]] —— 15+ 大厂 + RFC 7807/9457 + JSON:API 对比、
+- [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md) —— 15+ 大厂 + RFC 7807/9457 + JSON:API 对比、
   六维度、差距分析、纯/脏落位建议(本决策的证据底座)。
-- [[analysis-00006-ddd-building-blocks-library]] —— 构件库按 Layer×可插拔性切分、纯/脏分离硬约束、模块清单。
-- [[analysis-00002-domain-vs-integration-events]] —— `-integration` 命名的既有归属(避免混淆)。
-- [[design-00001-aipersimmon-ddd-and-scaffold]] —— 构件库与脚手架总设计(待补 `-web`/`-web-spring` 章节)。
+- [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) —— 构件库按 Layer×可插拔性切分、纯/脏分离硬约束、模块清单。
+- [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md) —— `-integration` 命名的既有归属(避免混淆)。
+- [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md) —— 构件库与脚手架总设计(待补 `-web`/`-web-spring` 章节)。
 
 外部(一手):
 

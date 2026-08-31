@@ -1,14 +1,16 @@
 ---
-id: 20260708161438-jmolecules
+id: reference-00006-jmolecules
 type: reference
-role: main
 status: active
+informs: [analysis-00005-structure-2-event-flow-and-cqrs, analysis-00006-ddd-building-blocks-library]
 ---
 
 # xmolecules/jmolecules — DDD-as-code reference notes
 
 Distilled reference for the Java DDD template. Source is reference-only (see
 THIRDPARTY.md). Facts verified against the repo/docs on 2026-07-08.
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

@@ -44,8 +44,8 @@ outbox 组件的迁移里(由 outbox 的历史表记账)。
 
 ## 关联
 
-- [[plan-00006-middleware-integration]](flyway.components 装配现场)
-- [[process-manager-schema-copies]]
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)(flyway.components 装配现场)
+- process-manager-schema-copies
 
 ## 核查结论(在当前 HEAD 复核)
 

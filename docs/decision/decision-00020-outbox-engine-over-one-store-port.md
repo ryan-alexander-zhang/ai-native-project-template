@@ -3,6 +3,7 @@ id: decision-00020-outbox-engine-over-one-store-port
 type: decision
 status: active
 motivated_by: [report-00003-ddd-library-review-2026-07-29]
+constrains: [design-00004-durable-process-manager-runtime, design-00008-operation-log-component, design-00012-module-naming-and-spring-freedom]
 ---
 
 # outbox 的投递逻辑归入 `-outbox-engine`，两个后端只提供一个 store 端口的适配器
@@ -17,7 +18,7 @@ motivated_by: [report-00003-ddd-library-review-2026-07-29]
 
 ## Context
 
-[[report-00003-ddd-library-review-2026-07-29]] §2 架构层第一条：
+[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md) §2 架构层第一条：
 
 > outbox 家族没有 engine 层：relay/retry/backoff/死信/租约轮询——全框架最关键的并发代码——在 jdbc 与
 > mybatis-plus 各维护一份（`OutboxRelayScheduler` 除包名外字节相同）。
@@ -38,8 +39,8 @@ relay 里被复制的那些**判断**，恰好是全框架最难写对的一批�
 - 重试预算不能被「mark-sent 失败」消耗——broker 已经收到了，那不是投递失败；
 - 死信搬移自身失败时，要退避但**不**计一次尝试，否则行会越过 max-attempts 被永久搁在表里。
 
-这三条各自都是一个独立 issue 换来的（[[issue-00012-dead-letter-move-failure-backoff]]、
-[[issue-00013-mark-sent-failure-not-a-dispatch-failure]]）。存两份的代价不是行数，而是
+这三条各自都是一个独立 issue 换来的（[issue-00012-dead-letter-move-failure-backoff](../issue/issue-00012-dead-letter-move-failure-backoff.md)、
+[issue-00013-mark-sent-failure-not-a-dispatch-failure](../issue/issue-00013-mark-sent-failure-not-a-dispatch-failure.md)）。存两份的代价不是行数，而是
 **任何一次修正都可能只落在一半的部署上**，而两个后端的用户都以为自己拿到的是同一个 relay。
 
 ## 选项
@@ -68,12 +69,12 @@ relay 里被复制的那些**判断**，恰好是全框架最难写对的一批�
 契约写在端口的 javadoc 上，等价性由两个模块各自跑的用例守住。这是本次抽取**没有**消除的重复，
 必须说出口而不是假装它不存在。
 
-> **后续（[[issue-00108-a-killed-relay-instance-stops-all-delivery]]）**：`findDue` 已变成
+> **后续（[issue-00108-a-killed-relay-instance-stops-all-delivery](../issue/issue-00108-a-killed-relay-instance-stops-all-delivery.md)）**：`findDue` 已变成
 > `claimDue(now, maxAttempts, batchSize, OutboxLease)`，并新增 `release`；上面那条「唯一没去重的重复」
 > 因此变成了**候选查询**（选聚合队头）。方法数仍是 7，判据未变。租约互斥没有下沉成方言实现——claim 是三条
 > 方言无关的语句，理由见该 issue。
 
-> **再后续（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）**：`markSent` 由单 id 改为收 **id 列表**，
+> **再后续（[issue-00111-the-relay-waited-for-each-send-in-turn](../issue/issue-00111-the-relay-waited-for-each-send-in-turn.md)）**：`markSent` 由单 id 改为收 **id 列表**，
 > 因为 relay 现在把整批交给传输再一起确认，一轮一次写而不是一行一次写。方法数与判据都没变——
 > 「一批已确认的行怎么落库」仍然只是「怎么读写表」。同一次改动在**契约**侧加了 `OutboxDispatcher.beginDispatch`
 > 与 `InFlightDispatch`：那是 engine 与传输之间的接缝，不属于 store 端口。
@@ -88,7 +89,7 @@ provider 由后端提供。未来一个 Redis 租约的后端因此不必绕过 
 ## 后果
 
 - 三个 `-engine` 模块，`-engine` 后缀从「两个例外」变成 outbox/process-manager/operation-log 一致的分层规则
-  （[[design-00012-module-naming-and-spring-freedom]] §3.1 的后缀表已把它写成规则的一部分，本次只是多一个实例）。
+  （[design-00012-module-naming-and-spring-freedom](../design/design-00012-module-naming-and-spring-freedom.md) §3.1 的后缀表已把它写成规则的一部分，本次只是多一个实例）。
 - 模块数 47 → 48。与报告 §3 第 13 项「收敛到约 20」方向相反**一步**，但那一项的目标是消除
   「一个 42 行接口一个模块」这类碎片，而不是把跨后端共用的运行时压回后端里；engine 层正是收敛的前提——
   第 7、8、10 项（行级 claim、持久化目的地、Kafka 腿流水线化）现在都只需改一处。
@@ -101,9 +102,9 @@ provider 由后端提供。未来一个 Redis 租约的后端因此不必绕过 
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 架构层第一条、§3 第 6 项）
-- 同形先例：[[design-00008-operation-log-component]]（operation-log 的 engine 层）、
-  [[design-00004-durable-process-manager-runtime]]（process-manager 的 engine 层）
-- 命名规则：[[design-00012-module-naming-and-spring-freedom]] §3.1（`-engine` 后缀语义）
-- 被本次收拢的三条判断：[[issue-00012-dead-letter-move-failure-backoff]]、
-  [[issue-00013-mark-sent-failure-not-a-dispatch-failure]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 架构层第一条、§3 第 6 项）
+- 同形先例：[design-00008-operation-log-component](../design/design-00008-operation-log-component.md)（operation-log 的 engine 层）、
+  [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（process-manager 的 engine 层）
+- 命名规则：[design-00012-module-naming-and-spring-freedom](../design/design-00012-module-naming-and-spring-freedom.md) §3.1（`-engine` 后缀语义）
+- 被本次收拢的三条判断：[issue-00012-dead-letter-move-failure-backoff](../issue/issue-00012-dead-letter-move-failure-backoff.md)、
+  [issue-00013-mark-sent-failure-not-a-dispatch-failure](../issue/issue-00013-mark-sent-failure-not-a-dispatch-failure.md)

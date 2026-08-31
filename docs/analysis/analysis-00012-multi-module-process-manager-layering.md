@@ -1,7 +1,7 @@
 ---
 id: analysis-00012-multi-module-process-manager-layering
 type: analysis
-status: active
+status: draft
 informs: [design-00004-durable-process-manager-runtime]
 ---
 

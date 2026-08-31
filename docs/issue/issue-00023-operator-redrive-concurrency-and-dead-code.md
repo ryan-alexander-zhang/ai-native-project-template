@@ -19,7 +19,7 @@ blocks: [plan-00003-durable-process-manager-implementation]
 ## 2. `replayParkedInputs` 的 `catch (ProcessSuspendedException)` 是死代码
 
 - `operation/JdbcProcessOperations.java:147`:捕获 `ProcessSuspendedException` 并 `break`,但 `runtime.handle` 遇挂起是
-  **park 后正常返回**、从不抛该异常(全库无 throw 点;deadline worker 侧的同款已在 [[issue-00017-cancelled-deadline-can-still-fire]] 删除)。
+  **park 后正常返回**、从不抛该异常(全库无 throw 点;deadline worker 侧的同款已在 [issue-00017-cancelled-deadline-can-still-fire](issue-00017-cancelled-deadline-can-still-fire.md) 删除)。
 - **修复**:删除该 catch(replay 遇实例被并发挂起时,下一条 handle 自然 park、等下次 redrive——行为不变),并移除无用 import。
 
 ## 复现 / 验证
@@ -30,5 +30,5 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[issue-00015-re-suspend-clobbers-resume-lifecycle]](同为 suspend/resume 未加锁族)、[[issue-00017-cancelled-deadline-can-still-fire]]。
-- [[plan-00003-durable-process-manager-implementation]]
+- [issue-00015-re-suspend-clobbers-resume-lifecycle](issue-00015-re-suspend-clobbers-resume-lifecycle.md)(同为 suspend/resume 未加锁族)、[issue-00017-cancelled-deadline-can-still-fire](issue-00017-cancelled-deadline-can-still-fire.md)。
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

@@ -2,13 +2,13 @@
 id: analysis-00037-samples-read-side-caching
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S26 读侧加速：缓存与投影的取舍
 
 对应 sample：`aipersimmon-ddd-samples/s26-read-side-caching`（一个部署单元、58 个用例）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]，与 [[analysis-00034-samples-cqrs-read-model]]（S12）成对。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)，与 [analysis-00034-samples-cqrs-read-model](analysis-00034-samples-cqrs-read-model.md)（S12）成对。
 
 ## 0. 本篇定位
 
@@ -250,7 +250,7 @@ C5 用的是"一进一出"的天然对照：同一个文件里两个订阅者，
 
 ## 11. 库的问题：两个新 issue，都不是正确性缺陷
 
-**[[issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener]]（P2）** ——
+**[issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener](../issue/issue-00166-the-event-listener-rules-do-not-see-transactionaleventlistener.md)（P2）** ——
 `EventRules.areEventListenersHandling` 用 `isAnnotatedWith` 只匹配**直接**标注，而
 `@TransactionalEventListener` 把 `@EventListener` 作为 meta-annotation 携带，所以**共用这个谓词的
 三条规则**（订阅者放对层 ×2、订阅者可按注解检索 ×1）对所有"提交后才跑"的订阅者一概不检查——
@@ -258,7 +258,7 @@ C5 用的是"一进一出"的天然对照：同一个文件里两个订阅者，
 存量查过了：全仓三处 `@TransactionalEventListener` 都已带标记，所以这是个**改完就绿**的一行修法；
 也正因为大家一直恰好记得加，这个洞从来没有被任何一次构建暴露过。
 
-**[[issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has]]（P3）** ——
+**[issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has](../issue/issue-00167-the-querybus-javadoc-denies-the-interceptor-chain-it-has.md)（P3）** ——
 `QueryBus`（端口，最先被读的那个文件）的 javadoc 写着 *"there is no transaction or interceptor chain
 here"*，而 `QueryInterceptor`、`RegistryQueryBus` 和装配代码三处都说有。想给读侧加横切关注点的人
 从端口文档得到"读侧没有接缝"的结论，于是把它写进每个 handler——正是 `QueryInterceptor` 说它要消除的

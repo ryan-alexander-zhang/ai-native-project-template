@@ -82,7 +82,7 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 Process Manager 两条 Major）
-- 设计：[[design-00004-durable-process-manager-runtime]] §4.8 已同步
-- 同批：[[issue-00103-parked-input-replay-is-not-crash-safe]]、
-  [[issue-00104-an-ended-instance-keeps-its-timers-forever]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 Process Manager 两条 Major）
+- 设计：[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) §4.8 已同步
+- 同批：[issue-00103-parked-input-replay-is-not-crash-safe](issue-00103-parked-input-replay-is-not-crash-safe.md)、
+  [issue-00104-an-ended-instance-keeps-its-timers-forever](issue-00104-an-ended-instance-keeps-its-timers-forever.md)

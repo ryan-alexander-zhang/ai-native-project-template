@@ -75,4 +75,4 @@ Testcontainers 的 `KafkaContainer` 驱动 Apache 官方镜像而 compose 用 bi
 
 ## 关联
 
-- [[plan-00015-scaffold-depth-and-evaluability]]（G2：样例改用 test-support 时发现）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（G2：样例改用 test-support 时发现）

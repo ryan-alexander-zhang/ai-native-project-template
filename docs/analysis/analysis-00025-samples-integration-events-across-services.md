@@ -2,13 +2,13 @@
 id: analysis-00025-samples-integration-events-across-services
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S4 集成事件跨服务：outbox 发布 + Kafka + inbox 消费
 
 对应 sample：`aipersimmon-ddd-samples/s04-integration-events-across-services`（两个服务模块）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 **本篇尚未覆盖寄宿的 S13（多租户端到端）与 S15（跨边界一条 trace）**，它们是下一个增量。
 
@@ -121,7 +121,7 @@ UUID 时零代价,有人开始用 per-source 序号时当场出事。
 
 但这条 guard 曾在**只消费的服务**上误报——消费方为了订阅必须带 `@Externalized`,于是被判成发布方,
 sample 只能给 inventory 加一个它永不写的 outbox。
-[[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]] **已修**:messaging 模块新增
+[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher](../issue/issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher.md) **已修**:messaging 模块新增
 `publishes-externalized-events`（默认 `true`,保持严格）,只消费的服务写一行 `false`。inventory 的
 outbox 依赖、`flyway.components` 里的 `outbox`、以及那句 `relay.enabled: false` 全部删掉了——三张永不
 写入的表不再出现在一个从不发布的服务里。**默认仍是严格的那一侧**,因为真发布方少了耐久传输就是不可见

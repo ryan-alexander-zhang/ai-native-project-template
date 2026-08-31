@@ -2,13 +2,13 @@
 id: analysis-00034-samples-cqrs-read-model
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S12 CQRS 读模型：事件驱动的投影
 
 对应 sample：`aipersimmon-ddd-samples/s12-cqrs-read-model`（两个服务：catalog-service 发布、
-ordering-service 持有投影；38 个用例）。场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。
+ordering-service 持有投影；38 个用例）。场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -133,7 +133,7 @@ writes"——**负向对照第一次跑出来 0 红，说明这个说法根本�
 ## 10. 库的问题：没有新的，确认了一个旧的
 
 没有发现新的库缺陷。确认了一个当时已开的：
-[[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]——ordering-service 只消费不发布，
+[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher](../issue/issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher.md)——ordering-service 只消费不发布，
 但消费方必须把契约标 `@Externalized`（bridge 由此推导订阅的 topic 集），而 Kafka starter 的
 durable-transport 守卫看到 `@Externalized` 事件却没有耐久发布者就拒绝启动，于是一个只消费的服务被迫带上
 一个它永不使用的 outbox，表一直空着。S12 是**第二次独立撞到**它（S4 是第一次），当时的处置与 S4 相同：

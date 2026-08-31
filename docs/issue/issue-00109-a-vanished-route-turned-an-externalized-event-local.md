@@ -101,10 +101,10 @@ MyBatis 侧 3 例：writer 盖章、未外发记 NULL、死信 + 重放不丢目
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 Outbox「静默丢失」那条、§3 第 8 项）
-- 前置：[[decision-00020-outbox-engine-over-one-store-port]]（判断收拢到 engine）、
-  [[issue-00108-a-killed-relay-instance-stops-all-delivery]]（并发轮询把「滚动发布期间按谁的表判」
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 Outbox「静默丢失」那条、§3 第 8 项）
+- 前置：[decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md)（判断收拢到 engine）、
+  [issue-00108-a-killed-relay-instance-stops-all-delivery](issue-00108-a-killed-relay-instance-stops-all-delivery.md)（并发轮询把「滚动发布期间按谁的表判」
   从概率变成常态）
-- 被修正的设计：[[design-00006-integration-event-routing]] §4.2（reach 在派发时决定 → 在写入时决定）
-- 同类先例（响亮失败取代静默降级）：[[issue-00107-silent-degradations-become-loud-failures]]、
+- 被修正的设计：[design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md) §4.2（reach 在派发时决定 → 在写入时决定）
+- 同类先例（响亮失败取代静默降级）：[issue-00107-silent-degradations-become-loud-failures](issue-00107-silent-degradations-become-loud-failures.md)、
   `issue-00053`（`idGenerator` 无 defaulting 重载）

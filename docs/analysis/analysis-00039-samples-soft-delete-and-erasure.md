@@ -2,14 +2,14 @@
 id: analysis-00039-samples-soft-delete-and-erasure
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S27 软删除、数据保留与擦除
 
 对应 sample：`aipersimmon-ddd-samples/s27-soft-delete-and-erasure`（一个部署单元、42 个用例）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]；用到的审计组件见
-[[analysis-00038-samples-operation-log]]（S14）。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；用到的审计组件见
+[analysis-00038-samples-operation-log](analysis-00038-samples-operation-log.md)（S14）。
 
 ## 0. 本篇定位
 
@@ -158,7 +158,7 @@ relay 为了保序也要问同一个问题。
 
 ## 8. 库的问题：一条，量出来的
 
-**[[issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected]]（P2）** ——
+**[issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected](../issue/issue-00168-the-audit-classifier-records-every-application-refusal-as-unexpected.md)（P2）** ——
 擦除被拒（`ApplicationException` + 本上下文的 `ErrorCode`，category `CONFLICT`）在审计行里记成
 `outcome=FAILED`、`failure_code=unexpected`、`failure_category=UNEXPECTED`。而 S14 里的领域拒绝
 （`DomainException` 子类）记的是 `REJECTED` + 本上下文的码 + `CONFLICT`。**同样是"业务不允许"，只因为抛的

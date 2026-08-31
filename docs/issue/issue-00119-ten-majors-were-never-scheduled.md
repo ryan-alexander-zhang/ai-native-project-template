@@ -31,7 +31,7 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 收尾时的多处小结与记忆写着"报告 13 项全部处理完毕、§2/§4 遗留项也已清空"。
 前半句对；**后半句不对**——它指的其实是 §2 里唯一标着"仍然开着"的那条
-（MP `updateById`，见 [[issue-00115-clearing-a-field-never-reached-the-database]]），
+（MP `updateById`，见 [issue-00115-clearing-a-field-never-reached-the-database](issue-00115-clearing-a-field-never-reached-the-database.md)），
 却写成了整个 §2。那句话之后，这 10 条在协作里就不可见了，直到被专门问起才重新查出来。
 
 ## 逐条实测（全部回读代码核实，非文档结论）
@@ -46,7 +46,7 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 | 6 | CQRS：handler 构造注入 CommandBus 触发循环依赖 | ~~开着~~ **已修** `issue-00124` | handler/拦截器改首次派发时解析；**fail-fast 未交出**——bus 实现 `SmartInitializingSingleton`，所有单例造完后强制建一次索引，重复 handler 仍是启动失败 |
 | 7 | CQRS：`domainEvents()` 承诺快照实为活视图 | ~~开着~~ **已修** `issue-00121` | 只改成快照会把 CME 换成静默丢事件，故新增 `drainDomainEvents()`（取走并清空一步完成）+ 对同聚合回写的拒绝 |
 | 8 | CQRS：命令失败只 DEBUG | ~~开着~~ **已修** `issue-00121` | 业务拒绝 INFO 无栈、技术故障 WARN 带栈，判据用框架自己的 `DomainException`/`ApplicationException`，按类型匹配 |
-| 9 | Web：5xx 冻结整个 TTL | **其实已修** | `IdempotencyFilter:189` ≥500 → `abandonQuietly`，是 [[issue-00101-idempotency-records-instead-of-claiming]] 顺带做掉的。**报告没划掉，是文档滞后** |
+| 9 | Web：5xx 冻结整个 TTL | **其实已修** | `IdempotencyFilter:189` ≥500 → `abandonQuietly`，是 [issue-00101-idempotency-records-instead-of-claiming](issue-00101-idempotency-records-instead-of-claiming.md) 顺带做掉的。**报告没划掉，是文档滞后** |
 | 10 | Web：`JdbcRateLimiter` 窗口边界竞态 | ~~开着~~ **已修** `issue-00123` | 扫描留两个窗口余量（活着的计数器不再在删除范围内）+ 读取容忍零行并以本次增量作答 |
 | 11 | Web：web-store 无清理 + 无 `expires_at` 索引 | **半修** | 索引 V3 已补（同样是 `issue-00101` 顺带）；**清理仍只在同一个 key 再次到来时触发**（`JdbcIdempotencyStore:54`），一次性 key 的行永不回收 |
 | 12 | Web：兜底 500 不记日志 | ~~开着~~ **已修** `issue-00121` | 先 `log.error(..., ex)` 再作答；响应仍不透露内部 |
@@ -82,14 +82,14 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 | 序 | 条目 | 规模 | 为什么排这里 |
 |---|---|---|---|
-| ~~1~~ | ~~MariaDB 方言（#5）~~ **已完成** [[issue-00120-mariadb-was-support-nobody-had-declared]] | — | **动手前查来历，把修法整个换掉了**：不是"支持得不好"，是**从来没有人声明过支持**。版本探测那条因此划掉——三处别名一并删除，落到已有的 fail-fast |
-| ~~2~~ | ~~`domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8）~~ **已完成** [[issue-00121-three-promises-that-did-not-match-their-behaviour]] | — | **"真快照"这个说法本身是错的**：只复制会把 CME 换成静默丢事件，真正的原语是 drain（取走并清空一步完成）。PIT 在测试写好前先把构建打回了 |
-| ~~3~~ | ~~pm 四表保留策略（#3）~~ **已完成** [[issue-00122-the-four-process-tables-grew-forever]] | — | 顺带找出一个真问题：`ORDER BY updated_at` 没有平局打破，配上批量上限会**饿死平局后面的实例**——与报告给 effect claim 提的那条同形 |
-| ~~4~~ | ~~`JdbcRateLimiter` 竞态（#10）~~ **已完成** [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]] | — | **负向对照暴露了我自己的一条测试是空的**：它挂钩在 `query(...)`，而旧代码走 `queryForObject(...)`，于是对着它要排除的那个实现绿着通过 |
-| ~~5~~ | ~~CommandBus 循环依赖（#6）~~ **已完成** [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]] | — | **规则指着一扇门，装配把它钉死了**：禁止 handler 依赖 handler 的那条规则，给出的替代路径正是注入 bus。先复现再修；负向对照差点因 spotless 重排而失效 |
-| ~~6~~ | ~~`ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11）~~ **已完成** [[issue-00126-an-anonymous-caller-chose-the-allocation]] | — | **先跑的那三道检查一个都不认人**——签名头非空、时间戳新鲜，攻击者填这些不花钱，而缓冲必须在验签之前，于是分配大小由匿名调用者决定。路径限定**没有照抄** tenancy 的归一化：改用 servlet urlPatterns，让容器按它自己要分发的路径匹配。清理那条最值得记：**V3 的索引就是为这个作业建的，注释都写了，作业没人写** |
-| ~~7~~ | ~~deadline claim 的 PG/MySQL 覆盖（#4）~~ **已完成** [[issue-00127-the-least-portable-statement-had-no-database-to-run-on]] | — | 语句本身是对的，**只是从来没有任何数据库跑过它**；对照（去掉 SKIP LOCKED）在两个库上都把每个 deadline 认领两遍。顺带撞出一个既有顺序依赖：`DeadlineCancelMysqlTest` 只 drop 一张表，一直依赖自己第一个跑 |
-| ~~8~~ | ~~effect claim 索引与全局排序（#1 #2）~~ **已完成** [[issue-00125-the-claim-sorted-one-instance-last-forever]] | — | **先测再改是对的**：报告说成因是索引缺 status，实测那个索引**一点用都没有**；真正的成因是 `<>` 在 PG 上不可 seek，而 **MySQL 的优化器自己就在做这个改写**——#1 只是 PG 的问题。最终**一行迁移都没加**。#2 更严重：不是变慢，是那个实例**永远轮不到** |
+| ~~1~~ | ~~MariaDB 方言（#5）~~ **已完成** [issue-00120-mariadb-was-support-nobody-had-declared](issue-00120-mariadb-was-support-nobody-had-declared.md) | — | **动手前查来历，把修法整个换掉了**：不是"支持得不好"，是**从来没有人声明过支持**。版本探测那条因此划掉——三处别名一并删除，落到已有的 fail-fast |
+| ~~2~~ | ~~`domainEvents()` 真快照（#7）、兜底 500 记日志（#12）、命令失败 DEBUG→WARN（#8）~~ **已完成** [issue-00121-three-promises-that-did-not-match-their-behaviour](issue-00121-three-promises-that-did-not-match-their-behaviour.md) | — | **"真快照"这个说法本身是错的**：只复制会把 CME 换成静默丢事件，真正的原语是 drain（取走并清空一步完成）。PIT 在测试写好前先把构建打回了 |
+| ~~3~~ | ~~pm 四表保留策略（#3）~~ **已完成** [issue-00122-the-four-process-tables-grew-forever](issue-00122-the-four-process-tables-grew-forever.md) | — | 顺带找出一个真问题：`ORDER BY updated_at` 没有平局打破，配上批量上限会**饿死平局后面的实例**——与报告给 effect claim 提的那条同形 |
+| ~~4~~ | ~~`JdbcRateLimiter` 竞态（#10）~~ **已完成** [issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in](issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in.md) | — | **负向对照暴露了我自己的一条测试是空的**：它挂钩在 `query(...)`，而旧代码走 `queryForObject(...)`，于是对着它要排除的那个实现绿着通过 |
+| ~~5~~ | ~~CommandBus 循环依赖（#6）~~ **已完成** [issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut](issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut.md) | — | **规则指着一扇门，装配把它钉死了**：禁止 handler 依赖 handler 的那条规则，给出的替代路径正是注入 bus。先复现再修；负向对照差点因 spotless 重排而失效 |
+| ~~6~~ | ~~`ReplayProtectionFilter` 缓冲上限 + 路径白名单（#13）、web-store 清理任务（#11）~~ **已完成** [issue-00126-an-anonymous-caller-chose-the-allocation](issue-00126-an-anonymous-caller-chose-the-allocation.md) | — | **先跑的那三道检查一个都不认人**——签名头非空、时间戳新鲜，攻击者填这些不花钱，而缓冲必须在验签之前，于是分配大小由匿名调用者决定。路径限定**没有照抄** tenancy 的归一化：改用 servlet urlPatterns，让容器按它自己要分发的路径匹配。清理那条最值得记：**V3 的索引就是为这个作业建的，注释都写了，作业没人写** |
+| ~~7~~ | ~~deadline claim 的 PG/MySQL 覆盖（#4）~~ **已完成** [issue-00127-the-least-portable-statement-had-no-database-to-run-on](issue-00127-the-least-portable-statement-had-no-database-to-run-on.md) | — | 语句本身是对的，**只是从来没有任何数据库跑过它**；对照（去掉 SKIP LOCKED）在两个库上都把每个 deadline 认领两遍。顺带撞出一个既有顺序依赖：`DeadlineCancelMysqlTest` 只 drop 一张表，一直依赖自己第一个跑 |
+| ~~8~~ | ~~effect claim 索引与全局排序（#1 #2）~~ **已完成** [issue-00125-the-claim-sorted-one-instance-last-forever](issue-00125-the-claim-sorted-one-instance-last-forever.md) | — | **先测再改是对的**：报告说成因是索引缺 status，实测那个索引**一点用都没有**；真正的成因是 `<>` 在 PG 上不可 seek，而 **MySQL 的优化器自己就在做这个改写**——#1 只是 PG 的问题。最终**一行迁移都没加**。#2 更严重：不是变慢，是那个实例**永远轮不到** |
 | — | #9 / #14 | — | #9 已修，只需在报告上划掉；#14 已显式接受，白名单与理由都在，不再作为待办 |
 
 ## 收尾：八档全部完成
@@ -116,16 +116,16 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 全部条目 + §3 顺序的覆盖缺口）
-- 顺带修好但报告未划掉的那条，与 web-store 索引：[[issue-00101-idempotency-records-instead-of-claiming]]
-- 证明"是注意力不是优先级"的对照：[[issue-00115-clearing-a-field-never-reached-the-database]]
-- §2 中已完成的最后一块（覆盖率）：[[issue-00117-the-advance-itself-had-no-tests]]、
-  [[issue-00118-the-recovery-paths-had-no-tests]]
-- 子：[[issue-00120-mariadb-was-support-nobody-had-declared]]（排期第 1 档，**已完成**）、
-  [[issue-00121-three-promises-that-did-not-match-their-behaviour]]（排期第 2 档，**已完成**）、
-  [[issue-00122-the-four-process-tables-grew-forever]]（排期第 3 档，**已完成**）、
-  [[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]（排期第 4 档，**已完成**）、
-  [[issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut]]（排期第 5 档，**已完成**）、
-  [[issue-00126-an-anonymous-caller-chose-the-allocation]]（排期第 6 档，**已完成**）、
-  [[issue-00127-the-least-portable-statement-had-no-database-to-run-on]]（排期第 7 档，**已完成**）、
-  [[issue-00125-the-claim-sorted-one-instance-last-forever]]（排期第 8 档，**已完成**）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 全部条目 + §3 顺序的覆盖缺口）
+- 顺带修好但报告未划掉的那条，与 web-store 索引：[issue-00101-idempotency-records-instead-of-claiming](issue-00101-idempotency-records-instead-of-claiming.md)
+- 证明"是注意力不是优先级"的对照：[issue-00115-clearing-a-field-never-reached-the-database](issue-00115-clearing-a-field-never-reached-the-database.md)
+- §2 中已完成的最后一块（覆盖率）：[issue-00117-the-advance-itself-had-no-tests](issue-00117-the-advance-itself-had-no-tests.md)、
+  [issue-00118-the-recovery-paths-had-no-tests](issue-00118-the-recovery-paths-had-no-tests.md)
+- 子：[issue-00120-mariadb-was-support-nobody-had-declared](issue-00120-mariadb-was-support-nobody-had-declared.md)（排期第 1 档，**已完成**）、
+  [issue-00121-three-promises-that-did-not-match-their-behaviour](issue-00121-three-promises-that-did-not-match-their-behaviour.md)（排期第 2 档，**已完成**）、
+  [issue-00122-the-four-process-tables-grew-forever](issue-00122-the-four-process-tables-grew-forever.md)（排期第 3 档，**已完成**）、
+  [issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in](issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in.md)（排期第 4 档，**已完成**）、
+  [issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut](issue-00124-the-rules-pointed-at-a-door-the-wiring-had-nailed-shut.md)（排期第 5 档，**已完成**）、
+  [issue-00126-an-anonymous-caller-chose-the-allocation](issue-00126-an-anonymous-caller-chose-the-allocation.md)（排期第 6 档，**已完成**）、
+  [issue-00127-the-least-portable-statement-had-no-database-to-run-on](issue-00127-the-least-portable-statement-had-no-database-to-run-on.md)（排期第 7 档，**已完成**）、
+  [issue-00125-the-claim-sorted-one-instance-last-forever](issue-00125-the-claim-sorted-one-instance-last-forever.md)（排期第 8 档，**已完成**）

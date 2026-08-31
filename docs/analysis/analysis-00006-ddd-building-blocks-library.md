@@ -7,18 +7,18 @@ status: active
 # DDD 构件库怎么封装：按 Layer 切分的 `aipersimmon-ddd-*` 库
 
 模板框架有两个目标：①脚手架能生成 modulith / multi-module / microservice 三种拓扑
-（见 [[analysis-00004-bounded-context-module-structure]]）；②把 DDD 架构语义与分层封装成
+（见 [analysis-00004-bounded-context-module-structure](analysis-00004-bounded-context-module-structure.md)）；②把 DDD 架构语义与分层封装成
 **可复用、可版本化**的构件（注解、BC 规则、ArchUnit 校验、聚合根/实体/值对象抽象、
 领域事件/集成事件的定义与收发、outbox/inbox、**CQRS 命令总线与读模型**、异常封装）。
 
 本分析回答目标②：**这套构件该怎么组织？该不该"按 Layer 引入"？** 前缀统一为
 `aipersimmon-ddd-`。**要求：参考 jMolecules 的实现，但不把它作为依赖**——下面专列一节说明代价与取舍。
 
-配套阅读：[[analysis-00001-domain-event-publishing]]（事件发布机制）、
-[[analysis-00002-domain-vs-integration-events]]（两类事件的区分）、
-[[analysis-00004-bounded-context-module-structure]]（三种拓扑）、
-[[analysis-00005-structure-2-event-flow-and-cqrs]]（CQRS 命令总线 + 读模型的详细设计）、
-[[analysis-00007-saga-process-manager]]（跨聚合长流程的 saga/process-manager 构件取舍）。
+配套阅读：[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)（事件发布机制）、
+[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)（两类事件的区分）、
+[analysis-00004-bounded-context-module-structure](analysis-00004-bounded-context-module-structure.md)（三种拓扑）、
+[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md)（CQRS 命令总线 + 读模型的详细设计）、
+[analysis-00007-saga-process-manager](analysis-00007-saga-process-manager.md)（跨聚合长流程的 saga/process-manager 构件取舍）。
 
 ## 结论先行
 
@@ -67,16 +67,16 @@ status: active
 | 模块 | 层 | 依赖 | 内容 |
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-core` | domain 词汇 | **零依赖** | 注解 `@AggregateRoot`/`@Entity`/`@ValueObject`/`@Repository`/`@Identity`/`@DomainEvent`/`@Service`；分层 stereotype `@DomainLayer`/`@ApplicationLayer`/`@InfrastructureLayer`/`@InterfaceLayer`(+ hexagonal 可选)；marker 接口 `AggregateRoot<ID>`/`Entity<ID>`/`Identifier`/`Association<T,ID>`/`DomainEvent`；基类 `AbstractAggregateRoot`(事件登记/清空)；`DomainException` 基类；**可选** `Transitions<S>` 状态迁移守卫(见§十) |
-| `aipersimmon-ddd-application` | application | `-core` | `DomainEvents` 发布 port(见 [[analysis-00001-domain-event-publishing]])；`ApplicationException` 基类 |
-| `aipersimmon-ddd-cqrs` | application(可选) | `-core` | CQRS 契约(见§五)：`Command`/`Query` 标记、`CommandHandler<C>`/`QueryHandler<Q,R>`、`CommandBus`/`QueryBus` port、装饰器 SPI、`ReadModel` 标记、`Projection` 写 port、`UnitOfWork` 抽象。**framework-free**（领域事件在 save 处排空,不再有 `AggregateCollector`,见 [[decision-00012-no-ambient-per-command-state]]） |
-| `aipersimmon-ddd-integration` | api(跨 BC 契约) | `-core`(极薄) | `IntegrationEvent` 基类、`EventEnvelope`(id/type/version/occurredAt/traceId)、版本化约定。拓扑无关的**契约层**(见 [[analysis-00002-domain-vs-integration-events]]) |
+| `aipersimmon-ddd-application` | application | `-core` | `DomainEvents` 发布 port(见 [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md))；`ApplicationException` 基类 |
+| `aipersimmon-ddd-cqrs` | application(可选) | `-core` | CQRS 契约(见§五)：`Command`/`Query` 标记、`CommandHandler<C>`/`QueryHandler<Q,R>`、`CommandBus`/`QueryBus` port、装饰器 SPI、`ReadModel` 标记、`Projection` 写 port、`UnitOfWork` 抽象。**framework-free**（领域事件在 save 处排空,不再有 `AggregateCollector`,见 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)） |
+| `aipersimmon-ddd-integration` | api(跨 BC 契约) | `-core`(极薄) | `IntegrationEvent` 基类、`EventEnvelope`(id/type/version/occurredAt/traceId)、版本化约定。拓扑无关的**契约层**(见 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)) |
 
 ### 可插拔实现层(有主见的 adapter starter,可选)
 
 | 模块 | 层 | 依赖 | 内容 |
 | --- | --- | --- | --- |
 | `aipersimmon-ddd-events-spring` | infrastructure | Spring | `ApplicationEventPublisher`→`DomainEvents` port 桥接;`@TransactionalEventListener` 装配;日志/装饰器 |
-| `aipersimmon-ddd-cqrs-spring` | infrastructure(可选) | `-cqrs` + Spring | Spring 实现的 `CommandBus` + 装饰器链(Logging→Validation→Transaction,用 `TransactionTemplate` 接管 UnitOfWork);领域事件在 save 处同事务排空,无线程域收集器(见§五、[[decision-00012-no-ambient-per-command-state]]) |
+| `aipersimmon-ddd-cqrs-spring` | infrastructure(可选) | `-cqrs` + Spring | Spring 实现的 `CommandBus` + 装饰器链(Logging→Validation→Transaction,用 `TransactionTemplate` 接管 UnitOfWork);领域事件在 save 处同事务排空,无线程域收集器(见§五、[decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)) |
 | `aipersimmon-ddd-outbox` | infrastructure(存储无关 core) | `spring-context` + Jackson | 投递契约 `OutboxDispatcher`、存储消息 `OutboxMessage`、默认 dispatcher(logging / in-process)+ dispatch autoconfig;无持久化 |
 | `aipersimmon-ddd-outbox-mybatis-plus` | infrastructure | `-outbox` + MyBatis-Plus | outbox 表 writer + relay/poller。**当前唯一的存储后端**(早期还有一个 `-outbox-jdbc` 平行实现,已删除) |
 | `aipersimmon-ddd-inbox-mybatis-plus` | infrastructure | MyBatis-Plus | 幂等/inbox,消费方去重;`Inbox` 契约在 `-application`。**当前唯一的存储后端**(早期的 `-inbox-jdbc` 已删除) |
@@ -91,7 +91,7 @@ status: active
 
 ## 四、不依赖 jMolecules:参考什么、重写什么、放弃什么
 
-jMolecules(见 `docs/reference/jmolecules/`)本身是 Apache-2.0、dependency-free 的,
+jMolecules(见 `docs/reference/reference-00006-jmolecules.md`)本身是 Apache-2.0、dependency-free 的,
 技术上完全可以直接依赖。**本项目选择不依赖**,取舍如下——诚实记录:
 
 **为什么不依赖(收益)**
@@ -119,7 +119,7 @@ jMolecules(见 `docs/reference/jmolecules/`)本身是 Apache-2.0、dependency-fr
 
 ## 五、CQRS:命令侧与查询侧对称,且整体可选
 
-CQRS 是这个模板的重头戏(详见 [[analysis-00005-structure-2-event-flow-and-cqrs]] §5)——
+CQRS 是这个模板的重头戏(详见 [analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md) §5)——
 它横跨 application 与 infrastructure,契约放 `aipersimmon-ddd-cqrs`(纯),实现放
 `aipersimmon-ddd-cqrs-spring`(starter),严守本文"纯/脏分离"。
 
@@ -135,14 +135,14 @@ CQRS 是这个模板的重头戏(详见 [[analysis-00005-structure-2-event-flow-
 - **实现(starter)**：Spring 版 `CommandBus` + **装饰器链 Logging→Validation→Transaction**;
   Transaction 装饰器用 `TransactionTemplate` 接管 UnitOfWork,使 handler 保持纯净、横切统一治理。
 - **一个务实点(analysis-00005 §5)**：MyBatis 无 EF 式 ChangeTracker——聚合自带事件,由**保存它的一方**在
-  save 处 `DomainEvents.publishAndClear` 同事务排空,无需旁路收集器(见 [[decision-00012-no-ambient-per-command-state]];**替代**原"每请求 `AggregateCollector`",既解决同一问题又不引入线程域状态)。
+  save 处 `DomainEvents.publishAndClear` 同事务排空,无需旁路收集器(见 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md);**替代**原"每请求 `AggregateCollector`",既解决同一问题又不引入线程域状态)。
 
 ### 查询侧(读)—— 真正绕过写模型
 
 - **`ReadModel` 标记 + 查询 port**(如 `OrderQueries`):查询直打投影视图,**不经聚合、不经写仓储**
   (repo 现状:`OrderQueries.byId` → `OrderSnapshot`,绕过 `Orders.byId`)。
 - **`Projection` 写 port**(如 `OrderProjection`):由领域事件**同事务**在进程内更新读模型
-  (repo 现状:`OrderProjection.placed/statusChanged`)——与事件链路(§一/[[analysis-00001-domain-event-publishing]])对齐。
+  (repo 现状:`OrderProjection.placed/statusChanged`)——与事件链路(§一/[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md))对齐。
 - `QueryBus`/`QueryHandler<Q,R>` 可选;读侧简单时直接注入 port 即可,不必上总线。
 
 > 归属小结:命令/查询**契约**在 `-cqrs`(纯、可选);命令**总线+装饰器**
@@ -197,7 +197,7 @@ application/infrastructure/adapter/任何 framework(已落地,在 `all()`);
 零依赖,可直接放进纯净的 domain 层。
 
 > 与 saga 状态机区分:这是**聚合级**(单聚合、单本地事务、无持久化流程状态);跨聚合的**流程级**
-> 状态机是 [[analysis-00007-saga-process-manager]] 的 `aipersimmon-ddd-saga`,是另一套抽象,勿复用。
+> 状态机是 [analysis-00007-saga-process-manager](analysis-00007-saga-process-manager.md) 的 `aipersimmon-ddd-saga`,是另一套抽象,勿复用。
 
 ### 工具本体(包名示意 `com.aipersimmon.ddd.core.state`)
 
@@ -297,7 +297,7 @@ Internal(distilled,在 `docs/reference/`):
 `spring-modulith-with-ddd/`(event externalization `mapping()` + `@Externalized`)。
 
 下游:本文的 `-core` `DomainException` / `-application` `ApplicationException` 基类,其完整异常体系
-(`ErrorCode` 贯通、`Invariant`、语义子类、消息可靠性)见 [[analysis-00010-exception-model]] 与 [[design-00003-exception-model]]。
+(`ErrorCode` 贯通、`Invariant`、语义子类、消息可靠性)见 [analysis-00010-exception-model](analysis-00010-exception-model.md) 与 [design-00003-exception-model](../design/design-00003-exception-model.md)。
 
 External:
 
@@ -307,4 +307,4 @@ External:
 - Microsoft, *.NET Microservices: Architecture for Containerized .NET Applications*(DomainEvent vs IntegrationEvent + IntegrationEventLog=Outbox) — https://learn.microsoft.com/dotnet/architecture/microservices/
 - Spring Boot — Creating Your Own Starter / Dependency Management(BOM) — https://docs.spring.io/spring-boot/reference/features/developing-auto-configuration.html
 - Alibaba COLA — https://github.com/alibaba/COLA
-- Greg Young / Udi Dahan — task-based commands & CQRS(命令总线可选、读模型绕过聚合的依据,详见 [[analysis-00005-structure-2-event-flow-and-cqrs]] Sources）
+- Greg Young / Udi Dahan — task-based commands & CQRS(命令总线可选、读模型绕过聚合的依据,详见 [analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md) Sources）

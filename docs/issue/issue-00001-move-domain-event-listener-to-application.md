@@ -7,7 +7,7 @@ blocks: [decision-00008-event-subscriber-layer-placement]
 
 # 把领域事件订阅移出 adapter,让 ordering-adapter 不再依赖 domain
 
-实施 [[decision-00008-event-subscriber-layer-placement]]:`ordering-adapter/messaging/OrderFulfilment`
+实施 [decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md):`ordering-adapter/messaging/OrderFulfilment`
 当前用 `@EventListener` 订阅内部领域事件 `OrderPlacedEvent` 来启动 saga,这是 `ordering-adapter`
 模块里**唯一**依赖 `ordering-domain` 的原因。按决策,领域事件订阅应归 application 层。
 
@@ -63,7 +63,7 @@ class OrderFulfilmentStarter {
 
 ## 附:集成事件侧(随本 issue 一并对齐)
 
-`onStockReserved`/`onStockReservationFailed` 留在 messaging adapter。按 [[decision-00008-event-subscriber-layer-placement]]
+`onStockReserved`/`onStockReservationFailed` 留在 messaging adapter。按 [decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md)
 命题 C,倾向让 adapter 把集成事件**翻译成 command** 经 `CommandBus` 入 application,而非直接调用 process manager。
 此项若改动面较大,可拆为后续 issue;本 issue 至少保证 adapter 不因集成事件而依赖 domain(集成事件类型在
 `inventory-api`,非 domain,故不阻塞去依赖目标)。
@@ -93,7 +93,7 @@ class OrderFulfilmentStarter {
 新增 ArchUnit 规则通过,证明 `ordering-adapter` 已无 `ordering.domain` 依赖。
 
 **订正**:早先此处曾把"`StockReserved`/`StockReservationFailed` 未翻译成 command"列为缺口——**这是误判**。
-按 [[decision-00008-event-subscriber-layer-placement]] 命题 C2,推进 saga 的集成事件**不应**包成 command,
+按 [decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md) 命题 C2,推进 saga 的集成事件**不应**包成 command,
 而应递交给 process manager(saga 反应后自行发 command)。当前 `OrderFulfilment` 直接调 `process.onStockReserved(...)`
 是**正确**的。命题 C1(驱动聚合的集成事件 → command)则由 `inventory-adapter/OrderPlacedListener` 体现。二者均已在 sample 中呈现。
 
@@ -102,10 +102,10 @@ class OrderFulfilmentStarter {
 - 其余脚手架形态(`modulith`、`microservice`)的领域事件订阅**未迁**(仍在 adapter),作为后续同类项。
   为使这两者不被新并入 `all()` 的监听器规则打挂,已从它们**彻底移除 ArchUnit**(删 `ArchitectureTest` /
   `PackageInfoTest`、去 pom 依赖),当前聚焦 multi-module 作示范——详见
-  [[decision-00008-event-subscriber-layer-placement]] Consequences。
+  [decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md) Consequences。
 
 ## 关联
 
-- 决策:[[decision-00008-event-subscriber-layer-placement]]
-- 背景分析:[[analysis-00009-saga-implementation-deep-dive]]、[[analysis-00002-domain-vs-integration-events]]
+- 决策:[decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md)
+- 背景分析:[analysis-00009-saga-implementation-deep-dive](../analysis/analysis-00009-saga-implementation-deep-dive.md)、[analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)
 </content>

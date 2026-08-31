@@ -1,7 +1,7 @@
 ---
 id: analysis-00008-web-api-response-envelope
 type: analysis
-status: active
+status: draft
 ---
 
 # Web 层封装怎么做：`ApiResponse` / `ApiRequest` 该不该有——15+ 大厂 HTTP 接口约定对比
@@ -10,16 +10,16 @@ status: active
 `ApiRequest`、错误响应体、分页约定、请求追踪/幂等约定。本文**先不下最终决策**(决策归
 `docs/decision/`),只做两件事:①**比较分析**——盘点 15+ 大厂与两份 IETF/跨语言标准的
 HTTP 接口约定,每条主张都带**一手证据 URL**;②**差距分析**——对照 `aipersimmon-ddd` 构件库现状,
-指出该补什么、补在哪一层(承接 [[analysis-00006-ddd-building-blocks-library]] 的"纯/脏分离")。
+指出该补什么、补在哪一层(承接 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的"纯/脏分离")。
 
-配套阅读:[[analysis-00006-ddd-building-blocks-library]](构件库按 Layer×可插拔性切分)、
-[[analysis-00004-bounded-context-module-structure]](三种拓扑)、
-[[analysis-00005-structure-2-event-flow-and-cqrs]](CQRS 命令/查询侧)、
-[[analysis-00002-domain-vs-integration-events]](两类事件区分)。
+配套阅读:[analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md)(构件库按 Layer×可插拔性切分)、
+[analysis-00004-bounded-context-module-structure](analysis-00004-bounded-context-module-structure.md)(三种拓扑)、
+[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md)(CQRS 命令/查询侧)、
+[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)(两类事件区分)。
 
 > 边界:本文只覆盖错误的**线上形态**(信封/ProblemDetail/状态码)。错误**在进程内如何建模**——
-> 领域/应用异常、`Invariant`、错误码从领域贯通到边界——见 [[analysis-00010-exception-model]] 与
-> [[design-00003-exception-model]]。
+> 领域/应用异常、`Invariant`、错误码从领域贯通到边界——见 [analysis-00010-exception-model](analysis-00010-exception-model.md) 与
+> [design-00003-exception-model](../design/design-00003-exception-model.md)。
 
 ## 结论先行
 
@@ -39,7 +39,7 @@ HTTP 接口约定,每条主张都带**一手证据 URL**;②**差距分析**—�
   与其发明第 16 种私有错误体,不如把这套标准封装好、映射好。
 - **"恒返 200 + 业务 code"会掏空 HTTP 语义**:腾讯云、飞书明确"只要被处理就返 200"。
   这让缓存、网关、重试、监控全部失灵——对一个强调边界清晰、可审计的模板是负资产。
-- **落位天然对齐 [[analysis-00006-ddd-building-blocks-library]] 的纯/脏切分**:HTTP 是 interface 层关注点,
+- **落位天然对齐 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的纯/脏切分**:HTTP 是 interface 层关注点,
   绝不能污染 framework-free 的 domain;所以"信封/异常映射/追踪/幂等"= Spring starter(脏、可选),
   "错误码目录 + 分页值对象"= 薄契约(纯)。
 
@@ -188,11 +188,11 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 ## 五、差距分析:对照 `aipersimmon-ddd` 构件库现状
 
 > 说明:仓库里的 `bc-and-layer-samples` / `*-scaffold-samples` 只是演示,**不作为任何设计参考**。
-> 本节的基准是**构件库本身**([[analysis-00006-ddd-building-blocks-library]] §三 的模块清单),
+> 本节的基准是**构件库本身**([analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) §三 的模块清单),
 > 结论只由 §二~§四 的大厂证据 + IETF 标准 + 本库的"纯/脏"硬约束推出。
 
 关键事实——**构件库当前根本没有 interface(Web)层构件**。§三 of
-[[analysis-00006-ddd-building-blocks-library]] 的清单里有 `-core`/`-application`/`-cqrs`/`-cqrs-spring`/
+[analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的清单里有 `-core`/`-application`/`-cqrs`/`-cqrs-spring`/
 `-integration`/`-events-spring`/outbox·inbox·messaging/`-archunit`/`-bom`,**唯独没有任何一个负责
 "入站 HTTP 适配"的模块**。所以"缺封装"是**整层缺失**,而不是"某个类没抽好"。
 
@@ -204,10 +204,10 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 | 缺什么 | 为什么(证据 / 原则) | 该不该补 / 补在哪 |
 | --- | --- | --- |
 | **异常 → RFC 9457 `ProblemDetail` 的中心映射** | 12/15 大厂用真实状态码;错误格式向 RFC 9457 收敛(§四);`DomainException`/`ApplicationException` 已在纯层,缺的只是到 HTTP 的映射策略 | ✅ 补:starter 里一个共享 `@RestControllerAdvice` + 错误码目录 |
-| **错误码 / `ProblemDescriptor` 映射** | 各厂私有错误体的共性就是"机器码 + 人类消息 + 字段明细 + 追踪锚"(§四) | ✅ 补:`ErrorCode` 身份放**纯**契约模块,`ErrorCode → ProblemDescriptor` 映射(family + override)放 starter(见 [[design-00003-exception-model]] §4.7) |
+| **错误码 / `ProblemDescriptor` 映射** | 各厂私有错误体的共性就是"机器码 + 人类消息 + 字段明细 + 追踪锚"(§四) | ✅ 补:`ErrorCode` 身份放**纯**契约模块,`ErrorCode → ProblemDescriptor` 映射(family + override)放 starter(见 [design-00003-exception-model](../design/design-00003-exception-model.md) §4.7) |
 | **统一分页约定** | 新接口普遍偏 cursor,Zalando SHOULD avoid offset(§六④) | ✅ 补:`Page`/`Slice`/`Cursor` 值对象(纯)+ 序列化(starter) |
 | **`traceId` / `RequestId` 贯穿** | RequestId 是云厂商通用共识,≈ RFC 9457 `instance`(§六⑥) | ✅ 补:starter 里的 filter + 写入 ProblemDetail 扩展成员 |
-| **(可选)`Idempotency-Key`** | Stripe/PayPal/Adyen/Google/AWS 都有写操作幂等键(§六⑥) | ⚠️ 可选:与 [[analysis-00006-ddd-building-blocks-library]] 的 inbox 幂等联动 |
+| **(可选)`Idempotency-Key`** | Stripe/PayPal/Adyen/Google/AWS 都有写操作幂等键(§六⑥) | ⚠️ 可选:与 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的 inbox 幂等联动 |
 | ~~通用成功信封 `{code,message,data}`~~ | 15 家里 12 家不套;PayPal 明文禁止;恒返 200 掏空 HTTP 语义(§三) | ❌ **不补** |
 | ~~通用 `ApiRequest` 外壳~~ | 无一家把请求套通用外壳;请求 DTO 本就该随用例走 | ❌ **不补** |
 
@@ -232,7 +232,7 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
   等价于 RFC 9457 的 `instance`。建议 starter 生成/透传一个 `traceId`,写入日志 + ProblemDetail 扩展成员。
 - **⑥ 幂等**:Stripe(`Idempotency-Key`)、PayPal(`PayPal-Request-Id`)、Adyen(`idempotency-key`)、
   Google(`request_id`)、AWS(`ClientToken`)都有客户端幂等键。建议**可选**,并与
-  [[analysis-00006-ddd-building-blocks-library]] 的 inbox 去重、[[analysis-00005-structure-2-event-flow-and-cqrs]]
+  [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的 inbox 去重、[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md)
   的命令总线联动,避免重复造。**注意:幂等 ≠ 防重放,见 §六B。**
 
 ---
@@ -326,11 +326,11 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 
 ## 七、落位建议:契约 + starter + 可插拔存储(mirror outbox)
 
-严格承接 [[analysis-00006-ddd-building-blocks-library]] 的铁律——**HTTP 是 interface 层关注点,
+严格承接 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的铁律——**HTTP 是 interface 层关注点,
 绝不能污染 framework-free 的 domain**。§六~§六C 的横切能力里,**错误映射、traceId、分页、幂等、防重放、
 限流**纳入本期,每项 **opt-in**;需要状态者(幂等 key / nonce / 限流计数)共用一套 SPI + 可换存储——
 与 outbox `-outbox`+`-outbox-mybatis-plus` 完全同构。**CORS 用 Spring 原生 / 网关,不进构件;
-401/403→Problem Details 列为未来项**(理由见下与 [[decision-00007-web-api-response-envelope]] §六)。拆成三档:
+401/403→Problem Details 列为未来项**(理由见下与 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §六)。拆成三档:
 
 | 模块(建议名) | 层 / 性质 | 依赖 | 内容 |
 | --- | --- | --- | --- |
@@ -339,7 +339,7 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 | `aipersimmon-ddd-web-store-redis` / `-web-store-mybatis-plus`(可换后端) | infrastructure | `-web` + Redis / MyBatis-Plus | 幂等/nonce/限流计数的 Redis(TTL、原子 INCR、令牌桶) 或关系库实现;同 SPI 可互换。关系库那个当时叫 `-web-store-jdbc` |
 
 - **与既有 starter 对称**:正如 `-cqrs`+`-cqrs-spring`、outbox 的"契约 + 可换存储",
-  `-web` 纯 + `-web-spring` 脏 + `-web-store-*` 可换,不破坏 [[analysis-00006-ddd-building-blocks-library]] 的纯净性硬约束。
+  `-web` 纯 + `-web-spring` 脏 + `-web-store-*` 可换,不破坏 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的纯净性硬约束。
 - **装配确定性**:store 后端在 classpath → 用它;否则内存兜底(`@ConditionalOnMissingBean`)。内存实现仅单机/开发;
   多实例生产须显式引入一个 `-web-store-*`(与 outbox 存储选择同理)。
 - **拓扑无关**:三种拓扑复用同一批 web 构件。**可选**:最小形态可完全不引、各 BC 自写。
@@ -348,7 +348,7 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 - **两样列为未来项**(该做、非反最佳实践,只是不进本期):**CORS**(Spring 原生 `CorsConfigurationSource`/
   网关即可,构件不重复封装声明式配置)、**401/403→Problem Details**(需引 Spring Security,且 §六C 那处
   过滤器链的坑使其非平凡;将来作 `@ConditionalOnClass(spring-security)` 的条件化增量补齐)。
-- 其余本期横切能力**一律提供**,只是默认关 + 可插拔(细节见 [[decision-00007-web-api-response-envelope]] §三/§六)。
+- 其余本期横切能力**一律提供**,只是默认关 + 可插拔(细节见 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §三/§六)。
 
 ---
 
@@ -358,9 +358,9 @@ Twilio/Zalando/Shopify/Adyen/Atlassian)。PayPal 甚至**明文禁止**在 2xx �
 
 1. **字段命名默认值**:camelCase(顺 Jackson/Spring) vs snake_case(顺多数大厂)——二选一并全局强制。
 2. **版本策略**:URL 路径 `/v1/`(推荐,对齐 Google/Shopify) vs Header——定一个默认。
-3. **幂等键**是否进 v1,以及与 inbox([[analysis-00006-ddd-building-blocks-library]])的边界。
+3. **幂等键**是否进 v1,以及与 inbox([analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md))的边界。
 4. **模块命名**:`-web` / `-web-spring` vs `-interface` / `-rest-spring`——与既有 `-integration`(集成事件契约,
-   见 [[analysis-00002-domain-vs-integration-events]])避免语义混淆。
+   见 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md))避免语义混淆。
 5. **错误码目录**的组织:枚举 vs 常量 vs 配置化,以及 i18n。
 6. **防重放攻击(§六B)的落位与范围**:签名请求的防重放归鉴权/网关层还是进构件?webhook 接收端的
    时间戳容差校验(推荐 5 分钟)是否做成 `-web-spring` 的可选 helper?与幂等键的边界如何在文档中明确区分?

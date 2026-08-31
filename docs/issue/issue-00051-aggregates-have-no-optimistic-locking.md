@@ -121,7 +121,7 @@ T1: 发布 OrderConfirmedEvent                    T2: 发布 OrderCancelledEvent
 
 ## 修复
 
-分两批（见 [[plan-00013-phase-one-correctness-remediation]]）：
+分两批（见 [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)）：
 
 - **批次 A（正确性基线）**：`AbstractAggregateRoot` 增加 `version`（`0` = 未持久化）+ `restoreVersion` /
   `version()` / `versionAdvanced()`；**三张被写入的聚合表**加 `version BIGINT NOT NULL DEFAULT 1`（新迁移）：
@@ -133,7 +133,7 @@ T1: 发布 OrderConfirmedEvent                    T2: 发布 OrderCancelledEvent
   **默认值是 `1` 而非 `0`**：`0` 被保留表示「尚未持久化」，若已有行以 `0` 迁入，仓储会把它们当作新聚合而走
   INSERT 并撞主键。（这是实施中发现并修正的一处自伤。）
 - **批次 B（易用性）**：抽出框架侧版本化仓储基类，把「版本谓词 + affected-rows 检查 + 事件发布」收成默认路径，
-  见 [[design-00011-aggregate-persistence-contract]]。
+  见 [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)。
 
 **⚠ 拦截器组合陷阱（必须同批处理，否则本 issue「看起来修了但实际没修」）**：MyBatis-Plus 只认**一个**
 `MybatisPlusInterceptor` bean，而 `AipersimmonDddTenancyMybatisPlusAutoConfiguration:35-45` 已用
@@ -141,7 +141,7 @@ T1: 发布 OrderConfirmedEvent                    T2: 发布 OrderCancelledEvent
 autoconfig，则**开启多租户时它静默退让**，`@Version` 不生成 `WHERE version = ?`，`updateById` 恒返回 1，
 超卖照旧。批次 A 的处置：让**样例自己**组合一个含 `TenantLineInnerInterceptor` + `OptimisticLockerInnerInterceptor`
 的 `MybatisPlusInterceptor`（tenancy 按其既有文档整体退让）；框架侧的 `InnerInterceptor` 贡献模型留给批次 B，
-见 [[design-00011-aggregate-persistence-contract]] §3。
+见 [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md) §3。
 
 **注意改动面**：批次 A 触及 `core`（新增字段与三个方法）、样例 DDL（新迁移）、3 个 DO + 3 个仓储、
 样例的 MyBatis-Plus 拦截器组合；不改任何仓储端口签名，但 **`Order.reconstitute` 等 rehydrate 工厂要多带一个
@@ -167,14 +167,14 @@ version 参数**（破坏性，无外部使用者，可接受）。
 `OrderingFlowTest` / `ReviewFlowTest` / `PaymentCompensationFlowTest` / `TwoTenantAcceptanceTest`，
 证明版本化写入与拦截器组合没有破坏既有流程或租户隔离。
 
-批次 B（仓储基类，把正确写法变成默认路径）见 [[plan-00013-phase-one-correctness-remediation]]，属易用性改进，
+批次 B（仓储基类，把正确写法变成默认路径）见 [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)，属易用性改进，
 本 issue 的缺陷已闭环。
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（P0-1，本 issue 的来源）
-- [[plan-00013-phase-one-correctness-remediation]]
-- [[design-00011-aggregate-persistence-contract]]（批次 B 的仓储基类方向）
-- [[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]（同一处仓储调用点的姊妹缺陷，批次 A 一并修）
-- [[issue-00055-aggregate-root-missing-identity-equality]]（同在 `AbstractAggregateRoot`，一并修）
-- [[design-00004-durable-process-manager-runtime]]（流程管理器已有的 `ProcessRevision` 版本化写入，本 issue 的正面对照）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P0-1，本 issue 的来源）
+- [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)（批次 B 的仓储基类方向）
+- [issue-00052-domain-events-lost-when-publish-and-clear-forgotten](issue-00052-domain-events-lost-when-publish-and-clear-forgotten.md)（同一处仓储调用点的姊妹缺陷，批次 A 一并修）
+- [issue-00055-aggregate-root-missing-identity-equality](issue-00055-aggregate-root-missing-identity-equality.md)（同在 `AbstractAggregateRoot`，一并修）
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（流程管理器已有的 `ProcessRevision` 版本化写入，本 issue 的正面对照）

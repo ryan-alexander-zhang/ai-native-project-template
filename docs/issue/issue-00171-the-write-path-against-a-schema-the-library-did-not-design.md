@@ -78,7 +78,7 @@ V2 迁移用 `DEFAULT 1` 并在注释里写明为什么不是 0。两处都有�
 （`AutoIncrementIdentityTest.anautoIncrementInsertSucceedsAndTheRowGetsAnIdTheApplicationNeverLearns`、
 `thesecondWriteIsWhereTheMissingKeyIsCaught`、`aversionOfZeroMakesAPreExistingRowLookLikeANewAggregate`）。
 
-相关：[[analysis-00042-samples-strangler-legacy-adoption]] §3。
+相关：[analysis-00042-samples-strangler-legacy-adoption](../analysis/analysis-00042-samples-strangler-legacy-adoption.md) §3。
 
 ## 解决记录（2026-08-05）
 

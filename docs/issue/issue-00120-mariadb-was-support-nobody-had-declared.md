@@ -89,7 +89,7 @@ pm-jdbc 与 pm-mybatis-plus 那两处**逐字节相同**，且两者本就都依
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（第一档）
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（第一档）
 - 报告原文与"方言化 claim 是负债而非资产"的判断：
-  [[report-00003-ddd-library-review-2026-07-29]]、[[issue-00108-a-killed-relay-instance-stops-all-delivery]]
+  [report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)、[issue-00108-a-killed-relay-instance-stops-all-delivery](issue-00108-a-killed-relay-instance-stops-all-delivery.md)
 - 仍未做的另一半（deadline claim 在 PG/MySQL 上零覆盖）：见 `issue-00119` 排期第 7 档

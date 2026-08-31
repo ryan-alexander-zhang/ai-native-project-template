@@ -95,11 +95,11 @@ void noComposeImageFloatsOnLatest() throws IOException {
   两条已过期的注释（"the scaffold does not manage MyBatis-Plus"）一并改写为说明**为什么这里不写版本**。
 - `provectuslabs/kafka-ui:latest` → `v0.7.2`，并按修复第 3 条移进 compose 的 `tools` profile。
   副作用是 8080 默认不再被监听——这正好消除了
-  [[issue-00093-the-readme-quickstart-cannot-succeed]] 里"打错端口却拿到 HTML 响应"的那条歧路。
+  [issue-00093-the-readme-quickstart-cannot-succeed](issue-00093-the-readme-quickstart-cannot-succeed.md) 里"打错端口却拿到 HTML 响应"的那条歧路。
 - 验证：`mvn -o compile` 通过（BOM 解析正常，两个模块编译到同一 MyBatis-Plus 版本线）。
 - 未做：复现一节那两条防再犯的结构断言。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00067-test-support-covers-every-store-except-the-transport]]（镜像固定权收归 test-support 的那一轮）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00067-test-support-covers-every-store-except-the-transport](issue-00067-test-support-covers-every-store-except-the-transport.md)（镜像固定权收归 test-support 的那一轮）

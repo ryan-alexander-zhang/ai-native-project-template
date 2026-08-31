@@ -7,7 +7,7 @@ blocks: [plan-00006-middleware-integration]
 
 # 入站消费桥订阅全部外发 topic 并全量进程内重投:无选择性订阅
 
-> **更新**:本 issue 原记"所有事件进同一条 topic、无路由";其**出站**一半已被 [[design-00006-integration-event-routing]]
+> **更新**:本 issue 原记"所有事件进同一条 topic、无路由";其**出站**一半已被 [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)
 > 解决(逐事件路由:`@Externalized` 事件发往各自命名 topic)。剩下的、仍 open 的是**入站**一半——消费桥对所有外发
 > topic 一把抓、全量重投、消费端过滤。标题保留旧名以维持 id 稳定。
 
@@ -79,13 +79,13 @@ topic-per-aggregate/context + 用 `ce_type` 分发(aipersimmon 现状已符合)�
 余项为 per-BC 容器(#4,多 BC 内做跨 BC 隔离)与选择性订阅(#2,拆服务时做)。
 
 > 注:消费桥的另一个更严重问题——**系统性故障被当毒丸、DB 短暂不可用即批量 DLT 并破坏 aggregate 顺序**——见
-> [[issue-00047-systemic-failure-treated-as-poison-dlt-flood]](High)。本 issue 只谈 fanout/隔离/吞吐,不含错误分类。
+> [issue-00047-systemic-failure-treated-as-poison-dlt-flood](issue-00047-systemic-failure-treated-as-poison-dlt-flood.md)(High)。本 issue 只谈 fanout/隔离/吞吐,不含错误分类。
 
 ## 关联
 
-- [[plan-00006-middleware-integration]]
-- [[design-00006-integration-event-routing]](已解决出站逐事件路由;入站选择性订阅为后续)
-- [[decision-00014-cloudevents-integration-event-contract]](§7 topic 路由的原始扩展点)
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)
+- [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)(已解决出站逐事件路由;入站选择性订阅为后续)
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)(§7 topic 路由的原始扩展点)
 
 ## 核查结论(在当前 HEAD 复核):**不是缺陷,保持 open 作为增强路线**
 
@@ -102,5 +102,5 @@ topic-per-aggregate/context + 用 `ce_type` 分发(aipersimmon 现状已符合)�
 本轮**不动它**:没有可修的错误,而在没有真实多 BC / 多服务诉求驱动前实现 #2/#4,是给框架加没人要的配置面。
 与本轮修的两个 issue 的区别很清楚——那两个是**静默数据丢失**(修),这个是**尚未需要的隔离能力**(留)。
 
-> 另注:本 issue 提到的"更严重问题"[[issue-00047-systemic-failure-treated-as-poison-dlt-flood]] 已 resolved,
-> 且其可观测性缺口由 [[issue-00057-unlimited-systemic-retry-is-invisible]] 补齐(systemic stall 现在会 WARN)。
+> 另注:本 issue 提到的"更严重问题"[issue-00047-systemic-failure-treated-as-poison-dlt-flood](issue-00047-systemic-failure-treated-as-poison-dlt-flood.md) 已 resolved,
+> 且其可观测性缺口由 [issue-00057-unlimited-systemic-retry-is-invisible](issue-00057-unlimited-systemic-retry-is-invisible.md) 补齐(systemic stall 现在会 WARN)。

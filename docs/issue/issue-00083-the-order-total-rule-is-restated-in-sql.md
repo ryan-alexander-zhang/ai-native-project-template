@@ -90,7 +90,7 @@ void aMixedCurrencyOrderCannotBeSummedByTheListQuery() {
    由 `MyBatisOrders.toRow` 从 `order.total()` 写入。
    读侧直接 `SELECT o.total_minor`——**LEFT JOIN 和 GROUP BY 一起消失**，
    列表查询退化成单表扫描，顺带解决
-   [[issue-00073-no-index-supports-the-cursor-paged-list]] 的一半代价。
+   [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md) 的一半代价。
    口径回到一处：聚合。
 2. 若要保留 SQL 聚合：至少把假设写成约束——
    `order_lines` 加一条"同一订单币种唯一"的检查（触发器或
@@ -120,11 +120,11 @@ void aMixedCurrencyOrderCannotBeSummedByTheListQuery() {
 顺带清理了两处因这次改动而失效的描述：`OrderListPagingTest` 的类 javadoc
 （"Each row is one SQL join with the line totals summed"）与用例名
 `aLineTotalIsSummedBySqlNotByLoadingTheAggregate` → `aPageIsAnsweredWithoutRehydratingAnyOrder`
-（[[issue-00070-ready-for-fulfilment-is-never-persisted]] 里的引用已同步更新）。
+（[issue-00070-ready-for-fulfilment-is-never-persisted](issue-00070-ready-for-fulfilment-is-never-persisted.md) 里的引用已同步更新）。
 留着它们就正好是本次评审反复在修的那类文档漂移。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00073-no-index-supports-the-cursor-paged-list]]（方案 1 同时改善它）
-- [[issue-00077-money-arithmetic-has-no-overflow-guard]]（SQL 侧的 `SUM` 同样没有溢出保护）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md)（方案 1 同时改善它）
+- [issue-00077-money-arithmetic-has-no-overflow-guard](issue-00077-money-arithmetic-has-no-overflow-guard.md)（SQL 侧的 `SUM` 同样没有溢出保护）

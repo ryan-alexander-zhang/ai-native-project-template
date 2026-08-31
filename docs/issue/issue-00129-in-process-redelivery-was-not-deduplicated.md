@@ -62,5 +62,5 @@ outbox-starter + messaging-kafka 全模块绿；scaffold `start -am` 验收套�
 
 ## 关联
 
-- 消费端幂等的另一半（业务级）：[[issue-00130-two-of-three-effect-handlers-forgot-the-redelivery]]
-- 极晚重复的库存滞留：[[issue-00147-a-very-late-duplicate-strands-a-reservation]]
+- 消费端幂等的另一半（业务级）：[issue-00130-two-of-three-effect-handlers-forgot-the-redelivery](issue-00130-two-of-three-effect-handlers-forgot-the-redelivery.md)
+- 极晚重复的库存滞留：[issue-00147-a-very-late-duplicate-strands-a-reservation](issue-00147-a-very-late-duplicate-strands-a-reservation.md)

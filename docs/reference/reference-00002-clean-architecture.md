@@ -1,8 +1,8 @@
 ---
-id: 20260708161438-clean-architecture
+id: reference-00002-clean-architecture
 type: reference
-role: main
 status: active
+informs: [analysis-00005-structure-2-event-flow-and-cqrs]
 ---
 
 # ardalis/CleanArchitecture — DDD reference notes
@@ -12,6 +12,8 @@ THIRDPARTY.md). Facts verified on 2026-07-08. **This is a .NET Clean Architectur
 solution template, not a tactical-DDD sample.** Read it for the dependency rule
 and boundary skeleton; add the tactical-DDD richness (and modular/outbox story)
 yourself — see "Where it underserves DDD" below.
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

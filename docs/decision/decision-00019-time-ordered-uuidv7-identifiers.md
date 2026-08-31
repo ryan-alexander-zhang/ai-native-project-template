@@ -2,11 +2,13 @@
 id: decision-00019-time-ordered-uuidv7-identifiers
 type: decision
 status: active
+motivated_by: [issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock]
+constrains: [design-00010-time-ordered-identifiers, plan-00012-time-ordered-identifiers-implementation]
 ---
 
 # 框架生成的 per-row 标识符改用时间有序 UUIDv7
 
-> **补充（[[issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock]]）：排序跟随墙钟，包括倒退。**
+> **补充（[issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock](../issue/issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock.md)）：排序跟随墙钟，包括倒退。**
 > JUG 的生成器只在同一毫秒内递增计数器，时间戳一变（**包括变小**）就重抽熵；而墙钟会被 NTP 校正拨回去。
 > 所以时钟倒退时 id 会倒序。**没有钳位**，理由是本决定选 UUIDv7 的目的从头到尾是**写放大与索引局部性**，
 > 不是排序保证：已核实框架里没有任何地方按 id 排序（outbox 按 `created_at` + 自增标识列，PM 按 `seq`，
@@ -16,9 +18,9 @@ status: active
 
 固化"框架为每行/每条消息铸造的标识符（command messageId、integration `event_id`、process 实例/迁移/effect/deadline id、
 operation-log `recordId` 等）应采用**时间有序 UUIDv7**，经统一的 `IdGenerator` SPI 生成、默认由成熟库实现"这一决策。
-与多租户（[[decision-00018-multi-tenancy-boundaries]]）**正交**：那里管的是低基数的 `tenant_id`（要窄+不可变、明确不用 UUIDv7），
-这里管的是高基数、高频插入的 per-row id。承接 [[decision-00013-command-context-and-causation-propagation]]（id 由 bus/durable
-runtime 铸造、业务不自造）、[[decision-00016-durable-runtime-staged-message-identity]]（staged 身份铸造点）。
+与多租户（[decision-00018-multi-tenancy-boundaries](decision-00018-multi-tenancy-boundaries.md)）**正交**：那里管的是低基数的 `tenant_id`（要窄+不可变、明确不用 UUIDv7），
+这里管的是高基数、高频插入的 per-row id。承接 [decision-00013-command-context-and-causation-propagation](decision-00013-command-context-and-causation-propagation.md)（id 由 bus/durable
+runtime 铸造、业务不自造）、[decision-00016-durable-runtime-staged-message-identity](decision-00016-durable-runtime-staged-message-identity.md)（staged 身份铸造点）。
 
 ## 结论先行
 
@@ -61,7 +63,7 @@ runtime 铸造、业务不自造）、[[decision-00016-durable-runtime-staged-me
    process-manager 的 id supplier、operation-log engine 的 `recordId` supplier（现默认 v4，本决策落定其 DDL 注释早已声明的 v7）。
    `correlationId`（= 根 messageId）与 `causationId`（= 上游 messageId）**自动继承** v7，无需单独处理。
 4. **前向兼容、零迁移**：不改任何 DDL（列已是 VARCHAR）；v4 老行与 v7 新行合法共存、各自全局唯一；收益仅对新插入累积。
-5. **不涵盖**：`tenant_id`（低基数、要窄+不可变，见 [[decision-00018-multi-tenancy-boundaries]] 命题四）、客户端提供的
+5. **不涵盖**：`tenant_id`（低基数、要窄+不可变，见 [decision-00018-multi-tenancy-boundaries](decision-00018-multi-tenancy-boundaries.md) 命题四）、客户端提供的
    web idempotency/nonce/bucket key、web 边缘 `requestId`（非持久化键）、lease `WorkerId`（非高频 PK）、消费方自有聚合业务键
    （由消费方自定，框架仅建议）。
 6. **默认开启**：id impl 模块进标准 starter/BOM，v7 成为默认；SPI fallback（无 impl 时退回 `UUID.randomUUID()`）仅为

@@ -61,5 +61,5 @@ status: resolved
 
 ## 关联
 
-- 传输级去重的另一缺口:[[issue-00129-in-process-redelivery-was-not-deduplicated]]
-- 唯一约束属于 schema 兜底同类：[[issue-00146-the-flagship-invariants-have-no-last-line]]
+- 传输级去重的另一缺口:[issue-00129-in-process-redelivery-was-not-deduplicated](issue-00129-in-process-redelivery-was-not-deduplicated.md)
+- 唯一约束属于 schema 兜底同类：[issue-00146-the-flagship-invariants-have-no-last-line](issue-00146-the-flagship-invariants-have-no-last-line.md)

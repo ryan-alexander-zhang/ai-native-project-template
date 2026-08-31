@@ -90,7 +90,7 @@ V4 给 rate_limit 补 `window_start` 索引——主键以 `bucket_key` 打头�
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 6 档）
-- "冷桶的清理属于第 6 档"的欠条来自：[[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in]]
-- 默认开/关的判据与之相反的那一档：[[issue-00122-the-four-process-tables-grew-forever]]
-- 没有照抄的那套路径归一化：`TenantResolutionFilter.dispatchPath`（[[issue-00099-tenant-isolation-fails-open-below-the-edge]]）
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 6 档）
+- "冷桶的清理属于第 6 档"的欠条来自：[issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in](issue-00123-the-rate-limiter-deleted-the-window-someone-was-counting-in.md)
+- 默认开/关的判据与之相反的那一档：[issue-00122-the-four-process-tables-grew-forever](issue-00122-the-four-process-tables-grew-forever.md)
+- 没有照抄的那套路径归一化：`TenantResolutionFilter.dispatchPath`（[issue-00099-tenant-isolation-fails-open-below-the-edge](issue-00099-tenant-isolation-fails-open-below-the-edge.md)）

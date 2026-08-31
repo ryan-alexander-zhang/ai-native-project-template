@@ -2,15 +2,16 @@
 id: decision-00013-command-context-and-causation-propagation
 type: decision
 status: active
+constrains: [spec-00001-operation-log-component, spec-00002-multi-tenancy, design-00002-web-layer, design-00005-observability-and-distributed-tracing]
 ---
 
 # 命令派发上下文与因果传播:`CommandContext` + 全链路 `EventEnvelope`
 
 固化"消息元数据(message id / correlation / causation / trace)如何从入站集成事件 → 命令 → 出站集成事件
 显式传播,以及入站集成事件如何被消费/翻译(ACL)"。承接
-[[decision-00009-event-type-markers-and-handler-contracts]](集成事件消费落在 adapter、翻译成 command)、
-[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]](元数据不进 payload)、
-[[decision-00012-no-ambient-per-command-state]](每命令状态必须显式、禁 ambient)。
+[decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md)(集成事件消费落在 adapter、翻译成 command)、
+[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)(元数据不进 payload)、
+[decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md)(每命令状态必须显式、禁 ambient)。
 
 ## 结论先行
 
@@ -39,26 +40,26 @@ command per event"*)。
 `publishEvent(裸 payload)`,`VERSION/OCCURRED_AT/TRACE_ID` 收到却丢弃,ACL adapter 拿不到任何元数据;
 (2)`traceId` 全链路定义了却在两个 OutboxWriter 都写死 `null`——死字段。
 
-> **增补**:本决策 §1「id 由 bus 铸造」的表述已被 [[decision-00016-durable-runtime-staged-message-identity]] 放宽——
+> **增补**:本决策 §1「id 由 bus 铸造」的表述已被 [decision-00016-durable-runtime-staged-message-identity](decision-00016-durable-runtime-staged-message-identity.md) 放宽——
 > 合法铸造方扩展为「`CommandBus`(同步根/子命令)+ durable runtime(staged effect)」,并新增 `CommandBus.sendAs(...)`
 > 逐字派发入口。核心不变式(业务代码/payload 不自造 id、禁 ambient)不变。
 >
 > **增补(traceId 已移除)**:本决策当初引入的 `traceId`(彼时是唯一可观测锚点、且实为 HTTP 边缘生成的 UUID)已在
-> [[design-00005-observability-and-distributed-tracing]] 落地后**从因果模型中删除**——`CommandContext` / `EventEnvelope` /
+> [design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md) 落地后**从因果模型中删除**——`CommandContext` / `EventEnvelope` /
 > `OutboxMessage` 不再有 `traceId` 字段(`root(String messageId)` 单参),DB `trace_id` 列经 Flyway V2 drop,Kafka `ce_traceid`
 > header 取消。原因:它现已冗余——**机器可复原的追踪身份由 `traceparent`(W3C SpanContext,含真 trace-id)承担**,**因果流关联由
-> `correlationId` 承担**;那个 UUID 的真正身份是**边缘请求 id**,已正名为 `requestId`(`X-Request-Id`,见 [[design-00002-web-layer]]),
+> `correlationId` 承担**;那个 UUID 的真正身份是**边缘请求 id**,已正名为 `requestId`(`X-Request-Id`,见 [design-00002-web-layer](../design/design-00002-web-layer.md)),
 > 且**仅存在于 web 边缘、不再随异步链传播**。
 >
 > **信息取舍(需知晓)**:删除后,**不装 OTEL 可观测模块**的消费方,失去"某下游异步事件源自哪次原始请求"的跨异步关联——
 > `correlationId` 仍关联整条因果流,装了 OTEL 则由 span link 复原该关联。这是"删冗余"的必然结果,符合脚手架口径:因果流用
 > `correlationId`、边缘用 `requestId`、要全链路追踪就装 OTEL。核心不变式(元数据不进 payload、禁 ambient)不变。
 >
-> **增补(新增 tenantId)**:[[decision-00018-multi-tenancy-boundaries]] 沿本决策的传播脊柱新增一个字段 `tenantId`——
+> **增补(新增 tenantId)**:[decision-00018-multi-tenancy-boundaries](decision-00018-multi-tenancy-boundaries.md) 沿本决策的传播脊柱新增一个字段 `tenantId`——
 > `CommandContext` 增 `tenantId`(写侧权威,`root`/`deriveChild` 继承、`of(envelope)` 读回),并按本决策 §3 同款在
 > `EventEnvelope`(CloudEvents 扩展属性)、`OutboxMessage`、outbox 表列、`IntegrationEventHeaders`(`ce_tenantid`)同步新增。
 > 语义定位与 correlation/causation 一致:**因果/路由类消息元数据、显式随命令传播、绝不进 payload、非 ambient**
-> (与 [[decision-00012-no-ambient-per-command-state]] 一致;`TenantContext` 仅作 trusted-boundary 一次写入的不可变身份,
+> (与 [decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md) 一致;`TenantContext` 仅作 trusted-boundary 一次写入的不可变身份,
 > 用于边缘→`CommandContext` 绑定与读侧/基础设施,非可变每命令状态)。这与本决策引用的 Axon `Message` MetaData 承载租户的
 > 实践同构。**这不是 operation-log 那类"把功能字段(actor/target)塞进 CommandContext"——那仍禁止,用 resolver。**
 > 核心不变式(元数据不进 payload、禁 ambient)不变。
@@ -69,11 +70,11 @@ command per event"*)。
    (根命令等于自身 messageId)、`causationId`(触发它的上一条消息 id,根命令为 `null`)、`traceId`(可空)。
    id 由 bus 铸造(`root(id, trace)` / `deriveChild(childId)`),`CommandContext` 自身不生成 id,保持纯值。
    (staged effect 的身份由 durable runtime 铸造并经 `sendAs` 逐字派发,见
-   [[decision-00016-durable-runtime-staged-message-identity]]。)
+   [decision-00016-durable-runtime-staged-message-identity](decision-00016-durable-runtime-staged-message-identity.md)。)
 2. **写侧契约全部显式携带 context**:`CommandHandler.handle(C, CommandContext)`;`CommandBus` 双重载——
    `send(cmd)`(根,bus 读 MDC `traceId` 播种)与 `send(cmd, cause)`(以 cause 派生子上下文:新 messageId、
    继承 correlation/trace、causation = cause.messageId);`CommandInterceptor.intercept(cmd, ctx, next)`。
-   命令 payload **不含**任何 correlation/causation 字段(承接 [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]])。
+   命令 payload **不含**任何 correlation/causation 字段(承接 [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md))。
 3. **出站显式盖章**:`IntegrationEvents.publish(event, CommandContext)`;`EventEnvelope` 增
    `correlationId`(必填)、`causationId`(可空);`OutboxMessage` / outbox 表 / `IntegrationEventHeaders`
    同步新增两字段两 header。发布时 `correlationId = ctx.correlationId`、`causationId = ctx.messageId`。
@@ -95,7 +96,7 @@ command per event"*)。
 ### 命题一 —— 因果传播必须显式,不能 ambient(与 decision-00012 同源)
 
 handler 在方法体里 publish 的出站事件要盖因果戳,就必须让 handler 拿到上下文——要么改 `handle` 签名让 context
-作为显式参数,要么用 ThreadLocal/ambient(已被 [[decision-00012-no-ambient-per-command-state]] 禁止)。没有第三条路。
+作为显式参数,要么用 ThreadLocal/ambient(已被 [decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md) 禁止)。没有第三条路。
 故选**显式参数**:`handle(C, CommandContext)`。这正是 Axon 5 用显式 `ProcessingContext` 取代线程绑定 `UnitOfWork`
 的同一取向——为响应式/虚拟线程去除 ThreadLocal 依赖。
 
@@ -103,7 +104,7 @@ handler 在方法体里 publish 的出站事件要盖因果戳,就必须让 hand
 
 命令 payload 保持纯业务字段;correlation/causation 作为 `CommandContext` 在命令**旁边**传递,`EventEnvelope`
 在消息**旁边**携带。这与 Axon 的 `Message = payload + metadata`、NServiceBus 的 `Handle(msg, context)` 一致,
-也与本仓 [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]"派发契约与标签分离"一脉相承。
+也与本仓 [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)"派发契约与标签分离"一脉相承。
 
 ### 命题三 —— 入站交付完整信封,是 ACL 的必要条件(语料强支撑)
 
@@ -116,7 +117,7 @@ domain-driven-hexagon 明确 adapter 即反腐层,把外部消息翻译成本地
 
 集成事件消费是 adapter+消息框架的传输关注点;adapter 收 `EventEnvelope<E>` 的普通 `@EventListener` 方法已足够
 自证身份(所在层 + 框架注解 + 引用 `IntegrationEvent`/信封类型)。新增库级 `IntegrationEventHandler` 契约边际≈0,
-与 [[decision-00009-event-type-markers-and-handler-contracts]] 命题 4/5 冲突且无收益,故不做。
+与 [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 命题 4/5 冲突且无收益,故不做。
 
 ## Consequences
 
@@ -130,19 +131,19 @@ domain-driven-hexagon 明确 adapter 即反腐层,把外部消息翻译成本地
 - 依赖:`application → cqrs`、`cqrs → integration`(见 Decision §6);均为纯契约层之间、无环。
 - scaffold(multi-module / modulith / microservice)全部随之迁移;`OrderingFlowTest` 端到端验证跨上下文
   saga 流程 + 信封路由 + 因果传播全绿。
-- 与 [[decision-00009-event-type-markers-and-handler-contracts]] 一致:不新增集成事件处理器契约;
+- 与 [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 一致:不新增集成事件处理器契约;
   `DomainEventHandler` 的 Javadoc"集成侧无对等 marker"依然成立(`EventEnvelope` 是传输信封,非 handler marker)。
 
 ## Sources
 
 内部:
 
-- `docs/reference/domain-driven-hexagon/20260708161438-ddd-notes.md` —— adapter 即 ACL;多入站 adapter 映射到同一 Command/Query。
-- `docs/reference/modular-monolith-with-ddd/20260708161438-ddd-notes.md` —— 日志装饰器承载 correlation id;inbox → internal command。
-- `docs/reference/axon-framework/20260708161438-ddd-notes.md` —— 消息三分(command/event/query)的基础。
+- `docs/reference/reference-00005-domain-driven-hexagon.md` —— adapter 即 ACL;多入站 adapter 映射到同一 Command/Query。
+- `docs/reference/reference-00007-modular-monolith-with-ddd.md` —— 日志装饰器承载 correlation id;inbox → internal command。
+- `docs/reference/reference-00001-axon-framework.md` —— 消息三分(command/event/query)的基础。
 - `aipersimmon-ddd/aipersimmon-ddd-cqrs/.../CommandContext.java`、`.../CommandBus.java`、`.../CommandHandler.java`。
 - `aipersimmon-ddd/aipersimmon-ddd-integration/.../EventEnvelope.java`;`aipersimmon-ddd-messaging-kafka/.../KafkaIntegrationEventListener.java`。
-- [[decision-00009-event-type-markers-and-handler-contracts]]、[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]、[[decision-00012-no-ambient-per-command-state]]、[[analysis-00002-domain-vs-integration-events]]。
+- [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md)、[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)、[decision-00012-no-ambient-per-command-state](decision-00012-no-ambient-per-command-state.md)、[analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)。
 
 外部:
 

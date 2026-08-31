@@ -103,8 +103,8 @@ interceptor」——那会让「自定义」名不副实，逃生舱的语义保
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§0 系统性主题 2、§3 第 5 项）
-- 设计：[[design-00011-aggregate-persistence-contract]] 开篇与 §3 已同步
-- 先例：[[issue-00053-id-generator-silently-degrades-to-uuidv4]]（缺失 `IdGenerator` 即启动失败，本批照它办）
-- 同族：[[issue-00051-aggregates-have-no-optimistic-locking]]（能力静默缺席的第一例）、
-  [[issue-00106-an-empty-flyway-component-list-created-every-table]]（同一主题里需要用户定契约的那条）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§0 系统性主题 2、§3 第 5 项）
+- 设计：[design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md) 开篇与 §3 已同步
+- 先例：[issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md)（缺失 `IdGenerator` 即启动失败，本批照它办）
+- 同族：[issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)（能力静默缺席的第一例）、
+  [issue-00106-an-empty-flyway-component-list-created-every-table](issue-00106-an-empty-flyway-component-list-created-every-table.md)（同一主题里需要用户定契约的那条）

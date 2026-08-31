@@ -1,7 +1,7 @@
 ---
 id: analysis-00013-operation-log-component
 type: analysis
-status: active
+status: draft
 ---
 
 # `aipersimmon-ddd` 通用操作日志组件预研
@@ -197,7 +197,7 @@ OperationLogPlan
 
 | 现有决策 | 对本组件的约束 |
 |---|---|
-| `decision-00010` | 日志等横切关注点由 `CommandBus + CommandInterceptor` 提供，不在 handler 内重复散落 |
+| `decision-00021` | 日志等横切关注点由 `CommandBus + CommandInterceptor` 提供，不在 handler 内重复散落 |
 | `decision-00011` | 类型化行为契约继续用接口；`@OperationLog` 只能是叠加属性元数据，不能替代 `Command<R>` |
 | `decision-00012` | 禁止自建 ThreadLocal / ambient 每命令状态；invocation state 必须是局部、显式对象 |
 | `decision-00013` | 直接读取显式 `CommandContext` 的 `messageId/correlationId/causationId`；不把元数据塞进 command payload |
@@ -790,7 +790,7 @@ state、开放表达式、事务和 delivery 语义——恰好都是本项目�
 
 ### 本仓库约束
 
-- `docs/decision/decision-00010-command-handler-reuse-and-cross-aggregate-placement.md`
+- `docs/decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md`
 - `docs/decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md`
 - `docs/decision/decision-00012-no-ambient-per-command-state.md`
 - `docs/decision/decision-00013-command-context-and-causation-propagation.md`

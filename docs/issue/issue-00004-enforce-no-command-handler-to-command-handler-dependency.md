@@ -2,20 +2,20 @@
 id: issue-00004-enforce-no-command-handler-to-command-handler-dependency
 type: issue
 status: resolved
-blocks: [decision-00010-command-handler-reuse-and-cross-aggregate-placement]
+blocks: [decision-00021-command-handler-reuse-and-cross-aggregate-placement]
 ---
 
 # 机器固化:CommandHandler 不得依赖 CommandHandler
 
-落地 [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]] 规则一。该决策已确立
+落地 [decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md) 规则一。该决策已确立
 "`CommandHandler` 之间不得互相依赖"(它是命令总线入口点,互调会绕过 / 双重应用横切、污染 Command 契约、
 破坏 UnitOfWork 边界),但目前**仅靠人工 review**,无机制强制。本 issue 追踪加一条 ArchUnit 规则把它固化。
 
 ## 背景
 
-- 规则出处:[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]] 规则一。
+- 规则出处:[decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md) 规则一。
 - 现状:`aipersimmon-ddd-archunit` 的 `AiPersimmonDddRules` 已用同一范式固化过 handler 契约
-  (见 [[decision-00009-event-type-markers-and-handler-contracts]] / [[issue-00002-land-domain-event-handler-annotation]]
+  (见 [decision-00009-event-type-markers-and-handler-contracts](../decision/decision-00009-event-type-markers-and-handler-contracts.md) / [issue-00002-land-domain-event-handler-annotation](issue-00002-land-domain-event-handler-annotation.md)
   的 `domainEventListenersShouldBeAnnotatedWithDomainEventHandler()`);本条与之同批维护。
 
 ## 已完成
@@ -46,5 +46,5 @@ blocks: [decision-00010-command-handler-reuse-and-cross-aggregate-placement]
 
 ## 关联
 
-- 决策:[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]
-- 同范式前序:[[decision-00009-event-type-markers-and-handler-contracts]]、[[issue-00002-land-domain-event-handler-annotation]]
+- 决策:[decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)
+- 同范式前序:[decision-00009-event-type-markers-and-handler-contracts](../decision/decision-00009-event-type-markers-and-handler-contracts.md)、[issue-00002-land-domain-event-handler-annotation](issue-00002-land-domain-event-handler-annotation.md)

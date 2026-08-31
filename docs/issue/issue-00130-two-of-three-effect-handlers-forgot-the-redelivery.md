@@ -70,4 +70,4 @@ CommandBus.java:50-52`）说稳定 messageId 是 handler 去重的前提；`Proc
 
 ## 关联
 
-- 传输级去重的缺口：[[issue-00129-in-process-redelivery-was-not-deduplicated]]
+- 传输级去重的缺口：[issue-00129-in-process-redelivery-was-not-deduplicated](issue-00129-in-process-redelivery-was-not-deduplicated.md)

@@ -10,8 +10,8 @@ blocks: [report-00002-scaffold-ddd-review]
 ## 问题（现状，file:line 为证）
 
 - **等级：Medium（这是读者接触 scaffold 的第一条命令，而它不可能成功）**。
-- 本 issue **不是** [[report-00002-scaffold-ddd-review]] 评审时发现的，
-  而是在实施 [[issue-00072-demo-seed-data-ships-in-a-production-migration]]
+- 本 issue **不是** [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md) 评审时发现的，
+  而是在实施 [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md)
   第 4 条（"把 quickstart 的租户前提写进 README"）时撞出来的——
   那一条要求写的正是 `-H 'X-Tenant-Id: __root__'`，而这个 header 值是**必然被拒**的。
 - 两边各自都对，合起来不成立：
@@ -89,7 +89,7 @@ void theQuickstartTenantIsAcceptedAtTheEdge() {
 
 `TenantResolutionFilter` 用 `response.sendError(400, ...)` 拒绝请求，绕过了
 `OrderingProblemCatalog`，所以租户相关的 400 是 Spring 默认错误体而非 RFC 9457 problem 文档，
-与 [[issue-00080-problem-title-key-has-no-message-bundle]] 所在的错误契约不一致。
+与 [issue-00080-problem-title-key-has-no-message-bundle](issue-00080-problem-title-key-has-no-message-bundle.md) 所在的错误契约不一致。
 这是框架侧（`aipersimmon-ddd-tenancy-spring-boot-starter`）的问题，不是 scaffold 的，另行落 issue。
 
 ## 验证结果
@@ -103,8 +103,8 @@ void theQuickstartTenantIsAcceptedAtTheEdge() {
 
 ## 关联
 
-- [[issue-00072-demo-seed-data-ships-in-a-production-migration]]（本 issue 由其第 4 条实施时暴露）
-- [[issue-00074-one-config-file-with-development-values-only]]（同一次 profile 拆分）
-- [[decision-00018-multi-tenancy-boundaries]]（`__root__` 哨兵的由来）
-- [[design-00009-multi-tenancy-tenant-id]]
-- [[report-00002-scaffold-ddd-review]]
+- [issue-00072-demo-seed-data-ships-in-a-production-migration](issue-00072-demo-seed-data-ships-in-a-production-migration.md)（本 issue 由其第 4 条实施时暴露）
+- [issue-00074-one-config-file-with-development-values-only](issue-00074-one-config-file-with-development-values-only.md)（同一次 profile 拆分）
+- [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)（`__root__` 哨兵的由来）
+- [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)

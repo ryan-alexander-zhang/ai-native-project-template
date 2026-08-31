@@ -32,9 +32,9 @@ implements: [design-00001-aipersimmon-ddd-and-scaffold]
 `docker compose down` 后 `mvn -q verify` 仍全绿（测试不依赖真实 SigNoz，用 Testcontainers + 内存 exporter）。
 
 **铁律**：本计划**只动 `multi-module/start` 的装配与配置 + 中间件编排文件**，不改任何业务代码——
-发布方只调 `IntegrationEvents.publish()`（[[decision-00006-integration-event-transport-selection]]），
+发布方只调 `IntegrationEvents.publish()`（[decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)），
 5 处跨上下文 `@EventListener(EventEnvelope<X>)` 消费者不变；集成事件契约（`@EventType` + `subject()`）
-已就绪（[[decision-00014-cloudevents-integration-event-contract]]）。传输切换是"换 starter + 属性"，非改代码。
+已就绪（[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)）。传输切换是"换 starter + 属性"，非改代码。
 
 ## 一、Design
 
@@ -45,7 +45,7 @@ implements: [design-00001-aipersimmon-ddd-and-scaffold]
 | 集成事件传输 | 方式一：进程内同步（`SpringIntegrationEvents` / events-spring） | 方式三：broker + outbox（`OutboxWriter` + `KafkaOutboxDispatcher`） |
 | 可靠性语义 | 无重试、无持久，进程崩溃即丢 | at-least-once（outbox 同事务写 + relay 重投 + inbox 去重） |
 | PostgreSQL 用途 | 仅 process-manager 四表 | + outbox 表 + inbox 表（均由 flyway 单一来源迁移） |
-| 可观测性 | 未装配，全链路 no-op | OTLP 导出 SigNoz，同步 + 异步跳连通 trace（承 [[plan-00005-observability-implementation]]） |
+| 可观测性 | 未装配，全链路 no-op | OTLP 导出 SigNoz，同步 + 异步跳连通 trace（承 [plan-00005-observability-implementation](plan-00005-observability-implementation.md)） |
 | 本地中间件 | `start/compose.yaml` 仅 postgres（db=ordering） | 用户提供的 compose：postgres 18.1 + Kafka + kafka-ui + SigNoz |
 
 ### 1.2 目标事件流（方式三）
@@ -79,9 +79,9 @@ flowchart LR
   故现有 5 处 `@EventListener` 处理器原样触发（`OrderFulfilment`、payment `PaymentRequestedListener`、
   inventory `OrderPlacedListener` / `StockReleaseRequestedListener`、application `OrderFulfilmentStarter`）。
 - **CloudEvents 线格式**：`@EventType(name, version)` → `ce_type`/`ce_dataschemaversion`，`subject()`=orderId → 消息 key，
-  同一订单事件保序落同一分区（[[decision-00014-cloudevents-integration-event-contract]]）。
+  同一订单事件保序落同一分区（[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)）。
 - **trace 缝合**：outbox 行持久化 `traceparent`/`trace_state`，relay 派发前 `restore(...)` 起 `outbox.publish` span 并
-  Span Link 回创建者（[[plan-00005-observability-implementation]] P2 已在库侧交付，本计划只需装配 OTEL starter + 配 OTLP 端点）。
+  Span Link 回创建者（[plan-00005-observability-implementation](plan-00005-observability-implementation.md) P2 已在库侧交付，本计划只需装配 OTEL starter + 配 OTLP 端点）。
 
 ### 1.3 中间件拓扑（据用户 compose）
 
@@ -173,14 +173,14 @@ flowchart LR
 
 ## 四、关联
 
-- [[design-00001-aipersimmon-ddd-and-scaffold]]（父；§5.6/5.8/5.14 传输与 Kafka）
-- [[decision-00006-integration-event-transport-selection]]（方式三装配：deps + `consumer.enabled` + inbox）
-- [[decision-00014-cloudevents-integration-event-contract]]（`@EventType`/`subject`/`ce_*`/key=subject）
-- [[decision-00016-durable-runtime-staged-message-identity]]（暂存消息身份，outbox/PM 行标识）
-- [[plan-00005-observability-implementation]]（trace 缝合与三柱闭环，本计划只装配 OTEL starter + 配 OTLP）
-- [[issue-00003-messaging-delivery-reliability]]、[[issue-00010-verify-kafka-dlt-with-embedded-broker]]、
-  [[issue-00011-bound-outbox-kafka-send-await]]（Kafka/DLT/outbox 已知遗留项，落地时对照）
-- [[process-manager-schema-copies]]（PM DDL 多副本；本计划 start 经 flyway 单一来源，不复制）
+- [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md)（父；§5.6/5.8/5.14 传输与 Kafka）
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)（方式三装配：deps + `consumer.enabled` + inbox）
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)（`@EventType`/`subject`/`ce_*`/key=subject）
+- [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md)（暂存消息身份，outbox/PM 行标识）
+- [plan-00005-observability-implementation](plan-00005-observability-implementation.md)（trace 缝合与三柱闭环，本计划只装配 OTEL starter + 配 OTLP）
+- [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md)、[issue-00010-verify-kafka-dlt-with-embedded-broker](../issue/issue-00010-verify-kafka-dlt-with-embedded-broker.md)、
+  [issue-00011-bound-outbox-kafka-send-await](../issue/issue-00011-bound-outbox-kafka-send-await.md)（Kafka/DLT/outbox 已知遗留项，落地时对照）
+- process-manager-schema-copies（PM DDL 多副本；本计划 start 经 flyway 单一来源，不复制）
 - scaffold-samples：`integration-events-over-kafka`、`reliable-integration-events`（装配范本，仅参考不引以为设计权威）
 
 ## 五、开放决策（落地前需拍板）
@@ -222,7 +222,7 @@ flowchart LR
 ### 落地中发现并处理的偏差
 
 1. **`server.port=8090`**（`application.yml`）：kafka-ui 在 compose 占宿主 `8080`，应用 Tomcat 默认 8080 冲突 → 改 8090。
-2. **PM-jdbc + inbox-jdbc + outbox-jdbc 的 `Clock` bean 冲突**（库级缺陷，已根治 → [[issue-00026-clock-bean-ambiguity-across-starters]]）：
+2. **PM-jdbc + inbox-jdbc + outbox-jdbc 的 `Clock` bean 冲突**（库级缺陷，已根治 → [issue-00026-clock-bean-ambiguity-across-starters](../issue/issue-00026-clock-bean-ambiguity-across-starters.md)）：
    多个 starter 各注册一个 `Clock`，`found 2` 报错。**根因两条**：(a) 库刻意不继承 `spring-boot-starter-parent` 故缺
    `-parameters`，按参数名的 bean 消歧失效；(b) outbox/inbox 的 clock 用**按类型** `@ConditionalOnMissingBean`（PM 用**按名**），
    有其他 clock 时整体退避、其自身按名注入落空。**库侧修复**：parent 开 `maven.compiler.parameters=true` + 四个组件 clock 统一

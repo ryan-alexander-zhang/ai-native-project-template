@@ -2,13 +2,13 @@
 id: analysis-00036-samples-schema-migration
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S23 Schema 演进与数据迁移
 
 对应 sample：`aipersimmon-ddd-samples/s23-schema-migration`（一个部署单元、两个限界上下文、26 个用例）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 

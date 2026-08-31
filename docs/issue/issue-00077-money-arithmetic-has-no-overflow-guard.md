@@ -128,5 +128,5 @@ must be reported as overflow, not as a negative amount: amount must be >= 0
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[design-00003-exception-model]]（无错误码的 `DomainException` 在边界上的呈现）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [design-00003-exception-model](../design/design-00003-exception-model.md)（无错误码的 `DomainException` 在边界上的呈现）

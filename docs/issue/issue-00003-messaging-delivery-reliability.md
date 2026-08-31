@@ -14,7 +14,7 @@ blocks: [design-00001-aipersimmon-ddd-and-scaffold]
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
 异步集成事件投递(outbox 发件 / kafka 收件)在**失败**时缺少受控处理:没有瞬时/永久分类、没有
-重试上限与退避、没有死信旁路。这是**投递可靠性**问题,与 [[design-00003-exception-model]] 的
+重试上限与退避、没有死信旁路。这是**投递可靠性**问题,与 [design-00003-exception-model](../design/design-00003-exception-model.md) 的
 "错误建模 / HTTP 契约" 正交——最初误并入异常体系(analysis-00010 曾列为缺口 #6),现拆出独立追踪。
 
 ## 问题(现状,file:line 为证)
@@ -61,8 +61,8 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
 ## 边界
 
 - 与 **inbox 幂等正交**:inbox 解决"至少一次导致的重复消费"(去重);DLQ 解决"永远失败的消息"(放弃+留存)。
-  二者都要、不互替(承 [[decision-00007-web-api-response-envelope]] §五三层分离,延伸到消费侧)。
-- 与 **HTTP 异常契约**([[design-00003-exception-model]])无关,不影响其验收。
+  二者都要、不互替(承 [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §五三层分离,延伸到消费侧)。
+- 与 **HTTP 异常契约**([design-00003-exception-model](../design/design-00003-exception-model.md))无关,不影响其验收。
 - 若实现规模变大,可从本 issue 抽出独立 `design` 承载 SPI/表结构/装配细节。
 
 ## 影响模块
@@ -78,7 +78,7 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
 - **AC-4**:死信可被工具/人工重放回主流程。
 - **AC-5**:jdbc 与 mybatis-plus 两后端行为一致(以 **H2** 验证);Kafka 的 poison → DLT → offset 前进 → inbox 链路
   以 **Embedded Kafka**(in-JVM,无 Docker)验证。**不含** PostgreSQL / Testcontainers 方言级端到端验证——刻意取舍,
-  避免 Docker 依赖与 CI 变重(见 [[issue-00010-verify-kafka-dlt-with-embedded-broker]])。
+  避免 Docker 依赖与 CI 变重(见 [issue-00010-verify-kafka-dlt-with-embedded-broker](issue-00010-verify-kafka-dlt-with-embedded-broker.md))。
 
 ## 落地进度
 
@@ -117,12 +117,12 @@ Azure Service Bus(`MaxDeliveryCount`)、GCP Pub/Sub(`dead_letter_topic`)。Sprin
   → `<topic>.DLT`,消费者越过毒丸继续消费后续正常消息(offset 前进),毒丸的 inbox 标记随事务回滚、正常消息标记
   提交。此测试当场揪出一个 H3 潜伏缺陷:`DeadLetterPublishingRecoverer` 默认目的地并非文档承诺的 `<topic>.DLT`,
   已改为**显式目的地解析器**(`<topic>.DLT`,按源分区键),使实际行为与文档一致——单元/mock 测试发现不了这类问题,
-  正是补真实链路测试的价值(见 [[issue-00010-verify-kafka-dlt-with-embedded-broker]])。
+  正是补真实链路测试的价值(见 [issue-00010-verify-kafka-dlt-with-embedded-broker](issue-00010-verify-kafka-dlt-with-embedded-broker.md))。
 
 全部 AC(1–5)达成,本 issue `resolved`。
 
 ## 关联
 
-- [[design-00001-aipersimmon-ddd-and-scaffold]] —— outbox/inbox/messaging 模块的所属设计。
-- [[analysis-00010-exception-model]] —— 曾误列为缺口 #6,现移出、指向本 issue。
-- [[decision-00007-web-api-response-envelope]] §五 —— 防重放/幂等/去重"三层分离"思想。
+- [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md) —— outbox/inbox/messaging 模块的所属设计。
+- [analysis-00010-exception-model](../analysis/analysis-00010-exception-model.md) —— 曾误列为缺口 #6,现移出、指向本 issue。
+- [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) §五 —— 防重放/幂等/去重"三层分离"思想。

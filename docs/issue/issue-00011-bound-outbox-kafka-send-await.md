@@ -13,7 +13,7 @@ blocks: [issue-00003-messaging-delivery-reliability]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-[[issue-00003-messaging-delivery-reliability]] 的生产侧加固让 `OutboxRelay` 单线程、逐条**阻塞等 ack** 后再
+[issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) 的生产侧加固让 `OutboxRelay` 单线程、逐条**阻塞等 ack** 后再
 标记 `sent`(at-least-once)。但 `KafkaOutboxDispatcher` 等待 ack 用的是**无超时**的 `Future.get()`——一旦某次
 发送迟迟不返回(broker 分区不可写、metadata 拉取卡住、网络黑洞),relay 线程就**无限期**卡在该条上。
 
@@ -109,5 +109,5 @@ AC-1 ~ AC-4 达成,本 issue `resolved`。
 
 ## 关联
 
-- [[issue-00003-messaging-delivery-reliability]] —— 本 issue 补齐其生产侧「等待 ack 必须有界」的遗漏。
-- [[issue-00007-ordering-across-backoff-window]] —— 同为 relay 侧加固;超时归入瞬时后走同一退避/保序通路。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 本 issue 补齐其生产侧「等待 ack 必须有界」的遗漏。
+- [issue-00007-ordering-across-backoff-window](issue-00007-ordering-across-backoff-window.md) —— 同为 relay 侧加固;超时归入瞬时后走同一退避/保序通路。

@@ -10,9 +10,9 @@ status: active
 
 引子问题是："当前全链路只持久化一个自制 `traceId`，引入 OTEL 后够不够？"结论是远远不够，且缺口不止一处。本文把缺口逐项列清、给出闭环设计，并明确"脚手架自带 / 消费方自接"的边界。
 
-本文承接 [[decision-00013-command-context-and-causation-propagation]]（`CommandContext` / `EventEnvelope` 显式因果传播）、[[design-00004-durable-process-manager-runtime]]（Process Manager 的异步 relay/deadline 与 SLI 指标）、[[design-00003-exception-model]]（异常模型，本文的 span 错误语义与之对齐），并回收 [[issue-00025-correlation-propagation-and-scrape-batching]]（deadline/replay 处的链路断裂）为其 trace 投影。
+本文承接 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)（`CommandContext` / `EventEnvelope` 显式因果传播）、[design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md)（Process Manager 的异步 relay/deadline 与 SLI 指标）、[design-00003-exception-model](design-00003-exception-model.md)（异常模型，本文的 span 错误语义与之对齐），并回收 [issue-00025-correlation-propagation-and-scrape-batching](../issue/issue-00025-correlation-propagation-and-scrape-batching.md)（deadline/replay 处的链路断裂）为其 trace 投影。
 
-> **落地增补（最终标识模型）**：实现完成后，那个"自制 `traceId`"被**拆成两件正确的事**——① 它的本质是 HTTP 边缘请求 id，正名为 **`requestId`**（`X-Request-Id`，仅存在于 web 边缘，见 [[design-00002-web-layer]]）；② 作为"可观测追踪身份"它已**冗余并删除**（`CommandContext`/`EventEnvelope`/`OutboxMessage` 去字段、DB `trace_id` 列 Flyway V2 drop、Kafka `ce_traceid` 取消），因为真身份由 **`traceparent`** 承担、因果流由 **`correlationId`** 承担。所以最终四组标识为：`requestId`（边缘）/ `correlationId`·`causationId`（因果流）/ `traceparent`·`trace_state`（机器追踪，含真 trace-id）/ 真 `trace_id`（仅错误响应回显 + 日志 MDC，从活跃 span 现取、不落库）。下文凡称"保留 `traceId` 为日志锚点"处，以本增补为准（该锚点即 `requestId` + 真 `trace_id`）。详见 [[decision-00013-command-context-and-causation-propagation]] 的移除增补。
+> **落地增补（最终标识模型）**：实现完成后，那个"自制 `traceId`"被**拆成两件正确的事**——① 它的本质是 HTTP 边缘请求 id，正名为 **`requestId`**（`X-Request-Id`，仅存在于 web 边缘，见 [design-00002-web-layer](design-00002-web-layer.md)）；② 作为"可观测追踪身份"它已**冗余并删除**（`CommandContext`/`EventEnvelope`/`OutboxMessage` 去字段、DB `trace_id` 列 Flyway V2 drop、Kafka `ce_traceid` 取消），因为真身份由 **`traceparent`** 承担、因果流由 **`correlationId`** 承担。所以最终四组标识为：`requestId`（边缘）/ `correlationId`·`causationId`（因果流）/ `traceparent`·`trace_state`（机器追踪，含真 trace-id）/ 真 `trace_id`（仅错误响应回显 + 日志 MDC，从活跃 span 现取、不落库）。下文凡称"保留 `traceId` 为日志锚点"处，以本增补为准（该锚点即 `requestId` + 真 `trace_id`）。详见 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) 的移除增补。
 
 ## 一、结论
 
@@ -24,9 +24,9 @@ status: active
 
 4. **领域主干必须由脚手架自带 span——这是"完整可追踪"的核心，也是本轮最大补漏。** 自动埋点只认识 HTTP / JDBC / Kafka；`CommandBus`、`QueryBus`、`DomainEvents`、入站 ACL、`ProcessRuntime.start/handle` 决策推进都是自研代码，默认在 trace 里是空洞。脚手架在可选 OTEL 模块里为它们创建 span（挂在既有 `CommandInterceptor` 等 SPI 上）。
 
-5. **闭环 = 三柱互通**：trace ↔ log（每条日志带 `trace_id`/`span_id`，一等而非可选）、trace ↔ metric（[[design-00004-durable-process-manager-runtime]] §5.3 的 SLI 加 **exemplar**）、以及一份 **span 属性目录**（`process.type` / `business_key` / `effect.kind` / `message.id` …）让 trace 可按业务维度查询。
+5. **闭环 = 三柱互通**：trace ↔ log（每条日志带 `trace_id`/`span_id`，一等而非可选）、trace ↔ metric（[design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) §5.3 的 SLI 加 **exemplar**）、以及一份 **span 属性目录**（`process.type` / `business_key` / `effect.kind` / `message.id` …）让 trace 可按业务维度查询。
 
-6. **失败必须在 trace 里可见**：handler 异常、codec 失败、effect/deadline 进 `DEAD` → 实例 `SUSPENDED`、revision 冲突重试，都 `setStatus(ERROR)` + `recordException`，与 [[design-00003-exception-model]] 对齐。
+6. **失败必须在 trace 里可见**：handler 异常、codec 失败、effect/deadline 进 `DEAD` → 实例 `SUSPENDED`、revision 冲突重试，都 `setStatus(ERROR)` + `recordException`，与 [design-00003-exception-model](design-00003-exception-model.md) 对齐。
 
 7. **层次边界不破坏**：framework-free 契约模块 `aipersimmon-ddd-observability` 只定义 no-op 的 tracer SPI 与属性常量；所有 OTEL 实现（propagator、span 创建、拦截器、MDC、exemplar、`opentelemetry-spring-boot-starter` 装配）集中在可选模块 `aipersimmon-ddd-observability-otel`。`core` / `cqrs` / `process-manager` / `outbox` 均**不依赖 OTEL**；未装配可观测性模块时全链路 no-op、行为与今天完全一致。
 
@@ -95,7 +95,7 @@ W3C Trace Context 中可续接的上下文是 `SpanContext`：
 
 ## 五、传播模型：同步 ambient，durable 跳手动缝合
 
-**同步链路完全交给 OTEL ambient `Context`**（`io.opentelemetry.context.Context.current()` / `Span.current()`）+ 库级自动埋点。HTTP → 命令 → 领域事件 → 投影 → JDBC → Kafka 直发，当前活跃 span 沿调用栈天然可见。手工把 `traceparent` 塞进 `CommandContext` 会与 ambient 重复，且违背 [[decision-00012-no-ambient-per-command-state]]（此处 ambient 的是 OTEL 基础设施 context，非注入业务上下文的 per-command 状态）。
+**同步链路完全交给 OTEL ambient `Context`**（`io.opentelemetry.context.Context.current()` / `Span.current()`）+ 库级自动埋点。HTTP → 命令 → 领域事件 → 投影 → JDBC → Kafka 直发，当前活跃 span 沿调用栈天然可见。手工把 `traceparent` 塞进 `CommandContext` 会与 ambient 重复，且违背 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)（此处 ambient 的是 OTEL 基础设施 context，非注入业务上下文的 per-command 状态）。
 
 **durable store-and-forward 是 ambient 唯一穿不过的一跳**：effect/deadline/outbox 行在事务 A（命令线程，ambient 活跃）写入，稍后由 relay/worker 轮询线程在事务 B 捞起——原 context 已消失，且没有任何自动埋点认识你自建的 `process_effect` / `aipersimmon_outbox` 表。这是 OTEL messaging 约定与"outbox 丢 trace 上下文"的标准场景，标准解法：**写行时把 ambient context 序列化进行，捞起时 extract 复原**。全库这样的跳点**只有两处**（outbox relay、PM relay/deadline，§三已穷举）。
 
@@ -119,7 +119,7 @@ public interface StoreAndForwardTracer {
 }
 ```
 
-> **`detach()` 的由来（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）**：outbox relay 流水线化之后，
+> **`detach()` 的由来（[issue-00111-the-relay-waited-for-each-send-in-turn](../issue/issue-00111-the-relay-waited-for-each-send-in-turn.md)）**：outbox relay 流水线化之后，
 > 「span 要当当前上下文」（producer 埋点读 ambient 注入消息头，只发生在**交出去**那一刻）与
 > 「span 要活着」（等到 ack 才能定成败）不再重合。此前 SPI 把 OTEL 分开的两件事（Span 与 Scope）捏成了一个
 > `Scope`。三条备选都不行：交出去就结束 span → 失败的投递在链路里显示成功；N 个 scope 同时开着 →
@@ -180,7 +180,7 @@ sequenceDiagram
   Worker->>DB: mark DELIVERED / 退避重试 / DEAD
 ```
 
-一并回收 [[issue-00025-correlation-propagation-and-scrape-batching]] 第 1 条：deadline 触发 / parked 重放处，`correlation_id`（业务）与 `traceparent`（可观测）同批贯穿到 deadline/transition 行。
+一并回收 [issue-00025-correlation-propagation-and-scrape-batching](../issue/issue-00025-correlation-propagation-and-scrape-batching.md) 第 1 条：deadline 触发 / parked 重放处，`correlation_id`（业务）与 `traceparent`（可观测）同批贯穿到 deadline/transition 行。
 
 ## 八、载体传播
 
@@ -209,7 +209,7 @@ trace_state VARCHAR(512)   -- 可选，可空
 
 `process_instance` 不加列（快照，非因果边界）；这些列无索引（不参与 claim 谓词）。
 
-> **DDL 同步警示**：PM 四表 DDL 跨 7 文件重复（生产 `{h2,mysql,postgresql}` + 测试副本 + scaffold 消费方副本，见 [[process-manager-schema-copies]]），**加上** `outbox-mybatis-plus` 各自的 schema——所有副本须一并改；MySQL 内联 `KEY` vs PG/H2 `CREATE INDEX`；相关模块在同一 reactor 里构建验证。
+> **DDL 同步警示**：PM 四表 DDL 跨 7 文件重复（生产 `{h2,mysql,postgresql}` + 测试副本 + scaffold 消费方副本，见 process-manager-schema-copies），**加上** `outbox-mybatis-plus` 各自的 schema——所有副本须一并改；MySQL 内联 `KEY` vs PG/H2 `CREATE INDEX`；相关模块在同一 reactor 里构建验证。
 
 ## 十、三柱闭环
 
@@ -224,9 +224,9 @@ trace_state VARCHAR(512)   -- 可选，可空
 
 ### 10.2 trace ↔ metric（exemplar）
 
-[[design-00004-durable-process-manager-runtime]] §5.3 已定 SLI（`oldest_pending_effect_age`、`dead_effects`、`suspended_instances`、`claim_latency`、`dispatch_latency`、`advance_conflict_retries` …）。
+[design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) §5.3 已定 SLI（`oldest_pending_effect_age`、`dead_effects`、`suspended_instances`、`claim_latency`、`dispatch_latency`、`advance_conflict_retries` …）。
 
-**outbox 侧的同形 SLI 已补齐（[[issue-00110-the-outbox-had-no-metrics-at-all]]）**：此前 outbox 零 Micrometer 指标，
+**outbox 侧的同形 SLI 已补齐（[issue-00110-the-outbox-had-no-metrics-at-all](../issue/issue-00110-the-outbox-had-no-metrics-at-all.md)）**：此前 outbox 零 Micrometer 指标，
 「积压深度」与「最老未发送年龄」这两条最经典的告警必须手写 SQL 打库才能得到——而那是消费方并不拥有的表。
 现在与 process-manager 同一形状：push 钩子 `OutboxObserver`（`claim.latency`、`dispatch.latency` 按 outcome 打标、
 `dead.lettered` 按 reason 打标、`mark.sent.failures`、`released`）+ pull 读 `OutboxBacklog`
@@ -247,11 +247,11 @@ trace_state VARCHAR(512)   -- 可选，可空
 | effect/deadline | `effect.kind`、`effect.index`、`deadline.name`、`retry.attempt`、`retry.max` |
 | 消息传输 | `messaging.system`、`messaging.destination`、`messaging.operation` |
 
-业务 payload **绝不**进属性（承接 [[decision-00013-command-context-and-causation-propagation]] 元数据在 payload 之外，及敏感字段脱敏）。
+业务 payload **绝不**进属性（承接 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) 元数据在 payload 之外，及敏感字段脱敏）。
 
 ## 十一、失败与错误可见性
 
-对齐 [[design-00003-exception-model]]，失败必须落在 span 上：
+对齐 [design-00003-exception-model](design-00003-exception-model.md)，失败必须落在 span 上：
 
 - 命令 handler 抛异常 / 校验失败 → 命令 span `setStatus(ERROR)` + `recordException`；`ConcurrencyTranslationCommandInterceptor` 翻译后的并发冲突亦然。
 - codec 编解码失败 → 推进 / 派发 span 记录异常。
@@ -262,7 +262,7 @@ trace_state VARCHAR(512)   -- 可选，可空
 ## 十二、采样策略
 
 - **头部采样决策必须跨异步保住**：`traceparent` 已携带 `sampled` 位（§四），复原端 `restore()` 尊重之——已覆盖。
-- **重试放大**：单 effect 最多 12 次退避尝试（[[design-00004-durable-process-manager-runtime]] §5.4）会放大 span 量；建议 collector 侧 **tail-based sampling**：全留 error/`DEAD`/`SUSPENDED` trace，对成功重试降采样。
+- **重试放大**：单 effect 最多 12 次退避尝试（[design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) §5.4）会放大 span 量；建议 collector 侧 **tail-based sampling**：全留 error/`DEAD`/`SUSPENDED` trace，对成功重试降采样。
 - 采样率/尾采样规则属于部署配置，脚手架给默认建议与 collector 配置示例，不硬编码。
 
 ## 十三、Baggage（可选增强）
@@ -311,30 +311,30 @@ flowchart TD
 
 1. **契约模块 + 列（无行为变化）**：建 `aipersimmon-ddd-observability`（SPI + no-op + 属性常量）；PM 三表 + 两套 outbox 表加 `traceparent`/`trace_state` 列（DDL 全副本，§九）。**不动 `CommandContext`/`EventEnvelope`**。全绿即合入，行为不变。
 2. **边界自动埋点 + 领域主干 span**：建 `aipersimmon-ddd-observability-otel`，接 `opentelemetry-spring-boot-starter`（边界白拿）；上 `TracingCommandInterceptor` 及 Query/DomainEvent/ACL/推进 span（§六）。此时同步全链路可见。
-3. **durable 跳缝合**：outbox（两实现）+ PM 写行 `captureCurrent()`、捞起 `restore()` link（§五/§七）；回收 [[issue-00025-correlation-propagation-and-scrape-batching]] correlation 断裂。
+3. **durable 跳缝合**：outbox（两实现）+ PM 写行 `captureCurrent()`、捞起 `restore()` link（§五/§七）；回收 [issue-00025-correlation-propagation-and-scrape-batching](../issue/issue-00025-correlation-propagation-and-scrape-batching.md) correlation 断裂。
 4. **三柱闭环**：MDC 注入 `trace_id`/`span_id`（§10.1）、SLI 加 exemplar（§10.2）、落实属性目录（§10.3）、错误语义（§十一）。
-5. **收敛（已做）**：自制 `traceId` 拆解——边缘正名 `requestId`、追踪身份删除归于 `traceparent`、错误体回显真 `trace_id`（详见顶部落地增补与 [[decision-00013-command-context-and-causation-propagation]]）。**仍可选**：baggage、collector tail-sampling。
+5. **收敛（已做）**：自制 `traceId` 拆解——边缘正名 `requestId`、追踪身份删除归于 `traceparent`、错误体回显真 `trace_id`（详见顶部落地增补与 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）。**仍可选**：baggage、collector tail-sampling。
 
 各阶段增量、可独立回滚；OTEL 未装配时全程 no-op。
 
 ## 十七、非目标与边界
 
 - 不改 `process_instance` 增 trace 列；不把 trace/traceparent 用于任何 claim/去重谓词（`message_id` 幂等、`correlation_id` 业务关联职责不变）。
-- 不把 `traceparent` 或业务 payload 写进 span 属性以外的地方；元数据不进 payload（[[decision-00013-command-context-and-causation-propagation]]）。
+- 不把 `traceparent` 或业务 payload 写进 span 属性以外的地方；元数据不进 payload（[decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）。
 - 不在 `core`/`cqrs`/`process-manager`/`outbox` 引入 OTEL 硬依赖；OTEL 只落可选模块。
 - 不强加 logback 配置文件 / 采样率 / collector 部署——这些是消费方部署配置，脚手架给约定、默认建议与示例。
-- 不替代业务指标看板设计；SLI 清单以 [[design-00004-durable-process-manager-runtime]] §5.3 为准，本文只补 exemplar 这条 trace↔metric 边。
+- 不替代业务指标看板设计；SLI 清单以 [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) §5.3 为准，本文只补 exemplar 这条 trace↔metric 边。
 
 ## Sources
 
 内部：
 
-- [[decision-00013-command-context-and-causation-propagation]] —— `CommandContext`/`EventEnvelope`/`OutboxMessage` 因果传播；元数据在 payload 之外。
-- [[design-00004-durable-process-manager-runtime]] §3.5 / §4.4 / §4.6 / §4.7 / §5.3 —— 异步 relay/deadline、身份重建、SLI 指标。
-- [[design-00003-exception-model]] —— span 错误语义对齐的异常模型。
-- [[decision-00012-no-ambient-per-command-state]] —— 禁 ambient 业务状态（区别于 OTEL 基础设施 context）。
-- [[issue-00025-correlation-propagation-and-scrape-batching]] —— deadline/replay 处的链路断裂（本文覆盖其 trace 投影）。
-- [[process-manager-schema-copies]] —— DDL 多副本同步约束。
+- [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) —— `CommandContext`/`EventEnvelope`/`OutboxMessage` 因果传播；元数据在 payload 之外。
+- [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) §3.5 / §4.4 / §4.6 / §4.7 / §5.3 —— 异步 relay/deadline、身份重建、SLI 指标。
+- [design-00003-exception-model](design-00003-exception-model.md) —— span 错误语义对齐的异常模型。
+- [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md) —— 禁 ambient 业务状态（区别于 OTEL 基础设施 context）。
+- [issue-00025-correlation-propagation-and-scrape-batching](../issue/issue-00025-correlation-propagation-and-scrape-batching.md) —— deadline/replay 处的链路断裂（本文覆盖其 trace 投影）。
+- process-manager-schema-copies —— DDL 多副本同步约束。
 - 代码：`aipersimmon-ddd-cqrs`（`CommandContext`、`CommandBus`、`QueryBus`、`CommandInterceptor`）、`aipersimmon-ddd-cqrs-spring`（`RegistryCommandBus`、`LoggingCommandInterceptor` 等）、`aipersimmon-ddd-application`（`Inbox`、`DomainEvents`）、`aipersimmon-ddd-events-spring`（`SpringDomainEvents`）、`aipersimmon-ddd-web-spring`（`TraceIdFilter`、`ProblemDetailFactory`）、`aipersimmon-ddd-messaging-kafka`（`KafkaIntegrationEventListener`、`IntegrationEventHeaders`）、`aipersimmon-ddd-outbox-engine`（`OutboxRelay`、`OutboxWriter` —— 自 `decision-00020` 起两个后端共用这一份）、`aipersimmon-ddd-process-manager-jdbc`（`JdbcProcessRuntime`、store/relay/deadline/operations）。
 
 外部：

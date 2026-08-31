@@ -104,6 +104,6 @@ private boolean isSelected(String component) {
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 持久化第三条 Major，挂起待方向者）
-- 起源：[[issue-00031-flyway-shared-schema-and-bundled-shedlock-table]]（每组件独立 history 表的取舍）
-- 依赖：[[issue-00103-parked-input-replay-is-not-crash-safe]]（列级 schema 探测让 opt-in 的失败变响亮）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 持久化第三条 Major，挂起待方向者）
+- 起源：[issue-00031-flyway-shared-schema-and-bundled-shedlock-table](issue-00031-flyway-shared-schema-and-bundled-shedlock-table.md)（每组件独立 history 表的取舍）
+- 依赖：[issue-00103-parked-input-replay-is-not-crash-safe](issue-00103-parked-input-replay-is-not-crash-safe.md)（列级 schema 探测让 opt-in 的失败变响亮）

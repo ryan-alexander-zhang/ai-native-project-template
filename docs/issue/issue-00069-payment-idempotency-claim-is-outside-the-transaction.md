@@ -101,7 +101,7 @@ if (recorded.isEmpty()) { operations.record(command.paymentOperationId(), decisi
 publish(decision, command, context);            // 首次与重投递走同一条出口
 ```
 
-   这条同时消灭了 `find()` 这个死方法（见 [[issue-00082-domain-surface-no-use-case-can-reach]]）。
+   这条同时消灭了 `find()` 这个死方法（见 [issue-00082-domain-surface-no-use-case-can-reach](issue-00082-domain-surface-no-use-case-can-reach.md)）。
 3. **改掉注释**：`PaymentOperations` 与 `payment/pom.xml` 里"in-memory 只是轻量替身"的说法要写清楚——
    真正的要求是**与副作用同事务**，"持久化"只是它的必要条件之一。
 
@@ -117,7 +117,7 @@ publish(decision, command, context);            // 首次与重投递走同一�
   幂等日志本来就是技术性出站适配器。
 - **（2）重投递改重发**：`AuthorizePaymentHandler` 改成本 issue 给的形状
   （`find` → `orElseGet(decide)` → 仅首次 `record` → **首投与重投走同一条出口**）。
-  `find()` 从此不再是死方法（[[issue-00082-domain-surface-no-use-case-can-reach]] 的一处随之消除）。
+  `find()` 从此不再是死方法（[issue-00082-domain-surface-no-use-case-can-reach](issue-00082-domain-surface-no-use-case-can-reach.md) 的一处随之消除）。
   重发安全性按本 issue 的要求先确认过：`OrderFulfilmentDefinition` 的 `(step, input)` 分派
   对重复 `PaymentAuthorized` 走 `ignore`。
 - **（3）注释改对**：`PaymentOperations`、`MyBatisPaymentOperations`、`payment/pom.xml`、
@@ -154,7 +154,7 @@ publish(decision, command, context);            // 首次与重投递走同一�
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[design-00004-durable-process-manager-runtime]]（§13.2 业务幂等键与传输层 effect id 的分工）
-- [[issue-00082-domain-surface-no-use-case-can-reach]]（`find()` 是其中一处死代码）
-- [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]]（payment deadline 目前是这个洞的唯一兜底）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（§13.2 业务幂等键与传输层 effect id 的分工）
+- [issue-00082-domain-surface-no-use-case-can-reach](issue-00082-domain-surface-no-use-case-can-reach.md)（`find()` 是其中一处死代码）
+- [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md)（payment deadline 目前是这个洞的唯一兜底）

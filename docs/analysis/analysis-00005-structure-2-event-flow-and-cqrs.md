@@ -12,22 +12,22 @@ status: active
 （3）集成事件**完整链路**（Outbox→Broker→Inbox）；（4）**CQRS-lite 读模型**的真正读写分离。
 每条主张都在文末 **Sources** 有参考或大厂实践出处。
 
-配套阅读：[[analysis-00001-domain-event-publishing]]（领域事件发布/消费机制、可插拔 publisher）、
-[[analysis-00002-domain-vs-integration-events]]（两类事件的判定轴与大厂实践）、
-[[analysis-00004-bounded-context-module-structure]]（s2 = 物理多模块 BC 的结构依据）。
+配套阅读：[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)（领域事件发布/消费机制、可插拔 publisher）、
+[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)（两类事件的判定轴与大厂实践）、
+[analysis-00004-bounded-context-module-structure](analysis-00004-bounded-context-module-structure.md)（s2 = 物理多模块 BC 的结构依据）。
 
 ## 结论先行
 
 1. **s2 已经有集成事件、Outbox、Inbox、跨 BC/跨聚合/外部调用；缺的是"领域事件层"与"真读模型"。**
    当前 `PlaceOrderService` 直接构造集成事件 `OrderPlaced` 丢进 outbox（`PlaceOrderService.java` 第 46-52 行），
-   领域事件与集成事件**塌缩为一层**——这与 [[analysis-00002-domain-vs-integration-events]] 的"概念上永远区分"相悖。
+   领域事件与集成事件**塌缩为一层**——这与 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md) 的"概念上永远区分"相悖。
 2. **在 s2（模块化单体、一个可部署单元）里，两类事件仍应落成两套类型**：领域事件在 `*-domain`/`*-application` 内、
    由聚合抛出、进程内同事务消费；集成事件在 `*-api`、瘦身（ID+最小数据）、经 Outbox 异步外发。两者之间加一层
    **翻译/防腐（ACL）**。依据：Microsoft eShopOnContainers（`DomainEvent` via MediatR 同事务 vs `IntegrationEvent` via
    event bus + `IntegrationEventLog` = Outbox）、Grzybek modular-monolith-with-ddd（两级事件 + Outbox/Inbox）。
 3. **Outbox 的原子性要求"翻译→写 outbox"与聚合状态变更处于同一事务**——因此该翻译必须用**同事务的
    `@EventListener`**，而非 `@TransactionalEventListener(AFTER_COMMIT)`（后者在提交后跑，破坏原子性）。
-   依据：[[analysis-00001-domain-event-publishing]] 的三档同步语义表 + eShop 的 IntegrationEventLog 同事务写入。
+   依据：[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) 的三档同步语义表 + eShop 的 IntegrationEventLog 同事务写入。
 4. **读侧要真正绕过写模型**：新增读模型端口 + 独立投影视图，查询直接打视图，不再 `Orders.byId` 载入整聚合。
    依据：ddd-by-examples/library 的 `SheetsReadModel`/`PatronProfileReadModel`（读模型直查 DB、绕过聚合）、
    ardalis CleanArchitecture 的 `QueryService`、Grzybek 的 raw-SQL 读侧（Dapper）。
@@ -47,7 +47,7 @@ status: active
 
 模块结构：每个 BC 拆 `api / domain / application / infrastructure / adapter` 五个 Maven 模块 + `shared-kernel` + `start`，
 BC 与层的隔离**编译期**（Maven classpath）成立，`ArchitectureTests` 做测试期兜底（`ArchitectureTests.java`）。这正是
-[[analysis-00004-bounded-context-module-structure]] 的 Structure 2。
+[analysis-00004-bounded-context-module-structure](analysis-00004-bounded-context-module-structure.md) 的 Structure 2。
 
 ### 已具备（✅）
 
@@ -66,7 +66,7 @@ BC 与层的隔离**编译期**（Maven classpath）成立，`ArchitectureTests`
 
 | # | 缺口 | 证据 | 影响 |
 | --- | --- | --- | --- |
-| G1 | **无领域事件层**：应用服务直接造集成事件写 outbox | `PlaceOrderService.java` 直接 `new OrderPlaced(...)` → `publisher.publish` | 领域/集成塌缩，内部模型即对外契约，违背 [[analysis-00002-domain-vs-integration-events]] |
+| G1 | **无领域事件层**：应用服务直接造集成事件写 outbox | `PlaceOrderService.java` 直接 `new OrderPlaced(...)` → `publisher.publish` | 领域/集成塌缩，内部模型即对外契约，违背 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md) |
 | G2 | **聚合不发事件**；确认走 `updateStatus` 绕过状态机 | `Order` 无 `registerEvent`；`ConfirmOrderService.apply` 调 `orders.updateStatus`，不调 `order.confirm()/cancel()` | `Order.confirm/cancel` 的不变式形同虚设 |
 | G3 | **读模型未分离**：读侧经写仓储载入整聚合再映射 | `FindOrderService.byId` → `orders.byId(id).map(...)` | 是 CQRS 命名不是读写分离；无法独立优化/演化读侧 |
 | G4 | **幂等不对称**：Ordering 消费端无 Inbox | `OrderConfirmationListener`/`ConfirmOrderService` 无幂等键 | 结果消息重投会重复 apply（虽多为幂等赋值，但无保护/无审计） |
@@ -79,7 +79,7 @@ BC 与层的隔离**编译期**（Maven classpath）成立，`ArchitectureTests`
 
 ## 二、领域事件 vs 集成事件：在 s2 里落成两套 + 一层翻译
 
-判定轴见 [[analysis-00002-domain-vs-integration-events]]：**能否一次编译抓到所有下游**。s2 是一个可部署单元，
+判定轴见 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)：**能否一次编译抓到所有下游**。s2 是一个可部署单元，
 但 **Inventory 消费者按"未来可独立部署"设计**（Structure 2 的晋升阶梯，见 analysis-00004 第 3 条），
 因此对外仍用**独立集成事件契约**。落地为三层：
 
@@ -93,16 +93,16 @@ Order 聚合 ──raise──> OrderPlacedEvent       │                      
 
 - **领域事件** `OrderPlacedEvent`（新增，放 `ordering-domain`，属通用语言）：由 `Order` 聚合 `registerEvent()` 抛出，
   可携带内部类型，进程内、**同事务**消费。依据：Vernon《Implementing DDD》"Effective Aggregate Design"（聚合发布领域事件）、
-  Spring Modulith `AbstractAggregateRoot.registerEvent`、jMolecules `@DomainEventPublisher`（见 `docs/reference/jmolecules/`）。
+  Spring Modulith `AbstractAggregateRoot.registerEvent`、jMolecules `@DomainEventPublisher`（见 `docs/reference/reference-00006-jmolecules.md`）。
 - **集成事件** `OrderPlaced`（已存在于 `ordering-api`，保持瘦）：对外契约，版本化、向后兼容。
   内容遵循 Fowler：默认 *Event Notification*（ID+最小数据），确需减少回查再升级 *Event-Carried State Transfer*。
 - **翻译层（ACL）**（新增）：一个 `ordering-application` 内的 `@EventListener`，把领域事件映射为集成事件并写 Outbox。
   依据：Spring Modulith 事件外化 `EventExternalizationConfiguration.mapping()` + `@Externalized`（见
-  `docs/reference/spring-modulith-with-ddd/`）；eShop 的 domain→integration 转换。
+  `docs/reference/reference-00008-spring-modulith-with-ddd.md`）；eShop 的 domain→integration 转换。
 
 > 为什么翻译必须**同事务**而非 AFTER_COMMIT：Outbox 的意义是"状态变更与待发消息原子落库"。若翻译在
 > `@TransactionalEventListener(AFTER_COMMIT)` 里跑，outbox 行会在提交**之后**才写，二者不再原子——进程崩溃即丢消息。
-> 故翻译用同事务 `@EventListener`（[[analysis-00001-domain-event-publishing]] 三档语义表的第一档）。
+> 故翻译用同事务 `@EventListener`（[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) 三档语义表的第一档）。
 > 读模型投影则可同事务（强一致）或 AFTER_COMMIT（读侧最终一致），二选一，见第五节。
 
 ---
@@ -114,7 +114,7 @@ Order 聚合 ──raise──> OrderPlacedEvent       │                      
 - `OrderPlacedEvent` —— `Order.place(...)` 时 `registerEvent`；消费者：①翻译成集成事件写 Outbox；②（可选）更新本地读模型投影。
 - `OrderConfirmedEvent` / `OrderCancelledEvent` —— `Order.confirm()/cancel()` 时 `registerEvent`；消费者：更新订单读模型投影为 CONFIRMED/CANCELLED。
 
-发布机制沿用 [[analysis-00001-domain-event-publishing]]：应用层只依赖 `DomainEvents` 接口（可插拔），
+发布机制沿用 [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)：应用层只依赖 `DomainEvents` 接口（可插拔），
 默认 `JustForward`（`ApplicationEventPublisher`，同步/同事务）。Spring 语义三档：
 
 | 想要 | 用什么 | 本蓝图用途 |
@@ -123,8 +123,8 @@ Order 聚合 ──raise──> OrderPlacedEvent       │                      
 | 仅提交后执行 | `@TransactionalEventListener(AFTER_COMMIT)` | 最终一致的读模型投影（可选） |
 | 异步脱离事务 | 加 `@Async` | 不用于本链路（一异步即滑向集成事件） |
 
-依据：[[analysis-00001-domain-event-publishing]]；Spring `@TransactionalEventListener` 文档；ardalis CleanArchitecture 的
-after-commit 分发（`SaveChangesInterceptor`，见 `docs/reference/clean-architecture/`）。
+依据：[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)；Spring `@TransactionalEventListener` 文档；ardalis CleanArchitecture 的
+after-commit 分发（`SaveChangesInterceptor`，见 `docs/reference/reference-00002-clean-architecture.md`）。
 
 ---
 
@@ -136,14 +136,14 @@ after-commit 分发（`SaveChangesInterceptor`，见 `docs/reference/clean-archi
    在下单同事务 `INSERT s2_ordering.outbox`。依据：Chris Richardson *Transactional Outbox*（microservices.io）；Grzybek Outbox。
 2. **Relay 轮询发送**：`OutboxRelay.flush()` `@Scheduled` 取 `sent=false` → `kafka.send` → 置 `sent=true`。
    **补 G8**：失败退避（指数退避 + 重试次数上限）+ 超限入 DLQ；可选升级为 Debezium CDC / Spring Modulith event publication registry
-   （语义一致、可靠性更高，见 [[analysis-00001-domain-event-publishing]] 第 5 条）。
+   （语义一致、可靠性更高，见 [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) 第 5 条）。
 3. **Broker**：Kafka，topic `order-placed` / `stock-result`，以 `orderId` 为 key 保证同订单分区有序。
 4. **消费 + Inbox（消费侧，幂等）**：
    - Inventory：**已有**——`ReserveStockService` 用 `Reservations`（orderId 为键）查重，命中 replay。
    - Ordering：**补 G4**——`OrderConfirmationListener`/`ConfirmOrderService` 增加同样的 Inbox（以 orderId/消息 id 去重）。
    依据：Chris Richardson *Idempotent Consumer*（microservices.io）；Grzybek Inbox。
 5. **契约演化（补 G7）**：`*-api` 事件视为版本化契约，采用 Confluent Schema Registry + Avro/Protobuf 向后兼容策略
-   （见 [[analysis-00002-domain-vs-integration-events]] 大厂实践）。
+   （见 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md) 大厂实践）。
 
 > **两条链路的接缝**：领域事件（链路一）→ 翻译（ACL）→ 集成事件写 Outbox（链路二起点）。回程亦对称：
 > Inventory 收 `OrderPlaced` → 领域行为 → （目标态）抛领域事件 `StockReserved`/`StockRejected` → 翻译成 `StockResult`
@@ -163,7 +163,7 @@ CQRS 的本质是把**改状态的意图（命令）**与**取数据的请求（
 **命令是什么。** 一个显式的、**任务型（task-based）而非 CRUD** 的意图对象，以祈使句命名（`PlaceOrderCommand`、
 `ConfirmOrderCommand`），只携带执行该意图所需的**最小数据**，**只返回 id / 元数据**（绝不返回读模型）。
 依据：Greg Young / Udi Dahan——命令是"要做某件事"的行为意图，不是对数据表的增删改（task-based UI / behavioral commands）；
-domain-driven-hexagon——"Command = state-changing intent, returns only id/metadata"（见 `docs/reference/domain-driven-hexagon/`）。
+domain-driven-hexagon——"Command = state-changing intent, returns only id/metadata"（见 `docs/reference/reference-00005-domain-driven-hexagon.md`）。
 
 **命令 ≠ 请求 DTO。** 边缘的 Web `PlaceOrderRequest` 与应用层 `PlaceOrderCommand` 分开：两者兼容性/生命周期不同，
 适配器负责映射。依据：domain-driven-hexagon（Request DTO 与 Command 分离，便于客户端向后兼容）。
@@ -171,16 +171,16 @@ domain-driven-hexagon——"Command = state-changing intent, returns only id/met
 **命令 handler = 薄应用服务。** 一条命令一个 handler；handler 只做**编排**——经仓储端口载入聚合、调用聚合的意图方法、
 持久化、发布领域事件；**自身不含领域逻辑，也不调别的应用服务**。依据：domain-driven-hexagon（Application Service = Command
 Handler）；ddd-by-examples/library（命令是显式对象 `PlaceOnHoldCommand`/`CheckOutBookCommand`/`CancelHoldCommand`，handler
-载入聚合→调领域方法→发事件，见 `docs/reference/ddd-by-examples-library/`）；Vernon《IDDD》应用服务即命令处理。
+载入聚合→调领域方法→发事件，见 `docs/reference/reference-00004-ddd-by-examples-library.md`）；Vernon《IDDD》应用服务即命令处理。
 
 **写模型 = 聚合。** 命令只经聚合的意图方法改状态，不变式在聚合内（§一 G2 已修：`Order.confirm()/cancel()`）。
 这与查询侧（5.2）构成读写分离：命令侧永不碰读模型 `order_view`，查询侧永不载入聚合。
 
 **命令总线 + 装饰器链。** 用一个轻量 `CommandBus` 把调用方与 handler 解耦，并在其上叠**有序装饰器**：
-`Logging（关联 id）→ Validation（Bean Validation）→ Transaction`。这与本文 [[analysis-00001-domain-event-publishing]]
+`Logging（关联 id）→ Validation（Bean Validation）→ Transaction`。这与本文 [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)
 里 `DomainEvents` 的"横切=装饰器"是同一手法。依据：modular-monolith-with-ddd（MediatR + **Logging→Validation→UnitOfWork**
-装饰器链，见 `docs/reference/modular-monolith-with-ddd/`）；clean-architecture（Mediator/pipeline behaviors，
-见 `docs/reference/clean-architecture/`）；Microsoft eShopOnContainers（MediatR pipeline behaviors 做校验/日志）；
+装饰器链，见 `docs/reference/reference-00007-modular-monolith-with-ddd.md`）；clean-architecture（Mediator/pipeline behaviors，
+见 `docs/reference/reference-00002-clean-architecture.md`）；Microsoft eShopOnContainers（MediatR pipeline behaviors 做校验/日志）；
 axon-framework（`CommandBus` + `@CommandHandler`，"decide vs apply"）。Java 落地：手写 `CommandHandler<C,R>` +
 按命令类型分发的 dispatcher，或 Axon `CommandBus`。
 
@@ -249,9 +249,9 @@ flowchart LR
 - 一致性选择：同库投影可**同事务**（强一致）或 **AFTER_COMMIT**（读侧最终一致、写事务更短）。默认同事务，量大再放宽。
 
 依据：ddd-by-examples/library `SheetsReadModel` / `PatronProfileReadModel`（读模型直查 DB、绕过聚合，见
-`docs/reference/ddd-by-examples-library/` "CQRS / events / outbox"）；ardalis CleanArchitecture `...QueryService`
-（读侧 DTO 绕过仓储，见 `docs/reference/clean-architecture/`）；Grzybek raw-SQL 读侧（Dapper 打视图，
-见 `docs/reference/modular-monolith-with-ddd/`）；Fowler *CQRS*；Greg Young / Udi Dahan CQRS。
+`docs/reference/reference-00004-ddd-by-examples-library.md` "CQRS / events / outbox"）；ardalis CleanArchitecture `...QueryService`
+（读侧 DTO 绕过仓储，见 `docs/reference/reference-00002-clean-architecture.md`）；Grzybek raw-SQL 读侧（Dapper 打视图，
+见 `docs/reference/reference-00007-modular-monolith-with-ddd.md`）；Fowler *CQRS*；Greg Young / Udi Dahan CQRS。
 
 > 提醒（沿用 clean-architecture 笔记）：读模型是**工程便利**，不是领域建模模式——别把投影 DTO 当聚合建模。
 
@@ -532,7 +532,7 @@ VIEW-->>Client: OrderSnapshot（不载入聚合）
 - 若跨 BC 步骤增多，再考虑升级为**编排/流程管理器（orchestration / process manager）**（Axon Saga 风格），YAGNI。
 
 依据：Chris Richardson *Saga pattern*（microservices.io，补偿事务）；Garcia-Molina & Salem *Sagas*（1987）；
-Axon `DeadlineManager`/`EventScheduler`（超时 + 补偿，见 `docs/reference/axon-framework/`）；Vernon《IDDD》过程管理器。
+Axon `DeadlineManager`/`EventScheduler`（超时 + 补偿，见 `docs/reference/reference-00001-axon-framework.md`）；Vernon《IDDD》过程管理器。
 
 ---
 
@@ -560,15 +560,15 @@ Axon `DeadlineManager`/`EventScheduler`（超时 + 补偿，见 `docs/reference/
 
 内部（本仓库蒸馏笔记 `docs/reference/` 与既有分析）：
 
-- [[analysis-00001-domain-event-publishing]] —— 领域事件发布/消费三档语义、可插拔 `DomainEvents` + Outbox。
-- [[analysis-00002-domain-vs-integration-events]] —— 两类事件判定轴、eShop/Grzybek/Confluent/Fowler 立场。
-- [[analysis-00004-bounded-context-module-structure]] —— s2 = 物理多模块 BC（Structure 2）与晋升阶梯。
-- `docs/reference/ddd-by-examples-library/` —— `SheetsReadModel`/`PatronProfileReadModel` 读模型直查、store-and-forward outbox。
-- `docs/reference/modular-monolith-with-ddd/` —— 两级事件 + Outbox/Inbox + raw-SQL 读侧。
-- `docs/reference/spring-modulith-with-ddd/` —— 事件外化 `mapping()` + `@Externalized`；event publication registry。
-- `docs/reference/clean-architecture/` —— after-commit 分发；`QueryService` 读侧 DTO 绕过仓储。
-- `docs/reference/axon-framework/` —— Saga / process manager（仅在流程复杂时参考）。
-- `docs/reference/jmolecules/` —— `@DomainEventPublisher` / `DomainEvent` 注解。
+- [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) —— 领域事件发布/消费三档语义、可插拔 `DomainEvents` + Outbox。
+- [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md) —— 两类事件判定轴、eShop/Grzybek/Confluent/Fowler 立场。
+- [analysis-00004-bounded-context-module-structure](analysis-00004-bounded-context-module-structure.md) —— s2 = 物理多模块 BC（Structure 2）与晋升阶梯。
+- `docs/reference/reference-00004-ddd-by-examples-library.md` —— `SheetsReadModel`/`PatronProfileReadModel` 读模型直查、store-and-forward outbox。
+- `docs/reference/reference-00007-modular-monolith-with-ddd.md` —— 两级事件 + Outbox/Inbox + raw-SQL 读侧。
+- `docs/reference/reference-00008-spring-modulith-with-ddd.md` —— 事件外化 `mapping()` + `@Externalized`；event publication registry。
+- `docs/reference/reference-00002-clean-architecture.md` —— after-commit 分发；`QueryService` 读侧 DTO 绕过仓储。
+- `docs/reference/reference-00001-axon-framework.md` —— Saga / process manager（仅在流程复杂时参考）。
+- `docs/reference/reference-00006-jmolecules.md` —— `@DomainEventPublisher` / `DomainEvent` 注解。
 
 外部（大厂 / 权威）：
 

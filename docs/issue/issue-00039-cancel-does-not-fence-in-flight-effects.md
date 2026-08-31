@@ -68,6 +68,6 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[issue-00017-cancelled-deadline-can-still-fire]] —— 同属"取消后仍可触发副作用"类缺陷(deadline 侧)。
-- [[design-00004-durable-process-manager-runtime]] —— cancel 语义的设计出处(:834-835)。
-- [[plan-00003-durable-process-manager-implementation]]
+- [issue-00017-cancelled-deadline-can-still-fire](issue-00017-cancelled-deadline-can-still-fire.md) —— 同属"取消后仍可触发副作用"类缺陷(deadline 侧)。
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) —— cancel 语义的设计出处(:834-835)。
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

@@ -1,8 +1,8 @@
 ---
-id: 20260708161438-domain-driven-hexagon
+id: reference-00005-domain-driven-hexagon
 type: reference
-role: main
 status: active
+informs: [analysis-00003-aggregate-first-vs-layer-first, analysis-00004-bounded-context-module-structure, analysis-00005-structure-2-event-flow-and-cqrs, design-00004-durable-process-manager-runtime]
 ---
 
 # Sairyss/domain-driven-hexagon — DDD reference notes
@@ -11,6 +11,8 @@ Distilled reference for the Java DDD template. Source is reference-only (see
 THIRDPARTY.md). Facts verified on 2026-07-08. **This is a TypeScript/NestJS
 tutorial**; borrow the vocabulary, responsibilities, and layering discipline —
 they map cleanly to Java/Spring.
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

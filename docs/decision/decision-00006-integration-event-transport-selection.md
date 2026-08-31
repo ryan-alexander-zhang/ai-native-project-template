@@ -2,15 +2,17 @@
 id: decision-00006-integration-event-transport-selection
 type: decision
 status: active
+motivated_by: [analysis-00001-domain-event-publishing, analysis-00002-domain-vs-integration-events, analysis-00007-saga-process-manager]
+constrains: [design-00001-aipersimmon-ddd-and-scaffold, design-00006-integration-event-routing]
 ---
 
 # 集成事件传输:三种方式、确定性装配、monolith-first 默认
 
-固化"集成事件怎么发"的传输选型策略。机制细节由 [[design-00001-aipersimmon-ddd-and-scaffold]]
+固化"集成事件怎么发"的传输选型策略。机制细节由 [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md)
 （§5.6 传输总览、§5.7 events-spring、§5.8 outbox、§5.14 messaging-kafka）承载;
 本文记录**策略与选型依据**——提供哪几种方式、默认走哪种、按什么信号升级、如何装配——
-而不重复机制。承接 [[analysis-00002-domain-vs-integration-events]]（为何跨 BC 用集成事件)
-与 [[analysis-00001-domain-event-publishing]]（发布/outbox 底座)。
+而不重复机制。承接 [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)（为何跨 BC 用集成事件)
+与 [analysis-00001-domain-event-publishing](../analysis/analysis-00001-domain-event-publishing.md)（发布/outbox 底座)。
 
 ## Context
 
@@ -64,7 +66,7 @@ monolith-first 原则下,不应一上来强制 broker;但要让**升级路径平
 | 运维承受力 | 只需应用本身 | 关系库 + 调度 | 关系库 + 调度 + broker |
 
 极长流程/人工审批/可视化编排等超出 at-least-once + 定时重投的需求,属传输之上的编排问题,
-见 [[analysis-00007-saga-process-manager]] 的 durable-execution 逃生舱,不在本决策范围。
+见 [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md) 的 durable-execution 逃生舱,不在本决策范围。
 
 ## 装配速查
 
@@ -116,11 +118,11 @@ starter 用每组件独立历史表自动应用,或复制进消费者自己的 F
 
 内部:
 
-- [[design-00001-aipersimmon-ddd-and-scaffold]] §5.6 传输总览、§5.7 events-spring、
+- [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md) §5.6 传输总览、§5.7 events-spring、
   §5.8 outbox(含存储无关 core 抽出与 MyBatis-Plus 变体)、§5.14 messaging-kafka。
-- [[analysis-00002-domain-vs-integration-events]] —— 领域事件 vs 集成事件、跨 BC 用集成事件。
-- [[analysis-00001-domain-event-publishing]] —— 事件发布与 outbox 底座。
-- [[analysis-00007-saga-process-manager]] —— 长流程编排与 durable-execution 逃生舱(本决策范围之外)。
+- [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md) —— 领域事件 vs 集成事件、跨 BC 用集成事件。
+- [analysis-00001-domain-event-publishing](../analysis/analysis-00001-domain-event-publishing.md) —— 事件发布与 outbox 底座。
+- [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md) —— 长流程编排与 durable-execution 逃生舱(本决策范围之外)。
 - scaffold-samples:`reliable-integration-events`(outbox + 进程内)、
   `integration-events-over-kafka`(outbox→Kafka→inbox→进程内,EmbeddedKafka 端到端)。
 

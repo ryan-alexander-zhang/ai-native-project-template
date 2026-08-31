@@ -118,6 +118,6 @@ SQL 本身不单独测：`PlaceOrder` 每次下单都要查它，`start` 里所�
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[decision-00015-cross-context-sync-query-via-gateway-acl]]（这条同步查询的设计依据）
-- [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]（同一 handler 家族的另一处重复加载）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [decision-00015-cross-context-sync-query-via-gateway-acl](../decision/decision-00015-cross-context-sync-query-via-gateway-acl.md)（这条同步查询的设计依据）
+- [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md)（同一 handler 家族的另一处重复加载）

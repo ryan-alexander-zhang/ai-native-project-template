@@ -54,6 +54,6 @@ V1 对它们什么都不做，V2 再去 drop 那个已经不存在的列就炸�
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 7 档，最后一档）
-- 同一形状的真缺陷（解析失败 = 每轮静默失败）：[[issue-00120-mariadb-was-support-nobody-had-declared]]
-- 本档顺带验证了它的改动：[[issue-00125-the-claim-sorted-one-instance-last-forever]]
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 7 档，最后一档）
+- 同一形状的真缺陷（解析失败 = 每轮静默失败）：[issue-00120-mariadb-was-support-nobody-had-declared](issue-00120-mariadb-was-support-nobody-had-declared.md)
+- 本档顺带验证了它的改动：[issue-00125-the-claim-sorted-one-instance-last-forever](issue-00125-the-claim-sorted-one-instance-last-forever.md)

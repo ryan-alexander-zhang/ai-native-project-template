@@ -113,5 +113,5 @@ BUILD SUCCESS（jdbc/mybatis-plus 后端未破坏，两个 worker 测试假件�
 
 ## 关联
 
-- codec null 字面量与失败码为空的叠加：[[issue-00131-one-side-allowed-null-the-other-side-threw]]
-- 因果链断裂（同为流程域的框架缺口）：[[issue-00137-the-bridge-starts-a-new-causal-chain]]
+- codec null 字面量与失败码为空的叠加：[issue-00131-one-side-allowed-null-the-other-side-threw](issue-00131-one-side-allowed-null-the-other-side-threw.md)
+- 因果链断裂（同为流程域的框架缺口）：[issue-00137-the-bridge-starts-a-new-causal-chain](issue-00137-the-bridge-starts-a-new-causal-chain.md)

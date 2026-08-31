@@ -149,6 +149,6 @@ void theNumberOfDistinctTestContextsIsDeliberate() {
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00067-test-support-covers-every-store-except-the-transport]]（`TestInfrastructure` 的由来）
-- [[issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind]]（同一批 `properties` 块的上一轮问题）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00067-test-support-covers-every-store-except-the-transport](issue-00067-test-support-covers-every-store-except-the-transport.md)（`TestInfrastructure` 的由来）
+- [issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind](issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind.md)（同一批 `properties` 块的上一轮问题）

@@ -73,7 +73,7 @@ void anOrderLineCannotReferenceAnotherTenantsOrder() {
 
 ## 修复
 
-新增（或并入 [[issue-00073-no-index-supports-the-cursor-paged-list]] 的）`V4`：
+新增（或并入 [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md) 的）`V4`：
 
 ```sql
 -- 父表主键纳入 tenant_id，使外键可以带上它
@@ -107,7 +107,7 @@ ALTER TABLE inventory.reservation_lines
 ## 验证结果
 
 已修。落在 `V4__tenant_scoped_keys_and_indexes.sql`，与
-[[issue-00073-no-index-supports-the-cursor-paged-list]] 合并为同一个迁移。
+[issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md) 合并为同一个迁移。
 
 - **修复方案里的语句顺序是错的，已调整**：原稿先 `DROP CONSTRAINT orders_pkey`，
   但子表外键正依赖该主键背后的唯一索引，PostgreSQL 会拒绝
@@ -131,7 +131,7 @@ ALTER TABLE inventory.reservation_lines
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00073-no-index-supports-the-cursor-paged-list]]（同一个 V4 迁移）
-- [[decision-00018-multi-tenancy-boundaries]]
-- [[design-00009-multi-tenancy-tenant-id]]（§6 unique-key trap；本 issue 是它在外键上的对应物）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md)（同一个 V4 迁移）
+- [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)
+- [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)（§6 unique-key trap；本 issue 是它在外键上的对应物）

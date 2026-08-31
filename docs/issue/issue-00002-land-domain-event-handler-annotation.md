@@ -7,7 +7,7 @@ blocks: [decision-00009-event-type-markers-and-handler-contracts]
 
 # 落地 @DomainEventHandler 架构语义注解
 
-实施 [[decision-00009-event-type-markers-and-handler-contracts]] 命题二:领域事件订阅者必须带
+实施 [decision-00009-event-type-markers-and-handler-contracts](../decision/decision-00009-event-type-markers-and-handler-contracts.md) 命题二:领域事件订阅者必须带
 `@DomainEventHandler` 架构语义注解。集成事件侧不设对应注解(命题三),故本 issue 只涉及领域事件侧。
 
 ## 已完成
@@ -26,7 +26,7 @@ blocks: [decision-00009-event-type-markers-and-handler-contracts]
 ## 未做(后续项)
 
 - **其余脚手架形态**(`modulith`、`microservice`)的领域事件订阅者尚未迁到 application、也未标注
-  `@DomainEventHandler`(且已从这两者移除 ArchUnit)。属 [[issue-00001-move-domain-event-listener-to-application]]
+  `@DomainEventHandler`(且已从这两者移除 ArchUnit)。属 [issue-00001-move-domain-event-listener-to-application](issue-00001-move-domain-event-listener-to-application.md)
   的同类后续;本 issue 按要求**只动 multi-module**。
 
 ## 验收标准(GWT)
@@ -39,6 +39,6 @@ blocks: [decision-00009-event-type-markers-and-handler-contracts]
 
 ## 关联
 
-- 决策:[[decision-00009-event-type-markers-and-handler-contracts]]
-- 前序:[[decision-00008-event-subscriber-layer-placement]]、[[issue-00001-move-domain-event-listener-to-application]]
+- 决策:[decision-00009-event-type-markers-and-handler-contracts](../decision/decision-00009-event-type-markers-and-handler-contracts.md)
+- 前序:[decision-00008-event-subscriber-layer-placement](../decision/decision-00008-event-subscriber-layer-placement.md)、[issue-00001-move-domain-event-listener-to-application](issue-00001-move-domain-event-listener-to-application.md)
 </content>

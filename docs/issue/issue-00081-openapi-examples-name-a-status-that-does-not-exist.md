@@ -32,7 +32,7 @@ blocks: [report-00002-scaffold-ddd-review]
 
   同一个 `orderId` 在同一份 `/v3/api-docs` 里有两种形态，
   而其中 `ord-123` 那种是系统永远不会产生的（id 恒为 UUIDv7，见
-  [[decision-00019-time-ordered-uuidv7-identifiers]]）。
+  [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)）。
 - 币种示例也不一致：`OrderSnapshot.java:18` 用 `CNY`，
   `OrderListItem.java:22` 用 `USD`，而种子数据与全部测试都是 `USD`。
 
@@ -44,7 +44,7 @@ blocks: [report-00002-scaffold-ddd-review]
    编译器、springdoc、测试都不会把它与 `OrderStatus` 或 id 格式做任何比对。
 3. **真根因**：这些示例写于状态机重构（`PLACED` → 六态）与 id 迁移（随机 → UUIDv7）**之前**，
    两次重构都没有把"示例值"算进影响面——因为没有任何机制把它们算进去。
-   它与 [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]]
+   它与 [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md)
    是同一类漂移，区别在于**这一处漂进了对外契约**，而那一处只漂在内部注释里。
 4. **排除的伪根因**：不是 `@Schema` 用错了位置——
    在 application 层的读模型上标注是有意的、且有 ArchUnit 规则背书
@@ -96,6 +96,6 @@ void everyStatusExampleInTheApiDocsIsARealOrderStatus() {
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[decision-00019-time-ordered-uuidv7-identifiers]]
-- [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]]（同类漂移，但只在内部注释）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)
+- [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md)（同类漂移，但只在内部注释）

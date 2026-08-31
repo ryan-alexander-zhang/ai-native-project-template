@@ -7,9 +7,9 @@ status: active
 # 集成事件路由：进程内默认 + 逐事件选择性外发到命名 topic
 
 把集成事件的传输从"应用级全局单选"细化到"**逐事件**"：默认走进程内 outbox+inbox，只有**显式标注**要外发的事件才
-路由到**命名 Kafka topic**；未外发的事件永不碰 broker。承接并修正 [[decision-00006-integration-event-transport-selection]]
+路由到**命名 Kafka topic**；未外发的事件永不碰 broker。承接并修正 [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)
 （三传输、单 dispatcher 全局），由 issue-00028 与
-[[issue-00030-single-topic-fanout-all-consumers-see-all-events]] 驱动。
+[issue-00030-single-topic-fanout-all-consumers-see-all-events](../issue/issue-00030-single-topic-fanout-all-consumers-see-all-events.md) 驱动。
 
 ## 一、结论先行
 
@@ -82,13 +82,13 @@ flowchart LR
   bridge --> el
 ```
 
-- **单张 outbox 表**：原子性/顺序不变（前提是聚合与 outbox 同库同事务，见 §八与 [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]）。
+- **单张 outbox 表**：原子性/顺序不变（前提是聚合与 outbox 同库同事务，见 §八与 [issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](../issue/issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md)）。
 - 分区 key 仍 = 聚合 `subject`（per-aggregate 保序，decision-00014 不变）。
-- **一批 send 是重叠的**（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）：router 的 Kafka 腿把整批
+- **一批 send 是重叠的**（[issue-00111-the-relay-waited-for-each-send-in-turn](../issue/issue-00111-the-relay-waited-for-each-send-in-turn.md)）：router 的 Kafka 腿把整批
   交给 producer 再逐个等 ack。这不会乱序，因为一批 claim 出来的行两两不同 `subject`（队头 claim 的性质），
   而某聚合的下一条要等这一条记账之后才可领——同一聚合的两条事件**永不同时在飞**。
 
-> **修正（[[issue-00109-a-vanished-route-turned-an-externalized-event-local]]）：reach 在写入时决定，
+> **修正（[issue-00109-a-vanished-route-turned-an-externalized-event-local](../issue/issue-00109-a-vanished-route-turned-an-externalized-event-local.md)）：reach 在写入时决定，
 > 不在派发时。** 上图里 router "按 reach 分流" 的实现原本是派发时查 `ExternalizedRoutes`，于是路由成了
 > 「relay 捞到这行时当前部署的代码怎么说」的函数。版本升级漏标注解、或滚动发布期间新旧实例并存，
 > `(type, version)` 从路由表消失，而库里还躺着写入时确实要外发的行——miss 落进程内腿、正常返回、
@@ -109,7 +109,7 @@ flowchart LR
 
 EXTERNAL 事件按 `@Externalized` 的 target 映射到**每类/每上下文命名 topic**；外部方按需订阅；DLT 为 `<topic>.DLT`，
 **不点名分区**——DLT 常按涓流建、分区数少于源主题，点名一个那里不存在的分区会让发布失败 → recoverer 失败 →
-错误处理器 seek 回去重试，毒消息永远出不去、分区无限停滞（[[issue-00111-the-relay-waited-for-each-send-in-turn]]）。
+错误处理器 seek 回去重试，毒消息永远出不去、分区无限停滞（[issue-00111-the-relay-waited-for-each-send-in-turn](../issue/issue-00111-the-relay-waited-for-each-send-in-turn.md)）。
 同聚合的死信仍落同一分区：recoverer 会把源记录的 key 抄过去，共位一直是 key 的功劳。
 替代今天的单 topic 火龙。
 
@@ -123,7 +123,7 @@ EXTERNAL 事件按 `@Externalized` 的 target 映射到**每类/每上下文命�
 
 **决策（D3=显式）**：不再有"装了 kafka 就默默全上 broker"的旧行为——任何事件进 broker 都必须显式 `@Externalized`。
 
-**迁移后果**：现有 `multi-module`（[[plan-00006-middleware-integration]]）目前靠"单 topic 全外发"跑 Kafka;本设计实现后,
+**迁移后果**：现有 `multi-module`（[plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)）目前靠"单 topic 全外发"跑 Kafka;本设计实现后,
 其真正需要跨进程的跨 BC 事件须补 `@Externalized`,否则退回全进程内。记为 plan-00006 之后的一次性小迁移(见 §八实现顺序)。
 
 升级路径：把某事件从 LOCAL 提升为 EXTERNAL = **加一个 `@Externalized` 注解 + 配 topic 名**，业务代码与 handler 不动——
@@ -146,7 +146,7 @@ EXTERNAL 事件按 `@Externalized` 的 target 映射到**每类/每上下文命�
 ## 八、前置依赖与实现顺序
 
 **决策（D4=认）**：outbox（LOCAL 或 EXTERNAL 皆然）的"同事务原子"以**聚合与 outbox 同库同事务**为**硬前提**。当前多模块
-聚合在内存（[[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]），故：
+聚合在内存（[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](../issue/issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md)），故：
 
 - 路由**机制**（`@Externalized`、`RoutingOutboxDispatcher`、多 topic、入站选择性）可先独立实现；
 - 但本设计的**可靠性论述**（同事务原子的 outbox）在 **plan-00007（聚合落 PG）** 落地前不成立，届时之前不对外宣称 outbox 可靠性；
@@ -165,11 +165,11 @@ EXTERNAL 事件按 `@Externalized` 的 target 映射到**每类/每上下文命�
 ## Sources
 
 内部：
-- [[plan-00008-integration-event-routing-implementation]]（本设计的落地：库机制 + multi-module 全绿；microservice/样例迁移因既有 decision-00013/00014 债 revert，另立后续）
-- [[decision-00006-integration-event-transport-selection]]（三传输、单 dispatcher；本设计细化其粒度）
-- [[decision-00014-cloudevents-integration-event-contract]]（`@EventType`、subject=key、ce_ 头；§7 topic 路由留作扩展点）
-- issue-00028、[[issue-00030-single-topic-fanout-all-consumers-see-all-events]]（驱动）
-- [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]（前置）、[[plan-00006-middleware-integration]]（现场）
+- [plan-00008-integration-event-routing-implementation](../plan/plan-00008-integration-event-routing-implementation.md)（本设计的落地：库机制 + multi-module 全绿；microservice/样例迁移因既有 decision-00013/00014 债 revert，另立后续）
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)（三传输、单 dispatcher；本设计细化其粒度）
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)（`@EventType`、subject=key、ce_ 头；§7 topic 路由留作扩展点）
+- issue-00028、[issue-00030-single-topic-fanout-all-consumers-see-all-events](../issue/issue-00030-single-topic-fanout-all-consumers-see-all-events.md)（驱动）
+- [issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](../issue/issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md)（前置）、[plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)（现场）
 - reference：`modular-monolith-with-ddd`、`spring-modulith-with-ddd`、`axon-framework`、`ddd-by-examples-library`
 
 外部：

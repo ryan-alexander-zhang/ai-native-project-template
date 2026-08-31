@@ -1,8 +1,8 @@
 ---
-id: 20260708161438-spring-modulith-with-ddd
+id: reference-00008-spring-modulith-with-ddd
 type: reference
-role: main
 status: active
+informs: [analysis-00001-domain-event-publishing, analysis-00002-domain-vs-integration-events, analysis-00004-bounded-context-module-structure, analysis-00005-structure-2-event-flow-and-cqrs]
 ---
 
 # xsreality/spring-modulith-with-ddd — DDD reference notes
@@ -11,6 +11,8 @@ Distilled reference for the Java DDD template. Source is reference-only (see
 THIRDPARTY.md). Facts verified against the repo on 2026-07-08. **This is the
 closest match to the target stack** (Spring Boot 4 / Spring Modulith 2 +
 jMolecules modular monolith).
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

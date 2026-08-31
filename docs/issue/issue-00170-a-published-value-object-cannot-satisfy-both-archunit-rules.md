@@ -67,7 +67,7 @@ Class <...sharedkernel.api.Money>  does not reside in a package '..domain..'
 `ArchitectureTest.thepublishedTypesAreStillImmutable` 手写补回不可变性检查
 （`..api..` 里的顶层类必须只有 final 字段）。这条比注解弱：它要每个项目自己写一遍。
 
-相关：[[analysis-00041-samples-add-bounded-context]] §3。
+相关：[analysis-00041-samples-add-bounded-context](../analysis/analysis-00041-samples-add-bounded-context.md) §3。
 
 ## 解决记录（2026-08-05）
 

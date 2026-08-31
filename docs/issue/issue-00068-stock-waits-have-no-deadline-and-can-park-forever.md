@@ -94,7 +94,7 @@ void aReserveStockThatDeadLettersDoesNotParkTheOrderForever() {
    from outside"必须改写，否则它会把一个已知缺口描述成不存在的。
 
 无论选哪条，都应同时收窄 `ReserveStockHandler` / `ReleaseStockHandler` 的失败语义
-（见 [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]），
+（见 [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md)），
 让"技术失败"与"业务失败"对流程呈现同一种可观测形态。
 
 ## 验证结果
@@ -140,16 +140,16 @@ void aReserveStockThatDeadLettersDoesNotParkTheOrderForever() {
 
 **未做**：本 issue 复现段的第二条（用 `@Primary Stocks` 装饰器抛
 `OptimisticLockingFailureException` 直到进死信）。技术失败逃出 catch 这条路径的**数据**后果
-已由 [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] 修好（回滚、无部分扣减），
+已由 [issue-00094-a-swallowed-domain-exception-leaks-stock-permanently](issue-00094-a-swallowed-domain-exception-leaks-stock-permanently.md) 修好（回滚、无部分扣减），
 而"没人再喂事实"的后果正由本次的 STOCK deadline 兜住——两者叠加已覆盖该场景，
 再造一个死信编排测试收益有限。
-[[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] 的失败语义收窄也已完成。
+[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md) 的失败语义收窄也已完成。
 
 验证：`mvn -o verify -pl start -am` 全绿，71 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[design-00004-durable-process-manager-runtime]]（deadline 与 max-lifetime 的契约）
-- [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]]（重复 SKU 是逃出 catch 的另一条路径）
-- [[issue-00070-ready-for-fulfilment-is-never-persisted]]（订单卡住时客户无法自助取消，与此叠加）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（deadline 与 max-lifetime 的契约）
+- [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md)（重复 SKU 是逃出 catch 的另一条路径）
+- [issue-00070-ready-for-fulfilment-is-never-persisted](issue-00070-ready-for-fulfilment-is-never-persisted.md)（订单卡住时客户无法自助取消，与此叠加）

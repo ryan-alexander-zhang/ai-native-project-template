@@ -35,7 +35,7 @@ blocks: [report-00002-scaffold-ddd-review]
    **写作时的上下文与消费时的上下文不同**，而裸文件名引用在两种上下文里看起来完全一样。
 3. **真根因**：scaffold 有两个身份（"仓库里的一个样例" / "被生成出去的模板"），
    文档写作时默认了第一个。这与
-   [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]] 属于同族——
+   [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md) 属于同族——
    都是**文档的假设没有随载体变化而更新**——但这一处的假设是关于**分发边界**的，
    本地怎么读都不会暴露。
 4. **排除的伪根因**：不是应该把两篇文档复制进 scaffold——
@@ -97,6 +97,6 @@ void everyDocumentTheScaffoldReferencesIsResolvableFromTheGeneratedProject() thr
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]]（同族：文档假设未随变化更新）
-- [[design-00001-aipersimmon-ddd-and-scaffold]]（scaffold 与库的分发关系）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md)（同族：文档假设未随变化更新）
+- [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md)（scaffold 与库的分发关系）

@@ -2,14 +2,14 @@
 id: analysis-00030-samples-synchronous-call-between-services
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S6 服务间同步调用
 
 对应 sample：`aipersimmon-ddd-samples/s06-synchronous-call-between-services`（两个服务模块）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。与
-[[analysis-00025-samples-integration-events-across-services]] 的对照是本篇第一节。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。与
+[analysis-00025-samples-integration-events-across-services](analysis-00025-samples-integration-events-across-services.md) 的对照是本篇第一节。
 
 ## 0. 本篇定位
 

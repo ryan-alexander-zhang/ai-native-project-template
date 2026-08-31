@@ -59,7 +59,7 @@ parked-input worker 靠重放的幂等性。两个实例同时 purge 会选到�
 
 补上 `instance_id` 作为决定性平局打破，与 deadline **列表查询**的 `(due_at, deadline_id)` 同一个约定。
 
-> 更正（[[issue-00125-the-claim-sorted-one-instance-last-forever]]）：此处原文写的是「与 deadline **claim** 同一个约定」，
+> 更正（[issue-00125-the-claim-sorted-one-instance-last-forever](issue-00125-the-claim-sorted-one-instance-last-forever.md)）：此处原文写的是「与 deadline **claim** 同一个约定」，
 > 而 deadline claim 当时**并没有**平局打破——这个约定只存在于 `JdbcProcessDeadlineStore` 的列表查询上。
 > claim 的那一半由 `issue-00125` 补上。
 
@@ -84,7 +84,7 @@ PG/H2 用 `CREATE INDEX IF NOT EXISTS`，MySQL 用 `ALTER TABLE ... ADD INDEX`�
 
 ## 关联
 
-- 父：[[issue-00119-ten-majors-were-never-scheduled]]（排期第 3 档）
-- "删掉转移会让 runtime 拒绝回答"，那条断言来自：[[issue-00117-the-advance-itself-had-no-tests]]
-- 终态决策仍然投递暂存效果，这条设计来自：[[issue-00104-an-ended-instance-keeps-its-timers-forever]]
-- 抄的形状与"不碰死信表"的先例：[[decision-00020-outbox-engine-over-one-store-port]]
+- 父：[issue-00119-ten-majors-were-never-scheduled](issue-00119-ten-majors-were-never-scheduled.md)（排期第 3 档）
+- "删掉转移会让 runtime 拒绝回答"，那条断言来自：[issue-00117-the-advance-itself-had-no-tests](issue-00117-the-advance-itself-had-no-tests.md)
+- 终态决策仍然投递暂存效果，这条设计来自：[issue-00104-an-ended-instance-keeps-its-timers-forever](issue-00104-an-ended-instance-keeps-its-timers-forever.md)
+- 抄的形状与"不碰死信表"的先例：[decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md)

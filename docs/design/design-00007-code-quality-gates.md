@@ -8,7 +8,7 @@ status: active
 
 把质量门禁从"文档声明、无人执行"变成"构建强制"。核心目标：**任何从本脚手架生成的项目，其 domain 层都强制满足
 单元测试覆盖率 ≥90% 且变异测试（PIT）≥90%**；其余工具（格式、架构、静态分析）按各自合适的作用域接入。承接
-[[TESTING.md]] 已声明但未执行的 90% 覆盖率 DoD 与 [[DEVELOPMENT.md]] 尚为占位符的 `Lint` 命令。
+[TESTING.md](../../TESTING.md) 已声明但未执行的 90% 覆盖率 DoD 与 [DEVELOPMENT.md](../../DEVELOPMENT.md) 尚为占位符的 `Lint` 命令。
 
 ## 一、结论先行
 
@@ -50,7 +50,7 @@ status: active
 - 不对 starter/adapter/infrastructure/wiring 层强制 90% 覆盖或变异——见 §三理由。
 - 不改任何业务/领域代码行为；本设计只加构建期门禁与一个测试支撑模块。
 
-> **修正（[[issue-00113-the-quality-gates-sat-where-the-risk-was-not]]）：门禁的作用域从"层"改为"风险"。**
+> **修正（[issue-00113-the-quality-gates-sat-where-the-risk-was-not](../issue/issue-00113-the-quality-gates-sat-where-the-risk-was-not.md)）：门禁的作用域从"层"改为"风险"。**
 > 本设计把 90/90 定在 domain 层（库这边即 6 个纯净层模块），理由见下一节——那些理由对**消费方项目**依然成立。
 > 但对**库自己**，它产生了一个反常结果：门禁全装在 record 与值类型上，而两个 engine
 > （`-outbox-engine` 1611 行、`-process-manager-engine` 5016 行）——按聚合顺序、重试预算、何时放弃、
@@ -60,9 +60,9 @@ status: active
 > `-process-manager-engine` 跨四个 store 端口的那 1300 行**仍在门外并在 pom 里点名**，不是默默豁免。
 > 另：PIT 阈值在 engine 上是 85 而非 90，理由写在 pom 里——剩下的变异体杀掉只会抬高数字而不保护任何行为。
 >
-> **续（[[issue-00117-the-advance-itself-had-no-tests]]）**：上面那 1300 行里最大的一块——`runtime`
+> **续（[issue-00117-the-advance-itself-had-no-tests](../issue/issue-00117-the-advance-itself-had-no-tests.md)）**：上面那 1300 行里最大的一块——`runtime`
 > （每一次流转都要过的路）——已随第四个内存 store 补完，0% → 100% line / 98.2% branch 并入门禁。
-> 门外现在只剩 `autoconfigure`（`replay` 与 `operation` 由 [[issue-00118-the-recovery-paths-had-no-tests]] 补完），外加**按名字排除的一个类**
+> 门外现在只剩 `autoconfigure`（`replay` 与 `operation` 由 [issue-00118-the-recovery-paths-had-no-tests](../issue/issue-00118-the-recovery-paths-had-no-tests.md) 补完），外加**按名字排除的一个类**
 > `SpringTxProcessUnitOfWork`：六行转发给 Spring 的 `TransactionTemplate`，
 > 对着 mock 的事务管理器写的测试断言的是那个 mock 而不是 Spring 真正做的传播；
 > 它的行为在真的地方被覆盖（脚手架对 PostgreSQL/MySQL 的端到端测试）。
@@ -74,7 +74,7 @@ status: active
 
 - PIT 通过修改字节码（取反条件、改边界、删语句等）再跑测试，看测试是否"杀死"变异体。它要求被测代码
   **快、确定、无外部依赖**——正是 domain 层的天然属性（`ordering-domain` 仅依赖框架无关的
-  `aipersimmon-ddd-core`，见 [[design-00001-aipersimmon-ddd-and-scaffold]] 的分层约束）。
+  `aipersimmon-ddd-core`，见 [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md) 的分层约束）。
 - 在 adapter/infrastructure/starter/auto-configuration 层跑 PIT：需拉起 Spring 上下文/Testcontainers，单次变异
   重跑成本极高、结果易受环境抖动影响，信噪比差。这些层的价值在 ArchUnit（结构正确）与集成测试（真实边界正确），
   不在变异分数。
@@ -162,7 +162,7 @@ flowchart TD
 
 关键门禁配置（写进各 reactor root 的 `pluginManagement`）：
 
-- **JaCoCo `check`**：三条 rule，`LINE` / `BRANCH` / `METHOD` 各 `minimum 0.90`（对应 [[TESTING.md]] 的行/分支/函数三项）。
+- **JaCoCo `check`**：三条 rule，`LINE` / `BRANCH` / `METHOD` 各 `minimum 0.90`（对应 [TESTING.md](../../TESTING.md) 的行/分支/函数三项）。
 - **PIT（D3 已定：从严）**：三个阈值同时 ≥90——`<mutationThreshold>90`（变异体被杀比例）、`<testStrengthThreshold>90`
   （测试强度 = 杀死 /（杀死 + 存活），剔除无覆盖变异体，是更能反映"测试真有效"的指标）、`<coverageThreshold>90`（PIT 自测行覆盖）。
   `targetClasses` 默认取模块包名（domain 纯净，PIT 跑得快而稳）。三档齐上，堵住"高覆盖但弱断言"的盲区。
@@ -190,7 +190,7 @@ gjf 内置，无需 config-artifact。
 
 - 单例容器 + `withReuse(true)`（MySQL / Postgres / Kafka / Redis）的 Base 类 / JUnit5 Extension，避免逐类重启，压 CI 时间。
 - `@DynamicPropertySource` / `ContextInitializer` 帮手，统一把 datasource/kafka 属性接进 Spring。
-- 测试 schema 引导：把当前跨 7 文件重复的 process-manager 四表 DDL（见 [[process-manager-schema-copies]]）在 testkit 集中一份。
+- 测试 schema 引导：把当前跨 7 文件重复的 process-manager 四表 DDL（见 process-manager-schema-copies）在 testkit 集中一份。
 
 克制原则：Testcontainers 官方 `@Testcontainers` + 单例已很地道；testkit 只增值三点——**单例 reuse 提速、属性接线一致、
 schema 预置**。薄基类值得，重框架不做。该模块依赖 JUnit/Spring/Testcontainers 是可以的，因为它是可选 test-scope
@@ -199,13 +199,13 @@ artifact，不污染框架无关约束。
 ## 八、CI 与命令接线
 
 - `ci.yml` 库那步 `install` → `verify`（触发 Spotless/PMD/CPD/SpotBugs/JaCoCo/PIT `check`）；脚手架那步 `test` → `verify`。
-- 填掉 [[DEVELOPMENT.md]] 的占位 `Lint`：`mvn -B verify`（或分解 `mvn spotless:check pmd:check spotbugs:check`）。
+- 填掉 [DEVELOPMENT.md](../../DEVELOPMENT.md) 的占位 `Lint`：`mvn -B verify`（或分解 `mvn spotless:check pmd:check spotbugs:check`）。
 - **Spotless 使用坑（写进 DEVELOPMENT.md）**：提交 Java 前跑**完整** `mvn spotless:apply`，**不要**用 `-DspotlessFiles`
   做范围限定检查——`verify` 阶段的 Spotless 比 `-DspotlessFiles` 的 CLI 检查更严，后者会"假通过"，导致违规代码提交后炸构建。
 
 ## 九、分阶段落地（避免一次性炸构建）
 
-已知风险：部分下游脚手架/样例在 HEAD 已是 RED（见 [[downstream-scaffolds-migration-debt]]），且门禁一上会暴露真实覆盖缺口。
+已知风险：部分下游脚手架/样例在 HEAD 已是 RED（见 downstream-scaffolds-migration-debt），且门禁一上会暴露真实覆盖缺口。
 故分批：
 
 1. `aipersimmon-ddd-quality-config`（规则集 config-artifact）+ 库 `aipersimmon-ddd-parent` 自声明质量 pluginManagement + Spotless 骨架。
@@ -235,10 +235,10 @@ artifact，不污染框架无关约束。
 ## Sources
 
 内部：
-- [[TESTING.md]]（已声明 90% 行/分支/函数 DoD，本设计执行之）、[[DEVELOPMENT.md]]（`Lint` 占位符）、[[CODE_STYLE.md]]（Google Style 一致性）
-- [[design-00001-aipersimmon-ddd-and-scaffold]]（分层与框架无关约束，domain 仅依赖 core）
+- [TESTING.md](../../TESTING.md)（已声明 90% 行/分支/函数 DoD，本设计执行之）、[DEVELOPMENT.md](../../DEVELOPMENT.md)（`Lint` 占位符）、[CODE_STYLE.md](../../CODE_STYLE.md)（Google Style 一致性）
+- [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md)（分层与框架无关约束，domain 仅依赖 core）
 - `aipersimmon-ddd-archunit`（"规则即代码发布模块"范式，被本设计的 config-artifact / testkit 复用）
-- [[downstream-scaffolds-migration-debt]]、[[process-manager-schema-copies]]（落地风险与去重目标）
+- downstream-scaffolds-migration-debt、process-manager-schema-copies（落地风险与去重目标）
 
 外部：
 - PIT (pitest) — Maven quickstart / `mutationThreshold`。https://pitest.org/quickstart/maven/

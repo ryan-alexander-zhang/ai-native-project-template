@@ -118,6 +118,6 @@ spring-kafka 3.3.x。
 
 ## 关联
 
-- [[plan-00006-middleware-integration]]
-- [[decision-00014-cloudevents-integration-event-contract]](§5 未知 (type,version) → DLT 的边界:仅适用于"消息坏",不含"环境坏")
-- [[issue-00030-single-topic-fanout-all-consumers-see-all-events]](同一消费桥的阻塞/隔离面)
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)(§5 未知 (type,version) → DLT 的边界:仅适用于"消息坏",不含"环境坏")
+- [issue-00030-single-topic-fanout-all-consumers-see-all-events](issue-00030-single-topic-fanout-all-consumers-see-all-events.md)(同一消费桥的阻塞/隔离面)

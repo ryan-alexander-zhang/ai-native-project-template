@@ -108,9 +108,9 @@ status: active
 
 | | 问题 | 落盘位置 |
 |---|---|---|
-| B1 | **README quickstart 100% 跑不通**：端口写 8080（实际 8090，且 8080 是 compose 里的 kafka-ui），且缺 `X-Tenant-Id`（`missing-policy: REJECT`），补上后还必须是 `__root__` 才有种子数据 | [[issue-00093-the-readme-quickstart-cannot-succeed]] |
-| B2 | **`ReserveStockHandler` 的失败路径永久泄漏库存**：`catch (DomainException)` 吞掉异常，事务不回滚，已落库的前几行扣减照常提交，却没有 `Reservation` 可供归还——与类注释的声明直接矛盾 | [[issue-00094-a-swallowed-domain-exception-leaks-stock-permanently]] |
-| B3 | **无认证无授权**：取消他人订单、批准他人审核、枚举他人订单、`/ops/dead-letters/**` 裸奔且被排除在租户校验之外 | [[design-00013-actor-identity-and-authorization]] |
+| B1 | **README quickstart 100% 跑不通**：端口写 8080（实际 8090，且 8080 是 compose 里的 kafka-ui），且缺 `X-Tenant-Id`（`missing-policy: REJECT`），补上后还必须是 `__root__` 才有种子数据 | [issue-00093-the-readme-quickstart-cannot-succeed](../issue/issue-00093-the-readme-quickstart-cannot-succeed.md) |
+| B2 | **`ReserveStockHandler` 的失败路径永久泄漏库存**：`catch (DomainException)` 吞掉异常，事务不回滚，已落库的前几行扣减照常提交，却没有 `Reservation` 可供归还——与类注释的声明直接矛盾 | [issue-00094-a-swallowed-domain-exception-leaks-stock-permanently](../issue/issue-00094-a-swallowed-domain-exception-leaks-stock-permanently.md) |
+| B3 | **无认证无授权**：取消他人订单、批准他人审核、枚举他人订单、`/ops/dead-letters/**` 裸奔且被排除在租户校验之外 | [design-00013-actor-identity-and-authorization](../design/design-00013-actor-identity-and-authorization.md) |
 
 B3 是从"演示"到"骨架"最大的一道坎，且它会让其它所有优点打折。它走 design 而非 issue，
 因为要定的是 seam 而不是补丁：actor 从哪进入调用链、它与 tenant 已有的传播骨架什么关系、
@@ -122,42 +122,42 @@ B3 是从"演示"到"骨架"最大的一道坎，且它会让其它所有优点�
 
 | Issue | 问题 |
 |---|---|
-| [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] | "payment 是唯一可能永不作答的外部步骤"这个论断是错的；`AWAITING_STOCK` / `AWAITING_STOCK_RELEASE` 同样外部作答却无 deadline |
-| [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]] | 演示的幂等模式有回滚洞（认领在事务外），且重投递应重发已记录结果而非静默返回——`find()` 定义了却从未调用 |
-| [[issue-00070-ready-for-fulfilment-is-never-persisted]] | 下单事务里把 READY 与 IN_PROGRESS 压成一个状态，`READY_FOR_FULFILMENT` 从不落库，客户自助取消在主流程不可达 |
-| [[issue-00071-credit-limit-is-checked-but-not-enforced]] | 跨聚合不变量在应用服务里裸检查，无并发保护也无补偿——既不强一致也不最终一致 |
-| [[issue-00072-demo-seed-data-ships-in-a-production-migration]] | 演示种子数据写在 `V1` 生产迁移里，会在每个环境执行 |
-| [[issue-00073-no-index-supports-the-cursor-paged-list]] | 三个迁移零 `CREATE INDEX`，而游标分页被当作性能特性宣传 |
-| [[issue-00074-one-config-file-with-development-values-only]] | 单一 `application.yml` 全是开发值，无 profile、无外部化数据源、无探针分组、无优雅停机 |
-| [[issue-00075-a-zero-amount-order-can-be-placed-but-not-paid]] | `@PositiveOrZero` vs `@Positive` 的跨上下文契约不一致，0 元订单下单成功但两分钟后被超时取消 |
-| [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] | inventory 靠 ordering 的 `OrderHasDistinctSkus` 才不出事，违反限界上下文自治 |
+| [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](../issue/issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md) | "payment 是唯一可能永不作答的外部步骤"这个论断是错的；`AWAITING_STOCK` / `AWAITING_STOCK_RELEASE` 同样外部作答却无 deadline |
+| [issue-00069-payment-idempotency-claim-is-outside-the-transaction](../issue/issue-00069-payment-idempotency-claim-is-outside-the-transaction.md) | 演示的幂等模式有回滚洞（认领在事务外），且重投递应重发已记录结果而非静默返回——`find()` 定义了却从未调用 |
+| [issue-00070-ready-for-fulfilment-is-never-persisted](../issue/issue-00070-ready-for-fulfilment-is-never-persisted.md) | 下单事务里把 READY 与 IN_PROGRESS 压成一个状态，`READY_FOR_FULFILMENT` 从不落库，客户自助取消在主流程不可达 |
+| [issue-00071-credit-limit-is-checked-but-not-enforced](../issue/issue-00071-credit-limit-is-checked-but-not-enforced.md) | 跨聚合不变量在应用服务里裸检查，无并发保护也无补偿——既不强一致也不最终一致 |
+| [issue-00072-demo-seed-data-ships-in-a-production-migration](../issue/issue-00072-demo-seed-data-ships-in-a-production-migration.md) | 演示种子数据写在 `V1` 生产迁移里，会在每个环境执行 |
+| [issue-00073-no-index-supports-the-cursor-paged-list](../issue/issue-00073-no-index-supports-the-cursor-paged-list.md) | 三个迁移零 `CREATE INDEX`，而游标分页被当作性能特性宣传 |
+| [issue-00074-one-config-file-with-development-values-only](../issue/issue-00074-one-config-file-with-development-values-only.md) | 单一 `application.yml` 全是开发值，无 profile、无外部化数据源、无探针分组、无优雅停机 |
+| [issue-00075-a-zero-amount-order-can-be-placed-but-not-paid](../issue/issue-00075-a-zero-amount-order-can-be-placed-but-not-paid.md) | `@PositiveOrZero` vs `@Positive` 的跨上下文契约不一致，0 元订单下单成功但两分钟后被超时取消 |
+| [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](../issue/issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md) | inventory 靠 ordering 的 `OrderHasDistinctSkus` 才不出事，违反限界上下文自治 |
 
 ## 3. Minor（已落 issue）
 
-[[issue-00077-money-arithmetic-has-no-overflow-guard]] ·
-[[issue-00078-six-places-still-describe-the-repositories-as-in-memory]] ·
-[[issue-00079-review-decision-id-bypasses-the-id-generator]] ·
-[[issue-00080-problem-title-key-has-no-message-bundle]] ·
-[[issue-00081-openapi-examples-name-a-status-that-does-not-exist]] ·
-[[issue-00082-domain-surface-no-use-case-can-reach]] ·
-[[issue-00083-the-order-total-rule-is-restated-in-sql]] ·
-[[issue-00084-stock-availability-check-is-one-query-per-sku]] ·
-[[issue-00085-ordering-carries-sku-as-a-bare-string]] ·
-[[issue-00086-customer-is-an-aggregate-nothing-writes]] ·
-[[issue-00087-a-raw-control-character-is-the-codec-separator]] ·
-[[issue-00088-dependency-and-image-versions-escape-the-boms]] ·
-[[issue-00089-the-generated-project-links-a-document-it-does-not-have]] ·
-[[issue-00090-order-lines-are-rewritten-on-every-save]] ·
-[[issue-00091-the-order-lines-foreign-key-omits-the-tenant]] ·
-[[issue-00092-each-test-context-starts-its-own-container-pair]]
+[issue-00077-money-arithmetic-has-no-overflow-guard](../issue/issue-00077-money-arithmetic-has-no-overflow-guard.md) ·
+[issue-00078-six-places-still-describe-the-repositories-as-in-memory](../issue/issue-00078-six-places-still-describe-the-repositories-as-in-memory.md) ·
+[issue-00079-review-decision-id-bypasses-the-id-generator](../issue/issue-00079-review-decision-id-bypasses-the-id-generator.md) ·
+[issue-00080-problem-title-key-has-no-message-bundle](../issue/issue-00080-problem-title-key-has-no-message-bundle.md) ·
+[issue-00081-openapi-examples-name-a-status-that-does-not-exist](../issue/issue-00081-openapi-examples-name-a-status-that-does-not-exist.md) ·
+[issue-00082-domain-surface-no-use-case-can-reach](../issue/issue-00082-domain-surface-no-use-case-can-reach.md) ·
+[issue-00083-the-order-total-rule-is-restated-in-sql](../issue/issue-00083-the-order-total-rule-is-restated-in-sql.md) ·
+[issue-00084-stock-availability-check-is-one-query-per-sku](../issue/issue-00084-stock-availability-check-is-one-query-per-sku.md) ·
+[issue-00085-ordering-carries-sku-as-a-bare-string](../issue/issue-00085-ordering-carries-sku-as-a-bare-string.md) ·
+[issue-00086-customer-is-an-aggregate-nothing-writes](../issue/issue-00086-customer-is-an-aggregate-nothing-writes.md) ·
+[issue-00087-a-raw-control-character-is-the-codec-separator](../issue/issue-00087-a-raw-control-character-is-the-codec-separator.md) ·
+[issue-00088-dependency-and-image-versions-escape-the-boms](../issue/issue-00088-dependency-and-image-versions-escape-the-boms.md) ·
+[issue-00089-the-generated-project-links-a-document-it-does-not-have](../issue/issue-00089-the-generated-project-links-a-document-it-does-not-have.md) ·
+[issue-00090-order-lines-are-rewritten-on-every-save](../issue/issue-00090-order-lines-are-rewritten-on-every-save.md) ·
+[issue-00091-the-order-lines-foreign-key-omits-the-tenant](../issue/issue-00091-the-order-lines-foreign-key-omits-the-tenant.md) ·
+[issue-00092-each-test-context-starts-its-own-container-pair](../issue/issue-00092-each-test-context-starts-its-own-container-pair.md)
 
 **评审之后新增**（修复过程中暴露，非本次评审所见）：
 
-- [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]] ——
+- [issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects](../issue/issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects.md) ——
   README 快速开始的 curl 必然 400：种子只在 `__root__`，而该值是客户端不可命名的保留租户。
-  由 [[issue-00072-demo-seed-data-ships-in-a-production-migration]] 第 4 条实施时撞出，已修。
-- [[issue-00097-the-payment-operation-log-has-no-cleanup]] ——
-  `payment_operations` 无保留期。由 [[issue-00069-payment-idempotency-claim-is-outside-the-transaction]]
+  由 [issue-00072-demo-seed-data-ships-in-a-production-migration](../issue/issue-00072-demo-seed-data-ships-in-a-production-migration.md) 第 4 条实施时撞出，已修。
+- [issue-00097-the-payment-operation-log-has-no-cleanup](../issue/issue-00097-the-payment-operation-log-has-no-cleanup.md) ——
+  `payment_operations` 无保留期。由 [issue-00069-payment-idempotency-claim-is-outside-the-transaction](../issue/issue-00069-payment-idempotency-claim-is-outside-the-transaction.md)
   的修复引入：把 `ConcurrentHashMap` 换成表时，"进程重启即清空"这条**隐含**的保留策略消失了，
   而它从未被写下来过，所以替换时没有东西提醒需要一个替代品。**未修。**
 
@@ -173,8 +173,8 @@ B3 是从"演示"到"骨架"最大的一道坎，且它会让其它所有优点�
 |---|---|
 | 认证 / 授权 / 权限 | 完全缺席（B3）。真实项目第一天就要面对 |
 | 事件版本演进 | 全部 `version = 1`，无 upcasting / 双写兼容示例。`OrderFulfilmentCodecs` 的注释详细讨论了 upcasting，却一个例子都没有 |
-| 配置与 profile 管理 | [[issue-00074-one-config-file-with-development-values-only]] |
-| i18n | [[issue-00080-problem-title-key-has-no-message-bundle]] |
+| 配置与 profile 管理 | [issue-00074-one-config-file-with-development-values-only](../issue/issue-00074-one-config-file-with-development-values-only.md) |
+| i18n | [issue-00080-problem-title-key-has-no-message-bundle](../issue/issue-00080-problem-title-key-has-no-message-bundle.md) |
 | 业务定时任务 | 框架 worker 有，业务调度示例没有（ShedLock 已在依赖里） |
 | 缓存 | 无。读模型 / 聚合 / 跨上下文查询三处都是天然位点 |
 | 限流 / 重放保护 | README 称"与幂等只差计数对象"，但两者失败语义不同，理由偏弱 |
@@ -193,20 +193,20 @@ README 的「Not demonstrated here, on purpose」只列了 5 项，**上面 12 �
 | 议题 | 经典 DDD | 本实现 | 判定 |
 |---|---|---|---|
 | 一事务一聚合 | Vernon 规则 #4 | `ReserveStockHandler` 刻意跨 N 个 `Stock` + 1 个 `Reservation` | **权衡成立**（每 SKU 一行是自然争用边界，合并成大聚合会串行化无关库存），但 B2 说明兑现不完整 |
-| 跨聚合不变量 | 同聚合强一致，或最终一致 + 补偿 | 应用服务裸检查，无并发保护无补偿 | **缺陷**，见 [[issue-00071-credit-limit-is-checked-but-not-enforced]] |
+| 跨聚合不变量 | 同聚合强一致，或最终一致 + 补偿 | 应用服务裸检查，无并发保护无补偿 | **缺陷**，见 [issue-00071-credit-limit-is-checked-but-not-enforced](../issue/issue-00071-credit-limit-is-checked-but-not-enforced.md) |
 | 聚合根不引用其他聚合根实例 | 只持 identity | `Order` 只持 `CustomerId` | **符合** |
 | 领域层零框架 | — | ArchUnit 强制，且贯彻到 codec 层 | **符合，超出常见水准** |
 | 仓储只面向聚合根 | — | `Orders`（写）/ `OrderQueries`（读）分离 | **符合** |
-| Specification vs Invariant | 可组合谓词 vs 断言 | 共享同一条规则声明 | **超出正典水准**，但主流程走不到，见 [[issue-00070-ready-for-fulfilment-is-never-persisted]] |
-| 上下文自治 | BC 自保不变量 | inventory 依赖 ordering 的不变量 | **缺陷**，见 [[issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself]] |
-| 聚合的定义 | 有生命周期、会被修改 | `Customer` 从不被修改 | **建模偏差**，见 [[issue-00086-customer-is-an-aggregate-nothing-writes]] |
+| Specification vs Invariant | 可组合谓词 vs 断言 | 共享同一条规则声明 | **超出正典水准**，但主流程走不到，见 [issue-00070-ready-for-fulfilment-is-never-persisted](../issue/issue-00070-ready-for-fulfilment-is-never-persisted.md) |
+| 上下文自治 | BC 自保不变量 | inventory 依赖 ordering 的不变量 | **缺陷**，见 [issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself](../issue/issue-00076-inventory-relies-on-an-upstream-invariant-to-protect-itself.md) |
+| 聚合的定义 | 有生命周期、会被修改 | `Customer` 从不被修改 | **建模偏差**，见 [issue-00086-customer-is-an-aggregate-nothing-writes](../issue/issue-00086-customer-is-an-aggregate-nothing-writes.md) |
 
-**与 `docs/decision` 的一致性：19 条全部被遵守。** 逐条核对了 00005（package-per-aggregate）、00008（subscriber 在 application 层）、00013（`CommandContext` 因果链）、00014（CloudEvents）、00015（gateway ACL）、00016（`context.cause().messageId()` 作为证据 id）、00017（操作日志）、00018（多租户）、00019（UUIDv7，仅 [[issue-00079-review-decision-id-bypasses-the-id-generator]] 一处例外）。**未发现决策与实现的冲突。**
+**与 `docs/decision` 的一致性：19 条全部被遵守。** 逐条核对了 00005（package-per-aggregate）、00008（subscriber 在 application 层）、00013（`CommandContext` 因果链）、00014（CloudEvents）、00015（gateway ACL）、00016（`context.cause().messageId()` 作为证据 id）、00017（操作日志）、00018（多租户）、00019（UUIDv7，仅 [issue-00079-review-decision-id-bypasses-the-id-generator](../issue/issue-00079-review-decision-id-bypasses-the-id-generator.md) 一处例外）。**未发现决策与实现的冲突。**
 
 ---
 
 ## 关联
 
-- [[plan-00015-scaffold-depth-and-evaluability]]（本轮评审的基线：scaffold 深度与可评估性）
-- [[report-00001-ddd-framework-review]]（同类评审，对象是组件库本身）
-- [[decision-00018-multi-tenancy-boundaries]]、[[decision-00019-time-ordered-uuidv7-identifiers]]、[[design-00011-aggregate-persistence-contract]]
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（本轮评审的基线：scaffold 深度与可评估性）
+- [report-00001-ddd-framework-review](report-00001-ddd-framework-review.md)（同类评审，对象是组件库本身）
+- [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)、[decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)、[design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)

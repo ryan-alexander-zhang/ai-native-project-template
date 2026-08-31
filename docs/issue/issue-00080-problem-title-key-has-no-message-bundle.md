@@ -117,6 +117,6 @@ theProblemTitleIsRenderedInTheRequestedLanguage:115
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[design-00003-exception-model]]
-- [[decision-00010-exception-model]]
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [design-00003-exception-model](../design/design-00003-exception-model.md)
+- [decision-00010-exception-model](../decision/decision-00010-exception-model.md)

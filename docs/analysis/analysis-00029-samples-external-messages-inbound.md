@@ -2,14 +2,14 @@
 id: analysis-00029-samples-external-messages-inbound
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S5 消费外部系统的消息（非本体系事件格式）
 
 对应 sample：`aipersimmon-ddd-samples/s05-external-messages-inbound`（单模块）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]；与
-[[analysis-00025-samples-integration-events-across-services]] 的对照是本篇的骨架。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；与
+[analysis-00025-samples-integration-events-across-services](analysis-00025-samples-integration-events-across-services.md) 的对照是本篇的骨架。
 
 ## 0. 本篇定位
 
@@ -33,7 +33,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 | 失败分级 | 桥的三档 | 本 sample 自己的策略，写在一处 |
 
 顺带一个装配上的好处：没有 `@Externalized` 事件，所以
-[[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]] 那条把 outbox 强加给纯消费服务的
+[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher](../issue/issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher.md) 那条把 outbox 强加给纯消费服务的
 启动检查在这里根本不触发——`flyway.components` 只有 `[inbox]`。（该 issue 2026-08-04 已修；S5 本来就
 不在它的射程内，因为它订阅的是外系统的消息、不经 `@Externalized` 声明。）
 

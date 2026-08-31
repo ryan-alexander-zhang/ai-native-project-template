@@ -85,7 +85,7 @@ JdbcTemplate?" 一节加一条例外说明，口吻与 `README.md` 的 declared-
 
 **(B) 若认为一致性本身值钱**，则新增 `aipersimmon-ddd-web-store-mybatis-plus`，用 mapper 实现三个
 SPI。代价要认：三张表的 DDL 与清理/校验逻辑多一份复制（参照
-[[process-manager-schema-copies]] 那类必须同步改动的复制点），收益仅为命名一致。
+process-manager-schema-copies 那类必须同步改动的复制点），收益仅为命名一致。
 
 无论选哪个，`CHOOSING-MODULES.md` 都必须**提到边界存储的存在**——今天它一个字都没有。
 

@@ -13,9 +13,9 @@ implements: [design-00007-code-quality-gates]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-落地 [[design-00007-code-quality-gates]]：domain/pure-tier 强制 90% 覆盖 + 90% 变异，全仓库 Spotless/PMD/CPD/SpotBugs。
+落地 [design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md)：domain/pure-tier 强制 90% 覆盖 + 90% 变异，全仓库 Spotless/PMD/CPD/SpotBugs。
 **无 provider parent、纯 BOM**（D1 修订，见 §P0/§P8）。分阶段推进，每阶段可独立 PR、可回滚，避免一次性炸构建
-（下游脚手架/样例在 HEAD 已有 RED 债，见 [[downstream-scaffolds-migration-debt]]）。
+（下游脚手架/样例在 HEAD 已有 RED 债，见 downstream-scaffolds-migration-debt）。
 
 ## 原则
 

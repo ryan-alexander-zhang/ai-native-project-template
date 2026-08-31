@@ -2,13 +2,13 @@
 id: analysis-00015-samples-http-command-query
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S1 HTTP 同步接口：命令与查询
 
 对应 sample：`aipersimmon-ddd-samples/s01-http-command-query`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -20,7 +20,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 S16；聚合怎么落表、`restoreVersion` 的坑属于 S17。本篇只用到"够跑通一条请求"的最小量，遇到
 建模问题就前向引用，避免模板本身失控。
 
-前提照 [[analysis-00014-ddd-samples-scenario-catalog]] §0.1：samples 与 scaffold 无关，唯一
+前提照 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md) §0.1：samples 与 scaffold 无关，唯一
 对标物是 `aipersimmon-ddd` 库的真实行为。本篇所有 API 与异常消息都取自库源码，不取自库文档的
 概述——两处不一致的地方在 §10 单独列出。
 
@@ -585,7 +585,7 @@ adapter/application 边界，不改库。
 
 ### 6.1 模板不用 `-starter-mybatis-plus`（重要更正）
 
-[[analysis-00014-ddd-samples-scenario-catalog]] 里 S1 写的是
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md) 里 S1 写的是
 `aipersimmon-ddd-starter-mybatis-plus`。**实际验证后要改**：那个 bundle 会一并带进 outbox、
 inbox、process-manager、operation-log 四组模块，而它们各自注册一个表结构校验器，默认
 `schema-validation=validate` 且只要存在 `SqlSessionFactory` 就生效。于是"bundle 装了但没配

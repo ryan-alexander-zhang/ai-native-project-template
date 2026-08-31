@@ -24,7 +24,7 @@ relay 的互斥只有一层：`OutboxRelayScheduler.poll()` 上的 `@SchedulerLo
    上去的——`batch-size 100 × producer.send-timeout-ms 30s = 50min`。
 
 所以一个旋钮同时决定「一次轮询最多能跑多久」与「崩溃后多久有人接手」，而这两件事想要的方向正好相反。
-[[report-00003-ddd-library-review-2026-07-29]] §2 把它列为 relay 最大的架构弱点。
+[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md) §2 把它列为 relay 最大的架构弱点。
 
 顺带的第二个后果：投递吞吐永远是单实例的。1 小时故障积压 180 万行要排约 5 小时，加机器没用。
 
@@ -145,10 +145,10 @@ mark-sent 失败那条路径同样调它——投递已成功、记录失败的�
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 Outbox 第一条、§3 第 7 项）
-- 前置：[[decision-00020-outbox-engine-over-one-store-port]]（判断收拢到 engine 之后，这一项只需改一处）
-- 被改写的两条既有判断：[[issue-00013-mark-sent-failure-not-a-dispatch-failure]]（失败后改为 release
-  而非等租约）、[[issue-00012-dead-letter-move-failure-backoff]]（死信搬移失败仍退避不计次，且返回 HELD）
-- 被本项作废的预算约束：[[issue-00050-outbox-relay-budget-and-config-validation]]、
-  [[issue-00011-bound-outbox-kafka-send-await]]（`batch-size × send-timeout` 不再进入租约算式）
-- 同形先例：[[design-00004-durable-process-manager-runtime]]（process-manager 的 `lease_*` 列与代际栅栏）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 Outbox 第一条、§3 第 7 项）
+- 前置：[decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md)（判断收拢到 engine 之后，这一项只需改一处）
+- 被改写的两条既有判断：[issue-00013-mark-sent-failure-not-a-dispatch-failure](issue-00013-mark-sent-failure-not-a-dispatch-failure.md)（失败后改为 release
+  而非等租约）、[issue-00012-dead-letter-move-failure-backoff](issue-00012-dead-letter-move-failure-backoff.md)（死信搬移失败仍退避不计次，且返回 HELD）
+- 被本项作废的预算约束：[issue-00050-outbox-relay-budget-and-config-validation](issue-00050-outbox-relay-budget-and-config-validation.md)、
+  [issue-00011-bound-outbox-kafka-send-await](issue-00011-bound-outbox-kafka-send-await.md)（`batch-size × send-timeout` 不再进入租约算式）
+- 同形先例：[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（process-manager 的 `lease_*` 列与代际栅栏）

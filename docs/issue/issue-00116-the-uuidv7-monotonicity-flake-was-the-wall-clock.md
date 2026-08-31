@@ -75,6 +75,6 @@ deadline 查询里的 id 只用作**决定性平局打破**（`ORDER BY due_at, 
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§4 遗留观察）
-- 选 UUIDv7 的理由是写放大而非排序保证：[[decision-00019-time-ordered-uuidv7-identifiers]]
-- id SPI 与铸造点：[[issue-00053-id-generator-silently-degrades-to-uuidv4]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§4 遗留观察）
+- 选 UUIDv7 的理由是写放大而非排序保证：[decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)
+- id SPI 与铸造点：[issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md)

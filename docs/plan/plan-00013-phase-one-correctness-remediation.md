@@ -13,7 +13,7 @@ implements: [report-00001-ddd-framework-review]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[report-00001-ddd-framework-review]] 的阶段一（P0-1 / P0-2 / P0-3 / P0-4 / P2-5）落成代码。目标是让框架在
+把 [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md) 的阶段一（P0-1 / P0-2 / P0-3 / P0-4 / P2-5）落成代码。目标是让框架在
 **「聚合是一个事务一致性单元」**这个 DDD 最核心的承诺上真正成立——当前它只是文档声明，运行期不成立。
 
 **验收锚点**：同一 SKU 的两个并发预留，恰好一方成功；`sum(reservation_lines.quantity) + stocks.available`
@@ -22,7 +22,7 @@ implements: [report-00001-ddd-framework-review]
 **铁律**：
 1. **core 保持零第三方运行时依赖**。`version` 是一个 `long` 字段，不引入任何依赖（enforcer + ArchUnit 守护不变）。
 2. **不引入通用 CRUD 端口**。领域仓储端口仍由消费方在 domain 层定义；框架只提供基类，不提供
-   `AggregateRepository<A, ID>`（详见 [[design-00011-aggregate-persistence-contract]] §2）。
+   `AggregateRepository<A, ID>`（详见 [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md) §2）。
 3. **能力降级必须显式**。本阶段修掉的 P0-3 正是「可选能力静默缺席」，因此本阶段自身**不得**引入同类静默——
    尤其是 MyBatis-Plus 拦截器组合（design-00011 §3 的陷阱）。
 4. **`version` 不参与身份**。不进 `equals`/`hashCode`，不进 `Association`，不向消费方的领域语言泄漏。
@@ -30,7 +30,7 @@ implements: [report-00001-ddd-framework-review]
 
 ## 一、Design
 
-契约与基类设计见 [[design-00011-aggregate-persistence-contract]]。本计划只负责落地顺序。
+契约与基类设计见 [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)。本计划只负责落地顺序。
 
 ```mermaid
 flowchart TB
@@ -82,27 +82,27 @@ flowchart TB
   （`getClass()` 比较 + `id()` 比较）与 `final hashCode`（`Objects.hashCode(id())`）。
   **测**：新建聚合 `version()==0`；rehydrate 后为持久化值；`versionAdvanced()` 后 +1；同 id 不同实例相等且
   `Set` 去重为 1；不同 id 不等；不同具体类型同 id 不等；`null`/异类不等；`version` 不影响相等。
-  → [[issue-00051-aggregates-have-no-optimistic-locking]]、[[issue-00055-aggregate-root-missing-identity-equality]]
+  → [issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md)、[issue-00055-aggregate-root-missing-identity-equality](../issue/issue-00055-aggregate-root-missing-identity-equality.md)
 - **A2** ~~`[archunit]` 新增 `aggregateRootsShouldNotOverrideEquality()`~~ —— **已取消（实施中判定为冗余）**。
   A1 把 `equals`/`hashCode` 声明为 `final`，子类覆写是**编译期错误**；而既有
   `BuildingBlockRules.aggregateRootsShouldExtendAbstractAggregateRoot()` 已强制 `@AggregateRoot` 类型继承基类。
   两者叠加已完整保证身份相等语义，ArchUnit 规则**永远不可能命中**——一条不可能失败的规则只是噪声
   （`CODE_QUALITY.md` §7「Metric-as-goal」与 `AGENTS.md` §2「Nothing speculative」）。报告 P2-5 提出该规则时
   尚未确定用 `final`，故此处收窄。
-  → [[issue-00055-aggregate-root-missing-identity-equality]]
+  → [issue-00055-aggregate-root-missing-identity-equality](../issue/issue-00055-aggregate-root-missing-identity-equality.md)
 - **A3** `[id]`+6 模块 `-id` 由 `test` 提为 `compile`（`cqrs-spring/pom.xml:80-85`），其余消费模块补依赖；
   删除 6 处 `generator != null ? ... : () -> UUID.randomUUID()...` 三元，改为直接注入 `IdGenerator`；
   移除 `RegistryCommandBus` / `SpringIntegrationEvents` / `OutboxWriter`(×2) 的「无 supplier」构造重载。
   保留 `@ConditionalOnMissingBean` 可覆盖性。**测**：装配测断言默认 `messageId`/`event_id` 均 `version()==7`；
-  自定义 `IdGenerator` 仍可覆盖。**并为 [[plan-00012-time-ordered-identifiers-implementation]] 补一条 patch**
+  自定义 `IdGenerator` 仍可覆盖。**并为 [plan-00012-time-ordered-identifiers-implementation](plan-00012-time-ordered-identifiers-implementation.md) 补一条 patch**
   说明其「铁律 3（回退等价）」被本任务有意推翻。**已办**：直接在 plan-00012 的铁律 3 就地加了推翻说明并
   指向 issue-00053，而不另建 patch 文档——该 plan 已 `resolved`，为一条交叉引用新建文档只会增加文档数而不增信息。
-  → [[issue-00053-id-generator-silently-degrades-to-uuidv4]]
+  → [issue-00053-id-generator-silently-degrades-to-uuidv4](../issue/issue-00053-id-generator-silently-degrades-to-uuidv4.md)
 - **A4** `[sample]` 新迁移 `V3__aggregate_version.sql`：`ordering.orders` / `inventory.stocks` /
   `inventory.reservations` 各加 `version BIGINT NOT NULL DEFAULT 1`。不动 `ordering.customers`（只读聚合）。
   **默认值 `1` 而非计划中的 `0`**：`0` 保留表示「尚未持久化」（仓储据此区分 INSERT/UPDATE），已有的 V1 种子行
   以 `0` 迁入会被误判为新聚合而走 INSERT 撞主键。实施中发现并修正。
-  → [[issue-00051-aggregates-have-no-optimistic-locking]]
+  → [issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md)
 - **A5** `[sample]` `OrderDo` / `StockDo` / `ReservationDo` 加 `@Version private Long version`；rehydrate 工厂
   （`Order.reconstitute`、`Stock`、`Reservation`）多带 version 参数并 `restoreVersion`；3 个仓储改为
   「`version()==0` → `insert`，否则 `updateById`」+ affected-rows 检查，`0` 行抛
@@ -113,18 +113,18 @@ flowchart TB
   同时含 `TenantLineInnerInterceptor` 与 `OptimisticLockerInnerInterceptor`、顺序为「租户先、乐观锁后」——
   两个 inner interceptor 任一缺席都是静默失效（租户不隔离，或版本谓词消失、超卖回归），故在装配层直接断言。
   既有 `TwoTenantAcceptanceTest` 保持绿。
-  → [[issue-00051-aggregates-have-no-optimistic-locking]]、[[design-00011-aggregate-persistence-contract]] §3
+  → [issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md)、[design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md) §3
 - **A6** `[sample]` 3 个仓储在 `save()` 末尾 `domainEvents.publishAndClear(aggregate)`；删除
   `PlaceOrderHandler:114` / `ConfirmOrderHandler:41` / `CancelOrderHandler:39` / `FulfilmentTrigger:46`
   四处手工调用。同步修正 `application/DomainEvents.java` 的 Javadoc（删掉 "or the handler" 这一歧义授权）
   与 `TransactionCommandInterceptor.java:13-16` 的说明。**测**：`OrderingFlowTest` 断言下单后 outbox 确有
   `OrderPlacedEvent`（防止收口把正常路径挡掉）；各 handler 单测断言事件仍被发布。
-  → [[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]
+  → [issue-00052-domain-events-lost-when-publish-and-clear-forgotten](../issue/issue-00052-domain-events-lost-when-publish-and-clear-forgotten.md)
 - **A7** `[sample]`+`[core]` `PlaceOrderHandler:102` 的 `OrderId` 与 `ReserveStockHandler:77` 的
   `ReservationId` 改由注入的 `IdGenerator` 铸造；**`core/id/IdGenerator.java` Javadoc 把「业务聚合/实体主键」
   显式列为推荐用途**（本 issue 的根因）。**测**：`AggregateIdIsTimeOrderedTest` 断言返回的 orderId
   `UUID.fromString(...).version()==7`，且连续下单 id 字典序与创建先后一致。
-  → [[issue-00054-sample-aggregate-ids-use-random-uuid]]
+  → [issue-00054-sample-aggregate-ids-use-random-uuid](../issue/issue-00054-sample-aggregate-ids-use-random-uuid.md)
 - **A8** `[sample]` 并发回归测试 `ConcurrentAggregateWriteTest`（Testcontainers PostgreSQL）：
   `concurrentReservationsOfOneSkuCannotOversell`（`CyclicBarrier` 对齐两个事务，断言恰好一方成功 + 库存守恒）
   与 `aWriteFromAStaleSnapshotIsRejected`（**无线程、确定性**，钉住版本谓词本身）。另加
@@ -133,14 +133,14 @@ flowchart TB
   版本谓词保证，再建一份只是重复覆盖同一机制；超卖是业务后果更重且断言更强（守恒式）的那条路径，故选它作主用例。
   **已证明该测试能捕获缺陷**：临时还原 `MyBatisStocks.save` 的读-改-写后，两个用例双双变红，
   超卖用例报 `expected: <1> but was: <2>`。
-  → [[issue-00051-aggregates-have-no-optimistic-locking]]
+  → [issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md)
 
 ### 批次 B · 易用性（依赖批次 A 全绿）
 
 - **B1** `[repo]` 新增 `aipersimmon-ddd-persistence-mybatis-plus` 与 `aipersimmon-ddd-persistence-jdbc`：
   pom（parent + 依赖 `-core`/`-application`）、`package-info`、根 `pom.xml` reactor、BOM 条目。
   **实际新增三个模块**：还需要 `aipersimmon-ddd-mybatis-plus` 作为 §3 组合器的归属——它既不能放在 tenancy
-  也不能放在 persistence（两者互相独立可选）。见 [[design-00011-aggregate-persistence-contract]] §2 的偏差说明。
+  也不能放在 persistence（两者互相独立可选）。见 [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md) §2 的偏差说明。
   另一处实施细节：`mybatis-plus-extension` 若同时以 `provided` 和 `test` 声明，后者会覆盖前者并把它从主编译
   classpath 移除；测试改用 `mybatis-plus-spring-boot3-starter`。
 - **B2** `[persistence-mybatis-plus]` `VersionedRow`（`getVersion`/`setVersion`）+
@@ -198,10 +198,10 @@ SpotBugs）通过。样例侧同时跑 `mvn -f aipersimmon-ddd-scaffold/multi-mo
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（阶段一的来源与优先级依据）
-- [[design-00011-aggregate-persistence-contract]]（契约与基类设计）
-- [[issue-00051-aggregates-have-no-optimistic-locking]] · [[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]] ·
-  [[issue-00053-id-generator-silently-degrades-to-uuidv4]] · [[issue-00054-sample-aggregate-ids-use-random-uuid]] ·
-  [[issue-00055-aggregate-root-missing-identity-equality]]
-- [[plan-00012-time-ordered-identifiers-implementation]]（A3 推翻其铁律 3）
-- [[design-00009-multi-tenancy-tenant-id]]（B4 改造其拦截器装配）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（阶段一的来源与优先级依据）
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)（契约与基类设计）
+- [issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md) · [issue-00052-domain-events-lost-when-publish-and-clear-forgotten](../issue/issue-00052-domain-events-lost-when-publish-and-clear-forgotten.md) ·
+  [issue-00053-id-generator-silently-degrades-to-uuidv4](../issue/issue-00053-id-generator-silently-degrades-to-uuidv4.md) · [issue-00054-sample-aggregate-ids-use-random-uuid](../issue/issue-00054-sample-aggregate-ids-use-random-uuid.md) ·
+  [issue-00055-aggregate-root-missing-identity-equality](../issue/issue-00055-aggregate-root-missing-identity-equality.md)
+- [plan-00012-time-ordered-identifiers-implementation](plan-00012-time-ordered-identifiers-implementation.md)（A3 推翻其铁律 3）
+- [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md)（B4 改造其拦截器装配）

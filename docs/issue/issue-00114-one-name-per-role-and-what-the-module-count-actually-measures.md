@@ -104,10 +104,10 @@ core 里三个角色各有两套同名声明：
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 架构层最后三条、§3 第 13 项）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 架构层最后三条、§3 第 13 项）
 - 驳回模块合并的直接依据是本次评审自己新加的门禁：
-  [[issue-00113-the-quality-gates-sat-where-the-risk-was-not]]
-- "消费者自选恰好一个存储后端"：[[design-00001-aipersimmon-ddd-and-scaffold]]
-- id SPI 必须响亮而非静默退化：[[issue-00053-id-generator-silently-degrades-to-uuidv4]]
-- DOM 解析 pom 的同法先例：[[issue-00112-the-bom-republished-every-pin-the-library-builds-against]]
-- 模块命名与 Spring 自由：[[design-00012-module-naming-and-spring-freedom]]
+  [issue-00113-the-quality-gates-sat-where-the-risk-was-not](issue-00113-the-quality-gates-sat-where-the-risk-was-not.md)
+- "消费者自选恰好一个存储后端"：[design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md)
+- id SPI 必须响亮而非静默退化：[issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md)
+- DOM 解析 pom 的同法先例：[issue-00112-the-bom-republished-every-pin-the-library-builds-against](issue-00112-the-bom-republished-every-pin-the-library-builds-against.md)
+- 模块命名与 Spring 自由：[design-00012-module-naming-and-spring-freedom](../design/design-00012-module-naming-and-spring-freedom.md)

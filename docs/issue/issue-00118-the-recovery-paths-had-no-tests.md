@@ -16,7 +16,7 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 | | 行数 | 覆盖率 | 来历 |
 |---|---|---|---|
-| `replay/ParkedInputWorker` | 181 | **0%** | 第 4 项为修 **critical #4** 新写的（[[issue-00103-parked-input-replay-is-not-crash-safe]]） |
+| `replay/ParkedInputWorker` | 181 | **0%** | 第 4 项为修 **critical #4** 新写的（[issue-00103-parked-input-replay-is-not-crash-safe](issue-00103-parked-input-replay-is-not-crash-safe.md)） |
 | `operation/ProcessOperations` | 213 | **0%** | 同一项改的操作员门面 |
 
 也就是说，**"修好 critical 的那段代码"本身从未被任何测试执行过**，当时只有脚手架端到端的间接证明。
@@ -76,8 +76,8 @@ blocks: [report-00003-ddd-library-review-2026-07-29]
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§3 第 12 项）
-- 前一块（`runtime`），以及"能被回滚抹掉的冲突不是冲突"：[[issue-00117-the-advance-itself-had-no-tests]]
-- 门禁从"层"挪到"风险"的原始一项：[[issue-00113-the-quality-gates-sat-where-the-risk-was-not]]
-- 被测代码的来历，critical #4：[[issue-00103-parked-input-replay-is-not-crash-safe]]
-- 门禁形状的既有先例：[[design-00007-code-quality-gates]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§3 第 12 项）
+- 前一块（`runtime`），以及"能被回滚抹掉的冲突不是冲突"：[issue-00117-the-advance-itself-had-no-tests](issue-00117-the-advance-itself-had-no-tests.md)
+- 门禁从"层"挪到"风险"的原始一项：[issue-00113-the-quality-gates-sat-where-the-risk-was-not](issue-00113-the-quality-gates-sat-where-the-risk-was-not.md)
+- 被测代码的来历，critical #4：[issue-00103-parked-input-replay-is-not-crash-safe](issue-00103-parked-input-replay-is-not-crash-safe.md)
+- 门禁形状的既有先例：[design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md)

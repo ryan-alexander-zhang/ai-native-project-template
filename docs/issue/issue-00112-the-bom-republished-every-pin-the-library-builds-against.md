@@ -102,7 +102,7 @@ BOM 该发布的是**它的拥有者承诺维持对齐的东西**。本库承诺
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 架构层「BOM 继承 parent」那条、§3 第 11 项）
-- 同源判断：本库刻意不继承 `spring-boot-starter-parent`（[[design-00001-aipersimmon-ddd-and-scaffold]]），
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 架构层「BOM 继承 parent」那条、§3 第 11 项）
+- 同源判断：本库刻意不继承 `spring-boot-starter-parent`（[design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md)），
   这一项是把同一条主张贯彻到**发布物**上——不继承别人的意见，也就不该把自己的意见塞给别人
-- 白名单里 OTel 那条的由来：[[design-00005-observability-and-distributed-tracing]]
+- 白名单里 OTel 那条的由来：[design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md)

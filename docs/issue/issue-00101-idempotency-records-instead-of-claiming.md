@@ -139,7 +139,7 @@ Redis 用 `SET NX` 写 pending 标记，其 TTL 即 lease；内存用 `compute` 
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（C1 / C2 由本 issue 结掉）
-- 设计：[[design-00002-web-layer]] §4.3 与 §5.5 已据此修订
-- 前序：[[issue-00099-tenant-isolation-fails-open-below-the-edge]]（键里的 tenant 段依赖它的收口点）
-- 相关：[[issue-00064-a-replayed-idempotent-response-loses-its-location-header]]（回放 header allow-list，保留）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（C1 / C2 由本 issue 结掉）
+- 设计：[design-00002-web-layer](../design/design-00002-web-layer.md) §4.3 与 §5.5 已据此修订
+- 前序：[issue-00099-tenant-isolation-fails-open-below-the-edge](issue-00099-tenant-isolation-fails-open-below-the-edge.md)（键里的 tenant 段依赖它的收口点）
+- 相关：[issue-00064-a-replayed-idempotent-response-loses-its-location-header](issue-00064-a-replayed-idempotent-response-loses-its-location-header.md)（回放 header allow-list，保留）

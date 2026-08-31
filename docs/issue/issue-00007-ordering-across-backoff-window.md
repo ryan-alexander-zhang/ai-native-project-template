@@ -7,7 +7,7 @@ blocks: [issue-00003-messaging-delivery-reliability]
 
 # 退避窗口内同 `subject` 的后续事件越过失败事件(破坏 per-aggregate 顺序)
 
-[[issue-00003-messaging-delivery-reliability]] 的 outbox 加固(H1)引入指数退避后,留下一个顺序漏洞:relay 的
+[issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) 的 outbox 加固(H1)引入指数退避后,留下一个顺序漏洞:relay 的
 poll 只选**已到期**行,而失败行的 `next_attempt_at` 被推到未来,于是它**退避期间从批次里消失**;`blockedSubjects`
 只在**单批次内**生效,跨轮无法得知该行仍在退避。结果同一 `subject` 的后续事件越过失败事件先行投递,推翻了库所
 宣称(Javadoc / Kafka key=subject)的 per-aggregate 顺序保证。
@@ -55,4 +55,4 @@ poll 只选**已到期**行,而失败行的 `next_attempt_at` 被推到未来,�
 
 ## 关联
 
-- [[issue-00003-messaging-delivery-reliability]] —— 退避(H1)引入本漏洞;本 issue 补齐其顺序保证。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 退避(H1)引入本漏洞;本 issue 补齐其顺序保证。

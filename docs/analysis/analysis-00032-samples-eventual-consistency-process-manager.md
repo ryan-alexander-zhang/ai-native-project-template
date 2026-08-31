@@ -2,13 +2,13 @@
 id: analysis-00032-samples-eventual-consistency-process-manager
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S9 最终一致性：process-manager 编排多步流程与补偿
 
 对应 sample：`aipersimmon-ddd-samples/s09-eventual-consistency-process-manager`（单模块，三个聚合，一个流程）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -133,7 +133,7 @@ DEAD → 实例 SUSPENDED → 修数据 → `redriveEffect` → 实例恢复 RUN
   `effect ... is not DEAD`。重投的语义因此改成在端口层驱动同一个输入两次（§5），那才是真正要证的性质。
 - **诊断要看两行**：实例说"哪件事挂住了它"（`effect ... exhausted retries`），effect 行的 `last_error`
   才说"为什么"。而后者没有任何端口能给 → 已开
-  [[issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended]]。
+  [issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended](../issue/issue-00164-no-port-tells-an-operator-why-an-instance-is-suspended.md)。
 
 ## 8. 负向对照（五个，逐个单跑）
 

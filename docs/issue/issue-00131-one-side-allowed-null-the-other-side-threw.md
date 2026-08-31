@@ -40,7 +40,7 @@ status: resolved
 首选生产侧兜底：`orElse("inventory.unspecified")`，并把"非空"写进 `StockReservationFailed`
 的 javadoc 成为契约保证。次选消费侧 ACL 翻译 null 为哨兵码。顺手项：
 `OrderFulfilmentCodecs.encodeCancel` 里 `String.join` 遇 null 元素写出 `"null"` 字面量的
-次生问题随 [[issue-00136-the-second-process-pays-the-boilerplate-again]] 的 codec 删除一并消失。
+次生问题随 [issue-00136-the-second-process-pays-the-boilerplate-again](issue-00136-the-second-process-pays-the-boilerplate-again.md) 的 codec 删除一并消失。
 
 ## 验证结果
 
@@ -53,8 +53,8 @@ status: resolved
 `ReserveStockHandler` 的 `orElse(null)` 改为 `orElse(UNSPECIFIED.code())`；
 `StockReservationFailed` javadoc 将"code 永不为 null"写成契约保证。inventory 三模块全绿，
 新测试即回归守卫。codec 的 `"null"` 字面量次生问题仍归
-[[issue-00136-the-second-process-pays-the-boilerplate-again]]。
+[issue-00136-the-second-process-pays-the-boilerplate-again](issue-00136-the-second-process-pays-the-boilerplate-again.md)。
 
 ## 关联
 
-- payload 校验的系统性缺口：[[issue-00143-the-headers-are-checked-and-the-payload-is-trusted]]
+- payload 校验的系统性缺口：[issue-00143-the-headers-are-checked-and-the-payload-is-trusted](issue-00143-the-headers-are-checked-and-the-payload-is-trusted.md)

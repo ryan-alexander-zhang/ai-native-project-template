@@ -134,5 +134,5 @@ assertEquals(Outcome.REJECTED, out.outcome());   // 修复前:FAILED / "unexpect
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（C3 / M1 / M2 由本 issue 结掉）
-- 设计：[[design-00008-operation-log-component]]、[[decision-00017-operation-log-component-boundaries]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（C3 / M1 / M2 由本 issue 结掉）
+- 设计：[design-00008-operation-log-component](../design/design-00008-operation-log-component.md)、[decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md)

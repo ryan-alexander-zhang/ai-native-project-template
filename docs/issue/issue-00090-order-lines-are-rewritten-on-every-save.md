@@ -31,7 +31,7 @@ for (int i = 0; i < lineData.size(); i++) { ...; lines.insert(row); }   // 逐�
 - 具体代价，按一张 3 行订单算：
   - 每次状态变更 = 1 DELETE + 3 INSERT + 1 UPDATE(header)，而不是 1 UPDATE；
   - DELETE 的谓词是 `(tenant_id, order_id)`，目前**无索引**
-    （见 [[issue-00073-no-index-supports-the-cursor-paged-list]]），
+    （见 [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md)），
     所以这次 DELETE 是全表扫；
   - 逐行 `insert` 而非 `insertBatch`，N 行 = N 次往返；
   - 行的物理版本被反复更新，令 `order_lines` 的膨胀（PostgreSQL dead tuple）
@@ -85,7 +85,7 @@ void confirmingAnOrderDoesNotRewriteItsLines() {
 2. **批量插入**：`lines.insert(row)` 逐行 → `insertBatch`，N 次往返变 1 次。
    这条与 1 正交，且对下单路径（唯一真正需要写行的路径）直接有效。
 3. **补索引**：`(tenant_id, order_id)` 上的索引让那次 DELETE 从全表扫变成索引扫——
-   随 [[issue-00073-no-index-supports-the-cursor-paged-list]] 一起做。
+   随 [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md) 一起做。
 
 同时建议更新 `MyBatisOrders.java:52` 的注释：
 把"行集很小所以整体重写"改成说明**为什么此处不做变更追踪**，
@@ -95,7 +95,7 @@ void confirmingAnOrderDoesNotRewriteItsLines() {
 ## 验证结果
 
 已修。修复方案 1 + 2 都做了；第 3 条（索引）已随
-[[issue-00073-no-index-supports-the-cursor-paged-list]] 在 `V4` 落地。
+[issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md) 在 `V4` 落地。
 
 - **方案 1**：`Order.lineSetChanged` / `Reservation.heldSetChanged` —— 瞬态标志，只在
   `place` / 构造器置位，`reconstitute` 清零；两个 `saveChildren` 据此短路。
@@ -119,6 +119,6 @@ delete + 重新 insert 相同数据在数据本身里是**不可见的**，这�
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00073-no-index-supports-the-cursor-paged-list]]（DELETE 谓词的索引）
-- [[design-00011-aggregate-persistence-contract]]（`MybatisPlusAggregateRepository` 的模板方法契约）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00073-no-index-supports-the-cursor-paged-list](issue-00073-no-index-supports-the-cursor-paged-list.md)（DELETE 谓词的索引）
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)（`MybatisPlusAggregateRepository` 的模板方法契约）

@@ -1,14 +1,16 @@
 ---
-id: 20260708161438-ddd-by-examples-factory
+id: reference-00003-ddd-by-examples-factory
 type: reference
-role: main
 status: active
+informs: [analysis-00004-bounded-context-module-structure]
 ---
 
 # ddd-by-examples/factory — DDD reference notes
 
 Distilled reference for the Java DDD template. Source is reference-only (see
 THIRDPARTY.md). Facts verified against the repo on 2026-07-08.
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

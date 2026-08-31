@@ -53,7 +53,7 @@ blocks: [report-00001-ddd-framework-review]
      `Subscribed to topic(s): it-events`、`partitions assigned: [it-events-0]`。
    - 不是 `isSystemicFailure` 把 schema 漂移判为 systemic 判错了。无限重试对 schema 漂移**是可辩护的**：
      补上迁移即自动恢复，且不会把健康消息洪水般冲进 DLT。真正的缺陷是这个无限重试**不可观测**，
-     那是另一个问题（见 [[issue-00057-unlimited-systemic-retry-is-invisible]]）。
+     那是另一个问题（见 [issue-00057-unlimited-systemic-retry-is-invisible](issue-00057-unlimited-systemic-retry-is-invisible.md)）。
    - 不是 20 秒超时太短。分区永久堵死，给 20 分钟也一样。
 
 ## 复现（test-first）
@@ -105,7 +105,7 @@ SpotBugs / JaCoCo 全部通过。这是框架第一次全量绿——此前这 3
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]
-- [[issue-00057-unlimited-systemic-retry-is-invisible]]（同一次排查发现：本 issue 之所以长期隐形的原因）
-- [[design-00009-multi-tenancy]] / [[decision-00018-multi-tenancy-pool-model]]（引入 V2 的来源）
-- [[issue-00044-integration-events-bypass-outbox-kafka-at-runtime]]（同模块的既有传输选择问题）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)
+- [issue-00057-unlimited-systemic-retry-is-invisible](issue-00057-unlimited-systemic-retry-is-invisible.md)（同一次排查发现：本 issue 之所以长期隐形的原因）
+- [design-00009-multi-tenancy-tenant-id](../design/design-00009-multi-tenancy-tenant-id.md) / [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)（引入 V2 的来源）
+- [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md)（同模块的既有传输选择问题）

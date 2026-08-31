@@ -94,7 +94,7 @@ MP 的 `update` SQL 是 `UPDATE t <set> et 的非空列 + ${ew.sqlSet} </set> WH
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 持久化「`MybatisPlusAggregateRepository:82` 用 `updateById`」那条，报告标注"**仍然开着**"）
-- 乐观锁的另一半见证断言，本项完全复用：[[issue-00107-silent-degradations-become-loud-failures]]
-- 框架在 outbox store 里早已认出同一个陷阱：[[issue-00108-a-killed-relay-instance-stops-all-delivery]]
-- 乐观锁协议本身：[[design-00011-aggregate-persistence-contract]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 持久化「`MybatisPlusAggregateRepository:82` 用 `updateById`」那条，报告标注"**仍然开着**"）
+- 乐观锁的另一半见证断言，本项完全复用：[issue-00107-silent-degradations-become-loud-failures](issue-00107-silent-degradations-become-loud-failures.md)
+- 框架在 outbox store 里早已认出同一个陷阱：[issue-00108-a-killed-relay-instance-stops-all-delivery](issue-00108-a-killed-relay-instance-stops-all-delivery.md)
+- 乐观锁协议本身：[design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)

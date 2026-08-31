@@ -2,14 +2,14 @@
 id: analysis-00040-samples-long-running-endpoints
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S28 长耗时与大数据量端点
 
 对应 sample：`aipersimmon-ddd-samples/s28-long-running-endpoints`（一个部署单元、77 个用例）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]；同步接口的既有讨论见
-[[analysis-00024-samples-scheduled-and-batch-entries]]（S11 划下的边界，本篇接着它往下走）。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；同步接口的既有讨论见
+[analysis-00024-samples-scheduled-and-batch-entries](analysis-00024-samples-scheduled-and-batch-entries.md)（S11 划下的边界，本篇接着它往下走）。
 
 ## 0. 本篇定位
 
@@ -25,7 +25,7 @@ informs: [analysis-00014-ddd-samples-scenario-catalog]
 | 上传的分片、断点、幂等 | `ChunkedUploadTest` | 20 个分片，批次聚合一次都没被重写 |
 
 **本篇没有发现库的功能缺陷。** 唯一开的 issue 是一条文档缺口
-（[[issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version]]，P2），
+（[issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version](../issue/issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version.md)，P2），
 而它恰好是本篇最锋利的那个负向对照量出来的。
 
 ## 1. 同步接口的上限：不在你以为的地方
@@ -168,7 +168,7 @@ S11 已经点出过这条边界并把这一侧留着：**没有版本可仲裁�
 
 对照 1 量的就是这个：去掉那个自增，**只红 1 个，而红的方式是"没有抛异常"**。事后从数据看不出这是并发
 缺陷，它看起来就是一次成功的取消。这条前提库里一处都没写过，见
-[[issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version]]（P2，三句话的文档修法）。
+[issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version](../issue/issue-00169-nothing-warns-that-a-hand-written-write-must-advance-the-version.md)（P2，三句话的文档修法）。
 
 ### 5.1 两个竞争，两个不同的守卫
 

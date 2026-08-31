@@ -19,7 +19,7 @@ status: active
 - Java/Spring 的标准做法是 `ApplicationEventPublisher.publishEvent()` + `@EventListener`，**默认同步、同线程、同事务**。
 - **一旦需要异步 / 持久 / 不丢，语义就滑向集成事件**——用 Outbox（store-and-forward）承接。
 - library 的巧思：**同一个 `DomainEvents` 接口 + 装饰器**，把"同步立即发"和"异步持久发"做成可热插拔的实现，业务代码零改动。
-- 区分领域事件 vs 集成事件的判定轴：**能否一次编译抓到所有下游**。能 → 概念区分即可；不能（跨网络/独立部署）→ 必须两套类型 + 版本化契约。详见 [[analysis-00002-domain-vs-integration-events]]。
+- 区分领域事件 vs 集成事件的判定轴：**能否一次编译抓到所有下游**。能 → 概念区分即可；不能（跨网络/独立部署）→ 必须两套类型 + 版本化契约。详见 [analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)。
 
 ## 一、跨 reference 的 publish / consume 对比
 
@@ -185,7 +185,7 @@ DomainEvents domainEventsWithStorage(ApplicationEventPublisher publisher,
 
 ## 相关参考
 
-- `docs/reference/ddd-by-examples-library/` —— 本分析的主源。
-- `docs/reference/spring-modulith-with-ddd/` —— 生产级 outbox 式发布注册表 + 事件外化 `mapping()`。
-- `docs/reference/modular-monolith-with-ddd/` —— 两级事件（domain / integration）+ Outbox/Inbox。
-- `docs/reference/axon-framework/` —— Event Sourcing 路线（仅在确需 ES 时采用）。
+- `docs/reference/reference-00004-ddd-by-examples-library.md` —— 本分析的主源。
+- `docs/reference/reference-00008-spring-modulith-with-ddd.md` —— 生产级 outbox 式发布注册表 + 事件外化 `mapping()`。
+- `docs/reference/reference-00007-modular-monolith-with-ddd.md` —— 两级事件（domain / integration）+ Outbox/Inbox。
+- `docs/reference/reference-00001-axon-framework.md` —— Event Sourcing 路线（仅在确需 ES 时采用）。

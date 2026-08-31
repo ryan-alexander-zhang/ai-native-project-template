@@ -2,13 +2,13 @@
 id: analysis-00022-samples-validation-layers
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S19 校验的三层分工
 
 对应 sample：`aipersimmon-ddd-samples/s19-validation-layers`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 

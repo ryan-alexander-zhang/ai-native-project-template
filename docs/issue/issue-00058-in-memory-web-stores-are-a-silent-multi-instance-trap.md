@@ -29,11 +29,11 @@ blocks: [report-00001-ddd-framework-review]
    且两者无法区分」。
 2. **最小机制**：`@ConditionalOnMissingBean(IdempotencyStore.class)` 把「使用者选了后端」与「使用者忘了选后端」
    压成同一个分支。缺 bean 时代码只为前者设计了行为（装个能跑的），没有为后者产生任何信号。
-   **这与 [[issue-00053-id-generator-silently-degrades-to-uuidv4]] 的 `ObjectProvider.getIfAvailable()` 是同一个
+   **这与 [issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md) 的 `ObjectProvider.getIfAvailable()` 是同一个
    反模式**：两种意图在类型上不可区分。
 3. **真根因**：能力降级没有被显式声明。而框架在别处**已经建立了正确范式两次**——
-   [[issue-00044-integration-events-bypass-outbox-kafka-at-runtime]] 的 `aipersimmonDddDurableTransportGuard`
-   对「传输被漏配」fail-loud；[[issue-00057-unlimited-systemic-retry-is-invisible]] 的 `SystemicStallReporter`
+   [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md) 的 `aipersimmonDddDurableTransportGuard`
+   对「传输被漏配」fail-loud；[issue-00057-unlimited-systemic-retry-is-invisible](issue-00057-unlimited-systemic-retry-is-invisible.md) 的 `SystemicStallReporter`
    对「无限重试」持续报告。in-memory web store 是**同一模式的第三个实例，仍是 fail-silent**。
 4. **排除的伪根因**：
    - 不是「in-memory 实现有 bug」。它们在单实例下完全正确，作为开发默认值是**对的**——体验重要，
@@ -91,8 +91,8 @@ classpath 上无任何 `-web-store-*`：
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（P1-6）
-- [[plan-00014-adoption-threshold-and-architecture-simplification]]（D2）
-- [[issue-00053-id-generator-silently-degrades-to-uuidv4]]（同一反模式：两种意图类型上不可区分）
-- [[issue-00044-integration-events-bypass-outbox-kafka-at-runtime]]（fail-loud 守卫的形状来源）
-- [[issue-00057-unlimited-systemic-retry-is-invisible]]（同一「降级必须显式声明」结论的第二例）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P1-6）
+- [plan-00014-adoption-threshold-and-architecture-simplification](../plan/plan-00014-adoption-threshold-and-architecture-simplification.md)（D2）
+- [issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md)（同一反模式：两种意图类型上不可区分）
+- [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md)（fail-loud 守卫的形状来源）
+- [issue-00057-unlimited-systemic-retry-is-invisible](issue-00057-unlimited-systemic-retry-is-invisible.md)（同一「降级必须显式声明」结论的第二例）

@@ -72,9 +72,9 @@ guard;不改 schema、不改 `OutboxDispatcher` 接口。需补一个"无真实 
 
 ## 关联
 
-- [[plan-00006-middleware-integration]]
-- [[issue-00044-integration-events-bypass-outbox-kafka-at-runtime]](已为"有 KafkaTemplate 但 publisher 非 durable"补 fail-loud guard;本 issue 是其未覆盖的姊妹路径:无 dispatcher → logging 兜底)
-- [[design-00006-integration-event-routing]](LOCAL/EXTERNAL 路由;外发 opt-in)
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)
+- [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md)(已为"有 KafkaTemplate 但 publisher 非 durable"补 fail-loud guard;本 issue 是其未覆盖的姊妹路径:无 dispatcher → logging 兜底)
+- [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)(LOCAL/EXTERNAL 路由;外发 opt-in)
 
 ## 核查结论(在当前 HEAD 复核)
 

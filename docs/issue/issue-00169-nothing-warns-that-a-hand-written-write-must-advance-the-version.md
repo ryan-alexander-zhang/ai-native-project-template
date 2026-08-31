@@ -59,7 +59,7 @@ status: resolved
 不建议由库去检测（例如要求所有写入走某个门面）。认领必须绕开版本校验才有意义，
 `saveAggregate` 也无从知道别人在做什么。这是一条**前提**，前提的正确位置是文档。
 
-相关：[[analysis-00040-samples-long-running-endpoints]] §5。
+相关：[analysis-00040-samples-long-running-endpoints](../analysis/analysis-00040-samples-long-running-endpoints.md) §5。
 
 ## 解决记录（2026-08-05）
 

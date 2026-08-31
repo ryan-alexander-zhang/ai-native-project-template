@@ -282,7 +282,7 @@ collector 无法启动 → 应用的 OTLP 导出无处接收 → 可观测性链
 OTLP gRPC/HTTP(4317/4318)正常收流,SigNoz 成功入库(见第 5 项)。
 
 > 仅改样例的 `docker/signoz/otel-collector-config.yaml` 一处;不涉及库代码。这是运行 SigNoz 栈的前置阻断项,
-> 建议纳入下游 SigNoz 兼容性维护(与 [[downstream-scaffolds-migration-debt]] 同类)。
+> 建议纳入下游 SigNoz 兼容性维护(与 downstream-scaffolds-migration-debt 同类)。
 
 ---
 

@@ -6,23 +6,23 @@ status: active
 
 # aipersimmon-ddd 异常/错误体系:现状盘点、对照与缺口分析
 
-给整个库的**异常与错误处理体系**做一次 gap 分析,为 [[design-00003-exception-model]] 提供依据。
-方法沿用 [[analysis-00008-web-api-response-envelope]]:先穷举现状(以源码 file:line 为证),再对照
+给整个库的**异常与错误处理体系**做一次 gap 分析,为 [design-00003-exception-model](../design/design-00003-exception-model.md) 提供依据。
+方法沿用 [analysis-00008-web-api-response-envelope](analysis-00008-web-api-response-envelope.md):先穷举现状(以源码 file:line 为证),再对照
 `docs/reference` 八个参考项目与大厂/IETF 标准,最后按严重度列缺口。
 
 **一句话结论**:异常体系呈**两极分化**——传输层(`-web`/`-web-spring`)的线上错误契约设计优秀、
 高于多数大厂平均线;但**领域层/应用层的异常模型非常薄弱**(全库仅 4 个自定义异常,`DomainException`/
 `ApplicationException` 只有一个 String message),且两层之间有一道**没接通的缝**,导致
-[[design-00002-web-layer]] 自己写的旗舰 wire 示例目前根本产不出来。传输层不欠缺,**内核欠缺**。
+[design-00002-web-layer](../design/design-00002-web-layer.md) 自己写的旗舰 wire 示例目前根本产不出来。传输层不欠缺,**内核欠缺**。
 
 > 说明:本仓当前代码是**开发中的脚手架,不是 truth**。本分析记录的 file:line 是"现状证据",
-> 不是"应然契约";该改的由 [[design-00003-exception-model]] 统一改。
+> 不是"应然契约";该改的由 [design-00003-exception-model](../design/design-00003-exception-model.md) 统一改。
 
 ---
 
 ## 一、现状盘点:库到底提供了什么
 
-> **快照说明**:§一、§二 是本分析写作时(异常体系落地**之前**)的现状/缺口证据,故仍出现旧的 `ProblemType`。缺口已由 [[decision-00010-exception-model]] / [[design-00003-exception-model]] 解决,且传输映射最终采**组合**(`ErrorCode → ProblemDescriptor`,family + override)而非 `ProblemType extends ErrorCode`——见 §4.7。下文"必须交付"(§六)已按最终 C+ 形态表述。
+> **快照说明**:§一、§二 是本分析写作时(异常体系落地**之前**)的现状/缺口证据,故仍出现旧的 `ProblemType`。缺口已由 [decision-00010-exception-model](../decision/decision-00010-exception-model.md) / [design-00003-exception-model](../design/design-00003-exception-model.md) 解决,且传输映射最终采**组合**(`ErrorCode → ProblemDescriptor`,family + override)而非 `ProblemType extends ErrorCode`——见 §4.7。下文"必须交付"(§六)已按最终 C+ 形态表述。
 
 ### 1.1 自定义异常类型——总共只有这些
 
@@ -75,7 +75,7 @@ filter 层另有三条**绕过 advice**、直写 `application/problem+json` 的�
 | **Guard vs Validate 分层**(不变量→抛;边缘输入→非异常返回) | domain-driven-hexagon("Bad input isn't a bug; a broken invariant is")、clean-architecture(Vogen+GuardClauses) | ⚠️ 部分:边缘有 Bean Validation,领域侧只有裸 throw |
 | **Always-Valid 自校验值对象** | domain-driven-hexagon、clean-architecture、spring-modulith-with-ddd | ✅ 已有(VO 构造即校验) |
 
-值得强调:本仓 **[[analysis-00005-structure-2-event-flow-and-cqrs]]:205-206** 已写明——"预期的领域失败
+值得强调:本仓 **[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md):205-206** 已写明——"预期的领域失败
 (如 `CreditExceededException`)用 **Result/受控异常**表达……依据:domain-driven-hexagon、
 clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Result,但库只落了"受控异常"的一半**,
 `Result` 那一半从未实现。这是一处**声明意图 vs 实现**的缺口,非仅评审观点。
@@ -90,7 +90,7 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 
 ## 三、对照大厂/标准:传输层是强项,但只覆盖了"最后一公里"
 
-[[analysis-00008-web-api-response-envelope]] 已用 15+ 家大厂 + IETF 做过完整对照,此处不重复,只补它**没覆盖的维度**:
+[analysis-00008-web-api-response-envelope](analysis-00008-web-api-response-envelope.md) 已用 15+ 家大厂 + IETF 做过完整对照,此处不重复,只补它**没覆盖的维度**:
 
 - 00008 讨论的是**响应/错误的线上契约**(信封 vs ProblemDetail、字段级 errors、状态码语义)——即"错误**离开进程之后**长什么样"。本库这块**达标甚至领先**。
 - 00008 **没有**讨论**错误在进程内如何被建模、如何从领域一路带到边界**——即"错误**在进程内部**如何流动、如何携带机器码"。本库这块**是空的**。
@@ -99,7 +99,7 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 
 1. **机器可读错误码是"从内到外"的贯穿契约**,不是边界现拼的。Stripe(`type`/`code`)、Google(`ErrorInfo.reason`+`domain`)、阿里云/华为云(点分 `Code`)——错误码在**业务逻辑抛出的那一刻**就确定,原样透传到响应。本库的 `code` 只能由 `-web` 的 `ApiException` 携带,**领域异常带不出来**(见第五节),等于把"从内到外"截断在了边界。
 
-(另一维度——错误的 transient/permanent 可重试性——属**异步投递可靠性**,不在本异常体系范围,独立追踪见 [[issue-00003-messaging-delivery-reliability]]。)
+(另一维度——错误的 transient/permanent 可重试性——属**异步投递可靠性**,不在本异常体系范围,独立追踪见 [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md)。)
 
 ---
 
@@ -112,7 +112,7 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 | 3 | **`ConstraintViolationException` → 500(应 400/422)** | 🔴 高(近似 bug) | `ValidationCommandInterceptor.java:31` 在命令总线抛 JSR-380 的 `ConstraintViolationException`,但 advice 只处理 `MethodArgumentNotValidException`/`BindException`,于是**命令级校验失败掉进 500 兜底**(`:63`)。 |
 | 4 | **i18n 挂了架子没放东西** | 🟡 中 | `ProblemTitleResolver` 接了 `MessageSource`,但**全库无任何 `messages*.properties`**,title 回退成 raw key;filter 路径(`ProblemHttpResponseWriter`)干脆不走 MessageSource。 |
 | 5 | **无 `Invariant` 抽象 / 无 `Result`** | 🟡 中 | 规则散落成 `if/throw`,可发现性、可测试性、可组合性均低于 modular-monolith / ddd-by-examples;与 `analysis-00005` 的 Result 意图不符。 |
-| 6 | **消息投递无 DLQ/重试上限**(**已移出**) | — | 属**异步投递可靠性**、非异常体系;独立追踪见 [[issue-00003-messaging-delivery-reliability]]。 |
+| 6 | **消息投递无 DLQ/重试上限**(**已移出**) | — | 属**异步投递可靠性**、非异常体系;独立追踪见 [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md)。 |
 | 7 | **`DomainException` 无子类层级、恒回显 message** | 🟢 低 | 除 `IllegalStateTransitionException` 外无细分;raw message 直进 `detail`,措辞即对外契约却不受版本治理。 |
 | 8 | **两处 Bean Validation 不共享 `FieldError`/code 路径** | 🟢 低 | 命令总线 JSR-380(cqrs-spring)与 web 400 映射(web-spring)各走各的,错误结构不统一。 |
 | 9 | **401/403 错误格式不统一(已知推迟项)** | 🟢 低 | 见 `decision-00007` §六:Spring Security 过滤器链早于 advice,401/403 仍是 Security 默认体。设计需给出条件化补齐路径。 |
@@ -121,7 +121,7 @@ clean-architecture(Result-over-exceptions)"。即**内部分析原本倾向 Resu
 
 ## 五、最关键的一条:设计与实现之间的断裂
 
-[[design-00002-web-layer]] §八(lines 258-271)亲自给出的旗舰 wire 示例:
+[design-00002-web-layer](../design/design-00002-web-layer.md) §八(lines 258-271)亲自给出的旗舰 wire 示例:
 
 ```
 HTTP/1.1 422 Unprocessable Content
@@ -131,16 +131,16 @@ Content-Type: application/problem+json
   "status": 422, "detail": "...", "traceId": "..." }
 ```
 
-> 注:业务规则默认状态由早先的 409 修正为 **422**(见 [[decision-00010-exception-model]] §四;design-00002 §八 已同步)。
+> 注:业务规则默认状态由早先的 409 修正为 **422**(见 [decision-00010-exception-model](../decision/decision-00010-exception-model.md) §四;design-00002 §八 已同步)。
 
 但在当前脚手架里**这个响应产不出来**:`CreditExceededException extends DomainException` → 命中
 `handleDomain` → 409(状态也错,应为 422)、`type=about:blank`、**`code` 缺失**。要得到文档那个带 `code`/`type` 的响应,
 必须改抛 `ApiException(OrderingProblemType.CREDIT_EXCEEDED, …)`;可 `ApiException`/`ProblemType` 都在
-`-web`,**领域层不能依赖 web**(违反 [[analysis-00006-ddd-building-blocks-library]] 的 framework-free/依赖向内铁律)。
+`-web`,**领域层不能依赖 web**(违反 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) 的 framework-free/依赖向内铁律)。
 
 **结论**:库设计了一套漂亮的机器可读错误码契约,却**没给领域异常任何"不依赖 `-web` 就能挂上 code"的通道**。
 这正是"欠缺感"的结构性根源——设计停在了传输层,没有向内贯通到领域异常。**这必须靠在 `-core` 引入一个
-framework-free 的错误码抽象来解**(详见 [[design-00003-exception-model]] §二)。
+framework-free 的错误码抽象来解**(详见 [design-00003-exception-model](../design/design-00003-exception-model.md) §二)。
 
 ---
 
@@ -154,16 +154,16 @@ framework-free 的错误码抽象来解**(详见 [[design-00003-exception-model]
 5. **Guard-vs-Validate 分工**成文;对 `Result`/`Either` 给出明确取舍(采纳/推迟/不做)。
 6. **401/403 条件化补齐**路径(仅当 classpath 有 spring-security)。→ 解 #9。
 
-(缺口 #6 消息投递可靠性不在本清单——见 [[issue-00003-messaging-delivery-reliability]]。)
+(缺口 #6 消息投递可靠性不在本清单——见 [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md)。)
 
 ---
 
 ## 关联
 
-- [[analysis-00008-web-api-response-envelope]] —— 传输层错误契约的大厂/标准对照(本文不重复其证据)。
-- [[analysis-00006-ddd-building-blocks-library]] —— 纯/脏分离与依赖向内铁律,约束错误码抽象只能落在 `-core`。
-- [[analysis-00005-structure-2-event-flow-and-cqrs]] —— 命令侧"Result/受控异常"意图的原始出处。
-- [[decision-00007-web-api-response-envelope]] —— per-BC 错误码目录(后细化为 §4.7 的组合)、扩展成员 `code`/`traceId`/`errors` 的决策来源。
-- [[design-00001-aipersimmon-ddd-and-scaffold]] / [[design-00002-web-layer]] —— 现有模块与 Web 层设计。
-- [[decision-00010-exception-model]] —— 本分析驱动的决策定案。
-- [[design-00003-exception-model]] —— 该决策落地的完整异常体系设计。
+- [analysis-00008-web-api-response-envelope](analysis-00008-web-api-response-envelope.md) —— 传输层错误契约的大厂/标准对照(本文不重复其证据)。
+- [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) —— 纯/脏分离与依赖向内铁律,约束错误码抽象只能落在 `-core`。
+- [analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md) —— 命令侧"Result/受控异常"意图的原始出处。
+- [decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md) —— per-BC 错误码目录(后细化为 §4.7 的组合)、扩展成员 `code`/`traceId`/`errors` 的决策来源。
+- [design-00001-aipersimmon-ddd-and-scaffold](../design/design-00001-aipersimmon-ddd-and-scaffold.md) / [design-00002-web-layer](../design/design-00002-web-layer.md) —— 现有模块与 Web 层设计。
+- [decision-00010-exception-model](../decision/decision-00010-exception-model.md) —— 本分析驱动的决策定案。
+- [design-00003-exception-model](../design/design-00003-exception-model.md) —— 该决策落地的完整异常体系设计。

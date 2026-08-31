@@ -13,7 +13,7 @@ blocks: [issue-00003-messaging-delivery-reliability]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-[[issue-00003-messaging-delivery-reliability]] 的生产侧加固里,relay 对「放弃」的行(永久失败 / 耗尽重试)
+[issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) 的生产侧加固里,relay 对「放弃」的行(永久失败 / 耗尽重试)
 调 `DeadLetterStore.store()` **同事务从 outbox 移入**死信表。但 `handleFailure` 的两条放弃分支**只在
 `store()` 成功的前提下**才算数——`store()` 一旦抛异常(死信表不可用/被删/迁移事务失败),既有代码既不退避、
 也不兜底。
@@ -88,7 +88,7 @@ AC-1 ~ AC-4 达成,本 issue `resolved`。
 
 ## 关联
 
-- [[issue-00003-messaging-delivery-reliability]] —— 本 issue 补齐其放弃通路「迁移也可能失败」的兜底。
-- [[issue-00007-ordering-across-backoff-window]] —— 其提到的 legacy-abandoned(`attempts>=max AND sent=false`)
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 本 issue 补齐其放弃通路「迁移也可能失败」的兜底。
+- [issue-00007-ordering-across-backoff-window](issue-00007-ordering-across-backoff-window.md) —— 其提到的 legacy-abandoned(`attempts>=max AND sent=false`)
   搁浅正是本修复「只推 next_attempt_at、不递增 attempts」要规避的。
-- [[issue-00011-bound-outbox-kafka-send-await]] —— 同批 outbox relay 加固(等待 ack 有界)。
+- [issue-00011-bound-outbox-kafka-send-await](issue-00011-bound-outbox-kafka-send-await.md) —— 同批 outbox relay 加固(等待 ack 有界)。

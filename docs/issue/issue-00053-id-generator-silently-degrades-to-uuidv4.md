@@ -87,9 +87,9 @@ blocks: [report-00001-ddd-framework-review]
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（P0-3，本 issue 的来源）
-- [[plan-00013-phase-one-correctness-remediation]]
-- [[plan-00012-time-ordered-identifiers-implementation]]（其「铁律 3：回退等价」被本 issue 推翻）
-- [[decision-00019-time-ordered-uuidv7-identifiers]] / [[design-00010-time-ordered-identifiers]]
-- [[issue-00054-sample-aggregate-ids-use-random-uuid]]（同源：时间有序 id 未覆盖聚合主键）
-- [[issue-00044-integration-events-bypass-outbox-kafka-at-runtime]]（「可选能力缺席 → fail-loud」的正确范式对照）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P0-3，本 issue 的来源）
+- [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)
+- [plan-00012-time-ordered-identifiers-implementation](../plan/plan-00012-time-ordered-identifiers-implementation.md)（其「铁律 3：回退等价」被本 issue 推翻）
+- [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md) / [design-00010-time-ordered-identifiers](../design/design-00010-time-ordered-identifiers.md)
+- [issue-00054-sample-aggregate-ids-use-random-uuid](issue-00054-sample-aggregate-ids-use-random-uuid.md)（同源：时间有序 id 未覆盖聚合主键）
+- [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md)（「可选能力缺席 → fail-loud」的正确范式对照）

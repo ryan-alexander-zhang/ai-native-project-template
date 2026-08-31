@@ -85,5 +85,5 @@ cleanup().purge();
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§4 遗留观察由本 issue 结掉）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§4 遗留观察由本 issue 结掉）
 - 同类风险：同模块其余 `@Scheduled` + `@SchedulerLock` 的方法若被测试直调，都有同一陷阱。

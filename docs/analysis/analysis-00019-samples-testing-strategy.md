@@ -2,13 +2,13 @@
 id: analysis-00019-samples-testing-strategy
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S18 分层测试策略
 
 对应 sample：`aipersimmon-ddd-samples/s18-testing-strategy`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 

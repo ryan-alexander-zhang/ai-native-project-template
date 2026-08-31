@@ -13,7 +13,7 @@ blocks: [decision-00014-cloudevents-integration-event-contract]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-[[decision-00014-cloudevents-integration-event-contract]] 命题一确立"事件类型是**逻辑契约**,不是 Java 类",
+[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) 命题一确立"事件类型是**逻辑契约**,不是 Java 类",
 并推荐把 `eventType()` 覆盖成版本化、命名空间化的名字(如 `com.example.ordering.OrderPlaced.v1`)。但默认
 类型注册表**按 `Class.getSimpleName()` 建键**,与生产侧写到线上的 `eventType()` 不一致——**一旦按推荐做法覆盖
 `eventType()`,producer 能发,默认 in-process / Kafka consumer 必然解析失败**。同时 `putIfAbsent` 会静默吞掉
@@ -79,7 +79,7 @@ consumer 建键的值同源,**缺失即硬报错**(不回退简单类名):
 5. **构建期护栏(ArchUnit)**:`AiPersimmonDddRules.integrationEventsShouldDeclareEventType()` 强化为自定义
    `ArchCondition`——凡 `implements IntegrationEvent` 必须有 `@EventType`、`name` 非空、`version ≥ 1`、且
    `name` 全局唯一;并入 `all()`,在 Spring 启动前、构建期即拦截(承
-   [[issue-00002-land-domain-event-handler-annotation]] / [[issue-00004-enforce-no-command-handler-to-command-handler-dependency]]
+   [issue-00002-land-domain-event-handler-annotation](issue-00002-land-domain-event-handler-annotation.md) / [issue-00004-enforce-no-command-handler-to-command-handler-dependency](issue-00004-enforce-no-command-handler-to-command-handler-dependency.md)
    同一范式)。**"代码改了但版本没 bump" 的漂移 lint 需要签入结构快照 + CI 比对,非 ArchUnit 能力所及,记为后续**。
 
 ## 边界收口(单一事实来源 + (type, version) catalog)
@@ -95,7 +95,7 @@ consumer 建键的值同源,**缺失即硬报错**(不回退简单类名):
 4. **缺注解事件发布即失败**:已守(`eventTypeOf`/`eventVersionOf` 在发布路径抛)。
 5. **未知 `(type, version)` 入站 → DLT,无 FQCN 回退**:删除 `RegistryIntegrationEventCatalog` 的 `Class.forName`
    回退;lookup miss 抛 `UnknownIntegrationEventException`(永久失败语义)。**注意**:真正的"路由到 DLT"依赖
-   [[issue-00003-messaging-delivery-reliability]](Kafka 侧尚无 `DeadLetterPublishingRecoverer`);当前是"清晰
+   [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md)(Kafka 侧尚无 `DeadLetterPublishingRecoverer`);当前是"清晰
    抛出→由容器处理",DLT 落地随 issue-00003。outbox 侧未知类型经 relay 重试达上限后进 outbox 死信(已有)。
 6. **可覆盖的 `IntegrationEventCatalog` SPI**:`IntegrationEventTypeResolver` 重命名为 `IntegrationEventCatalog`
    (`Optional<Class> lookup(String type, int version)`),默认实现 `RegistryIntegrationEventCatalog` 由注解扫描
@@ -126,8 +126,8 @@ consumer 建键的值同源,**缺失即硬报错**(不回退简单类名):
 
 ## 关联
 
-- [[decision-00014-cloudevents-integration-event-contract]] —— 逻辑类型契约的来源;本 issue **修正**其"`eventType()`
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) —— 逻辑类型契约的来源;本 issue **修正**其"`eventType()`
   默认简单类名、按简单类名零配置建表"的做法为"`@EventType` 必填、无回退、缺失即报错"(decision 正文已同步修订)。
-- [[issue-00002-land-domain-event-handler-annotation]]、[[issue-00004-enforce-no-command-handler-to-command-handler-dependency]]
+- [issue-00002-land-domain-event-handler-annotation](issue-00002-land-domain-event-handler-annotation.md)、[issue-00004-enforce-no-command-handler-to-command-handler-dependency](issue-00004-enforce-no-command-handler-to-command-handler-dependency.md)
   —— 同一"契约用注解声明 + ArchUnit 固化"范式。
-- [[issue-00003-messaging-delivery-reliability]] —— 反序列化永久失败进死信,与本 issue 的"解析失败"相邻但正交。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 反序列化永久失败进死信,与本 issue 的"解析失败"相邻但正交。

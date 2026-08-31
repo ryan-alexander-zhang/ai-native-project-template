@@ -7,8 +7,8 @@ blocks: [decision-00014-cloudevents-integration-event-contract]
 
 # 入站 CloudEvents 契约校验不完整(与 ADR "source 必填 / 畸形即刻 DLT" 未对齐)
 
-[[issue-00006-require-cloudevents-id-on-inbound]](M1)强制了 `ce_id` / `ce_type`,方向正确,但入站校验仍有缺口:
-部分必填属性被**默认兜底**、部分**根本不校验**、非法值被当**瞬时错误重试**——与 [[decision-00014-cloudevents-integration-event-contract]]
+[issue-00006-require-cloudevents-id-on-inbound](issue-00006-require-cloudevents-id-on-inbound.md)(M1)强制了 `ce_id` / `ce_type`,方向正确,但入站校验仍有缺口:
+部分必填属性被**默认兜底**、部分**根本不校验**、非法值被当**瞬时错误重试**——与 [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)
 "source 必填"及本库"畸形消息立即 DLT"的语义不一致。
 
 ## 问题(现状,file:line 为证 —— 改造前)
@@ -30,7 +30,7 @@ blocks: [decision-00014-cloudevents-integration-event-contract]
 ## 修复(采用严格契约,无默认协议 fallback)
 
 `reconstruct` 前置校验所有必填属性,任何"缺失或存在但非法"一律抛 `MalformedIntegrationEventException`(永久 → 首次即
-DLT,承 [[issue-00006-require-cloudevents-id-on-inbound]] 的 not-retryable 装配):
+DLT,承 [issue-00006-require-cloudevents-id-on-inbound](issue-00006-require-cloudevents-id-on-inbound.md) 的 not-retryable 装配):
 
 - `ce_id`:必填(M1 已有)。
 - `ce_type`:必填(M1 已有)。
@@ -52,6 +52,6 @@ DLT,承 [[issue-00006-require-cloudevents-id-on-inbound]] 的 not-retryable 装�
 
 ## 关联
 
-- [[issue-00006-require-cloudevents-id-on-inbound]] —— M1;本 issue 补齐其余必填属性的校验并统一"畸形→DLT"。
-- [[decision-00014-cloudevents-integration-event-contract]] —— source 必填、`(type, version)` 精确键的契约来源。
-- [[issue-00003-messaging-delivery-reliability]] —— 永久失败 → DLT 的 not-retryable 装配复用其错误处理器。
+- [issue-00006-require-cloudevents-id-on-inbound](issue-00006-require-cloudevents-id-on-inbound.md) —— M1;本 issue 补齐其余必填属性的校验并统一"畸形→DLT"。
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) —— source 必填、`(type, version)` 精确键的契约来源。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 永久失败 → DLT 的 not-retryable 装配复用其错误处理器。

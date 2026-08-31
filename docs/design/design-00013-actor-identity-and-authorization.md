@@ -6,9 +6,9 @@ status: draft
 
 # 操作者身份与授权：把 actor 接进 tenant 已经铺好的那条骨架
 
-本设计回答 [[report-00002-scaffold-ddd-review]] 的 B3：`aipersimmon-ddd-scaffold` 全程没有认证与授权。
+本设计回答 [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md) 的 B3：`aipersimmon-ddd-scaffold` 全程没有认证与授权。
 它同时是一份框架侧的 seam 设计——`actor` 与 `tenant` 是同一类"旁路元数据"，
-框架已经为后者建了完整的传播骨架（[[design-00009-multi-tenancy-tenant-id]]），
+框架已经为后者建了完整的传播骨架（[design-00009-multi-tenancy-tenant-id](design-00009-multi-tenancy-tenant-id.md)），
 前者却只有一个孤零零的 `OperationActorResolver`。本设计的主张是：**不要为 actor 另起一套。**
 
 ## 一、结论
@@ -166,11 +166,11 @@ public ResponseEntity<Void> cancel(@PathVariable String id) {
 
 | 文档/组件 | 影响 |
 |---|---|
-| [[design-00009-multi-tenancy-tenant-id]] | 无冲突。actor 复用同一条传播骨架；两个 filter 的相对顺序需固定（tenant 先，actor 后，因为 actor 可能来自租户内的用户目录） |
-| [[design-00008-operation-log-component]] | `Actor` 从 operation-log 迁出到 identity 组件；operation-log 反向依赖它。审计行的语义不变，但 `actor_id` 终于会是真人而非常量 |
-| [[design-00003-exception-model]] | 401/403 需并入 RFC 9457 家族。`ErrorCategory.FORBIDDEN` 已存在且已被 `NOT_ORDER_CUSTOMER` 使用——领域侧的 403 与边缘侧的 403 要能在 problem document 上区分（前者带 `code`，后者不带，与 409 的既有分裂同理） |
-| [[decision-00013-command-context-and-causation-propagation]] | `CommandContext` 增加 `actor` 字段，需要一条 ADR |
-| [[decision-00012-no-ambient-per-command-state]] | **需要核对**：该决策反对"环境态"。`ActorContext` 是 ThreadLocal，形式上是环境态——但 `TenantContext` 已经是同样的形状且被接受，理由是它在**可信边界**绑定、并显式复制进 `CommandContext`。actor 必须援引同一条豁免，否则两个决策会打架 |
+| [design-00009-multi-tenancy-tenant-id](design-00009-multi-tenancy-tenant-id.md) | 无冲突。actor 复用同一条传播骨架；两个 filter 的相对顺序需固定（tenant 先，actor 后，因为 actor 可能来自租户内的用户目录） |
+| [design-00008-operation-log-component](design-00008-operation-log-component.md) | `Actor` 从 operation-log 迁出到 identity 组件；operation-log 反向依赖它。审计行的语义不变，但 `actor_id` 终于会是真人而非常量 |
+| [design-00003-exception-model](design-00003-exception-model.md) | 401/403 需并入 RFC 9457 家族。`ErrorCategory.FORBIDDEN` 已存在且已被 `NOT_ORDER_CUSTOMER` 使用——领域侧的 403 与边缘侧的 403 要能在 problem document 上区分（前者带 `code`，后者不带，与 409 的既有分裂同理） |
+| [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) | `CommandContext` 增加 `actor` 字段，需要一条 ADR |
+| [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md) | **需要核对**：该决策反对"环境态"。`ActorContext` 是 ThreadLocal，形式上是环境态——但 `TenantContext` 已经是同样的形状且被接受，理由是它在**可信边界**绑定、并显式复制进 `CommandContext`。actor 必须援引同一条豁免，否则两个决策会打架 |
 
 ## 八、非目标
 
@@ -206,8 +206,8 @@ public ResponseEntity<Void> cancel(@PathVariable String id) {
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]（B3 的来源）
-- [[design-00009-multi-tenancy-tenant-id]]（本设计复用的骨架）
-- [[design-00008-operation-log-component]]（`Actor` 的当前住处）
-- [[design-00003-exception-model]]（401/403 的 problem 呈现）
-- [[decision-00012-no-ambient-per-command-state]]、[[decision-00013-command-context-and-causation-propagation]]（需要核对/新增 ADR）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)（B3 的来源）
+- [design-00009-multi-tenancy-tenant-id](design-00009-multi-tenancy-tenant-id.md)（本设计复用的骨架）
+- [design-00008-operation-log-component](design-00008-operation-log-component.md)（`Actor` 的当前住处）
+- [design-00003-exception-model](design-00003-exception-model.md)（401/403 的 problem 呈现）
+- [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)、[decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)（需要核对/新增 ADR）

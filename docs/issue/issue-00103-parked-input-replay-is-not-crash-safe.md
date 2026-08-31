@@ -86,7 +86,7 @@ if (resumed != null) {
 **未做的选择及原因**：没有为 parked 输入单开第 5 张表（队列会与审计行产生双写一致性问题，
 而 parked 行本身已经是队列）；没有给 worker 加租约（幂等 + 队头顺序已经足够，租约只会
 增加一处可失效的状态）；没有把重放塞进 resume 的同一个事务（一条输入失败会连带回滚 resume，
-且 `handle` 会因此变成 joined 事务，撞上 [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]）。
+且 `handle` 会因此变成 joined 事务，撞上 [issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried](issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried.md)）。
 
 ## 验证结果
 
@@ -97,8 +97,8 @@ if (resumed != null) {
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§1 C4）
-- 设计：[[design-00004-durable-process-manager-runtime]] §4.6 / §4.7 / §4.10 已同步
-- 同批：[[issue-00104-an-ended-instance-keeps-its-timers-forever]]、
-  [[issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried]]
-- 先例：[[issue-00037-parked-input-replay-order-non-monotonic]]（重放顺序改用 `transition_seq`，本次沿用）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§1 C4）
+- 设计：[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) §4.6 / §4.7 / §4.10 已同步
+- 同批：[issue-00104-an-ended-instance-keeps-its-timers-forever](issue-00104-an-ended-instance-keeps-its-timers-forever.md)、
+  [issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried](issue-00105-an-advance-conflict-inside-a-joined-transaction-cannot-be-retried.md)
+- 先例：[issue-00037-parked-input-replay-order-non-monotonic](issue-00037-parked-input-replay-order-non-monotonic.md)（重放顺序改用 `transition_seq`，本次沿用）

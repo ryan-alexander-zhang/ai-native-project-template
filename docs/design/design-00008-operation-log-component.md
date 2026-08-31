@@ -2,12 +2,12 @@
 id: design-00008-operation-log-component
 type: design
 status: active
-informs: [decision-00017-operation-log-component-boundaries]
+informs: [spec-00001-operation-log-component]
 ---
 
 # 通用操作日志组件：framework-free 内核、CQRS/Spring 捕获与 JDBC 存储
 
-本文把 [[analysis-00013-operation-log-component]] 的预研结论落成**可实施的结构设计**：一套面向业务阅读者的
+本文把 [analysis-00013-operation-log-component](../analysis/analysis-00013-operation-log-component.md) 的预研结论落成**可实施的结构设计**：一套面向业务阅读者的
 通用操作日志（Operation Log）构件，以 **clean-slate** 方式在 `aipersimmon-ddd` 内实现，借鉴 `mzt-biz-log` /
 `log-record` 的需求模型，但不依赖、不 fork、不复制其运行时内核。
 
@@ -15,10 +15,10 @@ informs: [decision-00017-operation-log-component-boundaries]
 `SUCCEEDED/REJECTED/FAILED` 的判定，全部属于消费方 bounded context；本组件只拥有捕获流程、统一模型、模板、
 脱敏、幂等、事务协调、持久化与查询端口。
 
-本文承接并受约束于：[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]、
-[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]、[[decision-00012-no-ambient-per-command-state]]、
-[[decision-00013-command-context-and-causation-propagation]]、[[decision-00014-cloudevents-integration-event-contract]]、
-[[design-00005-observability-and-distributed-tracing]]、[[design-00004-durable-process-manager-runtime]]。
+本文承接并受约束于：[decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)、
+[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)、[decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)、
+[decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)、[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)、
+[design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md)、[design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md)。
 
 本文是结构设计，不是 accepted decision。§十四列出的取舍必须先经 ADR 拍板、再产出 spec/plan，最后编码。
 
@@ -47,11 +47,11 @@ informs: [decision-00017-operation-log-component-boundaries]
 2. **业务 outcome 与事务 completion 是正交两维**（§八）。正常返回的 `SUCCEEDED/REJECTED` 与业务变更同事务提交；
    异常导致的 `REJECTED/FAILED` 在外层独立事务追加。禁止用 `async` / `joinTransaction` 一类 boolean 掩盖语义。
 3. **不提供 ambient context**：无 ThreadLocal / TTL / global map / 静态 util / SpringContext 查 bean。每次调用只用
-   局部、显式、不可变对象（对齐 [[decision-00012-no-ambient-per-command-state]]）。
+   局部、显式、不可变对象（对齐 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)）。
 4. **只记录显式 allowlist 的业务事实**：默认无字段可记录；同时保存稳定结构化字段与已渲染文案快照；不默认序列化
    完整 command/result/entity/异常/before-after 对象。
 5. **注解只放 `Command` 类型、由 `CommandInterceptor` 解释**，不做通用 method AOP（对齐
-   [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]] 与 [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]）。
+   [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md) 与 [decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)）。
 6. **受限模板，不开放完整 SpEL**：只暴露有限 immutable projection 的只读属性路径 + 极少纯函数；启动期编译校验。
 7. **默认不使用进程内异步队列**：同步本地 append + 数据库唯一约束收敛重试；中心化导出、MQ、异步 exporter 都不是 MVP。
 8. **写读端口分离**：`OperationLogSink`（write）与 `OperationLogReader`（read）分开；reader 不阻塞 write-path MVP。
@@ -130,12 +130,12 @@ flowchart LR
 
 | 现有决策 | 对本组件的约束 |
 | --- | --- |
-| [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]] | 日志属横切关注点，由 `CommandBus + CommandInterceptor` 统一提供，不在 handler 内散落；注解不诱导 handler 互调 |
-| [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]] | `@OperationLog` 只能叠加属性元数据，不替代 `Command<R>` 类型化契约；`<R>` 仍是 load-bearing |
-| [[decision-00012-no-ambient-per-command-state]] | 禁止自建 ThreadLocal / ambient 每命令状态；invocation state 必须是局部显式对象；成功/失败两路不共享 mutable frame |
-| [[decision-00013-command-context-and-causation-propagation]] | 直接读显式 `CommandContext` 的 `messageId/correlationId/causationId`；**不**给 `CommandContext` 加 actor/tenant/metadata map |
-| [[decision-00014-cloudevents-integration-event-contract]] | Operation Log 不是 Integration Event，不偷用 CloudEvents published language、不复用 outbox |
-| [[design-00005-observability-and-distributed-tracing]] | trace 由 OTel ambient context 管理；模型不自造 `traceId`；span 只写低风险关联值 |
+| [decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md) | 日志属横切关注点，由 `CommandBus + CommandInterceptor` 统一提供，不在 handler 内散落；注解不诱导 handler 互调 |
+| [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md) | `@OperationLog` 只能叠加属性元数据，不替代 `Command<R>` 类型化契约；`<R>` 仍是 load-bearing |
+| [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md) | 禁止自建 ThreadLocal / ambient 每命令状态；invocation state 必须是局部显式对象；成功/失败两路不共享 mutable frame |
+| [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) | 直接读显式 `CommandContext` 的 `messageId/correlationId/causationId`；**不**给 `CommandContext` 加 actor/tenant/metadata map |
+| [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) | Operation Log 不是 Integration Event，不偷用 CloudEvents published language、不复用 outbox |
+| [design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md) | trace 由 OTel ambient context 管理；模型不自造 `traceId`；span 只写低风险关联值 |
 
 ---
 
@@ -212,7 +212,7 @@ com.aipersimmon.ddd.operationlog
 | `templateKey` / `templateVersion` | 可选；文案来自哪个模板版本 |
 | `schemaVersion` | entry 结构版本，从 `1` 起递增，供将来迁移 / 导出 |
 
-不把 `requestId`、`traceId` 塞进核心模型（对齐 [[design-00005-observability-and-distributed-tracing]]）；排障靠当前 OTel span
+不把 `requestId`、`traceId` 塞进核心模型（对齐 [design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md)）；排障靠当前 OTel span
 与技术日志关联，最多把 `recordId` 写进 span 属性。
 
 ### 5.3 核心端口与生命周期
@@ -350,14 +350,14 @@ order   interceptor                          位置语义
 且落在兜底分支会让每个格式错误的请求去抬高 `FAILED` 计数器。
 
 两个 interceptor **不共享 ThreadLocal frame**，各自创建 immutable actor/tenant snapshot；只共享可重复读取的
-compiled metadata（有界 cache）（对齐 [[decision-00012-no-ambient-per-command-state]]）。
+compiled metadata（有界 cache）（对齐 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)）。
 
 **嵌套 command 的事务语义（评审补充）**：`CommandBus` 对每次 dispatch 重跑整条链，`TransactionCommandInterceptor` 用
 默认 `REQUIRED` 传播，故子命令**加入父事务**（同一物理事务）。据此明确：
 
 - 子命令的成功 append（Completed）加入父事务，**与父一起提交或回滚**；不因子成功而独立提交。
 - 子命令抛异常会把共享事务标为 rollback-only：即使父 handler 吞掉子异常，父在 200 处提交也会 `UnexpectedRollbackException`。
-  这是 Spring 既有行为，consumer 不应在事务内吞子命令异常——与 [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]
+  这是 Spring 既有行为，consumer 不应在事务内吞子命令异常——与 [decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)
   “handler 不互调、命令是总线入口”一致（嵌套 dispatch 本就应罕见）。
 - **每个失败的命令写自己的失败记录**（`issue-00102` 修订）：`Failed(25)` 不再检测活动事务，一律以
   `REQUIRES_NEW` 写入——真正的挂起-恢复。
@@ -531,7 +531,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_log_correlation
   不论外层是否有活动事务；记录失败**不替换**原业务异常，但必须打 metric + alert。
   每个失败的命令记录自己的失败，不推断谁负责记录（§6.1，`issue-00102`）。
 - `OperationLogSink` 对事务无感，只加入当前事务；独立事务由 interceptor 层（`TransactionTemplate`）负责，不藏进 sink 或 boolean 参数。
-- **已决定（§十四 D6 / [[decision-00017-operation-log-component-boundaries]] item 10）**：v1 要求业务与 operation-log
+- **已决定（§十四 D6 / [decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md) item 10）**：v1 要求业务与 operation-log
   同 `DataSource` / 同 `PlatformTransactionManager`；异源的 durable staging 另立 ADR。
 
 ### 8.3 失败日志的崩溃窗口（诚实声明）
@@ -550,7 +550,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_log_correlation
 - direct API 若会重试，调用者必须提供稳定 `idempotencyKey`；不能每次随机后声称幂等。
 - 并发/重投重复由 `(tenant_id, source, idempotency_key)` unique constraint 收敛：成功路径用方言原生 `ON CONFLICT DO NOTHING`、
   失败路径用隔离事务 catch（§7.3）；duplicate 视为幂等成功并打指标。`messageId` 跨重投稳定由
-  [[decision-00016-durable-runtime-staged-message-identity]] 的 `sendAs` 保证。
+  [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md) 的 `sendAs` 保证。
 - 组件只消除**日志重复**，不代替业务命令自身的幂等控制；不承诺跨服务全局总序。
 
 ### 8.5 不默认进程内异步
@@ -588,7 +588,7 @@ before projection；`failed` 路径不读取、不复用、不重建成功 prepa
 至少提供 metric：append attempt/success/failure/duplicate、render/redact/append latency、independent failure-record loss、
 query latency（有 reader 时）。metric label 只放低基数 `operationCode`（仍需基数预算）、`outcome`、`sinkType`；**不得**放
 actor id / target id / summary / change value。技术日志用 `recordId + correlationId` 关联；trace/span identity 继续由
-OTel ambient context 管理（对齐 [[design-00005-observability-and-distributed-tracing]]），最多把 `recordId` 写进 span 属性。
+OTel ambient context 管理（对齐 [design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md)），最多把 `recordId` 写进 span 属性。
 
 ---
 
@@ -599,7 +599,7 @@ OTel ambient context 管理（对齐 [[design-00005-observability-and-distribute
 - core（`aipersimmon-ddd-operation-log`）不得依赖 Spring / JDBC / CQRS。
 - 每个包有 `package-info.java`（`PackageInfoChecks`）。
 - 继承根 pom 的 Spotless(google-java-format) / PMD+CPD / SpotBugs 强制门；本组件模块在自身 `<build>` 开启 JaCoCo + PIT
-  （行/分支/函数与 mutation 阈值 90/90/90，见 [[design-00007-code-quality-gates]] 与 `TESTING.md`）。
+  （行/分支/函数与 mutation 阈值 90/90/90，见 [design-00007-code-quality-gates](design-00007-code-quality-gates.md) 与 `TESTING.md`）。
 
 ---
 
@@ -650,14 +650,14 @@ method annotation adapter；中心平台 exporter/CDC；单独 Audit Log profile
 | async result | v1 明确拒绝或正确等待完成态，不把“返回 Future”当成功 |
 | 三方言 | H2/MySQL/PostgreSQL migration、唯一约束、分页排序一致 |
 | ArchUnit / 可观测性 | domain 不依赖 operation-log；注解只在 application Command；无高基数 metric；recordId/correlationId 可关联 |
-| 质量门 | 按 `TESTING.md` / [[design-00007-code-quality-gates]] 执行覆盖率、静态分析、mutation、集成测试门槛 |
+| 质量门 | 按 `TESTING.md` / [design-00007-code-quality-gates](design-00007-code-quality-gates.md) 执行覆盖率、静态分析、mutation、集成测试门槛 |
 
 ---
 
 ## 十四、ADR 推荐决策
 
 以下把 analysis-00013 §12 的 13 条待拍板问题落成**推荐决策**。这些决策已固化进
-[[decision-00017-operation-log-component-boundaries]]（`draft`，ADR 正式载体）；本节保留为设计视角的展开与索引
+[decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md)（`active`，ADR 正式载体）；本节保留为设计视角的展开与索引
 （Dn ↔ ADR 决策项对应）。每条给出结论、理由（DDD 规范 / 大厂实践 / 生产可用性）、以及需要注意的边界。
 
 **D1 — Operation Log ≠ Audit Log；outcome 与 completion 正交。**
@@ -666,7 +666,7 @@ Audit Log profile + ADR。持久化模型采用 `outcome ∈ {SUCCEEDED, REJECTE
 `completion ∈ {COMMITTED, ROLLED_BACK, NOT_STARTED, UNKNOWN}` **两个正交、均非空**的枚举列。
 *理由*：`mzt-biz-log`/`log-record` 只有单一 success 布尔，无法表达“正常返回但业务拒绝（`REJECTED+COMMITTED`）”与
 “回滚后仍要留痕（`FAILED+ROLLED_BACK`）”这两个真实生产场景；把两维压成一维是这类组件最常见的语义债。DDD 上
-outcome 属 ubiquitous language 的业务概念、completion 属技术事务事实，二者不能混用（对齐 [[decision-00013-command-context-and-causation-propagation]]）。
+outcome 属 ubiquitous language 的业务概念、completion 属技术事务事实，二者不能混用（对齐 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)）。
 
 **D2 — 五模块、依赖单向；core 保持 framework-free & CQRS-free。**
 推荐：`operation-log`(纯契约) → `operation-log-engine`(pipeline+DDL+装配) → `operation-log-cqrs-spring`(捕获) /
@@ -677,16 +677,16 @@ engine；后端只实现存储端口、共享同一份 DDL。
 
 **D3 — 注解只放 `Command` 类型、由 `CommandInterceptor` 解释；不做通用 method AOP。**
 推荐：`@OperationLog` 仅标注 application `Command`，捕获点唯一为 `CommandBus` 拦截链；不提供 `@Around` method AOP。
-*理由*：[[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]] 已确立“注解只是叠加元数据、不是契约”；
+*理由*：[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md) 已确立“注解只是叠加元数据、不是契约”；
 `CommandBus` 是全仓库唯一命令入口，天然规避 Spring proxy self-invocation、public/final、advisor 顺序、异步完成态等坑
 （美团方案正是踩在这些坑上）。将来若确有“非 CQRS 但需注解 service 方法”的验证需求，再加独立 `-method-spring`
-adapter，且必须调用同一 `OperationLogs`（[[decision-00010-command-handler-reuse-and-cross-aggregate-placement]] 精神）。
+adapter，且必须调用同一 `OperationLogs`（[decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md) 精神）。
 
 **D4 — `prepare/complete/failed` 生命周期；两 interceptor 无 mutable 共享；冲突启动失败。**
 推荐：采用 §5.3 的三方法生命周期；成功与失败两路各持 invocation-local 不可变对象，**只共享可重复读取的 compiled
 metadata**，绝不共享 ThreadLocal/可变 frame。一个 input type 出现“注解+Definition 双绑、重复 Definition、泛型不可判定”
 时**启动期 fail-fast**。
-*理由*：[[decision-00012-no-ambient-per-command-state]] 禁 ambient 每命令状态；启动即失败而非运行期双写，是生产可用性
+*理由*：[decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md) 禁 ambient 每命令状态；启动即失败而非运行期双写，是生产可用性
 的基本要求（fail-fast > fail-silent）。
 
 **D5 — interceptor order = Failed 25 / Completed 250；分类走可插拔 `FailureClassifier`。**
@@ -694,7 +694,7 @@ metadata**，绝不共享 ThreadLocal/可变 frame。一个 input type 出现“
 `CompletedOperationLogInterceptor.ORDER=250`（事务内、handler 外层）。**修正（评审）**：Failed 必须外于并发翻译，才能
 看到已翻译的领域异常 `ConcurrencyConflictException`；若像初稿放在 75（并发翻译内层）只能看到未翻译的
 `OptimisticLockingFailureException`，与 classifier 期望的稳定领域词汇不符。异常分类由 core 的 `FailureClassifier` SPI 决定，
-默认映射：预期业务/校验/授权异常（对齐 [[design-00003-exception-model]] 的异常模型）→ `REJECTED`；`ConcurrencyConflictException`
+默认映射：预期业务/校验/授权异常（对齐 [design-00003-exception-model](design-00003-exception-model.md) 的异常模型）→ `REJECTED`；`ConcurrencyConflictException`
 → `FAILED` + `failureCategory=CONCURRENCY`（可重投）；其余技术异常 → `FAILED`。优先级：先判"可预期拒绝"，再判并发，
 最后兜底技术失败。消费方可覆盖默认 classifier。
 *理由*：大厂运维看板普遍区分"用户/业务拒绝"与"系统失败"以驱动告警与 SLO；把分类做成 SPI 而非硬编码，既有合理默认
@@ -705,7 +705,7 @@ metadata**，绝不共享 ThreadLocal/可变 frame。一个 input type 出现“
 原子性的前提，也是默认唯一模式。存在多个事务管理器时，用配置显式指定 operation-log 使用哪个。异库/跨库的 durable
 staging（outbox/CDC 式）不在 v1，另立 ADR。
 *理由*：绝大多数服务只有一个主关系库，同库同事务是取得“业务与成功日志原子提交”的最简且最可靠方式；异库必然引入
-最终一致与补偿，属于更重的能力，不应默认承担（对齐 §8.2、[[decision-00014-cloudevents-integration-event-contract]] 不复用 outbox）。
+最终一致与补偿，属于更重的能力，不应默认承担（对齐 §8.2、[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) 不复用 outbox）。
 
 **D7 — 受限 property-path 模板 + 启动期编译校验 + 纯函数白名单 + 尺寸预算。**
 推荐：实现小型 property-path 语法（非完整 SpEL），根对象限 §6.3 列表，纯函数白名单 = `{mask, truncate, defaultValue}`，
@@ -729,7 +729,7 @@ failure 只存 `code/category/safeSummary`，绝不落 stack/SQL/HTTP body/原�
 `(tenant_id, source, idempotency_key)`。收敛路径分两种：成功路径用方言原生 `ON CONFLICT DO NOTHING`（不 abort 事务），
 失败路径用隔离事务 catch（§7.3，评审阻断项修正）；均 → `RecordResult.DUPLICATE(existingRecordId)`。重投演进：先
 `FAILED+ROLLED_BACK` 后 `SUCCEEDED+COMMITTED` 产生两行（resultKind 不同各自幂等）。direct-API 若可重试，调用者必须传稳定 key。
-*理由*：durable 命令运行时是 at-least-once（[[decision-00016-durable-runtime-staged-message-identity]]），幂等键必须含
+*理由*：durable 命令运行时是 at-least-once（[decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md)），幂等键必须含
 outcome+completion 才能既去重又不吞掉“失败后成功”的真实演进；时间有序 id 保持主键/索引的 B-tree 插入局部性，避免随机
 UUID 的页分裂（大厂 DB 主键实践）。
 
@@ -745,7 +745,7 @@ UUID 的页分裂（大厂 DB 主键实践）。
 且 resolver 缺失时启动失败（纯 direct-API 应用不受影响）。可信来源为安全上下文（如 Security principal）或显式 invocation
 scope，**绝不**从 command payload 字段取；batch/scheduler 显式用 `SYSTEM`/`SERVICE` actor。不给 `CommandContext` 加
 actor/tenant/metadata map；跨异步边界传播“原始操作者”另立 ADR 定义有类型的 identity envelope。
-*理由*：[[decision-00013-command-context-and-causation-propagation]] 明确 `CommandContext` 只承载因果三元组；从 payload
+*理由*：[decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) 明确 `CommandContext` 只承载因果三元组；从 payload
 推断操作者可被业务参数伪造（越权/抵赖风险）。actor 作为“当时快照 VO”是 DDD 记录事实的正确建模。
 
 **D12 — v1 每次调用只写一条 entry；多记录延后。**
@@ -759,7 +759,7 @@ actor/tenant/metadata map；跨异步边界传播“原始操作者”另立 ADR
 retry；诚实声明失败日志的崩溃窗口（§8.3）。未来异步 exporter / Audit profile 各自另立 ADR，并满足容量/背压/持久化/
 退避+jitter/lease-fencing/优雅停机/DLT/backlog age/幂等消费的完整清单。
 *理由*：`mzt-biz-log`/`log-record` 的“内存异步 + 紧循环 retry”不是 durable，反而在崩溃/背压下静默丢数据；生产上宁可
-同步简单可靠，也不要“看起来异步、实则不可靠”的假能力（[[decision-00014-cloudevents-integration-event-contract]] 不偷用集成事件通道）。
+同步简单可靠，也不要“看起来异步、实则不可靠”的假能力（[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) 不偷用集成事件通道）。
 
 ---
 
@@ -962,7 +962,7 @@ class ScopeTenantResolver implements OperationTenantResolver {
 
 ### 15.7 自定义 `FailureClassifier`（把领域异常映射到 outcome）
 
-默认分类对齐 [[design-00003-exception-model]]。消费方可覆盖，把自己的领域异常判成 `REJECTED`（业务拒绝）而非 `FAILED`（系统故障）。
+默认分类对齐 [design-00003-exception-model](design-00003-exception-model.md)。消费方可覆盖，把自己的领域异常判成 `REJECTED`（业务拒绝）而非 `FAILED`（系统故障）。
 
 ```java
 @Component
@@ -1027,20 +1027,20 @@ class OrderOperationHistory {
 
 内部：
 
-- [[analysis-00013-operation-log-component]]（本设计的预研来源）
-- [[decision-00017-operation-log-component-boundaries]]（本设计固化的 ADR；§十四 Dn ↔ ADR 决策项）
-- [[spec-00001-operation-log-component]]（本设计承载的 feature spec）、[[plan-00010-operation-log-implementation]]（落地计划）
-- [[decision-00010-command-handler-reuse-and-cross-aggregate-placement]]
-- [[decision-00011-cqrs-write-contracts-as-interfaces-not-annotations]]
-- [[decision-00012-no-ambient-per-command-state]]
-- [[decision-00013-command-context-and-causation-propagation]]
-- [[decision-00014-cloudevents-integration-event-contract]]
-- [[decision-00016-durable-runtime-staged-message-identity]]（at-least-once 与幂等键设计的依据）
-- [[design-00003-exception-model]]（`FailureClassifier` 默认分类对齐的异常模型）
-- [[design-00004-durable-process-manager-runtime]]（framework-free 内核 + 存储后端的分层思路来源；注意其文本仍描述早期
+- [analysis-00013-operation-log-component](../analysis/analysis-00013-operation-log-component.md)（本设计的预研来源）
+- [decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md)（本设计固化的 ADR；§十四 Dn ↔ ADR 决策项）
+- [spec-00001-operation-log-component](../spec/spec-00001-operation-log-component.md)（本设计承载的 feature spec）、[plan-00010-operation-log-implementation](../plan/plan-00010-operation-log-implementation.md)（落地计划）
+- [decision-00021-command-handler-reuse-and-cross-aggregate-placement](../decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md)
+- [decision-00011-cqrs-write-contracts-as-interfaces-not-annotations](../decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md)
+- [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md)
+- [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)
+- [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md)（at-least-once 与幂等键设计的依据）
+- [design-00003-exception-model](design-00003-exception-model.md)（`FailureClassifier` 默认分类对齐的异常模型）
+- [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md)（framework-free 内核 + 存储后端的分层思路来源；注意其文本仍描述早期
   三模块形态，core/engine/jdbc/mybatis-plus 的"engine seam + 双后端"是**代码现状**，见记忆 `process-manager-engine`，非该 design 原文）
-- [[design-00005-observability-and-distributed-tracing]]
-- [[design-00007-code-quality-gates]]
+- [design-00005-observability-and-distributed-tracing](design-00005-observability-and-distributed-tracing.md)
+- [design-00007-code-quality-gates](design-00007-code-quality-gates.md)
 - 代码：`aipersimmon-ddd/aipersimmon-ddd-cqrs/.../CommandInterceptor.java`、`.../Command.java`、`.../CommandContext.java`
 - 代码：`aipersimmon-ddd/aipersimmon-ddd-cqrs-spring/.../RegistryCommandBus.java`、`.../TransactionCommandInterceptor.java`
 - 代码：`aipersimmon-ddd/aipersimmon-ddd-outbox-jdbc/...`（JDBC sink 风格；该模块后已删除）、`aipersimmon-ddd/aipersimmon-ddd-flyway/...`（migration 发现）

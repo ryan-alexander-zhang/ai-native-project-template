@@ -13,7 +13,7 @@ implements: [design-00005-observability-and-distributed-tracing]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[design-00005-observability-and-distributed-tracing]] 落成代码：为 `aipersimmon-ddd` 脚手架建立
+把 [design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md) 落成代码：为 `aipersimmon-ddd` 脚手架建立
 Trace / Log / Metric 全链路闭环——同步链路骑 OTEL ambient、两处异步跳（outbox relay、PM relay/deadline）
 capture/restore 缝合、领域主干（命令/查询/领域事件/入站 ACL/推进）由脚手架自带 span、并打通三柱互通。
 
@@ -28,7 +28,7 @@ capture/restore 缝合、领域主干（命令/查询/领域事件/入站 ACL/�
 
 ## 一、Design
 
-详见 [[design-00005-observability-and-distributed-tracing]]。落地关键结构：
+详见 [design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md)。落地关键结构：
 
 ```mermaid
 flowchart TD
@@ -92,7 +92,7 @@ flowchart TD
     `ClaimedEffect`/`DeadlineRow` + load 读回；`JdbcProcessEffectRelay` 派发前 `restore("effect.dispatch "+id)`、`JdbcProcessDeadlineWorker` 触发 `runtime.handle` 前 `restore("deadline.fire "+id)` link 回创建者 span；
     runtime 加 17-参 ctor、relay/worker 加 tracer ctor 重载（NoOp 默认，既有测试不破）；PM starter 三 bean 经 `ObjectProvider<StoreAndForwardTracer>` 注入。
     transition 是审计行、非派发跳，不缝。recording-tracer 测试（effect 写捕获 + relay restore）2 绿，process-manager-jdbc 57 绿、PM starter 23 绿。
-    **注**：本轮以 trace 缝合为主；[[issue-00025-correlation-propagation-and-scrape-batching]] 的 correlation 断裂是既有 correlation_id 语义问题，与 trace 列正交，留原 issue 单独处理（deadline/effect 行现已一并持久化 traceparent）。
+    **注**：本轮以 trace 缝合为主；[issue-00025-correlation-propagation-and-scrape-batching](../issue/issue-00025-correlation-propagation-and-scrape-batching.md) 的 correlation 断裂是既有 correlation_id 语义问题，与 trace 列正交，留原 issue 单独处理（deadline/effect 行现已一并持久化 traceparent）。
 
 - ✅ **P3**（三柱闭环）
   - ✅ **trace↔log / trace↔metric 由 starter 交付**（as-built）：`opentelemetry-spring-boot-starter` 传递依赖已带
@@ -111,7 +111,7 @@ flowchart TD
   - ✅ **正名**:web 边缘 `TraceIdFilter`→`RequestIdFilter`、`X-Trace-Id`→`X-Request-Id`、MDC/`ApiError` `traceId`→`requestId`、config `web.trace.*`→`web.request-id.*`。
   - ✅ **移除冗余**:`CommandContext`(`root(messageId)` 单参)/`EventEnvelope`/`OutboxMessage` 去 `traceId` 字段;PM 三 store 的 `*Insert`/row + 两套 outbox writer/dead-letter 去 `trace_id`;Kafka 去 `ce_traceid`;**Flyway V2 `drop_trace_id`**(h2/mysql/pg × outbox 两表 + PM 三表),测试 schema 加载 V1+V2。
   - ✅ **错误体回查**:`ApiError` 新增真 OTEL `traceId` 字段;observability-otel starter 新增 `TraceIdMdcFilter`(从活跃 span 取真 trace-id 写 MDC `trace_id`),ProblemDetail 读之——错误 id 现可粘进 Tempo 直达 trace。
-  - **信息取舍**:`requestId` 现为**边缘专属、不随异步链传播**;不装 OTEL 的消费方失去"下游事件源自哪次请求"的跨异步关联(`correlationId` 仍关联因果流,装 OTEL 则 span link 复原)。记于 [[decision-00013-command-context-and-causation-propagation]] 移除增补。
+  - **信息取舍**:`requestId` 现为**边缘专属、不随异步链传播**;不装 OTEL 的消费方失去"下游事件源自哪次请求"的跨异步关联(`correlationId` 仍关联因果流,装 OTEL 则 span link 复原)。记于 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) 移除增补。
   - **保留**:`traceparent`/`trace_state` 列 + P1–P4 全部 span 逻辑不变。全 reactor 绿(27 模块,含真实 MySQL/PG Testcontainers)。提交 `e37cc92`(移除) + `3cf4444`(正名)。
   - **注**:dead-letter 行从不带 `traceparent`(过去只有旧 `trace_id`,已随之删)——终态行无可复原追踪上下文,可接受。
 
@@ -126,9 +126,9 @@ flowchart TD
 
 ## 四、关联
 
-- [[design-00005-observability-and-distributed-tracing]]（父）
-- [[design-00004-durable-process-manager-runtime]]（异步 relay/deadline、SLI）
-- [[decision-00013-command-context-and-causation-propagation]]（因果传播、元数据不进 payload）
-- [[design-00003-exception-model]]（span 错误语义对齐）
-- [[issue-00025-correlation-propagation-and-scrape-batching]]（P2 一并回收）
-- [[process-manager-schema-copies]]（DDL 多副本同步）
+- [design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md)（父）
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)（异步 relay/deadline、SLI）
+- [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md)（因果传播、元数据不进 payload）
+- [design-00003-exception-model](../design/design-00003-exception-model.md)（span 错误语义对齐）
+- [issue-00025-correlation-propagation-and-scrape-batching](../issue/issue-00025-correlation-propagation-and-scrape-batching.md)（P2 一并回收）
+- process-manager-schema-copies（DDL 多副本同步）

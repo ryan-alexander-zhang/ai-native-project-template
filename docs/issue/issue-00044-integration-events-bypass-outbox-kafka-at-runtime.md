@@ -152,8 +152,8 @@ docker exec start-kafka-1 bash -c "/opt/bitnami/kafka/bin/kafka-get-offsets.sh -
 
 ## 关联
 
-- [[design-00006-integration-event-routing]](本条为其运行期未落地)
-- [[decision-00006-integration-event-transport-selection]](方式三:出站箱→Kafka→入站箱)
-- [[events-spring-shadows-mybatis-outbox]](记忆:同一装配陷阱)
-- [[record-00001-multi-module-ddd-integration-verification]](F-1 完整证据)
-- [[samples-not-reference]]
+- [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)(本条为其运行期未落地)
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)(方式三:出站箱→Kafka→入站箱)
+- events-spring-shadows-mybatis-outbox(记忆:同一装配陷阱)
+- [record-00001-multi-module-ddd-integration-verification](../record/record-00001-multi-module-ddd-integration-verification.md)(F-1 完整证据)
+- samples-not-reference

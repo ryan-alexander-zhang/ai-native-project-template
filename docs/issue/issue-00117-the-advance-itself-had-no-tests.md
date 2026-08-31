@@ -109,13 +109,13 @@ payload 超限。
 前两个现在**四个 store double 都齐了**，是下一块；`autoconfigure` 要的是 Spring 上下文测试，
 和这些不是同一种测试。写在 pom 里，而不是把全模块阈值调低到能过——后者读起来像覆盖率，实际是缺口。
 
-> **后续（[[issue-00118-the-recovery-paths-had-no-tests]]）**：`replay` 与 `operation` 已补完，
+> **后续（[issue-00118-the-recovery-paths-had-no-tests](issue-00118-the-recovery-paths-had-no-tests.md)）**：`replay` 与 `operation` 已补完，
 > 门外只剩 `autoconfigure`。
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 架构层「4567 行零直接测试」那条）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 架构层「4567 行零直接测试」那条）
 - 本项承接第 12 项自己留下的那一块，三个 store double 与会回滚的 UoW 都来自那里：
-  [[issue-00113-the-quality-gates-sat-where-the-risk-was-not]]
-- 停泊/重放的持久化约定：[[design-00004-durable-process-manager-runtime]]
-- 门禁形状的既有先例：[[design-00007-code-quality-gates]]
+  [issue-00113-the-quality-gates-sat-where-the-risk-was-not](issue-00113-the-quality-gates-sat-where-the-risk-was-not.md)
+- 停泊/重放的持久化约定：[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)
+- 门禁形状的既有先例：[design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md)

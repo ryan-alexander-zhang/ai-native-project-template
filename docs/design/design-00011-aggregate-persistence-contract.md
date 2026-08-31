@@ -7,7 +7,7 @@ informs: [plan-00013-phase-one-correctness-remediation]
 
 # 聚合持久化契约：版本化写入、事件发布收口，与 MyBatis-Plus 拦截器组合
 
-> **补充（[[issue-00115-clearing-a-field-never-reached-the-database]]）：保存聚合从来不是部分更新。**
+> **补充（[issue-00115-clearing-a-field-never-reached-the-database](../issue/issue-00115-clearing-a-field-never-reached-the-database.md)）：保存聚合从来不是部分更新。**
 > `MybatisPlusAggregateRepository` 原先用 `updateById`，而 MyBatis-Plus 默认把 null 字段从 `SET` 剔除——
 > 对部分更新是对的（null = "我没打算说这一列"），对这里是错的（`toRow` 映射整个根，null = "这字段空了"）。
 > 后果是一条被接受的命令静默只执行一半：版本推进、见证断言通过、事件照常发布、库里旧值不动、下次加载僵尸字段复活。
@@ -22,11 +22,11 @@ informs: [plan-00013-phase-one-correctness-remediation]
 下真正生效所必需的**拦截器组合模型**。
 
 「同生共死」不是注释里的期望而是**两个仓储基类的前置条件**：`saveAggregate` 在无活动事务时拒绝写入
-（[[issue-00107-silent-degradations-become-loud-failures]]）。否则行与事件各自提交，中途失败就留下
+（[issue-00107-silent-degradations-become-loud-failures](../issue/issue-00107-silent-degradations-become-loud-failures.md)）。否则行与事件各自提交，中途失败就留下
 「写了行没有事件」或「发了事件而库里没有那个状态」，且没有任何东西可回滚——而这种失败在一切正常的日子里完全不可见。
 
-背景缺陷：[[issue-00051-aggregates-have-no-optimistic-locking]]、
-[[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]。
+背景缺陷：[issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md)、
+[issue-00052-domain-events-lost-when-publish-and-clear-forgotten](../issue/issue-00052-domain-events-lost-when-publish-and-clear-forgotten.md)。
 
 ## 一、core：聚合版本契约
 
@@ -51,7 +51,7 @@ public abstract class AbstractAggregateRoot<ID> implements AggregateRoot<ID> {
 - `versionAdvanced()` **public** —— 同上；与既有的 `clearDomainEvents()` 可见性一致（同类需求、同类妥协）。
 
 **`version` 不参与 `equals`/`hashCode`**：版本是并发控制元数据，不是身份。同一订单的 v3 与 v5 仍是同一订单
-（见 [[issue-00055-aggregate-root-missing-identity-equality]]）。`transient` 只加在 `domainEvents` 上；`version`
+（见 [issue-00055-aggregate-root-missing-identity-equality](../issue/issue-00055-aggregate-root-missing-identity-equality.md)）。`transient` 只加在 `domainEvents` 上；`version`
 是需要持久化的状态，不标 `transient`。
 
 ```mermaid
@@ -158,7 +158,7 @@ protected abstract int update(A aggregate, long expectedVersion);   // SQL 必�
 若按直觉再加一个「注册 `OptimisticLockerInnerInterceptor` 的 autoconfig」并同样标
 `@ConditionalOnMissingBean(MybatisPlusInterceptor.class)`，则**开启多租户时它会静默退让**：tenancy 的 bean 先在，
 乐观锁拦截器永不注册，`@Version` 不产生 `WHERE version = ?`，于是 `updateById` 恒返回 1，
-[[issue-00051-aggregates-have-no-optimistic-locking]] **看起来修了但实际没修**。这与该 issue 的根因同类
+[issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md) **看起来修了但实际没修**。这与该 issue 的根因同类
 （能力静默缺席），不可接受。
 
 **改为 `InnerInterceptor` 贡献模型**：框架持有唯一一个 `MybatisPlusInterceptor`，按 `@Order` 收集所有
@@ -192,7 +192,7 @@ flowchart LR
 这是有意的（否则「自定义」名不副实），但意味着自定义者必须自己装齐框架的 inner interceptor；
 `InnerInterceptorCompositionTest.aConsumerOwnedInterceptorWinsWholesale` 断言了这一语义，Javadoc 也写明。
 
-**但「钉住代价」不等于「拦住后果」**（[[issue-00107-silent-degradations-become-loud-failures]]）：上面那段推理的结论是
+**但「钉住代价」不等于「拦住后果」**（[issue-00107-silent-degradations-become-loud-failures](../issue/issue-00107-silent-degradations-become-loud-failures.md)）：上面那段推理的结论是
 「乐观锁静默消失」，而当时唯一的补救是启动日志——**而那行日志恰好印在会退让的那个 bean 里**，所以真正发生时它也不打印。
 于是写路径改为**自证**：`MybatisPlusAggregateRepository.saveAggregate` 在 `updateById` 之后检查
 `row.getVersion() == expected + 1`。这个断言可行是因为拦截器留下了目击者——它在改写语句之后会把自增后的版本
@@ -206,16 +206,16 @@ flowchart LR
 - **不涵盖悲观锁**（`SELECT ... FOR UPDATE`）。乐观锁是默认，写冲突罕见时它更省资源；高冲突聚合可由消费方在
   自己的仓储里自行加锁，框架不提供开关（避免一个不该由框架决定的性能选择）。
 - **不涵盖跨聚合事务**。一个命令写多个聚合时，各自独立版本校验；框架不引入聚合间的一致性协调（那是流程管理器
-  的职责，见 [[design-00004-durable-process-manager-runtime]]）。
+  的职责，见 [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md)）。
 - **不涵盖 `version` 的溢出/回绕**。`BIGINT` 单调递增，实践中不可达。
 - **不涵盖读模型**。投影表无聚合语义，不参与版本化。
 - **不改 `DomainEvents` 接口**。`publishAndClear` 保持原样，只是调用点收口到基类。
 
 ## 关联
 
-- [[issue-00051-aggregates-have-no-optimistic-locking]]（本设计要解决的主缺陷）
-- [[issue-00052-domain-events-lost-when-publish-and-clear-forgotten]]（事件发布收口）
-- [[issue-00055-aggregate-root-missing-identity-equality]]（`version` 不参与相等）
-- [[plan-00013-phase-one-correctness-remediation]]（落地计划，批次 A / B）
-- [[design-00009-multi-tenancy-tenant-id]]（tenancy 的 MyBatis-Plus 拦截器现状，§3 要改的对象）
-- [[design-00001-aipersimmon-ddd-and-scaffold]]（模块分层与「端口在 domain、实现在 infrastructure」的既有约定）
+- [issue-00051-aggregates-have-no-optimistic-locking](../issue/issue-00051-aggregates-have-no-optimistic-locking.md)（本设计要解决的主缺陷）
+- [issue-00052-domain-events-lost-when-publish-and-clear-forgotten](../issue/issue-00052-domain-events-lost-when-publish-and-clear-forgotten.md)（事件发布收口）
+- [issue-00055-aggregate-root-missing-identity-equality](../issue/issue-00055-aggregate-root-missing-identity-equality.md)（`version` 不参与相等）
+- [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)（落地计划，批次 A / B）
+- [design-00009-multi-tenancy-tenant-id](design-00009-multi-tenancy-tenant-id.md)（tenancy 的 MyBatis-Plus 拦截器现状，§3 要改的对象）
+- [design-00001-aipersimmon-ddd-and-scaffold](design-00001-aipersimmon-ddd-and-scaffold.md)（模块分层与「端口在 domain、实现在 infrastructure」的既有约定）

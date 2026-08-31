@@ -111,9 +111,9 @@ DLT 通常按"涓流"建，分区数少于它影子的主题；点名一个那�
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 Outbox「吞吐上限约 100 msg/s」与「DLT 固定源分区号」两条、§3 第 10 项）
-- **前提**：批内不重复 subject 这条性质来自 [[issue-00108-a-killed-relay-instance-stops-all-delivery]]
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 Outbox「吞吐上限约 100 msg/s」与「DLT 固定源分区号」两条、§3 第 10 项）
+- **前提**：批内不重复 subject 这条性质来自 [issue-00108-a-killed-relay-instance-stops-all-delivery](issue-00108-a-killed-relay-instance-stops-all-delivery.md)
   的队头 claim——没有它，流水线化就得真的按 subject 排序并 fail-fast
-- 度量这次改动的接缝来自 [[issue-00110-the-outbox-had-no-metrics-at-all]]（`dispatch.latency` / `claim.latency`）
-- 目的地在交出去之前就拦下：[[issue-00109-a-vanished-route-turned-an-externalized-event-local]]
-- 追踪接缝：[[design-00005-observability-and-distributed-tracing]]
+- 度量这次改动的接缝来自 [issue-00110-the-outbox-had-no-metrics-at-all](issue-00110-the-outbox-had-no-metrics-at-all.md)（`dispatch.latency` / `claim.latency`）
+- 目的地在交出去之前就拦下：[issue-00109-a-vanished-route-turned-an-externalized-event-local](issue-00109-a-vanished-route-turned-an-externalized-event-local.md)
+- 追踪接缝：[design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md)

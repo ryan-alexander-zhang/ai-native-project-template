@@ -127,5 +127,5 @@ curl -s -o /dev/null -w "%{http_code}\n" localhost:8090/actuator/health  # 期�
 
 ## 关联
 
-- [[design-00003-exception-model]](NOT_FOUND→404 一等族;本条为其未落地)
-- [[record-00001-multi-module-ddd-integration-verification]](F-2 完整证据)
+- [design-00003-exception-model](../design/design-00003-exception-model.md)(NOT_FOUND→404 一等族;本条为其未落地)
+- [record-00001-multi-module-ddd-integration-verification](../record/record-00001-multi-module-ddd-integration-verification.md)(F-2 完整证据)

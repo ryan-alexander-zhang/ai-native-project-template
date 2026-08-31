@@ -68,7 +68,7 @@ MeterBinder 另外把一次抓取内的多个 gauge 读合并成一次查询（1
 process-manager 有 `ProcessManagerHealthIndicator`，outbox **不加**。
 
 一个连不上 broker 的 relay 不是「有病的实例」。把 pod 翻成 DOWN 会因为一个重启修不好的问题把它踢出服务，
-而积压还在原地。更直接的证据是本次评审的 C5（[[issue-00104-an-ended-instance-keeps-its-timers-forever]]）：
+而积压还在原地。更直接的证据是本次评审的 C5（[issue-00104-an-ended-instance-keeps-its-timers-forever](issue-00104-an-ended-instance-keeps-its-timers-forever.md)）：
 那正是一个卡在 DEGRADED 上、没有任何东西在排空的健康检查。积压年龄是拿来叫人的 gauge，不是回收 pod 的理由。
 
 ## 落地
@@ -114,9 +114,9 @@ Micrometer bean 放在同一个配置类里。`@ConditionalOnBean` 只看得见*
 
 ## 关联
 
-- 父：[[report-00003-ddd-library-review-2026-07-29]]（§2 Outbox「零 Micrometer 指标」那条、§3 第 9 项）
-- 同形先例：[[design-00004-durable-process-manager-runtime]] §5.3（push/pull 分家、MeterBinder 记忆化）
+- 父：[report-00003-ddd-library-review-2026-07-29](../report/report-00003-ddd-library-review-2026-07-29.md)（§2 Outbox「零 Micrometer 指标」那条、§3 第 9 项）
+- 同形先例：[design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) §5.3（push/pull 分家、MeterBinder 记忆化）
 - 相邻接缝：`StoreAndForwardTracer`（一条消息的旅程） vs 本项（整个群体的形状），见
-  [[design-00005-observability-and-distributed-tracing]] §10.2
-- `released` 是第 7 项那个旋钮的反馈信号：[[issue-00108-a-killed-relay-instance-stops-all-delivery]]
-- 不加健康检查的直接依据：[[issue-00104-an-ended-instance-keeps-its-timers-forever]]
+  [design-00005-observability-and-distributed-tracing](../design/design-00005-observability-and-distributed-tracing.md) §10.2
+- `released` 是第 7 项那个旋钮的反馈信号：[issue-00108-a-killed-relay-instance-stops-all-delivery](issue-00108-a-killed-relay-instance-stops-all-delivery.md)
+- 不加健康检查的直接依据：[issue-00104-an-ended-instance-keeps-its-timers-forever](issue-00104-an-ended-instance-keeps-its-timers-forever.md)

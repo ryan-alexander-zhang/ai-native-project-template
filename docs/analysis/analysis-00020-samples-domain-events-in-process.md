@@ -2,14 +2,14 @@
 id: analysis-00020-samples-domain-events-in-process
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S3 领域事件的发布与消费（同进程）
 
 对应 sample：`aipersimmon-ddd-samples/s03-domain-events-in-process`。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]；测试风格见
-[[analysis-00019-samples-testing-strategy]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)；测试风格见
+[analysis-00019-samples-testing-strategy](analysis-00019-samples-testing-strategy.md)。
 
 ## 0. 本篇定位
 

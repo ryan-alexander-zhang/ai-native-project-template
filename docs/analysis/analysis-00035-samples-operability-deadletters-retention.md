@@ -2,14 +2,14 @@
 id: analysis-00035-samples-operability-deadletters-retention
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S22 运维面：死信、重放、保留清理与启动自检
 
 对应 sample：`aipersimmon-ddd-samples/s22-operability-deadletters-retention`（两个服务：
 ordering-service 发布并提供运维端点、inventory-service 消费；42 个用例）。场景清单见
-[[analysis-00014-ddd-samples-scenario-catalog]]。
+[analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)。
 
 ## 0. 本篇定位
 
@@ -83,11 +83,11 @@ ordering-service 发布并提供运维端点、inventory-service 消费；42 个
 实测且是真缺口：relay 只记最外层异常，所以最常见的发布失败读作
 `org.springframework.kafka.KafkaException: Send failed` ——topic 名和真实原因
 （`Topic … not present in metadata`、`UnknownTopicOrPartitionException`）在 cause 链下两层，被丢掉。
-[[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]] **2026-08-04 已修**（新增
+[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half](../issue/issue-00165-a-dead-letters-last-error-drops-the-only-useful-half.md) **2026-08-04 已修**（新增
 `FailureSummary` 有界摊平 cause 链，outbox relay 与 process-manager relay 两处共用）。
 
 写这篇时 `DeadLetterTest` 断言的是**现状**，包括"topic 名不在其中"，而不是拿个子串糊过去——按
-[[isolate-before-attributing-a-fix]] 的规矩，测试要能在修好之后反过来。**这条规矩当天就兑现了**：改完库，
+isolate-before-attributing-a-fix 的规矩，测试要能在修好之后反过来。**这条规矩当天就兑现了**：改完库，
 那两条断言变红，改成正向断言即可，不靠任何人记得回来收尾。
 
 ## 5. 消费侧：分区拿一条处理不了的记录怎么办
@@ -173,7 +173,7 @@ ordering-service 发布并提供运维端点、inventory-service 消费；42 个
 
 **顺便记一条脚手架教训**：这三次启动最初共用同一个数据库，于是"该失败的那次"启动成功了——因为兄弟用例先
 启动过一次并留下了表。发现它的是**对照用例的红**。测试基座因此改成每次启动建一个新库
-（`Boot.java` 的 javadoc 记了原委）。这是 [[isolate-before-attributing-a-fix]] 的反向：**一个"这个配置起不来"
+（`Boot.java` 的 javadoc 记了原委）。这是 isolate-before-attributing-a-fix 的反向：**一个"这个配置起不来"
 的断言，没有兄弟断言"同一个应用能起来"就一文不值**——而这次正是那个兄弟暴露了共享状态。
 
 ## 9. 能力降级：框架做不到时说什么
@@ -197,12 +197,12 @@ ordering-service 发布并提供运维端点、inventory-service 消费；42 个
 
 ## 10. 库的问题：一个新的，一个旧的，一处措辞
 
-**新开 [[issue-00165-a-dead-letters-last-error-drops-the-only-useful-half]]（P2，可运维性）——当天已修**：
+**新开 [issue-00165-a-dead-letters-last-error-drops-the-only-useful-half](../issue/issue-00165-a-dead-letters-last-error-drops-the-only-useful-half.md)（P2，可运维性）——当天已修**：
 `OutboxRelay.java:472` 的 `summarize` 只取最外层异常，`ProcessEffectRelay.java:247` 同形状。修法就是复用
 `DefaultFailureClassifier` 已有的有界走链，提成 `core.error.FailureSummary` 供两处共用（"两处各写一遍"正是
 成因）。
 
-**复现旧的 [[issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher]]——也已修**：
+**复现旧的 [issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher](../issue/issue-00161-the-publisher-guard-misreads-a-consumer-as-a-publisher.md)——也已修**：
 inventory-service 只消费不发布，却被守卫逼着带 outbox，并因此**被逼给三张永不写入的表跑 migration**
 （`flyway.components` 里那个 `outbox` 就是这么来的）。这是它第四次被独立撞到（S4、S12、S21、S22），
 **同一条 issue 复发四次本身就是优先级信号**。修法：messaging 模块新增

@@ -6,14 +6,14 @@ status: active
 
 # 跨聚合长流程怎么封装：Saga / Process Manager 的构件取舍
 
-承接 [[analysis-00006-ddd-building-blocks-library]]：`aipersimmon-ddd-*` 要不要、以什么形态
+承接 [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md)：`aipersimmon-ddd-*` 要不要、以什么形态
 提供 **saga / process-manager** 抽象?本文回答三件事——(1) choreography 与 orchestration 的选型轴；
 (2) 构件库该提供到什么程度；(3) 何时该从"手写事件编排"升级到 **durable-execution 引擎**(Temporal 等)。
 
-配套阅读：[[analysis-00005-structure-2-event-flow-and-cqrs]] §8（s2 **这一条具体** saga 的实现——
-choreography + 超时补偿,已闭环）、[[analysis-00006-ddd-building-blocks-library]]（构件库方法论：
-纯/脏分离、拓扑无关、参考不依赖）、[[analysis-00002-domain-vs-integration-events]]（跨 BC 用集成事件）、
-[[analysis-00001-domain-event-publishing]]（事件发布/outbox）。
+配套阅读：[analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md) §8（s2 **这一条具体** saga 的实现——
+choreography + 超时补偿,已闭环）、[analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md)（构件库方法论：
+纯/脏分离、拓扑无关、参考不依赖）、[analysis-00002-domain-vs-integration-events](analysis-00002-domain-vs-integration-events.md)（跨 BC 用集成事件）、
+[analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md)（事件发布/outbox）。
 
 ## 结论先行
 
@@ -71,12 +71,12 @@ choreography + 超时补偿,已闭环）、[[analysis-00006-ddd-building-blocks-
   **共识是分场景,不是二选一。**
 
 **对本模板的启示**:monolith-first 项目**默认不该**一上来引 Temporal(运维 + lock-in 成本高;
-`docs/reference/axon-framework/` 对"全套框架带来的 ES/token store/运维负担"已明确 caveat)。
+`docs/reference/reference-00001-axon-framework.md` 对"全套框架带来的 ES/token store/运维负担"已明确 caveat)。
 但要把 saga 契约做成**引擎无关**,以便日后平滑换引擎——这正是档 1 的价值:一个**可被替换的协调抽象**。
 
 ## 五、参考 Axon Saga:借形态,不依赖
 
-沿用 00006 的取舍(`docs/reference/axon-framework/` §"Sagas / process managers"):
+沿用 00006 的取舍(`docs/reference/reference-00001-axon-framework.md` §"Sagas / process managers"):
 
 | Axon 提供 | `aipersimmon-ddd-saga` 对应 | 重写成本 |
 | --- | --- | --- |
@@ -134,10 +134,10 @@ choreography + 超时补偿,已闭环）、[[analysis-00006-ddd-building-blocks-
 
 内部(蒸馏笔记 `docs/reference/` 与既有分析):
 
-- [[analysis-00005-structure-2-event-flow-and-cqrs]] §8 —— s2 choreography saga + 超时补偿(已闭环)与残留边界。
-- [[analysis-00006-ddd-building-blocks-library]] —— 构件库纯/脏分离、参考不依赖方法论。
-- [[analysis-00001-domain-event-publishing]] —— 事件发布/outbox(saga 可靠推进的底座)。
-- `docs/reference/axon-framework/` —— `@Saga` / `@SagaEventHandler` / `DeadlineManager`;及"全套框架运维负担"caveat。
+- [analysis-00005-structure-2-event-flow-and-cqrs](analysis-00005-structure-2-event-flow-and-cqrs.md) §8 —— s2 choreography saga + 超时补偿(已闭环)与残留边界。
+- [analysis-00006-ddd-building-blocks-library](analysis-00006-ddd-building-blocks-library.md) —— 构件库纯/脏分离、参考不依赖方法论。
+- [analysis-00001-domain-event-publishing](analysis-00001-domain-event-publishing.md) —— 事件发布/outbox(saga 可靠推进的底座)。
+- `docs/reference/reference-00001-axon-framework.md` —— `@Saga` / `@SagaEventHandler` / `DeadlineManager`;及"全套框架运维负担"caveat。
 
 外部(大厂 / 权威):
 

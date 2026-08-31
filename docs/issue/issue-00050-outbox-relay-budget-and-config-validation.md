@@ -26,7 +26,7 @@ blocks: [plan-00006-middleware-integration]
 - 而 `KafkaMessagingProperties.java:49-50` 的 javadoc **自己明确要求**:"Keep `outbox.batch-size × this`
   comfortably below the relay's `relay.lock-at-most-for`"。**出厂默认恰恰不满足这条自述约束。**
 - 后果:全批 stall 时锁在任务未结束前过期,另一实例拿锁并发 relay 同一批未标 `sent` 的行 → 在 broker 已不健康
-  时翻倍压力(与 [[issue-00011-bound-outbox-kafka-send-await]] 描述的跨实例并发投递同源)。
+  时翻倍压力(与 [issue-00011-bound-outbox-kafka-send-await](issue-00011-bound-outbox-kafka-send-await.md) 描述的跨实例并发投递同源)。
 - **来历**:issue-00011(已 resolved)修的是"单条 ack **无界**等待",并在其「边界」一节把本条(批级预算 vs 租约)
   **显式记为"属运维调参边界,非本 issue 主修点"而 defer**。此处把它单列,让"defer"变成可追踪的待办。
 
@@ -48,7 +48,7 @@ blocks: [plan-00006-middleware-integration]
    **有界且总预算 < 租约**;issue-00011 给了单条上界,却把"批级总预算"留给运维,默认值本身没兑现注释里的约束。
 2. **(b) `@Value` 直取绕过了校验层。** 属性没有集中到一个 `@Validated @ConfigurationProperties`,于是没有天然的
    约束落点;非法值一路穿到运行期,表现为"静默空转/误死信/误清理"而非启动失败——与 fail-fast 的装配原则相悖
-   (对照 [[issue-00021-starter-config-fail-fast-and-wiring]] 已确立的方向)。
+   (对照 [issue-00021-starter-config-fail-fast-and-wiring](issue-00021-starter-config-fail-fast-and-wiring.md) 已确立的方向)。
 
 ## 复现(test-first)
 
@@ -95,6 +95,6 @@ blocks: [plan-00006-middleware-integration]
 
 ## 关联
 
-- [[plan-00006-middleware-integration]]
-- [[issue-00011-bound-outbox-kafka-send-await]]((a) 是其「边界」一节显式 defer 的批级预算项)
-- [[issue-00021-starter-config-fail-fast-and-wiring]]((b) 的 fail-fast 装配原则先例)
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)
+- [issue-00011-bound-outbox-kafka-send-await](issue-00011-bound-outbox-kafka-send-await.md)((a) 是其「边界」一节显式 defer 的批级预算项)
+- [issue-00021-starter-config-fail-fast-and-wiring](issue-00021-starter-config-fail-fast-and-wiring.md)((b) 的 fail-fast 装配原则先例)

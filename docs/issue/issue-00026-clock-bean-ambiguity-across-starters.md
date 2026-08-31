@@ -24,7 +24,7 @@ blocks: [plan-00006-middleware-integration]
 - `inbox-jdbc/.../AipersimmonDddInboxAutoConfiguration.java`:`inboxClock()`(`:26`)贡献第二个 `Clock` bean,
   `jdbcInbox`/`inboxCleanup` 以参数名 `inboxClock` 注入。`outbox-jdbc` 同理有 `outboxClock()`(`:50`)。
 - 当 process-manager-jdbc 与 inbox-jdbc(及/或 outbox-jdbc)**同时在 classpath**(典型:一个既编排 saga 又
-  经 outbox/Kafka 收发集成事件的应用,见 [[plan-00006-middleware-integration]]),容器里出现 ≥2 个 `Clock` bean。
+  经 outbox/Kafka 收发集成事件的应用,见 [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)),容器里出现 ≥2 个 `Clock` bean。
   `jdbcProcessRuntime` 的 `Clock` 参数按**类型**解析到多个候选 → `NoSuchBeanDefinitionException: expected single
   matching bean but found 2: inboxClock,processManagerClock` → **整个应用上下文启动失败**。
 
@@ -74,6 +74,6 @@ blocks: [plan-00006-middleware-integration]
 
 ## 关联
 
-- [[plan-00006-middleware-integration]](暴露现场:PM + inbox + outbox 三 starter 同装)
-- [[issue-00019-starter-beans-not-gated-on-jdbctemplate]](同属自动配置装配退避/共存类缺陷)
-- [[process-manager-schema-copies]]
+- [plan-00006-middleware-integration](../plan/plan-00006-middleware-integration.md)(暴露现场:PM + inbox + outbox 三 starter 同装)
+- [issue-00019-starter-beans-not-gated-on-jdbctemplate](issue-00019-starter-beans-not-gated-on-jdbctemplate.md)(同属自动配置装配退避/共存类缺陷)
+- process-manager-schema-copies

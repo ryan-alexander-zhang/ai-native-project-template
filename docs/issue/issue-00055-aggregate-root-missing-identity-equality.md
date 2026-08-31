@@ -71,7 +71,7 @@ List.of(a).contains(b);            // false
   `final` 使覆写成为**编译期错误**，而既有 `aggregateRootsShouldExtendAbstractAggregateRoot()` 已强制
   `@AggregateRoot` 继承基类；两者叠加后该规则永远不可能命中。一条不可能失败的规则不提供任何保护，只增加噪声。
 
-**注意 `version` 字段不参与相等**（见 [[issue-00051-aggregates-have-no-optimistic-locking]]）：版本是持久化
+**注意 `version` 字段不参与相等**（见 [issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)）：版本是持久化
 并发控制的元数据，不是身份的一部分；同一订单的 v3 与 v5 仍是同一个订单。`domainEvents` 同理不参与。
 
 **注意改动面**：仅 `aipersimmon-ddd-core`（一个类）+ 一条 ArchUnit 规则 + 单测。样例无需改动（它们本就没有
@@ -93,7 +93,7 @@ List.of(a).contains(b);            // false
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（P2-5，本 issue 的来源）
-- [[plan-00013-phase-one-correctness-remediation]]
-- [[issue-00051-aggregates-have-no-optimistic-locking]]（同在 `AbstractAggregateRoot`，同批修改；`version` 不参与相等）
-- [[analysis-00006-ddd-building-blocks-library]]（构件库的基类职责范围）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（P2-5，本 issue 的来源）
+- [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)
+- [issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)（同在 `AbstractAggregateRoot`，同批修改；`version` 不参与相等）
+- [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md)（构件库的基类职责范围）

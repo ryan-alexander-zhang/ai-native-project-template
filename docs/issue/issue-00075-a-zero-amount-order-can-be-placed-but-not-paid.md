@@ -90,7 +90,7 @@ void aZeroAmountAuthorizeIsRejectedByTheBus() {
 
 同时建议给 `PaymentTimedOut` 的取消理由留一条区分：
 "支付超时"与"支付请求根本没被受理"对运维是两件事，
-目前都记成 `PAYMENT_TIMEOUT`（见 [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]] 的可观测性讨论）。
+目前都记成 `PAYMENT_TIMEOUT`（见 [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md) 的可观测性讨论）。
 
 ## 验证结果
 
@@ -125,7 +125,7 @@ void aZeroAmountAuthorizeIsRejectedByTheBus() {
 - `OrderingFlowTest.aZeroAmountOrderIsConfirmedRatherThanQuietlyCancelledTwoMinutesLater`：
   端到端。**放进已有的 `OrderingFlowTest` 而不是新建测试类**，
   因为它的 `properties` 与嵌套 `RecorderConfig` 已经界定了一个上下文，
-  新建一个会多起一对容器（[[issue-00092-each-test-context-starts-its-own-container-pair]]）。
+  新建一个会多起一对容器（[issue-00092-each-test-context-starts-its-own-container-pair](issue-00092-each-test-context-starts-its-own-container-pair.md)）。
 
 **负向对照的实测输出**（把 `@PositiveOrZero` 改回 `@Positive`，备份原文件而非 `git checkout --`）：
 
@@ -148,6 +148,6 @@ OrderingFlowTest.aZeroAmountOrderIsConfirmedRatherThanQuietlyCancelledTwoMinutes
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00068-stock-waits-have-no-deadline-and-can-park-forever]]（deadline 目前掩盖了这个缺陷的严重度）
-- [[decision-00014-cloudevents-integration-event-contract]]（发布语言应承载值域约定）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00068-stock-waits-have-no-deadline-and-can-park-forever](issue-00068-stock-waits-have-no-deadline-and-can-park-forever.md)（deadline 目前掩盖了这个缺陷的严重度）
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)（发布语言应承载值域约定）

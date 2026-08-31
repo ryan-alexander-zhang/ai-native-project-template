@@ -81,6 +81,6 @@ static final ArchRule idsComeFromTheIdGenerator =
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[decision-00019-time-ordered-uuidv7-identifiers]]
-- [[issue-00054-sample-aggregate-ids-use-random-uuid]]（同一约定的上一轮修复，这次是它漏掉的一处）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md)
+- [issue-00054-sample-aggregate-ids-use-random-uuid](issue-00054-sample-aggregate-ids-use-random-uuid.md)（同一约定的上一轮修复，这次是它漏掉的一处）

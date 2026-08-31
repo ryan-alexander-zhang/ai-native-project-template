@@ -70,6 +70,6 @@ guard 根本保护不了该列。H2/Postgres 使用无界 `TEXT`/`CLOB`,故此�
 
 ## 关联
 
-- [[process-manager-schema-copies]]
-- [[issue-00020-ddl-id-column-widths-inconsistent]]
-- [[plan-00003-durable-process-manager-implementation]]
+- process-manager-schema-copies
+- [issue-00020-ddl-id-column-widths-inconsistent](issue-00020-ddl-id-column-widths-inconsistent.md)
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

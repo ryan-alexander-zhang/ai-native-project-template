@@ -65,5 +65,5 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[plan-00003-durable-process-manager-implementation]]
-- [[design-00004-durable-process-manager-runtime]]
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md)

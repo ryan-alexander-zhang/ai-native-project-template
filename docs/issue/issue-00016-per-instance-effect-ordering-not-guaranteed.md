@@ -25,7 +25,7 @@ blocks: [plan-00003-durable-process-manager-implementation]
    同 `created_at`、同 `effect_index` 的效果互不阻塞"。
 2. **最小机制**:顺序不变式被编码在 `(created_at, effect_index)` 上,但 `created_at` 不保证每实例严格单调,`effect_index`
    跨 transition 归零、`transition_id` 为随机 id——**没有任何一个每实例单调的排序键**。
-3. **真根因**:缺一个每实例单调序列。与 [[issue-00007-ordering-across-backoff-window]] 同源——顺序约束必须落在一个
+3. **真根因**:缺一个每实例单调序列。与 [issue-00007-ordering-across-backoff-window](issue-00007-ordering-across-backoff-window.md) 同源——顺序约束必须落在一个
    可靠的单调键上,不能依赖墙钟。deadline 侧已有 `generation`(MAX+1、在实例行锁内)先例可循。
 
 ## 复现(test-first)
@@ -55,5 +55,5 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[issue-00007-ordering-across-backoff-window]] —— outbox 侧同类顺序问题的先例与修法。
-- [[plan-00003-durable-process-manager-implementation]]
+- [issue-00007-ordering-across-backoff-window](issue-00007-ordering-across-backoff-window.md) —— outbox 侧同类顺序问题的先例与修法。
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

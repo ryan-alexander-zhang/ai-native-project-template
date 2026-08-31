@@ -15,8 +15,8 @@ blocks: [plan-00015-scaffold-depth-and-evaluability]
 
 ## 问题（现状，file:line 为证）
 
-- **等级：High（能力静默不生效——正是 issue-00044 治过的那一类，只是这次在 web 侧未被治；
-  在本仓当前依赖组合下它还会直接导致启动失败，见 [[issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist]]）**。
+- **等级：High（能力静默不生效——正是 [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md) 治过的那一类，只是这次在 web 侧未被治；
+  在本仓当前依赖组合下它还会直接导致启动失败，见 [issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist](issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist.md)）**。
 - 触发场景（真实操作，不是构造出来的）：样例按 `CHOOSING-MODULES.md` 与 `CONFIGURATION.md` 的指引
   1. 加依赖 `aipersimmon-ddd-web-store-jdbc`；
   2. `aipersimmon.ddd.flyway.components` 补 `web-store`；
@@ -43,7 +43,7 @@ blocks: [plan-00015-scaffold-depth-and-evaluability]
    必须有一条显式的排序边（`@AutoConfiguration(before = …)` / `beforeName`），否则两者之间没有 happens-before。
 3. **真根因**：兜底与实现被写成了两个**平级**的 `@ConditionalOnMissingBean` 提供者。这在只有一个提供者时
    看不出问题，一旦第二个出现，正确性就依赖装配顺序这个偶然量。
-4. **这不是新问题，是同一个问题的第二次出现**：[[issue-00044]] 里 `events-spring` 的
+4. **这不是新问题，是同一个问题的第二次出现**：[issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md) 里 `events-spring` 的
    in-process 发布器盖掉了 outbox 的持久化发布器，修法正是给 outbox 侧加
    `@AutoConfigure(beforeName = …)` + 一个 fail-loud 守卫。web 侧的兜底/后端对完全同构，但没有做同样的事。
 5. **为什么没有任何告警**：`AipersimmonDddWebAutoConfiguration:269-313` 的 D2 守卫检查的是
@@ -71,7 +71,7 @@ void theJdbcStoreDisplacesTheInMemoryOne() {
 
 ## 修复
 
-按 issue-00044 已确立的做法，在**后端侧**声明优先：
+按 [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md) 已确立的做法，在**后端侧**声明优先：
 
 ```java
 @AutoConfiguration(
@@ -80,7 +80,7 @@ void theJdbcStoreDisplacesTheInMemoryOne() {
 ```
 
 用 `beforeName` 而非 `before`，是因为后端模块不应对 `-web-spring-boot-starter` 产生编译依赖
-（同 issue-00044 的处理）。`-web-store-redis` 需要同样处理。
+（同 [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md) 的处理）。`-web-store-redis` 需要同样处理。
 
 守卫的措辞也应一并修正：它今天把"in-memory 生效"一律归因为"你没装后端模块"。
 
@@ -104,7 +104,7 @@ void theJdbcStoreDisplacesTheInMemoryOne() {
 
 ## 关联
 
-- [[issue-00044]]（同构缺陷的第一次出现，已修；本 issue 是它在 web 侧的未修副本）
-- [[issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap]]（D2 的守卫；本缺陷让它的诊断指错方向）
-- [[issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist]]（同一次触发暴露的第二个缺陷）
-- [[plan-00015-scaffold-depth-and-evaluability]]（F2 因此受阻）
+- [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md)（同构缺陷的第一次出现，已修；本 issue 是它在 web 侧的未修副本）
+- [issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap](issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap.md)（D2 的守卫；本缺陷让它的诊断指错方向）
+- [issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist](issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist.md)（同一次触发暴露的第二个缺陷）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（F2 因此受阻）

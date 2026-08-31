@@ -1,8 +1,8 @@
 ---
-id: 20260708161438-axon-framework
+id: reference-00001-axon-framework
 type: reference
-role: main
 status: active
+informs: [analysis-00001-domain-event-publishing, analysis-00005-structure-2-event-flow-and-cqrs, analysis-00007-saga-process-manager, design-00004-durable-process-manager-runtime]
 ---
 
 # AxonIQ/AxonFramework — DDD/CQRS/ES reference notes
@@ -11,6 +11,8 @@ Distilled reference for the Java DDD template. Source is reference-only (see
 THIRDPARTY.md). Facts verified against the repo on 2026-07-08. This is a
 **framework**, not a sample app — read it for the programming model, and mind
 the "when not to adopt" caveats.
+Captured: 2026-07-08 (the timestamp `20260708161438` carried by this file's
+former name).
 
 ## Source
 

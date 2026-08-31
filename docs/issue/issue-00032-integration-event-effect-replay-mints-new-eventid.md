@@ -81,7 +81,7 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[decision-00016-durable-runtime-staged-message-identity]] —— "outbox 已负责身份" 假设的出处,本条证伪其覆盖范围。
-- [[design-00004-durable-process-manager-runtime]] —— 同 effectId 重投契约(:256/:278)。
-- [[issue-00003-messaging-delivery-reliability]] —— 同属投递可靠性/去重族。
-- [[plan-00003-durable-process-manager-implementation]]
+- [decision-00016-durable-runtime-staged-message-identity](../decision/decision-00016-durable-runtime-staged-message-identity.md) —— "outbox 已负责身份" 假设的出处,本条证伪其覆盖范围。
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) —— 同 effectId 重投契约(:256/:278)。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 同属投递可靠性/去重族。
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)

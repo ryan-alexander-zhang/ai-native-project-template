@@ -13,11 +13,11 @@ implements: [design-00006-integration-event-routing]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[design-00006-integration-event-routing]] 从设计落成代码：集成事件传输从"装了 Kafka 就全上 broker"细化到
+把 [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md) 从设计落成代码：集成事件传输从"装了 Kafka 就全上 broker"细化到
 **逐事件 opt-in**——默认 LOCAL（进程内 outbox+inbox），只有显式标注 `@Externalized` 的事件才外发到**命名 topic**，
-未标注者永不碰 broker。承接 [[decision-00006-integration-event-transport-selection]]（三传输、单 dispatcher）并按
-[[design-00006-integration-event-routing]] 四项已定决策（D1 注解 / D2 Level 2 / D3 显式 opt-in / D4 PG 同事务原子）实现。
-前置 [[plan-00007-aggregate-persistence-mybatis-plus]]（聚合落 PG）已 resolved，D4 硬前提成立。
+未标注者永不碰 broker。承接 [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)（三传输、单 dispatcher）并按
+[design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md) 四项已定决策（D1 注解 / D2 Level 2 / D3 显式 opt-in / D4 PG 同事务原子）实现。
+前置 [plan-00007-aggregate-persistence-mybatis-plus](plan-00007-aggregate-persistence-mybatis-plus.md)（聚合落 PG）已 resolved，D4 硬前提成立。
 
 **验收锚点**：
 1. **无 Kafka**：不引入 `messaging-kafka` → 全 LOCAL（方式二 outbox+inbox），行为不变。
@@ -45,7 +45,7 @@ implements: [design-00006-integration-event-routing]
 
 - **`@Externalized`（新，`aipersimmon-ddd-integration`）**：`@Target(TYPE) @Retention(RUNTIME)`，`String value()` = 目标 topic，
   支持 `${property:default}` 占位（解析留到装配层，契约里只声明"要外发 + 逻辑目标"）。缺省该注解 = LOCAL。与 `@EventType`
-  同层但**独立**——传输/部署关注点不污染 [[decision-00014-cloudevents-integration-event-contract]] 的契约身份（D1）。
+  同层但**独立**——传输/部署关注点不污染 [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) 的契约身份（D1）。
   静态读取器（仿 `IntegrationEvent.eventTypeOf`）：`Externalized.targetOf(Class)` → `Optional<String>`（原始 target，未解析）。
 - **`RoutingOutboxDispatcher`（新，`aipersimmon-ddd-messaging-kafka`）**：relay 仍只注入**一个** `OutboxDispatcher`，
   但装了 Kafka 时它是路由器，内部持**进程内腿**（复用 `InProcessOutboxDispatcher`）与 **Kafka 腿**（`KafkaOutboxDispatcher`）：
@@ -55,7 +55,7 @@ implements: [design-00006-integration-event-routing]
   - reach/topic 在启动时预解析成 `(type,version) → 解析后 topic` 映射（`${}` 用 `Environment`/`StringValueResolver` 解析一次），
     dispatch 时只查表。
 - **多 topic 出站**：`KafkaOutboxDispatcher` 的 topic 从"构造期固定"改为"**逐消息**"——路由器算出 topic 传入。保留 `ce_*`
-  binary binding、key=subject、bounded send（[[decision-00014-cloudevents-integration-event-contract]] 不变）。
+  binary binding、key=subject、bounded send（[decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) 不变）。
 - **多 topic 入站**：`KafkaIntegrationEventListener` 的 `@KafkaListener(topics=...)` 从单 topic 改为**被外发 topic 集合**
   （SpEL 引用一个暴露 `String[]` 的 bean）。inbox 按 `ce_id` 去重不变；`<topic>.DLT` 由 recoverer 按 `record.topic()` 逐 topic 派生（已有）。
 - **闲置 WARN（D3）**：装了 Kafka 但零 `@Externalized` → 不注册消费桥（空 topic 集合会让 `@KafkaListener` 启动失败），
@@ -105,7 +105,7 @@ outbox core 之前——沿用今天"Kafka 顶替默认"的确定性装配，只
   - `ReservationPlaced` 补 `@Externalized`（否则 EmbeddedKafka 消费桥不再触发）；how-to Javadoc / `application.properties` 同步。样例 reactor 绿。
 
 - **P6 — 回归与文档回填**
-  - 各 reactor `mvn verify` 全绿；`design-00006` 状态与实现记录回填；本 plan 落 as-built；核对 [[decision-00006-integration-event-transport-selection]]
+  - 各 reactor `mvn verify` 全绿；`design-00006` 状态与实现记录回填；本 plan 落 as-built；核对 [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)
     的"dispatcher 三选一/composite"叙述是否需注记（路由器即内置 composite 的一种）。
 
 ## 三、验收路径
@@ -119,12 +119,12 @@ outbox core 之前——沿用今天"Kafka 顶替默认"的确定性装配，只
 
 ## 四、关联
 
-- [[design-00006-integration-event-routing]]（父；本 plan 实现其全貌，D1–D4）
-- [[decision-00006-integration-event-transport-selection]]（三传输、单 dispatcher；路由器是其"自定义 composite"叙述的内置化）
-- [[decision-00014-cloudevents-integration-event-contract]]（`@EventType`/subject=key/`ce_*`；§7 topic 路由扩展点在此落地）
-- [[plan-00006-middleware-integration]]（现场：single-topic 全外发，本 plan 迁移之）、[[plan-00007-aggregate-persistence-mybatis-plus]]（D4 前置，已 resolved）
-- issue-00028、[[issue-00030-single-topic-fanout-all-consumers-see-all-events]]（驱动，本 plan 解）
-- [[samples-not-reference]]（样例仅演示，非设计权威；但须随库默认变更保持绿）
+- [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)（父；本 plan 实现其全貌，D1–D4）
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)（三传输、单 dispatcher；路由器是其"自定义 composite"叙述的内置化）
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md)（`@EventType`/subject=key/`ce_*`；§7 topic 路由扩展点在此落地）
+- [plan-00006-middleware-integration](plan-00006-middleware-integration.md)（现场：single-topic 全外发，本 plan 迁移之）、[plan-00007-aggregate-persistence-mybatis-plus](plan-00007-aggregate-persistence-mybatis-plus.md)（D4 前置，已 resolved）
+- issue-00028、[issue-00030-single-topic-fanout-all-consumers-see-all-events](../issue/issue-00030-single-topic-fanout-all-consumers-see-all-events.md)（驱动，本 plan 解）
+- samples-not-reference（样例仅演示，非设计权威；但须随库默认变更保持绿）
 
 ## 五、已定 / 开放决策
 
@@ -147,7 +147,7 @@ outbox core 之前——沿用今天"Kafka 顶替默认"的确定性装配，只
 
 **未做（经确认 revert，非 design-00006 范畴）：**
 
-落地中发现 `microservice` 与 `integration-events-over-kafka` 样例在**改动前的 HEAD 即已 RED**，且原因**早于 design-00006**（是 [[decision-00013-command-context-and-causation-propagation]] / [[decision-00014-cloudevents-integration-event-contract]] 迁移债，与 decision-00014 as-built 自述"modulith / microservice 未在本次复验范围"一致）：
+落地中发现 `microservice` 与 `integration-events-over-kafka` 样例在**改动前的 HEAD 即已 RED**，且原因**早于 design-00006**（是 [decision-00013-command-context-and-causation-propagation](../decision/decision-00013-command-context-and-causation-propagation.md) / [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) 迁移债，与 decision-00014 as-built 自述"modulith / microservice 未在本次复验范围"一致）：
 
 - **microservice**：`schema.sql` 从未建 outbox-jdbc relay `@SchedulerLock` 所需的 `shedlock` 表 → relay 每次轮询 `BadSqlGrammar([INSERT INTO shedlock...])` → outbox 永不外发 → e2e 订单恒 `PENDING`（确定性红）。补 `shedlock` 后又暴露一处**静默的消费侧 dead-letter**（可重试异常，未记栈，成因未定）。
 - **integration-events-over-kafka 样例**：`ReservationService` 仍调 decision-00013 之前的旧 `publish(...)` 签名（**不编译**），`ReservationPlaced` 缺 decision-00014 强制的 `@EventType`。

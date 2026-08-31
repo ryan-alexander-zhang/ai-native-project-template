@@ -8,8 +8,8 @@ implements: [design-00001-aipersimmon-ddd-and-scaffold]
 # 聚合落 PostgreSQL（MyBatis-Plus）+ per-BC schema 隔离
 
 把 `multi-module` 的业务聚合从内存 `ConcurrentHashMap` 改为**真正持久化到 PostgreSQL**（MyBatis-Plus 实现），
-让聚合与 outbox 落在**同一个库、同一个事务**——消除 [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]
-的假原子性，兑现 [[plan-00006-middleware-integration]] 的"真正集成 PostgreSQL"，并作为 [[design-00006-integration-event-routing]]
+让聚合与 outbox 落在**同一个库、同一个事务**——消除 [issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](../issue/issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md)
+的假原子性，兑现 [plan-00006-middleware-integration](plan-00006-middleware-integration.md) 的"真正集成 PostgreSQL"，并作为 [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)
 outbox 可靠性的硬前提（D4）落地。
 
 **验收锚点**：(1) `POST /orders` 下单后重启应用，订单仍在（真持久化，非内存）；(2) **原子性**——注入 outbox 写失败，
@@ -94,15 +94,15 @@ infrastructure；适配器在 DO ↔ 领域聚合之间转换。ArchUnit "domain
 
 - 不做 CQRS 读模型、事件溯源、JPA/Hibernate。
 - **schema 隔离仅覆盖业务聚合**；outbox/inbox/PM/shedlock 作为共享 infra 留 public，**不逐 BC 拆 outbox、不分库**
-  （彻底隔离/拆分就绪属 [[issue-00031-flyway-shared-schema-and-bundled-shedlock-table]] / issue-00028 范畴）。
+  （彻底隔离/拆分就绪属 [issue-00031-flyway-shared-schema-and-bundled-shedlock-table](../issue/issue-00031-flyway-shared-schema-and-bundled-shedlock-table.md) / issue-00028 范畴）。
 - 不改 `IntegrationEvents` port、不改 handler/application、不新增事务代码（复用既有拦截器）；domain 仅加 framework-free 重建 API（见实施记录）。
 
 ## 五、关联
 
-- [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]]（本计划直接解决）
-- [[design-00006-integration-event-routing]]（D4：本计划为其 outbox 可靠性前提）
-- [[plan-00006-middleware-integration]]（现场；六.已记为后续 plan-00007）
-- [[decision-00006-integration-event-transport-selection]]（outbox 同事务原子性）
+- [issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](../issue/issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md)（本计划直接解决）
+- [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md)（D4：本计划为其 outbox 可靠性前提）
+- [plan-00006-middleware-integration](plan-00006-middleware-integration.md)（现场；六.已记为后续 plan-00007）
+- [decision-00006-integration-event-transport-selection](../decision/decision-00006-integration-event-transport-selection.md)（outbox 同事务原子性）
 - reference：`modular-monolith-with-ddd`（每模块独立 schema、禁跨模块 join/FK）
 
 ## 六、实施记录（as-built，全部已验证）
@@ -130,5 +130,5 @@ infrastructure；适配器在 DO ↔ 领域聚合之间转换。ArchUnit "domain
 
 ### 后续（本计划已解除的前置）
 
-- [[issue-00027-outbox-atomicity-broken-by-in-memory-aggregate]] → **resolved**（本计划落地 + 原子性测试守护）。
-- [[design-00006-integration-event-routing]] 的 D4 前置（聚合落 PG）**已满足**，其路由机制可在此之上实现。
+- [issue-00027-outbox-atomicity-broken-by-in-memory-aggregate](../issue/issue-00027-outbox-atomicity-broken-by-in-memory-aggregate.md) → **resolved**（本计划落地 + 原子性测试守护）。
+- [design-00006-integration-event-routing](../design/design-00006-integration-event-routing.md) 的 D4 前置（聚合落 PG）**已满足**，其路由机制可在此之上实现。

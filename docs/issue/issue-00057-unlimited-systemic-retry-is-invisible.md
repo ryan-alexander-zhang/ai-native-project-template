@@ -16,7 +16,7 @@ blocks: [report-00001-ddd-framework-review]
   「retried **indefinitely** … and **never** dead-lettered。The partition waits at the record until
   recovery」。该取舍本身是对的（不把健康消息冲进 DLT，保住 per-aggregate 顺序）。
 - 但这条无限重试路径**永远不报告它在重试什么、为什么**。默认日志级别下，
-  [[issue-00056-kafka-tests-pin-a-stale-inbox-schema]] 的排查里 20 秒无限重试期间，应用层输出只有两行 INFO，
+  [issue-00056-kafka-tests-pin-a-stale-inbox-schema](issue-00056-kafka-tests-pin-a-stale-inbox-schema.md) 的排查里 20 秒无限重试期间，应用层输出只有两行 INFO，
   每 10 秒重复一次：
   ```
   INFO o.a.k.c.c.i.ClassicKafkaConsumer      : Seeking to offset 0 for partition it-events-0
@@ -90,7 +90,7 @@ blocks: [report-00001-ddd-framework-review]
 
 ## 关联
 
-- [[issue-00056-kafka-tests-pin-a-stale-inbox-schema]]（本 issue 的发现现场；那个 issue 长期不可诊断的原因）
-- [[report-00001-ddd-framework-review]]（可服务性视角）
-- [[issue-00044-integration-events-bypass-outbox-kafka-at-runtime]]（「可选能力缺席 → fail-loud」的正确范式）
-- [[issue-00053-id-generator-silently-degrades-to-uuidv4]]（同一类「降级必须显式声明」的结论）
+- [issue-00056-kafka-tests-pin-a-stale-inbox-schema](issue-00056-kafka-tests-pin-a-stale-inbox-schema.md)（本 issue 的发现现场；那个 issue 长期不可诊断的原因）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（可服务性视角）
+- [issue-00044-integration-events-bypass-outbox-kafka-at-runtime](issue-00044-integration-events-bypass-outbox-kafka-at-runtime.md)（「可选能力缺席 → fail-loud」的正确范式）
+- [issue-00053-id-generator-silently-degrades-to-uuidv4](issue-00053-id-generator-silently-degrades-to-uuidv4.md)（同一类「降级必须显式声明」的结论）

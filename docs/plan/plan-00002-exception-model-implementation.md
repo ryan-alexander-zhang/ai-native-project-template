@@ -7,8 +7,8 @@ implements: [design-00003-exception-model]
 
 # 异常/错误体系落地计划
 
-把 [[design-00003-exception-model]](决策见 [[decision-00010-exception-model]])落成代码。目标验收锚点:
-**对信用超限的下单请求,脚手架原样产出 [[design-00002-web-layer]] §八 的 422 ProblemDetail(带
+把 [design-00003-exception-model](../design/design-00003-exception-model.md)(决策见 [decision-00010-exception-model](../decision/decision-00010-exception-model.md))落成代码。目标验收锚点:
+**对信用超限的下单请求,脚手架原样产出 [design-00002-web-layer](../design/design-00002-web-layer.md) §八 的 422 ProblemDetail(带
 `code:"ordering.credit-exceeded"` + `type`)**;当前产不出来即未完成。
 
 全为**加法式**改动(旧 message-only 构造保留),不破坏 `-core` 零依赖红线与依赖向内铁律。
@@ -21,13 +21,13 @@ implements: [design-00003-exception-model]
 - ✅ **P4**(`-web-spring`:`ProblemDetailFactory` registry 贯通 + advice 全量映射 + `ConstraintViolation→400` 修复)—— 已实现(WebLayerTest 11 tests 绿)。**未做子项**:i18n 默认 bundle 交付、filter 路径接入 MessageSource、401/403 条件化(均为加法,不影响验收)。
 - ✅ **P5**(`-cqrs-spring`:`OptimisticLockingFailureException → ConcurrencyConflictException`)—— 已实现。
 - ✅ **P7(multi-module)**(`OrderingErrorCode` + `checkInvariant` + `EntityNotFound` + `OrderingProblemCatalog`(只 override `CREDIT_EXCEEDED`,余走 family))—— 已实现,**端到端验收通过**:credit-exceeded → 422 带 code + `type:/problems/insufficient-credit`,duplicate-sku → 422 带 family `type:/problems/domain-rule-violation`,unknown → 404(`ExceptionContractTest`,multi-module tests 绿)。
-- ↗ **消息投递可靠性(原 P6)已移出本计划**,作为独立 issue 追踪:[[issue-00003-messaging-delivery-reliability]](属投递可靠性,非异常体系)。
+- ↗ **消息投递可靠性(原 P6)已移出本计划**,作为独立 issue 追踪:[issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md)(属投递可靠性,非异常体系)。
 - ⏳ **P7(modulith)**—— **未做**:modulith 仍是旧手写 `OrderExceptionHandler`、未引 web-spring,需先补 web-spring 接入,再镜像 multi-module 的异常模型改动。
 - ⏳ **P4 剩余子项**(i18n bundle、401/403)。
 
 ## Design
 
-设计细节不在此重复,见 [[design-00003-exception-model]] §四–§十。相位依赖:
+设计细节不在此重复,见 [design-00003-exception-model](../design/design-00003-exception-model.md) §四–§十。相位依赖:
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
   P5 --> P7
 ```
 
-P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[issue-00003-messaging-delivery-reliability]],不属本计划。)
+P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [issue-00003-messaging-delivery-reliability](../issue/issue-00003-messaging-delivery-reliability.md),不属本计划。)
 
 ## Tasks
 
@@ -89,13 +89,13 @@ P2 与 P3 只依赖 P1,可并行;P7 收口验收。(消息投递可靠性见 [[i
 
 1. **全部相位任务勾完**,且 `mvn -q -o install`(库)+ 两个脚手架 `mvn -q -o test` 全绿。
 2. **贯通验收(核心)**:对信用超限下单,响应为
-   `422 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/insufficient-credit"`(该码 override 了专属 type)—— 与 [[design-00002-web-layer]] §八 一致。
+   `422 application/problem+json`,body 含 `"code":"ordering.credit-exceeded"` 与 `"type":"/problems/insufficient-credit"`(该码 override 了专属 type)—— 与 [design-00002-web-layer](../design/design-00002-web-layer.md) §八 一致。
 3. **回归验收**:unknown order → 404;命令 Bean Validation 失败 → 400 带 `errors[]`;领域业务规则违反 → 422;状态机非法迁移/并发 → 409;未预期 → 500 不回显。
 4. **架构验收**:`-core`/`-application`/`-web` 仍 framework-free(archunit + pom 零依赖红线);无 `-web → 领域` 的反向依赖。
 
 ## 关联
 
-- [[design-00003-exception-model]] —— 实现依据(类型、映射、模块落位)。
-- [[decision-00010-exception-model]] —— 策略与取舍。
-- [[analysis-00010-exception-model]] —— 缺口编号(#1–#9),与各相位一一对应。
-- [[design-00002-web-layer]] §八 —— 端到端验收的线上契约基准。
+- [design-00003-exception-model](../design/design-00003-exception-model.md) —— 实现依据(类型、映射、模块落位)。
+- [decision-00010-exception-model](../decision/decision-00010-exception-model.md) —— 策略与取舍。
+- [analysis-00010-exception-model](../analysis/analysis-00010-exception-model.md) —— 缺口编号(#1–#9),与各相位一一对应。
+- [design-00002-web-layer](../design/design-00002-web-layer.md) §八 —— 端到端验收的线上契约基准。

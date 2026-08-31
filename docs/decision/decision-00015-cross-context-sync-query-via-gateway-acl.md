@@ -2,15 +2,16 @@
 id: decision-00015-cross-context-sync-query-via-gateway-acl
 type: decision
 status: active
+motivated_by: [analysis-00011-event-send-consume-mechanisms]
 ---
 
 # 跨上下文同步调用:Open Host Service + 消费方 Gateway ACL,且只用于读
 
 固化"一个 BC 需要**当场读到另一个 BC 当前状态**时怎么调"的选型。承接
-[[analysis-00004-bounded-context-module-structure]](跨上下文只经发布语言,#5)、
-[[analysis-00002-domain-vs-integration-events]](防腐 / Published Language)、
-[[decision-00006-integration-event-transport-selection]](异步事件传输)与
-[[analysis-00007-saga-process-manager]](长流程编排)。本文只定**同步调用**这一条通道
+[analysis-00004-bounded-context-module-structure](../analysis/analysis-00004-bounded-context-module-structure.md)(跨上下文只经发布语言,#5)、
+[analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md)(防腐 / Published Language)、
+[decision-00006-integration-event-transport-selection](decision-00006-integration-event-transport-selection.md)(异步事件传输)与
+[analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md)(长流程编排)。本文只定**同步调用**这一条通道
 的形状与边界;异步状态传播仍归上述两篇,不在此重复。
 
 ## Context
@@ -116,14 +117,14 @@ status: active
 
 内部:
 
-- [[analysis-00004-bounded-context-module-structure]] —— 跨上下文只经发布语言(#5)、promotion ladder(#3)、
+- [analysis-00004-bounded-context-module-structure](../analysis/analysis-00004-bounded-context-module-structure.md) —— 跨上下文只经发布语言(#5)、promotion ladder(#3)、
   Structure 2 模块布局。
-- [[analysis-00002-domain-vs-integration-events]] —— 防腐层 / Published Language;契约只带 id + 最小数据、
+- [analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md) —— 防腐层 / Published Language;契约只带 id + 最小数据、
   不暴露内部类型。
-- [[decision-00006-integration-event-transport-selection]] —— 异步状态传播的传输选型与 outbox/inbox 兜底
+- [decision-00006-integration-event-transport-selection](decision-00006-integration-event-transport-selection.md) —— 异步状态传播的传输选型与 outbox/inbox 兜底
   (本通道之外的另一条路)。
-- [[analysis-00007-saga-process-manager]] —— 多步跨 BC 状态变更的编排 + 补偿。
-- [[analysis-00011-event-send-consume-mechanisms]] —— **事件(异步)**收发机制清单;本决策是其对照面的
+- [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md) —— 多步跨 BC 状态变更的编排 + 补偿。
+- [analysis-00011-event-send-consume-mechanisms](../analysis/analysis-00011-event-send-consume-mechanisms.md) —— **事件(异步)**收发机制清单;本决策是其对照面的
   **同步(非事件)**跨 BC 通道。
 - 已工作实现(演示,非设计权威):`aipersimmon-ddd-scaffold/multi-module` —— ordering 下单前经
   `StockAvailabilityGateway`(Port)/ `StockAvailabilityGatewayAdapter`(消费方 ACL)同步查询 inventory

@@ -20,7 +20,7 @@ principles below) in a `decision/` doc.
 A bounded context (BC) is a *language/model* boundary — the scope in which one
 ubiquitous language and model are consistent — **not** a deployment unit; this is
 the DDD position (Evans, Vernon), summarized in
-`docs/reference/domain-driven-hexagon/`. A microservice is a *deployment* unit.
+`docs/reference/reference-00005-domain-driven-hexagon.md`. A microservice is a *deployment* unit.
 The two often align but are different axes.
 
 A DDD codebase decomposes on two axes — by BC (vertical) and by layer
@@ -77,7 +77,7 @@ app/                                   [module]  one deployable jar
   `ApplicationModules.verify()`, backed by ArchUnit; Spring Modulith 2.0 can also
   check at startup). Moving a boundary = renaming a package (cheap).
 - Basis: Spring Modulith docs (module = direct sub-package; `verify()`);
-  `docs/reference/spring-modulith-with-ddd/`; Newman (modular monolith).
+  `docs/reference/reference-00008-spring-modulith-with-ddd.md`; Newman (modular monolith).
 
 ### Structure 2 — Modular monolith, **physical** BCs (multi-module / B2)
 
@@ -99,8 +99,8 @@ app/                          aggregator POM (one deployable via start/)
 
 - Boundaries: **BC and layer both compile-time** (a disallowed type is off the
   classpath). Moving a boundary = Maven surgery (expensive).
-- Basis: `docs/reference/ddd-by-examples-factory/` (Gradle module per context —
-  `*-model`/`*-adapters`); `docs/reference/modular-monolith-with-ddd/` (module =
+- Basis: `docs/reference/reference-00003-ddd-by-examples-factory.md` (Gradle module per context —
+  `*-model`/`*-adapters`); `docs/reference/reference-00007-modular-monolith-with-ddd.md` (module =
   bounded context, schema-per-module, extract with no app change); layer names
   follow COLA (adapter/app/domain/infrastructure).
 
@@ -146,7 +146,7 @@ app/                          aggregator POM, one deployable
   in the degenerate single-BC case, where it collapses into Structure 3's
   per-service COLA layout.
 - Basis: BC is the boundary that matters most (Fowler: boundaries =
-  BoundedContexts; `docs/reference/domain-driven-hexagon/`); the whole point of
+  BoundedContexts; `docs/reference/reference-00005-domain-driven-hexagon.md`); the whole point of
   monolith-first is cheap BC extraction (Newman) — this structure makes it
   cross-cutting.
 
@@ -172,13 +172,13 @@ in a `decision/` doc) once a structure is chosen for the scaffold:
 4. **Reject global layer modules** for any multi-BC build (see above).
 5. **Cross-context communication is always via published language** (integration
    events / `*-api`), never a direct internal reference — in every structure.
-   Basis: `docs/reference/modular-monolith-with-ddd/`,
-   `docs/reference/spring-modulith-with-ddd/`.
+   Basis: `docs/reference/reference-00007-modular-monolith-with-ddd.md`,
+   `docs/reference/reference-00008-spring-modulith-with-ddd.md`.
 6. **Spring Modulith's scope:** boundary verification in Structure 1; its event
    publication registry (transactional outbox) for inter-context events in
    Structures 1–2; extraction aid via `@Externalized` toward Structure 3. It is
    **not** the layer-boundary mechanism in Structure 2 (Maven is). Basis: Spring
-   Modulith docs; `docs/reference/spring-modulith-with-ddd/`.
+   Modulith docs; `docs/reference/reference-00008-spring-modulith-with-ddd.md`.
 
 Open for review: **which structure does the template ship the one worked BC in —
 Structure 1 (simplest, monolith-first-purest) or Structure 2 (shows the full

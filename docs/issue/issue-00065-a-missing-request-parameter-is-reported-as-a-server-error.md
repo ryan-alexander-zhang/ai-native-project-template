@@ -29,7 +29,7 @@ blocks: [plan-00015-scaffold-depth-and-evaluability]
 2. **最小机制**：兜底 `@ExceptionHandler(Exception.class)` 按定义会接住任何没被更具体处理器认领的异常。
    Spring 把"缺参数/参数转不了型"表达为一个**普通异常**，它没被认领，所以被兜底接走，
    而兜底的语义是"我们这边出错了"。
-3. **真根因**：issue-00045 那一轮补的是**路由层**的失败（路径、方法、媒体类型）与**请求体**的失败，
+3. **真根因**：[issue-00045-web-handler-maps-unknown-route-to-500](issue-00045-web-handler-maps-unknown-route-to-500.md) 那一轮补的是**路由层**的失败（路径、方法、媒体类型）与**请求体**的失败，
    参数绑定这一层被漏掉了。判据本应是"这个失败是客户端造成的还是服务端造成的"，
    实际用的判据是"它出现在我列举过的那几个位置吗"——枚举而非分类，所以必然漏。
 4. **为什么一直没被发现**：在这次之前，样例的所有端点都只用 `@PathVariable`（必然存在，否则不匹配路由）
@@ -80,5 +80,5 @@ matrix variable，而不是只补今天撞到的那一个子类——否则下�
 
 ## 关联
 
-- [[issue-00045]]（路由/方法/媒体类型/请求体的同族修复；本 issue 是它漏掉的一层）
-- [[plan-00015-scaffold-depth-and-evaluability]]（F3 的列表端点是第一个带查询参数的端点）
+- [issue-00045-web-handler-maps-unknown-route-to-500](issue-00045-web-handler-maps-unknown-route-to-500.md)（路由/方法/媒体类型/请求体的同族修复；本 issue 是它漏掉的一层）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（F3 的列表端点是第一个带查询参数的端点）

@@ -2,14 +2,14 @@
 id: analysis-00026-samples-event-contract-evolution
 type: analysis
 status: draft
-informs: [analysis-00014-ddd-samples-scenario-catalog]
+parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
 # S21 事件契约演进与多版本共存
 
 对应 sample：`aipersimmon-ddd-samples/s21-event-contract-evolution`（两个服务模块）。
-场景清单见 [[analysis-00014-ddd-samples-scenario-catalog]]，上游链路见
-[[analysis-00025-samples-integration-events-across-services]]。
+场景清单见 [analysis-00014-ddd-samples-scenario-catalog](analysis-00014-ddd-samples-scenario-catalog.md)，上游链路见
+[analysis-00025-samples-integration-events-across-services](analysis-00025-samples-integration-events-across-services.md)。
 
 ## 0. 本篇定位
 

@@ -13,7 +13,7 @@ implements: [design-00008-operation-log-component]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-把 [[design-00008-operation-log-component]] / [[spec-00001-operation-log-component]] 落成代码：五模块
+把 [design-00008-operation-log-component](../design/design-00008-operation-log-component.md) / [spec-00001-operation-log-component](../spec/spec-00001-operation-log-component.md) 落成代码：五模块
 （core / engine / cqrs-spring / jdbc / mybatis-plus）的三入口闭环（注解 / Definition / direct-API）+ 双存储后端。
 
 **验收锚点**：一个不依赖业务样例的最小 consumer fixture，能经三种入口在 **`-jdbc`/`-mybatis-plus` × H2/MySQL/PostgreSQL**
@@ -26,7 +26,7 @@ implements: [design-00008-operation-log-component]
 
 ## 一、Design
 
-详见 [[design-00008-operation-log-component]]。落地关键结构：
+详见 [design-00008-operation-log-component](../design/design-00008-operation-log-component.md)。落地关键结构：
 
 ```mermaid
 flowchart LR
@@ -88,7 +88,7 @@ flowchart LR
 - **T3** `[engine]`（依赖 T2）`OperationLogs` 默认实现：normalize → validate → redact → freeze → append pipeline；
   注入 `OperationLogSink` + `Clock`（name-scoped `operationLogClock`）+ id supplier（UUIDv7/ULID）+ 尺寸/隐私预算；
   `idempotencyKey = SHA-256_hex(messageId|operationCode|outcome|completion)`；CR/LF 清洗、default-deny allowlist、脱敏、size 预算裁剪并计数。
-- **T4** `[engine]`（依赖 T2）默认 `FailureClassifier`：对齐 [[design-00003-exception-model]]（预期业务/校验/授权→`REJECTED`；
+- **T4** `[engine]`（依赖 T2）默认 `FailureClassifier`：对齐 [design-00003-exception-model](../design/design-00003-exception-model.md)（预期业务/校验/授权→`REJECTED`；
   `ConcurrencyConflictException`→`FAILED`+`CONCURRENCY`；其余→`FAILED`）；可被消费方 `@Primary` 覆盖。
 - **T5** `[engine]` DDL + 装配：`.../db/migration/operation-log/{h2,mysql,postgresql}/V1__aipersimmon_operation_log.sql`
   （design §7.2；PG `timestamptz` / MySQL `DATETIME(6)`+UTC / H2 `TIMESTAMP WITH TIME ZONE`；MySQL inline `KEY`+ASCII 列+DYNAMIC）；
@@ -137,8 +137,8 @@ flowchart LR
 7. **嵌套 command**：子日志随父事务提交/回滚、失败只由 root 写、无 `REQUIRES_NEW`-while-parent-open。
 8. **方言等价**：六组合下唯一约束/幂等收敛/时间序/分页排序一致（AC-19.1）。
 9. **no-op**：仅装 `-cqrs-spring` 之外的 direct-API 路径不因缺失 resolver 而失败；纯 direct-API 应用不触发注解校验。
-10. 质量门：覆盖率/静态分析/mutation/集成测试按 `TESTING.md` / [[design-00007-code-quality-gates]] 达标。
+10. 质量门：覆盖率/静态分析/mutation/集成测试按 `TESTING.md` / [design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md) 达标。
 
 ## 四、Links
-- Spec: [[spec-00001-operation-log-component]] · Design: [[design-00008-operation-log-component]] ·
-  Decision: [[decision-00017-operation-log-component-boundaries]] · Analysis: [[analysis-00013-operation-log-component]]
+- Spec: [spec-00001-operation-log-component](../spec/spec-00001-operation-log-component.md) · Design: [design-00008-operation-log-component](../design/design-00008-operation-log-component.md) ·
+  Decision: [decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md) · Analysis: [analysis-00013-operation-log-component](../analysis/analysis-00013-operation-log-component.md)

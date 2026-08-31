@@ -9,7 +9,7 @@ blocks: [design-00004-durable-process-manager-runtime]
 
 ## 问题(现状,file:line 为证)
 
-- **等级:样例范畴**(scaffold 演示,非库契约;见 [[samples-not-reference]])。但它示范了一种会削弱审计与幂等的坏模式,值得单列。
+- **等级:样例范畴**(scaffold 演示,非库契约;见 samples-not-reference)。但它示范了一种会削弱审计与幂等的坏模式,值得单列。
 - `aipersimmon-ddd-scaffold/multi-module/ordering/ordering-process-jdbc/.../OrderFulfilmentDefinition.react()`
   用**业务键**充当证据 ref 的身份,而非因果 envelope 的 `messageId`。逐字段核对各 `record` 首参:
   - `:98-99` `new ReservationFailureRef(orderId, new OrderId(orderId), failed.code(), failed.reason())`
@@ -34,7 +34,7 @@ blocks: [design-00004-durable-process-manager-runtime]
 
 ## 复现(test-first)
 
-`OrderFulfilmentDefinitionTest`(`ordering-process-jdbc`,新建,与 [[issue-00035-order-fulfilment-definition-ignores-step]] 同一测试类):
+`OrderFulfilmentDefinitionTest`(`ordering-process-jdbc`,新建,与 [issue-00035-order-fulfilment-definition-ignores-step](issue-00035-order-fulfilment-definition-ignores-step.md) 同一测试类):
 - `reservationFailedCompensatesWithFailureEvidenceIdFromTheCause`:断言 `ReservationFailureRef.failureId == context.cause().messageId()`(而非 orderId)。
 - `stockReleasedCancelsWithTwoDistinctEvidenceIds`:断言 `PaymentDeclineRef.declineId` 取自记住的拒付事件 id、`StockReleaseRef.releaseId` 取自当前 stock-released 事件 id,且 `assertNotEquals` 二者互异。
 - `theThreeEvidenceIdsAcrossAFlowAreAllDistinct`:把三条证据 id 收进 `Set`,断言 size==3。
@@ -58,6 +58,6 @@ blocks: [design-00004-durable-process-manager-runtime]
 
 ## 关联
 
-- [[issue-00035-order-fulfilment-definition-ignores-step]] —— 同一 `react()` 的另一处样例缺陷(忽略当前 step)。
-- [[design-00004-durable-process-manager-runtime]] —— 运行时的稳定身份契约(effectId/messageId)语境。
-- [[samples-not-reference]] —— scaffold 为演示,非设计权威。
+- [issue-00035-order-fulfilment-definition-ignores-step](issue-00035-order-fulfilment-definition-ignores-step.md) —— 同一 `react()` 的另一处样例缺陷(忽略当前 step)。
+- [design-00004-durable-process-manager-runtime](../design/design-00004-durable-process-manager-runtime.md) —— 运行时的稳定身份契约(effectId/messageId)语境。
+- samples-not-reference —— scaffold 为演示,非设计权威。

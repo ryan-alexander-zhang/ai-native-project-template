@@ -26,7 +26,7 @@ VALUES ('SKU-1', 10), ('SKU-2', 5), ('SKU-RESTRICTED', 10);
 - 注释里的 "same demo data the in-memory repositories used" 还暴露了它的来历：
   这是从早期内存仓储时代平移过来的种子，当时它确实只活在进程里；
   搬到 Flyway 之后性质变了，注释没跟上（与
-  [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]] 同源）。
+  [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md) 同源）。
 - 反证据：scaffold 自己的测试**已经不依赖这份种子**了。
   多租户上线后，`(tenant_id, id)` / `(tenant_id, sku)` 成了复合主键（`V2:28-32`），
   而种子行落在 `__root__` 下，于是 8 个测试类各自在 `@BeforeEach` 里重新种自己的租户数据
@@ -81,12 +81,12 @@ spring:
    种子只存在于 `__root__`，所以 curl 必须带 `-H 'X-Tenant-Id: __root__'`。
 
 本 issue 依赖 profile 拆分，实施时与
-[[issue-00074-one-config-file-with-development-values-only]] 一起做最省事。
+[issue-00074-one-config-file-with-development-values-only](issue-00074-one-config-file-with-development-values-only.md) 一起做最省事。
 
 ## 验证结果
 
 已修。四条修复全部落地，与
-[[issue-00074-one-config-file-with-development-values-only]] 同批（profile 拆分是前置）。
+[issue-00074-one-config-file-with-development-values-only](issue-00074-one-config-file-with-development-values-only.md) 同批（profile 拆分是前置）。
 
 - 种子从 `V1__aggregates.sql` 移到 `db/dev/afterMigrate__seed.sql`；V1 原处留一段注释说明
   **为什么这里不能有数据**，而不是留白——留白会被下一个人填回去。
@@ -98,7 +98,7 @@ spring:
 
 **第 4 条（README quickstart 租户前提）实施时发现它本身是错的**：
 方案要求写 `-H 'X-Tenant-Id: __root__'`，而 `__root__` 是客户端按设计**不可命名**的保留租户，
-那条 curl 必然 400。已另落 [[issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects]]
+那条 curl 必然 400。已另落 [issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects](issue-00096-the-quickstart-curl-names-a-tenant-the-edge-rejects.md)
 并一并修掉：种子改为同时种 `__root__`（供 7 个走 `commandBus` 不绑租户的测试）与
 `demo`（供 README 的 curl），README 改用 `demo` 并解释为什么不是 `__root__`。
 
@@ -113,7 +113,7 @@ prod profile 下两张表 count 为 0，而 schema 完整可查。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00074-one-config-file-with-development-values-only]]（profile 拆分是本修复的前置）
-- [[issue-00078-six-places-still-describe-the-repositories-as-in-memory]]（同一次内存→PostgreSQL 迁移留下的注释债）
-- [[decision-00018-multi-tenancy-boundaries]]（`__root__` 哨兵）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00074-one-config-file-with-development-values-only](issue-00074-one-config-file-with-development-values-only.md)（profile 拆分是本修复的前置）
+- [issue-00078-six-places-still-describe-the-repositories-as-in-memory](issue-00078-six-places-still-describe-the-repositories-as-in-memory.md)（同一次内存→PostgreSQL 迁移留下的注释债）
+- [decision-00018-multi-tenancy-boundaries](../decision/decision-00018-multi-tenancy-boundaries.md)（`__root__` 哨兵）

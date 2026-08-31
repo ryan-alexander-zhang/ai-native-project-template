@@ -58,6 +58,6 @@ CloudEvents `id` 是**必填**属性,也是 inbox 去重键。Kafka 消费桥对
 
 ## 关联
 
-- [[decision-00014-cloudevents-integration-event-contract]] —— `id`/`type` 为必填属性、inbox 键的契约来源。
-- [[issue-00003-messaging-delivery-reliability]] —— 本 issue 复用其 Kafka DLT 通道与 not-retryable 永久分类。
-- [[issue-00005-integration-event-logical-type-resolution]] —— 同"永久失败 → DLT、不猜测/不补造"的立场(边界 #5)。
+- [decision-00014-cloudevents-integration-event-contract](../decision/decision-00014-cloudevents-integration-event-contract.md) —— `id`/`type` 为必填属性、inbox 键的契约来源。
+- [issue-00003-messaging-delivery-reliability](issue-00003-messaging-delivery-reliability.md) —— 本 issue 复用其 Kafka DLT 通道与 not-retryable 永久分类。
+- [issue-00005-integration-event-logical-type-resolution](issue-00005-integration-event-logical-type-resolution.md) —— 同"永久失败 → DLT、不猜测/不补造"的立场(边界 #5)。

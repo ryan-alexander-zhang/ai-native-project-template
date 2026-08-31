@@ -7,8 +7,8 @@ implements: [report-00001-ddd-framework-review]
 
 # 阶段二 + 阶段三：采纳门槛与架构精简
 
-承接 [[report-00001-ddd-framework-review]]。阶段一（正确性止血）已由
-[[plan-00013-phase-one-correctness-remediation]] 完成。本 plan 覆盖报告的**阶段二（采纳门槛）与阶段三
+承接 [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)。阶段一（正确性止血）已由
+[plan-00013-phase-one-correctness-remediation](plan-00013-phase-one-correctness-remediation.md) 完成。本 plan 覆盖报告的**阶段二（采纳门槛）与阶段三
 （架构精简）全部 10 项**。
 
 ## 一、为什么把两个阶段合并、并且反转它们的顺序
@@ -96,7 +96,7 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
    不成立：框架与样例里每个 id 类型都是 **record**——record 免费提供这四项，且**不能继承类**。基类既无必要也
    不可实现。剩下的唯一重复是两行空值校验，不足以让每个项目的每个 id 都 import 一个新类型。
 3. **`-money` 模块不做**。报告自己写着「不必自造，直接引 Joda-Money / javax.money」。新建模块属推测性设计。
-4. **报告 P1-2 的三段式规则不可照抄**，已由 [[design-00012-module-naming-and-spring-freedom]] 重新表述：
+4. **报告 P1-2 的三段式规则不可照抄**，已由 [design-00012-module-naming-and-spring-freedom](../design/design-00012-module-naming-and-spring-freedom.md) 重新表述：
    按字面执行会把 42 个模块变成约 60 个（13 个后端适配器各自再裂一个 starter），与 P1-1 方向相反。真正的
    不变量是「领域层可依赖的模块必须零 Spring」，按此重测**真违规者只有 `-outbox` 一个**；报告点名的 `-id` 与两个
    `-engine` 不持有契约，问题只是「名字没说明自己是什么」。
@@ -108,9 +108,9 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
 
 ### 过程中新发现并已修复的缺陷（不在本 plan 原范围）
 
-- [[issue-00056-kafka-tests-pin-a-stale-inbox-schema]] —— 三个 Kafka 消费端集成测试在 HEAD 即红，
+- [issue-00056-kafka-tests-pin-a-stale-inbox-schema](../issue/issue-00056-kafka-tests-pin-a-stale-inbox-schema.md) —— 三个 Kafka 消费端集成测试在 HEAD 即红，
   借用的 inbox schema 漏了租户迁移 V2。
-- [[issue-00057-unlimited-systemic-retry-is-invisible]] —— 被判为 systemic 的失败无限重试却从不报告原因，
+- [issue-00057-unlimited-systemic-retry-is-invisible](../issue/issue-00057-unlimited-systemic-retry-is-invisible.md) —— 被判为 systemic 的失败无限重试却从不报告原因，
   这是上一条长期不可诊断的原因。
 
 ### 批次 D（采纳门槛）—— 已完成
@@ -131,7 +131,7 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
    并按报告第 2 条把它写成「何时才该手写」的进阶示例。**每个 payload 的样板从约 200 行降到 22 行**是真实收益，
    总行数没降那么多是因为新增了约 60 行「如何选择」的教学注释。
 2. **D1 的捆绑包命名用 `-starter-` 中缀，而非报告的 `-<stack>-spring-boot-starter` 后缀**。后者已被 C5 的
-   拦截器组合座占用，且二者不能合并（见 [[design-00012-module-naming-and-spring-freedom]] §3.4）。
+   拦截器组合座占用，且二者不能合并（见 [design-00012-module-naming-and-spring-freedom](../design/design-00012-module-naming-and-spring-freedom.md) §3.4）。
 3. **D1 是 16 → 4，而非报告设想的 17 → 2**。`-openapi-spring-boot-starter` 与
    `-observability-otel-spring-boot-starter` 各自拉一整套有主张的第三方栈（springdoc + Swagger UI、
    整个 OpenTelemetry starter），不应由默认路径替使用者决定。报告 P1-1 把 "observability(no-op)" 列进核心包，
@@ -147,7 +147,7 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
 
 ### 过程中新发现（已立 issue，未修复）
 
-- [[issue-00059-outbox-relay-tests-race-the-startup-poll]] —— outbox 两个后端共 7 个测试类用
+- [issue-00059-outbox-relay-tests-race-the-startup-poll](../issue/issue-00059-outbox-relay-tests-race-the-startup-poll.md) —— outbox 两个后端共 7 个测试类用
   `poll-delay-ms` 大值试图关掉后台调度，但 `@Scheduled(fixedDelay)` 是**先执行再等待**，启动即轮询一次；
   它若持有 ShedLock 锁，测试体那次直接 `relay()` 会被切面整个跳过 → 间歇性失败。**产品行为无误，
   只有测试对调度器的假设是错的。** 标记 `open`。
@@ -169,6 +169,6 @@ D2/D3/D4 与 D1 无依赖，但都必须早于 D5。
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（本 plan 的来源）
-- [[plan-00013-phase-one-correctness-remediation]]（阶段一，已 resolved）
-- [[design-00011-aggregate-persistence-contract]]（阶段一产出的仓储基类，D1 的 starter 要覆盖它）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（本 plan 的来源）
+- [plan-00013-phase-one-correctness-remediation](plan-00013-phase-one-correctness-remediation.md)（阶段一，已 resolved）
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)（阶段一产出的仓储基类，D1 的 starter 要覆盖它）

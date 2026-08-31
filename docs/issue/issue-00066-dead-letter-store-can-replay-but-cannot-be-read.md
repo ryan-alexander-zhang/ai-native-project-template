@@ -96,4 +96,4 @@ Optional<DeadLetter> find(String eventId);
 
 ## 关联
 
-- [[plan-00015-scaffold-depth-and-evaluability]]（F5；本 issue 在计划阶段即被预登记为"必然会撞上的摩擦点"）
+- [plan-00015-scaffold-depth-and-evaluability](../plan/plan-00015-scaffold-depth-and-evaluability.md)（F5；本 issue 在计划阶段即被预登记为"必然会撞上的摩擦点"）

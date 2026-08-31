@@ -393,13 +393,13 @@ public interface SimpleProcess<S> {
 
 ## 实施结果
 
-三个阶段全部完成。阶段一见 [[plan-00013-phase-one-correctness-remediation]]，阶段二与三见
-[[plan-00014-adoption-threshold-and-architecture-simplification]]（其「完成记录」逐项列出结果与 11 处偏差）。
+三个阶段全部完成。阶段一见 [plan-00013-phase-one-correctness-remediation](../plan/plan-00013-phase-one-correctness-remediation.md)，阶段二与三见
+[plan-00014-adoption-threshold-and-architecture-simplification](../plan/plan-00014-adoption-threshold-and-architecture-simplification.md)（其「完成记录」逐项列出结果与 11 处偏差）。
 
 本报告的判断在实施中被推翻或修正的四处，**以 plan-00014 与 design-00012 的记录为准**：
 
 - **P1-2 的三段式规则不可照字面执行**（会把 42 个模块变成约 60 个）；真正的不变量是「领域层可依赖的模块
-  必须零 Spring」，据此真违规者只有 `-outbox` 一个 → [[design-00012-module-naming-and-spring-freedom]]。
+  必须零 Spring」，据此真违规者只有 `-outbox` 一个 → [design-00012-module-naming-and-spring-freedom](../design/design-00012-module-naming-and-spring-freedom.md)。
 - **P2-1 的转换点不应放在 `integration`**（那会把它从零依赖的根变成非根）；已放在 `application`。
 - **P2-4 的 `AbstractIdentifier` 不可实现**：所有 id 类型都是 record，record 免费提供 `equals`/`hashCode`
   且不能继承类。

@@ -2,12 +2,11 @@
 id: design-00010-time-ordered-identifiers
 type: design
 status: active
-informs: [decision-00019-time-ordered-uuidv7-identifiers]
 ---
 
 # 时间有序标识符设计：`IdGenerator` SPI + UUIDv7 默认实现 + 铸造点收口
 
-把 [[decision-00019-time-ordered-uuidv7-identifiers]] 落成可实施结构：一个 framework-free 的 `IdGenerator` SPI、
+把 [decision-00019-time-ordered-uuidv7-identifiers](../decision/decision-00019-time-ordered-uuidv7-identifiers.md) 落成可实施结构：一个 framework-free 的 `IdGenerator` SPI、
 一个库支撑的 UUIDv7 默认实现（独立 impl 模块 + autoconfig）、以及把现有各处 `UUID.randomUUID()` 铸造点统一收口。
 
 ## 一、结论

@@ -51,7 +51,7 @@ if (!customer.canAfford(order.total())) {
 4. **排除的伪根因**：不是 `V3` 的决定写错了——在"`Customer` 从不被写入"这个前提下，
    不加 version 列是对的。错的是那个前提本身：**如果额度要被强制，`Customer` 就必须被写入**
    （扣减已用额度），前提就不成立了。这也正是
-   [[issue-00086-customer-is-an-aggregate-nothing-writes]] 的另一面。
+   [issue-00086-customer-is-an-aggregate-nothing-writes](issue-00086-customer-is-an-aggregate-nothing-writes.md) 的另一面。
 
 ## 复现（test-first）
 
@@ -95,7 +95,7 @@ scaffold 的其它权衡处（多聚合事务、hybrid 编排）都有这样的�
 ## 验证结果
 
 已修。**采用修复方案 1（强一致）**，与
-[[issue-00086-customer-is-an-aggregate-nothing-writes]] 的方案 1 联合决定、同一次改动落地。
+[issue-00086-customer-is-an-aggregate-nothing-writes](issue-00086-customer-is-an-aggregate-nothing-writes.md) 的方案 1 联合决定、同一次改动落地。
 
 **为什么是强一致而不是最终一致**（这条 issue 最要紧的是"必须有立场"，所以立场写在这里，
 也写进了 `PlaceOrderHandler` 的注释）：最终一致的正当理由是**不变量跨越了一条无法事务化的边界**。
@@ -140,13 +140,13 @@ scaffold 的其它权衡处（多聚合事务、hybrid 编排）都有这样的�
 
 **未做**：方案 3（改名承认现状）被放弃是显然的；方案 2（最终一致 + 对账）见上文理由。
 `Money` 新增 `minus`（拒绝为负）；`Money` 的溢出保护仍是
-[[issue-00077-money-arithmetic-has-no-overflow-guard]]，不在本次范围。
+[issue-00077-money-arithmetic-has-no-overflow-guard](issue-00077-money-arithmetic-has-no-overflow-guard.md)，不在本次范围。
 
 验证：`mvn -o verify -pl start -am` 全绿，70 个测试 0 失败，Spotless / PMD / SpotBugs 通过。
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00086-customer-is-an-aggregate-nothing-writes]]（同一根因的另一面）
-- [[design-00011-aggregate-persistence-contract]]（version 列与 `VersionedRow` 契约）
-- [[issue-00051-aggregates-have-no-optimistic-locking]]（`V3` 的来源）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00086-customer-is-an-aggregate-nothing-writes](issue-00086-customer-is-an-aggregate-nothing-writes.md)（同一根因的另一面）
+- [design-00011-aggregate-persistence-contract](../design/design-00011-aggregate-persistence-contract.md)（version 列与 `VersionedRow` 契约）
+- [issue-00051-aggregates-have-no-optimistic-locking](issue-00051-aggregates-have-no-optimistic-locking.md)（`V3` 的来源）

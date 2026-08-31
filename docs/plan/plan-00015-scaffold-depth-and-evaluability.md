@@ -13,8 +13,8 @@ implements: [report-00001-ddd-framework-review]
 > `-web-store-mybatis-plus` 承接）。因此下文带 `-jdbc` 的模块名、路径与 `file:line`，指的是当时的代码，
 > 不是现在的树；它们作为当时的证据保留，未被改写成 MyBatis-Plus 的路径。
 
-[[report-00001-ddd-framework-review]] 的三个阶段已由 [[plan-00013-phase-one-correctness-remediation]] 与
-[[plan-00014-adoption-threshold-and-architecture-simplification]] 完成。本 plan 处理其后的两件事：
+[report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md) 的三个阶段已由 [plan-00013-phase-one-correctness-remediation](plan-00013-phase-one-correctness-remediation.md) 与
+[plan-00014-adoption-threshold-and-architecture-simplification](plan-00014-adoption-threshold-and-architecture-simplification.md) 完成。本 plan 处理其后的两件事：
 
 1. **回流缺口** —— plan-00014 收尾之后的三个破坏性修复（`e4d6596` / `3ac0084` / `64494d7`）没有回到样例，
    其中两处是可验证的实际缺陷。
@@ -131,13 +131,13 @@ stateDiagram-v2
 - **E1** `[process-manager-engine]`+`[scaffold]` 改正 `ProcessManagerProperties.java:10` 的 Javadoc
   （去掉 `.jdbc`，与 `:13` 的 `prefix=` 一致）；11 个测试类的 22 行属性去掉 `jdbc.` 段。
   **测**：新增 `ProcessManagerPropertyBindingTest`，断言文档所述前缀真的绑定（设 1h 得 1h，而不是默认 500ms）。
-  → [[issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind]]
+  → [issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind](../issue/issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind.md)
 - **E2** `[scaffold]` 4 处 `outbox.poll-delay-ms=3600000` → `outbox.relay.enabled=false`；
   同样把只求"安静"的 `effect-relay` / `deadline-worker` 改为 `enabled=false`（真要跑快的 e2e
   保留 `poll-delay=200ms`——那是节奏诉求，用节奏参数是对的）。
   **测**：断言 `relay.enabled=false` 时上下文无 `OutboxRelayScheduler` bean，而仅设 `poll-delay-ms` 时它仍在——
   把"delay 不是开关"从注释变成断言。**另**：全仓 grep `poll-delay-ms=3600000` 0 命中。
-  → [[issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever]]
+  → [issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever](../issue/issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever.md)
 - **E3** `[scaffold]` 清两处悬空引用：`FindOrderHandler.java:14` 指向的 "CQRS read-model how-to" 已随
   `605fab3` 删除（F3 落地后这句改为指向新的读模型实现）；`OrderFulfilmentDefinition.java:31` 的
   "the old orchestration saga" 在 saga 模块删除后只对读过历史的人有意义。
@@ -148,7 +148,7 @@ stateDiagram-v2
   恰好一方 204，另一方 409，且 body 是 `/problems/resource-conflict` 的 RFC 9457 文档。
   这条链路（`OptimisticLockingFailureException` → `ConcurrencyTranslationCommandInterceptor` →
   `ConcurrencyConflictException` → `ApplicationExceptionAdvice` → 409）今天在库里逐段有测试，
-  **在样例里没有一处端到端走通**——[[plan-00013-phase-one-correctness-remediation]] 的阶段验收第 3 条
+  **在样例里没有一处端到端走通**——[plan-00013-phase-one-correctness-remediation](plan-00013-phase-one-correctness-remediation.md) 的阶段验收第 3 条
   因此实际未闭合。
   **测**：`ConcurrentApprovalTest`（MockMvc + 真 PG），断言状态码分布恰好 {204, 409}、409 的
   `type`/`status` 正确、且订单最终只有一次 `OrderReadyForFulfilmentEvent`。
@@ -267,12 +267,12 @@ stateDiagram-v2
 
 | id | 摘要 | 状态 |
 | --- | --- | --- |
-| [[issue-00062-web-store-module-does-not-displace-the-in-memory-stores]] | 后端 store 与内存兜底之间没有排序边——issue-00044 的同构副本 | 已修 |
-| [[issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist]] | `getIfAvailable` 用在多候选处 → 开幂等即启动失败 | 已修 |
-| [[issue-00064-a-replayed-idempotent-response-loses-its-location-header]] | 重放的 201 丢 `Location` | 已修（收尾轮） |
-| [[issue-00065-a-missing-request-parameter-is-reported-as-a-server-error]] | 参数绑定失败不在 4xx 覆盖内 → 500 | 已修 |
-| [[issue-00066-dead-letter-store-can-replay-but-cannot-be-read]] | `replay(eventId)` 而拿不到 `eventId` | 已修（收尾轮，新增 `DeadLetters` 只读端口） |
-| [[issue-00067-test-support-covers-every-store-except-the-transport]] | 测试模块没有 Kafka——库自己的传输 | 已修（收尾轮） |
+| [issue-00062-web-store-module-does-not-displace-the-in-memory-stores](../issue/issue-00062-web-store-module-does-not-displace-the-in-memory-stores.md) | 后端 store 与内存兜底之间没有排序边——issue-00044 的同构副本 | 已修 |
+| [issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist](../issue/issue-00063-in-memory-web-store-cannot-be-built-when-several-clocks-exist.md) | `getIfAvailable` 用在多候选处 → 开幂等即启动失败 | 已修 |
+| [issue-00064-a-replayed-idempotent-response-loses-its-location-header](../issue/issue-00064-a-replayed-idempotent-response-loses-its-location-header.md) | 重放的 201 丢 `Location` | 已修（收尾轮） |
+| [issue-00065-a-missing-request-parameter-is-reported-as-a-server-error](../issue/issue-00065-a-missing-request-parameter-is-reported-as-a-server-error.md) | 参数绑定失败不在 4xx 覆盖内 → 500 | 已修 |
+| [issue-00066-dead-letter-store-can-replay-but-cannot-be-read](../issue/issue-00066-dead-letter-store-can-replay-but-cannot-be-read.md) | `replay(eventId)` 而拿不到 `eventId` | 已修（收尾轮，新增 `DeadLetters` 只读端口） |
+| [issue-00067-test-support-covers-every-store-except-the-transport](../issue/issue-00067-test-support-covers-every-store-except-the-transport.md) | 测试模块没有 Kafka——库自己的传输 | 已修（收尾轮） |
 
 **它们的共同点，就是这个 plan 想证明的那件事**：没有一个需要更多单元测试才能发现。库的每个模块单测
 只装配自己那一个组件——于是「两个自动配置同时在场」「容器里有 5 个 `Clock`」「端点带查询参数」
@@ -333,10 +333,10 @@ stateDiagram-v2
 
 ## 关联
 
-- [[report-00001-ddd-framework-review]]（本 plan 的来源；P1-4 / P1-6 / P2-4 在样例侧的落地缺口）
-- [[plan-00013-phase-one-correctness-remediation]]（其阶段验收第 3 条由 F1 补齐）
-- [[plan-00014-adoption-threshold-and-architecture-simplification]]（其后的三个修复由批次 E 回流）
-- [[issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind]] ·
-  [[issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever]]
-- [[issue-00059-outbox-relay-tests-race-the-startup-poll]]（E2 是它未覆盖到的第二处副本）
-- [[issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap]]（F2 第一次在样例里用上它的显式降级）
+- [report-00001-ddd-framework-review](../report/report-00001-ddd-framework-review.md)（本 plan 的来源；P1-4 / P1-6 / P2-4 在样例侧的落地缺口）
+- [plan-00013-phase-one-correctness-remediation](plan-00013-phase-one-correctness-remediation.md)（其阶段验收第 3 条由 F1 补齐）
+- [plan-00014-adoption-threshold-and-architecture-simplification](plan-00014-adoption-threshold-and-architecture-simplification.md)（其后的三个修复由批次 E 回流）
+- [issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind](../issue/issue-00060-scaffold-tests-set-a-process-manager-prefix-that-does-not-bind.md) ·
+  [issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever](../issue/issue-00061-scaffold-tests-disable-the-outbox-relay-with-the-wrong-lever.md)
+- [issue-00059-outbox-relay-tests-race-the-startup-poll](../issue/issue-00059-outbox-relay-tests-race-the-startup-poll.md)（E2 是它未覆盖到的第二处副本）
+- [issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap](../issue/issue-00058-in-memory-web-stores-are-a-silent-multi-instance-trap.md)（F2 第一次在样例里用上它的显式降级）

@@ -1,15 +1,15 @@
 ---
 id: design-00001-aipersimmon-ddd-and-scaffold
 type: design
-status: active
+status: draft
 ---
 
 # aipersimmon-ddd 库 + Maven-archetype 脚手架：最终形态与 Phase 1 设计
 
-把分析阶段的结论落成**可构建的设计**。承接 [[analysis-00006-ddd-building-blocks-library]]
-（构件库按 Layer × 可插拔性切分、参考不依赖、拓扑无关）、[[analysis-00007-saga-process-manager]]
-（saga 分档）、[[analysis-00004-bounded-context-module-structure]]（三种拓扑）、
-[[decision-00005-package-per-aggregate]]（domain 包结构)。
+把分析阶段的结论落成**可构建的设计**。承接 [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md)
+（构件库按 Layer × 可插拔性切分、参考不依赖、拓扑无关）、[analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md)
+（saga 分档）、[analysis-00004-bounded-context-module-structure](../analysis/analysis-00004-bounded-context-module-structure.md)（三种拓扑）、
+[decision-00005-package-per-aggregate](../decision/decision-00005-package-per-aggregate.md)（domain 包结构)。
 
 分析阶段结束,`bc-and-layer-samples/` 是分析期 demo,**最终删除**——由 archetype + scaffold-samples 取代。
 
@@ -100,7 +100,7 @@ flowchart TD
 | --- | --- | --- |
 | **Phase 1** | `-bom` → `-core` → `-archunit`(**按此序,一个一个做**)+ `multi-module` archetype + scaffold-samples | 先把"库依赖 + 分层 + arch 校验"跑通;archetype 依赖上述库子集 |
 | Phase 2 | `-application` / `-integration` + `-events-spring` / `-outbox` / `-inbox` | 事件与 outbox/inbox 上移进库 |
-| **Phase 3 ✅** | `-cqrs(+spring)` / legacy `-saga(+spring)` | CQRS 与旧 saga 基线已交付；durable Process Manager 的 clean-slate 目标见 [[design-00004-durable-process-manager-runtime]] |
+| **Phase 3 ✅** | `-cqrs(+spring)` / legacy `-saga(+spring)` | CQRS 与旧 saga 基线已交付；durable Process Manager 的 clean-slate 目标见 [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) |
 | **Phase 4 ✅** | `modulith` / `microservice` / CI+GitHub Packages | 全部交付并验证生成 `com.acme.shop` 全绿:`modulith`(单模块 modular monolith,边界测试期强制);`microservice`(`contracts` 共享契约 + `ordering-service`/`inventory-service` 独立部署 + `e2e-tests`,跨服务走 outbox→Kafka→inbox,EmbeddedKafka 端到端 2/2);CI(`ci.yml` 构建库+三脚手架+样例)+ 发布(`publish-library.yml` + `distributionManagement` → GitHub Packages) |
 
 **依赖顺序注意**:archetype 生成的项目要能解析 `aipersimmon-ddd-*`,故库子集必须先 `mvn install` 到本地 `.m2`。Phase 1 内部次序:①库 `bom→core→archunit`;②**手写双 BC 参考项目 `scaffold/multi-module`**(建立在库之上);③从它 `create-from-project` 派生 archetype 并验证生成/回归;④按需补 `scaffold-samples` 的聚焦 how-to 例子。
@@ -178,13 +178,13 @@ com.aipersimmon.ddd.core
 
 > **实现阶段发现**:库里放 JPA `@Entity` 有"实体扫描覆盖"陷阱——库的 `@EntityScan` 会让使用者靠默认扫描的自有实体失效。故**先做 `-outbox-jdbc`**（该模块后已删除，只留 `-outbox-mybatis-plus`）(`JdbcTemplate`,无 `@Entity`/`@EntityScan`,零扫描冲突);`-outbox-jpa` 作为后续变体。发布 port `IntegrationEvents` 已加到 `-application`。
 
-> **第二次演进(已交付,[[decision-00020-outbox-engine-over-one-store-port]])**:writer / relay / 调度触发器 /
+> **第二次演进(已交付,[decision-00020-outbox-engine-over-one-store-port](../decision/decision-00020-outbox-engine-over-one-store-port.md))**:writer / relay / 调度触发器 /
 > 保留期清理与共享的 Spring 装配再从两个后端上抽到 **`aipersimmon-ddd-outbox-engine`**,后端只留一个
 > `OutboxStore` 适配器 + 死信 store/读侧 + ShedLock 的 `LockProvider`。此前 relay 在两个后端各一份,
 > 而那份代码承载着按聚合顺序、mark-sent 不计重试预算、死信搬移失败不计尝试这三条各自换来一个 issue 的判断——
 > 存两份的代价是任何一次修正都可能只落在一半的部署上。与 `-process-manager-engine` / `-operation-log-engine` 同形。
 
-> **第三次演进(已交付,[[issue-00108-a-killed-relay-instance-stops-all-delivery]])**:relay 的互斥从**调度**
+> **第三次演进(已交付,[issue-00108-a-killed-relay-instance-stops-all-delivery](../issue/issue-00108-a-killed-relay-instance-stops-all-delivery.md))**:relay 的互斥从**调度**
 > 移到**行**。原来只有 `OutboxRelayScheduler.poll()` 上的 `@SchedulerLock`,而被杀的实例解不开那把锁,
 > 其余实例便一路静默跳过轮询——最长 `PT60M` 全线停摆;那 60 分钟又是被最坏批次预算
 > (`batch-size × send-timeout`)顶上去的,一个旋钮同时管着"轮询多久"与"崩溃多久恢复"。现在每行带
@@ -193,14 +193,14 @@ com.aipersimmon.ddd.core
 > 活在单节点内存里的保证撑不住并发 poller。轮询自带"半个租约"的时间预算,于是租约长度只表示
 > "崩溃后多久有人接手",而 Kafka 启动守卫的算式里 `batch-size` 整项消失。
 
-> **第四次演进(已交付,[[issue-00109-a-vanished-route-turned-an-externalized-event-local]])**:
+> **第四次演进(已交付,[issue-00109-a-vanished-route-turned-an-externalized-event-local](../issue/issue-00109-a-vanished-route-turned-an-externalized-event-local.md))**:
 > 事件的**目的地**也成为行上的一列。原来 reach 在派发时按当前 `@Externalized` 注解重新判定,
 > 于是版本升级漏标或滚动发布期间路由表 miss → 落进程内腿 → 正常返回 → 标记已发送,永不到 broker 且
 > 全程无迹象。现在 writer 在写入事务里解析并落 `destination`(NULL = 进程内),`aipersimmon_dead_letter`
 > 同样带这一列(否则重放会把外发事件复活成本地投递)。查询端口 `EventDestinations` 在 outbox core,
 > `ExternalizedRoutes` 实现之;relay 另守一条:带目的地的行不得交给到不了外部的 dispatcher。
 
-> **第五次演进(已交付,[[issue-00111-the-relay-waited-for-each-send-in-turn]])**:一轮 poll 的代价从
+> **第五次演进(已交付,[issue-00111-the-relay-waited-for-each-send-in-turn](../issue/issue-00111-the-relay-waited-for-each-send-in-turn.md))**:一轮 poll 的代价从
 > **往返之和**降到**一次往返**。原来每条消息 `send.get(timeout)`——写一条等一条 ack,单实例上限约 100 msg/s,
 > 且 producer 缓冲区里永远只有一条记录,自带的批处理形同虚设。现在"交出去"与"等回执"是两件事
 > (`OutboxDispatcher.beginDispatch` 返回 `InFlightDispatch`),relay 把**整批**交给传输再逐个等,
@@ -238,11 +238,11 @@ com.aipersimmon.ddd.core
 
 ### 5.10 `aipersimmon-ddd-cqrs`(纯,可选,→ `-core`)
 
-承接 [[analysis-00006-ddd-building-blocks-library]] §五(纯/脏分离、CQRS 整体可选)。framework-free,只依赖 `-core`。
+承接 [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) §五(纯/脏分离、CQRS 整体可选)。framework-free,只依赖 `-core`。
 
 - **写侧**:`Command<R>` / `CommandHandler<C,R>`(薄 handler)/ `CommandBus.send`;`CommandInterceptor` 环绕 SPI(`Invocation<R>.proceed()` + `order()`,越小越外层)。
 - **读侧**:`Query<R>` / `QueryHandler<Q,R>` / `QueryBus.ask`;`@ReadModel` / `@Projection` stereotype。
-- **横切抽象**:`UnitOfWork`(事务边界 port)。领域事件不经旁路收集器:聚合自带事件,由保存它的一方在 save 处、同事务内 `DomainEvents.publishAndClear(root)` 排空(见 [[decision-00012-no-ambient-per-command-state]];**替代**原 `AggregateCollector`,补 JDBC/MyBatis 无 ChangeTracker 的同一问题)。
+- **横切抽象**:`UnitOfWork`(事务边界 port)。领域事件不经旁路收集器:聚合自带事件,由保存它的一方在 save 处、同事务内 `DomainEvents.publishAndClear(root)` 排空(见 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md);**替代**原 `AggregateCollector`,补 JDBC/MyBatis 无 ChangeTracker 的同一问题)。
 - 测试:契约级(泛型可组合 + 拦截器环绕/排序 + `UnitOfWork` 默认重载),3/3。
 
 ### 5.11 `aipersimmon-ddd-cqrs-spring`(starter,可选,→ `-cqrs` + `-application` + Spring)
@@ -250,7 +250,7 @@ com.aipersimmon.ddd.core
 analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction,`TransactionTemplate` 接管 UnitOfWork)。
 
 - `RegistryCommandBus` / `RegistryQueryBus`:按 handler 泛型签名(`ResolvableType`)索引命令/查询类型;**handler 须是具体类**(lambda 会擦除泛型,无法索引)。
-- 内置拦截器:`LoggingCommandInterceptor`(order 0)、`ValidationCommandInterceptor`(order 100,`@ConditionalOnClass/Bean(Validator)`,Bean Validation 存在才装配)、`TransactionCommandInterceptor`(order 200,只提供事务边界;领域事件由聚合在 save 处 `DomainEvents.publishAndClear` 同事务排空,拦截器不再集中 drain,见 [[decision-00012-no-ambient-per-command-state]])。
+- 内置拦截器:`LoggingCommandInterceptor`(order 0)、`ValidationCommandInterceptor`(order 100,`@ConditionalOnClass/Bean(Validator)`,Bean Validation 存在才装配)、`TransactionCommandInterceptor`(order 200,只提供事务边界;领域事件由聚合在 save 处 `DomainEvents.publishAndClear` 同事务排空,拦截器不再集中 drain,见 [decision-00012-no-ambient-per-command-state](../decision/decision-00012-no-ambient-per-command-state.md))。
 - `TransactionTemplateUnitOfWork`(领域事件排空不再依赖任何线程域收集器)。
 - `AipersimmonDddCqrsAutoConfiguration`:`@ConditionalOnMissingBean` 全可覆盖;`@AutoConfiguration(after = {DataSourceTransactionManager/Transaction/ValidationAutoConfiguration})` 以正确评估 `@ConditionalOnBean`。测试:端到端(happy / 失败回滚且不投递事件 / 校验先于事务拒绝 / 查询侧),4/4。
 
@@ -258,18 +258,18 @@ analysis-00006 §五的实现侧(装饰器链 Logging→Validation→Transaction
 
 `aipersimmon-ddd-saga`、`SagaState`、`SagaStore` 与独立 `DeadlineScheduler` 只代表已经交付的历史基线，不再是目标 API，
 也不提供兼容迁移约束。新的 framework-free 核心以 `ProcessDefinition`、`ProcessDecision`、`ProcessEffect`、
-`ProcessRuntime` port 和显式 codec SPI 为边界；规范设计见 [[design-00004-durable-process-manager-runtime]] §三。
+`ProcessRuntime` port 和显式 codec SPI 为边界；规范设计见 [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) §三。
 
 ### 5.13 JDBC Runtime 与 Spring Boot Starter
 
 生产目标拆为 `aipersimmon-ddd-process-manager-jdbc`（后改名 `-engine` + `-mybatis-plus`）与
 `aipersimmon-ddd-process-manager-jdbc-spring-boot-starter`：前者负责四表持久化、原子推进、effect relay、durable deadline、
 租约/围栏、幂等与运维能力；后者只负责 Boot 自动装配、配置、worker 生命周期、可观测性和启动校验。两者的完整边界、
-Temporal/Seata provider 策略及非规范性订单 Sample 统一以 [[design-00004-durable-process-manager-runtime]] 为准。
+Temporal/Seata provider 策略及非规范性订单 Sample 统一以 [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) 为准。
 
 ### 5.14 `aipersimmon-ddd-messaging-kafka`(starter,可选,→ `-outbox`(core)+ `-application` + spring-kafka)
 
-集成事件**方式三(broker)**的落地(承接 §5.6 传输总览、[[analysis-00002-domain-vs-integration-events]])。**建立在 outbox 之上,不替代它**;仅依赖**存储无关的 outbox core**(`OutboxDispatcher`/`OutboxMessage` + dispatch autoconfig),因此可与任一存储后端(`-outbox-jdbc` / `-outbox-mybatis-plus`)组合——**消费者需另行自选一个 outbox 存储 starter**(此前经 `-outbox-jdbc` 传递依赖隐式带入,现改为显式)。
+集成事件**方式三(broker)**的落地(承接 §5.6 传输总览、[analysis-00002-domain-vs-integration-events](../analysis/analysis-00002-domain-vs-integration-events.md))。**建立在 outbox 之上,不替代它**;仅依赖**存储无关的 outbox core**(`OutboxDispatcher`/`OutboxMessage` + dispatch autoconfig),因此可与任一存储后端(`-outbox-jdbc` / `-outbox-mybatis-plus`)组合——**消费者需另行自选一个 outbox 存储 starter**(此前经 `-outbox-jdbc` 传递依赖隐式带入,现改为显式)。
 
 - **生产侧** `KafkaOutboxDispatcher implements OutboxDispatcher`:把 outbox 行发到 Kafka topic(key=eventId,value=payload JSON,信封元数据走 headers `IntegrationEventHeaders`);**阻塞等 broker ack** 才返回,失败抛错 → relay 不标记已发 → 下轮重试(at-least-once)。作为 `OutboxDispatcher` bean **自动顶替**日志默认实现(autoconfig `before` **core dispatch autoconfig** + `@ConditionalOnMissingBean`)。
 - **消费侧(可选,`consumer.enabled=true`)** `KafkaIntegrationEventListener`:`@KafkaListener` 消费 topic,按 eventId 经 `Inbox` 去重(**同事务**),再用 type header + payload 重建事件、经 `ApplicationEventPublisher` **进程内重投**给本地 `@EventListener`——即"message 的 inbox"半边。无 `Inbox` 时不去重(要求处理器自身幂等)。
@@ -277,10 +277,10 @@ Temporal/Seata provider 策略及非规范性订单 Sample 统一以 [[design-00
 
 ### 5.15 Web 层构件族(`-web` / `-web-spring` / `-web-store-{redis,jdbc}`)
 
-interface(入站 HTTP)层构件族,详见 [[design-00002-web-layer]]:纯契约 `-web`(ProblemDescriptor/ProblemRegistry/ApiError/Page/Cursor +
+interface(入站 HTTP)层构件族,详见 [design-00002-web-layer](design-00002-web-layer.md):纯契约 `-web`(ProblemDescriptor/ProblemRegistry/ApiError/Page/Cursor +
 横切 SPI)+ Spring starter `-web-spring`(异常→RFC 9457 ProblemDetail、traceId、分页、i18n、幂等/防重放/限流,
 逐项 opt-in)+ 可换存储 `-web-store-redis`/`-web-store-mybatis-plus`(与 outbox 存储后端同构;后者当时叫 `-web-store-jdbc`)。策略见
-[[decision-00007-web-api-response-envelope]],证据见 [[analysis-00008-web-api-response-envelope]]。
+[decision-00007-web-api-response-envelope](../decision/decision-00007-web-api-response-envelope.md),证据见 [analysis-00008-web-api-response-envelope](../analysis/analysis-00008-web-api-response-envelope.md)。
 
 ## 六、脚手架设计(`multi-module`)
 
@@ -295,7 +295,7 @@ flowchart LR
   samples["scaffold-samples<br/>聚焦单点 how-to 例子"] -.->|各自演示一项技术| mm
 ```
 
-- **参考项目 `multi-module`(archetype 的源,真相源)**:一个**手写、可运行的双 BC** 多模块 DDD 项目,建立在 `aipersimmon-ddd-*`(BOM + core + archunit)之上,遵循 [[decision-00005-package-per-aggregate]] 的包结构。它**先由人手写**(可参考只读的 `bc-and-layer-samples`,但不复制),是 `create-from-project` 的**唯一输入**。
+- **参考项目 `multi-module`(archetype 的源,真相源)**:一个**手写、可运行的双 BC** 多模块 DDD 项目,建立在 `aipersimmon-ddd-*`(BOM + core + archunit)之上,遵循 [decision-00005-package-per-aggregate](../decision/decision-00005-package-per-aggregate.md) 的包结构。它**先由人手写**(可参考只读的 `bc-and-layer-samples`,但不复制),是 `create-from-project` 的**唯一输入**。
   - **两个 BC,至少一个多聚合**:`ordering`(多聚合:`Order` + `Customer`)、`inventory`(单聚合:`Stock`)。单 BC 不足以表达 BC 边界与跨 BC 协作。
   - **目录嵌套 `<bc>/<bc>-<layer>`,且 BC 目录是聚合 pom**:每个 BC 一个目录含一个聚合 `pom.xml`(`packaging=pom`,列出该 BC 的五层模块),根 pom 只列 `ordering` / `inventory` / `start`。**不可**用扁平的 `ordering-adapter`(退化的单 BC 写法)。BC 目录必须是**有 pom 的聚合模块**——否则 `create-from-project` 无法处理"无 pom 的分组目录"(见下)。
   - **内部模块依赖用 `${project.groupId}` / `${project.version}`**(reactor groupId 无关),而非写死 `com.example`——否则派生出的 archetype 生成项目时内部依赖仍指向 `com.example`(见下)。
@@ -313,19 +313,19 @@ flowchart LR
   2. `-archunit` 的规则如何参数化消费者的分层包命名(约定 vs 显式传参)?Phase 1 落地时定。
   3. ~~GitHub Packages 发布与 CI/CD 的具体形态(Phase 4)~~ **已交付**:`.github/workflows/ci.yml`(装库→建脚手架/样例)、`publish-library.yml`(release/手动触发 → `mvn deploy` 库到 GitHub Packages,`setup-java` 配 `github` server + `GITHUB_TOKEN`)、库 parent `distributionManagement`(repo id `github`)。消费者需在自己的 Maven 配置加同一 GitHub Packages 仓库并鉴权。
   4. ~~**集成事件方式三(broker)**:`-messaging-kafka`~~ **已交付(§5.14)**:Kafka `OutboxDispatcher` + inbox 守卫的进程内消费桥;实时 broker 端到端集成测试归消费方应用,库内为无 broker 的单元/装配测试。
-  5. **Process Manager 生产化(Phase 3 之后)**:旧 `-saga/-saga-spring`、JDBC deadline 与 command/outbox 样例均作为已交付基线保留，但不继续扩展 `-saga-jpa`；后续采用 [[design-00004-durable-process-manager-runtime]] 的 clean-slate 三模块设计。JPA 变体 `-outbox-jpa` / `-inbox-jpa` 仍是独立的消息存储开放项，不属于 Process Manager backend。
+  5. **Process Manager 生产化(Phase 3 之后)**:旧 `-saga/-saga-spring`、JDBC deadline 与 command/outbox 样例均作为已交付基线保留，但不继续扩展 `-saga-jpa`；后续采用 [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) 的 clean-slate 三模块设计。JPA 变体 `-outbox-jpa` / `-inbox-jpa` 仍是独立的消息存储开放项，不属于 Process Manager backend。
   7. **`microservice` 拓扑落地要点(已交付)**:每 BC 独立部署,跨服务**只经 Kafka**(outbox→Kafka→inbox 守卫的消费桥→进程内重投)。选**共享 `contracts` 模块**(两服务同依赖 → 事件类 FQN 一致 → 库的消费桥 `Class.forName` 直接可用,无需库改动)。**落地发现**:e2e 同一 JVM 启两服务时,两服务 jar 的 `application.properties` 在同一 classpath 根**冲突**(后启的服务错读前者配置);修法 = e2e 用各服务专属 `spring.config.name`(`ordering-e2e`/`inventory-e2e`),各服务自身的 `application.properties` 保持不变(独立部署/生成项目仍正确)。单主题 + 各服务独立消费组:每方收到全量、只对自己关心的事件反应。
   6. ~~**scaffold-samples 补 how-to**:"接一个 saga""加 CQRS 读模型""集成事件走 Kafka"~~ **已交付**:`add-cqrs-read-model`(命令管道+读模型)、`orchestrate-with-saga`(process manager + deadline + 补偿)、`integration-events-over-kafka`(outbox→Kafka→inbox→进程内,EmbeddedKafka 端到端)。**落地时修了库两处装配缺陷**:saga-spring 的 `DeadlineScheduler`↔`DeadlineHandler` 构造循环(改 scheduler 惰性 `Supplier<DeadlineHandler>` 解析);messaging-kafka autoconfig 未 `after = KafkaAutoConfiguration`,致 `@ConditionalOnBean(KafkaTemplate)` 早评估、Kafka dispatcher 未顶替日志默认(已修)。**`multi-module` 已改为 orchestration saga**(`OrderFulfilment` 过程管理器 + `OrderFulfilmentSaga` 中心状态 + 内存 `SagaStore`,`StockReserved` 确认 / `StockReservationFailed` 补偿取消);archetype 重新派生并验证生成 `com.acme.shop` 全绿(含补偿分支)。**后续再拆分层**:把过程管理器的协调策略下沉到 application 层(`OrderFulfilmentProcessManager`,`@ProcessManager`,依赖 `SagaStore`/`CommandBus` port、只吃 order id),`adapter/messaging` 的 `OrderFulfilment` 收缩为仅绑 `@EventListener` 的瘦投递壳——对齐主流实践(协调在 application、投递在 edge),消除"编排逻辑住在 interface 层"的分层张力。**三套拓扑(`multi-module` / `modulith` / `microservice`)一致落地**,各自测试全绿(microservice 含真 Kafka 的 `MicroserviceFlowE2eTest`)。~~**archetype 尚未就此改动重新派生**(留待下次重派生一并验证)~~ **已于 2026-08-06 重新派生并端到端验证**(见 §六 archetype 条目)。
 
 ## Sources
 
 内部:
-- [[analysis-00006-ddd-building-blocks-library]] —— 模块切分、参考不依赖、CQRS、§十 `Transitions<S>`。
-- [[analysis-00007-saga-process-manager]] —— saga 分档(Phase 3)。
-- [[design-00004-durable-process-manager-runtime]] —— durable Process Manager 三模块的当前生产目标与迁移边界。
-- [[analysis-00004-bounded-context-module-structure]] —— 三种拓扑与 "ship one worked BC"。
-- [[decision-00005-package-per-aggregate]] —— domain 包结构(archetype 骨架遵循)。
-- [[design-00003-exception-model]] —— `-core`/`-application` 异常体系增量(`ErrorCode`/`Invariant` + 语义子类),扩展本文 §5.3/§5.5。
+- [analysis-00006-ddd-building-blocks-library](../analysis/analysis-00006-ddd-building-blocks-library.md) —— 模块切分、参考不依赖、CQRS、§十 `Transitions<S>`。
+- [analysis-00007-saga-process-manager](../analysis/analysis-00007-saga-process-manager.md) —— saga 分档(Phase 3)。
+- [design-00004-durable-process-manager-runtime](design-00004-durable-process-manager-runtime.md) —— durable Process Manager 三模块的当前生产目标与迁移边界。
+- [analysis-00004-bounded-context-module-structure](../analysis/analysis-00004-bounded-context-module-structure.md) —— 三种拓扑与 "ship one worked BC"。
+- [decision-00005-package-per-aggregate](../decision/decision-00005-package-per-aggregate.md) —— domain 包结构(archetype 骨架遵循)。
+- [design-00003-exception-model](design-00003-exception-model.md) —— `-core`/`-application` 异常体系增量(`ErrorCode`/`Invariant` + 语义子类),扩展本文 §5.3/§5.5。
 
 外部:
 - Maven Archetype —— Guide to Creating Archetypes / `archetype:create-from-project`。https://maven.apache.org/guides/mini/guide-creating-archetypes.html

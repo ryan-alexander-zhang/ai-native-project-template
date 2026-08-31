@@ -66,7 +66,7 @@ GET /orders?customerId=CUST-1 -> 405 HttpRequestMethodNotSupportedException
    `-pl` 只是让这个既有的歧义暴露出来。
 4. **为什么这个项目特别容易踩**：
    - 17 个模块，且 `start` 的测试要起十来对容器
-     （[[issue-00092-each-test-context-starts-its-own-container-pair]]），
+     （[issue-00092-each-test-context-starts-its-own-container-pair](issue-00092-each-test-context-starts-its-own-container-pair.md)），
      所以**每个人都会想只跑一部分**——`-pl` 是最自然的做法；
    - `start` 依赖全部 16 个兄弟模块，命中面最大；
    - 症状落在 HTTP 状态码上，看起来像 web 层的问题，而真因在构建层。
@@ -164,6 +164,6 @@ Any failures you saw before adding -am are suspect.
 
 ## 关联
 
-- [[report-00002-scaffold-ddd-review]]
-- [[issue-00092-each-test-context-starts-its-own-container-pair]]（测试慢正是"只跑一部分"的动机来源，两者叠加才构成这个陷阱）
-- [[issue-00088-dependency-and-image-versions-escape-the-boms]]（另一类"版本坐标不携带足够信息"的问题）
+- [report-00002-scaffold-ddd-review](../report/report-00002-scaffold-ddd-review.md)
+- [issue-00092-each-test-context-starts-its-own-container-pair](issue-00092-each-test-context-starts-its-own-container-pair.md)（测试慢正是"只跑一部分"的动机来源，两者叠加才构成这个陷阱）
+- [issue-00088-dependency-and-image-versions-escape-the-boms](issue-00088-dependency-and-image-versions-escape-the-boms.md)（另一类"版本坐标不携带足够信息"的问题）

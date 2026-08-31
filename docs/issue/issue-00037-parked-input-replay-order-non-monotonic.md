@@ -35,7 +35,7 @@ blocks: [plan-00003-durable-process-manager-implementation]
    任意排序"。
 2. **最小机制**:重放顺序不变式被编码在 `(created_at, transition_id)` 上,但 `created_at` 毫秒精度不保证严格单调、
    `transition_id` 是随机 UUID——**没有任何一个每实例单调的排序键**。
-3. **真根因**:transition 侧缺一个每实例单调序列列。这与 effect 侧 [[issue-00016-per-instance-effect-ordering-not-guaranteed]]
+3. **真根因**:transition 侧缺一个每实例单调序列列。这与 effect 侧 [issue-00016-per-instance-effect-ordering-not-guaranteed](issue-00016-per-instance-effect-ordering-not-guaranteed.md)
    同源——顺序约束必须落在可靠的单调键上,不能依赖墙钟或随机 id。effect 表的 `seq`(`MAX(seq)+1`、实例行锁内)是现成先例。
    排除的**非**根因:不是 `created_at` 精度不够(即便纳秒也有并列与回拨风险),而是排序键选错。
 
@@ -63,7 +63,7 @@ blocks: [plan-00003-durable-process-manager-implementation]
 3. `findParkedInputs()`、`timeline()` 的 `ORDER BY` 改用 `transition_seq`;`findLatestTransitionId()` 改为
    `ORDER BY transition_seq DESC LIMIT 1`。
 
-(注:多份 DDL 副本须同步变更——见 [[process-manager-schema-copies]]。)
+(注:多份 DDL 副本须同步变更——见 process-manager-schema-copies。)
 
 ## 验证结果
 
@@ -78,7 +78,7 @@ blocks: [plan-00003-durable-process-manager-implementation]
 
 ## 关联
 
-- [[issue-00016-per-instance-effect-ordering-not-guaranteed]] —— effect 侧同类"排序键非单调"问题及其 `seq` 修法(先例)。
-- [[issue-00007-ordering-across-backoff-window]] —— outbox 侧同源顺序问题。
-- [[process-manager-schema-copies]] —— DDL 多副本需同改。
-- [[plan-00003-durable-process-manager-implementation]]
+- [issue-00016-per-instance-effect-ordering-not-guaranteed](issue-00016-per-instance-effect-ordering-not-guaranteed.md) —— effect 侧同类"排序键非单调"问题及其 `seq` 修法(先例)。
+- [issue-00007-ordering-across-backoff-window](issue-00007-ordering-across-backoff-window.md) —— outbox 侧同源顺序问题。
+- process-manager-schema-copies —— DDL 多副本需同改。
+- [plan-00003-durable-process-manager-implementation](../plan/plan-00003-durable-process-manager-implementation.md)
