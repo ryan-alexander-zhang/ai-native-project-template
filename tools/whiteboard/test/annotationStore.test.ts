@@ -232,29 +232,72 @@ describe('the annotation list on disk', () => {
 
     await expect(store.add(DOC, question)).rejects.toBeInstanceOf(WorkflowError)
     expect(readFileSync(fileOf(repoRoot), 'utf8')).toBe('{ not json')
-    // The reading path is forgiving instead: the user loses that list, not the board.
+  })
+
+  /**
+   * issue-00023 — one file, one answer. A read that served an unreadable list as
+   * «no annotations» told the owner their annotations are gone, and the first
+   * annotation they then made would write over the file a person could still have
+   * rescued by hand. The refusal names the file for that reason.
+   */
+  it('refuses to read a file it cannot parse, the way a write refuses it', async () => {
+    const { repoRoot, store } = storeOn()
+    mkdirSync(join(repoRoot, ANNOTATIONS_DIR), { recursive: true })
+
+    for (const broken of ['{ not json', '{ "docId": "x" }', '[]']) {
+      writeFileSync(fileOf(repoRoot), broken)
+
+      expect(() => store.read(DOC)).toThrowError(WorkflowError)
+      expect(() => store.read(DOC)).toThrowError(new RegExp(`${DOC}\\.json`))
+      await expect(store.add(DOC, question)).rejects.toThrowError(new RegExp(`${DOC}\\.json`))
+    }
+  })
+
+  // And a document that simply has no file yet is no such refusal: an empty list
+  // is the honest reading of «nothing annotated yet» (spec-00007-AC-9.9).
+  it('reads a document with no file at all as an empty list', () => {
+    const { store } = storeOn()
+
     expect(store.read(DOC)).toMatchObject({ docId: DOC, annotations: [], batches: [] })
+  })
+
+  /**
+   * issue-00023 — a turn that changed nothing is not a turn worth a file. Every
+   * cowrite session's end goes through the batch landing, so an unconditional
+   * write left an empty annotation file behind for every document anyone ever
+   * cowrote by hand (spec-00007-FR-8: the session behaves no differently).
+   */
+  it('writes no file at all for a turn that changed nothing', async () => {
+    const { repoRoot, store } = storeOn()
+
+    // No batch of this document to land, and no file to land it in.
+    await store.landBatch(DOC, 's-1', 'done', 'abc1234')
+    await store.update(DOC, () => 'nothing to change')
+
+    expect(existsSync(fileOf(repoRoot))).toBe(false)
+    // A turn that does change something still writes, of course.
+    await store.add(DOC, question)
+    expect(existsSync(fileOf(repoRoot))).toBe(true)
   })
 
   // Valid JSON that is no annotation list is the same refusal an unparsable file
   // is: the file is the only copy, so nothing may be written over it.
-  it('refuses to write over a file whose JSON is no annotation list', async () => {
+  it('refuses to write over a file whose JSON is no annotation list, saying what is wrong with it', async () => {
     const { repoRoot, store } = storeOn()
     mkdirSync(join(repoRoot, ANNOTATIONS_DIR), { recursive: true })
     writeFileSync(fileOf(repoRoot), '{ "docId": "x" }')
 
-    await expect(store.add(DOC, question)).rejects.toBeInstanceOf(WorkflowError)
-    expect(store.read(DOC).annotations).toEqual([])
+    await expect(store.add(DOC, question)).rejects.toThrowError(/holds neither a list of annotations/)
+    expect(readFileSync(fileOf(repoRoot), 'utf8')).toBe('{ "docId": "x" }')
   })
 
-  it('addresses a list by the document id alone, and reads no file outside its own directory', () => {
+  it('addresses a list by the document id alone, and reads no file outside its own directory', async () => {
     const { store } = storeOn()
 
-    expect(store.read('../asks/spec-00001-x')).toMatchObject({
-      docId: '../asks/spec-00001-x',
-      annotations: [],
-      batches: [],
-    })
+    // Refused on both sides rather than answered with an empty list: a name that
+    // is no document id is nobody's annotations (issue-00023).
+    expect(() => store.read('../asks/spec-00001-x')).toThrowError(WorkflowError)
+    await expect(store.add('../asks/spec-00001-x', question)).rejects.toThrowError(WorkflowError)
   })
 })
 

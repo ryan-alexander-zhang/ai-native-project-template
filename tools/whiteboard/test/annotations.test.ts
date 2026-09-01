@@ -547,6 +547,36 @@ describe('a document the tree still remembers and the disk has lost', () => {
 })
 
 /**
+ * issue-00023 — one file, one answer. A read that served an unreadable list as
+ * «no annotations» would have the owner believe their annotations are gone, and
+ * the next one they make writes over the file a person could still rescue.
+ */
+describe('a stored list that cannot be read', () => {
+  async function broken() {
+    const board = boardOn({ 'spec/x.md': SPEC('draft') })
+    await board.annotations.add('spec-00001-x', {
+      type: 'question',
+      text: 'why two gates?',
+      anchor: anchorFor(board.docsDir, 'spec/x.md', GATE),
+    })
+    writeFileSync(join(board.repoRoot, ANNOTATIONS_DIR, 'spec-00001-x.json'), '{ not json')
+    return board
+  }
+
+  it('refuses to serve a list and to submit it when the stored file cannot be read', async () => {
+    const board = await broken()
+
+    expect(() => board.annotations.list('spec-00001-x')).toThrowError(/cannot be read/)
+    // Never «there is nothing to submit»: that reading is the same lie one step on.
+    await expect(board.annotations.submit('spec-00001-x', {})).rejects.toThrowError(/cannot be read/)
+    expect(board.opened).toEqual([])
+    expect(board.spawned).toEqual([])
+  })
+})
+
+/**
+ * spec-00007-FR-11 — the annotations of a document that has been deleted or
+ * renamed are kept/**
  * spec-00007-FR-11 — the annotations of a document that has been deleted or
  * renamed are kept and simply have nowhere to be shown: the board answers, the
  * file stays, and neither type is offered on a document that is not there.

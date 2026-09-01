@@ -39,6 +39,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { useDefaultLayout } from 'react-resizable-panels'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { type SessionListing, api } from './api.ts'
+import { AnnotationList } from './AnnotationList.tsx'
+import { annotationRows } from './annotationRows.ts'
 import { AskEntry } from './AskEntry.tsx'
 import { AskList } from './AskList.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
@@ -46,7 +48,7 @@ import { CoverageView } from './CoverageView.tsx'
 import { CreateDialog } from './CreateDialog.tsx'
 import { Details } from './Details.tsx'
 import { DiagnosticList, IssueList } from './Drilldowns.tsx'
-import { Editor } from './Editor.tsx'
+import { Editor, type EditorAnnotate } from './Editor.tsx'
 import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
 import { NodeCard } from './NodeCard.tsx'
@@ -209,6 +211,55 @@ function Canvas() {
       />
     ) : undefined
 
+  /**
+   * The annotation list as one reading of the three payloads that own its parts
+   * (design-00002 §16.4), and the two things drawn from it: the traces of the
+   * unsubmitted, locatable ones (spec-00007-AC-9.13) and the located one.
+   */
+  const annotationRowList = useMemo(
+    () => (board.annotations === undefined ? [] : annotationRows(board.annotations, board.threads)),
+    [board.annotations, board.threads],
+  )
+  const traces = useMemo(
+    () =>
+      annotationRowList.flatMap((row) =>
+        row.state === 'pending' && row.range !== undefined ? [{ id: row.id, ...row.range }] : [],
+      ),
+    [annotationRowList],
+  )
+  const locatedRow = annotationRowList.find((row) => row.id === board.locatedAnnotation)
+  const reanchorRow = annotationRowList.find((row) => row.id === board.reanchoring)
+  const annotationView = board.annotations
+  /**
+   * The document every annotation entry is addressed to. There is one whenever
+   * there is a payload — the annotations are read for the document the editor is
+   * on and carried with its id (design-00002 §16.8) — and naming it here binds
+   * each entry to that document rather than to whichever one the editor may have
+   * moved on to by the time the request goes.
+   */
+  const annotated = board.editing!
+  const annotate: EditorAnnotate | undefined =
+    annotationView === undefined
+      ? undefined
+      : {
+          docId: annotated,
+          // The two gates come from the submit statement and from nowhere else:
+          // the board rules on neither (design-00002 §16.2).
+          eligible: {
+            question: annotationView.submitPreview.questionEligible,
+            issue: annotationView.submitPreview.issueEligible,
+          },
+          traces,
+          ...(locatedRow?.range === undefined
+            ? {}
+            : { locate: { id: locatedRow.id, range: locatedRow.range, askedAt: board.locatedAt } }),
+          ...(reanchorRow === undefined ? {} : { reanchor: { id: reanchorRow.id, text: reanchorRow.text } }),
+          onAdd: (input) => board.addAnnotation(annotated, input),
+          onReanchor: (input) => board.finishReanchor(annotated, input.anchor),
+          onLeaveLocate: () => board.locateAnnotation(annotated, undefined),
+          onUnsaved: board.setUnsavedBuffer,
+        }
+
   const nodes = useMemo(() => {
     const laid = toFlowNodes(board.graph, board.placed, board.selected)
     const suppressed = suppressedNodes(board.graph, board.selected)
@@ -277,6 +328,17 @@ function Canvas() {
   useEffect(() => {
     if (drilled !== undefined && !board.graph.nodes.some((node) => node.id === drilled)) setDrilled(undefined)
   }, [board.graph, drilled])
+
+  // Esc leaves the re-anchor mode: it is a gesture under way, and the way out of
+  // one is the key that leaves everything else here (design-00002 §16.4).
+  useEffect(() => {
+    if (board.reanchoring === undefined) return
+    const leave = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') board.startReanchor(annotated, undefined)
+    }
+    window.addEventListener('keydown', leave)
+    return () => window.removeEventListener('keydown', leave)
+  }, [board.reanchoring, board.startReanchor, annotated])
 
   // Esc closes the detail and leaves the sub-canvas standing (spec-00001-AC-37.7).
   useEffect(() => {
@@ -607,6 +669,44 @@ function Canvas() {
                           void board.ask({ docId: board.editing!, question, threadId, resend: true })
                         }
                       />
+                    }
+                    annotate={annotate}
+                    annotations={
+                      annotationView === undefined ? undefined : (
+                        <AnnotationList
+                          rows={annotationRowList}
+                          preview={annotationView.submitPreview}
+                          // A row is locatable when its anchor lands somewhere:
+                          // the payload's own fresh reading, and no second
+                          // judgment of it here (design-00002 §16.4).
+                          locatable={(row) => row.range !== undefined}
+                          located={board.locatedAnnotation}
+                          reanchoring={board.reanchoring}
+                          unsaved={board.unsavedBuffer}
+                          submitting={board.submitting}
+                          agents={board.agents}
+                          askAgents={board.askAgents}
+                          onLocate={(row) => board.locateAnnotation(annotated, row.id)}
+                          // The question path's navigation reuses
+                          // spec-00005-FR-9 whole, whatever state the thread is
+                          // in; a thread that has left the payload is the
+                          // close-nearest case — a toast, and the view stays
+                          // (design-00002 §16.6).
+                          onThread={(row) => {
+                            if (!board.threads.some((one) => one.id === row.threadId)) {
+                              toast.error(`no thread ${row.threadId} on this document`)
+                              return
+                            }
+                            board.showEditorMode(annotated, 'asks')
+                            board.locate(row.threadId)
+                          }}
+                          onSession={(row) => row.sessionId !== undefined && board.showSession(row.sessionId)}
+                          onChange={(id, change) => board.changeAnnotation(annotated, id, change)}
+                          onRemove={(id) => board.removeAnnotation(annotated, id)}
+                          onReanchor={(id) => board.startReanchor(annotated, id)}
+                          onSubmit={(agents) => void board.submitAnnotations(annotated, agents)}
+                        />
+                      )
                     }
                     // The workspace half of a cowrite (spec-00006-FR-4): the
                     // target's text on disk, re-read with each refresh, and the

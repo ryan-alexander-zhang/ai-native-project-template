@@ -167,6 +167,23 @@ if (typeof window !== 'undefined') {
   Range.prototype.getClientRects ??= () =>
     ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} }) as unknown as DOMRectList
 
+  // The annotation input hangs off the rectangle of the live selection
+  // (design-00002 §16.2), and jsdom implements neither Range measurement. Same
+  // reason as the stub above: the gap belongs in the harness, not in a component
+  // that would have to guard a call every browser answers.
+  Range.prototype.getBoundingClientRect ??= () =>
+    ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: 0,
+      height: 0,
+      toJSON: () => ({}),
+    }) as DOMRect
+
   // jsdom implements no SVG layout, so mermaid's measurement calls throw. Stubbing
   // the primitives lets mermaid parse and emit real svg; only the metrics are fake.
   const svg = SVGElement.prototype as unknown as {

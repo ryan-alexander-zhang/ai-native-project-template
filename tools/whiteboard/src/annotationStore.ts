@@ -182,16 +182,23 @@ export class AnnotationStore {
   }
 
   /**
-   * A document's annotations as they stand, or an empty list (spec-00007-FR-3).
-   * The **reading** path, forgiving on purpose: a file that will not parse costs
-   * the user that list and not the board. Nothing is ever written back on this
-   * reading — see `startWrite`.
+   * A document's annotations as they stand, or an empty list when it has none
+   * yet (spec-00007-FR-3). Nothing is ever written back on this reading — see
+   * `startWrite`.
+   *
+   * A file that will not read **refuses**, the same way a write over it refuses
+   * (issue-00023): three file states, three answers, and never a default
+   * standing in for one of them. Served as «no annotations», an unreadable list
+   * tells the owner their annotations are gone — and the first one they make
+   * afterwards writes over the file a person could still have rescued by hand.
+   * That is the one failure this store cannot recover from, so it is the one it
+   * must not paper over.
    */
   read(docId: string): AnnotationList {
     try {
       return this.load(docId) ?? empty(docId)
-    } catch {
-      return empty(docId)
+    } catch (cause) {
+      throw this.unreadable(docId, cause)
     }
   }
 
@@ -376,12 +383,21 @@ export class AnnotationStore {
     return annotation
   }
 
-  /** One read-modify-write of one document's list, in that document's own turn. */
+  /**
+   * One read-modify-write of one document's list, in that document's own turn —
+   * and a **write** only when the turn changed something (issue-00023). A turn
+   * that changed nothing is not a turn worth a file: every session's end lands a
+   * batch, and most of those sessions are nobody's batch, so writing regardless
+   * left an empty annotation file behind for every document anyone cowrote by
+   * hand. Judged over the whole list rather than trusted to each caller, so a
+   * caller that finds nothing to do cannot create a file by forgetting to say so.
+   */
   private write<T>(docId: string, change: (list: AnnotationList) => T): Promise<T> {
     return this.queue.run(docId, () => {
       const list = this.startWrite(docId)
+      const before = JSON.stringify(list)
       const result = change(list)
-      this.save(list)
+      if (JSON.stringify(list) !== before) this.save(list)
       return result
     })
   }
@@ -396,9 +412,19 @@ export class AnnotationStore {
     try {
       return this.load(docId) ?? empty(docId)
     } catch (cause) {
-      const why = (cause as Error).message
-      throw new WorkflowError(`the annotations of ${docId} cannot be read, so nothing may be written over — ${why}`)
+      throw this.unreadable(docId, cause)
     }
+  }
+
+  /**
+   * The one refusal both paths raise over a file that will not read
+   * (issue-00023): one class and one wording, so a reader and a writer cannot
+   * describe the same file differently. It names the **file** rather than the
+   * document, because what the owner has to do about it is open that file.
+   */
+  private unreadable(docId: string, cause: unknown): WorkflowError {
+    const why = (cause as Error).message
+    return new WorkflowError(`${this.pathOf(docId)} cannot be read as an annotation list — ${why}`)
   }
 
   /**
@@ -419,7 +445,9 @@ export class AnnotationStore {
     }
     const parsed = JSON.parse(text) as AnnotationList
     if (!Array.isArray(parsed?.annotations) || !Array.isArray(parsed?.batches)) {
-      throw new Error(`${this.pathOf(docId)} holds no annotation list`)
+      // The path is the wrapper's to name (`unreadable`), so this says only what
+      // is wrong with the content.
+      throw new Error('it holds neither a list of annotations nor a list of batches')
     }
     const list = { docId, annotations: parsed.annotations, batches: parsed.batches, issued: parsed.issued }
     return { ...list, issued: issuedOf(list) }

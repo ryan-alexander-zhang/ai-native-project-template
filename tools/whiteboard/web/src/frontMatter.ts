@@ -1,12 +1,24 @@
 const FRONT_MATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/
 
 /**
+ * How many characters of the file the front matter block takes — **the one
+ * computation of that length** (design-00002 §16.3). Two coordinate systems meet
+ * over it: an annotation's offsets are the whole file's, and the preview's are
+ * the body's, so the conversion runs both ways and a second computation of the
+ * prefix would be a systematic misplacement of every annotation in the document
+ * — one that a file without front matter could never show.
+ */
+export function frontMatterPrefix(text: string): number {
+  return FRONT_MATTER.exec(text)?.[0].length ?? 0
+}
+
+/**
  * The editor holds the whole file so front matter stays visible and repairable,
  * but as Markdown a `---` block renders as a rule and a setext heading. The
  * preview shows the body; the metadata is already on the node.
  */
 export function stripFrontMatter(text: string): string {
-  return text.replace(FRONT_MATTER, '')
+  return text.slice(frontMatterPrefix(text))
 }
 
 /**

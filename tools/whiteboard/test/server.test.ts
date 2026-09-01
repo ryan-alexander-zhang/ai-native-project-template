@@ -3823,19 +3823,30 @@ describe('doc annotations', () => {
   /** A pty stand-in that records what it was told, and a headless one that never ends. */
   function seams() {
     const written: string[] = []
-    const spawn: SpawnPty = () => ({
-      onData: () => {},
-      onExit: () => {},
-      write: (data) => void written.push(data),
-      resize: () => {},
-      kill: () => {},
-    })
+    const exits: Array<(exitCode: number) => void> = []
+    const spawn: SpawnPty = () => {
+      const listeners: Array<(event: { exitCode: number }) => void> = []
+      let gone = false
+      const end = (exitCode: number) => {
+        if (gone) return
+        gone = true
+        for (const listener of listeners) listener({ exitCode })
+      }
+      exits.push(end)
+      return {
+        onData: () => {},
+        onExit: (listener) => void listeners.push(listener),
+        write: (data) => void written.push(data),
+        resize: () => {},
+        kill: () => end(0),
+      }
+    }
     const payloads: string[] = []
     const spawnHeadless: SpawnHeadless = (_command, args) => {
       payloads.push(args.at(-1)!)
       return { onStdout: () => {}, onStderr: () => {}, onExit: () => {}, kill: () => {} }
     }
-    return { spawn, spawnHeadless, written, payloads }
+    return { spawn, spawnHeadless, written, payloads, exit: (index = 0) => exits[index]!(0) }
   }
 
   function annotationBoard(status = 'draft', files: Record<string, string> = {}) {
@@ -4062,6 +4073,47 @@ describe('doc annotations', () => {
     expect(listed.annotations[0]).toMatchObject({ state: 'submitted', threadId: 't-1' })
     expect(listed.annotations[1]).toMatchObject({ state: 'submitted', batchId: 'b-1' })
     expect(listed.batches[0]).toMatchObject({ status: 'cowriting', annotationIds: ['n-2'] })
+  })
+
+  /**
+   * issue-00023 — the entries answer the state of the stored file rather than
+   * pretending it is empty: a `GET` that served zero annotations over an
+   * unreadable list is what would have the owner rebuild them over it.
+   */
+  it('answers 422 naming the file when the stored annotations cannot be read', async () => {
+    const { call, docsDir, repoRoot } = annotationBoard()
+    await add(call, 'spec-00001-b', {
+      type: 'question',
+      text: 'why two gates?',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+    writeFileSync(join(repoRoot, '.whiteboard/annotations/spec-00001-b.json'), '{ not json')
+
+    const read = await call('GET', '/api/annotations/spec-00001-b')
+    const submitted = await call('POST', '/api/annotations/spec-00001-b/submit', {})
+
+    for (const { status, body } of [read, submitted]) {
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/spec-00001-b\.json cannot be read/)
+      expect(body.reason).toBeUndefined()
+    }
+  })
+
+  /**
+   * issue-00023 — a document nobody annotated has no annotation file, and a
+   * cowrite started by hand leaves none behind: every session's end goes through
+   * the batch landing, and a landing with no batch to land changes nothing
+   * (spec-00007-FR-8 — the session behaves no differently for the annotations).
+   */
+  it('leaves no annotation file behind for a cowrite nobody annotated', async () => {
+    const { call, board, repoRoot, exit } = annotationBoard()
+
+    const started = await call('POST', '/api/sessions/cowrite', { docId: 'spec-00001-b' })
+    exit()
+    await board.sessions.whenFinished(started.body.sessionId)
+
+    expect(started.status).toBe(200)
+    expect(existsSync(join(repoRoot, '.whiteboard/annotations'))).toBe(false)
   })
 
   /**

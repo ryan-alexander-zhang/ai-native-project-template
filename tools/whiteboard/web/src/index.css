@@ -218,3 +218,19 @@
 .preview :where(hr) {
   @apply border-border my-6;
 }
+
+/*
+  Annotation traces (spec-00007-AC-9.13) and the temporary mark a locate leaves
+  (design-00002 §16.6). One vocabulary for both sides — the editor's CodeMirror
+  decoration and the preview's `mark` element carry the same classes — and no
+  colour per type: `--muted` for the trace, `--ring` for the located one, which
+  are the existing words for «marked» and «this is the one». `--destructive` and
+  a third palette are deliberately not used: they already mean anomaly.
+*/
+.annotation-mark {
+  @apply bg-muted underline decoration-2;
+  color: inherit;
+}
+.annotation-mark--located {
+  @apply ring-ring rounded-sm ring-2;
+}
