@@ -86,6 +86,7 @@ or bullets over a single conclusion. This applies to documents too.
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
+- Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
 - When a quality gate fails (format / complexity / duplication / static analysis / coverage)
   or a review flags complexity or duplication, refactor per `CODE_QUALITY.md`: solve it — do
   not raise a threshold or suppress a finding to make the build pass.

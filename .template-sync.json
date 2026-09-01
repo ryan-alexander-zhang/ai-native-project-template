@@ -8,6 +8,7 @@
     "PR.md",
     "REVIEW.md",
     "CONTEXT_TEMPLATE.md",
+    "ARCHITECTURE_TEMPLATE.md",
     "SECURITY.md",
     ":(glob)docs/**/README.md",
     ":(glob)docs/**/TEMPLATE.md"
