@@ -501,7 +501,7 @@ describe('an anchor that stops landing after the submit', () => {
   // spec-00007-AC-12.1
   // spec-00007-AC-12.3
   it('degrades one annotation’s reading and not its neighbour’s', async () => {
-    const { docsDir, annotations } = boardOn({ 'spec/x.md': SPEC('draft') })
+    const { docsDir, annotations, sessions } = boardOn({ 'spec/x.md': SPEC('draft') })
     for (const [text, selected] of [
       ['name the gate', GATE],
       ['and this one', OTHER],
@@ -513,13 +513,22 @@ describe('an anchor that stops landing after the submit', () => {
       })
     }
     await annotations.submit('spec-00001-x', {})
+    // The write the session makes into the target as it works through issue A,
+    // which is where a run's own revision reaches issue B's passage. The session
+    // is a stand-in process here, so the write is made in its place — the seam is
+    // the disk, and the disk is what the reading is taken over.
     writeFileSync(join(docsDir, 'spec/x.md'), SPEC('draft').replace(OTHER, 'Rewritten by the session.'))
 
-    const listed = annotations.list('spec-00001-x').annotations
+    const view = annotations.list('spec-00001-x')
+    const listed = view.annotations
     expect(listed[0]!.locate).toMatchObject({ start: expect.any(Number) })
     expect(listed[1]!.locate).toEqual({ failed: 'missing' })
     expect(listed.every((annotation) => annotation.state === 'submitted')).toBe(true)
     expect(listed[1]!.quote).toBe(OTHER)
+    // Nothing was interrupted: the batch is still being cowritten and its session
+    // is still running, which is the other half of «处理不中断».
+    expect(view.batches[0]).toMatchObject({ status: 'cowriting', annotationIds: ['n-1', 'n-2'] })
+    expect(sessions.cowriteOn('spec-00001-x')).toBeTruthy()
   })
 })
 
@@ -576,10 +585,10 @@ describe('a stored list that cannot be read', () => {
 
 /**
  * spec-00007-FR-11 — the annotations of a document that has been deleted or
- * renamed are kept/**
- * spec-00007-FR-11 — the annotations of a document that has been deleted or
  * renamed are kept and simply have nowhere to be shown: the board answers, the
  * file stays, and neither type is offered on a document that is not there.
+ * The board-wide half of both readings — no node, so no editor to reach the list
+ * from — is server.test.ts's own pair (AC-11.3, AC-11.4).
  */
 describe('a document that is deleted', () => {
   // spec-00007-AC-11.3

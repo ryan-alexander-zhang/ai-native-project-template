@@ -620,6 +620,74 @@ describe('what one document’s editor leaves behind', () => {
   })
 })
 
+describe('a question row following its thread', () => {
+  /**
+   * spec-00007-AC-9.11 — the resend is the ask list's own, and the annotation row
+   * has no path of its own into it: the row reads failed off the thread's last
+   * exchange, the owner resends from the question list, and the row is back to
+   * running because the thread is. Nothing writes the state onto the annotation.
+   */
+  it('reads failed, and follows the thread back to running after a resend from the question list', async () => {
+    const failed = thread({
+      exchanges: [{ ...thread().exchanges[0]!, question: 'which gate?', outcome: 'failed', answer: undefined }],
+    })
+    serve({
+      lists: [failed],
+      view: view({ annotations: [annotation({ state: 'submitted', threadId: 't-1' })] }),
+    })
+    const resend = vi.spyOn(api, 'ask').mockImplementation(async () => {
+      // What the server's own ask list then says: the same thread, one exchange on.
+      threads = [thread({ exchanges: [...failed.exchanges, { ...failed.exchanges[0]!, outcome: 'running' }] })]
+      return { sessionId: 's2', threadId: 't-1' }
+    })
+    await openBoard()
+    await openEditor()
+    await showTab('Annotations')
+    expect(rows()[0]!.textContent).toContain('failed')
+
+    // The resend goes through the question list, the way the existing thread
+    // ability is reached (spec-00005-FR-7).
+    await showTab('Questions')
+    const listed = within(screen.getByRole('list', { name: 'Ask threads' })).getAllByRole('listitem')
+    await userEvent.click(within(listed[0]!).getAllByRole('button')[0]!)
+    await userEvent.click(screen.getByRole('button', { name: 'Resend the question of t-1' }))
+    await settle(2)
+
+    expect(resend).toHaveBeenCalledWith({
+      docId: 'prd-00001-x',
+      question: 'which gate?',
+      threadId: 't-1',
+      resend: true,
+    })
+    await showTab('Annotations')
+    await waitFor(() => expect(rows()[0]!.textContent).toContain('running'))
+    // And the annotation itself never moved: the row is a mirror.
+    expect(annotations.annotations[0]).toMatchObject({ state: 'submitted', threadId: 't-1' })
+  })
+})
+
+describe('annotating while a cowrite holds the buffer', () => {
+  /**
+   * design-00002 §16.2 末条 — the read-only of spec-00006-FR-4 is over the Source
+   * view's editing and saving alone. Annotating writes no document and touches no
+   * buffer, so the right-click is offered through the whole read-only period; the
+   * submit is the thing that has to wait for a save, which is FR-5's own refusal.
+   */
+  it('offers the annotate menu while the session has the buffer locked', async () => {
+    serve({ sessions: [listing()] })
+    await openBoard()
+    await openEditor()
+
+    const content = screen.getByLabelText('Editing prd-00001-x').querySelector<HTMLElement>('.cm-content')!
+    expect(content.getAttribute('contenteditable')).toBe('false')
+    selectIn(CONTENT.indexOf('the anchor'), 'prd-00001-x')
+
+    expect(fireEvent.contextMenu(content)).toBe(false)
+    expect(await screen.findByRole('menuitem', { name: 'Add a question annotation' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Add an issue annotation' })).toBeTruthy()
+  })
+})
+
 describe('changing an annotation from the list', () => {
   /** spec-00007-AC-3.1 — a change and a delete, each through the one refresh path. */
   it('edits and drops an annotation', async () => {

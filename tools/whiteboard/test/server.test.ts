@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { taskInstruction } from '../src/advance.ts'
+import type { SubmitResult } from '../src/annotations.ts'
 import type { AskThread } from '../src/askStore.ts'
 import type { AgentConfig } from '../src/config.ts'
 import type { SpawnHeadless } from '../src/headless.ts'
@@ -3849,11 +3850,27 @@ describe('doc annotations', () => {
     return { spawn, spawnHeadless, written, payloads, exit: (index = 0) => exits[index]!(0) }
   }
 
-  function annotationBoard(status = 'draft', files: Record<string, string> = {}) {
-    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': SPEC(status), 'prd/p.md': RELATED_PRD, ...files })
+  /**
+   * `realCalls` runs the ask path on the config's own agent process instead of the
+   * recording stand-in, which is what lets a thread actually finish;
+   * `awaitThresholdMs` is the silence a session is read as waiting after.
+   */
+  function annotationBoard(
+    status = 'draft',
+    files: Record<string, string> = {},
+    options: { realCalls?: boolean; awaitThresholdMs?: number; on?: { repoRoot: string; docsDir: string } } = {},
+  ) {
+    const { repoRoot, docsDir } = options.on ?? makeRepo({ 'spec/b.md': SPEC(status), 'prd/p.md': RELATED_PRD, ...files })
     const seam = seams()
     return {
-      ...boardOnRepo(repoRoot, docsDir, testConfig(), seam.spawn, undefined, seam.spawnHeadless),
+      ...boardOnRepo(
+        repoRoot,
+        docsDir,
+        testConfig(),
+        seam.spawn,
+        options.awaitThresholdMs,
+        options.realCalls ? undefined : seam.spawnHeadless,
+      ),
       ...seam,
     }
   }
@@ -4138,5 +4155,236 @@ describe('doc annotations', () => {
     expect(view.batches[0]).toMatchObject({ status: 'failed', commit: null })
     expect(view.annotations[0]).toMatchObject({ state: 'pending' })
     expect(view.annotations[0]!.batchId).toBeUndefined()
+  })
+
+  /** An issue on the document, submitted: the session that carries it, and the batch. */
+  async function issueSubmitted(board: ReturnType<typeof annotationBoard>, text = 'name the gate') {
+    await add(board.call, 'spec-00001-b', {
+      type: 'issue',
+      text,
+      anchor: anchorOf(board.docsDir, 'spec/b.md', PASSAGE),
+    })
+    const { body } = await board.call('POST', '/api/annotations/spec-00001-b/submit', {})
+    return body as SubmitResult
+  }
+
+  /**
+   * spec-00007-AC-8.1 and AC-8.4 — the session an annotation submit started holds
+   * the document exactly as a hand-started cowrite does: the advance is refused
+   * for same-document exclusion, and the accept for the running-session state lock
+   * (spec-00006-FR-10). Nothing about the refusals knows where the session came
+   * from — which is the whole of FR-8.
+   */
+  // spec-00007-AC-8.1
+  // spec-00007-AC-8.4
+  it('refuses an advance and an accept on the document its own annotations are being cowritten on', async () => {
+    const board = annotationBoard()
+    const submitted = await issueSubmitted(board)
+
+    const advance = await board.call('POST', '/api/sessions', { sourceId: 'spec-00001-b', targetType: 'design' })
+    const accept = await board.call('POST', '/api/docs/spec-00001-b/review', { action: 'accept' })
+
+    expect(submitted.submitted.issues).toMatchObject({ batchId: 'b-1' })
+    expect([advance.status, advance.body.reason]).toEqual([409, 'doc-busy'])
+    expect(advance.body.error).toMatch(/already has a running agent session/)
+    expect([accept.status, accept.body.reason]).toEqual([409, 'doc-busy'])
+  })
+
+  /**
+   * spec-00007-AC-8.2 — the collapse filter of the annotation-started session is
+   * the cowrite's own (spec-00006-FR-6): the target's body lands, the rewrite of a
+   * related document is put back, and the one commit names the target.
+   */
+  // spec-00007-AC-8.2
+  it('restores what the annotation-started session wrote outside the target and commits the rest', async () => {
+    const board = annotationBoard()
+    const submitted = await issueSubmitted(board)
+
+    appendFileSync(join(board.docsDir, 'spec/b.md'), '\nthe session named the gate.\n')
+    appendFileSync(join(board.docsDir, 'prd/p.md'), '\nand wrote into the parent too\n')
+    board.exit()
+    await board.board.sessions.whenFinished(submitted.submitted.issues!.sessionId)
+
+    expect(lastCommitMessage(board.repoRoot)).toBe('wb(cowrite): spec-00001-b')
+    expect(lastCommitFiles(board.repoRoot)).toEqual(['docs/spec/b.md'])
+    expect(readFileSync(join(board.docsDir, 'spec/b.md'), 'utf8')).toContain('the session named the gate.')
+    expect(readFileSync(join(board.docsDir, 'prd/p.md'), 'utf8')).toBe(RELATED_PRD)
+  })
+
+  /**
+   * spec-00007-AC-8.3 — silence past the threshold with the process alive reads as
+   * awaiting input, the same as any other terminal session (spec-00003-FR-6). The
+   * badge and the leave-behind notification are drawn off this one mark, and are
+   * proved over it in the front end's own suite (web/test/sessions.test.tsx,
+   * web/test/notifications.test.tsx) — which is why the mark is what is asserted here.
+   */
+  // spec-00007-AC-8.3
+  it('reads the annotation-started session as awaiting input once it has gone quiet', async () => {
+    const board = annotationBoard('draft', {}, { awaitThresholdMs: AWAIT_THRESHOLD })
+    await issueSubmitted(board)
+
+    await vi.waitFor(async () => {
+      const { body } = await board.call('GET', '/api/sessions')
+      expect(body.sessions[0]).toMatchObject({ kind: 'cowrite', sourceId: 'spec-00001-b', awaiting: true })
+    }, SESSION_WAIT)
+  })
+
+  /**
+   * spec-00007-AC-11.1 — the whole commit ledger of an issue submit that had to
+   * transition first: the status commit at the submit, the collapse commit at the
+   * end, and nothing else. spec-00007-AC-8.5 rides along on the same run — the
+   * session neither promotes nor accepts, so the document is left on `draft` for
+   * the owner to review.
+   */
+  // spec-00007-AC-8.5
+  // spec-00007-AC-11.1
+  it('makes exactly the transition and the collapse commit, leaving the document on draft', async () => {
+    const board = annotationBoard('active')
+    const before = commitCount(board.repoRoot)
+    const submitted = await issueSubmitted(board)
+
+    appendFileSync(join(board.docsDir, 'spec/b.md'), '\nthe session named the gate.\n')
+    board.exit()
+    await board.board.sessions.whenFinished(submitted.submitted.issues!.sessionId)
+
+    expect(commitCount(board.repoRoot)).toBe(before + 2)
+    expect(git(board.repoRoot, 'log', '-2', '--pretty=%s').trim().split('\n')).toEqual([
+      'wb(cowrite): spec-00001-b',
+      'wb(status): spec-00001-b',
+    ])
+    // The status the transition left is the status the session leaves behind.
+    expect(readFileSync(join(board.docsDir, 'spec/b.md'), 'utf8')).toContain('status: draft')
+    const { body: graph } = await board.call('GET', '/api/graph')
+    expect(graph.nodes.find((one: { id: string }) => one.id === 'spec-00001-b')).toMatchObject({ status: 'draft' })
+    // And the annotation store is no part of the ledger: neither commit staged it,
+    // and nothing of it is tracked (the .gitignore half is annotationStore.test.ts).
+    expect(git(board.repoRoot, 'ls-files')).not.toContain('.whiteboard')
+    expect(git(board.repoRoot, 'show', '--name-only', '--pretty=', 'HEAD~1').trim()).toBe('docs/spec/b.md')
+  })
+
+  /**
+   * spec-00007-AC-11.2 — the question path makes no commit anywhere: not at the
+   * submit, not while the call runs, not when the thread has its answer. The call
+   * is the config's own agent process here, so the thread really does finish.
+   */
+  // spec-00007-AC-11.2
+  it('makes no commit at all for a submit of questions, thread and answer included', async () => {
+    const board = annotationBoard('draft', {}, { realCalls: true })
+    await add(board.call, 'spec-00001-b', {
+      type: 'question',
+      text: 'why two gates?',
+      anchor: anchorOf(board.docsDir, 'spec/b.md', PASSAGE),
+    })
+    const before = commitCount(board.repoRoot)
+
+    const { body } = await board.call('POST', '/api/annotations/spec-00001-b/submit', {})
+
+    expect(body.submitted.questions).toHaveLength(1)
+    expect(body.transition).toBeNull()
+    await vi.waitFor(async () => {
+      const { body: asks } = await board.call('GET', '/api/asks/spec-00001-b')
+      expect(asks.threads[0].exchanges[0]).toMatchObject({ outcome: 'answered' })
+    }, SESSION_WAIT)
+    expect(commitCount(board.repoRoot)).toBe(before)
+    expect(git(board.repoRoot, 'status', '--porcelain')).not.toContain('docs/')
+  })
+
+  /**
+   * spec-00007-AC-3.1, AC-3.3 and AC-9.8 over a real restart: a second board on
+   * the same repo is what a restart is, and everything the last one wrote comes
+   * back — the unsubmitted annotation with its edit in place, the deleted one
+   * still gone, the submitted question with its thread, and the finished batch
+   * with its collapse commit. A batch still being cowritten is the one thing that
+   * does move, and that move is AC-10.8's own test above.
+   */
+  // spec-00007-AC-3.1
+  // spec-00007-AC-3.3
+  // spec-00007-AC-9.8
+  it('brings the annotations and their states back across a restart', async () => {
+    const board = annotationBoard('draft', {}, { realCalls: true })
+    const anchor = anchorOf(board.docsDir, 'spec/b.md', PASSAGE)
+    const other = anchorOf(board.docsDir, 'spec/b.md', 'And another sentence entirely.')
+    // One question and one issue to submit, and two more to keep unsubmitted —
+    // of which one is edited and one dropped (AC-3.1).
+    await add(board.call, 'spec-00001-b', { type: 'question', text: 'why two gates?', anchor })
+    await add(board.call, 'spec-00001-b', { type: 'issue', text: 'name the gate', anchor })
+    const submitted = (await board.call('POST', '/api/annotations/spec-00001-b/submit', {})).body as SubmitResult
+    appendFileSync(join(board.docsDir, 'spec/b.md'), '\nthe session named the gate.\n')
+    board.exit()
+    await board.board.sessions.whenFinished(submitted.submitted.issues!.sessionId)
+    await add(board.call, 'spec-00001-b', { type: 'question', text: 'and this one?', anchor: other })
+    await add(board.call, 'spec-00001-b', { type: 'issue', text: 'to be dropped', anchor: other })
+    await board.call('PATCH', '/api/annotations/spec-00001-b/n-3', { text: 'and this one, really?' })
+    await board.call('DELETE', '/api/annotations/spec-00001-b/n-4')
+
+    const restarted = annotationBoard('draft', {}, { on: { repoRoot: board.repoRoot, docsDir: board.docsDir } })
+    const { body } = await restarted.call('GET', '/api/annotations/spec-00001-b')
+
+    expect(body.annotations.map((one: { id: string; state: string }) => [one.id, one.state])).toEqual([
+      ['n-1', 'submitted'],
+      ['n-2', 'submitted'],
+      ['n-3', 'pending'],
+    ])
+    expect(body.annotations[2]).toMatchObject({ text: 'and this one, really?', quote: 'And another sentence entirely.' })
+    expect(body.annotations[0]).toMatchObject({ threadId: 't-1' })
+    expect(body.batches).toEqual([
+      expect.objectContaining({ id: 'b-1', status: 'done', annotationIds: ['n-2'], commit: expect.any(String) }),
+    ])
+    // The thread the question is mirrored from outlives the restart too.
+    const { body: asks } = await restarted.call('GET', '/api/asks/spec-00001-b')
+    expect(asks.threads[0]).toMatchObject({ id: 't-1' })
+  })
+
+  /**
+   * spec-00007-AC-11.3 — the document was given another id, so nothing on the
+   * board leads to the annotations of the old one any more: the graph has no such
+   * node, and the editor that is the only way to the annotation list is therefore
+   * unreachable. The file itself is kept (the reclaim is a later round).
+   */
+  // spec-00007-AC-11.3
+  it('leaves the annotations of a renamed document unreachable and on disk', async () => {
+    const { call, board, docsDir, repoRoot } = annotationBoard()
+    await add(call, 'spec-00001-b', {
+      type: 'question',
+      text: 'why two gates?',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+
+    writeFileSync(join(docsDir, 'spec/b.md'), SPEC('draft').replace('spec-00001-b', 'spec-00003-d'))
+    // What the watch does when it sees the write (spec-00001-FR-42); the watch
+    // itself is proved in its own tests, and armed here it would only add a wait.
+    board.docs.invalidate()
+
+    const { body: graph } = await call('GET', '/api/graph')
+    expect(graph.nodes.map((one: { id: string }) => one.id)).not.toContain('spec-00001-b')
+    // Nothing of the old id is offered for annotating either, so no entry can lead
+    // back to it (spec-00007-FR-4's anomalous/absent branch).
+    const { body } = await call('GET', '/api/annotations/spec-00001-b')
+    expect(body.submitPreview).toMatchObject({ issueEligible: false, questionEligible: false })
+    expect(existsSync(join(repoRoot, '.whiteboard/annotations/spec-00001-b.json'))).toBe(true)
+  })
+
+  /**
+   * spec-00007-AC-11.4 — the same for a document deleted outright, with a batch
+   * that has already finished on it: the node is gone, and the record of what was
+   * done is kept exactly as it stood.
+   */
+  // spec-00007-AC-11.4
+  it('leaves the annotations of a deleted document unreachable and on disk, batch and all', async () => {
+    const board = annotationBoard()
+    const submitted = await issueSubmitted(board)
+    appendFileSync(join(board.docsDir, 'spec/b.md'), '\nthe session named the gate.\n')
+    board.exit()
+    await board.board.sessions.whenFinished(submitted.submitted.issues!.sessionId)
+
+    rmSync(join(board.docsDir, 'spec/b.md'))
+    board.board.docs.invalidate()
+
+    const { body: graph } = await board.call('GET', '/api/graph')
+    expect(graph.nodes.map((one: { id: string }) => one.id)).not.toContain('spec-00001-b')
+    const { body } = await board.call('GET', '/api/annotations/spec-00001-b')
+    expect(body.batches[0]).toMatchObject({ status: 'done', commit: expect.any(String) })
+    expect(body.submitPreview).toMatchObject({ issueEligible: false, questionEligible: false })
+    expect(existsSync(join(board.repoRoot, '.whiteboard/annotations/spec-00001-b.json'))).toBe(true)
   })
 })
