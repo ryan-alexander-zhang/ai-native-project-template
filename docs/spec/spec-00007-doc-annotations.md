@@ -75,7 +75,7 @@ parent: prd-00002-doc-annotations
     design 修订轮定形后随之入列（见 FR-9，呈现归属属 design）。
 - 本 spec 不新增术语——「修订会话」是共写词条的待避词，不使用；
   issue 批的进展状态用「共写中」等普通词，见 FR-9。
-- 规模：本 spec 12 FR / 70 AC，正文约 620 行——已越过 Sizing 的
+- 规模：本 spec 12 FR / 72 AC，正文约 640 行——已越过 Sizing 的
   「~500 正文行」触发线，刻意不拆：标注是一个连贯增量（加注、
   提交、双通路、进展是一条链），拆开任何一半都不可独立交付；FR 数
   （12）远低于 ~20 的触发线，行数主要来自逐条 GWT。
@@ -100,7 +100,10 @@ parent: prd-00002-doc-annotations
 ## 4. System Requirements
 
 - **spec-00007-FR-1** (Event) 当用户在一份正常文档编辑器的编辑或预览
-  视图态中选中一段非空文本并执行添加标注时，系统应提供类型选择
+  视图态中选中一段**可映射的非空正文选区**（front matter、围栏
+  代码块/mermaid 源码块与行内代码内不可加注——不可映射区，双侧
+  对称，细则属 design；域主裁定 2026-09-01）并执行添加标注时，
+  系统应提供类型选择
   （question / issue，可选集由 FR-4、FR-10 守门）与标注文本输入；
   确认后记录一条未提交标注：类型、标注文本、选区锚（选区文本及其
   上下文）、选区原文引用、创建时刻。预览视图态中的选区应落为**源
@@ -130,8 +133,12 @@ parent: prd-00002-doc-annotations
   类型不设守门（任意类型皆可，同共写口径——域主裁定，§7）。条件
   不满足（work item 的 `resolved`/`wontfix`、两种类的 `archived`）
   时，添加标注的类型可选集不含 issue（question 照常），经接口添加
-  issue 类型标注应被拒绝。守门在提交时**复验**：标注攒下后文档因
-  流转丧失资格的，统一提交的 issue 部分应整体拦下、原因指明资格，
+  issue 类型标注应被拒绝——「可选集」读作**可选中**的集合：状态
+  守门的 issue 项呈现但不可选且呈资格原因（用户改得动状态，要给
+  出路），配置守门（FR-10 的无 headless）的 question 项不呈现
+  （域主裁定 2026-09-01，呈现形态属 design）。守门在提交时
+  **复验**：标注攒下后文档因流转丧失资格的，统一提交的 issue 部分
+  应整体拦下、原因指明资格，
   question 部分照常。异常文档不提供任何标注入口（编辑器不呈现添加
   入口，经接口添加或提交被拒绝——同答疑的异常口径）。
 - **spec-00007-FR-5** (Event) 当用户对一份文档执行统一提交时：编辑
@@ -266,6 +273,11 @@ parent: prd-00002-doc-annotations
   Given 编辑器中无任何选区
   When 唤起上下文菜单
   Then 不呈现添加标注入口
+- **spec-00007-AC-1.6** (spec-00007-FR-1)
+  Given 选区落在 front matter 或围栏代码块之内（编辑与预览两侧
+  各取其一）
+  When 唤起上下文菜单
+  Then 均不呈现添加标注入口——不可映射区不可加注
 - **spec-00007-AC-2.1** (spec-00007-FR-2)
   Given 一条未提交标注锚定文档中段的一句话
   When 在该句之前插入两个新段落并保存
@@ -302,7 +314,7 @@ parent: prd-00002-doc-annotations
 - **spec-00007-AC-4.1** (spec-00007-FR-4)
   Given 一份 `resolved` 的 plan 文档的编辑器
   When 选中文本打开添加标注的类型选择
-  Then 可选集只有 question，无 issue
+  Then issue 不可选且呈现资格原因，question 照常可选
 - **spec-00007-AC-4.2** (spec-00007-FR-4)
   Given 一份 `archived` 文档
   When 经接口对其添加 issue 类型标注
@@ -319,7 +331,7 @@ parent: prd-00002-doc-annotations
 - **spec-00007-AC-4.5** (spec-00007-FR-4)
   Given 一份 `wontfix` 的 issue 文档的编辑器
   When 选中文本打开添加标注的类型选择
-  Then 可选集只有 question
+  Then issue 不可选且呈现资格原因，question 照常可选
 - **spec-00007-AC-4.6** (spec-00007-FR-4)
   Given 一份异常文档（其编辑器仍可达，`spec-00001-FR-2`）
   When 打开其编辑器并选中文本
@@ -431,6 +443,11 @@ parent: prd-00002-doc-annotations
   Given 该共写会话正常结束、目标文档在提交时已转 `draft`
   When 查看该文档
   Then status 仍为 `draft`——会话不促进、不接收，评审留给人
+- **spec-00007-AC-8.6** (spec-00007-FR-8)
+  Given 编辑器呈现该文档的预览视图态
+  When 一次标注统一提交发起该文档的共写会话
+  Then 编辑器保持预览呈现——不发生 `spec-00006-FR-4` 的 Source
+  视图一次覆盖
 - **spec-00007-AC-9.1** (spec-00007-FR-9)
   Given 一份文档有一条未提交标注、一条已回答的 question、一条共写
   中的 issue
@@ -604,9 +621,14 @@ Open Questions 均已闭合删除）与 spec 审计轮的四项均已落成条�
 接受或推翻）：锚的恰一处命中（键含上下文、创建期歧义同拦）、提交
 在途拒绝、分派次序先共写后 question、agent 选择逐通路各取缺省、
 `spec-00006-FR-4` 的 Source 视图一次覆盖对标注来源不适用、流转
-commit 失败沿 `spec-00001-FR-20`（会话照常启动）。预览选区映射、
-锚数据形态与重定位细则、标注列表的呈现归属委给两份 design 的修订
-轮（§5）。
+commit 失败沿 `spec-00001-FR-20`（会话照常启动）。T1/T2 审计轮的
+另一批域主裁决（2026-09-01）：守门呈现双轨（状态守门禁用+原因、
+配置守门不呈现——FR-4/AC-4.1/AC-4.5 措辞随裁）、question 镜像取
+机械粒度（追问退态如实呈现）、锚层 2 消歧只认唯一命中（去打分）、
+不可映射区不加注（FR-1 半句随裁）、unsavedChanges 前端声明、BR-28
+首句括注等六项细节——均记于本 spec 与两份 design 的对应条文。
+预览选区映射、锚数据形态与重定位细则、标注列表的呈现归属委给两份
+design 的修订轮（§5）。
 
 ## Links
 

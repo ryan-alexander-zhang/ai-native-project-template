@@ -2,7 +2,7 @@
 id: rule-00001-docs-workflow
 type: rule
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00006-whiteboard-co-write]
+informs: [spec-00001-docs-whiteboard, spec-00006-whiteboard-co-write, spec-00007-doc-annotations]
 ---
 
 # Rule: docs 工作流
@@ -131,12 +131,16 @@ Hit policy: `UNIQUE`
 - **rule-00001-BR-27** (Constraint) 非入口类型不得新建——它们经产品流推进
   （BR-13…BR-17）产生，携带指回来源的关系。On violation: 新建被拒绝。
 - **rule-00001-BR-28** (Definition) 共写：对一份文档发起的多轮协作写作
-  会话——agent 按用户在对话中给出的意图与材料，起草或改写该文档内容
+  会话——agent 按用户在对话中给出的意图与材料（含系统程序化构成的选区
+  材料，见给法末项；首句括注第二十三轮增，域主裁定），起草或改写该文档内容
   （写域边界见 BR-30）；适用于任意类型；不是评审动作，不改变文档状态。
   材料的给法：对话中粘贴、报仓内文档 id、给仓库外绝对路径或 URL（仓外
-  读取的授权由所选 CLI 承载，见 `spec-00006-FR-7`）。会话之间的载体只有
-  文档本身，材料不构成会话间记忆——材料价值经正文或 `reference` 文档
-  沉淀，落地形态见 `spec-00006-FR-1`。（`decision-00015` 增。）
+  读取的授权由所选 CLI 承载，见 `spec-00006-FR-7`）、标注统一提交程序化
+  构成的选区材料（末项第二十三轮增，`spec-00007-FR-7`）。会话之间的载体
+  只有文档本身，材料不构成会话间记忆——材料价值经正文或 `reference` 文档
+  沉淀，落地形态见 `spec-00006-FR-1`；程序化选区材料照此成立，终止或
+  失败后再提交发起的新会话各自重新拿到材料（第二十三轮注）。
+  （`decision-00015` 增。）
 - **rule-00001-BR-29** (Constraint) 共写只可对 `draft` 文档、或 `open`
   状态的 work item 发起——`active` 的 living doc 须先经修订轮（BR-3）
   转回 `draft`；`resolved`、`wontfix` 与 `archived` 的文档不可共写。
@@ -410,6 +414,11 @@ Hit policy: `UNIQUE`
   Given 发起共写时以粘贴文本、仓内文档 id、仓库外 URL 各给一份材料
   When 会话启动
   Then 三份材料均进入会话的任务输入
+- **rule-00001-AC-28.4** (rule-00001-BR-28)
+  Given 一份文档的两条 issue 标注经统一提交程序化构成材料段
+  When 共写会话启动
+  Then 两条各自的选区原文、上下文与标注文本均进入会话的任务输入
+  （第二十三轮增，`spec-00007-FR-7`；指令断言见 `spec-00007-AC-7.1`）
 - **rule-00001-AC-29.1** (rule-00001-BR-29)
   Given 一份 `draft` 的 report 文档
   When 发起共写
