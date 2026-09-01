@@ -1,7 +1,7 @@
 ---
 id: plan-00023-doc-annotations
 type: plan
-status: open
+status: resolved
 implements: [spec-00007-doc-annotations]
 ---
 
