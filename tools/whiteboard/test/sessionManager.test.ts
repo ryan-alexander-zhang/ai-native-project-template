@@ -7,6 +7,7 @@ import { spawnPty } from '../src/pty.ts'
 import {
   NoSessionError,
   SessionBusyError,
+  type SessionInfo,
   SessionManager,
   type SessionOutcome,
   type SessionPlan,
@@ -1420,5 +1421,71 @@ describe('cowrite sessions', () => {
         baseline: second,
       },
     ])
+  })
+})
+
+/**
+ * The one callback every end state runs (design-00001 §12.6): an exit, a stop and
+ * a start that never came off, each handed the session as it finished.
+ */
+describe('the end callback', () => {
+  function endReporting(onSessionEnd: (info: SessionInfo) => Promise<void>, command = 'node') {
+    const { repoRoot } = makeRepo({})
+    const manager = new SessionManager({
+      agents: [{ name: 'test', command, args: HOLD, cwd: 'docs' }],
+      maxSessions: 3,
+      repoRoot,
+      spawn: spawnPty,
+      submitDelayMs: 50,
+      onSessionEnd,
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    return manager
+  }
+
+  it('hands over the session as it finished, exit and stop alike', async () => {
+    const seen: Array<{ status: string; sha?: string }> = []
+    const manager = endReporting(async (info) => {
+      seen.push({ status: info.status, sha: info.outcome?.sha })
+    })
+
+    const { id } = manager.start(ADVANCE)
+    await manager.terminate(id)
+    await manager.whenFinished(id)
+
+    expect(seen).toEqual([{ status: 'terminated', sha: undefined }])
+  })
+
+  // spec-00001-FR-16: the start that never came off is an end state too
+  it('runs on a start that never came off', async () => {
+    const seen: string[] = []
+    const manager = endReporting(async (info) => void seen.push(info.status), 'whiteboard-no-such-command')
+
+    const { id } = manager.start(ADVANCE)
+    await manager.whenFinished(id)
+
+    expect(seen).toEqual(['failed'])
+  })
+
+  /**
+   * A callback that throws costs the user that record and nothing else — and it is
+   * recorded in **its own** field: a landing that could not be written and a
+   * transcript that could not be saved are two different records, and folding them
+   * together would have one read as the other and overwrite a real one.
+   */
+  it('records a callback that threw apart from a history failure', async () => {
+    const manager = endReporting(async () => {
+      throw new Error('the annotations cannot be read')
+    })
+
+    const { id } = manager.start(ADVANCE)
+    await manager.terminate(id)
+    await manager.whenFinished(id)
+
+    const [session] = manager.list()
+    expect(session!.hookError).toBe('the annotations cannot be read')
+    expect(session!.historyError).toBeUndefined()
+    expect(session!.status).toBe('terminated')
   })
 })

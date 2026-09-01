@@ -3,7 +3,7 @@ import type { AgentConfig } from './config.ts'
 import type { Expectation } from './advance.ts'
 import type { AskResult } from './askStore.ts'
 import { HAND_EDIT_NOTE } from './cowrite.ts'
-import type { ContentSnapshot, DirtySnapshot } from './gitLayer.ts'
+import type { CommitOutcome, ContentSnapshot, DirtySnapshot } from './gitLayer.ts'
 import { type SpawnHeadless, failureReason, headlessArgs, readCapture, spawnHeadless } from './headless.ts'
 import { writeSessionHistory } from './sessionHistory.ts'
 import { WorkflowError } from './workflow.ts'
@@ -135,13 +135,25 @@ export interface SessionInfo {
    * be landed on its thread. Either failure blocks nothing; it is a notice.
    */
   historyError?: string
+  /**
+   * Why the end callback could not do its work, if it could not (design-00001
+   * §12.6): an issue batch whose landing the store refused. Its own field rather
+   * than `historyError`'s — the two are different records, and folding them
+   * together would have a batch failure read as a lost transcript and overwrite a
+   * real one. Blocks nothing; it is a notice.
+   */
+  hookError?: string
 }
 
-export interface SessionOutcome {
+/**
+ * What the wrap-up made of a session: the document it was about, what the
+ * product check found, and the commit itself — `CommitOutcome`'s fields, its hash
+ * included, so a caller that has to name the commit reads it here rather than
+ * being handed a copy that dropped it (design-00001 §12.6).
+ */
+export interface SessionOutcome extends CommitOutcome {
   docId?: string
   problems: string[]
-  committed: boolean
-  error?: string
 }
 
 /**
@@ -319,6 +331,16 @@ export interface SessionManagerOptions {
    */
   onAskEnd?: (plan: SessionPlan, result: AskResult) => Promise<void>
   /**
+   * Runs when a session reaches an end state, whichever of the three it is
+   * (design-00001 §12.6): `exited`, `terminated`, and the `failed` of a start
+   * that never came off. One callback for all three, handed the session as it
+   * finished — an issue batch does not care **why** its session ended, only that
+   * it did, and the end state is what it maps from. It runs after the exit hook
+   * below, so `outcome` is in hand and the commit can be named
+   * (spec-00007-AC-9.4).
+   */
+  onSessionEnd?: (info: SessionInfo) => Promise<void>
+  /**
    * Runs when a process exits: commits and validates what that session produced.
    * It is handed the session's **own** baseline, because several sessions run at
    * once and each commits the difference from the dirt it alone inherited
@@ -377,7 +399,7 @@ export class SessionManager {
    */
   startDeferred(plan: SessionPlan, agentName?: string): SessionInfo {
     const agent = this.resolveAgent(agentName, plan.kind)
-    this.admit(plan)
+    this.admit(plan.kind, plan.sourceId)
     const startedAt = new Date().toISOString()
     const info: SessionInfo = {
       id: this.nextId(startedAt),
@@ -545,14 +567,20 @@ export class SessionManager {
    * sessions alone (design-00001 §10.3) — reading it one way only would make the
    * two halves of AC-6.1 and AC-6.2 contradict each other. The cap counts every
    * kind (spec-00003-FR-3).
+   *
+   * Callable on its own, without a plan and without taking anything
+   * (design-00001 §12.4 第 2 步): a unified submit judges these two rules
+   * **before** it moves the document's status, so a refusal leaves no
+   * transition behind (spec-00007-AC-10.1, AC-10.3). The slot is still taken in
+   * `startDeferred` alone, which is why running this twice is no bookkeeping
+   * error — the first reading is «may this happen at all», the second is the
+   * first-come-first-served record.
    */
-  private admit(plan: SessionPlan): void {
+  admit(kind: SessionKind, sourceId: string): void {
     const running = this.running()
-    const occupied = running.some(
-      (session) => session.plan.kind !== 'ask' && session.info.sourceId === plan.sourceId,
-    )
-    if (plan.kind !== 'ask' && occupied) {
-      throw new SessionBusyError(`${plan.sourceId} already has a running agent session`, 'doc-busy')
+    const occupied = running.some((session) => session.plan.kind !== 'ask' && session.info.sourceId === sourceId)
+    if (kind !== 'ask' && occupied) {
+      throw new SessionBusyError(`${sourceId} already has a running agent session`, 'doc-busy')
     }
     if (running.length >= this.options.maxSessions) {
       throw new SessionBusyError(
@@ -945,7 +973,31 @@ export class SessionManager {
     session.endedAt = new Date().toISOString()
     session.info.error = message
     this.publish(session, `whiteboard: could not start the agent — ${message}\r\n`)
+    // `failed` is one of the three end states, and it runs the same end callback
+    // the other two do (design-00001 §12.6): there is no exit to come, so this is
+    // the only place it can be told. Held on `finished`, which is what a caller
+    // waiting on the wrap-up of this session awaits.
+    session.finished = this.announceSessionEnd(session)
     return session.info
+  }
+
+  /**
+   * Tell the caller a session has ended (design-00001 §12.6). A hook that throws
+   * costs the user that record and nothing else — the same reading
+   * spec-00001-AC-54.3 fixes for the history — and left to reject it would come
+   * out of an exit handler as an unhandled rejection, with every other session
+   * still running on this process.
+   */
+  private async announceSessionEnd(session: Session): Promise<void> {
+    try {
+      await this.options.onSessionEnd?.(session.info)
+    } catch (cause) {
+      const message = (cause as Error).message
+      session.info.hookError = message
+      if (session.plan.kind !== 'ask') {
+        this.publish(session, `whiteboard: could not record how the session ended — ${message}\r\n`)
+      }
+    }
   }
 
   private publish(session: Session, data: string): void {
@@ -1037,6 +1089,9 @@ export class SessionManager {
       session.info.outcome = { problems: [message], committed: false, error: message }
       if (terminal) this.publish(session, `whiteboard: the wrap-up failed — ${message}\r\n`)
     }
+    // Last, so the outcome above is in hand: what an issue batch records of its
+    // session is its end state and its collapse commit (design-00001 §12.6).
+    await this.announceSessionEnd(session)
   }
 
   /**

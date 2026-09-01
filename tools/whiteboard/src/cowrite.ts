@@ -1,3 +1,4 @@
+import { type SelectionAnchor, markedPassage } from './annotationAnchor.ts'
 import { type DocGraph, type DocNode, declaredId, findNode, parseDocId } from './docRepository.ts'
 import { WorkflowError } from './workflow.ts'
 
@@ -73,6 +74,46 @@ export function materialLines(materials: CowriteMaterials | undefined, graph: Do
           '  it asks the owner is that mechanism’s own policy: the board neither pre-authorises the read nor',
           '  answers for them, and a refusal or an unreachable material ends nothing — carry on with the rest.',
         ]),
+  ]
+}
+
+/**
+ * The four discipline clauses a submitted issue batch carries (spec-00007-FR-7,
+ * design-00001 §12.4). They ride at the end of the materials segment, so they
+ * stand right after the issues they are about and ahead of the instruction's
+ * last line. The third one says **why** as well as what: a write outside the
+ * scope is filtered out and restored when the session ends
+ * (rule-00001-BR-30, §11.3), so the instruction layer and the enforcement layer
+ * tell the agent the same thing and it has nothing to guess at.
+ */
+const ISSUE_DISCIPLINE = [
+  'Work through the issues above one by one, in the order given, and report on each as you finish it.',
+  'Where you cannot tell what an issue is asking for, stop and ask the owner — never guess.',
+  'Where an issue implies a change to a related document, report that implication and leave it to the',
+  '  owner: writing it is outside what you may write here, and would be filtered out and restored',
+  '  when this session ends.',
+  'Do no review action: never accept, clarify or audit anything, and never touch the status line.',
+]
+
+/**
+ * The materials segment of a cowrite a unified submit started (spec-00007-FR-7,
+ * design-00001 §12.4): one segment per issue — the passage the owner marked,
+ * with its context, and what they want changed — and the discipline clauses
+ * after them. It takes the place of {@link materialLines} at the one joint the
+ * instruction has for materials, which is why the skeleton around it does not
+ * move at all (spec-00006-FR-1).
+ */
+export function issueMaterialLines(
+  issues: ReadonlyArray<{ text: string; anchor: SelectionAnchor }>,
+  docPath: string,
+): string[] {
+  return [
+    ...issues.flatMap((issue, index) => [
+      `Issue ${index + 1} of ${issues.length} — the passage the owner marked in ${docPath}:`,
+      `  ${markedPassage(issue.anchor)}`,
+      `What they want changed: ${issue.text}`,
+    ]),
+    ...ISSUE_DISCIPLINE,
   ]
 }
 

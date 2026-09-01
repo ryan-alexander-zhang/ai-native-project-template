@@ -422,7 +422,7 @@ describe('POST /api/docs/:id/status', () => {
     const { status, body } = await call('POST', '/api/docs/idea-00001-x/status', { to: 'active' })
 
     expect(status).toBe(200)
-    expect(body).toEqual({ committed: true, status: 'active' })
+    expect(body).toMatchObject({ committed: true, status: 'active' })
   })
 
   // spec-00001-AC-7.1, and design-00001 §7: a refusal that is not the gate's names no gaps
@@ -481,7 +481,7 @@ describe('POST /api/docs/:id/status', () => {
       const { status, body } = await call('POST', '/api/docs/plan-00001-y/status', { to: 'resolved' })
 
       expect(status).toBe(200)
-      expect(body).toEqual({ committed: true, status: 'resolved' })
+      expect(body).toMatchObject({ committed: true, status: 'resolved' })
     })
   })
 })
@@ -3803,5 +3803,288 @@ describe('cowrite sessions', () => {
 
     expect(lastCommitFiles(repoRoot)).toEqual(['docs/integration/cli.md'])
     expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toContain('the audit session wrote this')
+  })
+})
+
+/**
+ * The annotation entries (spec-00007-FR-3, FR-5, design-00001 §12.3): the HTTP
+ * contract — which code each refusal answers with and which word it carries — and
+ * the two paths running end to end over the real receipt chains. What each path
+ * decides is proved at the service level (annotations.test.ts).
+ */
+describe('doc annotations', () => {
+  const PASSAGE = 'The gate is cheap to check.'
+  const BODY = `# Spec\n\n${PASSAGE}\n\nAnd another sentence entirely.\n`
+  const SPEC = (status: string) =>
+    doc({ id: 'spec-00001-b', type: 'spec', status, parent: 'prd-00001-p' }, BODY)
+  const RELATED_PRD = doc({ id: 'prd-00001-p', type: 'prd', status: 'active' }, '# Prd\n')
+  const ARCHIVED = doc({ id: 'spec-00002-c', type: 'spec', status: 'archived' }, BODY)
+
+  /** A pty stand-in that records what it was told, and a headless one that never ends. */
+  function seams() {
+    const written: string[] = []
+    const spawn: SpawnPty = () => ({
+      onData: () => {},
+      onExit: () => {},
+      write: (data) => void written.push(data),
+      resize: () => {},
+      kill: () => {},
+    })
+    const payloads: string[] = []
+    const spawnHeadless: SpawnHeadless = (_command, args) => {
+      payloads.push(args.at(-1)!)
+      return { onStdout: () => {}, onStderr: () => {}, onExit: () => {}, kill: () => {} }
+    }
+    return { spawn, spawnHeadless, written, payloads }
+  }
+
+  function annotationBoard(status = 'draft', files: Record<string, string> = {}) {
+    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': SPEC(status), 'prd/p.md': RELATED_PRD, ...files })
+    const seam = seams()
+    return {
+      ...boardOnRepo(repoRoot, docsDir, testConfig(), seam.spawn, undefined, seam.spawnHeadless),
+      ...seam,
+    }
+  }
+
+  /** The anchor the editor would cut for that passage of the document on disk. */
+  const anchorOf = (docsDir: string, relPath: string, selected: string) => {
+    const text = readFileSync(join(docsDir, relPath), 'utf8')
+    const at = text.indexOf(selected)
+    return {
+      selected,
+      before: text.slice(Math.max(0, at - 40), at),
+      after: text.slice(at + selected.length, at + selected.length + 40),
+    }
+  }
+
+  const add = (call: BoardCall, docId: string, body: Record<string, unknown>) =>
+    call('POST', `/api/annotations/${docId}`, body)
+
+  // spec-00007-AC-9.9 — the list, the batches and the statement come in one read
+  it('serves an empty list with the submit statement for a document nobody has annotated', async () => {
+    const { call } = annotationBoard()
+
+    const { status, body } = await call('GET', '/api/annotations/spec-00001-b')
+
+    expect(status).toBe(200)
+    expect(body).toEqual({
+      annotations: [],
+      batches: [],
+      submitPreview: {
+        questions: 0,
+        issues: 0,
+        willTransitionTo: null,
+        issueEligible: true,
+        questionEligible: true,
+      },
+    })
+  })
+
+  // spec-00007-AC-1.1 over the entry, with the reading of the anchor riding along
+  it('records an annotation and serves it back with where its anchor lands', async () => {
+    const { call, docsDir } = annotationBoard()
+
+    const created = await add(call, 'spec-00001-b', {
+      type: 'question',
+      text: 'why two gates?',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+
+    expect(created.status).toBe(201)
+    expect(created.body.annotation).toMatchObject({ id: 'n-1', type: 'question', quote: PASSAGE, state: 'pending' })
+    const { body } = await call('GET', '/api/annotations/spec-00001-b')
+    expect(body.annotations[0].locate).toEqual({
+      start: readFileSync(join(docsDir, 'spec/b.md'), 'utf8').indexOf(PASSAGE),
+      end: readFileSync(join(docsDir, 'spec/b.md'), 'utf8').indexOf(PASSAGE) + PASSAGE.length,
+    })
+    expect(body.submitPreview).toMatchObject({ questions: 1, issues: 0 })
+  })
+
+  // spec-00007-AC-4.2 and AC-1.4 — the refusals of the add entry carry their word
+  it('answers 422 with the reason for an ineligible type and for an empty text', async () => {
+    const { call, docsDir } = annotationBoard('draft', { 'spec/c.md': ARCHIVED })
+    const anchor = anchorOf(docsDir, 'spec/c.md', PASSAGE)
+
+    const ineligible = await add(call, 'spec-00002-c', { type: 'issue', text: 'change this', anchor })
+    const empty = await add(call, 'spec-00001-b', { type: 'question', text: '  ', anchor })
+
+    expect([ineligible.status, ineligible.body.reason]).toEqual([422, 'type-ineligible'])
+    expect([empty.status, empty.body.reason]).toEqual([422, 'empty-text'])
+  })
+
+  // The annotations of a document are addressable in their own right, so an id the
+  // board cannot resolve is the document's refusal and not the store's
+  it('answers 409 doc-missing when the document the add names is not there', async () => {
+    const { call, docsDir } = annotationBoard()
+
+    const { status, body } = await add(call, 'spec-00009-gone', {
+      type: 'question',
+      text: 'why?',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+
+    expect([status, body.reason]).toEqual([409, 'doc-missing'])
+  })
+
+  // spec-00007-AC-3.1 and AC-3.4 over the entries: change, re-anchor, delete
+  it('changes, re-anchors and drops an annotation', async () => {
+    const { call, docsDir } = annotationBoard()
+    const anchor = anchorOf(docsDir, 'spec/b.md', PASSAGE)
+    await add(call, 'spec-00001-b', { type: 'question', text: 'why two gates?', anchor })
+    await add(call, 'spec-00001-b', { type: 'issue', text: 'name the gate', anchor })
+
+    const changed = await call('PATCH', '/api/annotations/spec-00001-b/n-1', {
+      text: 'why two gates, really?',
+      anchor: anchorOf(docsDir, 'spec/b.md', 'And another sentence entirely.'),
+    })
+    const dropped = await call('DELETE', '/api/annotations/spec-00001-b/n-2')
+
+    expect(changed.status).toBe(200)
+    expect(changed.body.annotation).toMatchObject({
+      text: 'why two gates, really?',
+      quote: 'And another sentence entirely.',
+    })
+    expect([dropped.status, dropped.body.annotationId]).toEqual([200, 'n-2'])
+    const { body } = await call('GET', '/api/annotations/spec-00001-b')
+    expect(body.annotations.map((one: { id: string }) => one.id)).toEqual(['n-1'])
+  })
+
+  it('answers 404 for an annotation neither entry can find', async () => {
+    const { call } = annotationBoard()
+
+    expect((await call('PATCH', '/api/annotations/spec-00001-b/n-9', { text: 'x' })).status).toBe(404)
+    expect((await call('DELETE', '/api/annotations/spec-00001-b/n-9')).status).toBe(404)
+  })
+
+  // design-00001 §12.3 — a submitted annotation is out of both entries' reach
+  it('answers 409 already-submitted for a change or a delete of one that has gone', async () => {
+    const { call, docsDir } = annotationBoard()
+    await add(call, 'spec-00001-b', {
+      type: 'question',
+      text: 'why two gates?',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+    await call('POST', '/api/annotations/spec-00001-b/submit', {})
+
+    const changed = await call('PATCH', '/api/annotations/spec-00001-b/n-1', { text: 'x' })
+    const dropped = await call('DELETE', '/api/annotations/spec-00001-b/n-1')
+
+    expect([changed.status, changed.body.reason]).toEqual([409, 'already-submitted'])
+    expect([dropped.status, dropped.body.reason]).toEqual([409, 'already-submitted'])
+  })
+
+  // spec-00007-AC-5.3 and AC-5.4 — the whole-batch refusals, each with its word
+  it('answers 422 for an empty submit and for an unsaved buffer', async () => {
+    const { call, docsDir } = annotationBoard()
+
+    const empty = await call('POST', '/api/annotations/spec-00001-b/submit', {})
+    await add(call, 'spec-00001-b', {
+      type: 'question',
+      text: 'why?',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+    const unsaved = await call('POST', '/api/annotations/spec-00001-b/submit', { unsavedChanges: true })
+
+    expect([empty.status, empty.body.reason]).toEqual([422, 'empty-submit'])
+    expect([unsaved.status, unsaved.body.reason]).toEqual([422, 'unsaved-buffer'])
+  })
+
+  /**
+   * spec-00007-AC-10.6 — the document was deleted since the annotations were made:
+   * the submit is refused whole and the annotations are kept. The id is resolved
+   * against the tree read afresh, so no watch has to have fired first.
+   */
+  // spec-00007-AC-10.6
+  it('answers 409 doc-missing when the document is gone, keeping the annotations', async () => {
+    const { call, docsDir } = annotationBoard()
+    await add(call, 'spec-00001-b', {
+      type: 'issue',
+      text: 'name the gate',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+    rmSync(join(docsDir, 'spec/b.md'))
+
+    const { status, body } = await call('POST', '/api/annotations/spec-00001-b/submit', {})
+
+    expect([status, body.reason]).toEqual([409, 'doc-missing'])
+    expect((await call('GET', '/api/annotations/spec-00001-b')).body.annotations).toHaveLength(1)
+  })
+
+  /**
+   * spec-00007-AC-7.3 with AC-6.1 and AC-7.1 over the real chains: the transition
+   * commit, one cowrite session carrying the issues, one ask thread per question
+   * carrying its passage — and the thread is in the document's ask list, which is
+   * the same list a typed question lands in.
+   */
+  // spec-00007-AC-5.1
+  // spec-00007-AC-6.1
+  // spec-00007-AC-7.1
+  // spec-00007-AC-7.3
+  it('submits both paths at once: the transition, the cowrite, and a thread per question', async () => {
+    const { call, board, docsDir, repoRoot, written, payloads } = annotationBoard('active')
+    const anchor = anchorOf(docsDir, 'spec/b.md', PASSAGE)
+    await add(call, 'spec-00001-b', { type: 'question', text: 'why two gates?', anchor })
+    await add(call, 'spec-00001-b', { type: 'issue', text: 'name the gate', anchor })
+    const before = commitCount(repoRoot)
+
+    const { status, body } = await call('POST', '/api/annotations/spec-00001-b/submit', {})
+
+    expect(status).toBe(200)
+    expect(body.transition).toEqual({ to: 'draft', committed: true })
+    expect(body.submitted.questions).toEqual([
+      { annotationId: 'n-1', threadId: 't-1', sessionId: expect.any(String) },
+    ])
+    expect(body.submitted.issues).toMatchObject({ batchId: 'b-1', annotationIds: ['n-2'] })
+    expect(body.blocked).toEqual([])
+    // The transition is the one commit this submit makes; the collapse's comes
+    // when the session ends (spec-00007-FR-11).
+    expect(commitCount(repoRoot)).toBe(before + 1)
+    expect(lastCommitMessage(repoRoot)).toBe('wb(status): spec-00001-b')
+    expect(readFileSync(join(docsDir, 'spec/b.md'), 'utf8')).toContain('status: draft')
+    // The cowrite got the issues as its materials, and the session is in the registry.
+    expect(written[0]).toContain('Issue 1 of 1 — the passage the owner marked in spec/b.md:')
+    expect(written[0]).toContain(`[[${PASSAGE}]]`)
+    expect(written[0]).toContain('What they want changed: name the gate')
+    expect(board.sessions.list().map((session) => session.kind)).toEqual(['cowrite', 'ask'])
+    // The question went through the ask receipt chain: its first call carries the
+    // standing instruction, the marked passage and the question itself.
+    expect(payloads[0]).toContain('spec/b.md')
+    expect(payloads[0]).toContain('Modify no file')
+    expect(payloads[0]).toContain(`The passage they marked, quoted from spec/b.md:`)
+    expect(payloads[0]).toContain(`[[${PASSAGE}]]`)
+    expect(payloads[0]!.endsWith('why two gates?')).toBe(true)
+    const { body: asks } = await call('GET', '/api/asks/spec-00001-b')
+    expect(asks.threads[0]).toMatchObject({ id: 't-1', agent: 'claude' })
+    expect(asks.threads[0].exchanges[0]).toMatchObject({ question: expect.stringContaining('why two gates?') })
+    // And the annotations hold their references, each of one kind.
+    const { body: listed } = await call('GET', '/api/annotations/spec-00001-b')
+    expect(listed.annotations[0]).toMatchObject({ state: 'submitted', threadId: 't-1' })
+    expect(listed.annotations[1]).toMatchObject({ state: 'submitted', batchId: 'b-1' })
+    expect(listed.batches[0]).toMatchObject({ status: 'cowriting', annotationIds: ['n-2'] })
+  })
+
+  /**
+   * spec-00007-AC-10.8 — the batch was still being cowritten when the process
+   * went: the next boot writes it off and hands its annotations back, so nothing on
+   * disk says «being cowritten» when nothing is.
+   */
+  // spec-00007-AC-10.8
+  it('writes off a batch the last process was killed with, at the next boot', async () => {
+    const { call, docsDir, repoRoot } = annotationBoard()
+    await add(call, 'spec-00001-b', {
+      type: 'issue',
+      text: 'name the gate',
+      anchor: anchorOf(docsDir, 'spec/b.md', PASSAGE),
+    })
+    await call('POST', '/api/annotations/spec-00001-b/submit', {})
+
+    // A crash leaves the file as it stands; the next boot is what reconciles it.
+    const rebooted = boardOnRepo(repoRoot, docsDir, testConfig(), seams().spawn)
+
+    const view = rebooted.board.annotations.list('spec-00001-b')
+    expect(view.batches[0]).toMatchObject({ status: 'failed', commit: null })
+    expect(view.annotations[0]).toMatchObject({ state: 'pending' })
+    expect(view.annotations[0]!.batchId).toBeUndefined()
   })
 })

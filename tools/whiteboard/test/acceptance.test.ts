@@ -81,7 +81,7 @@ describe('the whiteboard acceptance path', () => {
     const opened = await call('GET', '/api/docs/idea-00001-whiteboard')
     const edited = opened.body.content.replace('A board over the docs tree.', 'A board over the docs tree, MVP.')
     expect((await call('PUT', '/api/docs/idea-00001-whiteboard', { content: edited, baseHash: opened.body.hash })).body)
-      .toEqual({ committed: true })
+      .toMatchObject({ committed: true })
 
     // S3: clarify first — a session, and its agent leaves the question behind;
     // the document stays draft and accept is refused while the question stands
@@ -325,7 +325,7 @@ describe('the whiteboard acceptance path', () => {
 
     const granted = await call('POST', '/api/docs/plan-00001-mvp/status', { to: 'resolved' })
     expect(granted.status).toBe(200)
-    expect(granted.body).toEqual({ committed: true, status: 'resolved' })
+    expect(granted.body).toMatchObject({ committed: true, status: 'resolved' })
   })
 
   // the agent that ignores the brief leaves a marked node, not a silent one

@@ -41,6 +41,18 @@ const NO_VERIFY = { '--no-verify': null }
 export interface CommitOutcome {
   committed: boolean
   error?: string
+  /**
+   * The hash git named the commit by, when one landed (design-00001 §12.6): what
+   * an issue batch keeps as the reference to its collapse commit
+   * (spec-00007-AC-9.4). Absent when nothing was committed, which is what the
+   * batch records as «no landed change» (spec-00007-AC-9.5).
+   *
+   * Carried back exactly as `simple-git` reports it, which on this version is the
+   * **full** hash rather than the abbreviated one §12.6 describes: the length is
+   * the reference's presentation and belongs where it is shown, not to a
+   * transformation invented here.
+   */
+  sha?: string
 }
 
 export function commitMessage(action: ActionKind, docId: string): string {
@@ -65,8 +77,10 @@ export class GitLayer {
     if (paths.length === 0) return { committed: false }
     try {
       await this.git.add(paths)
-      await this.git.commit(message, paths, NO_VERIFY)
-      return { committed: true }
+      // What git itself named the commit, carried back as it came: the collapse
+      // commit of an issue batch is referred to by it (design-00001 §12.6).
+      const result = await this.git.commit(message, paths, NO_VERIFY)
+      return { committed: true, ...(result.commit === '' ? {} : { sha: result.commit }) }
     } catch (cause) {
       return { committed: false, error: (cause as Error).message }
     }

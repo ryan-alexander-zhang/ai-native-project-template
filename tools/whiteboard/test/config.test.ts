@@ -466,8 +466,8 @@ describe('the config shipped with this repo', () => {
   })
 
   /** spec-00003-FR-3: the cap this repo runs on, spelled out rather than left to the default. */
-  it('declares a session cap of three', () => {
-    expect(loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname).maxSessions).toBe(3)
+  it('declares a session cap of five', () => {
+    expect(loadFlowConfig(new URL('../../../whiteboard.config.yaml', import.meta.url).pathname).maxSessions).toBe(5)
   })
 
   /**

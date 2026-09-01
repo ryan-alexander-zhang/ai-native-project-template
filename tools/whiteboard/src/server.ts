@@ -3,6 +3,9 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { WebSocketServer } from 'ws'
 import { type Expectation, findProduct, markProduct, productProblems, taskInstruction } from './advance.ts'
 import { auditableTypes } from './auditRules.ts'
+import type { SelectionAnchor } from './annotationAnchor.ts'
+import { AnnotationConflictError, NoAnnotationError } from './annotationStore.ts'
+import { Annotations } from './annotations.ts'
 import { AskBusyError, AskStore } from './askStore.ts'
 import { clarifiableTypes } from './clarifyRules.ts'
 import type { FlowConfig } from './config.ts'
@@ -46,6 +49,12 @@ export class Board {
   readonly sessions: SessionManager
   /** The ask lists on disk (spec-00005-FR-5): board state, kept outside git and outside docs/. */
   readonly asks: AskStore
+  /**
+   * The annotations of every document, and the unified submit that hands them to
+   * the two paths that already exist (spec-00007): board state as well, beside
+   * the ask lists and out of git.
+   */
+  readonly annotations: Annotations
   /** Live only while the board is listening: a board nobody can connect to has nobody to tell. */
   readonly watcher: DocsWatcher
   private readonly repoRoot: string
@@ -89,8 +98,36 @@ export class Board {
       // Every ask plan carries the thread it belongs to; the doc service builds
       // no other kind of ask plan (design-00001 §10.2).
       onAskEnd: (plan, result) => this.asks.finish(plan.sourceId, plan.threadId!, result),
+      // Every end state of every session comes through here, and nearly none of
+      // them is an issue batch (design-00001 §12.6). The refresh follows the
+      // backfill rather than preceding it — both go through the signal's own
+      // window, so a board reads the batch as it stands after it landed.
+      onSessionEnd: async (info) => {
+        try {
+          await this.annotations.landBatch(info)
+        } finally {
+          // In a `finally`: a landing that failed is still an end the boards have
+          // to hear about, and swallowing the refresh with it would leave every
+          // page showing a session the server has finished with (issue-00013).
+          this.watcher.signal()
+        }
+      },
       onExit: (plan, baseline) => this.finishSession(plan, baseline),
     })
+    this.annotations = new Annotations({
+      repoRoot,
+      docs: this.docs,
+      sessions: this.sessions,
+      agents: config.agents,
+      // The issue path calls the same cowrite ruling and the question path the
+      // same ask receipt chain a hand-started one calls: «no difference in
+      // behaviour» is one piece of code (spec-00007-FR-8, design-00001 §12.4).
+      openAsk: (input) => this.openAsk(input),
+    })
+    // Same hook as the ask lists', one directory each: the registry comes up
+    // empty, so a batch left reading `cowriting` is written off rather than shown
+    // as being cowritten for ever (spec-00007-AC-10.8).
+    this.annotations.store.reconcile()
     // The status lock of spec-00006-FR-10: the registry knows which documents are
     // being cowritten, the write paths are where the refusal belongs, and this is
     // the one wire between them (design-00001 §11.4).
@@ -163,7 +200,9 @@ export class Board {
         this.sessions.runningClaims(),
         this.sessions.reservedNumbers(REFERENCE_TYPE),
       )
-      return { docId: plan.sourceId, problems: outcome.problems, committed: outcome.committed, error: outcome.error }
+      // Spread whole rather than field by field: the commit's own hash rides
+      // along, and an issue batch keeps it as its reference (spec-00007-AC-9.4).
+      return { docId: plan.sourceId, ...outcome }
     }
     // Clarify and audit were asked for no new document, so there is nothing to
     // check: their commit is named by the kind and carries the document they
@@ -265,6 +304,25 @@ export class Board {
     // `/api/docs/:id/` (design-00001 §7).
     app.post('/api/sessions/ask', async (req, res) => res.json(await this.askSession(req.body)))
     app.get('/api/asks/:id', (req, res) => res.json({ threads: this.asks.read(req.params.id).threads }))
+    // The annotations of one document, and the unified submit of them
+    // (spec-00007-FR-3, FR-5). Not under `/api/docs/:id/`: the annotations
+    // outlive the document, so they are addressable after it is gone, the way the
+    // ask list is (design-00001 §12.3).
+    app.get('/api/annotations/:id', (req, res) => res.json(this.annotations.list(req.params.id)))
+    app.post('/api/annotations/:id', async (req, res) => {
+      res.status(201).json({ annotation: await this.annotations.add(req.params.id, req.body) })
+    })
+    app.patch('/api/annotations/:id/:annotationId', async (req, res) => {
+      const annotation = await this.annotations.change(req.params.id, req.params.annotationId, req.body)
+      res.json({ annotation })
+    })
+    app.delete('/api/annotations/:id/:annotationId', async (req, res) => {
+      await this.annotations.remove(req.params.id, req.params.annotationId)
+      res.json({ annotationId: req.params.annotationId })
+    })
+    app.post('/api/annotations/:id/submit', async (req, res) => {
+      res.json(await this.annotations.submit(req.params.id, req.body))
+    })
     app.post('/api/sessions/audit', (req, res) => {
       res.json(this.sessions.start(this.docs.auditPlan(docIdOf(req.body)), agentOf(req.body)))
     })
@@ -296,7 +354,24 @@ export class Board {
    * nothing (spec-00005-AC-6.4, AC-7.1).
    */
   private async askSession(body: unknown): Promise<{ sessionId: string; threadId: string }> {
-    const { docId, question, threadId, resend, agent } = askRequest(body)
+    return this.openAsk(askRequest(body))
+  }
+
+  /**
+   * The receipt chain itself, without the request around it: what the ask entry
+   * runs, and what each question of a unified submit runs (design-00001 §12.5).
+   * One function, so the two entries cannot receive a question differently.
+   */
+  private async openAsk(input: {
+    docId: string
+    question: string
+    threadId?: string
+    resend?: boolean
+    agent?: string
+    /** The passage a submitted question was marked on; a typed one carries none. */
+    selection?: SelectionAnchor
+  }): Promise<{ sessionId: string; threadId: string }> {
+    const { docId, question, threadId, resend, agent, selection } = input
     // Held so a failure *after* the admission can be undone: the slot is taken
     // inside the callback and the record is written after it, so a write that
     // fails would otherwise leave a session running with no process to come
@@ -307,7 +382,7 @@ export class Board {
     try {
       const started = await this.asks.open(docId, { question, threadId, resend }, (thread) => {
         const info = this.sessions.start(
-          this.docs.askPlan(docId, question, thread),
+          this.docs.askPlan(docId, question, thread, selection),
           // A follow-up runs the agent its thread was opened with: a resume id
           // is that one CLI's, and no other could take it (spec-00005-FR-2).
           thread.exchanges.length === 0 ? agent : thread.agent,
@@ -629,7 +704,9 @@ const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [
   [ConflictError, 409],
   [SessionBusyError, 409],
   [AskBusyError, 409],
+  [AnnotationConflictError, 409],
   [NoSessionError, 404],
+  [NoAnnotationError, 404],
   [WorkflowError, 422],
 ]
 

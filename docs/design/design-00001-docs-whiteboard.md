@@ -1164,7 +1164,7 @@ design-00002 §16。
         "sessionId": "<注册表会话 id>",
         "annotationIds": ["n-1", "n-5"],
         "startedAt": "<ISO>", "endedAt": "<ISO>",
-        "commit": "<收束 commit 的短 hash；null = 无落地变更>"
+        "commit": "<收束 commit 的完整 hash（截断呈现归前端）；null = 无落地变更>"
       }
     ]
   }
@@ -1236,8 +1236,10 @@ design-00002 §16。
   文本截取、原样存，含换行。**单位钉死为 code point 而非 UTF-16 code
   unit**：`Array.from` 计数即得，截取因此永不切开代理对（一个 emoji 或
   一个罕用汉字被劈成半个的锚，其后任何匹配都必然失败）；并且**边界不得
-  落在组合序列内部**——截到第 64 个之后，若下一个（`after` 为前一个）
-  码点属 `\p{M}`（组合记号），沿该方向继续吞并直到不再是组合记号为止，
+  落在组合序列内部**——截到第 64 个之后，若边界外紧邻的下一个码点
+  （`before` 侧看其首码点之前、`after` 侧看其末码点之后，方向各自向外）
+  属 `\p{M}`（组合记号），沿该方向继续吞并直到不再是组合记号为止
+  （初稿括注的方向读法自相矛盾，实现轮据实校正），
   宁可多带几个码点也不留半个字位簇。**64 是设计缺省，待实测调**（域主
   裁定保留该值待实测）——它调的是层 1 的两头：太短则常见短语的整键仍会
   多处等同命中，而层 2 不猜、直接拦下；太长则任何邻近改动都打掉整键、
@@ -1299,10 +1301,17 @@ POST   /api/annotations/:id              {type, text, anchor} → 201 {annotatio
 PATCH  /api/annotations/:id/:annId       {text?, type?, anchor?} → 200 {annotation} | 404 | 409 {error, reason: already-submitted} | 422 同 POST
 DELETE /api/annotations/:id/:annId       → 200 | 404 | 409 {error, reason: already-submitted}
 POST   /api/annotations/:id/submit       {unsavedChanges: boolean, agents?: {question?, cowrite?}}
-  → 200 {submitted, blocked, transition}
+  → 200 {submitted, blocked, transition, warnings?}
   | 409 {error, reason: submit-in-flight|doc-missing}
   | 422 {error, reason: doc-anomalous|unsaved-buffer|empty-submit|unknown-agent|agent-not-headless}
 ```
+
+（`warnings?: string[]` 系评审轮增补：仅「线程已开、引用写不进盘」
+一种情形出现——该 question 如实报 submitted 并附警告，不报 blocked，
+否则重提会为同一问开出第二条线程；前端可忽略，缺省不存在。另注：
+提交在途期间该文档标注的 `PATCH`/`DELETE` 同答 409
+`submit-in-flight`——分派按提交时刻的快照构建，窗口内的改删会使批
+与材料脱离盘上现实，评审轮增补。）
 
 - **不挂 `/api/docs/:id/` 下**：标注存储脱离文档存续（文档删除后仍可寻址），
   与 `/api/asks/:id`、`/api/create` 同例（§7）。`:id` 的形态先校验
@@ -1397,7 +1406,10 @@ POST   /api/annotations/:id/submit       {unsavedChanges: boolean, agents?: {que
   `orphan`，**不进任何通路**（`spec-00007-FR-5`：单条拦下、一条失效不阻
   整批），其余条目按 `type` 分两组。
 - **issue 资格复验**（`spec-00007-FR-4`）以**刚读盘的 front matter** 判，
-  不读图缓存——攒批期间的流转必须被看见。判据复用既有代码，不新写表：
+  不读图缓存——攒批期间的流转必须被看见；读盘在提交开头做**一次**
+  （`invalidate()` 后读，同 §11.3 手法），判定次序仍在锚校验之后——
+  同一请求内二次读盘无可观察差别，反会凭空多出「提交中途文档消失」的
+  失败面（实现轮据实校正）。判据复用既有代码，不新写表：
   `statusRules` 的种类二分 + `rule-00001-BR-29`（`draft`，或 work item 的
   `open`）直接合格；`active` 的 living doc 经 `rule-00001-BR-3` 合格且需
   流转；其余整批 issue 拦 `gate-ineligible`，question 照常
@@ -1511,11 +1523,14 @@ POST   /api/annotations/:id/submit       {unsavedChanges: boolean, agents?: {que
   `spec-00001-FR-16` 的启动失败在 Node 里是 spawn 之后的异步 `error`
   事件，而 `AC-7.4` 要求「CLI 必然启动失败时文档仍为 `active`、无流转
   commit」——不做一次不 spawn 的预检就无法在写盘之前知道这件事，而
-  `spec-00007-FR-7` 又明写写盘之后**不回滚**。预检的判据：`command` 含
-  路径分隔符时按路径 `fs.accessSync(X_OK)`，**相对路径的基准与 spawn
-  同——`join(repoRoot, agent.cwd ?? '.')`**（不是服务进程的 cwd，两者
-  在本仓恰好不同：会话的工作目录是 `docs/`，§3）；裸名则按 `PATH` 逐段
-  拼同一判定。预检拦住的是 FR-16 的主要情形（命令不存在/不可执行）；
+  `spec-00007-FR-7` 又明写写盘之后**不回滚**。预检的判据**与 spawn
+  逐字同源**：复用 `pty.ts` 的同一个判定函数（spawn 前自查的那一个）
+  ——`command` 含路径分隔符时按路径 `fs.accessSync(X_OK)`，基准是
+  **服务进程的 cwd**；裸名走 `which`/`where`。初稿写的
+  「`join(repoRoot, agent.cwd ?? '.')` 基准与逐段拼 `PATH`」与 spawn
+  的实际判定不符——预检若自立判据，恰好制造它要防的「预检过而
+  spawn 拒」落点（实现轮据实校正，评审揭出）。预检拦住的是 FR-16
+  的主要情形（命令不存在/不可执行）；
   spawn 之后才崩的残余落进 FR-7 自己点名的**复合角落**（下条）。
 - **两处残余角落，都落 FR-7 明写的复合角落，都不回滚**：
   （a）第 5 步的二次受理判定抛 `cap-reached` 或 `doc-busy`——第 2 步与
@@ -1611,7 +1626,8 @@ stateDiagram-v2
   `status`/`endedAt`/`commit`，终局按上表映射。
 - **收束 commit 引用**（`spec-00007-AC-9.4`/`AC-9.5`）：`CommitOutcome`
   增一个可选 `sha`——`simple-git` 的 `commit()` 已返回 `CommitResult.commit`
-  （短 hash），照实带回即可；无可暂存变更时 GitLayer 本就返回
+  （实测为完整 40 位 hash，非初稿所记短 hash——实现轮据实校正；截断
+  呈现归前端），照实带回即可；无可暂存变更时 GitLayer 本就返回
   `{committed: false}`、无 sha，批的 `commit` 记 `null`，「明示无变更」由
   这个 `null` 承载（`spec-00006-FR-8` 的无 commit 分支）。这是本轮对既有
   类型的**唯一**改动。
