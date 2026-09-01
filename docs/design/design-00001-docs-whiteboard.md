@@ -2,7 +2,7 @@
 id: design-00001-docs-whiteboard
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations]
 ---
 
 # Design: Docs 白板 MVP
@@ -551,10 +551,14 @@ stateDiagram-v2
   依赖这一半）。无选中且未下钻时只取 graph。
   **治理轮（spec-00002）加第三项，已由领域负责人裁定**：**全局覆盖率视图打开
   期间**，同一次刷新一并重取 `GET /api/coverage`；视图未打开时**不取**——它是
-  最重的一次读取，没人在看就不该跑。（第四项——问题列表打开期间重取
-  `GET /api/asks/:id`——见 §10.3；**第二十二轮加第五项**：共写目标文档的
+  最重的一次读取，没人在看就不该跑。（第四项——问题列表**或标注列表**
+  打开期间重取 `GET /api/asks/:id`（后一半第二十三轮增，理由见 §12.6）
+  ——见 §10.3；**第二十二轮加第五项**：共写目标文档的
   编辑器打开期间重取 `GET /api/docs/:id` 与当前 `baseHash` 比对，缓冲重载的
-  判据来源，design-00002 §15；未在共写中不取。）三份载荷共用同一条通路，覆盖率视图因此
+  判据来源，design-00002 §15；未在共写中不取。**第二十三轮加第六项**：目标
+  文档的**编辑器打开期间**重取 `GET /api/annotations/:id`——条件取编辑器
+  而非「列表打开」，是对前五项口径的有意偏离，裁定与理由属 design-00002
+  §16.8，服务端侧见 §12.6。）三份载荷共用同一条通路，覆盖率视图因此
   没有自己的刷新机制。后果按 design-00002 §10 的既有规则落位：行随刷新重新推导，计数当场
   更新（`spec-00002-AC-10.4`）；一份已被删除的文档**整行消失**——这就是「就近
   关闭」用在视图行上（并入 `spec-00001-FR-44` 族）；展开态按**文档 id** 保持
@@ -718,7 +722,9 @@ spec-00001-FR-26、FR-27 承接。
 
 承载 `spec-00005` 的服务端侧；取舍全部在案于 `decision-00012`。答疑不再
 起 PTY：一次调用是一个被捕获输出的子进程，一个问题是一条独立会话，
-追问 resume 它。界面侧见 design-00002 §14。
+追问 resume 它。界面侧见 design-00002 §14。（第二十三轮增第三个发起
+来源：标注统一提交的 question 通路，其首调指令的选区材料拼装点见
+§12.5。）
 
 ### 10.1 headless 声明（流程配置扩展，spec-00005-FR-8）
 
@@ -889,9 +895,12 @@ kind=ask 的会话进同一注册表，差异逐条：
   **无快照、无 commit、不进 commit 串行队列**（`spec-00005-FR-4`）→
   `/api/events` 广播照常。
 - **刷新重取扩一项**（§6 与 design-00002 §10 的重取清单）：问题列表
-  视图打开期间，前端刷新一并重取 `GET /api/asks/:id`；未打开不取——
-  与覆盖率视图同一口径。无此项，`running → answered` 的翻转永远到不了
-  页面（`spec-00005-AC-3.3` 依赖它）。
+  视图**或标注列表**打开期间，前端刷新一并重取 `GET /api/asks/:id`；
+  两者都未打开不取——与覆盖率视图同一口径。无此项，`running → answered`
+  的翻转永远到不了页面（`spec-00005-AC-3.3` 依赖它）。**后一半是第二十三
+  轮增的**：标注列表的 question 项状态由前端按 `threadId` 从这份载荷现算
+  （§12.1），用户停在标注列表这一视图态时若不取，那些项的状态会停在打开
+  那一刻。
 - **会话与线程的反查**：`/api/sessions` 载荷不加字段（kind=ask 即
   headless 形态，终端答疑已退役）；面板行与通知只持注册表会话 id，
   前端由 `sourceId` 取 `GET /api/asks/:id`、按 exchange 的
@@ -903,6 +912,8 @@ kind=ask 的会话进同一注册表，差异逐条：
 **第五种会话种类、第四种交互式终端形态**：与推进/澄清/审计同走 PTY seam、
 同一注册表与并发正则、同一等待判定与终止阶梯、同一历史落盘；差别只在
 受理裁决、任务指令、与收束的**域过滤**。界面侧见 design-00002 §15。
+（第二十三轮增第二个发起来源：标注统一提交的 issue 通路——程序化材料、
+自动流转与全有或全无的实现次序见 §12.4，本节的受理与收束原样适用。）
 
 ### 11.1 受理与任务指令
 
@@ -1106,9 +1117,540 @@ POST /api/sessions/cowrite   {create: {type, slug}, agent?, materials?}
 其执行层地位仍由 `spec-00006-AC-6.*` 的测试承载。未实测不进默认配置
 （与 §3、§10.1 同一纪律）。
 
-## 12. Open Questions
+## 12. 文内标注通路（第二十三轮）
+
+承载 `spec-00007` 的服务端侧。标注**不是新的会话种类**：question 走 §10 的
+headless 答疑，issue 走 §11 的共写，注册表、互斥、上限、等待判定、快照、
+收束过滤、收束 commit、状态锁一体沿用。本节因此只定三样新东西——板外的
+标注存储、选区锚的重定位算法、统一提交这一个把两条既有通路串起来的动作
+——其余每一处都是既有函数的**调用者**，`spec-00007-FR-8` 的「与手工发起
+的共写无行为差别」由「同一个受理函数」机械成立，不是纪律。界面侧见
+design-00002 §16。
+
+### 12.1 标注存储（`spec-00007-FR-3`/`FR-11`）
+
+- 位置：`.whiteboard/annotations/<docId>.json`——与 §10.2 的问题列表存储
+  **同侧同构**：一文档一文件、按文档 id 键控、逐 docId 一条串行队列串行
+  完成一切读-改-写、写盘经临时文件 + rename 原子替换；仓库 `.gitignore`
+  既有的 `.whiteboard/` 排除覆盖之（`spec-00007-AC-3.2`），存储的读写自身
+  不产生任何 commit（`spec-00007-FR-11`）。同构不是审美：标注与答疑线程在
+  同一次刷新里被一起读、在一次统一提交里被一起写，两套存储机制会立刻长出
+  两套失效、核销与并发口径。
+- 形态（`resumeId` 属答疑存储，此处只持 `threadId` 引用；批与标注分列两个
+  数组）：
+
+  ```json
+  {
+    "docId": "spec-00007-doc-annotations",
+    "annotations": [
+      {
+        "id": "n-<取号顺序号>",
+        "type": "question",
+        "text": "标注文本",
+        "anchor": { "selected": "…", "before": "…", "after": "…" },
+        "quote": "选区原文引用（定格副本）",
+        "createdAt": "<ISO>",
+        "state": "pending",
+        "orphan": "missing | ambiguous（仅提交校验拦下时落，重新选区或改锚即清）",
+        "blocked": "<上次提交单条拦下的原因，再次提交即清>",
+        "threadId": "<question 提交后持有的答疑线程 id>",
+        "batchId": "<issue 提交后所属批次 id>"
+      }
+    ],
+    "batches": [
+      {
+        "id": "b-<取号顺序号>",
+        "status": "cowriting",
+        "sessionId": "<注册表会话 id>",
+        "annotationIds": ["n-1", "n-5"],
+        "startedAt": "<ISO>", "endedAt": "<ISO>",
+        "commit": "<收束 commit 的短 hash；null = 无落地变更>"
+      }
+    ]
+  }
+  ```
+
+- **未提交与已提交是同一个数组里的一个字段**（`state ∈ pending |
+  submitted`），不是两个数组：标注列表按创建序混排逐项呈现
+  （`spec-00007-FR-9`），拆数组只是把合并的活推给每个读者。孤儿是 `pending`
+  上的一个**失效标记**（`orphan`）而非第三个值——`spec-00007-FR-9` 明写它
+  不是独立状态，数据形态照此，界面才不会长出第三个分支。
+- **`quote` 与 `anchor.selected` 分两个字段，初始同值**。锚是**键**，引用是
+  给人看的**兜底**（`spec-00007-FR-2`：锚失效后引用照常可见）；分开存，
+  「引用独立于锚有效性」在数据层就成立，而不依赖任何一处读取代码记得别把
+  引用从锚上现算。**`quote` 一律由服务端从 `anchor.selected` 派生，不收
+  客户端给的值**——创建（`POST`）与重新选区（`PATCH` 带 `anchor`）两路
+  同一派生，契约里因此没有 `quote` 入参（§12.3）。两路对称是刻意的：让
+  两个字段初始同值这件事只有一处实现，客户端无从把引用与锚给成两样。
+  重新选区（`spec-00007-FR-3`）两者一并替换、`orphan` 一并清除——这就是
+  孤儿标注的出路的全部实现。
+- **批状态是单一来源**：issue 项的进展**不在标注上存副本**，读 `batchId`
+  指向的那一行 `batches[].status`（`spec-00007-FR-9` 的批粒度）。若一批 N
+  条各存一份状态副本，收尾回填就是 N 次写，崩在第三条上便留下一个半批。
+- **question 项的状态同样不存副本，且服务端不做 join**：标注只持
+  `threadId`，`GET /api/annotations/:id` 原样下发该引用，状态由**前端**
+  取 `GET /api/asks/:id`（§10.2 的那份存储）、**按 `threadId` 直取该
+  线程**、读其**末条 exchange 的 `outcome`** 现算——
+  `running | answered | failed | terminated` 一一对应进行中、已回答、
+  失败、终止（呈现侧的合成见 design-00002 §16.4）。**这与 §10.3 末条
+  会话面板的查法不是同一种**：面板行只持注册表会话 id，须按 exchange 的
+  `runSessionId` **反查**线程；标注本来就持有线程 id，直取即可，不经反查。
+  两份存储因此各自仍是自己的单一来源：服务端若 join，标注载荷的失效条件
+  就变成两个文件的并集，而问题列表那半边已经有自己的重取项（§10.3，其
+  取数条件同轮扩为「问题列表或标注列表打开期间」）。
+  `spec-00007-AC-9.11`/`AC-9.14` 的「重发走问题列表的既有线程能力、
+  标注项跟随」由此**不需要任何回写通路**：问题列表就地改写那条
+  exchange，下一次合成就跟着变了。**镜像是机械的，粒度不作特判**
+  （域主裁定：标注项就是线程末条 exchange 状态的镜像；用户在该线程上
+  追问期间标注项从「已回答」退回「进行中」，这是如实呈现，不是缺陷，
+  因而不引入「只镜像首问」一类的粒度规则）。
+- 文档删除或改 id：文件保留、不回收，graph 上无该 id 时前端无处呈现
+  （`spec-00007-FR-11`，同 §10.2 末条的问题列表口径；回收属范围外）。
+
+### 12.2 选区锚与重定位（`spec-00007-FR-2`）
+
+- **坐标系是整文件的规范化文本**，不是剥掉 front matter 的正文，也不是
+  磁盘字节：编辑视图态的偏移本来就是对整文件数的（front matter 可见可改，
+  §2 Editor），预览映射产出的偏移加上 front matter 块长度即整文件偏移
+  （映射本身属 design-00002 §16）。两个视图态一个坐标系，锚因此不必记
+  自己是从哪个视图态来的。**坐标系与可加注面是两回事**：可加注的是
+  **可映射正文选区**——front matter 与代码块 / mermaid 源码块内不可加注
+  （域主裁定，守门与呈现属 design-00002，条文半句由 `spec-00007-FR-1`
+  承载），而锚的偏移照旧对整文件数。已知边界，记明不修：选区紧贴正文
+  开头时其 `before`（上下文，不是选区本身）可能含 front matter 尾部，
+  `status` 行随修订轮变动会打掉这条锚的整键——退到层 2，仍不中则退化为
+  「原文已变更」（`spec-00007-FR-12`），不影响任何处理。
+- **规范化只有一件事，且存、匹配、下发三处同一份**（这一条与上一条互锁，
+  必须一起读）：服务端读到整文件后先把 `\r\n` 与裸 `\r` 一律换成 `\n`，
+  **锚的三段按该规范化文本截取、重定位在该规范化文本上扫描、`locate` 的
+  偏移也是该规范化文本上的偏移**。不折叠空白、不去 Markdown 语法——锚锚的
+  是源文本，任何进一步的规范化都会让「锚文本被改」这个判定失真，把用户
+  明明改过的句子判成命中。**不做原文件坐标的换算**：换算表要随每次读盘
+  重建、还得在前端复算一遍才对得上，而**前端在切片与高亮前做同一次
+  规范化**即可让两侧共用一个坐标系（CodeMirror 的 `lineSeparator` 默认
+  就是 `\n`，本仓亦无 CRLF 文件——这在今天是恒等变换，写死它是为了将来
+  有人拉进一份 CRLF 文件时两侧不会各说各话）。规范化只在**读侧**，不改
+  磁盘内容，写盘照旧是编辑器给什么写什么。
+- **锚的三段**：`selected` = 选区文本；`before`/`after` = 其前后各
+  **64 个 Unicode code point**（不足则到文首/文尾），按创建时刻的规范化
+  文本截取、原样存，含换行。**单位钉死为 code point 而非 UTF-16 code
+  unit**：`Array.from` 计数即得，截取因此永不切开代理对（一个 emoji 或
+  一个罕用汉字被劈成半个的锚，其后任何匹配都必然失败）；并且**边界不得
+  落在组合序列内部**——截到第 64 个之后，若下一个（`after` 为前一个）
+  码点属 `\p{M}`（组合记号），沿该方向继续吞并直到不再是组合记号为止，
+  宁可多带几个码点也不留半个字位簇。**64 是设计缺省，待实测调**（域主
+  裁定保留该值待实测）——它调的是层 1 的两头：太短则常见短语的整键仍会
+  多处等同命中，而层 2 不猜、直接拦下；太长则任何邻近改动都打掉整键、
+  把定位频繁推进层 2，与 `spec-00007-FR-2`「锚文本之外的改动不影响定位」
+  相悖。两三行的量级是这两头之间的一个起点，实测后可改，改的只是一个
+  常数、不动算法。**取字符不取行**：取行则边界随 Markdown 折行漂移，而
+  预览映射交回来的本来就是字符偏移。
+- **偏移量的单位是 UTF-16 code unit**（`String.prototype.indexOf` 与
+  CodeMirror 的天然单位），与上一条的「64 按 code point」**不矛盾**：
+  64 是一个**计数**，`locate` 的 `start`/`end` 是**下标**，两者各取各的
+  自然单位，各自钉死即可，不必为了统一而给任何一侧套一层换算。
+- **扫描是全位置重叠枚举**（`indexOf(key, hit + 1)` 递进，**不是**
+  `hit + key.length`）：这一句决定歧义计数，因而决定 `AC-2.3`/`AC-2.4` 的
+  成败——自重叠的键（`abab` 之于 `ababab`）按非重叠只数得一处，会把本该
+  拦下的歧义静默判成命中，正是 `spec-00007-FR-2` 禁的「静默取其一」。
+  命中数一旦超过 1 即可短路（下面两层都只问「零、一、还是多于一」）。
+- **重定位算法，两层，恰一处命中**（`spec-00007-FR-2` 的条文级口径落在
+  这里）：
+  1. **整键**：`before + selected + after` 在全文中扫描。恰一处 → 命中，
+     返回 `selected` 所在区间。**多于一处 → 判歧义命中、失败，不降级**
+     ——`spec-00007-AC-2.4` 的「创建时刻即歧义」（整段逐字重复文本）正是
+     这一支，与后续编辑造成的歧义（`AC-2.3`）同一处置。
+  2. **整键零命中时退到 `selected` 单独扫描**（上下文被邻近编辑改动的常见
+     情形）：零命中 → 失败（`missing`）；**恰一处 → 命中**；**多于一处
+     → 失败（`ambiguous`）**。这一层**只认唯一命中，不做任何打分**
+     （**域主裁定**：层 2 去打分；初稿的「公共前后缀之和 + 领先第二名
+     ≥ 8」两项一并删除，那个常数不再存在）。
+     **理由**：打分是在猜「哪一处更像当初那一处」，而 `spec-00007-FR-2`
+     明写定位失败即拦下、**不静默取其一**——一个会猜的算法，它猜对时省下
+     的是一次重新选区，猜错时给出的是一条指着别处的标注，后者的代价高得
+     不成比例。去掉它，本层的判据回到一句话：**上下文帮不上忙的时候，就
+     承认帮不上**。
+     **「上下文参与消歧」仍然成立，落点在层 1**：整键含上下文，选区文本
+     是常见短语时靠上下文照样唯一定位（`CONTEXT.md`「选区锚」词条与
+     `spec-00007-FR-2` 的那半句说的正是这件事）。层 2 是上下文**已被改动**
+     之后的退路，此时上下文已不是可信的判据，拿它打分等于用一份过期的
+     证据做裁决。
+  3. 失败只有两种原因值：`missing` 与 `ambiguous`，前端据以选提示文案，
+     二者在处置上无差别（提交前拦下、提交后退化）。
+- **两个执行点，同一个函数**：
+  - **统一提交时**，对**刚读盘的整文件**逐条重定位（`spec-00007-FR-5`
+    的「以磁盘正文重新定位」）——这也是「提交前须无未保存改动」这道前置
+    存在的理由：锚校验以磁盘为准，缓冲里的新句子在盘上还不存在。
+  - **标注列表读取时**（`GET /api/annotations/:id`），对当前磁盘整文件
+    逐条重定位，每条产出 `locate: {start, end} | {failed: 'missing' |
+    'ambiguous'}`。已提交项的失败**只是呈现退化，不改状态、不中断处理**
+    （`spec-00007-FR-12`，`AC-12.1` 的「共写自己改掉了另一条的锚」即此支）。
+  - 编辑期不重锚（`spec-00007` §6 排除）：列表载荷的定位一律以磁盘为准，
+    缓冲有未保存改动时的文内痕迹由前端自行按缓冲定位（design-00002 §16）。
+- 代价：一次全文 `indexOf` 扫描 × 标注条数，本仓文档量级（几十 KB、十条
+  量级）可忽略，不设缓存——缓存要跟着磁盘失效，那是拿 §2 的缓存失效复杂度
+  换一个测不出来的耗时。
+
+### 12.3 统一提交 API（`spec-00007-FR-5`/`FR-10`）
+
+```
+GET    /api/annotations/:id              → {annotations, batches, submitPreview}
+POST   /api/annotations/:id              {type, text, anchor} → 201 {annotation} | 422 {error, reason: type-ineligible|empty-text|doc-anomalous}
+PATCH  /api/annotations/:id/:annId       {text?, type?, anchor?} → 200 {annotation} | 404 | 409 {error, reason: already-submitted} | 422 同 POST
+DELETE /api/annotations/:id/:annId       → 200 | 404 | 409 {error, reason: already-submitted}
+POST   /api/annotations/:id/submit       {unsavedChanges: boolean, agents?: {question?, cowrite?}}
+  → 200 {submitted, blocked, transition}
+  | 409 {error, reason: submit-in-flight|doc-missing}
+  | 422 {error, reason: doc-anomalous|unsaved-buffer|empty-submit|unknown-agent|agent-not-headless}
+```
+
+- **不挂 `/api/docs/:id/` 下**：标注存储脱离文档存续（文档删除后仍可寻址），
+  与 `/api/asks/:id`、`/api/create` 同例（§7）。`:id` 的形态先校验
+  再作路径，沿会话历史的文件名守卫口径。
+- **改与删只对未提交的条目开放**（`spec-00007-FR-3` 明写「提交前每条可
+  修改、可删除、可重新选区」）：`PATCH`/`DELETE` 命中 `state: submitted`
+  的条目一律 **409 `already-submitted`**。取 409 不取 422 按 §7 钉死的
+  词汇——这是「请求与资源的当前状态冲突」，条目本身合法，只是已经不在可
+  改可删的那个状态上了。**这不是洁癖**：已提交的 issue 条目被删会让
+  `batches[].annotationIds` 指向不存在的条目，那批的「回到未提交」就没有
+  东西可回；已提交标注的删除与清空本就是 `spec-00007` §6 排除的将来轮。
+  终止/失败后**回到未提交**的条目 `state` 已改回 `pending`，照常可改可删
+  （`AC-10.7`）——判据只看 `state`，不看有没有提交过。
+- **`submitPreview` 与列表同一次下发，不另立预演端点**
+  （`spec-00007-FR-5` 的「提交入口应明示本次将发生的动作」）：
+  `{questions: n, issues: m, willTransitionTo: 'draft' | null, issueEligible,
+  questionEligible}`，由 Workflow Engine 现算。前端零判定（§2 的既有分工：
+  裁决只有一个点），而明示与列表本就是同一次呈现的两半——拆成第二个端点等于
+  把资格判定实现两遍，且必然漂移。两处口径钉死：
+  - **计数不扣孤儿**：`questions`/`issues` 就是未提交区里该类型的条数，
+    **预览不做锚校验**——锚校验只发生在提交那一刻（`spec-00007-FR-5`），
+    预览若先算一遍，一是把一次全文扫描搬进每次刷新，二是它算出的数与真正
+    提交时的数仍会不同（中间盘上还会变）。`AC-5.7` 验的是「将发生的动作
+    **种类与数目按未提交区呈现**」，不是「预言最终有几条真的发起」；有
+    条目被孤儿拦下时，实际结果由应答的 `blocked` 与列表里的失效标记
+    承接，那才是它该出现的地方。
+  - **`issueEligible`/`questionEligible` 只含状态守门与 agent 声明守门**
+    ——前者是 `spec-00007-FR-4` 的 `rule-00001-BR-29`/`BR-3` 判定，后者是
+    `FR-10` 的「有无 agent 声明 headless」——**不含同文档互斥与总并发
+    上限**。这两样绝不能进来：`spec-00007` §1 已为统一提交入口登记了
+    `spec-00003-FR-2`/`FR-3`「发起入口禁用」半句的**排除**，把互斥或上限
+    算进 eligible 就等于让入口随它们整体禁用，绕回被明文排除掉的那件事。
+    互斥与上限只在提交时逐通路判、以 `blocked` 呈现（`AC-10.1`、
+    `AC-10.3`）。
+  二者同时是 `spec-00007-FR-4`/`FR-10` **类型可选集**的唯一来源（前端不
+  自行按 status 推）。
+- **前置校验的固定次序**（`spec-00007-FR-5` 的「整体前置先于逐通路判定」，
+  次序按代价递增，同 §6 的既有理由）：**在途（409）→ 文档存在（409
+  `doc-missing`）→ 文档非异常（422 `doc-anomalous`）→ 未保存缓冲（422）
+  → 空提交（422）→ agent 合法性（422）**。在途排头是并发保护——第二次
+  请求根本不该去碰盘；文档存在与非异常排在缓冲之前，因为对一份已删或
+  front matter 不合法的文档提示「先保存」是句错话。任一命中即整批不发生
+  任何事（`AC-5.4`、`AC-5.3`、`AC-10.4`、`AC-10.6`、`AC-4.6`）。
+- **异常文档整体拒绝**（`spec-00007-FR-4` 末句、`AC-4.6`）：判据是图上该
+  节点的 `ok === false`——与添加标注的 `doc-anomalous` 同一判据、同一码，
+  提交与添加两个入口因此不可能对同一份文档给出不同结论。前端本就不呈现
+  入口，这一道是服务端兜底（同 §11.1 共写对异常节点的既有做法）。
+- **`doc-missing` 的判据钉死为「按 graph 的 id 解析」**，不是按规范路径
+  读盘：`DocService.require(id)` 找不到该 id 的节点即 409。`AC-10.6`
+  要的正是**改 id** 也被拒——一份被改了 id 的文档，其规范路径下的文件
+  可能还在（改 id 未必改文件名，甚至改了文件名而路径仍可拼出），按路径
+  读盘会把它当成还在，于是拿着旧 id 的标注去提交一份已经不是它的文档。
+  按 id 解析则删除与改 id 是同一支，一条判据两个 AC 都守住。撞 id 的
+  情形沿 §2 的既有通路（`require` 抛 `ConflictError` / 409），不新写。
+- **未保存缓冲由前端声明**（载荷字段 `unsavedChanges`，缺省读 `false`）。
+  服务端**无从核验**：未保存缓冲只活在浏览器里，没有第二个观察点。这不是
+  留了个洞——伪造它的全部后果是拿磁盘正文重定位（`spec-00007-FR-5` 明写
+  锚以磁盘为准），用户自己看到一批孤儿被拦下，不产生任何越界写、不改任何
+  状态；为它引入第二道核验（比如要求带 `baseHash`）会凭空多出一个 spec
+  没有的拒绝面——外部改动过的文档将无法提交。**此定性经域主确认**（前端
+  声明、服务端不核验，`spec-00007-FR-5` 的这道前置就落在这个契约上）。
+- **在途判定**（`spec-00007-FR-10`）：服务端持一个**内存**的
+  `Set<docId>`，在前置全部通过、进入分派时加入，分派全部完成（含逐条拒绝
+  已落盘）后在 `finally` 里移除。放内存不放盘：在途是一次请求的生命期，
+  跨重启没有意义，重启后未提交区照旧、重提即可。它与 §10.2 的逐 docId
+  写队列**不是同一样东西**——那条队列串行的是单次读-改-写，在途要跨越
+  流转、spawn 与多次落盘，队列表达不了。
+- **应答结构，部分成功一律 200**。本节钉死这条分界：**4xx = 整批没有发生
+  任何事；200 = 批已执行，逐条结局在载荷里**。提交是批动作，锚失效、资格
+  丧失、上限拦下都是**单条或单通路**的结局，用 HTTP 状态码表达它们会逼着
+  前端从一个码里猜哪几条成了。
+
+  ```json
+  {
+    "submitted": {
+      "questions": [{ "annotationId": "n-3", "threadId": "t-7", "sessionId": "s-11" }],
+      "issues": { "batchId": "b-2", "sessionId": "s-10", "annotationIds": ["n-1", "n-5"] }
+    },
+    "blocked": [{ "annotationId": "n-2", "reason": "orphan-missing", "message": "…" }],
+    "transition": { "to": "draft", "committed": true }
+  }
+  ```
+
+  `submitted.issues` 与 `transition` 为 `null` 表示该通路未发生；`blocked`
+  的 `reason` 枚举：`orphan-missing`、`orphan-ambiguous`、`gate-ineligible`
+  （issue 资格复验不过，整批 issue 同因，`AC-4.7`）、`doc-busy`（同文档
+  互斥，含自指，`AC-10.1`）、`cap-reached`（`AC-6.3`、`AC-10.3`）、
+  `start-failed`（`AC-7.4`）、`no-headless-agent`。被拦下的条目
+  `state` 留 `pending`、写 `blocked` 字段，可改可删可再提交
+  （`AC-10.2`）。
+- **逐条锚校验**在前置之后、分派之前一次做完：失败的条目就地写
+  `orphan`，**不进任何通路**（`spec-00007-FR-5`：单条拦下、一条失效不阻
+  整批），其余条目按 `type` 分两组。
+- **issue 资格复验**（`spec-00007-FR-4`）以**刚读盘的 front matter** 判，
+  不读图缓存——攒批期间的流转必须被看见。判据复用既有代码，不新写表：
+  `statusRules` 的种类二分 + `rule-00001-BR-29`（`draft`，或 work item 的
+  `open`）直接合格；`active` 的 living doc 经 `rule-00001-BR-3` 合格且需
+  流转；其余整批 issue 拦 `gate-ineligible`，question 照常
+  （`spec-00007-AC-4.7`）。
+- **逐通路 agent 选择**（`spec-00007-FR-5`）：载荷 `agents` 是**两个
+  字段**而非一个——`question` 的可选集是声明了 `headless` 的 agent
+  （§10.1），`cowrite` 的是配置全集（§3）。缺省各取各可选集的**第一条**
+  （`spec-00001-FR-55` 口径），`spec-00007-AC-5.6` 要的正是两边各缺省各的，
+  单字段表达不了。可选集来源是 `/api/config` 的既有下发（`headless` 声明
+  可辨），不新增端点。**三种情形三个词，对齐 §7 `/api/sessions/ask` 的
+  既有 422 词汇（「未知 agent」与「agent 未声明 headless」在那里就是分开
+  说的）**：显式指定的名字不在配置里 → 422 `unknown-agent`；指定的
+  question agent 在配置里但未声明 `headless` → 422 `agent-not-headless`；
+  二者都是**整批不发生**（前置阶段判，客户端给错了参数）。而**一条
+  agent 都没有声明 headless** 时不是 422——那是 `spec-00007-FR-10` 的
+  对称守门，是环境的事实不是请求的错，question 条目**逐条**拦
+  `no-headless-agent`，issue 照常发起（`AC-10.5`）。
+- **分派次序：先共写，后逐条 question**（`spec-00007-FR-5` 的可观察承诺）。
+  实现上是一个 `await` 序列而非并发：issue 通路整个走完（判定 → 流转 → 占槽 →
+  spawn）之后，才逐条顺序受理 question。`spec-00007-AC-5.8`（只剩一个名额
+  时共写取走、两条 question 皆拦）由这个次序**直接**成立，不需要为它加任何
+  名额预留机制。
+
+### 12.4 issue 通路——程序化发起共写（`spec-00007-FR-7`/`FR-8`）
+
+- **发起是服务端内部直调**，不经 `POST /api/sessions/cowrite` 的 HTTP 层：
+  调用 §11.1 的同一个受理函数，`materials` 位换成程序化构成的材料行。
+  同一注册表、同一受理裁决、同一收束过滤、同一收束 commit——
+  `spec-00007-FR-8` 的「无行为差别」因此是**同一段代码**，而不是两处需要
+  对齐的实现。
+- **材料段**（`spec-00006-FR-3` 的既有拼接位，`CowriteTask.materialLines`）
+  换一个构造函数产出，逐条 issue 一段，指令骨架、写域约束、reference 要件、
+  蒸馏要求原样不动（`spec-00006-FR-1` 的指令骨架零改动）：
+
+  ```
+  Issue <i> of <n> — the passage the owner marked in <docPath>:
+    …<before>[[<selected>]]<after>…
+  What they want changed: <标注文本>
+  ```
+
+  上下文原样附上（`spec-00007-AC-7.1` 要「选区原文/上下文/标注文本」三样
+  齐全），选区本身以 `[[ ]]` 夹注标出——agent 拿到的是原文不是转述，而
+  夹注让它分得清哪一段是被点名的那一句。
+- **纪律条款**四条，紧随材料段之后、末行 `Change nothing outside the docs
+  tree.` 之前（纪律是对材料的处置方式，位置跟着材料走）：
+
+  ```
+  Work through the issues above one by one, in the order given, and report on each as you finish it.
+  Where you cannot tell what an issue is asking for, stop and ask the owner — never guess.
+  Where an issue implies a change to a related document, report that implication and leave it to the
+    owner: writing it is outside what you may write here, and would be filtered out and restored
+    when this session ends.
+  Do no review action: never accept, clarify or audit anything, and never touch the status line.
+  ```
+
+  第三条同时说了「为什么」——写域外的写入**会被收束过滤复原**
+  （`rule-00001-BR-30`、§11.3），指令层与执行层因此说的是同一件事，agent
+  不必猜哪条是硬约束。
+- **自动流转复用既有状态切换通路**（`spec-00007-FR-7`，`rule-00001-BR-3`）：
+  目标为 `active` 的 living doc 时调 `DocService.changeStatus(id, 'draft')`
+  ——就是 §6 写管道的状态切换支，读盘校验 → 流转合法性表 → 三道门 → 写盘 →
+  `wb(status): <id>` 一动作一 commit，全部原样。**不新写流转函数、不旁路
+  三道门**：`active → draft` 天然三门皆不适用（§6 已述——目标非促进态、非
+  `archived`、非 plan 的 `open → resolved`），复用因此不改变任何一次拒绝的
+  结论，却白拿了 compare-and-swap 冲突检测与 commit 串行队列。
+- **实现次序：判定段与占槽段拆开，流转夹在中间**（`spec-00007-FR-7` 的
+  全有或全无，边界是流转写盘）：
+
+  1. 前置（§12.3）→ 逐条锚校验 → issue 资格复验；
+  2. **判定段——纯判定，不入注册表**：同文档互斥与总并发上限。实现上把
+     `SessionManager` 现有的私有 `admit(plan)` 提为可单独调用的判定
+     （它本就无副作用，只抛 `SessionBusyError`；占槽发生在
+     `startDeferred` 里 `admit` 之后的入表那一步）。不过即整批拦下
+     `doc-busy`/`cap-reached`，**不流转、不建会话**（`AC-10.1`、
+     `AC-10.3`）；
+  3. **启动预检**：对所选 agent 的 `command` 做可执行性判定，不可执行即
+     整批拦 `start-failed`、**不流转**；
+  4. **流转**（目标为 `active` 的 living doc 时）——`changeStatus` 写盘 +
+     commit。此刻注册表里**没有本会话**；
+  5. **占槽段**：从**刚流转完的盘上内容重读** `id`/`status`，据以构造
+     `plan.cowrite = {targetPath, preId, preStatus}`，再调
+     `startDeferred`——它同步完成受理二次判定、占槽、会话前快照与内容
+     快照、入表 `running`（§5、§11.3）；
+  6. 批行以 `cowriting` 落盘、该批标注改 `submitted`（§12.6 写序）；
+  7. `launchTerminal` spawn。
+
+  **`preStatus`/`preId` 的取值时机是第 5 步，即流转之后**——这句是本节
+  对 §11 的唯一接口约定，必须明写：`startDeferred` 读的是调用方给的
+  `plan.cowrite`，调用方在流转前构造它就会把 `active` 钉进基线。
+  **为什么必须这样排——三处冲突同一个因**（会话过早入表），改次序一次
+  全消，§11 的三段代码零改动：
+  - `spec-00006-FR-10` 的**状态锁**（§11.4）在 `changeStatus` 前查注册表，
+    见到本文档有运行中 `cowrite` 即 409 `doc-busy`——先占槽后流转，这次
+    流转会被本会话自己锁死；
+  - §11.3 的 **front matter 守卫**拿 `preStatus` 把收束时的 `status` 行
+    改回会话前值——基线若停在 `active`，收束会把 `draft` 无条件改回
+    `active`，直接违 `spec-00007-AC-8.5`（会话不促进、不改状态，文档收束
+    后仍应是 `draft`）；
+  - §11.4 的 **PUT 旁路封堵**同样锚定受理时刻的 `preStatus`——基线若是
+    `active`，用户在会话期间对正文的手改保存会因 `status` 与基线不符而
+    必然 409，违 `spec-00006-FR-5` 与 `spec-00007-FR-8` 的「与手工发起的
+    共写无行为差别」。
+
+  另外两个候选被否决，记明理由：**「流转对本会话豁免锁」**要把 §11.4
+  那条「注册表里有没有运行中 cowrite」的单行判据改成带例外的判据，
+  `spec-00006-FR-10`「不得有一条通路绕过」的可核性随之打折，且它只解掉
+  三处冲突里的一处；**「`preStatus` 流转后回填」**等于承认基线有一段
+  时间是错的——那段窗口里用户恰好保存正文仍会 409，且它同样不解状态锁
+  自锁。
+  **第 3 步是本节为 `spec-00007-AC-7.4` 添的唯一新机制**：
+  `spec-00001-FR-16` 的启动失败在 Node 里是 spawn 之后的异步 `error`
+  事件，而 `AC-7.4` 要求「CLI 必然启动失败时文档仍为 `active`、无流转
+  commit」——不做一次不 spawn 的预检就无法在写盘之前知道这件事，而
+  `spec-00007-FR-7` 又明写写盘之后**不回滚**。预检的判据：`command` 含
+  路径分隔符时按路径 `fs.accessSync(X_OK)`，**相对路径的基准与 spawn
+  同——`join(repoRoot, agent.cwd ?? '.')`**（不是服务进程的 cwd，两者
+  在本仓恰好不同：会话的工作目录是 `docs/`，§3）；裸名则按 `PATH` 逐段
+  拼同一判定。预检拦住的是 FR-16 的主要情形（命令不存在/不可执行）；
+  spawn 之后才崩的残余落进 FR-7 自己点名的**复合角落**（下条）。
+- **两处残余角落，都落 FR-7 明写的复合角落，都不回滚**：
+  （a）第 5 步的二次受理判定抛 `cap-reached` 或 `doc-busy`——第 2 步与
+  第 5 步之间隔着流转的写盘与 commit（有 `await`），期间别的发起可能
+  取走最后一个名额或占走该文档；同一窗口里第 4 步流转自身也可能被
+  §11.4 的状态锁以 409 `doc-busy` 拒绝，该支落在写盘**之前**、归口
+  与判定段拒绝相同（批行未落盘、应答直接拦）；
+  （b）第 7 步 spawn 之后的异步启动失败。两者中已写过盘的，文件一律
+  保留为 `draft`，修复后再提交走不流转分支；**回到未提交的路子不同**——
+  (a) 发生在批行落盘之前，那批 issue 还是 `pending`，本次应答直接拦
+  该 reason；(b) 时应答早已发出、批行已在盘上，issue 经 §12.6 的
+  `failed` 终局回到未提交区，错误由会话结束提示与 `/api/events` 送达。
+  **判定跑两遍是有意的**，不是冗余：第一遍为 `AC-10.3` 的「无流转」，
+  第二遍才是 §5 那条「受理时占用、先到先得」的记账，语义各归各。
+  不为 (a) 加锁——加锁就是把流转的写盘与 commit 整个放进注册表的临界区，
+  而那次 commit 走的是 §4 的串行队列，会与别的会话收尾互相等待。
+- **流转 commit 失败**（`spec-00001-FR-20`，`spec-00007-AC-7.5`）：
+  `changeStatus` 返回的 `{committed: false, error}` 原样进应答的
+  `transition`，**会话照常启动**——写盘已成，文档在盘上就是 `draft`，可
+  共写（同 `spec-00006-FR-2` 对建档 commit 失败的既有裁定）。commit 失败
+  不是流转失败。
+- **`spec-00006-FR-4` 的 Source 视图一次覆盖不适用，不需要任何传递机制**：
+  那次覆盖是**前端行为**（发起成功后把编辑器切到 Source，design-00002
+  §15），服务端载荷里从来没有它。谁发起谁覆盖——共写发起 UI 的调用点做，
+  统一提交的调用点不做。服务端因此零改动，例外落在 design-00002 修订轮的
+  一个调用点上。
+- 会话运行中的一切照 §11：等待判定与徽标（`AC-8.3`）、同文档互斥
+  （`AC-8.1`）、状态锁拒绝接收（`AC-8.4`）、收束过滤（`AC-8.2`）、收束
+  commit、终止收尾——本节不加码，也不豁免。
+
+### 12.5 question 通路——首调指令的选区材料（`spec-00007-FR-6`）
+
+- **拼装点是 `sessionTasks.askInstruction`**，增一个可选的 `selection`
+  参数：在既有四行（性质说明 + 目标文档路径 + 全部关系文档路径 + 只读
+  说明）之后、问题文本之前追加一节：
+
+  ```
+  The passage they marked, quoted from <docPath>:
+    …<before>[[<selected>]]<after>…
+  ```
+
+  首调载荷（§10.1 的 `{question}` 整段替换）因此是「答疑指令 + 选区节 +
+  标注文本」，占位形态与 capture 口径零改动。**追问不带选区节**——resume
+  形态只替换追问文本（`spec-00005-FR-2` 的上下文不重付），这一点对标注
+  发起的线程与手工发起的线程完全一致。
+- 每条 question 各发一次首调、各开一条线程（`spec-00005-FR-2`），返回的
+  `threadId` 在同一条逐 docId 串行队列里回写该标注。发起受既有拒绝面约束
+  ——线程串行、总并发上限（`spec-00005-FR-6`：不占文档，但占名额）——被
+  拒的**单条**拦下留未提交区、`blocked` 点名原因，不阻其余
+  （`spec-00007-AC-6.3`）。
+- 无 agent 声明 headless 时（`spec-00007-FR-10` 对称 FR-4）：
+  `submitPreview.questionEligible` 为 false，`POST /api/annotations/:id`
+  的 question 类型 422 `type-ineligible`，提交中的 question 条目拦
+  `no-headless-agent`，issue 不受影响。
+
+### 12.6 批状态生命周期、核销与刷新（`spec-00007-FR-9`/`FR-10`）
+
+```mermaid
+stateDiagram-v2
+  [*] --> cowriting: 批行落盘（先于 spawn）
+  cowriting --> done: 注册表 exited（收束过滤与 commit 照常）
+  cowriting --> terminated: 注册表 terminated（面板终止 / 正常关停）
+  cowriting --> failed: 注册表 failed（spawn 后启动失败，spec-00001-FR-16）
+  cowriting --> failed: 启动核销（服务异常终止遗留）
+  done --> [*]: 标注保持 submitted，呈已完成与收束 commit 引用
+  terminated --> [*]: 标注解引用回 pending，可改可删可再提交
+  failed --> [*]: 同上
+```
+
+**终局映射是注册表状态的一张全表**，`SessionStatus` 的四个值一个不漏：
+`exited`（不论退出码）→ `done`，`terminated` → `terminated`，`failed`
+→ `failed`；第四个 `running` 是进行中、不映射。三条终局共用**同一个
+结束回调**，批不认识「为什么结束」，只认结束态。
+
+- **批行的写序：落盘先于 spawn**（同 §10.2 答疑 exchange 的取法，理由
+  也同一条——崩溃时内存里的记录没有意义，启动核销要有东西可核）：占槽段
+  完成后（§12.4 第 5 步）先以 `cowriting` 追加批行、把该批标注改为
+  `submitted`，随后才 `launchTerminal`。
+- **spawn 之后的启动失败不设特设回滚，走注册表的 `failed` 终局**
+  （`spec-00001-FR-16`，`spec-00007-FR-7` 点名的复合角落）：
+  `launchTerminal` 的 seam 抛出时会话经既有路径落 `failed`、还槽、进
+  会话列表并发提示条（§5），而 `failed` 是上表里的一条终局——**同一个
+  结束回调**照常跑到批回填，批记 `failed`、标注解引用回未提交区。
+  写明「不特设回滚」是因为初稿的两步手工回滚会**漏掉一半**：`failed`
+  这条终局本来就要为「异常终止核销」以外的失败存在，两套写法只会在
+  某个角落各写一遍、其中一遍忘了解引用。批行尚未落盘时（占槽成功而批
+  写盘本身抛出）无可回填——那批标注还没改成 `submitted`，什么都没发生，
+  会话按 §10.3 的 `abandon` 还槽即可。
+- **回填挂点在会话的结束回调**——自然结束时它就是 §11.3 收尾序列的末端，
+  次序为历史落盘 → 过滤 → commit → **批回填** → `/api/events` 广播；
+  `failed` 的会话没有收束那几步，回填仍在同一个回调上。按 `sessionId`
+  在 `batches` 中反查（该字段即为此存在），写
+  `status`/`endedAt`/`commit`，终局按上表映射。
+- **收束 commit 引用**（`spec-00007-AC-9.4`/`AC-9.5`）：`CommitOutcome`
+  增一个可选 `sha`——`simple-git` 的 `commit()` 已返回 `CommitResult.commit`
+  （短 hash），照实带回即可；无可暂存变更时 GitLayer 本就返回
+  `{committed: false}`、无 sha，批的 `commit` 记 `null`，「明示无变更」由
+  这个 `null` 承载（`spec-00006-FR-8` 的无 commit 分支）。这是本轮对既有
+  类型的**唯一**改动。
+- **回到未提交的实现**：`terminated`/`failed` 时把该批 `annotationIds`
+  的每条 `state` 改回 `pending`、清 `batchId`；批行本身**保留不删**
+  （只增不删的既有先例，`spec-00007` §6），此后不再被任何标注引用，只作
+  历史。`spec-00007-AC-10.7`（终止后可改后再提交、新会话）与 `AC-10.2`
+  由此成立。
+- **启动核销**（`spec-00007-AC-10.8`）：服务启动扫一遍
+  `.whiteboard/annotations/` 目录，`status: cowriting` 的批一律改写为
+  `failed` 并按上一条解引用——与 §10.2 答疑的启动核销**同一挂点**（同一次
+  启动扫描，两个目录各扫一遍），理由也同一条：注册表空态起步
+  （`spec-00003-FR-9`），磁盘上不许有幽灵进行中。
+- **正常关停**无需新判：§5 的关停收尾对 `cowrite` 会话逐个走终止路径，
+  收尾回调照常跑，批记 `terminated`。
+- **刷新重取扩一项**（§6 与 §10.3 的重取清单，第六项）：目标文档的
+  **编辑器打开期间**，前端刷新一并重取 `GET /api/annotations/:id`；
+  编辑器未打开不取。条件取编辑器而非「列表打开」是对前五项口径的**有意
+  偏离**——未提交标注的文内痕迹要在编辑与预览两态里呈现
+  （`spec-00007-AC-9.13`），裁定与理由属 design-00002 §16.8，服务端侧
+  只需知道这条载荷会被高频重取（12.2 末所说的「不设缓存」正是对着它
+  算的）。无此项，`cowriting → done` 的翻转到不了页面（question 项的
+  线程状态走的是 §10.3 的问题列表那一项，两半各有各的重取）；载荷里逐条现算的 `locate`
+  也随之刷新，`spec-00007-FR-12` 的「原文已变更」提示因此在共写写入的
+  下一次推送里就到位（`AC-12.1`）。
+- **连带把第四项的条件一并改了**（§10.3 与 §6 那两处措辞，本轮就地改，
+  非留待办）：question 项的状态由前端按 `threadId` 从 `GET /api/asks/:id`
+  合成（§12.1），而第四项原来的取数条件是「问题列表视图打开期间」——
+  用户停在标注列表这一视图态时它不取，那些项的状态会停在打开那一刻。
+  条件因此扩为「问题列表**或标注列表**打开期间」，两处原文已同轮
+  改写；对侧的前端登记见 design-00002 §16.8。服务端载荷零改动，改的只是
+  谁在什么时候来取。
+
+## 13. Open Questions
 
 - 本文档当前无未决项（第二十一轮的取舍全部由 decision-00012 在案；
   接续失效的出路已由域主裁定取「诚实标注」并回写 §10.2，2026-08-26；
   claude headless 声明的参数按 §10.1 的实测门落地；第二十二轮的取舍
-  全部由 decision-00015 在案，共写的接入验证按 §11.5 的实测门落地）。
+  全部由 decision-00015 在案，共写的接入验证按 §11.5 的实测门落地；
+  第二十三轮委给本文档的三项——锚的数据形态、恰一处命中的判定细则、
+  统一提交 API 的语义——已在 §12 逐项落定，随本轮评审一并接受或推翻，
+  未留待定项）。
