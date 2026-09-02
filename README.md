@@ -14,6 +14,8 @@ agents:
 - test-level guides that let each repo choose its own unit and E2E stack while
   pinning integration testing to Testcontainers and API testing to Bruno by
   default
+- a local docs whiteboard that renders the `docs/` tree as a board and drives
+  the review / promote / ask / co-write workflow
 
 This is not a full application starter. It does not assume a frontend stack,
 backend stack, or deployment platform. You bring the runtime code and keep the
@@ -67,6 +69,19 @@ Start here after creating a repo from this template:
   [TESTING.md](TESTING.md) (policy only — the framework choices live in the
   `*_TESTING.md` guides), and the [docs/](docs/README.md) taxonomy
 
+## Docs Whiteboard
+
+A local, single-user board over `docs/`: documents are nodes, front matter
+relations are edges, and every action (review, promote, ask, co-write, annotate)
+writes back to the Markdown files and commits.
+
+```bash
+cd tools/whiteboard && npm install && npm run build && npm start   # http://localhost:4173
+```
+
+Behavior is configured in [whiteboard.config.yaml](whiteboard.config.yaml); commands
+and details in [tools/whiteboard/README.md](tools/whiteboard/README.md).
+
 ## Repo Map
 
 - [AGENTS.md](AGENTS.md): behavior rules for coding agents in this repo
@@ -81,6 +96,7 @@ Start here after creating a repo from this template:
 - [REVIEW.md](REVIEW.md): project-specific review checklist (starts empty)
 - [THIRDPARTY.md](THIRDPARTY.md): register of external reference-only sources
 - [docs/README.md](docs/README.md): source of truth for the docs taxonomy
+- [tools/whiteboard/README.md](tools/whiteboard/README.md): the docs whiteboard
 
 ## Suggested Adoption Flow
 
