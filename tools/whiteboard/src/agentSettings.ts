@@ -100,6 +100,21 @@ function projectOnly(project: AgentConfig[]): EffectiveAgent[] {
 }
 
 /**
+ * The one null the file admits (design-00001 §13.1): `overrides.<name>.headless:
+ * null` takes a project entry's headless declaration away, which is how an entry
+ * leaves the ask option set from the panel (spec-00009-AC-9.3). Every other null
+ * is the layer being ill-formed rather than a key being unset — «absent» and
+ * «null» reading the same would make «undo this override» two writings of one
+ * thing; and an added entry has no declaration to take away, so it admits none.
+ */
+function rejectNulls(keys: Record<string, unknown>, at: string, undoable?: 'headless'): void {
+  for (const [key, value] of Object.entries(keys)) {
+    if (value !== null || key === undoable) continue
+    throw new LocalSettingsError(`agent settings: \`${at}.${key}\` may not be null`, `${at}.${key}`)
+  }
+}
+
+/**
  * One local entry, checked the way a project one is: the two layers run the
  * **same** function — that is what `readAgentEntry` is for — and differ only in
  * what a failure costs. Here it costs the layer, not the start (spec-00009-FR-4).
@@ -140,6 +155,7 @@ function applyOverrides(
         `${at}.cwd`,
       )
     }
+    rejectNulls(keys, at, 'headless')
     const base = merged.get(name)
     if (!base) {
       // The project layer renamed or dropped it. One ignored line, not a broken
@@ -170,6 +186,7 @@ function addEntries(merged: Map<string, EffectiveAgent>, entries: Record<string,
         `${at}.cwd`,
       )
     }
+    rejectNulls(keys, at)
     if (merged.has(name)) {
       throw new LocalSettingsError(
         `agent settings: \`${name}\` has the same name as a project entry; write it under \`overrides\``,

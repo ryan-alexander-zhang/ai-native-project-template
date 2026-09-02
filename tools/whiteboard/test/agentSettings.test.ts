@@ -4,6 +4,14 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { EffectiveAgents, LocalSettingsError, mergeAgents, readLocalSettings } from '../src/agentSettings.ts'
 import type { AgentConfig } from '../src/config.ts'
+import type { HeadlessConfig } from '../src/headless.ts'
+
+/** A headless declaration the entry checks pass, so a test can put one on an entry and take it off again. */
+const HEADLESS: HeadlessConfig = {
+  first: ['-p', '{question}'],
+  resume: ['-p', '--resume', '{session}', '{question}'],
+  capture: 'claude-json',
+}
 
 const PROJECT: AgentConfig[] = [
   { name: 'claude', command: 'first-cli', args: ['--model={model}'], cwd: 'docs', model: 'm1' },
@@ -75,6 +83,36 @@ describe('mergeAgents', () => {
   it('refuses an override or an added entry that is not a mapping at all', () => {
     expect(() => mergeAgents(PROJECT, { overrides: { claude: 'm2' } })).toThrowError(/`overrides.claude`/)
     expect(() => mergeAgents(PROJECT, { entries: { codex: 7 } })).toThrowError(/`entries.codex`/)
+  })
+
+  /**
+   * The one null the file admits (design-00001 §13.1): the project entry's
+   * headless declaration is taken away, so the entry leaves the ask option set
+   * without leaving the list — which is what makes spec-00009-AC-9.3's Given
+   * reachable from the panel at all.
+   */
+  it('takes a project entry’s headless declaration away for a null override', () => {
+    const asker: AgentConfig[] = [{ name: 'claude', command: 'first-cli', args: [], cwd: 'docs', headless: HEADLESS }]
+
+    const { agents } = mergeAgents(asker, { overrides: { claude: { headless: null } } })
+
+    expect(agents[0]!.headless).toBeUndefined()
+    expect(agents[0]).toMatchObject({ name: 'claude', command: 'first-cli', source: 'overridden' })
+  })
+
+  /**
+   * Every other null is the layer being ill-formed, not a key being unset: an
+   * added entry has no project declaration to take away, so it admits none either.
+   */
+  it('refuses a null under any other key, naming it', () => {
+    for (const [local, at] of [
+      [{ overrides: { claude: { model: null } } }, 'overrides.claude.model'],
+      [{ overrides: { claude: { args: null } } }, 'overrides.claude.args'],
+      [{ entries: { codex: { command: 'codex', headless: null } } }, 'entries.codex.headless'],
+    ] as const) {
+      expect(() => mergeAgents(PROJECT, local)).toThrowError(LocalSettingsError)
+      expect(() => mergeAgents(PROJECT, local)).toThrowError(new RegExp(`\`${at}\``))
+    }
   })
 
   it('refuses a name written as both an override and an added entry', () => {

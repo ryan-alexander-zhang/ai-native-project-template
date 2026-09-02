@@ -56,7 +56,7 @@ export function agentCards(
       name: entry.name,
       appended: false,
       source: overridden.length === 0 ? 'project' : 'overridden',
-      entry: { ...entry, ...override },
+      entry: merged(entry, override),
       overridden,
       disabled: disabled.has(entry.name),
       isDefault: local.default === entry.name,
@@ -77,6 +77,17 @@ export function agentCards(
     })
   }
   return sorted(cards, order)
+}
+
+/**
+ * A project entry under its local override, read the way the server reads it:
+ * `headless: null` is the declaration **taken away**, not one more key with a
+ * value (design-00001 §13.1), so the row shows no headless badge and the ask
+ * option set is one shorter.
+ */
+function merged(entry: AgentEntry, override: AgentOverride): AgentEntry {
+  const { headless, ...rest } = { ...entry, ...override }
+  return headless === null ? rest : { ...rest, headless }
 }
 
 /** Effective order first, everything the effective list has no place for after it, and the disabled last. */
@@ -122,6 +133,25 @@ export function withField<K extends OverridableKey>(
     ...local,
     [table]: { ...local[table], [card.name]: { ...current, [key]: value } },
   } as LocalAgentSettings
+}
+
+/**
+ * «No headless»: the entry declares none, and so is no longer one an ask can be
+ * put to (design-00002 §18.3). Two writings of one thing, because the layers
+ * mean different things by it — a project entry's declaration is **taken away**
+ * by the one null the file admits, while an appended entry simply does not carry
+ * the key (design-00001 §13.1).
+ */
+export function withoutHeadless(local: LocalAgentSettings, card: AgentCard): LocalAgentSettings {
+  if (!card.appended) {
+    const override = { ...local.overrides?.[card.name], headless: null }
+    return { ...local, overrides: { ...local.overrides, [card.name]: override } }
+  }
+  const entries = { ...local.entries }
+  const entry = { ...entries[card.name]! }
+  delete entry.headless
+  entries[card.name] = entry
+  return { ...local, entries }
 }
 
 /**

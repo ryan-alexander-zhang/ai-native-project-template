@@ -101,12 +101,19 @@ export interface AgentEntry {
 /**
  * What the local layer may say about one project entry: any key but `cwd`, which
  * is the write-scope barrier and never local (design-00001 §13.1). Each key it
- * carries replaces the project's whole key — undoing one is deleting it.
+ * carries replaces the project's whole key — undoing one is deleting it. The one
+ * null the file admits is `headless: null`, which takes the project entry's
+ * declaration away rather than replacing it.
  */
-export type AgentOverride = Partial<Omit<AgentEntry, 'name' | 'cwd'>>
+export type AgentOverride = Partial<Omit<AgentEntry, 'name' | 'cwd' | 'headless'>> & {
+  headless?: HeadlessDecl | null
+}
 
-/** An entry only this machine declares: an override that must carry a `command`. */
-export type LocalAgentEntry = AgentOverride & { command: string }
+/**
+ * An entry only this machine declares: an override that must carry a `command`,
+ * and that has no project declaration to take away, so no null of its own.
+ */
+export type LocalAgentEntry = Omit<AgentOverride, 'headless'> & { command: string; headless?: HeadlessDecl }
 
 /** The local layer file, whole (design-00001 §13.1). A save PUTs one of these. */
 export interface LocalAgentSettings {

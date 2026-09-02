@@ -42,6 +42,7 @@ import {
   withEntry,
   withField,
   withoutEntry,
+  withoutHeadless,
   withoutOverride,
 } from './settingsModel.ts'
 
@@ -238,6 +239,7 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
                     )
                   }
                   onField={(key, value) => edit(withField(local, card, key, value))}
+                  onNoHeadless={() => edit(withoutHeadless(local, card))}
                   onUndo={(key) => edit(withoutOverride(local, card.name, key))}
                   onDisabled={(off) => edit(withDisabled(local, card.name, off))}
                   onDefault={() => edit(withDefault(local, card.name))}
@@ -273,6 +275,7 @@ interface RowProps {
   onToggle: () => void
   onShow: (key: string) => void
   onField: <K extends OverridableKey>(key: K, value: FieldValue[K]) => void
+  onNoHeadless: () => void
   onUndo: (key: OverridableKey) => void
   onDisabled: (off: boolean) => void
   onDefault: () => void
@@ -359,7 +362,7 @@ function Masked({ value, shown, onToggle }: { value: string; shown: boolean; onT
  * layer's to replace — the working directory is the first barrier of the write
  * scope, and an appended entry's is `docs` and nothing else (spec-00009-FR-3).
  */
-function Form({ card, captures, error, onField, onUndo, onDisabled, onDefault, onDelete }: RowProps) {
+function Form({ card, captures, error, onField, onNoHeadless, onUndo, onDisabled, onDefault, onDelete }: RowProps) {
   const headless: HeadlessDecl = card.entry.headless ?? { first: [], resume: [], capture: captures[0] ?? '' }
   const undo = (key: OverridableKey) =>
     card.overridden.includes(key) ? (
@@ -434,6 +437,16 @@ function Form({ card, captures, error, onField, onUndo, onDisabled, onDefault, o
             ))}
           </SelectContent>
         </Select>
+      </Field>
+      <Field label="No headless">
+        {/* The entry declares no headless form, and so leaves the ask option set
+            (design-00002 §18.3). Turning it back off writes the form on show,
+            which for an entry that has none is the blank one above. */}
+        <Switch
+          aria-label="No headless"
+          checked={card.entry.headless === undefined}
+          onCheckedChange={(off) => (off ? onNoHeadless() : onField('headless', headless))}
+        />
       </Field>
       {said('headless')}
 

@@ -195,7 +195,7 @@ describe('the settings panel', () => {
     expect(within(card('other')).getByText('disabled')).toBeTruthy()
 
     await expand('other')
-    await userEvent.click(within(card('other')).getByRole('switch'))
+    await userEvent.click(within(card('other')).getByRole('switch', { name: 'Disabled' }))
 
     expect(within(card('other')).queryByText('disabled')).toBeNull()
   })
@@ -327,6 +327,46 @@ describe('the list a save makes effective', () => {
     expect((await screen.findAllByRole('menuitem')).map((one) => one.textContent)).toEqual(['claude', 'codex-local'])
   })
 
+  // spec-00009-AC-9.3's precondition, reachable from the panel: «no headless» on a
+  // project entry is the one null the file admits, and it is what takes that entry
+  // out of the ask choice (design-00001 §13.1, design-00002 §18.3)
+  it('writes a null headless override when a project entry is told to declare none', async () => {
+    serve({ project: [CLAUDE, OTHER] }, [listed('claude', true), listed('other', false)])
+    const put = vi
+      .spyOn(api, 'saveAgentSettings')
+      .mockResolvedValue({ effective: [listed('claude', false, 'overridden'), listed('other', false)], notices: [] })
+    await openBoard()
+    await openSettings()
+
+    await expand('claude')
+    await userEvent.click(within(card('claude')).getByRole('switch', { name: 'No headless' }))
+    expect(within(card('claude')).queryByText('headless')).toBeNull()
+    await save()
+    await closeSettings()
+
+    expect(put).toHaveBeenCalledWith({ overrides: { claude: { headless: null } } })
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
+  })
+
+  // spec-00009-FR-7 — the same switch on an added entry: nothing to take away, so
+  // the key is simply not written (design-00002 §18.3)
+  it('drops the headless key altogether when an added entry is told to declare none', async () => {
+    serve({ local: { entries: { 'codex-local': { command: 'codex', headless: HEADLESS } } } }, [
+      listed('claude', true),
+      listed('codex-local', true, 'local'),
+    ])
+    const put = vi
+      .spyOn(api, 'saveAgentSettings')
+      .mockResolvedValue({ effective: [listed('claude', true), listed('codex-local', false, 'local')], notices: [] })
+    await openBoardAndSettings()
+
+    await expand('codex-local')
+    await userEvent.click(within(card('codex-local')).getByRole('switch', { name: 'No headless' }))
+    await save()
+
+    expect(put).toHaveBeenCalledWith({ entries: { 'codex-local': { command: 'codex' } } })
+  })
+
   // spec-00009-AC-8.4 — the board's half: with no headless agent left, neither
   // ask entry is drawn. The refusal of one put through the API is the server's
   it('draws neither ask entry once the one headless agent is disabled and saved', async () => {
@@ -337,7 +377,7 @@ describe('the list a save makes effective', () => {
     await openSettings()
 
     await expand('claude')
-    await userEvent.click(within(card('claude')).getByRole('switch'))
+    await userEvent.click(within(card('claude')).getByRole('switch', { name: 'Disabled' }))
     await save()
     await closeSettings()
 

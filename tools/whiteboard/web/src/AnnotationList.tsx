@@ -192,11 +192,16 @@ function SubmitConfirm({
 }) {
   const [question, setQuestion] = useState<string>()
   const [cowrite, setCowrite] = useState<string>()
+  // A name the settings panel has since taken off the list is no longer a choice:
+  // sent, it would be refused as unknown, so a pick the list no longer carries
+  // falls back to the first (spec-00009-FR-8, design-00002 §18.3).
+  const held = (pick: string | undefined, list: readonly string[]) =>
+    pick !== undefined && list.includes(pick) ? pick : undefined
   // One agent is no choice at all: nothing is drawn and nothing is sent, so the
   // server takes the first of that path's own set (spec-00007-AC-5.6).
   const chosen = {
-    ...(askAgents.length > 1 ? { question: question ?? askAgents[0] } : {}),
-    ...(agents.length > 1 ? { cowrite: cowrite ?? agents[0] } : {}),
+    ...(askAgents.length > 1 ? { question: held(question, askAgents) ?? askAgents[0] } : {}),
+    ...(agents.length > 1 ? { cowrite: held(cowrite, agents) ?? agents[0] } : {}),
   }
 
   return (
