@@ -5,6 +5,7 @@
     "docs/*/[^A-Z]*",
     "docs/*/*/*",
     "CONTEXT.md",
+    "ARCHITECTURE.md",
     ".github/",
     ".template-sync.json",
     "scripts/release.sh",
