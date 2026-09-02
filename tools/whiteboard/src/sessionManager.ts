@@ -4,7 +4,7 @@ import type { Expectation } from './advance.ts'
 import type { AskResult } from './askStore.ts'
 import { HAND_EDIT_NOTE } from './cowrite.ts'
 import type { CommitOutcome, ContentSnapshot, DirtySnapshot } from './gitLayer.ts'
-import { type SpawnHeadless, failureReason, headlessArgs, readCapture, spawnHeadless } from './headless.ts'
+import { type SpawnHeadless, failureReason, fillModel, headlessArgs, readCapture, spawnHeadless } from './headless.ts'
 import { writeSessionHistory } from './sessionHistory.ts'
 import { WorkflowError } from './workflow.ts'
 
@@ -122,7 +122,7 @@ export interface SessionInfo {
   sourceId: string
   /** The type an advance was asked to produce; the other kinds produce no new document. */
   targetType?: string
-  /** Which agent of the flow config is running it (spec-00001-FR-55). */
+  /** Which agent of the effective agent list is running it (spec-00001-FR-55). */
   agent: string
   status: SessionStatus
   exitCode?: number
@@ -185,7 +185,27 @@ export interface PtyProcess {
   kill(): void
 }
 
-export type SpawnPty = (command: string, args: string[], cwd: string) => PtyProcess
+export type SpawnPty = (
+  command: string,
+  args: string[],
+  cwd: string,
+  /** The whole environment the child runs in — the board's own with the entry's `env` over it (spec-00009-FR-1). */
+  env: Record<string, string>,
+) => PtyProcess
+
+/**
+ * The environment one agent's child process runs in (design-00001 §13.4): the
+ * board's own, with the entry's `env` laid over it — so `HOME` and the rest of
+ * the shell the board was started from are still there, and what the entry names
+ * wins where the two meet (spec-00009-AC-1.2). No key is filtered.
+ */
+export function childEnv(agent: AgentConfig): Record<string, string> {
+  const base: Record<string, string> = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) base[key] = value
+  }
+  return { ...base, ...agent.env }
+}
 
 /**
  * Why a start was refused, in a word the board can act on (design-00001 §7):
@@ -287,8 +307,12 @@ interface Session {
 }
 
 export interface SessionManagerOptions {
-  /** Every agent the flow config declares; a session runs the one it names, or the first (spec-00001-FR-55). */
-  agents: AgentConfig[]
+  /**
+   * The effective agent list as it stands (spec-00001-FR-55). A function and not
+   * an array: the two layers are merged afresh at every admission, so the list
+   * cannot be frozen at start-up (spec-00009-FR-3, decision-00017 §5).
+   */
+  agents: () => AgentConfig[]
   /** How many sessions may run at once — `max_sessions` of the flow config (spec-00003-FR-3). */
   maxSessions: number
   repoRoot: string
@@ -380,8 +404,8 @@ export class SessionManager {
    * by arrival, and first come first served needs no lock of its own
    * (spec-00003-AC-3.6).
    */
-  start(plan: SessionPlan, agentName?: string): SessionInfo {
-    const info = this.startDeferred(plan, agentName)
+  start(plan: SessionPlan, agent?: string | AgentConfig): SessionInfo {
+    const info = this.startDeferred(plan, agent)
     // The slot is taken; the process waits. An ask call's record has to be on
     // disk before there is a process to reconcile it against, so its spawn is
     // the caller's next step rather than this one's (design-00001 §10.2 写序).
@@ -397,8 +421,8 @@ export class SessionManager {
    * cowrite that is creating its own target, which must not file a document if
    * the cap refuses it (spec-00006-AC-2.6).
    */
-  startDeferred(plan: SessionPlan, agentName?: string): SessionInfo {
-    const agent = this.resolveAgent(agentName, plan.kind)
+  startDeferred(plan: SessionPlan, named?: string | AgentConfig): SessionInfo {
+    const agent = this.resolveAgent(named, plan.kind)
     this.admit(plan.kind, plan.sourceId)
     const startedAt = new Date().toISOString()
     const info: SessionInfo = {
@@ -455,7 +479,12 @@ export class SessionManager {
     const { repoRoot } = this.options
     const { agent, info, plan } = session
     try {
-      session.pty = this.options.spawn(agent.command, agent.args, join(repoRoot, agent.cwd ?? '.'))
+      session.pty = this.options.spawn(
+        agent.command,
+        fillModel(agent.args, agent.model),
+        join(repoRoot, agent.cwd ?? '.'),
+        childEnv(agent),
+      )
       session.kill = () => session.pty?.kill()
     } catch (cause) {
       return this.fail(session, (cause as Error).message)
@@ -504,9 +533,9 @@ export class SessionManager {
     // The declared flag set whole, and never the entry's `args`: those are the
     // interactive form's (design-00001 §10.1). The instruction goes in as one
     // argv element, so there is no shell and no escaping.
-    const args = headlessArgs(agent.headless!, session.plan.instruction, session.plan.resumeId)
+    const args = headlessArgs(agent.headless!, session.plan.instruction, session.plan.resumeId, agent.model)
     try {
-      const child = spawn(agent.command, args, join(repoRoot, agent.cwd ?? '.'))
+      const child = spawn(agent.command, args, join(repoRoot, agent.cwd ?? '.'), childEnv(agent))
       session.kill = () => child.kill()
       child.onStdout((chunk) => {
         session.stdout += chunk
@@ -903,27 +932,36 @@ export class SessionManager {
 
   /**
    * The agent a session runs (spec-00001-FR-55): the one it names, or the first
-   * the flow config declares — which is the behaviour of every board before the
-   * eleventh round, so a single-agent config is unaffected.
+   * of the effective agent list — which is the behaviour of every board before
+   * the eleventh round, so a single-agent config is unaffected.
    *
    * An ask narrows the choice to the agents that declare a headless form
    * (spec-00005-FR-2, FR-8): the default is the first of those, and naming one
    * without a declaration is refused for that reason rather than for not
-   * existing. A config where none declares one answers no ask at all
-   * (spec-00005-AC-7.4).
+   * existing. A list where none declares one answers no ask at all
+   * (spec-00005-AC-7.4) — and a follow-up whose thread names an agent the list
+   * no longer holds is refused down these very branches (spec-00009-FR-9).
+   *
+   * An entry rather than a name is one already resolved at the batch's own
+   * admission and passed through (design-00001 §13.2): the whole batch then runs
+   * the list as it stood when it was received (spec-00009-AC-5.5).
    */
-  private resolveAgent(name: string | undefined, kind: SessionKind): AgentConfig {
-    const { agents } = this.options
+  private resolveAgent(named: string | AgentConfig | undefined, kind: SessionKind): AgentConfig {
+    if (typeof named === 'object') return named
+    const agents = this.options.agents()
+    const name = named
     if (name === undefined) {
       const chosen = kind === 'ask' ? agents.find((agent) => agent.headless !== undefined) : agents[0]
       if (!chosen) {
-        throw new WorkflowError('no agent in the flow config declares a headless form, so nothing can answer an ask')
+        throw new WorkflowError(
+          'no agent in the effective agent list declares a headless form, so nothing can answer an ask',
+        )
       }
       return chosen
     }
     const agent = agents.find((candidate) => candidate.name === name)
     if (!agent) {
-      throw new WorkflowError(`${JSON.stringify(name)} is not an agent in the flow config`)
+      throw new WorkflowError(`${JSON.stringify(name)} is not an agent in the effective agent list`)
     }
     if (kind === 'ask' && agent.headless === undefined) {
       throw new WorkflowError(`${JSON.stringify(name)} declares no headless form, so it cannot answer an ask`)

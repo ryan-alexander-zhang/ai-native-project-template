@@ -38,11 +38,11 @@ function requireExecutable(command: string): void {
 
 /** The pty spawner, with the grace as a parameter so a test can wait it out. */
 export function ptySpawner(graceMs: number = KILL_GRACE_MS): SpawnPty {
-  return (command, args, cwd): PtyProcess => {
+  return (command, args, cwd, env): PtyProcess => {
     requireExecutable(command)
     // A size to start on, not the size it stays: the terminal that attaches
     // reports its own and the session is resized to it (spec-00001-FR-12).
-    const pty = spawn(command, args, { name: 'xterm-color', cols: 120, rows: 30, cwd })
+    const pty = spawn(command, args, { name: 'xterm-color', cols: 120, rows: 30, cwd, env })
     // First SIGHUP, node-pty's own default — a CLI that listens gets to finish —
     // then SIGKILL once the grace is up (issue-00012). Signalling a process that
     // has already gone is a no-op node-pty swallows.

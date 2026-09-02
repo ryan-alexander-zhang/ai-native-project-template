@@ -44,6 +44,16 @@ The `agents` block names the CLI a session runs. A session's working directory i
 CLI here, verify it against `spec-00001-AC-13.2`**: a write outside the docs tree
 must not land. An unverified CLI does not belong in the shipped config.
 
+That block is the **project layer**, shared through git. Over it sits a **local
+layer** — `.whiteboard/agents.json`, which git ignores — holding this machine's
+own choices: a different `model` or `command` for an entry the project declares,
+extra `env`, an entry only this machine has, a disabled entry, a different
+default. Edit it from the settings panel in the board's top bar, or by hand; it
+is re-read on every session start, so a change takes effect without a restart,
+and an ill-formed file is ignored whole rather than stopping the board. The
+verification discipline above applies to the **project layer only**: what runs on
+your own machine is your own call.
+
 ## Notes
 
 - `node-pty` ships prebuilt binaries whose `spawn-helper` needs the executable

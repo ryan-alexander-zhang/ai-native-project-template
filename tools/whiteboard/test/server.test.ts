@@ -2363,7 +2363,7 @@ describe('the agent a session runs', () => {
     ] as const) {
       const { status, body } = await call('POST', path, request)
       expect(status).toBe(422)
-      expect(body.error).toMatch(/is not an agent in the flow config/)
+      expect(body.error).toMatch(/is not an agent in the effective agent list/)
     }
     expect(spawned).toEqual([])
     expect(board.sessions.latest()).toBeNull()
@@ -2388,6 +2388,363 @@ describe('the agent a session runs', () => {
     await board.sessions.whenFinished()
 
     expect((await call('GET', '/api/sessions/history')).body[0].agent).toBe('claude')
+  })
+})
+
+/**
+ * The two agent layers and the settings entries over them (spec-00009). The
+ * project layer is the flow config's `agents`; the local one is
+ * `.whiteboard/agents.json`, which the panel writes and a person may edit by
+ * hand. Everything that used to read «the configured agents» reads the merge of
+ * the two, recomputed at every admission and every download — which is what
+ * makes a save take effect with no restart (design-00001 §13).
+ */
+describe('the effective agent list', () => {
+  const DRAFT_SPEC = doc({ id: 'spec-00001-b', type: 'spec', status: 'draft' }, '# Spec\n')
+
+  /** The project layer these tests lay a local one over: a model on the first entry, a plain second. */
+  const PROJECT: AgentConfig[] = [
+    { name: 'claude', command: 'first-cli', args: ['--model={model}'], cwd: 'docs', model: 'm1' },
+    { name: 'other', command: 'second-cli', args: ['--yolo'], cwd: 'docs' },
+  ]
+
+  const localPath = (repoRoot: string) => join(repoRoot, '.whiteboard', 'agents.json')
+
+  /** Write the local layer — an object as JSON, a string as it stands, so an unparsable file can be one. */
+  function writeLocal(repoRoot: string, local: unknown): void {
+    mkdirSync(join(repoRoot, '.whiteboard'), { recursive: true })
+    writeFileSync(localPath(repoRoot), typeof local === 'string' ? local : JSON.stringify(local, null, 2))
+  }
+
+  /**
+   * A board whose pty records what it was spawned with, over a project layer and
+   * an optional local one already on disk — «the board started with this file
+   * there», which is what the FR-4 acceptances are about.
+   */
+  function settingsBoard(local?: unknown, agents: AgentConfig[] = PROJECT) {
+    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': DRAFT_SPEC })
+    if (local !== undefined) writeLocal(repoRoot, local)
+    const config = testConfig()
+    config.agents = agents
+    const spawned: Array<{ command: string; args: string[] }> = []
+    const open = boardOnRepo(repoRoot, docsDir, config, (command, args) => {
+      spawned.push({ command, args })
+      return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
+    })
+    return { ...open, spawned, writeLocal: (next: unknown) => writeLocal(repoRoot, next) }
+  }
+
+  /** Start an advance naming no agent: the one case «the first of the list» decides (spec-00001-FR-55). */
+  const advance = (call: BoardCall) => call('POST', '/api/sessions', { sourceId: 'spec-00001-b', targetType: 'plan' })
+
+  const configAgents = async (call: BoardCall) => (await call('GET', '/api/config')).body.agents
+  const settings = async (call: BoardCall) => (await call('GET', '/api/settings/agents')).body
+
+  // spec-00009-AC-3.1
+  it('runs a session on the model the local layer overrides the project one with', async () => {
+    const { call, spawned } = settingsBoard({ overrides: { claude: { model: 'm2' } } })
+
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+  })
+
+  // spec-00009-AC-3.2
+  it('downloads a locally added entry after the project ones, in that order', async () => {
+    const { call } = settingsBoard({ entries: { 'codex-local': { command: 'codex' } } }, [PROJECT[0]!])
+
+    expect(await configAgents(call)).toEqual([
+      { name: 'claude', headless: false, source: 'project', default: false },
+      { name: 'codex-local', headless: false, source: 'local', default: false },
+    ])
+  })
+
+  // spec-00009-AC-3.3
+  it('runs an unnamed session on the entry the local layer makes the default', async () => {
+    const { call, spawned } = settingsBoard({ default: 'other' })
+
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'second-cli', args: ['--yolo'] }])
+  })
+
+  // spec-00009-AC-3.5
+  it('downloads the project layer entry for entry when there is no local file', async () => {
+    const { call } = settingsBoard()
+
+    expect(await configAgents(call)).toEqual([
+      { name: 'claude', headless: false, source: 'project', default: false },
+      { name: 'other', headless: false, source: 'project', default: false },
+    ])
+  })
+
+  // spec-00009-AC-3.6
+  it('refuses a session that names a disabled entry, and starts nothing', async () => {
+    const { call, spawned } = settingsBoard({ disabled: ['other'] })
+
+    const { status, body } = await call('POST', '/api/sessions', {
+      sourceId: 'spec-00001-b',
+      targetType: 'plan',
+      agent: 'other',
+    })
+
+    expect(status).toBe(422)
+    expect(body.error).toMatch(/"other" is not an agent in the effective agent list/)
+    expect(spawned).toEqual([])
+  })
+
+  // spec-00009-AC-3.7
+  it('picks up a local file written by hand while it is running, with no restart', async () => {
+    const { call, spawned, writeLocal: write } = settingsBoard()
+
+    write({ overrides: { claude: { model: 'm2' } } })
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+  })
+
+  // spec-00009-AC-3.8
+  it('leaves a disabled entry out of the config download altogether', async () => {
+    const { call } = settingsBoard({ disabled: ['other'] })
+
+    expect(await configAgents(call)).toEqual([{ name: 'claude', headless: false, source: 'project', default: false }])
+  })
+
+  // spec-00009-AC-4.1
+  it('starts on an unparsable local file, falls back to the project layer and says why', async () => {
+    const { call } = settingsBoard('{ not json')
+
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+    expect((await settings(call)).error.message).toMatch(/agents\.json is not readable JSON/)
+  })
+
+  // spec-00009-AC-4.2
+  it('ignores the whole layer when it overrides cwd, model and all, naming that key', async () => {
+    const { call, spawned } = settingsBoard({ overrides: { claude: { cwd: 'docs/x', model: 'm2' } } })
+
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'] }])
+    expect(await settings(call)).toMatchObject({ error: { at: 'overrides.claude.cwd' } })
+  })
+
+  // spec-00009-AC-4.3
+  it('ignores a layer that disables every entry there is, saying the list would be empty', async () => {
+    const { call } = settingsBoard({ disabled: ['claude', 'other'] })
+
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+    expect((await settings(call)).error.message).toMatch(/effective agent list would be empty/)
+  })
+
+  // spec-00009-AC-4.4
+  it('falls back to the project layer at the next start when the file is edited into nonsense', async () => {
+    const { call, spawned, writeLocal: write } = settingsBoard({ overrides: { claude: { model: 'm2' } } })
+
+    write('{ broken')
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'] }])
+    expect((await settings(call)).error.message).toMatch(/not readable JSON/)
+  })
+
+  // spec-00009-AC-4.5
+  it('ignores an override of an entry the project layer no longer has, and keeps the rest', async () => {
+    const { call, spawned } = settingsBoard({
+      overrides: { old: { model: 'm3' }, claude: { model: 'm2' } },
+    })
+
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect((await settings(call)).notices).toEqual([
+      { name: 'old', message: 'the override of `old` points at no project entry' },
+    ])
+  })
+
+  // spec-00009-AC-4.6
+  it('ignores a layer whose default is also disabled, naming that entry', async () => {
+    const { call } = settingsBoard({ default: 'claude', disabled: ['claude'] })
+
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+    expect((await settings(call)).error.message).toMatch(/`claude` is the default and also disabled/)
+  })
+
+  // spec-00009-AC-4.7
+  it('ignores a layer whose added entry declares a cwd of its own, naming that key', async () => {
+    const { call } = settingsBoard({ entries: { 'codex-local': { command: 'codex', cwd: '.' } } })
+
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+    expect(await settings(call)).toMatchObject({ error: { at: 'entries.codex-local.cwd' } })
+  })
+
+  // spec-00009-AC-4.8
+  it('ignores a disabled name nothing answers to, and keeps the rest of the layer', async () => {
+    const { call, spawned } = settingsBoard({ disabled: ['old'], overrides: { claude: { model: 'm2' } } })
+
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect((await settings(call)).notices).toEqual([
+      { name: 'old', message: '`old` is disabled, but no entry of that name exists' },
+    ])
+  })
+
+  // spec-00009-AC-4.9
+  it('ignores a layer that adds an entry by a project entry’s own name, saying so', async () => {
+    const { call } = settingsBoard({ entries: { claude: { command: 'my-claude' } } })
+
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+    expect((await settings(call)).error.message).toMatch(/`claude` has the same name as a project entry/)
+  })
+
+  // spec-00005-AC-8.3 — a local entry's headless declaration is checked the same
+  // way the project layer's is, but an ill-formed one costs the layer, not the start
+  it('starts on a local entry whose headless declaration is ill-formed, naming that declaration', async () => {
+    const { call } = settingsBoard({
+      entries: { 'codex-local': { command: 'codex', headless: { first: ['-p'], resume: ['-p'], capture: 'claude-json' } } },
+    })
+
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+    expect(await settings(call)).toMatchObject({ error: { at: 'entries.codex-local.headless.first' } })
+  })
+
+  /** The panel's data source (spec-00009-FR-7): both layers, the merge, and the captures the code holds. */
+  it('hands the settings panel both layers, the effective list and the built-in captures', async () => {
+    const { call } = settingsBoard({ overrides: { claude: { model: 'm2' } } })
+
+    expect(await settings(call)).toEqual({
+      project: PROJECT,
+      local: { overrides: { claude: { model: 'm2' } } },
+      effective: [
+        { name: 'claude', headless: false, source: 'overridden', default: false },
+        { name: 'other', headless: false, source: 'project', default: false },
+      ],
+      captures: ['claude-json'],
+      notices: [],
+    })
+  })
+
+  // spec-00009-AC-5.1
+  it('writes the saved local layer to .whiteboard/agents.json', async () => {
+    const { call, repoRoot } = settingsBoard()
+
+    const { status } = await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+
+    expect(status).toBe(200)
+    expect(JSON.parse(readFileSync(localPath(repoRoot), 'utf8'))).toEqual({ overrides: { claude: { model: 'm2' } } })
+  })
+
+  // spec-00009-AC-5.2
+  it('runs the next session on the saved list, with no restart', async () => {
+    const { call, spawned } = settingsBoard()
+
+    await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+    await advance(call)
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+  })
+
+  // spec-00009-AC-5.3
+  it('leaves a running session on the argv it started with when the model is saved over', async () => {
+    const { call, spawned, board } = settingsBoard()
+
+    await advance(call)
+    await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'] }])
+    expect(board.sessions.latest()!.status).toBe('running')
+  })
+
+  // spec-00009-AC-5.6
+  it('overwrites an unparsable local file with the content the panel saved', async () => {
+    const { call, repoRoot } = settingsBoard('{ not json')
+
+    const { status } = await call('PUT', '/api/settings/agents', { default: 'other' })
+
+    expect(status).toBe(200)
+    expect(JSON.parse(readFileSync(localPath(repoRoot), 'utf8'))).toEqual({ default: 'other' })
+  })
+
+  // spec-00009-AC-6.1
+  it('refuses a save whose model no args hold a placeholder for, and writes nothing', async () => {
+    const { call, repoRoot } = settingsBoard(undefined, [{ name: 'claude', command: 'first-cli', args: [], cwd: 'docs' }])
+
+    const { status, body } = await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+
+    expect(status).toBe(422)
+    expect(body).toMatchObject({ at: 'overrides.claude.args' })
+    expect(body.error).toMatch(/overrides\.claude\.model/)
+    expect(existsSync(localPath(repoRoot))).toBe(false)
+  })
+
+  // spec-00009-AC-6.2
+  it('refuses the very same save the very same way the second time', async () => {
+    const { call, repoRoot } = settingsBoard(undefined, [{ name: 'claude', command: 'first-cli', args: [], cwd: 'docs' }])
+    const save = () => call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+
+    const first = await save()
+    const second = await save()
+
+    expect(second).toEqual(first)
+    expect(existsSync(localPath(repoRoot))).toBe(false)
+  })
+
+  // spec-00009-AC-6.3
+  it('refuses an added entry with no command, naming that key', async () => {
+    const { call, repoRoot } = settingsBoard()
+
+    const { status, body } = await call('PUT', '/api/settings/agents', { entries: { 'codex-local': { args: [] } } })
+
+    expect(status).toBe(422)
+    expect(body).toMatchObject({ at: 'entries.codex-local.command' })
+    expect(existsSync(localPath(repoRoot))).toBe(false)
+  })
+
+  // spec-00009-AC-6.6
+  it('refuses a headless declaration missing the question placeholder, naming that form', async () => {
+    const { call, repoRoot } = settingsBoard()
+
+    const { status, body } = await call('PUT', '/api/settings/agents', {
+      entries: {
+        'codex-local': { command: 'codex', headless: { first: ['-p'], resume: ['-p', '{session}', '{question}'], capture: 'claude-json' } },
+      },
+    })
+
+    expect(status).toBe(422)
+    expect(body).toMatchObject({ at: 'entries.codex-local.headless.first' })
+    expect(existsSync(localPath(repoRoot))).toBe(false)
+  })
+
+  /** A board whose `.whiteboard` is a plain file, so the directory the save needs can be neither used nor made. */
+  function unwritableBoard() {
+    const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': DRAFT_SPEC })
+    writeFileSync(join(repoRoot, '.whiteboard'), 'not a directory\n')
+    const config = testConfig()
+    config.agents = PROJECT
+    return { ...boardOnRepo(repoRoot, docsDir, config), repoRoot }
+  }
+
+  // spec-00009-AC-6.4
+  it('reports a save it could not write, leaving no file and the list as it was', async () => {
+    const { call, repoRoot } = unwritableBoard()
+
+    const { status } = await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+
+    expect(status).toBe(500)
+    expect(existsSync(localPath(repoRoot))).toBe(false)
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
+  })
+
+  // spec-00009-AC-6.5
+  it('reports the same write failure the second time, the list still as it was', async () => {
+    const { call } = unwritableBoard()
+    const save = () => call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
+
+    await save()
+    const { status } = await save()
+
+    expect(status).toBe(500)
+    expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
   })
 })
 
@@ -2903,7 +3260,7 @@ describe('ask threads', () => {
     const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
 
     expect(status).toBe(422)
-    expect(body.error).toMatch(/no agent in the flow config declares a headless form/)
+    expect(body.error).toMatch(/no agent in the effective agent list declares a headless form/)
     expect(spawned).toEqual([])
   })
 
@@ -3342,6 +3699,149 @@ describe('ask threads', () => {
 
     expect((await stopped).status).toBe('terminated')
     expect(spawned).toHaveLength(1)
+  })
+
+  /**
+   * The ask side of the two agent layers (spec-00009). What answers an ask is
+   * read off the effective list at every admission, so a save reaches the next
+   * question and no other: a call already in flight runs the entry its session
+   * took a snapshot of, and a follow-up whose thread names an agent the list no
+   * longer holds is refused rather than quietly answered by a different CLI
+   * (spec-00009-FR-9, design-00001 §13.2).
+   */
+  describe('over the effective agent list', () => {
+    const FORM = testConfig().agents[0]!.headless!
+    const TWO: AgentConfig[] = [
+      { name: 'claude', command: 'first-cli', args: [], cwd: 'docs', headless: FORM },
+      { name: 'other', command: 'second-cli', args: [], cwd: 'docs', headless: FORM },
+    ]
+    /**
+     * One entry that can answer an ask and one that cannot. Two and not one:
+     * disabling the only entry there is would leave the effective list empty,
+     * which is the local layer being ill-formed rather than a list with no
+     * headless entry in it (spec-00009-FR-4).
+     */
+    const ONE_ASKER: AgentConfig[] = [
+      { name: 'claude', command: 'first-cli', args: [], cwd: 'docs', headless: FORM },
+      { name: 'plain', command: 'second-cli', args: [], cwd: 'docs' },
+    ]
+
+    const save = (call: BoardCall, local: unknown) => call('PUT', '/api/settings/agents', local)
+
+    // spec-00009-AC-3.4
+    it('sends an unnamed ask to the first entry still in the list once one is disabled', async () => {
+      const { call, spawned } = askBoard(TREE, { agents: TWO })
+      await save(call, { disabled: ['claude'] })
+
+      await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+      expect(spawned[0]!.command).toBe('second-cli')
+      expect((await threadsOf(call, 'spec-00001-b'))[0]!.agent).toBe('other')
+    })
+
+    // spec-00009-AC-5.4
+    it('lets a call already in flight finish and file its answer, whatever is saved meanwhile', async () => {
+      const { call, board, end } = askBoard(TREE, { agents: TWO })
+      const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?', agent: 'claude' })
+
+      await save(call, { disabled: ['claude'] })
+      end(0, { stdout: ANSWER('because they are cheap to check') })
+      await board.sessions.whenFinished(first.body.sessionId)
+
+      expect((await threadsOf(call, 'spec-00001-b'))[0]!.exchanges[0]).toMatchObject({
+        answer: 'because they are cheap to check',
+        outcome: 'answered',
+      })
+    })
+
+    // spec-00009-AC-8.4 — the server half; the two entries going away is design-00002 §18's
+    it('refuses an ask outright once the last headless entry is disabled', async () => {
+      const { call, spawned } = askBoard(TREE, { agents: ONE_ASKER })
+      await save(call, { disabled: ['claude'] })
+
+      const { status, body } = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/no agent in the effective agent list declares a headless form/)
+      expect(spawned).toEqual([])
+    })
+
+    /** A thread opened on a locally added entry, answered, with that entry still in the list. */
+    async function threadOnALocalEntry() {
+      const board = askBoard(TREE, { agents: ONE_ASKER })
+      await save(board.call, { entries: { 'codex-local': { command: 'codex-cli', headless: FORM } } })
+      const first = await ask(board.call, {
+        docId: 'spec-00001-b',
+        question: 'why two gates?',
+        agent: 'codex-local',
+      })
+      board.end(0, { stdout: ANSWER('because they are cheap to check') })
+      await board.board.sessions.whenFinished(first.body.sessionId)
+      return board
+    }
+
+    // spec-00009-AC-9.1
+    it('refuses a follow-up whose agent the local layer no longer declares, leaving the thread whole', async () => {
+      const { call, spawned } = await threadOnALocalEntry()
+      await save(call, {})
+
+      const { status, body } = await ask(call, {
+        docId: 'spec-00001-b',
+        question: 'and the third?',
+        threadId: 't-1',
+      })
+
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/"codex-local" is not an agent in the effective agent list/)
+      expect(spawned).toHaveLength(1)
+      expect((await threadsOf(call, 'spec-00001-b'))[0]!.exchanges).toHaveLength(1)
+    })
+
+    // spec-00009-AC-9.2
+    it('resumes the thread once the same entry is added back with its headless form', async () => {
+      const { call, spawned } = await threadOnALocalEntry()
+      await save(call, {})
+      await save(call, { entries: { 'codex-local': { command: 'codex-cli', headless: FORM } } })
+
+      const { status } = await ask(call, { docId: 'spec-00001-b', question: 'and the third?', threadId: 't-1' })
+
+      expect(status).toBe(200)
+      expect(spawned[1]).toMatchObject({ command: 'codex-cli' })
+      expect(spawned[1]!.args).toContain('cli-1')
+    })
+
+    // spec-00009-AC-9.3
+    it('refuses a follow-up whose agent the local layer stripped the headless form from', async () => {
+      const { call, board, spawned, end } = askBoard(TREE, { agents: ONE_ASKER })
+      const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?' })
+      end(0, { stdout: ANSWER('because they are cheap to check') })
+      await board.sessions.whenFinished(first.body.sessionId)
+      await save(call, { overrides: { claude: { headless: null } } })
+
+      const { status, body } = await ask(call, {
+        docId: 'spec-00001-b',
+        question: 'and the third?',
+        threadId: 't-1',
+      })
+
+      expect(status).toBe(422)
+      expect(body.error).toMatch(/"claude" declares no headless form/)
+      expect(spawned).toHaveLength(1)
+    })
+
+    // spec-00009-AC-9.4
+    it('opens a new thread on another document normally while an old one’s agent is gone', async () => {
+      const { call, board, spawned, end } = askBoard(TREE, { agents: TWO })
+      const first = await ask(call, { docId: 'spec-00001-b', question: 'why two gates?', agent: 'claude' })
+      end(0, { stdout: ANSWER('because they are cheap to check') })
+      await board.sessions.whenFinished(first.body.sessionId)
+      await save(call, { disabled: ['claude'] })
+
+      const { status } = await ask(call, { docId: 'prd-00001-p', question: 'and this one?', agent: 'other' })
+
+      expect(status).toBe(200)
+      expect(spawned[1]!.command).toBe('second-cli')
+    })
   })
 })
 

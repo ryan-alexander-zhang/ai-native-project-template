@@ -2,17 +2,18 @@ import type { Server } from 'node:http'
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
 import { WebSocketServer } from 'ws'
 import { type Expectation, findProduct, markProduct, productProblems, taskInstruction } from './advance.ts'
+import { type EffectiveAgent, EffectiveAgents, LocalSettingsError } from './agentSettings.ts'
 import { auditableTypes } from './auditRules.ts'
 import type { SelectionAnchor } from './annotationAnchor.ts'
 import { AnnotationConflictError, NoAnnotationError } from './annotationStore.ts'
 import { Annotations } from './annotations.ts'
 import { AskBusyError, AskStore } from './askStore.ts'
 import { clarifiableTypes } from './clarifyRules.ts'
-import type { FlowConfig } from './config.ts'
+import type { AgentConfig, FlowConfig } from './config.ts'
 import { type CowriteMaterials, REFERENCE_TYPE } from './cowrite.ts'
 import { type ActionResult, ConflictError, DocService, GateError } from './docService.ts'
 import type { DirtySnapshot } from './gitLayer.ts'
-import type { SpawnHeadless } from './headless.ts'
+import { CAPTURES, type SpawnHeadless } from './headless.ts'
 import { listSessionHistory, readSessionHistory } from './sessionHistory.ts'
 import {
   NoSessionError,
@@ -57,6 +58,12 @@ export class Board {
   readonly annotations: Annotations
   /** Live only while the board is listening: a board nobody can connect to has nobody to tell. */
   readonly watcher: DocsWatcher
+  /**
+   * The two agent layers, re-read on every call (design-00001 §13.2): the one
+   * source every «which agents are there» question is answered from — session
+   * admission, config download and the settings panel alike (spec-00009-FR-3).
+   */
+  readonly agents: EffectiveAgents
   private readonly repoRoot: string
   /**
    * What the last advance was asked for, re-checked against the disk on every
@@ -70,6 +77,7 @@ export class Board {
     const { repoRoot, docsDir, config, spawn = spawnPty, spawnHeadless, awaitThresholdMs } = options
     this.repoRoot = repoRoot
     this.docs = new DocService(repoRoot, docsDir, config)
+    this.agents = new EffectiveAgents(config.agents, repoRoot)
     this.asks = new AskStore(repoRoot)
     // The registry comes up empty, so a call the last process was killed with
     // is written off here rather than left saying «in progress» for good
@@ -79,7 +87,7 @@ export class Board {
     // also where the parsed tree goes stale (spec-00001 §7 非功能项).
     this.watcher = new DocsWatcher(docsDir, () => this.docs.invalidate())
     this.sessions = new SessionManager({
-      agents: config.agents,
+      agents: () => this.agents.current().agents,
       maxSessions: config.maxSessions,
       repoRoot,
       spawn,
@@ -118,7 +126,7 @@ export class Board {
       repoRoot,
       docs: this.docs,
       sessions: this.sessions,
-      agents: config.agents,
+      agents: () => this.agents.current().agents,
       // The issue path calls the same cowrite ruling and the question path the
       // same ask receipt chain a hand-started one calls: «no difference in
       // behaviour» is one piece of code (spec-00007-FR-8, design-00001 §12.4).
@@ -243,9 +251,40 @@ export class Board {
     // The effective config, plus the two type sets the code holds
     // (spec-00001-FR-56): the front end reads its entry rulings off this one
     // payload instead of keeping a copy of rule-00001-BR-20 and BR-23.
-    app.get('/api/config', (_req, res) =>
-      res.json({ ...config, clarifiable: clarifiableTypes(), auditable: auditableTypes() }),
-    )
+    app.get('/api/config', (_req, res) => {
+      // The effective agent list, recomputed here rather than taken from the
+      // config: `agents` is the project layer alone, and what the entries the
+      // board offers are is the two layers merged (spec-00009-FR-3). A disabled
+      // entry is simply not in it (spec-00009-AC-3.8).
+      const { agents, notices, error } = this.agents.current()
+      res.json({
+        ...config,
+        agents: listed(agents),
+        clarifiable: clarifiableTypes(),
+        auditable: auditableTypes(),
+        agentSettings: { ...(error ? { error } : {}), notices },
+      })
+    })
+
+    // The settings panel's own two ends (spec-00009-FR-5, FR-7): both layers as
+    // they stand, and a save of the local one. The save answers with the list it
+    // just made effective — the next admission reads the same file back, so
+    // there is no window in which the two disagree (design-00001 §13.3).
+    app.get('/api/settings/agents', (_req, res) => {
+      const { agents, notices, error, local } = this.agents.current()
+      res.json({
+        project: config.agents,
+        local,
+        effective: listed(agents),
+        captures: CAPTURES,
+        ...(error ? { error } : {}),
+        notices,
+      })
+    })
+    app.put('/api/settings/agents', (req, res) => {
+      const { agents, notices } = this.agents.save(req.body)
+      res.json({ effective: listed(agents), notices })
+    })
 
     // Creating a document (spec-00001-FR-53): the prefill first — a number and a
     // template, nothing written — then the save, which is the write path's create
@@ -367,7 +406,8 @@ export class Board {
     question: string
     threadId?: string
     resend?: boolean
-    agent?: string
+    /** A name to resolve, or the entry a unified submit already resolved for the whole batch (spec-00009-AC-5.5). */
+    agent?: string | AgentConfig
     /** The passage a submitted question was marked on; a typed one carries none. */
     selection?: SelectionAnchor
   }): Promise<{ sessionId: string; threadId: string }> {
@@ -665,15 +705,34 @@ function materialsOf(value: unknown): CowriteMaterials | undefined {
 }
 
 /**
+ * One effective entry as the front end reads it (design-00001 §7): the name, the
+ * one thing about the headless declaration a caller needs — whether there is one
+ * — where the entry came from, and whether the local layer made it the default.
+ * The rest of an entry belongs to the settings panel, which reads the two layers
+ * themselves rather than this list.
+ */
+function listed(
+  agents: EffectiveAgent[],
+): Array<{ name: string; headless: boolean; source: string; default: boolean }> {
+  return agents.map((agent) => ({
+    name: agent.name,
+    headless: agent.headless !== undefined,
+    source: agent.source,
+    default: agent.default,
+  }))
+}
+
+/**
  * The agent a session request names, if it names one (spec-00001-FR-55). Absent
- * means the first configured agent, which is every board's behaviour so far;
- * anything that is not a name is refused rather than quietly read as absent.
+ * means the first entry of the effective agent list, which is every board's
+ * behaviour so far; anything that is not a name is refused rather than quietly
+ * read as absent.
  */
 function agentOf(body: { agent?: unknown } | undefined): string | undefined {
   const agent = body?.agent
   if (agent === undefined || agent === null) return undefined
   if (typeof agent !== 'string') {
-    throw new WorkflowError('agent must name one of the agents in the flow config')
+    throw new WorkflowError('agent must name one of the agents in the effective agent list')
   }
   return agent
 }
@@ -702,6 +761,7 @@ function parseSize(frame: string): { cols: number; rows: number } | undefined {
 
 const STATUS_BY_ERROR: Array<[new (...args: never[]) => Error, number]> = [
   [ConflictError, 409],
+  [LocalSettingsError, 422],
   [SessionBusyError, 409],
   [AskBusyError, 409],
   [AnnotationConflictError, 409],
@@ -726,5 +786,8 @@ function errorHandler(error: Error, _req: Request, res: Response, _next: NextFun
   // The resolved gate names its gaps in the body (design-00001 §7); every other
   // refusal carries its message alone, so the field's presence is the gate's.
   const gaps = error instanceof GateError ? { gaps: error.gaps } : {}
-  res.status(match?.[1] ?? 500).json({ error: error.message, ...gaps, ...reasonOf(error) })
+  // A refused save says which key it is about, so the panel can point at the
+  // field rather than at the form (spec-00009-FR-6, design-00001 §7).
+  const at = error instanceof LocalSettingsError && error.at !== undefined ? { at: error.at } : {}
+  res.status(match?.[1] ?? 500).json({ error: error.message, ...gaps, ...at, ...reasonOf(error) })
 }

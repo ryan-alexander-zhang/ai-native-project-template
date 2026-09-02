@@ -174,6 +174,77 @@ describe('parseFlowConfig', () => {
   })
 
 
+  /**
+   * spec-00009-FR-1 and FR-2: an entry may name the model it runs on and the
+   * environment it adds, and `{model}` is paired with that value **per form**.
+   * A value no array stands for is a model that never reaches the CLI, which is
+   * the silent failure the key exists to make visible (decision-00017 §2 第 2 条);
+   * a placeholder with no value would spawn the word `{model}` itself. The
+   * project layer refuses to start over either, naming the entry and the key
+   * (spec-00001-FR-15's own terms).
+   */
+  describe('the model and env of an agent entry', () => {
+    const WITH_MODEL = VALID.replace('args: ["--foo"]', 'args: ["--model={model}"]\n    model: m1')
+
+    it('reads the model and the env of an entry that declares them', () => {
+      const config = parse(`${WITH_MODEL}    env: { FOO: bar }\n`)
+
+      expect(config.agents[0]).toMatchObject({ model: 'm1', args: ['--model={model}'] })
+      expect(config.agents[0]!.env).toEqual({ FOO: 'bar' })
+    })
+
+    it('leaves model and env unset for an entry that declares neither', () => {
+      expect(parse(VALID).agents[0]).toMatchObject({ model: undefined, env: undefined })
+    })
+
+    // spec-00009-AC-2.1
+    it('rejects a {model} placeholder in args when the entry names no model', () => {
+      expectConfigError(VALID.replace('args: ["--foo"]', 'args: ["--model={model}"]'), /agents\.claude.*\bmodel\b/)
+    })
+
+    // spec-00009-AC-2.2
+    it('rejects a model the args hold no placeholder for', () => {
+      expectConfigError(VALID.replace('args: ["--foo"]', 'args: ["--foo"]\n    model: m1'), /agents\.claude\.model/)
+    })
+
+    // spec-00009-AC-2.3
+    it('rejects a model the declared resume form holds no placeholder for, naming that form', () => {
+      const headless = HEADLESS.replace('first:  [-p, "{question}"]', 'first:  [-p, "{model}", "{question}"]')
+
+      expectConfigError(`${WITH_MODEL}${headless}`, /agents\.claude\.headless\.resume/)
+    })
+
+    // spec-00009-AC-2.4
+    it('rejects an env that is a list rather than a mapping', () => {
+      expectConfigError(`${VALID}    env: [FOO=bar]\n`, /agents\.claude\.env/)
+    })
+
+    it('rejects an env value that is not a string, naming the key', () => {
+      expectConfigError(`${VALID}    env: { FOO: 3 }\n`, /agents\.claude\.env\.FOO/)
+    })
+
+    // spec-00009-AC-2.5
+    it('rejects an empty model', () => {
+      expectConfigError(`${VALID}    model: ""\n`, /agents\.claude\.model/)
+    })
+
+    // spec-00009-AC-2.6
+    it('starts on a model paired with a placeholder in args and no headless declaration at all', () => {
+      const config = parse(WITH_MODEL)
+
+      expect(config.agents[0]).toMatchObject({ model: 'm1', headless: undefined })
+    })
+
+    it('starts on a model paired with a placeholder in every declared form', () => {
+      const headless = HEADLESS.replace('first:  [-p, "{question}"]', 'first:  [-p, "{model}", "{question}"]').replace(
+        'resume: [-p, --resume, "{session}", "{question}"]',
+        'resume: [-p, --resume, "{session}", "{model}", "{question}"]',
+      )
+
+      expect(parse(`${WITH_MODEL}${headless}`).agents[0]!.headless!.first).toEqual(['-p', '{model}', '{question}'])
+    })
+  })
+
   it('rejects invalid YAML', () => {
     expectConfigError('types: [\n  unclosed', /invalid YAML/)
   })

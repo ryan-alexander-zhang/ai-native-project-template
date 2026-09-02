@@ -56,6 +56,9 @@ function boardOn(files: Record<string, string>, options: BoardOptions = {}) {
   const config = cowriteConfig()
   if (options.agents) config.agents = options.agents
   if (options.maxSessions !== undefined) config.maxSessions = options.maxSessions
+  // The effective agent list as it stands rather than as it stood: a save while
+  // a batch is in flight changes what the next reader sees (spec-00009-FR-3).
+  let effective = config.agents
   const docs = new DocService(repoRoot, docsDir, config, options.git?.(repoRoot))
   const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
   const written: string[] = []
@@ -79,7 +82,7 @@ function boardOn(files: Record<string, string>, options: BoardOptions = {}) {
       kill: () => end(0),
     }
   }
-  const opened: Array<{ docId: string; question: string; agent: string; selection: SelectionAnchor }> = []
+  const opened: Array<{ docId: string; question: string; agent: AgentConfig; selection: SelectionAnchor }> = []
   let release = () => {}
   const held: Promise<void> = options.holdAsk
     ? new Promise<void>((resolve) => {
@@ -87,7 +90,7 @@ function boardOn(files: Record<string, string>, options: BoardOptions = {}) {
       })
     : Promise.resolve()
   const sessions: SessionManager = new SessionManager({
-    agents: config.agents,
+    agents: () => effective,
     maxSessions: config.maxSessions,
     repoRoot,
     spawn,
@@ -100,7 +103,7 @@ function boardOn(files: Record<string, string>, options: BoardOptions = {}) {
     repoRoot,
     docs,
     sessions,
-    agents: config.agents,
+    agents: () => effective,
     openAsk: async (input) => {
       opened.push(input)
       await held
@@ -128,6 +131,10 @@ function boardOn(files: Record<string, string>, options: BoardOptions = {}) {
     exit: (index = 0, exitCode = 0) => exits[index]!(exitCode),
     /** Let the held ask calls through (`holdAsk`). */
     release: () => release(),
+    /** What a save does to the effective list, without a settings file behind it (spec-00009-AC-5.5). */
+    setAgents: (next: AgentConfig[]) => {
+      effective = next
+    },
   }
 }
 
@@ -1073,7 +1080,7 @@ describe('a unified submit', () => {
     await board.annotations.submit('spec-00001-x', {})
 
     expect(board.sessions.list()[0]).toMatchObject({ kind: 'cowrite', agent: 'plain' })
-    expect(board.opened[0]!.agent).toBe('second')
+    expect(board.opened[0]!.agent.name).toBe('second')
   })
 
   it('runs the agent each path is given by name', async () => {
@@ -1089,7 +1096,7 @@ describe('a unified submit', () => {
     await board.annotations.submit('spec-00001-x', { agents: { question: 'second', cowrite: 'second' } })
 
     expect(board.sessions.list()[0]).toMatchObject({ kind: 'cowrite', agent: 'second' })
-    expect(board.opened[0]!.agent).toBe('second')
+    expect(board.opened[0]!.agent.name).toBe('second')
   })
 
   /**
@@ -1107,6 +1114,33 @@ describe('a unified submit', () => {
     })
     expect(board.opened).toEqual([])
     expect(board.spawned).toEqual([])
+  })
+
+  /**
+   * spec-00009-AC-5.5 — the batch resolves its agents **once**, when it is
+   * received, and every session it opens runs those entries: a save landing
+   * between the first question and the second cannot change what the second one
+   * runs, any more than it can change a session already spawned
+   * (design-00001 §13.2 整批一次解析).
+   */
+  // spec-00009-AC-5.5
+  it('opens every question of a batch on the entry it resolved at admission', async () => {
+    const board = await withAnnotations(
+      'draft',
+      [
+        ['question', GATE],
+        ['question', OTHER],
+      ],
+      { holdAsk: true },
+    )
+    const submitted = board.annotations.submit('spec-00001-x', {})
+    await vi.waitFor(() => expect(board.opened).toHaveLength(1))
+
+    board.setAgents([])
+    board.release()
+    await submitted
+
+    expect(board.opened.map((call) => call.agent.name)).toEqual(['claude', 'claude'])
   })
 
   it('refuses a submit whose fields are not what they have to be', async () => {
@@ -1576,7 +1610,7 @@ describe('the executability reading the precheck shares with the spawn', () => {
   /** Whether the real spawner would start this command, the process killed at once. */
   function spawns(command: string, cwd: string): boolean {
     try {
-      spawnPty(command, ['-e', ''], cwd).kill()
+      spawnPty(command, ['-e', ''], cwd, {}).kill()
       return true
     } catch {
       return false
