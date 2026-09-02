@@ -130,6 +130,34 @@ describe('askInstruction', () => {
     expect(askInstruction({ docPath: 'record/r.md', relatedPaths: [] })).not.toContain('relation documents')
   })
 
+  /**
+   * spec-00007-AC-6.1 — a question a unified submit opened carries the passage it
+   * was marked on: the existing four lines, then the passage, then the question
+   * itself (design-00001 §12.5). The context is verbatim and the selection is
+   * fenced, so the agent reads the source rather than a retelling.
+   */
+  // spec-00007-AC-6.1
+  it('carries the marked passage after the standing instruction, when there is one', () => {
+    const instruction = askInstruction({
+      docPath: 'spec/board.md',
+      relatedPaths: ['idea/board.md'],
+      selection: { before: 'and so ', selected: 'the gate is cheap', after: ' to check' },
+    })
+    const lines = instruction.split('\n')
+
+    expect(instruction).toContain('The passage they marked, quoted from spec/board.md:')
+    expect(instruction).toContain('  …and so [[the gate is cheap]] to check…')
+    expect(lines.findIndex((line) => line.includes('The passage they marked'))).toBeGreaterThan(
+      lines.findIndex((line) => line.includes('Modify no file')),
+    )
+  })
+
+  // A follow-up resumes a conversation that was already shown all of that
+  // (spec-00005-FR-2), so nothing but the question is paid for twice
+  it('carries no passage when none was marked', () => {
+    expect(askInstruction({ docPath: 'spec/board.md', relatedPaths: [] })).not.toContain('The passage they marked')
+  })
+
   // spec-00005-AC-1.2 — the context lines the terminal form carried, kept whole:
   // the document and every one of its relation documents, as paths
   it('carries the target path and both its relation document paths', () => {

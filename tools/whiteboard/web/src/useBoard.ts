@@ -3,8 +3,12 @@ import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
 import { type ItemsView, declaresItems } from '../../src/requirements.ts'
+import { SUBMIT_REFUSAL } from './annotationRows.ts'
 import {
   ApiError,
+  type AnnotationChange,
+  type AnnotationInput,
+  type AnnotationListView,
   type AskSubmit,
   type AskThread,
   type CoverageRow,
@@ -114,6 +118,32 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   const [editorMode, setEditorMode] = useState<EditorMode>('source')
   const [located, setLocated] = useState<string>()
   const [threads, setThreads] = useState<AskThread[]>([])
+  /**
+   * The annotations of the document in the editor, and — beside them and held by
+   * id like every other presentation state — the one the board is located on
+   * (design-00002 §16.8). The two locate items never disturb each other: going
+   * to a thread leaves the located annotation where it is.
+   */
+  const [annotations, setAnnotations] = useState<{ docId: string; view: AnnotationListView }>()
+  const [locatedAnnotation, setLocatedAnnotation] = useState<string>()
+  /**
+   * Which locate this is. The located annotation alone is not enough to act on:
+   * asking for the same one twice is two asks — and a change of the document
+   * clears the mark, so the second ask is exactly how a reader gets it back
+   * (design-00002 §16.6).
+   */
+  const [locatedAt, setLocatedAt] = useState(0)
+  /**
+   * The annotation waiting for a new selection. **Not** presentation state
+   * (design-00002 §16.4): it is a gesture under way, and one kept across a
+   * refresh would leave the user being asked to select a passage somewhere they
+   * never asked to be.
+   */
+  const [reanchoring, setReanchoring] = useState<string>()
+  /** Whether the editor buffer holds unsaved edits, as the editor reports it. */
+  const [unsavedBuffer, setUnsavedBuffer] = useState(false)
+  /** Whether a unified submit is on its way out (design-00002 §16.5's pending entry). */
+  const [submitting, setSubmitting] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
   // Every session the server holds, and — apart from it — which one the terminal
   // is showing: the pick is presentation state, kept by session id across a
@@ -158,6 +188,21 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * again (design-00002 §10, §15).
    */
   const cowriting = useRef<string | undefined>(undefined)
+  /**
+   * The document whose **editor** is open — the whole condition of the sixth
+   * read, and a ref for the same reason the others are. Deliberately not «whose
+   * annotation list is open», unlike the four reads above: the traces have to be
+   * right in the editing and preview states too, and a list-only condition would
+   * leave them stale in the two states they are actually drawn in
+   * (design-00002 §16.8).
+   */
+  const annotating = useRef<string | undefined>(undefined)
+  /**
+   * The last of the two body states this editor was on, which is where a locate
+   * and the re-anchor mode land. Editing when there is no record
+   * (design-00002 §16.4, §16.6).
+   */
+  const bodyMode = useRef<EditorMode>('source')
   /**
    * How each session was last seen: the status it was in, and whether it was
    * waiting. The refresh signal is the only channel either reaches the board
@@ -282,6 +327,55 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   }, [])
 
   /**
+   * The open editor's annotations, re-read (design-00002 §16.8's sixth item):
+   * the records, where each anchor lands on the disk just now, the batches, and
+   * the submit statement. The location follows the same close-nearest rule
+   * everything else does — an annotation that has gone from the payload takes
+   * only the location with it and the list state stays.
+   */
+  const readAnnotations = useCallback(async () => {
+    const docId = annotating.current
+    if (docId === undefined) return
+    try {
+      const view = await api.annotations(docId)
+      // Only good for the editor it was asked about, for the reason the ask
+      // list's read is: two reads can be in flight and the slow one must not
+      // paint another document's annotations.
+      if (annotating.current !== docId) return
+      setAnnotations({ docId, view })
+      setLocatedAnnotation((current) =>
+        current !== undefined && view.annotations.some((one) => one.id === current) ? current : undefined,
+      )
+    } catch (error) {
+      if (annotating.current === docId) {
+        setAnnotations(undefined)
+        setLocatedAnnotation(undefined)
+      }
+      toast.error(error instanceof Error ? error.message : String(error))
+    }
+  }, [])
+
+  /**
+   * Everything that belonged to the document the editor was on. **One** list of
+   * it, because every way into an editor goes through it — opening a document,
+   * going to a thread, starting a cowrite — and a way in that forgot one item
+   * would carry that item into the next document: a re-anchor gesture, say, which
+   * would take the right-click away there and point the first selection made at an
+   * annotation of the document that was closed (design-00002 §14, §16.4).
+   */
+  const forget = useCallback((id?: string) => {
+    setLocated(undefined)
+    setThreads([])
+    listed.current = undefined
+    bodyMode.current = 'source'
+    annotating.current = id
+    setAnnotations(undefined)
+    setLocatedAnnotation(undefined)
+    setReanchoring(undefined)
+    setUnsavedBuffer(false)
+  }, [])
+
+  /**
    * The cowrite target's text on disk (spec-00006-FR-4). Asked for only while
    * that document's editor is open, like the coverage view's read and the ask
    * list's: not in a cowrite, nothing is asked for.
@@ -370,8 +464,12 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     // editor decides what to do with it — reload a clean buffer, keep a dirty
     // one (spec-00006-FR-4, design-00002 §10, §15).
     await readCowriteTarget(next)
+    // And the sixth, on terms of its own: the annotations come with the graph
+    // while that document's **editor** is open, in whichever view state
+    // (design-00002 §16.8).
+    await readAnnotations()
     return next
-  }, [readCoverage, readAsks, readCowriteTarget])
+  }, [readCoverage, readAsks, readCowriteTarget, readAnnotations])
 
   /**
    * The one way in, and one read at a time (see `reading` above). A read that
@@ -452,17 +550,17 @@ export function useBoard(openSession: (session: SessionListing) => void) {
       setDraft(undefined)
       setEditing(docId)
       setEditorMode('asks')
+      // Nothing of the last document's editor survives the switch: it is all held
+      // by document id, and anything painted under another document's name would
+      // be read as this one's (design-00002 §10, §16.4).
+      forget(docId)
       listed.current = docId
-      setLocated(undefined)
-      // Nothing of the last document's list survives the switch: it is held by
-      // document id, and threads painted under another document's name would be
-      // read as this one's (design-00002 §10, the same clearing `edit` does).
-      setThreads([])
+      void readAnnotations()
       const next = await readAsks()
       if (runSessionId === undefined) return
       setLocated(next.find((thread) => thread.exchanges.some((one) => one.runSessionId === runSessionId))?.id)
     },
-    [readAsks],
+    [readAsks, readAnnotations, forget],
   )
 
   /**
@@ -508,8 +606,13 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   const showEditorMode = useCallback(
     (docId: string, mode: EditorMode) => {
       setEditorMode(mode)
-      listed.current = mode === 'asks' ? docId : undefined
-      if (mode === 'asks') void readAsks()
+      // The threads are read while **either** list is open: an annotation's
+      // question state is the last exchange of its thread, so stopping on the
+      // annotation list without them would leave every question row stale
+      // (design-00002 §16.8).
+      listed.current = mode === 'asks' || mode === 'annotations' ? docId : undefined
+      if (mode === 'source' || mode === 'preview') bodyMode.current = mode
+      if (listed.current !== undefined) void readAsks()
     },
     [readAsks],
   )
@@ -570,9 +673,7 @@ export function useBoard(openSession: (session: SessionListing) => void) {
       setDraft(undefined)
       setEditing(started.docId)
       setEditorMode('source')
-      setLocated(undefined)
-      setThreads([])
-      listed.current = undefined
+      forget(started.docId)
       shownRef.current = started.sessionId
       setShownId(started.sessionId)
       setTerminalOpen(true)
@@ -580,6 +681,146 @@ export function useBoard(openSession: (session: SessionListing) => void) {
       return true
     },
     [refresh],
+  )
+
+  /**
+   * One new annotation (spec-00007-FR-1). What comes back is its id — the trace of
+   * an annotation made on an **unsaved** buffer is put into the local interval set
+   * under it, since no refresh will bring it back for a text only the browser
+   * holds (spec-00007-AC-1.3) — or `undefined` when it was refused, which keeps
+   * the words that were typed where they are.
+   *
+   * The document is **named by the caller** rather than read off the open editor:
+   * the entry belongs to a passage of one document, and a request that resolved
+   * the document a second time could act on whichever one the editor had moved on
+   * to by then.
+   */
+  const addAnnotation = useCallback(
+    async (docId: string, input: AnnotationInput): Promise<string | undefined> => {
+      try {
+        const { annotation } = await api.addAnnotation(docId, input)
+        await refresh()
+        return annotation.id
+      } catch (error) {
+        toast.error(refusalText(error))
+        return undefined
+      }
+    },
+    [refresh],
+  )
+
+  /**
+   * Change an annotation before it goes (spec-00007-FR-3): its text, its type, or
+   * its selection. What comes back is whether it went, for the same reason the
+   * ask entry needs to know.
+   */
+  const changeAnnotation = useCallback(
+    async (docId: string, annotationId: string, change: AnnotationChange): Promise<boolean> => {
+      try {
+        await api.changeAnnotation(docId, annotationId, change)
+      } catch (error) {
+        toast.error(refusalText(error))
+        return false
+      }
+      await refresh()
+      return true
+    },
+    [refresh],
+  )
+
+  const removeAnnotation = useCallback(
+    (docId: string, annotationId: string) => {
+      void run(() => api.removeAnnotation(docId, annotationId))
+    },
+    [run],
+  )
+
+  /**
+   * Enter the re-anchor mode on one annotation, or leave it. Entering takes the
+   * editor to the body state it was last on — editing, with no record — because
+   * a selection is what the mode is waiting for (design-00002 §16.4).
+   */
+  const startReanchor = useCallback(
+    (docId: string, annotationId?: string) => {
+      setReanchoring(annotationId)
+      if (annotationId === undefined) return
+      showEditorMode(docId, bodyMode.current)
+    },
+    [showEditorMode],
+  )
+
+  /** The new selection accepted: the anchor and the quote are replaced, and the list comes back. */
+  const finishReanchor = useCallback(
+    async (docId: string, anchor: AnnotationInput['anchor']): Promise<boolean> => {
+      const annotationId = reanchoring
+      if (annotationId === undefined) return false
+      if (!(await changeAnnotation(docId, annotationId, { anchor }))) return false
+      setReanchoring(undefined)
+      showEditorMode(docId, 'annotations')
+      return true
+    },
+    [reanchoring, changeAnnotation, showEditorMode],
+  )
+
+  /**
+   * Locate an annotation, or stop being located on one. The locate lands on the
+   * body state the editor was last on — the one the reader was reading — and the
+   * mark itself is the editor's and the preview's own (design-00002 §16.6).
+   */
+  const locateAnnotation = useCallback(
+    (docId: string, annotationId?: string) => {
+      setLocatedAnnotation(annotationId)
+      // Counted, so the same annotation asked for twice is two asks: the id alone
+      // would leave the second press with nothing to change and no way to bring a
+      // cleared mark back (design-00002 §16.6).
+      if (annotationId === undefined) return
+      setLocatedAt((count) => count + 1)
+      showEditorMode(docId, bodyMode.current)
+    },
+    [showEditorMode],
+  )
+
+  /**
+   * The unified submit (spec-00007-FR-5). The two endings are read off the status
+   * code, the line design-00001 §12.3 fixes: **4xx is a batch that did not happen
+   * at all**, said in one toast with the list untouched; **200 is a batch that
+   * ran**, said in one summary toast, with each held-back annotation's reason
+   * left on its own row — a toast disappears and a held-back annotation has to be
+   * dealt with.
+   *
+   * On the way out the terminal switches to the cowrite session (design-00002
+   * §15) while the editor keeps whatever it was showing: spec-00006-FR-4's
+   * one-off Source override does not apply to an annotation submit
+   * (spec-00007-AC-8.6).
+   */
+  const submitAnnotations = useCallback(
+    async (docId: string, agents: { question?: string; cowrite?: string }) => {
+      setSubmitting(true)
+      try {
+        const result = await api.submitAnnotations(docId, { unsavedChanges: unsavedBuffer, agents })
+        const sent = result.submitted.questions.length + (result.submitted.issues?.annotationIds.length ?? 0)
+        const held = result.blocked.length
+        if (held === 0) toast.message(`submitted ${sent} annotations`)
+        else toast.error(`submitted ${sent}, held back ${held}`)
+        // A transition whose commit failed is a notice, never a refusal: the file
+        // is `draft` on disk and the session went ahead (spec-00007-AC-7.5).
+        if (result.transition?.error !== undefined) toast.error(result.transition.error)
+        for (const warning of result.warnings ?? []) toast.error(warning)
+        const session = result.submitted.issues?.sessionId
+        if (session !== undefined) {
+          shownRef.current = session
+          setShownId(session)
+          setTerminalOpen(true)
+        }
+        await refresh()
+      } catch (error) {
+        const word = error instanceof ApiError ? error.reason : undefined
+        toast.error((word === undefined ? undefined : SUBMIT_REFUSAL[word]) ?? refusalText(error))
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [refresh, unsavedBuffer],
   )
 
   /**
@@ -612,16 +853,19 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * buffer goes: a creation abandoned must not follow the next document into the
    * editor.
    */
-  const edit = useCallback((id?: string) => {
-    setDraft(undefined)
-    setEditing(id)
-    // The view state, the location and the threads all belong to the document
-    // that was open: another one opens on its own text (design-00002 §14).
-    setEditorMode('source')
-    setLocated(undefined)
-    setThreads([])
-    listed.current = undefined
-  }, [])
+  const edit = useCallback(
+    (id?: string) => {
+      setDraft(undefined)
+      setEditing(id)
+      // The view state, the location and the threads all belong to the document
+      // that was open: another one opens on its own text (design-00002 §14). The
+      // annotations, the located one and the re-anchor gesture go the same way.
+      setEditorMode('source')
+      forget(id)
+      if (id !== undefined) void readAnnotations()
+    },
+    [forget, readAnnotations],
+  )
 
   /**
    * Open a new document's buffer (spec-00001-FR-53). The server allocates the
@@ -635,10 +879,13 @@ export function useBoard(openSession: (session: SessionListing) => void) {
       const id = `${idPrefix}${slug}`
       setDraft(prefillFrontMatter(template, id, type))
       setEditing(id)
+      // A buffer that is not a document yet has no annotations, and nothing of the
+      // last document's editor may follow it here.
+      forget(undefined)
     } catch (error) {
       toast.error(refusalText(error))
     }
-  }, [])
+  }, [forget])
 
   /**
    * A created document exists from here on, so the prefilled buffer is done with
@@ -758,6 +1005,16 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     editorMode,
     threads,
     located,
+    // The annotations of the document in the editor, and only ever for that one
+    // (design-00002 §16.8). The fourth view state, its located annotation and the
+    // re-anchor gesture are all held here, so the list — which lives beside the
+    // editor rather than inside it — can drive them.
+    annotations: annotations !== undefined && annotations.docId === editing ? annotations.view : undefined,
+    locatedAnnotation,
+    locatedAt,
+    reanchoring,
+    unsavedBuffer,
+    submitting,
     terminalOpen,
     sessions,
     // Held by id, resolved from the current listing: a refresh keeps the user on
@@ -790,6 +1047,14 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     showAsks,
     showEditorMode,
     locate: setLocated,
+    locateAnnotation,
+    addAnnotation,
+    changeAnnotation,
+    removeAnnotation,
+    startReanchor,
+    finishReanchor,
+    submitAnnotations,
+    setUnsavedBuffer,
     ask,
     cowrite,
     stopSession,

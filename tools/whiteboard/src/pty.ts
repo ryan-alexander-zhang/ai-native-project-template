@@ -5,23 +5,35 @@ import { KILL_GRACE_MS, killLadder } from './killLadder.ts'
 import type { PtyProcess, SpawnPty } from './sessionManager.ts'
 
 /**
- * A pty forks before exec, so a missing command surfaces as an ordinary non-zero
- * exit rather than a spawn error. Checking first is what lets the board tell
- * "the agent never started" from "the agent ran and failed" (spec-00001-FR-16).
+ * Why this command cannot be run, or nothing when it can. A pty forks before
+ * exec, so a missing command surfaces as an ordinary non-zero exit rather than a
+ * spawn error: checking first is what lets the board tell «the agent never
+ * started» from «the agent ran and failed» (spec-00001-FR-16).
+ *
+ * Exported because the unified submit has to ask the **same** question before it
+ * moves a document's status (design-00001 §12.4 第 3 步, spec-00007-AC-7.4): a
+ * second reading of «can this start» would let a submit write the transition and
+ * then be refused by this one, which is exactly the landing FR-7 forbids.
  */
-function requireExecutable(command: string): void {
+export function unrunnable(command: string): string | undefined {
   if (command.includes('/') || command.includes('\\')) {
     try {
       accessSync(command, constants.X_OK)
     } catch {
-      throw new Error(`agent command is not executable: ${command}`)
+      return `agent command is not executable: ${command}`
     }
-    return
+    return undefined
   }
   const finder = process.platform === 'win32' ? 'where' : 'which'
   if (spawnSync(finder, [command]).status !== 0) {
-    throw new Error(`agent command not found on PATH: ${command}`)
+    return `agent command not found on PATH: ${command}`
   }
+  return undefined
+}
+
+function requireExecutable(command: string): void {
+  const problem = unrunnable(command)
+  if (problem !== undefined) throw new Error(problem)
 }
 
 /** The pty spawner, with the grace as a parameter so a test can wait it out. */

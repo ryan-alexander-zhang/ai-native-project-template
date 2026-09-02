@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { ITEM_GRAMMAR } from './advance.ts'
+import { type SelectionAnchor, normalizeText } from './annotationAnchor.ts'
 import type { FlowConfig, FlowStep } from './config.ts'
 import {
   type CowriteMaterials,
@@ -68,11 +69,29 @@ import {
   assertClarifiable,
   assertCowritable,
   assertEntryType,
+  cowriteRevision,
   hasOpenQuestions,
   idPrefix,
+  issueEligible,
   nextStepsFor,
   transitionsFor,
 } from './workflow.ts'
+
+/**
+ * A document as the annotation paths read it (design-00001 §12.3): the three
+ * things an add, a submit preview and a submit all ask of it, taken in one
+ * reading so the entry and the submit can never answer differently.
+ */
+export interface AnnotationTarget {
+  docId: string
+  /** Where it lives, relative to the docs tree: what the marked passage names (spec-00007-AC-7.1). */
+  path: string
+  /** Whether its front matter reads at all; an anomalous document takes no annotation (spec-00007-AC-4.6). */
+  sound: boolean
+  issueEligible: boolean
+  /** The transition a submit would make first, or nothing when it needs none (spec-00007-FR-7). */
+  revision?: 'draft'
+}
 
 /** The document changed under the action, or is gone; the caller must refresh (spec-00001-FR-5, FR-19). */
 export class ConflictError extends Error {
@@ -573,12 +592,25 @@ export class DocService {
    * gets the question alone, because the conversation it resumes was already
    * told all of that and would be paying for it twice.
    */
-  askPlan(id: string, question: string, thread: { id: string; resumeId?: string }): SessionPlan {
+  askPlan(
+    id: string,
+    question: string,
+    thread: { id: string; resumeId?: string },
+    // The passage a question was marked on, when a unified submit opened the
+    // thread (spec-00007-FR-6): it rides in the first call's instruction and
+    // never in a follow-up's, like every other piece of that context
+    // (design-00001 §12.5).
+    selection?: SelectionAnchor,
+  ): SessionPlan {
     const graph = this.graph()
     const node = this.require(id, graph)
     this.readOrConflict(node)
     assertAskable(node)
-    const instruction = askInstruction({ docPath: node.path, relatedPaths: relatedDocPaths(graph, node.id) })
+    const instruction = askInstruction({
+      docPath: node.path,
+      relatedPaths: relatedDocPaths(graph, node.id),
+      selection,
+    })
     return {
       kind: 'ask',
       sourceId: node.id,
@@ -616,15 +648,78 @@ export class DocService {
    * the same reading the collapse filter takes of them (design-00001 §11.3).
    */
   cowritePlan(id: string, materials?: CowriteMaterials, reservedReferences: readonly number[] = []): SessionPlan {
+    return this.cowritePlanFor(id, (graph) => materialLines(materials, graph), reservedReferences)
+  }
+
+  /**
+   * What the cowrite of a submitted issue batch is started with
+   * (spec-00007-FR-7, design-00001 §12.4): the very same ruling, the same
+   * instruction skeleton and the same plan as a hand-started cowrite, with the
+   * materials segment already rendered from the annotations
+   * (`issueMaterialLines`). «No difference in behaviour» (spec-00007-FR-8) is
+   * therefore one piece of code rather than two that have to be kept in step.
+   *
+   * The status it reads is whatever is on disk **now**, which is why the
+   * transition has to have happened before this is called: the plan is what the
+   * collapse filter's front matter guard puts back (design-00001 §12.4 第 5 步).
+   */
+  annotationCowritePlan(
+    id: string,
+    materialSegment: readonly string[],
+    reservedReferences: readonly number[] = [],
+  ): SessionPlan {
+    return this.cowritePlanFor(id, () => [...materialSegment], reservedReferences)
+  }
+
+  /**
+   * The ruling both cowrite-on-an-existing-document forms share. The materials
+   * are rendered inside it rather than by the caller, so a material that cannot
+   * be resolved is refused in the same place it always was — after the document
+   * itself has been found.
+   */
+  private cowritePlanFor(
+    id: string,
+    materials: (graph: DocGraph) => string[],
+    reservedReferences: readonly number[],
+  ): SessionPlan {
     const graph = this.graph()
     const node = this.require(id, graph)
     this.readOrConflict(node)
     assertCowritable(node, this.config)
     return this.cowriteSessionPlan(
       { docId: node.id, path: node.path, type: node.type!, status: node.status! },
-      materials,
+      materials(graph),
       reservedReferences,
     )
+  }
+
+  /**
+   * The document an annotation action is addressed to, as the annotation gates
+   * read it (spec-00007-FR-4, design-00001 §12.3): whether the board can act on
+   * it at all, whether an issue may be raised on it, and the transition a submit
+   * would make first. A missing id and a colliding one are refused the way every
+   * other action on one is — the existing path, not a second one
+   * (spec-00007-AC-10.6).
+   */
+  annotationTarget(id: string): AnnotationTarget {
+    const node = this.require(id)
+    return {
+      docId: node.id,
+      path: node.path,
+      sound: node.ok && node.type !== undefined && node.status !== undefined,
+      issueEligible: issueEligible(node, this.config),
+      revision: cowriteRevision(node, this.config),
+    }
+  }
+
+  /**
+   * The document's whole file, normalised the one way an anchor is read
+   * (design-00001 §12.2): what both execution points relocate against — the
+   * submit, and the list read. Front matter included, because that is the
+   * coordinate system the anchors were cut in.
+   */
+  annotationSource(id: string): string {
+    return normalizeText(this.readOrConflict(this.require(id)).content)
   }
 
   /**
@@ -653,7 +748,11 @@ export class DocService {
       path,
       // A new document is `draft` by rule-00001-BR-26, which is what the guard of
       // the collapse filter will hold its front matter to.
-      plan: this.cowriteSessionPlan({ docId: id, path, type, status: 'draft' }, materials, reserved),
+      plan: this.cowriteSessionPlan(
+        { docId: id, path, type, status: 'draft' },
+        materialLines(materials, this.graph()),
+        reserved,
+      ),
     }
   }
 
@@ -721,7 +820,7 @@ export class DocService {
   /** The plan both cowrite forms share; the target is described rather than looked up. */
   private cowriteSessionPlan(
     target: { docId: string; path: string; type: string; status: string },
-    materials: CowriteMaterials | undefined,
+    materials: string[],
     reservedReferences: readonly number[],
   ): SessionPlan {
     return {
@@ -733,7 +832,7 @@ export class DocService {
         readmePath: typeReadmePath(target.type),
         grammar: ITEM_GRAMMAR[target.type],
         referenceStart: allocateNumber(this.graph(), REFERENCE_TYPE, reservedReferences),
-        materialLines: materialLines(materials, this.graph()),
+        materialLines: materials,
       }),
       cowrite: { targetPath: target.path, preId: target.docId, preStatus: target.status },
     }
@@ -815,7 +914,7 @@ export class DocService {
     before: DirtySnapshot,
     claims: readonly SessionClaim[] = [],
     reservedReferences: readonly number[] = [],
-  ): Promise<{ committed: boolean; error?: string; problems: string[] }> {
+  ): Promise<CommitOutcome & { problems: string[] }> {
     const cowrite = plan.cowrite!
     return this.serially(async () => {
       const docsPath = this.docsPath()

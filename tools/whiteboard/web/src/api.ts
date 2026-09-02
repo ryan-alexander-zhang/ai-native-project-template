@@ -1,3 +1,6 @@
+import type { SelectionAnchor } from '../../src/annotationAnchor.ts'
+import type { Annotation, AnnotationType } from '../../src/annotationStore.ts'
+import type { AnnotationListView, SubmitPreview, SubmitResult } from '../../src/annotations.ts'
 import type { AskExchange, AskThread } from '../../src/askStore.ts'
 import type { FlowConfig, FlowStep } from '../../src/config.ts'
 import type { CowriteMaterials } from '../../src/cowrite.ts'
@@ -8,8 +11,13 @@ import type { SessionHistoryEntry, SessionHistoryMeta } from '../../src/sessionH
 import type { SessionInfo, SessionListing } from '../../src/sessionManager.ts'
 
 export type {
+  Annotation,
+  AnnotationListView,
+  AnnotationType,
   AskExchange,
   AskThread,
+  SubmitPreview,
+  SubmitResult,
   CoverageRow,
   CowriteMaterials,
   DocContent,
@@ -71,6 +79,32 @@ export interface CreatePrefill {
   template: string
 }
 
+
+/** What one new annotation carries (design-00001 §12.1); the quote is the server's to derive. */
+export interface AnnotationInput {
+  type: AnnotationType
+  text: string
+  anchor: SelectionAnchor
+}
+
+/** What a change to an unsubmitted annotation may carry: its text, its type, a new selection. */
+export interface AnnotationChange {
+  text?: string
+  type?: AnnotationType
+  anchor?: SelectionAnchor
+}
+
+/**
+ * What one unified submit carries (design-00001 §12.3). `unsavedChanges` is the
+ * **front end's declaration** — an unsaved buffer lives in the browser and the
+ * server has no second place to observe it — so the entry here is the one and
+ * only judgment of it (design-00002 §16.5). The agent of each path is named on
+ * its own, since the two choose from different sets (spec-00007-FR-5).
+ */
+export interface AnnotationSubmit {
+  unsavedChanges: boolean
+  agents?: { question?: string; cowrite?: string }
+}
 
 /** A refused action; `status` is what the board shows the user (409 conflict, 422 rejected). */
 export class ApiError extends Error {
@@ -190,6 +224,35 @@ export const api = {
     )
     return threads
   },
+  /**
+   * A document's annotations, each with where its anchor lands on the disk just
+   * now, the batches of its submitted issues, and the submit statement
+   * (design-00001 §12.3). Read while that document's **editor** is open, not
+   * merely its list: the traces have to be right in the two other view states
+   * too (design-00002 §16.8).
+   */
+  annotations: (docId: string) =>
+    request<AnnotationListView>('GET', `/api/annotations/${encodeURIComponent(docId)}`),
+  addAnnotation: (docId: string, input: AnnotationInput) =>
+    request<{ annotation: Annotation }>('POST', `/api/annotations/${encodeURIComponent(docId)}`, input),
+  changeAnnotation: (docId: string, annotationId: string, change: AnnotationChange) =>
+    request<{ annotation: Annotation }>(
+      'PATCH',
+      `/api/annotations/${encodeURIComponent(docId)}/${encodeURIComponent(annotationId)}`,
+      change,
+    ),
+  removeAnnotation: (docId: string, annotationId: string) =>
+    request<{ annotationId: string }>(
+      'DELETE',
+      `/api/annotations/${encodeURIComponent(docId)}/${encodeURIComponent(annotationId)}`,
+    ),
+  /**
+   * One unified submit of a document's unsubmitted annotations
+   * (spec-00007-FR-5). 4xx means the batch did not happen at all; 200 means it
+   * ran and every per-annotation outcome is in the payload (design-00001 §12.3).
+   */
+  submitAnnotations: (docId: string, submit: AnnotationSubmit) =>
+    request<SubmitResult>('POST', `/api/annotations/${encodeURIComponent(docId)}/submit`, submit),
   // The way out of a session that will not end by itself; what comes back is the
   // session as it finished (spec-00001-FR-49). The session is named: the stop
   // acts on the one the terminal is showing (spec-00003-FR-5).

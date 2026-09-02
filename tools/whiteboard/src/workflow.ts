@@ -1,6 +1,6 @@
 import { isAuditable } from './auditRules.ts'
 import { isClarifiable } from './clarifyRules.ts'
-import type { FlowConfig, FlowStep } from './config.ts'
+import type { DocKind, FlowConfig, FlowStep } from './config.ts'
 import type { DocGraph, DocNode } from './docRepository.ts'
 import { highestNumber } from './docRepository.ts'
 import { allowedTransitions, promotedStatus } from './statusRules.ts'
@@ -115,12 +115,42 @@ export function assertAuditable(node: DocNode, config: FlowConfig): void {
  */
 export function assertCowritable(node: DocNode, config: FlowConfig): void {
   const kind = kindOf(node, config)
-  const legal = node.status === 'draft' || (kind === 'work' && node.status === 'open')
-  if (!legal) {
+  if (!cowritableStatus(kind, node.status!)) {
     throw new WorkflowError(
       `cowrite applies to a draft document, or an open work item (rule-00001-BR-29); ${node.id} is ${node.status}`,
     )
   }
+}
+
+/** rule-00001-BR-29 as a reading: the statuses a cowrite may be started on outright. */
+function cowritableStatus(kind: DocKind, status: string): boolean {
+  return status === 'draft' || (kind === 'work' && status === 'open')
+}
+
+/**
+ * The transition a unified submit makes before it can cowrite, or nothing when
+ * it needs none (spec-00007-FR-7, rule-00001-BR-3): an `active` living doc goes
+ * back to `draft` for its revision round, and a document that is cowritable
+ * where it stands moves not at all. The legality is read off the transition
+ * table itself rather than restated here.
+ */
+export function cowriteRevision(node: DocNode, config: FlowConfig): 'draft' | undefined {
+  if (!node.ok || node.type === undefined || node.status === undefined) return undefined
+  const kind = config.types[node.type]!
+  if (cowritableStatus(kind, node.status)) return undefined
+  return allowedTransitions(kind, node.status).includes('draft') ? 'draft' : undefined
+}
+
+/**
+ * Whether an issue may be raised on this document at all (spec-00007-FR-4): it
+ * is cowritable as it stands (rule-00001-BR-29), or it is one legal transition
+ * away from being so (BR-3). Everything else — a work item that is `resolved` or
+ * `wontfix`, either kind `archived`, and any anomalous document — is out. The
+ * type is no part of it: cowrite excludes none (rule-00001-BR-28).
+ */
+export function issueEligible(node: DocNode, config: FlowConfig): boolean {
+  if (!node.ok || node.type === undefined || node.status === undefined) return false
+  return cowritableStatus(config.types[node.type]!, node.status) || cowriteRevision(node, config) !== undefined
 }
 
 /**

@@ -95,7 +95,7 @@ describe('changeStatus', () => {
 
     const result = await service.changeStatus('prd-00001-x', 'active')
 
-    expect(result).toEqual({ committed: true, status: 'active' })
+    expect(result).toMatchObject({ committed: true, status: 'active' })
     expect(onDisk(docsDir, 'prd/a.md')).toContain('status: active')
     expect(lastCommitMessage(repoRoot)).toBe('wb(status): prd-00001-x')
   })
@@ -770,7 +770,7 @@ describe('the resolved gate', () => {
 
     const result = await service.changeStatus('plan-00001-y', 'resolved')
 
-    expect(result).toEqual({ committed: true, status: 'resolved' })
+    expect(result).toMatchObject({ committed: true, status: 'resolved' })
     expect(onDisk(docsDir, 'plan/a.md')).toContain('status: resolved')
     expect(lastCommitMessage(repoRoot)).toBe('wb(status): plan-00001-y')
   })

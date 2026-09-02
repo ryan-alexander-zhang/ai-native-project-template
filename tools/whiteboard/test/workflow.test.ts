@@ -8,7 +8,9 @@ import {
   assertAskable,
   assertAuditable,
   assertClarifiable,
+  cowriteRevision,
   hasOpenQuestions,
+  issueEligible,
   idPrefix,
   nextStepsFor,
   transitionsFor,
@@ -290,5 +292,43 @@ describe('allocateNumber and idPrefix', () => {
   it('starts at one for a type with no documents', () => {
     const graph = readGraph(makeDocsDir({}), config)
     expect(idPrefix('task', allocateNumber(graph, 'task'))).toBe('task-00001-')
+  })
+})
+
+/**
+ * The issue gate of spec-00007-FR-4, as one table: a document is annotatable with
+ * an issue when a cowrite may be started on it as it stands (rule-00001-BR-29) or
+ * one legal transition away (BR-3). `cowriteRevision` names that transition, and
+ * it is the one a unified submit makes before the session.
+ */
+describe('issueEligible and cowriteRevision', () => {
+  const cases: Array<[string, string, boolean, 'draft' | undefined]> = [
+    ['prd', 'draft', true, undefined],
+    ['prd', 'active', true, 'draft'],
+    ['prd', 'archived', false, undefined],
+    ['plan', 'draft', true, undefined],
+    ['plan', 'open', true, undefined],
+    ['plan', 'resolved', false, undefined],
+    ['plan', 'wontfix', false, undefined],
+    ['plan', 'archived', false, undefined],
+  ]
+
+  // spec-00007-AC-4.1, AC-4.3, AC-4.4, AC-4.5 — every status of both kinds
+  for (const [type, status, eligible, revision] of cases) {
+    it(`reads a ${status} ${type} as ${eligible ? 'annotatable' : 'not annotatable'} with an issue`, () => {
+      const { node } = single({ id: `${type}-00001-x`, type, status }, '# X\n')
+
+      expect(issueEligible(node, config)).toBe(eligible)
+      expect(cowriteRevision(node, config)).toBe(revision)
+    })
+  }
+
+  // spec-00007-AC-4.6 — an anomalous document is annotatable with neither type
+  it('reads an anomalous document as annotatable with nothing at all', () => {
+    const { node } = single({ id: 'nope', type: 'prd', status: 'draft' }, '# X\n')
+
+    expect(node.ok).toBe(false)
+    expect(issueEligible(node, config)).toBe(false)
+    expect(cowriteRevision(node, config)).toBeUndefined()
   })
 })

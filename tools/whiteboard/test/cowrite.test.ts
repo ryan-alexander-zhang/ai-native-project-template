@@ -4,6 +4,7 @@ import {
   type ReferenceCandidate,
   cowriteInstruction,
   guardFrontMatter,
+  issueMaterialLines,
   judgeReferences,
   materialLines,
   prefilledTemplate,
@@ -154,6 +155,65 @@ describe('materialLines', () => {
     const lines = materialLines({ docIds: ['prd-00001-board'] }, graphOn(REPO)).join('\n')
 
     expect(lines).not.toContain('permission mechanism')
+  })
+})
+
+/**
+ * The materials segment a unified submit builds in place of the one the owner
+ * typed (spec-00007-FR-7, design-00001 §12.4): one segment per issue, and the
+ * discipline clauses after them.
+ */
+describe('issueMaterialLines', () => {
+  const ISSUES = [
+    { text: 'name which gate', anchor: { before: 'and so ', selected: 'the gate is cheap', after: ' to check' } },
+    { text: 'cite the measurement', anchor: { before: 'we found ', selected: 'it costs nothing', after: ' at all' } },
+  ]
+
+  // spec-00007-AC-7.1 — all three of the passage, its context and the text, per issue
+  it('gives each issue its number, its marked passage with context, and what is wanted', () => {
+    const instruction = cowriteInstruction({ ...TASK, materialLines: issueMaterialLines(ISSUES, 'spec/x.md') })
+
+    expect(instruction).toContain('Issue 1 of 2 — the passage the owner marked in spec/x.md:')
+    expect(instruction).toContain('…and so [[the gate is cheap]] to check…')
+    expect(instruction).toContain('What they want changed: name which gate')
+    expect(instruction).toContain('Issue 2 of 2 — the passage the owner marked in spec/x.md:')
+    expect(instruction).toContain('…we found [[it costs nothing]] at all…')
+    expect(instruction).toContain('What they want changed: cite the measurement')
+  })
+
+  /**
+   * The four discipline clauses, and where they stand: right after the issues they
+   * are about, and ahead of the instruction's own last line. The third says why as
+   * well as what — the collapse filter is the enforcement layer of the same rule
+   * (rule-00001-BR-30), so the agent has nothing to guess at.
+   */
+  // spec-00007-AC-7.1
+  it('adds the four discipline clauses after the issues and before the closing line', () => {
+    const lines = cowriteInstruction({ ...TASK, materialLines: issueMaterialLines(ISSUES, 'spec/x.md') }).split('\n')
+    const at = (needle: string) => lines.findIndex((line) => line.includes(needle))
+
+    for (const clause of [
+      'Work through the issues above one by one, in the order given, and report on each as you finish it.',
+      'Where you cannot tell what an issue is asking for, stop and ask the owner — never guess.',
+      'Where an issue implies a change to a related document, report that implication and leave it to the',
+      'Do no review action: never accept, clarify or audit anything, and never touch the status line.',
+    ]) {
+      expect(lines).toContain(clause)
+    }
+    expect(at('Work through the issues')).toBeGreaterThan(at('Issue 2 of 2'))
+    expect(at('Do no review action')).toBeLessThan(at('Change nothing outside the docs tree.'))
+    expect(lines.at(-1)).toBe('Change nothing outside the docs tree.')
+  })
+
+  // The instruction skeleton is untouched: the segment goes in at the one joint
+  // the cowrite instruction has for materials (spec-00006-FR-1's zero change)
+  it('leaves the cowrite skeleton exactly as it is', () => {
+    const instruction = cowriteInstruction({ ...TASK, materialLines: issueMaterialLines(ISSUES, 'spec/x.md') })
+
+    expect(instruction).toContain('This is a cowrite session')
+    expect(instruction).toContain('never its front matter id or status line')
+    expect(instruction).toContain('reference/TEMPLATE.md')
+    expect(instruction).not.toContain('The materials the owner gave you')
   })
 })
 

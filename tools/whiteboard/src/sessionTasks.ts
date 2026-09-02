@@ -1,5 +1,6 @@
 import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { type SelectionAnchor, markedPassage } from './annotationAnchor.ts'
 import type { DocGraph } from './docRepository.ts'
 
 /**
@@ -24,6 +25,13 @@ export interface ClarifyTask {
 export interface AskTask {
   docPath: string
   relatedPaths: string[]
+  /**
+   * The passage the question was marked on, when the thread was opened by a
+   * unified submit rather than typed (spec-00007-FR-6, design-00001 §12.5). Only
+   * the **first** call carries it: a follow-up resumes the conversation that was
+   * already shown it (spec-00005-FR-2).
+   */
+  selection?: SelectionAnchor
 }
 
 /** What an audit session is told; its contract is spec-00001-FR-50 with rule-00001-BR-22. */
@@ -121,12 +129,17 @@ export function clarifyInstruction(task: ClarifyTask): string {
  * and would be paying for the context twice (spec-00005-FR-2).
  */
 export function askInstruction(task: AskTask): string {
-  const { docPath, relatedPaths } = task
+  const { docPath, relatedPaths, selection } = task
   return [
     'This is an ask session: the owner of one document asks you a question about it, and you answer it.',
     ...contextLines(docPath, relatedPaths),
     'Answer the question below. Modify no file — not this document, not another, not anywhere:',
     '  the answer itself is the whole of what is wanted.',
+    // The marked passage goes after the standing instruction and before the
+    // question, which is what the question is about (design-00001 §12.5).
+    ...(selection === undefined
+      ? []
+      : [`The passage they marked, quoted from ${docPath}:`, `  ${markedPassage(selection)}`]),
   ].join('\n')
 }
 
