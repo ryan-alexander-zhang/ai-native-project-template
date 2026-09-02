@@ -87,6 +87,11 @@ or bullets over a single conclusion. This applies to documents too.
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
 - Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
+- Before the first implementation `plan` turns `open`, fill the project-derived root guides
+  from their templates and the `active` decisions/designs: `ARCHITECTURE.md`, the Commands in
+  `DEVELOPMENT.md`, the project-specific values in `TESTING.md` / `CODE_STYLE.md` /
+  `CODE_QUALITY.md`. Never implement while a root guide the work depends on still holds
+  template placeholders.
 - When a quality gate fails (format / complexity / duplication / static analysis / coverage)
   or a review flags complexity or duplication, refactor per `CODE_QUALITY.md`: solve it — do
   not raise a threshold or suppress a finding to make the build pass.
