@@ -150,21 +150,6 @@ if (typeof window !== 'undefined') {
     })
   }
 
-  // The fallback above only reaches the events user-event hands over untouched.
-  // It builds its own with `view` as an **own**, non-configurable property —
-  // always null, since it never fills one in — and an own property shadows the
-  // prototype. Leaving that one assignment out is the only way past it: once
-  // installed, its getter cannot be redefined.
-  const defineProperty = Object.defineProperty
-  Object.defineProperty = function (target: object, key: PropertyKey, attributes: PropertyDescriptor) {
-    // The name and the kind of the target first: every definition in the run
-    // comes through here, and a getter is not something to call on a guess.
-    if (key === 'view' && target instanceof UIEvent) {
-      if ((attributes.get?.call(target) ?? attributes.value) == null) return target
-    }
-    return defineProperty(target, key, attributes)
-  } as typeof Object.defineProperty
-
   // react-resizable-panels hit-tests every pointerdown against the dividers
   // between the panels of a group, and preventDefault()s the ones that land on
   // one. jsdom measures every element as a zero-sized box at the origin, which

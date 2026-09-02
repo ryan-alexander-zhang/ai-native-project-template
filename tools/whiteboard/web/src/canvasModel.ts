@@ -37,6 +37,11 @@ export function toFlowNodes(graph: DocGraph, placed: Placed[], selected?: string
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
       data: { node },
+      // Not draggable is not «free for the pane to pan from»: React Flow marks a
+      // draggable node `nopan` itself, and dropping the drag drops that with it,
+      // which hands the press on a node's own control to the pan gesture — the
+      // same swallowed click, one layer down (issue-00024).
+      className: 'nopan',
       selected: node.id === selected,
     }
   })

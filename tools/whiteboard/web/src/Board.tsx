@@ -653,6 +653,12 @@ function Canvas() {
                       // Handles exist to anchor edges, not to draw them: every edge
                       // comes from front matter (spec-00001-AC-1.14).
                       nodesConnectable={false}
+                      // Positions come from the layout (spec-00001-AC-1.2), and
+                      // a controlled flow with no `onNodesChange` has nowhere
+                      // for a drag to land: the gesture layer only ever
+                      // swallowed the clicks on the controls inside a node
+                      // (issue-00024).
+                      nodesDraggable={false}
                       onError={onFlowError}
                       minZoom={minZoom}
                       fitView

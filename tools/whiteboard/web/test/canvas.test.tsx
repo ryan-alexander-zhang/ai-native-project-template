@@ -531,6 +531,38 @@ describe('the board', () => {
     expect(screen.getByText('no issues')).toBeTruthy()
   })
 
+  // issue-00024 — positions come from the layout (spec-00001-AC-1.2), so the
+  // drag gesture has nowhere to land and only ever swallowed clicks on the
+  // controls inside a node. React Flow marks a draggable node with the class.
+  it('a document node is not draggable', async () => {
+    render(<Board />)
+
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    const wrapper = screen.getByTestId('node-prd-00001-x').closest('.react-flow__node')
+
+    expect(wrapper).toBeTruthy()
+    expect(wrapper!.classList.contains('draggable')).toBe(false)
+  })
+
+  // issue-00024 — the gesture itself, on the anomaly badge inside a node: press,
+  // move, release. While the node was draggable, d3-drag took the press and, on
+  // a release that had moved, swallowed the click that followed.
+  it('a press that moves on a node control still opens what it opens', async () => {
+    const bad = node({ id: 'spec-00002-bad', type: 'spec', path: 'spec/b.md', ok: false, problems: ['no status'] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ ...GRAPH, nodes: [bad], edges: [] })
+
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00002-bad')).toBeTruthy())
+    const badge = screen.getByLabelText('Front matter problems of spec-00002-bad')
+
+    fireEvent.mouseDown(badge, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(document, { clientX: 12, clientY: 12 })
+    fireEvent.mouseUp(document, { clientX: 12, clientY: 12 })
+    fireEvent.click(badge, { clientX: 12, clientY: 12 })
+
+    await waitFor(() => expect(screen.getByText('no status')).toBeTruthy())
+  })
+
   // issue-00002 / spec-00001-AC-1.1 — asserted on the DOM, not on the model:
   // toFlowEdges() was right all along while the canvas stayed empty.
   it('draws an edge for each declared relation', async () => {
