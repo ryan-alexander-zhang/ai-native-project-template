@@ -2,7 +2,7 @@
 id: design-00001-docs-whiteboard
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00009-whiteboard-agent-settings]
 ---
 
 # Design: Docs 白板 MVP
@@ -306,6 +306,10 @@ agents:
     command: claude
     args: []            # 权限相关参数见下方「写权限约束」；接入时逐 CLI 验证
     cwd: docs           # 会话工作目录取 docs/，作为第一层越界屏障
+    # 第二十六轮（spec-00009-FR-1）两个可选键：
+    # model: claude-sonnet-5          # 非空字符串；有它则 args（及 headless 两数组，若声明）须含 {model}
+    # env: { FOO: bar }               # 字符串映射，叠加到子进程环境；{} 合法
+    # args 与 headless.first/resume 中的 {model} 每处替换为 model（子串亦可，如 --model={model}）
 ```
 
 - 校验规则（spec FR-15 的"文档类型、关系字段、下一步映射、入口类型列表、
@@ -314,6 +318,20 @@ agents:
   `agents` 至少一项，`command` 非空字符串、`args` 为字符串数组、`cwd` 若有必须
   是 `docs` 内路径；`max_sessions` 若有必须是正整数（缺失取缺省 3——
   spec-00003-AC-3.4/AC-3.5，第十六轮）。任何违规 → 启动失败并指明条目。
+  **第二十六轮增（`spec-00009-FR-2`）**：`model` 若有须是非空字符串；`env`
+  若有须是字符串到字符串的映射；`{model}` 与 `model` **按形态成对**——
+  `args` 或 `headless` 任一数组含 `{model}` 而无 `model` → 拒绝；有 `model`
+  而 `args` 无 `{model}` → 拒绝（点名 `agents.<n>.model`）；有 `model` 且声明
+  `headless` 而 `first` 或 `resume` 无 `{model}` → 拒绝（点名该数组）。「含」
+  是至少一次（现有 `placeholders(argv, placeholder)` 计数、`requirePlaceholder`
+  只做恰等，需新加一个「至少一次」的检查；模型可在一条命令里出现多次无害，
+  与 `{question}` 的恰一次不同）。这套条目校验抽成一个对**单条**条目的纯
+  函数 `readAgentEntry(name, raw, at)`——今天的 `readAgent` 把错误位置硬编码
+  为 `agents.<name>`，抽出后位置前缀由调用方给：项目层传 `agents.<name>`、
+  本地层传 `overrides.<name>` / `entries.<name>`（§13.2 的 `at` 由此而来）。
+  项目层由启动校验调用、抛 `ConfigError`；本地层由 §13 的合并调用、把同一
+  错误当作「本地层不合式」收下而不抛——两层一套规则（`spec-00009-FR-3`
+  末句）靠的就是共用这一个函数。
 - **写权限约束（spec FR-13）**：机制为 per-CLI 适配——首选「会话工作目录设为
   `docs/` + CLI 自身的权限模式（越界写需显式批准）」，辅以 CLI 的
   allow/deny 权限参数。**本节的具体参数是意向而非已验证事实**：每个接入的
@@ -321,7 +339,9 @@ agents:
   未通过验证的 CLI 不进默认配置。
 - 多 agent 并存时可在发起会话时指定其中一条（`POST /sessions*` 的可选
   `agent` 字段），缺省取配置中的**第一项**；未知名字拒绝且不启动（spec
-  FR-55，第十一轮取代原「由用户选择 CLI 留后续版本」的搁置）。
+  FR-55，第十一轮取代原「由用户选择 CLI 留后续版本」的搁置）。**第二十六轮
+  起「配置中」读作有效 agent 列表**（§13）：本节的 `agents` 是它的项目层，
+  本地层与合并规则在 §13；本节的校验规则对两层同一。
 - **关系矩阵 `carries`（治理轮，spec-00002-FR-5/FR-6）**。**键名取
   `carries` 的理由**：配置里已有 `flow[].carry`（「这一步带上哪个关系」），
   `carries` 是同一个动词在类型这一层的用法（「这个类型带哪些关系字段」），不引入
@@ -427,6 +447,18 @@ stateDiagram-v2
   terminated --> [*]: 收尾同 exited；面板与历史标「终止」
   failed --> [*]: 终端呈现错误
 ```
+
+**第二十六轮（`spec-00009-FR-1`/`FR-5`）**：`POST sessions*` 受理时
+`resolveAgent` 从有效 agent 列表（§13）取条目并整份存进会话——`Session.agent`
+今天已经持有整个 `AgentConfig`、`launchTerminal` 与 headless 的 `launch` 也已
+只读它不查列表，这一点**不是新改动**；新的是列表每次重算、每次返回**新建**
+的对象（§13.2）——快照语义靠这一点成立，合并结果**不得 memoize** 成共享
+引用。命令、`args`、`cwd`、`model`、`env`、`headless` 由此在受理时定格，其后
+的设置保存不再触及这个会话（已受理未 spawn 的亦然）。
+spawn 时 `args` 经 `fillModel(args, model)` 把每处 `{model}` 换成 `model`
+（无 `model` 时原样——校验已保证此时数组里没有占位），`SpawnPty` 增第四参
+`env`，实现为 `{ ...process.env, ...agent.env }` 喂 node-pty；headless seam
+同形（§10.1）。
 
 退出收尾（commit + 刷新）恰执行一次：`pty.onExit` 只触发一次，终止与自然
 退出竞态时先到者定（FR-49）。第十一轮起收尾序列在 commit 之前多一步
@@ -603,7 +635,9 @@ GET  /api/sessions/history/:id        → {meta, transcript}         # 单条元
 DELETE /api/sessions/:id              → 200 | 404 该会话不存在或非运行中（已 exited/failed——重复终止同 404，不二次 commit；逐会话判定，spec-00003-FR-5）   # 终止指定会话（FR-49，issue-00010；第十六轮加会话标识，原无标识形态废止）；退出收尾照常、恰一次；信号升级 SIGHUP→宽限→SIGKILL（issue-00012），等待因此有界。ask 会话同端点同语义，升级阶梯为第二 seam 自持的 SIGTERM→宽限→SIGKILL（§10.3，第二十一轮）
 WS   /api/terminal?sessionId=<id>     双向。文本帧 = stdin 原样字节；二进制帧 = JSON 控制（现仅 {cols, rows} 尺寸帧：前端 fit 后与面板变化时上报，服务端调 pty.resize；非法控制帧忽略不断连——FR-12/issue-00009）；服务端→前端仍为 stdout 文本帧 + exit 事件。（本行原写作 /api/sessions/:id/term，与实现不符，第七轮据实校正；第十六轮加 sessionId——终端接入指定会话，尺寸帧只随呈现中的会话连接到达，未呈现的会话自然无帧，spec-00003-FR-5）
 WS   /api/events                      服务端→前端：无载荷信号，收到即刷新（重取 graph + 当前 items + 会话状态；FR-42/FR-43）。三个来源：docs/ 变更（watcher），会话收尾——**无论有无 commit**（FR-12/issue-00013，触发源由此真正共用一条通路），以及等待标志的翻转（onAwaitingChange → watcher.signal，只在标志真变时广播——重复信号因此不重播，spec-00003-FR-6；第十八轮据实补记，spec-00004-FR-2 的「置位经刷新到达页面」依赖它）。同批多会话收尾只广播一次（spec-00003-FR-8，第十六轮）
-GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）；max_sessions 随配置下发（spec-00003-FR-4 的「运行中数/上限」，第十六轮）
+GET  /api/config                      → 生效的流程配置（只读）+ 代码内建的可澄清/可审计类型集（FR-56，第十一轮：前端入口呈现的单一来源，不再自持副本）；entry 列表随配置下发（FR-53）；max_sessions 随配置下发（spec-00003-FR-4 的「运行中数/上限」，第十六轮）；agents 第二十六轮起为**有效 agent 列表**（§13）——每项 {name, headless: boolean, source: project|local|overridden, default?: boolean}——被禁用者**不在其中**（`spec-00009-AC-3.8`；禁用态只经 /api/settings/agents 可见），每次请求重新计算；另带 agentSettings: {error?: {message, at?}, notices: [{name, message}]}（本地层不合式的原因 / 无所指的单条）
+GET  /api/settings/agents             → {project: [<项目层条目全量，含 model/env/args/headless>], local: <本地层文件原样 | null>, effective: <同 /api/config 的 agents>, captures: [<代码内建的 capture 名集合，今天 ['claude-json']>], error?, notices}   # 设置面板的数据源（spec-00009-FR-7），第二十六轮；captures 供 headless.capture 下拉——不进 /api/config，FR-56 的两个内建集不增第三个
+PUT  /api/settings/agents             <本地层文件全量>             → 200 {effective, notices} | 422 {error, at}（合并校验不过，不写盘，spec-00009-FR-6）| 500 {error}（写盘失败——临时文件 + rename，磐上无半写文件）   # 保存（spec-00009-FR-5）；返回即已生效——下一次受理读的就是这份
 GET  /api/docs/:id/items              → {items, diagnostics}        # 需求条目：id、正文、AC（含 GWT 文本）、验收行、覆盖三态（FR-31…FR-33）；diagnostics 吸收原 unattributed（FR-40），子画布同源复用（FR-35），无第二个端点
 GET  /api/coverage                    → [{docId, title, verified, failing, uncovered, items: [{id, coverage}]}]   # 全局覆盖率视图（spec-00002-FR-10/FR-11，治理轮）：全仓每份 spec/rule 一行，三态计数 + 逐条目覆盖；不区分文档 status，撞 id 的文档不在列；无可列文档时为 []
 ```
@@ -775,7 +809,11 @@ capture 内建：① `-p --output-format json` 的 stdout 是单个 JSON 对象�
   的语义随之是「argv 载荷」而非「首笔 PTY 输入」。
 - 命令构造：`command` + headless 声明数组逐项做占位替换后 spawn——
   **不拼接条目的 `args`**（那是交互形态的参数集，交互旗标误入 print
-  调用逐 CLI 后果不明，headless 声明自持完整旗标）。spawn 走与
+  调用逐 CLI 后果不明，headless 声明自持完整旗标）。**第二十六轮**：
+  占位集增 `{model}`，与 `{question}` / `{session}` 在 `headlessArgs` 的
+  **同一遍**正则里替换（一遍而非两遍的理由不变：问题正文里若出现
+  `{model}` 字样不得被再次替换）；`SpawnHeadless` 增第四参 `env`，与 §5
+  的 pty seam 同一合成方式。条目从会话里存的快照取（§5，今天已如此）。spawn 走与
   `SpawnPty` 并列的**第二个注入 seam**（`child_process`，非 pty；
   `cwd` 沿用条目的 `cwd`），其 kill 升级自持（§10.3）。整段指令作为
   单个 argv 元素传入，不经 shell——无转义面。
@@ -1667,7 +1705,123 @@ stateDiagram-v2
   改写；对侧的前端登记见 design-00002 §16.8。服务端载荷零改动，改的只是
   谁在什么时候来取。
 
-## 13. Open Questions
+## 13. Agent 设置——两层配置与设置面板的服务端（第二十六轮）
+
+承载 `spec-00009` 的服务端；取舍全部在案于 `decision-00017`。界面侧归
+design-00002 §18。§3 的 `agents` 从本轮起是**项目层**；本节持有本地层的文件
+形态、合并规则、不合式降级、按次重新计算与两个 API 的语义。
+
+### 13.1 本地层文件
+
+`.whiteboard/agents.json`（`.whiteboard/` 已 gitignore；JSON 而非 YAML 的理由
+见 `decision-00017` §2 第 3 条）。形态：
+
+```json
+{
+  "default": "claude",
+  "disabled": ["other"],
+  "overrides": {
+    "claude": { "model": "claude-sonnet-5", "args": ["--model", "{model}"], "env": { "FOO": "bar" } }
+  },
+  "entries": {
+    "codex-local": { "command": "codex", "args": ["-m", "{model}"], "model": "gpt-5", "env": {} }
+  }
+}
+```
+
+- 四个键都可选；文件不存在 = 空本地层。`overrides` 与 `entries` **分两个键**
+  而不混在一张表里：这样「覆盖所指的项目条目不存在」是一次键比对就能判的
+  事（`spec-00009-FR-4` 末句的单条忽略），追加条目「不得声明 `cwd`」也只是
+  对 `entries` 的一条键检查。
+- `overrides.<name>` 可出现的键：`command`、`args`、`model`、`env`、
+  `headless`——**没有 `cwd`**（出现即整层不合式，`spec-00009-AC-4.2`）。撤销
+  一项覆盖 = 从该对象删掉那个键；对象为空时删掉整条。覆盖是**键级整体替换**，
+  不做深合并：本地写了 `env` 就整个换掉项目层的 `env`，写了 `headless` 就整个
+  换掉 `headless`——深合并会让「撤销」失去明确语义（撤到哪一层？）。
+- `entries.<name>` 是一条完整条目减 `cwd`：`command` 必填，其余同 §3；合并时
+  `cwd` 恒填 `docs`（`spec-00009-FR-3`）。与项目层同名、或同一名字同时出现在
+  `overrides` 与 `entries` → 整层不合式（`spec-00009-FR-4` 第二十六轮补注的
+  两项；那应写成 override）。
+- `disabled` 是字符串数组、`default` 是**单个字符串**——形态上就只能有一个
+  缺省，FR-4 的「缺省多于一条」由此是结构性不可能；`default` 非字符串按形态
+  错处置（整层不合式）。两处的名字可指项目条目或追加条目；所指不存在 → 单条
+  忽略并进 `notices`（与无所指的 override 同处置）；`default` 指向被禁用者 →
+  整层不合式（`AC-4.6`）。
+
+### 13.2 合并与有效列表
+
+`agentSettings.ts`（新模块）导出一个纯函数
+
+```
+mergeAgents(project: AgentConfig[], local: LocalAgentSettings | null)
+  → { agents: EffectiveAgent[], notices: Notice[] }   // 或抛 LocalSettingsError（整层不合式）
+```
+
+`EffectiveAgent = AgentConfig & { source: 'project' | 'local' | 'overridden', default: boolean }`。
+步骤：① 项目条目按 YAML 键序为底；② 逐条应用 `overrides`——把项目条目的
+原始键与覆盖键**浅合并后重新过 `readAgentEntry`**（§3 抽出的单条校验：
+`{model}` 成对、`env` 形态、`headless` 声明……一律在合并结果上判，而不是各层
+分别判——否则「项目层有 `{model}`、本地把 `args` 覆盖成没有」这种跨层错抓
+不到）；③ 追加 `entries`（`cwd` 填 `docs` 后同样过 `readAgentEntry`）；④ 去掉
+`disabled` 所指；⑤ `default` 所指移到首位；⑥ 为空 → 整层不合式。任一步的
+校验错都以 `LocalSettingsError { message, at }` 抛出，`at` 形如
+`overrides.claude.model` / `entries.codex-local.cwd`。
+
+**读取点**：`EffectiveAgents`（同模块的一个小类）持有项目层数组与本地文件
+路径，`current(): { agents, notices, error? }` **每次调用都重读文件**并合并——
+文件几百字节、调用点少（会话受理、配置下发、设置面板的 GET/PUT），不做
+mtime 缓存；文件不存在 = 空本地层；读失败、JSON 解析失败或合并抛错 →
+`agents` 退为项目层、`error` 带原因（`spec-00009-FR-4`）；`console.warn` 只在
+错误**出现或变化**时记一次（记住上一次的 `error.message` 比对），不随每次
+受理重复。`SessionManager.options.agents` 与 `Annotations.options.agents`
+（`annotations.ts:126`，今天同样是启动时冻结的数组）都从 `AgentConfig[]` 改为
+`() => AgentConfig[]`——「不在启动时定格」（`decision-00017` §5 的站立约束）
+在类型上就成立。
+
+**整批一次解析**（`spec-00009-AC-5.5`）：统一提交的 `chooseAgents` 今天解析出
+`AgentConfig` 后，`openThread` / `startIssues` 往下只传 **名字**，`server.ts`
+再经 `SessionManager.start` 按名字重新解析——本轮起两层间传的是**已解析的
+条目**：`openAsk` / `start` 增一个「预解析条目」入参形态（有它就不再查列表），
+批内每条会话用的都是受理时那一份。追问同理但反向：`spec-00009-FR-9` 的
+拒绝在 `resolveAgent` 里已成立——线程记录的名字不在当前列表 → 既有的
+「不是有效列表中的 agent」拒绝；在列表但 `headless` 为空 → 既有的「未声明
+headless 形态」拒绝——两条用户可见文案里的 "flow config" 随本轮改为
+"effective agent list"（`sessionManager.ts`、`annotations.ts` 三处、
+`sessionHistory.ts` 注释同改）。
+
+### 13.3 保存
+
+`PUT /api/settings/agents` 收本地层**全量**：① 形态校验（四个键的类型）；②
+`mergeAgents(project, body)` 试合并——抛错即 422 `{error, at}`，不写盘；③ 写
+`.whiteboard/agents.json`：`mkdir -p .whiteboard` → 写 `agents.json.tmp` →
+`rename`——rename 原子，失败面上磁盘要么是旧文件要么是新文件，没有半写
+（`spec-00009-AC-6.4`）；写失败 500，不改内存里任何东西（本来也没有——
+有效列表按次重读）。④ 返回新的 `effective` 与 `notices`。**不广播
+`/api/events`**：变更推送的三个来源不加第四个（`decision-00017` §2 第 8 条），
+发起保存的页面用返回值就地更新选择器，其他页面下次重新加载见新列表。
+
+### 13.4 进程环境与模型注入
+
+- `env` 合成：`{ ...process.env, ...agent.env }`，两个 seam 同一函数
+  `childEnv(agent)`。不过滤键名（`PATH` 可被覆盖，`spec-00009` §7 已接受）。
+- `{model}`：`fillModel(argv, model)` 对每个元素做全局子串替换；`args` 在
+  `launchTerminal` 里过它；headless 在 `headlessArgs` 的同一遍正则里连同
+  `{question}` / `{session}` 一起替（§10.1）。无 `model` 的条目校验已保证数组
+  里没有占位，函数对此是恒等。
+- 会话历史（`.whiteboard/sessions/<id>.json`）的 `agent` 字段仍记**名字**；
+  快照（§5）只活在运行中的会话对象里，不入历史——历史回答「用了哪条」，
+  不回答「那条当时长什么样」。
+
+### 13.5 接入验证纪律的适用面
+
+§3 / §10.1 / §11.5 的「未实测不进默认配置」只约束**项目层**（模板自带的
+`whiteboard.config.yaml`）。本地层是用户机器上的用户选择，白板不验、也不
+拦；设置面板在追加条目旁呈现「未经写域校验」的说明即是全部（design-00002
+§18）。模板自带的 `claude` 条目要加 `model` / `{model}`，仍须先对当前 claude
+版本实测 `--model` 在交互与 `-p` 两种形态下生效，实测记录写进 YAML 注释——
+与既有条目同一纪律。
+
+## 14. Open Questions
 
 - 本文档当前无未决项（第二十一轮的取舍全部由 decision-00012 在案；
   接续失效的出路已由域主裁定取「诚实标注」并回写 §10.2，2026-08-26；
@@ -1675,4 +1829,5 @@ stateDiagram-v2
   全部由 decision-00015 在案，共写的接入验证按 §11.5 的实测门落地；
   第二十三轮委给本文档的三项——锚的数据形态、恰一处命中的判定细则、
   统一提交 API 的语义——已在 §12 逐项落定，随本轮评审一并接受或推翻，
-  未留待定项）。
+  未留待定项；第二十六轮的取舍全部由 decision-00017 在案，委给本文档的
+  本地层文件形态与读取点已在 §13 落定）。

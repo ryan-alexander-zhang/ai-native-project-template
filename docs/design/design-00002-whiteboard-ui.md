@@ -2,7 +2,7 @@
 id: design-00002-whiteboard-ui
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00008-whiteboard-navigation-sidebar]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00008-whiteboard-navigation-sidebar, spec-00009-whiteboard-agent-settings]
 ---
 
 # Design: Docs 白板界面
@@ -59,7 +59,7 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 
 ```mermaid
 flowchart TB
-  TB[Top bar<br/>导航栏开关（第二十四轮）· 标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 桌面通知开关（第十七轮）· 主题切换]
+  TB[Top bar<br/>导航栏开关（第二十四轮）· 标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 桌面通知开关（第十七轮）· 设置入口（第二十六轮，§18）· 主题切换]
   subgraph Work[工作区]
     direction LR
     NV[Navigation sidebar<br/>可收起 · 宽度可调（第二十四轮）] ---|可拖动分隔| CV[Canvas<br/>React Flow]
@@ -69,9 +69,9 @@ flowchart TB
   Work --- TP[Terminal panel<br/>高度可调]
 ```
 
-浮于其上的四者不占布局：**浮窗工具栏**贴选中节点悬浮于画布；**命令面板**是
+浮于其上的五者不占布局：**浮窗工具栏**贴选中节点悬浮于画布；**命令面板**是
 覆盖全屏的对话框；**提示条**堆叠在画布一角；**缩略图**贴画布右下角（第二十四
-轮，§17）。左侧的**导航栏**是工作区行内、画布与右槽之外的第三个区域（第二十四
+轮，§17）；**设置面板**是覆盖全屏的对话框（第二十六轮，§18）。左侧的**导航栏**是工作区行内、画布与右槽之外的第三个区域（第二十四
 轮，§17）：与右槽三态和终端面板互不占位、不参与右槽互斥，可收起。（澄清对话框第八轮废弃——澄清
 改为发起会话，见 decision-00006。）
 
@@ -596,6 +596,9 @@ design-00001 §10.3）。另注：同批多会话收尾的刷新合并为一次�
 有意偏离）；**第四项的取数条件同轮扩**为问题列表**或标注列表**打开期间
 （标注列表的 question 项状态由 asks 合成——design-00001 §12.1，否则
 停在标注列表时线程状态过期）。理由与 `CONTEXT.md` 的回写措辞见 §16.8。
+**第二十六轮再增一项**：设置面板的开合（§18.1）——只活在当前页面、不跨
+重载、刷新不动它（对话框覆盖全屏，刷新与它无交集）；重取清单**不加项**：
+面板的数据源在打开时取、不随刷新重取（§18.1）。
 
 ## 11. 治理轮的两处裁定余项（已裁，非未决）
 
@@ -1485,13 +1488,120 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   仍由 `spec-00001-FR-27`/`FR-36` 持有，缩略图的拖动与缩放为库承诺、导航栏
   宽度记忆为非功能项，两者不写 GWT（§6 末段与 §8 的既有口径）。
 
-## 18. Open Questions
+## 18. 设置面板（第二十六轮）
+
+承载 `spec-00009-FR-7` / `FR-8` 的界面侧；取舍全部在案于 `decision-00017`，
+数据与合并规则归 design-00001 §13，本节只管呈现与编辑。
+
+### 18.1 入口与容器
+
+- **顶栏入口**：主题切换之前一个图标 `Button`（Lucide `Settings`），
+  `aria-label` 为 `Agent settings`。
+- **容器是 `Dialog`**（与命令面板同族，覆盖全屏、`Esc` 关闭），不进右槽：
+  设置不是对某份文档的操作，与文档面板互斥没有意义；也不做常驻面板——用完
+  即走。开合是呈现状态（§10 的族增一项，`CONTEXT.md` 已随 spec 接收同步），
+  **不跨重载保持**：它是一次性的操作入口，与主题、通知开关那类记住的选择
+  不同。
+- 数据源 `GET /api/settings/agents`：**每次打开**取一次（手改文件后重开即见
+  其错误，`spec-00009-AC-4.4`）；打开期间不轮询；保存成功后用响应回填，不
+  重取。
+
+### 18.2 列表
+
+列出的是**两层条目的并集**（`project` ∪ `local.entries`，从
+`GET /api/settings/agents` 的 `project` 与 `local` 合成），不只是有效列表——被
+禁用的条目（项目的或追加的）**也列出**、可在此启用或删除
+（`spec-00009-AC-7.4`、FR-7 的「禁用与启用」「删除本地条目」）。顺序：先按
+有效列表顺序（缺省项因此在首位），被禁用者排在末尾并降对比度。每条一张
+卡片：
+
+- 首行：名字（等宽）· 来源 `Badge`（`项目` / `本地` / `项目+本地覆盖`，
+  `variant` 依次 `secondary` / `default` / `outline`）· 缺省 `Badge`（仅缺省项）·
+  `headless` `Badge`（仅声明者）· 禁用 `Badge`（仅禁用者）。
+- 次行：`command` + `args` 的一行摘要（等宽、`truncate`），`{model}` 已按
+  `model` 填好呈现（读者看到的就是将要运行的命令）。
+- 三行：`model` 的值（无则不呈现该行）；`env` 的键列表，每键后跟**遮罩的值**
+  与 18.3 的显示按钮——FR-7 要求面板**列出** `model` 与 `env`，
+  `spec-00009-AC-7.7` 的「打开面板即见遮罩」在卡片这一层成立，不必展开。
+- 追加条目（来源为本地）卡片底部一条 `text-muted-foreground` 说明：「此 CLI
+  未经写域校验（design-00001 §11.5），越界写入不由白板拦截」。不可关闭、
+  不占提示条——它是一行说明文字，不是通知。
+- 顶部两个动作：**新增本地条目**、**保存**（有未保存改动时才可用）；底部
+  `agentSettings.error` 有值时一条 `destructive` 色的说明行（本地层不合式的
+  原因与 `at`），`notices` 逐条 `muted` 说明行（无所指的覆盖/禁用/缺省）。
+
+### 18.3 编辑表单
+
+点一行展开（`aria-expanded`）为表单，字段与只读性：
+
+| 字段 | 控件 | 项目条目 | 追加条目 |
+| --- | --- | --- | --- |
+| `command` | `Input` | 可覆盖 | 必填 |
+| `model` | `Input`（自由文本） | 可覆盖 | 可填 |
+| `args` | 每元素一个 `Input` 的列表，增删按钮 | 可覆盖 | 可填 |
+| `cwd` | 只读文本 | 项目值 | `docs` |
+| `env` | 键值对列表，值列见下 | 可覆盖 | 可填 |
+| `headless` | 三个子字段：`first` / `resume` 各为元素列表，`capture` 为下拉（选项来自配置下发的内建集合，今天只有 `claude-json`） | 可覆盖 | 可填 |
+| 禁用 | `Switch` | 可 | 可 |
+| 设为缺省 | 单选（列表级） | 可 | 可 |
+
+- 组件：表中的 `Input`、`Switch`、`Select` 三个 shadcn 组件今天的 `ui/`
+  目录里**没有**（现有：badge、breadcrumb、button、card、command、dialog、
+  dropdown-menu、popover、resizable、tabs、tooltip），按 decision-00001 的方式
+  加入；不手写替代品。
+- 项目条目的每个可覆盖字段旁有「撤销覆盖」小按钮，**仅当该字段有本地覆盖时
+  呈现**；点击后字段回到项目值、来源徽标随之变化（`spec-00009-AC-7.2`）。
+  覆盖是键级整体替换（design-00001 §13.1）：`args` 或 `env` 改任何一项即整个
+  键成为本地值，表单上以该字段的「已覆盖」标识说明。
+- **`env` 值缺省遮罩**（域主 2026-09-02 裁定）：只读态显示 `••••••` 与一个
+  `Eye` 图标按钮，`aria-label` 为 `Show value`；点击后该值显示明文并换为
+  `EyeOff`（`Hide value`），逐值独立、不联动（`spec-00009-AC-7.8`）；进入编辑
+  态（聚焦该值的 `Input`）时不遮罩——遮罩的是**浏览**，不是**输入**。
+- 表单不做实时校验：合并规则只有一份、在服务端（design-00001 §13.2），前端
+  不复制一份来预判。保存时 422 的 `{error, at}` 落到对应字段下方为
+  `destructive` 文案并滚入视野；`at` 无法映射到字段时落在顶部说明行。
+- 删除追加条目：卡片上的 `destructive` 图标按钮，一步删除、无二次确认——
+  保存前都在表单里，关掉对话框即放弃。
+
+### 18.4 保存与就地更新
+
+- 保存 = 把表单序列化为本地层全量 `PUT /api/settings/agents`。成功：用响应
+  的 `effective` 回填列表，并喂给 `useBoard`——它今天不持有配置对象，持有的是
+  从配置推出的 `agents: string[]` 与 `askAgents: string[]`
+  （`useBoard.ts:954-963`，后者按 `headless !== undefined` 过滤），保存成功后
+  这两个数组从响应重新推导；`/api/config` 的 `agents` 项本轮起 `headless` 是
+  **布尔**（design-00001 §7），过滤条件随之改为真值判断，否则每条都会被当作
+  可答疑。§14 的答疑入口、§15 的共写发起、§16 的统一提交与 `AskEntry` 的
+  选择器都读这两个数组，因此**同页即刻**呈现新列表、无需重取 `GET /api/config`
+  （`spec-00009-FR-8`）；选择器恰一条时不呈现的判定不变（`agents.length > 1`）。
+  **已选中的 agent 名要随之校正**：`AskEntry` 与 `MaterialsInput` 各自持有
+  `agent` 状态、缺省 `chosen = agent ?? agents[0]`，若用户先选了 `codex-local`
+  再在面板删掉它，下一次请求会带着已死的名字被 422——保存成功后 `useBoard`
+  把不在新列表里的已选名重置为未选（回到「第一条」缺省）。`api.ts` 的
+  `ConfigPayload` 今天复用服务端的 `AgentConfig[]` 作 `agents` 类型，收窄后
+  另立前端类型。
+  其他标签页不更新（design-00001 §13.3：不广播），这是 `spec-00009-FR-8`
+  明写的边界。
+- 失败：422 见 18.3；500（写盘失败）为顶部 `destructive` 说明行「未能写入
+  `.whiteboard/agents.json`」+ 原因，表单内容保留供重试（`spec-00009-AC-6.5`）。
+- 保存后对话框**不自动关闭**：用户可能连改几条。
+
+### 18.5 可访问性
+
+- 卡片头是 `Button`（`aria-expanded`），字段皆为带 `<label>` 的真控件；来源、
+  缺省、禁用三个徽标都是文字，不只靠色（§6）。
+- 遮罩按钮与撤销覆盖按钮是图标按钮，`aria-label` 如上；遮罩状态以
+  `aria-pressed` 反映。
+
+## 19. Open Questions
 
 - 本文档当前无未决项（第十五轮审计的两问已由域主裁定，见 spec-00001 §8；
   就近关闭的裁定已回写 §9；第十六轮的取舍全部由 decision-00009 在案；
   第十七轮的取舍全部由 decision-00010 在案；第二十一轮的取舍全部由
   decision-00012 在案；第二十二轮的取舍全部由 decision-00015 在案；
   第二十四轮的取舍全部由 decision-00016 在案；
+  第二十六轮的取舍全部由 decision-00017 在案，`env` 值的遮罩由域主
+  2026-09-02 裁定、条文在 §18.3；
   第二十三轮的取舍由本文 §16 就地裁定——其中标注列表的**呈现归属**
   （§16.1）是 `spec-00007-FR-9` 明写委给本文的一项，随本轮接收由域主
   确认，不作为未决项挂起）。

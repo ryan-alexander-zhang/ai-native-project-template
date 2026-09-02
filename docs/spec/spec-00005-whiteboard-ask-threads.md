@@ -196,11 +196,14 @@ parent: prd-00001-docs-whiteboard
   终止入口位置不变）可终止（`spec-00001-FR-49`）：进程结束、该问记
   终止态、可重发；系统不以无输出时长判定失败（无超时——手动终止
   兜底）；经接口对答疑会话请求终端接入、输入或尺寸调整应被拒绝。
-- **spec-00005-FR-8** (Ubiquitous) 流程配置的 agent 条目应可携带
+- **spec-00005-FR-8** (Ubiquitous) agent 条目应可携带
   可选的 headless 声明：首调与接续两种命令形态、问题占位与只读旗标
-  （接续标识的捕获口径属 design）；声明不合式时按 `spec-00001-FR-15`
-  启动校验拒绝并点名该条目；未声明的 agent 不进入答疑的可选集
-  （FR-2），全部未声明的拒绝面由 FR-7 承接。
+  （接续标识的捕获口径属 design）；声明不合式时，项目层的条目按
+  `spec-00001-FR-15` 启动校验拒绝并点名该条目，本地层的条目按
+  `spec-00009-FR-4` 处置（本地层整体忽略、不拦启动）；未声明的 agent
+  不进入答疑的可选集（FR-2），全部未声明的拒绝面由 FR-7 承接。
+  （第二十六轮修订轮：原「流程配置的 agent 条目」——本地 agent 设置的
+  条目同样可声明 headless，`spec-00009-FR-3`。）
 - **spec-00005-FR-9** (Complex) 问题列表应作为文档编辑器的第三视图
   态呈现（与编辑、预览并列），槽位规则不变（`spec-00001-FR-31` 原样
   适用——列表随编辑器占用右侧槽位）：逐项呈问题与状态，点开一项
@@ -246,7 +249,8 @@ parent: prd-00001-docs-whiteboard
   When 用户提交一个新问题
   Then 问题列表出现第二条线程，其首调不携带接续标识（独立会话）
 - **spec-00005-AC-2.3** (spec-00005-FR-2)
-  Given 流程配置两条 agent，仅其一声明 headless 形态
+  Given 有效 agent 列表两条，仅其一声明 headless 形态（第二十六轮：原
+  「流程配置两条」，理由同 `spec-00001-AC-55.4`）
   When 用户执行答疑
   Then agent 可选集只含声明者；新线程可另选 agent，追问沿用该线程的
   agent
@@ -358,13 +362,18 @@ parent: prd-00001-docs-whiteboard
   When 经接口对其请求终端接入、输入或尺寸调整
   Then 三者均被拒绝
 - **spec-00005-AC-8.1** (spec-00005-FR-8)
-  Given 一条 agent 配置的 headless 声明缺少必需占位
+  Given 项目层一条 agent 条目的 headless 声明缺少必需占位
   When 服务启动
   Then 启动被拒且报错点名该 agent 条目（`spec-00001-FR-15` 口径）
 - **spec-00005-AC-8.2** (spec-00005-FR-8)
   Given 一条 agent 配置携带合式的 headless 声明
   When 一条线程首调与追问相继执行
   Then 两次调用各按声明的首调与接续命令形态执行
+- **spec-00005-AC-8.3** (spec-00005-FR-8)
+  Given 本地层一条追加条目的 headless 声明缺少必需占位（第二十六轮增）
+  When 服务启动
+  Then 服务照常启动，该条目不在有效 agent 列表中，设置面板点名该条目的
+  headless 声明
 - **spec-00005-AC-9.1** (spec-00005-FR-9)
   Given 一个文档有三条线程：已回答、进行中、失败
   When 打开其编辑器并切到问题列表态
