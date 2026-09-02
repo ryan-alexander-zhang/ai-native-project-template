@@ -36,6 +36,23 @@ function byIdThenPath(a: DocNode, b: DocNode): number {
  * position does not move when its neighbours change.
  */
 export function layoutGraph(graph: DocGraph, typeOrder: string[]): Placed[] {
+  return orderedColumns(graph, typeOrder).flatMap((column, index) =>
+    column.map((node, row) => ({
+      id: node.id,
+      x: index * (NODE_WIDTH + COLUMN_GAP),
+      y: row * (NODE_HEIGHT + ROW_GAP),
+    })),
+  )
+}
+
+/**
+ * The columns in the order they are drawn, each already in row order. The one
+ * grouping, read by the canvas here and by the navigation sidebar through
+ * `sidebarModel.ts`: group order is column order and row order is row order
+ * because it is the same code, not two rules aimed at each other
+ * (design-00002 §17.2).
+ */
+export function orderedColumns(graph: DocGraph, typeOrder: string[]): DocNode[][] {
   const columns = new Map<string, DocNode[]>()
   for (const node of graph.nodes) {
     const key = columnKey(node, typeOrder)
@@ -44,16 +61,5 @@ export function layoutGraph(graph: DocGraph, typeOrder: string[]): Placed[] {
     else columns.set(key, [node])
   }
 
-  return [...columns.keys()]
-    .sort()
-    .flatMap((key, index) =>
-      columns
-        .get(key)!
-        .sort(byIdThenPath)
-        .map((node, row) => ({
-          id: node.id,
-          x: index * (NODE_WIDTH + COLUMN_GAP),
-          y: row * (NODE_HEIGHT + ROW_GAP),
-        })),
-    )
+  return [...columns.keys()].sort().map((key) => columns.get(key)!.sort(byIdThenPath))
 }
