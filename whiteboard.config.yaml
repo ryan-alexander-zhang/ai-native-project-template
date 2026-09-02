@@ -154,3 +154,18 @@ agents:
       first:  [-p, --output-format, json, --permission-mode, plan, "{question}"]
       resume: [-p, --output-format, json, --permission-mode, plan, --resume, "{session}", "{question}"]
       capture: claude-json
+    # Model (spec-00009-FR-1, design-00001 §13.5): `model` plus a `{model}`
+    # placeholder in `args` AND in both headless forms — the three must go in
+    # together, or startup refuses the entry (spec-00009-FR-2). Verified against
+    # claude 2.1.258 (2026-09-02) with `--model sonnet`: the interactive form's
+    # banner and `/status` report `sonnet (claude-sonnet-5)`; the `-p` first and
+    # `--resume` calls both answered with `.modelUsage` keyed `claude-sonnet-5`,
+    # `.result` and `.session_id` intact, `--permission-mode plan` unaffected.
+    # The template leaves the project layer on the CLI's own default model; a
+    # per-machine choice belongs in the local layer (the board's settings panel,
+    # or `.whiteboard/agents.json`). To pin one for the whole team instead,
+    # uncomment the four lines and replace the headless arrays above:
+    # model: sonnet
+    # args: [--model, "{model}"]
+    #   first:  [-p, --output-format, json, --permission-mode, plan, --model, "{model}", "{question}"]
+    #   resume: [-p, --output-format, json, --permission-mode, plan, --model, "{model}", --resume, "{session}", "{question}"]
