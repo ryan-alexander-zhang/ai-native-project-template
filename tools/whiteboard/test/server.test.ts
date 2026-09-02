@@ -2426,9 +2426,9 @@ describe('the effective agent list', () => {
     if (local !== undefined) writeLocal(repoRoot, local)
     const config = testConfig()
     config.agents = agents
-    const spawned: Array<{ command: string; args: string[] }> = []
-    const open = boardOnRepo(repoRoot, docsDir, config, (command, args) => {
-      spawned.push({ command, args })
+    const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
+    const open = boardOnRepo(repoRoot, docsDir, config, (command, args, cwd) => {
+      spawned.push({ command, args, cwd })
       return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
     })
     return { ...open, spawned, writeLocal: (next: unknown) => writeLocal(repoRoot, next) }
@@ -2446,7 +2446,7 @@ describe('the effective agent list', () => {
 
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m2'] }])
   })
 
   // spec-00009-AC-3.2
@@ -2465,7 +2465,7 @@ describe('the effective agent list', () => {
 
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'second-cli', args: ['--yolo'] }])
+    expect(spawned).toMatchObject([{ command: 'second-cli', args: ['--yolo'] }])
   })
 
   // spec-00009-AC-3.5
@@ -2500,7 +2500,7 @@ describe('the effective agent list', () => {
     write({ overrides: { claude: { model: 'm2' } } })
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m2'] }])
   })
 
   // spec-00009-AC-3.8
@@ -2518,13 +2518,14 @@ describe('the effective agent list', () => {
     expect((await settings(call)).error.message).toMatch(/agents\.json is not readable JSON/)
   })
 
-  // spec-00009-AC-4.2
+  // spec-00009-AC-4.2 — the cwd as well as the model: the overridden `docs/x`
+  // never reaches the child, which is the write-scope barrier holding
   it('ignores the whole layer when it overrides cwd, model and all, naming that key', async () => {
-    const { call, spawned } = settingsBoard({ overrides: { claude: { cwd: 'docs/x', model: 'm2' } } })
+    const { call, spawned, docsDir } = settingsBoard({ overrides: { claude: { cwd: 'docs/x', model: 'm2' } } })
 
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'] }])
+    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'], cwd: docsDir }])
     expect(await settings(call)).toMatchObject({ error: { at: 'overrides.claude.cwd' } })
   })
 
@@ -2543,7 +2544,7 @@ describe('the effective agent list', () => {
     write('{ broken')
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m1'] }])
     expect((await settings(call)).error.message).toMatch(/not readable JSON/)
   })
 
@@ -2555,7 +2556,7 @@ describe('the effective agent list', () => {
 
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m2'] }])
     expect((await settings(call)).notices).toEqual([
       { name: 'old', message: 'the override of `old` points at no project entry' },
     ])
@@ -2583,7 +2584,7 @@ describe('the effective agent list', () => {
 
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m2'] }])
     expect((await settings(call)).notices).toEqual([
       { name: 'old', message: '`old` is disabled, but no entry of that name exists' },
     ])
@@ -2641,7 +2642,7 @@ describe('the effective agent list', () => {
     await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
     await advance(call)
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m2'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m2'] }])
   })
 
   // spec-00009-AC-5.3
@@ -2651,7 +2652,7 @@ describe('the effective agent list', () => {
     await advance(call)
     await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
 
-    expect(spawned).toEqual([{ command: 'first-cli', args: ['--model=m1'] }])
+    expect(spawned).toMatchObject([{ command: 'first-cli', args: ['--model=m1'] }])
     expect(board.sessions.latest()!.status).toBe('running')
   })
 
@@ -2715,35 +2716,47 @@ describe('the effective agent list', () => {
     expect(existsSync(localPath(repoRoot))).toBe(false)
   })
 
-  /** A board whose `.whiteboard` is a plain file, so the directory the save needs can be neither used nor made. */
+  /**
+   * A board whose `.whiteboard/` is there and unwritable — AC-6.4's «不可写» half.
+   * The directory the save needs is made and found, so the refusal happens where
+   * the half-write would: at the staging file the save writes before renaming it.
+   */
   function unwritableBoard() {
     const { repoRoot, docsDir } = makeRepo({ 'spec/b.md': DRAFT_SPEC })
-    writeFileSync(join(repoRoot, '.whiteboard'), 'not a directory\n')
+    const home = join(repoRoot, '.whiteboard')
+    mkdirSync(home, { recursive: true })
+    chmodSync(home, 0o500)
     const config = testConfig()
     config.agents = PROJECT
-    return { ...boardOnRepo(repoRoot, docsDir, config), repoRoot }
+    return { ...boardOnRepo(repoRoot, docsDir, config), repoRoot, writable: () => chmodSync(home, 0o700) }
   }
 
   // spec-00009-AC-6.4
   it('reports a save it could not write, leaving no file and the list as it was', async () => {
-    const { call, repoRoot } = unwritableBoard()
+    const { call, repoRoot, writable } = unwritableBoard()
 
     const { status } = await call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
 
+    writable()
     expect(status).toBe(500)
     expect(existsSync(localPath(repoRoot))).toBe(false)
+    // …and no staging file either: half of a save is worse on disk than none of it
+    expect(existsSync(`${localPath(repoRoot)}.tmp`)).toBe(false)
     expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
   })
 
   // spec-00009-AC-6.5
   it('reports the same write failure the second time, the list still as it was', async () => {
-    const { call } = unwritableBoard()
+    const { call, repoRoot, writable } = unwritableBoard()
     const save = () => call('PUT', '/api/settings/agents', { overrides: { claude: { model: 'm2' } } })
 
     await save()
     const { status } = await save()
 
+    writable()
     expect(status).toBe(500)
+    expect(existsSync(localPath(repoRoot))).toBe(false)
+    expect(existsSync(`${localPath(repoRoot)}.tmp`)).toBe(false)
     expect((await configAgents(call)).map((agent: { name: string }) => agent.name)).toEqual(['claude', 'other'])
   })
 })

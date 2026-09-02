@@ -393,7 +393,7 @@ describe('the list a save makes effective', () => {
  * the panel says why, naming the entry and the key.
  */
 describe('what the panel says about an ill-formed local layer', () => {
-  const ILL = 'agent settings: .whiteboard/agents.json is not valid JSON'
+  const ILL = 'agent settings: .whiteboard/agents.json is not readable JSON — Unexpected end of JSON input'
 
   // spec-00009-AC-4.1
   it('names a local file that will not parse', async () => {
@@ -407,7 +407,8 @@ describe('what the panel says about an ill-formed local layer', () => {
   it('names the entry whose cwd the local layer tried to override', async () => {
     serve({
       error: {
-        message: 'agent settings: `overrides.claude.cwd` may not be overridden',
+        message:
+          'agent settings: `overrides.claude.cwd` may not be overridden; the working directory is the write-scope barrier',
         at: 'overrides.claude.cwd',
       },
     })
@@ -430,29 +431,30 @@ describe('what the panel says about an ill-formed local layer', () => {
   it('names an override that points at no project entry', async () => {
     serve({
       local: { overrides: { claude: { model: 'm2' } } },
-      notices: [{ name: 'old', message: 'the override names no entry of either layer' }],
+      notices: [{ name: 'old', message: 'the override of `old` points at no project entry' }],
     })
     await openBoardAndSettings()
 
-    expect(screen.getByText(/the override names no entry of either layer/)).toBeTruthy()
+    expect(screen.getByText(/the override of `old` points at no project entry/)).toBeTruthy()
     expect(screen.getByText('old')).toBeTruthy()
   })
 
   // spec-00009-AC-4.6
   it('names a default that points at a disabled entry', async () => {
     serve({
-      error: { message: 'agent settings: `claude` is named the default and disabled at once', at: 'default' },
+      error: { message: 'agent settings: `claude` is the default and also disabled', at: 'default' },
     })
     await openBoardAndSettings()
 
-    expect(screen.getByText(/`claude` is named the default and disabled at once/)).toBeTruthy()
+    expect(screen.getByText(/`claude` is the default and also disabled/)).toBeTruthy()
   })
 
   // spec-00009-AC-4.7
   it('names an added entry that declared a cwd of its own', async () => {
     serve({
       error: {
-        message: 'agent settings: `entries.codex-local.cwd` may not be declared',
+        message:
+          'agent settings: `entries.codex-local.cwd` may not be declared; an added entry always runs in `docs`',
         at: 'entries.codex-local.cwd',
       },
     })
@@ -465,11 +467,11 @@ describe('what the panel says about an ill-formed local layer', () => {
   it('names a disable that points at no entry', async () => {
     serve({
       local: { overrides: { claude: { model: 'm2' } }, disabled: ['old'] },
-      notices: [{ name: 'old', message: 'the disable names no entry of either layer' }],
+      notices: [{ name: 'old', message: '`old` is disabled, but no entry of that name exists' }],
     })
     await openBoardAndSettings()
 
-    expect(screen.getByText(/the disable names no entry of either layer/)).toBeTruthy()
+    expect(screen.getByText(/`old` is disabled, but no entry of that name exists/)).toBeTruthy()
   })
 
   // spec-00009-AC-4.9
@@ -477,13 +479,13 @@ describe('what the panel says about an ill-formed local layer', () => {
     serve({
       local: { entries: { claude: { command: 'claude' } } },
       error: {
-        message: 'agent settings: `claude` is a project entry; write it as an override',
+        message: 'agent settings: `claude` has the same name as a project entry; write it under `overrides`',
         at: 'entries.claude',
       },
     })
     await openBoardAndSettings()
 
-    expect(screen.getByText(/`claude` is a project entry; write it as an override/)).toBeTruthy()
+    expect(screen.getByText(/`claude` has the same name as a project entry; write it under `overrides`/)).toBeTruthy()
     // The same name twice is one row, not two: the project layer's (design-00001 §13.1).
     expect(cards()).toHaveLength(1)
   })
@@ -622,10 +624,19 @@ describe('editing the local layer', () => {
 
 /** spec-00009-FR-5 and FR-6 as the panel takes them. */
 describe('saving from the panel', () => {
+  /** The pairing refusal `config.ts` words when a model no `args` stand for is saved (spec-00009-FR-2). */
+  const UNPAIRED =
+    'config: `overrides.claude.model` is set, so `overrides.claude.args` must hold a `{model}` placeholder'
+  /** And the one it words for an added entry with no command of its own. */
+  const NO_COMMAND = 'config: `entries.codex-local.command` must be a non-empty string'
+
   // spec-00009-AC-5.6 — the panel is showing the error of a file that will not
   // parse; a save writes over it all the same
   it('saves over a local file that would not parse', async () => {
-    serve({ local: null, error: { message: 'agent settings: .whiteboard/agents.json is not valid JSON' } })
+    serve({
+      local: null,
+      error: { message: 'agent settings: .whiteboard/agents.json is not readable JSON — Unexpected end of JSON input' },
+    })
     const put = vi
       .spyOn(api, 'saveAgentSettings')
       .mockResolvedValue({ effective: [listed('claude', true, 'overridden')], notices: [] })
@@ -636,7 +647,7 @@ describe('saving from the panel', () => {
     await save()
 
     expect(put).toHaveBeenCalledWith({ overrides: { claude: { model: 'm2' } } })
-    await waitFor(() => expect(screen.queryByText(/is not valid JSON/)).toBeNull())
+    await waitFor(() => expect(screen.queryByText(/is not readable JSON/)).toBeNull())
   })
 
   // spec-00009-AC-6.1 — the refusal lands under the field it is about, and the
@@ -644,7 +655,7 @@ describe('saving from the panel', () => {
   it('shows a refused save under the field it names', async () => {
     serve()
     vi.spyOn(api, 'saveAgentSettings').mockRejectedValue(
-      new ApiError(422, 'agent settings: `claude` has a `model` but no `{model}` in `args`', undefined, undefined, 'overrides.claude.model'),
+      new ApiError(422, UNPAIRED, undefined, undefined, 'overrides.claude.args'),
     )
     await openBoardAndSettings()
 
@@ -652,7 +663,7 @@ describe('saving from the panel', () => {
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'm2' } })
     await save()
 
-    expect(await screen.findByText(/has a `model` but no `\{model\}` in `args`/)).toBeTruthy()
+    expect(await screen.findByText(UNPAIRED)).toBeTruthy()
     expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('m2')
   })
 
@@ -662,26 +673,26 @@ describe('saving from the panel', () => {
     const put = vi
       .spyOn(api, 'saveAgentSettings')
       .mockRejectedValue(
-        new ApiError(422, 'agent settings: `claude` has a `model` but no `{model}` in `args`', undefined, undefined, 'overrides.claude.model'),
+        new ApiError(422, UNPAIRED, undefined, undefined, 'overrides.claude.args'),
       )
     await openBoardAndSettings()
 
     await expand('claude')
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'm2' } })
     await save()
-    await screen.findByText(/has a `model` but no `\{model\}` in `args`/)
+    await screen.findByText(UNPAIRED)
     await save()
 
     expect(put).toHaveBeenCalledTimes(2)
     expect(put).toHaveBeenLastCalledWith({ overrides: { claude: { model: 'm2' } } })
-    expect(screen.getByText(/has a `model` but no `\{model\}` in `args`/)).toBeTruthy()
+    expect(screen.getByText(UNPAIRED)).toBeTruthy()
   })
 
   // spec-00009-AC-6.3
   it('names the command of an added entry that has none', async () => {
     serve()
     vi.spyOn(api, 'saveAgentSettings').mockRejectedValue(
-      new ApiError(422, 'agent settings: `codex-local` declares no `command`', undefined, undefined, 'entries.codex-local.command'),
+      new ApiError(422, NO_COMMAND, undefined, undefined, 'entries.codex-local.command'),
     )
     await openBoardAndSettings()
 
@@ -690,7 +701,7 @@ describe('saving from the panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     await save()
 
-    expect(await screen.findByText('agent settings: `codex-local` declares no `command`')).toBeTruthy()
+    expect(await screen.findByText(NO_COMMAND)).toBeTruthy()
   })
 
   // spec-00009-FR-6 — a save that never reached the server is reported like any
@@ -714,7 +725,7 @@ describe('saving from the panel', () => {
     serve()
     const put = vi
       .spyOn(api, 'saveAgentSettings')
-      .mockRejectedValue(new ApiError(500, 'EACCES: permission denied'))
+      .mockRejectedValue(new ApiError(500, "EACCES: permission denied, open '/repo/.whiteboard/agents.json.tmp'"))
     await openBoardAndSettings()
 
     await expand('claude')

@@ -11,8 +11,9 @@ verifies: [spec-00009-whiteboard-agent-settings]
 对 [plan-00025-whiteboard-agent-settings](../plan/plan-00025-whiteboard-agent-settings.md)
 的验收。交付范围为 `spec-00009` 全部 9 条 FR 的 55 条 AC；范围外一并验收的是
 `spec-00001-AC-55.1` … `AC-55.4` 与 `spec-00005-AC-2.3` / `AC-8.1` / `AC-8.2` /
-`AC-8.3` 四条——它们随本轮把「流程配置的 agents」换名词为「有效 agent 列表」，
-口径不变，故列出其现有测试而非补新测。`spec-00009` §6（Codex 接入）与模板
+`AC-8.3` 八条——前七条随本轮把「流程配置的 agents」换名词为「有效 agent 列表」，
+口径不变，列出其现有测试；`spec-00005-AC-8.3` 是本轮新增的 AC，其测试由本 plan
+的 T1 新写。`spec-00009` §6（Codex 接入）与模板
 `whiteboard.config.yaml` 给 `claude` 加 `model` 两项在本 plan 的 Out of Scope 内，
 不在此验收。T1（服务端）、T2（页面）、T3（收口）三段落地，第二十六轮据实校正
 （`33f5ac9e`）的两处在 T3 补齐，见「实现期的既定取舍」。测试路径相对
@@ -27,7 +28,8 @@ verifies: [spec-00009-whiteboard-agent-settings]
 - `npm run typecheck`：退出码 0，`tsc --noEmit` 无输出。
 - `npm run test:coverage`：退出码 0，statements 98.68% / branches 95.33% /
   functions 98.57% / lines 99.26%（4426/4485、2596/2723、1384/1404、3804/3832），
-  四项均高于 `vitest.config.ts` 的 90 门槛；阈值与排除项一字未改。
+  `vitest.config.ts` 只对 lines / branches / functions 设 90 门槛，三项皆过，
+  statements 一并列出仅作参考；阈值与排除项一字未改。
 - `npm run build`：退出码 0（附带的 chunk 大小提示是既有的，非错误）。
 
 ## 验收清单
