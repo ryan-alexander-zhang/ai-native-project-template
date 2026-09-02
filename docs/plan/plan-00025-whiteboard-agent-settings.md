@@ -1,7 +1,7 @@
 ---
 id: plan-00025-whiteboard-agent-settings
 type: plan
-status: open
+status: resolved
 implements: [spec-00009-whiteboard-agent-settings]
 ---
 
