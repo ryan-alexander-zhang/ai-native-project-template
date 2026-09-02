@@ -6,11 +6,75 @@ together with a reference service that consumes them and the design record behin
 For *using* the library, start at [aipersimmon-ddd/README.md](aipersimmon-ddd/README.md). This
 document is about how the modules are arranged and why, which is what you need before changing them.
 
-## 1. Repository layout
+## 1. Introduction & Goals
+
+Building blocks for Java services practicing tactical DDD, consumed by Spring Boot applications.
+Quality goals, ranked:
+
+1. **Framework freedom** — domain code compiles and unit-tests without Spring (§5.2's invariant).
+2. **Correctness under concurrency and redelivery** — no lost updates, no duplicate effects (§10).
+3. **Piecemeal adoption** — every concern usable alone; bundles are convenience, not lock-in.
+
+System requirements live in `docs/spec/`:
+[operation log](docs/spec/spec-00001-operation-log-component.md),
+[multi-tenancy](docs/spec/spec-00002-multi-tenancy.md).
+
+## 2. Constraints
+
+| Constraint | Source |
+| --- | --- |
+| Java 21, Maven | `aipersimmon-ddd/pom.xml` (`maven.compiler.release`) |
+| Docs-system skeleton files are owned by template `main`; this branch may not edit them | `.template-sync.json`, `frozen-docs` CI gate |
+
+## 3. Context & Scope
+
+```mermaid
+flowchart LR
+  App["Consuming Spring Boot service"] --> Lib["aipersimmon-ddd modules"]
+  Lib --> DB[("Relational DB")]
+  Lib --> K[("Kafka")]
+  Lib --> R[("Redis")]
+  Lib --> O["OpenTelemetry backend"]
+  GH["GitHub Packages"] -. distributes .-> App
+```
+
+| Neighbor | Direction | Purpose |
+| --- | --- | --- |
+| Consuming service | in | assembles the BOM, starters, and adapters |
+| Relational DB | out | aggregate persistence, outbox/inbox/process/audit tables (MyBatis-Plus adapters) |
+| Kafka | out | integration event transport |
+| Redis | out | shared web stores: idempotency, nonce, rate limit |
+| OpenTelemetry backend | out | traces via `observability-otel` |
+| GitHub Packages | out | published library and archetype |
+
+## 4. Solution Strategy
+
+- Five module shapes with a framework-free contract tier (§5.2) —
+  [design-00012](docs/design/design-00012-module-naming-and-spring-freedom.md).
+- One command, one aggregate, one version-checked write; write contracts as plain interfaces, no
+  ambient per-command state —
+  [decision-00011](docs/decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md),
+  [decision-00012](docs/decision/decision-00012-no-ambient-per-command-state.md).
+- Domain events and integration events are distinct; the outward contract is CloudEvents-shaped, with
+  causation carried end-to-end —
+  [decision-00013](docs/decision/decision-00013-command-context-and-causation-propagation.md),
+  [decision-00014](docs/decision/decision-00014-cloudevents-integration-event-contract.md).
+- Reliability by construction: transactional outbox + inbox dedupe + a durable process manager for
+  long flows —
+  [decision-00016](docs/decision/decision-00016-durable-runtime-staged-message-identity.md),
+  [decision-00020](docs/decision/decision-00020-outbox-engine-over-one-store-port.md).
+- Cross-cutting capabilities (web, tenancy, audit, observability) are opt-in and SPI-pluggable —
+  [decision-00007](docs/decision/decision-00007-web-api-response-envelope.md),
+  [decision-00017](docs/decision/decision-00017-operation-log-component-boundaries.md),
+  [decision-00018](docs/decision/decision-00018-multi-tenancy-boundaries.md).
+
+## 5. Building Block View
+
+### 5.1. Repository layout
 
 ```
 .
-├── aipersimmon-ddd/                 the library: 47 Maven modules + BOM (see §3)
+├── aipersimmon-ddd/                 the library: 47 Maven modules + BOM (see §5.3)
 │   ├── README.md                    quick start
 │   ├── CHOOSING-MODULES.md          which dependency for which problem
 │   └── CONFIGURATION.md             every aipersimmon.ddd.* property
@@ -27,7 +91,7 @@ document is about how the modules are arranged and why, which is what you need b
 use this" and deliberately cite no document ids, so they stay readable to someone who has only the
 published jars.
 
-## 2. The four kinds of module
+### 5.2. The four kinds of module
 
 Every module is exactly one of these, and its **name says which**:
 
@@ -39,7 +103,7 @@ Every module is exactly one of these, and its **name says which**:
 | `aipersimmon-ddd-<concern>-spring-boot-starter` | **wiring** for one concern | yes | no |
 | `aipersimmon-ddd-starter[-<stack>]` | **bundle** — aggregates the above | yes | no |
 
-### The invariant
+#### The invariant
 
 > A module a domain layer may depend on must be framework-free.
 
@@ -52,14 +116,14 @@ no technology suffix may not declare an `org.springframework` or `com.baomidou` 
 test scope, and no artifactId may end in `-spring` (the abandoned spelling of
 `-spring-boot-starter`). Four build-tooling modules are exempt, with the reasons recorded in the class.
 
-### Adapter and wiring are one module, on purpose
+#### Adapter and wiring are one module, on purpose
 
 A backend adapter ships its own `AutoConfiguration.imports`. Splitting each into
 `-<concern>-<backend>` plus `-<concern>-<backend>-spring-boot-starter` would take 47 modules to about
 60 and double what a consumer assembles by hand — for no added choice, since there is only ever one
 way to wire a given adapter.
 
-## 3. Module map
+### 5.3. Module map
 
 ```mermaid
 flowchart TD
@@ -165,7 +229,10 @@ Edges are `compile` scope and the graph is acyclic. `core` and `integration` are
 dependencies; `integration` in particular must **stay** a root, so a service that publishes integration
 events and nothing else does not inherit the command bus.
 
-### Responsibilities
+Component internals live in `docs/design/`, starting from
+[design-00001](docs/design/design-00001-aipersimmon-ddd-and-scaffold.md).
+
+#### Responsibilities
 
 **Contract — framework-free**
 
@@ -237,7 +304,18 @@ events and nothing else does not inherit the command bus.
 | `test-support` | Singleton Testcontainers and `@ServiceConnection` configs |
 | `quality-config` | Shared PMD ruleset and SpotBugs excludes |
 
-## 4. Runtime shape of a service
+### 5.4. The reference service
+
+`aipersimmon-ddd-scaffold/multi-module` is a working Spring Boot application with three bounded
+contexts (ordering, inventory, payment), each layered `api` / `domain` / `application` /
+`infrastructure` / `adapter`, plus a `start` module that assembles them.
+
+It exercises the framework end to end against real infrastructure — PostgreSQL and Kafka via
+Testcontainers — covering concurrent aggregate writes, multi-tenant acceptance, the durable seven-step
+fulfilment flow with ordered compensation, and the audit log. Treat it as a demonstration, not as
+design authority: the record in `docs/` is authoritative.
+
+## 6. Runtime View
 
 ```mermaid
 flowchart LR
@@ -260,7 +338,66 @@ flowchart LR
     Process --> Bus
 ```
 
-Four properties this shape exists to guarantee:
+The properties this shape guarantees are §10. Per-scenario sequence detail:
+
+| Scenario | Design |
+| --- | --- |
+| Web request handling | [design-00002](docs/design/design-00002-web-layer.md) |
+| Error propagation | [design-00003](docs/design/design-00003-exception-model.md) |
+| Durable process runtime | [design-00004](docs/design/design-00004-durable-process-manager-runtime.md) |
+| Integration event routing | [design-00006](docs/design/design-00006-integration-event-routing.md) |
+| Operation-log pipeline | [design-00008](docs/design/design-00008-operation-log-component.md) |
+| Aggregate persistence | [design-00011](docs/design/design-00011-aggregate-persistence-contract.md) |
+| Actor identity and authorization | [design-00013](docs/design/design-00013-actor-identity-and-authorization.md) |
+
+## 7. Deployment View
+
+A library, not a deployed system: modules and the archetype publish to GitHub Packages via the
+`publish-library` / `publish-archetype` workflows; `ci.yml` builds every push, `frozen-docs.yml`
+guards the docs-system files. Release procedure →
+[operation-00001](docs/operation/operation-00001-releasing-the-java-ddd-stack.md). The reference
+service runs locally against PostgreSQL and Kafka Testcontainers; it is not deployed.
+
+## 8. Crosscutting Concepts
+
+| Concern | Where |
+| --- | --- |
+| Exceptions and error codes | [design-00003](docs/design/design-00003-exception-model.md), [decision-00010](docs/decision/decision-00010-exception-model.md) |
+| Observability and tracing | [design-00005](docs/design/design-00005-observability-and-distributed-tracing.md) |
+| Multi-tenancy | [design-00009](docs/design/design-00009-multi-tenancy-tenant-id.md), [decision-00018](docs/decision/decision-00018-multi-tenancy-boundaries.md) |
+| Identifiers (UUIDv7) | [design-00010](docs/design/design-00010-time-ordered-identifiers.md), [decision-00019](docs/decision/decision-00019-time-ordered-uuidv7-identifiers.md) |
+| Quality gates | [design-00007](docs/design/design-00007-code-quality-gates.md), [CODE_QUALITY.md](CODE_QUALITY.md), [TESTING.md](TESTING.md) |
+| Security | [SECURITY.md](SECURITY.md) |
+| Code style | [CODE_STYLE.md](CODE_STYLE.md) |
+
+## 9. Architecture Decisions
+
+Index of `active` decisions; content stays in each doc.
+
+| Decision | Outcome |
+| --- | --- |
+| [decision-00005](docs/decision/decision-00005-package-per-aggregate.md) | Package per aggregate, aggregate internals package-private |
+| [decision-00006](docs/decision/decision-00006-integration-event-transport-selection.md) | 集成事件传输：三种方式、确定性装配、monolith-first 默认 |
+| [decision-00007](docs/decision/decision-00007-web-api-response-envelope.md) | Web 层无通用信封 + RFC 9457；横切能力全做但 opt-in、可插拔 |
+| [decision-00008](docs/decision/decision-00008-event-subscriber-layer-placement.md) | 领域事件订阅归 application、集成事件归 adapter 并转 command |
+| [decision-00009](docs/decision/decision-00009-event-type-markers-and-handler-contracts.md) | 事件类型标记与三种 Handler 的契约形态 |
+| [decision-00010](docs/decision/decision-00010-exception-model.md) | 领域贯穿式错误码 + `Invariant` 一等抽象 + 默认 throw |
+| [decision-00011](docs/decision/decision-00011-cqrs-write-contracts-as-interfaces-not-annotations.md) | CQRS 写侧契约用接口、查询侧标记用注解；不提供 `@Command` |
+| [decision-00012](docs/decision/decision-00012-no-ambient-per-command-state.md) | 禁止 ambient 每命令状态：领域事件在 save 处排空 |
+| [decision-00013](docs/decision/decision-00013-command-context-and-causation-propagation.md) | `CommandContext` + 全链路 `EventEnvelope` 因果传播 |
+| [decision-00014](docs/decision/decision-00014-cloudevents-integration-event-contract.md) | 集成事件对外契约对齐 CloudEvents |
+| [decision-00015](docs/decision/decision-00015-cross-context-sync-query-via-gateway-acl.md) | 跨上下文同步调用：OHS + 消费方 Gateway ACL，只用于读 |
+| [decision-00016](docs/decision/decision-00016-durable-runtime-staged-message-identity.md) | durable runtime 铸造 staged effect 消息身份；`CommandBus.sendAs` |
+| [decision-00017](docs/decision/decision-00017-operation-log-component-boundaries.md) | 操作日志组件的定位、模块、事务与安全边界 |
+| [decision-00018](docs/decision/decision-00018-multi-tenancy-boundaries.md) | 多租户：隔离模型、传播、唯一键与强制隔离边界 |
+| [decision-00019](docs/decision/decision-00019-time-ordered-uuidv7-identifiers.md) | 框架生成的 per-row 标识符用时间有序 UUIDv7 |
+| [decision-00020](docs/decision/decision-00020-outbox-engine-over-one-store-port.md) | 投递逻辑归 `-outbox-engine`，后端只做 store 端口适配 |
+| [decision-00021](docs/decision/decision-00021-command-handler-reuse-and-cross-aggregate-placement.md) | CommandHandler 不依赖 CommandHandler；复用按类型分流分层 |
+| [decision-00022](docs/decision/decision-00022-legacy-docs-debt-policy.md) | 存量文档立债不翻新，新档从严、触碰即修 |
+
+## 10. Quality Requirements
+
+Four properties the runtime shape (§6) exists to guarantee:
 
 1. **One command, one aggregate, one version-checked write.** A stale write matches no row and is
    refused, surfacing as 409 rather than as a lost update.
@@ -272,20 +409,18 @@ Four properties this shape exists to guarantee:
    manager as a pure `(state, input) → decision` function over durable state, so an out-of-order or
    repeated fact is a no-op rather than a corruption.
 
-## 5. The reference service
+Enforced at build time: `mvn -f aipersimmon-ddd/pom.xml install` runs, per module, Spotless
+(google-java-format), PMD + CPD, SpotBugs, JaCoCo, and PIT mutation coverage on the framework-free
+contract modules; the ArchUnit rules run as ordinary tests. A failing gate is fixed, never raised or
+suppressed ([CODE_QUALITY.md](CODE_QUALITY.md), [TESTING.md](TESTING.md)).
 
-`aipersimmon-ddd-scaffold/multi-module` is a working Spring Boot application with three bounded
-contexts (ordering, inventory, payment), each layered `api` / `domain` / `application` /
-`infrastructure` / `adapter`, plus a `start` module that assembles them.
+## 11. Risks & Technical Debt
 
-It exercises the framework end to end against real infrastructure — PostgreSQL and Kafka via
-Testcontainers — covering concurrent aggregate writes, multi-tenant acceptance, the durable seven-step
-fulfilment flow with ordered compensation, and the audit log. Treat it as a demonstration, not as
-design authority: the record in `docs/` is authoritative.
+Legacy docs written before the current docs system stay as-is under a declared-debt policy — new docs
+conform strictly, touched docs are fixed on touch:
+[decision-00022](docs/decision/decision-00022-legacy-docs-debt-policy.md); the ledger is
+[report-00004](docs/report/report-00004-docs-conformance-audit.md).
 
-## 6. Quality gates
+## 12. Glossary
 
-`mvn -f aipersimmon-ddd/pom.xml install` runs, per module: Spotless (google-java-format), PMD + CPD,
-SpotBugs, JaCoCo, and PIT mutation coverage on the framework-free contract modules. The ArchUnit rules
-run as ordinary tests. See [CODE_QUALITY.md](CODE_QUALITY.md) and [TESTING.md](TESTING.md); a failing
-gate is fixed, never raised or suppressed.
+See [CONTEXT.md](CONTEXT.md).
