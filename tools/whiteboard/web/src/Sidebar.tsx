@@ -2,7 +2,7 @@ import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { readCollapsed, writeCollapsed } from './sidebar.ts'
+import { readExpanded, writeExpanded } from './sidebar.ts'
 import type { TypeGroup } from './sidebarModel.ts'
 import { statusColour, statusLabel, typeIcon } from './status.ts'
 
@@ -21,17 +21,18 @@ export interface SidebarProps {
  * board's one jump path, so a row whose document has left the board refuses
  * exactly as the command palette's pick does (spec-00008-FR-8).
  *
- * Collapsed groups live in the browser, so the same groups are shut on the next
- * open (design-00002 §17.1).
+ * Expanded groups live in the browser, so the same groups are open on the next
+ * open; with no key every group is collapsed and the first screen is the type
+ * groups alone (design-00002 §17.1, spec-00008-AC-4.3).
  */
 export function Sidebar({ groups, selected, onPick }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState<string[]>(readCollapsed)
+  const [expanded, setExpanded] = useState<string[]>(readExpanded)
   const selectedRow = useRef<HTMLButtonElement>(null)
 
   function toggle(key: string) {
-    const next = collapsed.includes(key) ? collapsed.filter((one) => one !== key) : [...collapsed, key]
-    writeCollapsed(next)
-    setCollapsed(next)
+    const next = expanded.includes(key) ? expanded.filter((one) => one !== key) : [...expanded, key]
+    writeExpanded(next)
+    setExpanded(next)
   }
 
   // A **change** of selection opens the group it landed in — and only a change:
@@ -40,23 +41,23 @@ export function Sidebar({ groups, selected, onPick }: SidebarProps) {
   // same effect on mount is what makes reopening catch up (spec-00008-AC-3.4).
   useEffect(() => {
     const group = groups.find((one) => one.nodes.some((node) => node.id === selected))
-    if (group === undefined || !collapsed.includes(group.key)) return
-    const next = collapsed.filter((one) => one !== group.key)
-    writeCollapsed(next)
-    setCollapsed(next)
+    if (group === undefined || expanded.includes(group.key)) return
+    const next = [...expanded, group.key]
+    writeExpanded(next)
+    setExpanded(next)
     // Only the selection may reopen a group, so the effect watches nothing else.
   }, [selected])
 
   // …and then the row is scrolled to, once the expansion above has drawn it.
   useEffect(() => {
     selectedRow.current?.scrollIntoView({ block: 'nearest' })
-  }, [selected, collapsed])
+  }, [selected, expanded])
 
   return (
     <nav aria-label="Documents" className="h-full overflow-y-auto p-2">
       {groups.map((group) => {
         const Icon = typeIcon(group.key)
-        const open = !collapsed.includes(group.key)
+        const open = expanded.includes(group.key)
         return (
           <div key={group.key}>
             <Button

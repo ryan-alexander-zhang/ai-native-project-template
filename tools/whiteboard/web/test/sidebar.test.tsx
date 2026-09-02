@@ -163,11 +163,19 @@ async function openBoard() {
   return rendered
 }
 
-/** Open the board with every group on show and the first read settled. */
+/** Open the board with the type groups drawn and the first read settled. */
 async function openWithDocuments() {
   const rendered = await openBoard()
-  await waitFor(() => expect(row('plan-00002')).toBeTruthy())
+  await waitFor(() => expect(header('plan')).toBeTruthy())
   return rendered
+}
+
+/**
+ * Every group starts collapsed (spec-00008-AC-4.3), so a case that reads rows
+ * opens the groups it reads the way a user does: by pressing their headers.
+ */
+async function expand(...types: string[]) {
+  for (const type of types) await userEvent.click(header(type))
 }
 
 /** A refresh, as a push delivers it (spec-00001-FR-44). */
@@ -184,6 +192,7 @@ describe('the navigation sidebar', () => {
   // spec-00008-AC-1.1
   it('groups every document by type in column order, each group in row order', async () => {
     await openWithDocuments()
+    await expand('spec', 'plan', 'record', 'issue')
 
     expect(names()).toEqual([
       'spec 1',
@@ -207,6 +216,7 @@ describe('the navigation sidebar', () => {
       node({ id: 'loose-00001', type: undefined, status: 'draft', title: 'No type at all', path: 'loose/a.md' }),
     ])
     await openWithDocuments()
+    await expand('memo', 'untyped')
 
     expect(names().slice(-4)).toEqual([
       'memo 1',
@@ -223,7 +233,8 @@ describe('the navigation sidebar', () => {
       node({ id: 'plan/one.md', path: 'plan/one.md', type: 'plan', title: 'One', duplicateOf: 'plan-00009' }),
       node({ id: 'plan/two.md', path: 'plan/two.md', type: 'plan', title: 'Two', duplicateOf: 'plan-00009' }),
     ])
-    await openBoard()
+    await openWithDocuments()
+    await expand('plan')
     await waitFor(() => expect(row('plan/one.md')).toBeTruthy())
 
     expect(names().slice(-3)).toEqual([
@@ -237,6 +248,8 @@ describe('the navigation sidebar', () => {
   it('says «front matter problem» where an anomalous document’s status would be', async () => {
     graph = graphOf([node({ id: 'spec/bad.md', path: 'spec/bad.md', status: 'nope', ok: false, title: 'Broken' })])
     await openBoard()
+    await waitFor(() => expect(header('spec')).toBeTruthy())
+    await expand('spec')
     await waitFor(() => expect(row('spec/bad.md')).toBeTruthy())
 
     expect(row('spec/bad.md').textContent).toContain('front matter problem')
@@ -257,6 +270,7 @@ describe('going to a document from the sidebar', () => {
   // spec-00008-AC-2.1
   it('selects the document of the row and centres the viewport on it', async () => {
     await openWithDocuments()
+    await expand('plan')
 
     await userEvent.click(row('plan-00002'))
 
@@ -267,6 +281,7 @@ describe('going to a document from the sidebar', () => {
   // spec-00008-AC-2.2
   it('leaves a sub-canvas and its detail behind on the way', async () => {
     await openWithDocuments()
+    await expand('plan')
     fireEvent.click(screen.getByTestId('node-spec-00001'))
     await waitFor(() => expect(screen.getByLabelText('Requirements of spec-00001')).toBeTruthy())
     await userEvent.click(screen.getByRole('button', { name: /Expand as sub-canvas/ }))
@@ -288,6 +303,7 @@ describe('going to a document from the sidebar', () => {
   // re-centring call itself, so the mock is cleared where the drag would be.
   it('centres again on the row already selected', async () => {
     await openWithDocuments()
+    await expand('plan')
     await userEvent.click(row('plan-00002'))
     await waitFor(() => expect(screen.getByRole('toolbar', { name: /plan-00002/ })).toBeTruthy())
     setCenter.mockClear()
@@ -315,7 +331,7 @@ describe('the sidebar following the selection', () => {
   // spec-00008-AC-3.2
   it('opens the collapsed group the jumped-to document sits in', async () => {
     await openWithDocuments()
-    await userEvent.click(header('spec'))
+    expect(header('spec').getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('button', { name: /^spec-00001/ })).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: /Find a document/ }))
@@ -349,42 +365,45 @@ describe('the sidebar following the selection', () => {
     await userEvent.click(toggle())
 
     await waitFor(() => expect(row('spec-00001').getAttribute('aria-current')).toBe('true'))
+    expect(header('spec').getAttribute('aria-expanded')).toBe('true')
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
   })
 })
 
-describe('collapsing a group', () => {
+describe('expanding and collapsing a group', () => {
   // spec-00008-AC-4.1
-  it('puts the rows away and keeps the header and its count', async () => {
+  it('brings the rows out and keeps the header and its count', async () => {
     await openWithDocuments()
 
     await userEvent.click(header('plan'))
 
     expect(names()).toEqual([
       'spec 1',
-      'spec-00001 active Whiteboard spec',
       'plan 3',
+      'plan-00001 open First plan',
+      'plan-00002 draft Second plan',
+      'plan-00003 resolved Third plan',
       'record 1',
-      'record-00001 active First record',
       'issue 1',
-      'issue-00001 resolved The one issue',
     ])
   })
 
   // spec-00008-AC-4.4
-  it('brings the rows back on the next press', async () => {
+  it('puts the rows away on the next press and keeps the header and its count', async () => {
     await openWithDocuments()
-    await userEvent.click(header('plan'))
+    await expand('plan')
 
     await userEvent.click(header('plan'))
 
-    expect(row('plan-00002')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^plan-00002/ })).toBeNull()
+    expect(names()).toEqual(['spec 1', 'plan 3', 'record 1', 'issue 1'])
   })
 
-  // spec-00008-AC-4.5
+  // spec-00008-AC-4.5 — the group is open because the selection opened it, which
+  // is the only way FR-3 ever opens one; the press after that is the user's.
   it('stays collapsed when the group is the selected row’s own', async () => {
     await openWithDocuments()
-    await userEvent.click(row('plan-00002'))
+    fireEvent.click(screen.getByTestId('node-plan-00002'))
     await waitFor(() => expect(row('plan-00002').getAttribute('aria-current')).toBe('true'))
 
     await userEvent.click(header('plan'))
@@ -394,25 +413,26 @@ describe('collapsing a group', () => {
   })
 
   // spec-00008-AC-4.2
-  it('is still collapsed the next time the board is opened', async () => {
+  it('is still expanded the next time the board is opened, alone', async () => {
     const first = await openWithDocuments()
-    await userEvent.click(header('plan'))
+    await expand('plan')
     first.unmount()
 
     await openBoard()
 
     await waitFor(() => expect(header('plan')).toBeTruthy())
-    expect(header('plan').getAttribute('aria-expanded')).toBe('false')
-    expect(header('spec').getAttribute('aria-expanded')).toBe('true')
-    expect(header('record').getAttribute('aria-expanded')).toBe('true')
+    expect(header('plan').getAttribute('aria-expanded')).toBe('true')
+    expect(header('spec').getAttribute('aria-expanded')).toBe('false')
+    expect(header('record').getAttribute('aria-expanded')).toBe('false')
   })
 
   // spec-00008-AC-4.3
-  it('opens every group when none was ever collapsed', async () => {
+  it('collapses every group when none was ever expanded', async () => {
     await openWithDocuments()
 
-    expect(entries().filter((entry) => entry.getAttribute('aria-expanded') === 'true')).toHaveLength(4)
-    expect(entries().filter((entry) => entry.getAttribute('aria-expanded') === 'false')).toEqual([])
+    expect(entries().filter((entry) => entry.getAttribute('aria-expanded') === 'false')).toHaveLength(4)
+    expect(entries().filter((entry) => entry.getAttribute('aria-expanded') === 'true')).toEqual([])
+    expect(names()).toEqual(['spec 1', 'plan 3', 'record 1', 'issue 1'])
   })
 })
 
@@ -462,7 +482,8 @@ describe('the sidebar under a refresh', () => {
   // spec-00008-AC-6.1
   it('takes a new document into its group at its row', async () => {
     graph = graphOf([SPEC, PLAN_1, PLAN_3])
-    await openBoard()
+    await openWithDocuments()
+    await expand('spec', 'plan')
     await waitFor(() => expect(row('plan-00003')).toBeTruthy())
 
     await refreshWith(graphOf([SPEC, PLAN_1, PLAN_2, PLAN_3]))
@@ -479,9 +500,23 @@ describe('the sidebar under a refresh', () => {
   })
 
   // spec-00008-AC-6.2
-  it('keeps the collapsed groups collapsed and the selected row highlighted', async () => {
+  it('keeps the expanded group expanded and the collapsed one collapsed', async () => {
     await openWithDocuments()
-    await userEvent.click(header('plan'))
+    await expand('spec')
+
+    await refreshWith(
+      graphOf([...NODES, node({ id: 'record-00002', type: 'record', title: 'Another record', path: 'record/b.md' })]),
+    )
+
+    await waitFor(() => expect(header('record').textContent).toContain('2'))
+    expect(header('plan').getAttribute('aria-expanded')).toBe('false')
+    expect(header('spec').getAttribute('aria-expanded')).toBe('true')
+    expect(row('spec-00001')).toBeTruthy()
+  })
+
+  // spec-00008-AC-6.7
+  it('keeps the selected row highlighted', async () => {
+    await openWithDocuments()
     fireEvent.click(screen.getByTestId('node-spec-00001'))
     await waitFor(() => expect(row('spec-00001').getAttribute('aria-current')).toBe('true'))
 
@@ -489,8 +524,7 @@ describe('the sidebar under a refresh', () => {
       graphOf([...NODES, node({ id: 'record-00002', type: 'record', title: 'Another record', path: 'record/b.md' })]),
     )
 
-    await waitFor(() => expect(row('record-00002')).toBeTruthy())
-    expect(header('plan').getAttribute('aria-expanded')).toBe('false')
+    await waitFor(() => expect(header('record').textContent).toContain('2'))
     expect(row('spec-00001').getAttribute('aria-current')).toBe('true')
   })
 
@@ -509,6 +543,7 @@ describe('the sidebar under a refresh', () => {
   // spec-00008-AC-6.4
   it('drops a group with its last row', async () => {
     await openWithDocuments()
+    await expand('issue')
 
     await refreshWith(graphOf(NODES.filter((one) => one.id !== 'issue-00001')))
 
@@ -519,6 +554,7 @@ describe('the sidebar under a refresh', () => {
   // spec-00008-AC-6.5
   it('follows a status the refresh changed', async () => {
     await openWithDocuments()
+    await expand('plan')
     expect(row('plan-00002').textContent).toContain('draft')
 
     await refreshWith(graphOf(NODES.map((one) => (one.id === 'plan-00002' ? { ...one, status: 'active' } : one))))
@@ -535,15 +571,8 @@ describe('the sidebar under a refresh', () => {
       graphOf([...NODES, node({ id: 'task-00001', type: 'task', status: 'open', title: 'The first task', path: 't/a.md' })]),
     )
 
-    await waitFor(() => expect(row('task-00001')).toBeTruthy())
-    expect(names().slice(-6)).toEqual([
-      'task 1',
-      'task-00001 open The first task',
-      'record 1',
-      'record-00001 active First record',
-      'issue 1',
-      'issue-00001 resolved The one issue',
-    ])
+    await waitFor(() => expect(header('task')).toBeTruthy())
+    expect(names()).toEqual(['spec 1', 'plan 3', 'task 1', 'record 1', 'issue 1'])
   })
 })
 
@@ -563,6 +592,7 @@ describe('a row whose document has left the board', () => {
   it('refuses in place and moves neither the selection nor the viewport', async () => {
     const toastError = vi.spyOn(toast, 'error').mockImplementation(() => 'id')
     await openWithDocuments()
+    await expand('plan')
     fireEvent.click(screen.getByTestId('node-spec-00001'))
     await waitFor(() => expect(current()).toHaveLength(1))
     setCenter.mockClear()
@@ -579,6 +609,7 @@ describe('a row whose document has left the board', () => {
   it('refuses the same way the second time', async () => {
     const toastError = vi.spyOn(toast, 'error').mockImplementation(() => 'id')
     await openWithDocuments()
+    await expand('plan')
     fireEvent.click(screen.getByTestId('node-spec-00001'))
     await waitFor(() => expect(current()).toHaveLength(1))
     setCenter.mockClear()

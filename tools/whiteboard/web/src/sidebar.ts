@@ -6,7 +6,7 @@
  */
 
 const OPEN_KEY = 'whiteboard-sidebar'
-const COLLAPSED_KEY = 'whiteboard-sidebar-collapsed'
+const EXPANDED_KEY = 'whiteboard-sidebar-expanded'
 
 /** No key means open: the sidebar is there until the user puts it away (spec-00008-AC-5.1). */
 export function readSidebarOpen(): boolean {
@@ -17,12 +17,12 @@ export function writeSidebarOpen(open: boolean): void {
   localStorage.setItem(OPEN_KEY, open ? 'open' : 'closed')
 }
 
-/** The keys of the collapsed groups; no key means every group is expanded (spec-00008-AC-4.3). */
-export function readCollapsed(): string[] {
-  const stored = localStorage.getItem(COLLAPSED_KEY)
+/** The keys of the expanded groups; no key means every group is collapsed (spec-00008-AC-4.3). */
+export function readExpanded(): string[] {
+  const stored = localStorage.getItem(EXPANDED_KEY)
   return stored === null ? [] : (JSON.parse(stored) as string[])
 }
 
-export function writeCollapsed(keys: string[]): void {
-  localStorage.setItem(COLLAPSED_KEY, JSON.stringify(keys))
+export function writeExpanded(keys: string[]): void {
+  localStorage.setItem(EXPANDED_KEY, JSON.stringify(keys))
 }
