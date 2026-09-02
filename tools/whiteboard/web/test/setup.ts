@@ -150,6 +150,29 @@ if (typeof window !== 'undefined') {
     })
   }
 
+  // react-resizable-panels hit-tests every pointerdown against the dividers
+  // between the panels of a group, and preventDefault()s the ones that land on
+  // one. jsdom measures every element as a zero-sized box at the origin, which
+  // is exactly where a synthetic pointer is — so without a box every press
+  // would read as a press on a divider, and a prevented pointerdown is enough
+  // to stop a Radix menu from opening. Report a box for the panels, so the
+  // dividers land where no synthetic pointer is.
+  const PANEL_RECT = {
+    x: 500,
+    y: 500,
+    top: 500,
+    left: 500,
+    right: 1500,
+    bottom: 1500,
+    width: 1000,
+    height: 1000,
+    toJSON: () => ({}),
+  } as DOMRect
+  const boundingRect = Element.prototype.getBoundingClientRect
+  Element.prototype.getBoundingClientRect = function (this: Element) {
+    return this.hasAttribute('data-panel') ? PANEL_RECT : boundingRect.call(this)
+  }
+
   // Radix menus, dialogs and popovers reach for pointer-capture and scrolling
   // APIs jsdom does not implement.
   const element = Element.prototype as unknown as {

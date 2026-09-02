@@ -2,6 +2,7 @@ import {
   Background,
   Controls,
   type Node as FlowNode,
+  MiniMap,
   NodeToolbar,
   Position,
   ReactFlow,
@@ -18,6 +19,8 @@ import {
   History,
   Keyboard,
   LayoutDashboard,
+  PanelLeft,
+  PanelLeftClose,
   Search,
   Terminal as TerminalIcon,
   TriangleAlert,
@@ -55,6 +58,7 @@ import { NodeCard } from './NodeCard.tsx'
 import { NotifySwitch } from './NotifySwitch.tsx'
 import { SessionHistory } from './SessionHistory.tsx'
 import { SessionPanel } from './SessionPanel.tsx'
+import { Sidebar } from './Sidebar.tsx'
 import { AcceptanceRowNode, CriterionNode, ItemNode } from './SubNodes.tsx'
 import { Terminal } from './Terminal.tsx'
 import { ThemeMenu } from './ThemeMenu.tsx'
@@ -62,6 +66,8 @@ import { Toolbar } from './Toolbar.tsx'
 import { evidenceOf, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from './canvasModel.ts'
 import { onFlowError } from './flowError.ts'
 import { JumpContext } from './jump.ts'
+import { readSidebarOpen, writeSidebarOpen } from './sidebar.ts'
+import { typeGroups } from './sidebarModel.ts'
 import { detailTarget, subCanvas } from './subCanvas.ts'
 import { useTheme } from './theme.ts'
 import { useBoard } from './useBoard.ts'
@@ -110,6 +116,18 @@ function minZoomFor(sub: { nodes: FlowNode[] }, width: number, height: number): 
   return Math.min(DEFAULT_MIN_ZOOM, Math.min(width / right, height / bottom) / 2)
 }
 
+/**
+ * What a minimap block is coloured by: the document's status, or the anomaly
+ * colour when its front matter does not parse. A sub-canvas node stands for no
+ * document and so has no status to take (design-00002 §17.4); the colours
+ * themselves are in index.css, so the theme carries them.
+ */
+function minimapClass(node: FlowNode): string {
+  if (node.type !== 'doc') return ''
+  const doc = (node.data as DocNodeData).node
+  return doc.ok ? `minimap-status-${doc.status}` : 'minimap-anomaly'
+}
+
 function Canvas() {
   // A clicked desktop notification lands exactly where the session panel's row
   // lands (spec-00004-FR-5): `goToSession` below is that one act, held here
@@ -144,6 +162,10 @@ function Canvas() {
   // done (issue-00006).
   const canvasWidth = useStore((state) => state.width)
   const canvasHeight = useStore((state) => state.height)
+  // The navigation sidebar's own preference, remembered across opens
+  // (spec-00008-FR-5). Put away, it is not rendered at all — the terminal
+  // panel's shape, not a zero-width panel (design-00002 §17.1).
+  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   // v4 has no autoSaveId; this hook is the persistence path (localStorage by default).
   const rows = useDefaultLayout({ id: 'whiteboard-rows', panelIds: ['work', 'terminal'] })
   const columns = useDefaultLayout({ id: 'whiteboard-columns', panelIds: ['canvas', 'editor'] })
@@ -158,6 +180,12 @@ function Canvas() {
   const detailColumns = useDefaultLayout({
     id: 'whiteboard-detail-columns',
     panelIds: ['canvas', 'detail'],
+  })
+  // The sidebar's width is its own, so opening a right-slot panel and moving
+  // the sidebar's edge never write over each other (design-00002 §9, §17.1).
+  const sidebarColumns = useDefaultLayout({
+    id: 'whiteboard-sidebar-columns',
+    panelIds: ['sidebar', 'board'],
   })
 
   /**
@@ -277,6 +305,11 @@ function Canvas() {
       }
     })
   }, [board.graph, board.placed, board.selected, board.kinds, runningOn, board.showSession])
+
+  // The sidebar's list of every document on the board, grouped and ordered by
+  // the canvas's own rule (spec-00008-FR-1). `kinds` is the flow config's type
+  // map, so its key order is the declared column order.
+  const groups = useMemo(() => typeGroups(board.graph, Object.keys(board.kinds)), [board.graph, board.kinds])
 
   // Hovering a panel row asks "where is this item's evidence": the records that
   // verified it, and the AC ids they cited (spec-00001-FR-34).
@@ -409,6 +442,12 @@ function Canvas() {
     if (board.showSession(session.id)) focus(session.sourceId)
   }
 
+  /** Put the sidebar away or bring it back, and remember which (spec-00008-FR-5). */
+  function toggleSidebar() {
+    writeSidebarOpen(!sidebarOpen)
+    setSidebarOpen(!sidebarOpen)
+  }
+
   /**
    * Selecting on the top-level canvas. The panel it may open takes the right
    * third, so the same wait applies: a click that changes the canvas width ends
@@ -426,6 +465,17 @@ function Canvas() {
     <JumpContext.Provider value={{ idOwners: board.graph.idOwners, onJump: focus }}>
     <div className="flex h-screen flex-col">
       <header className="flex items-center gap-3 border-b px-4 py-2">
+        {/* The way the list of documents is put away and brought back, and the
+            leftmost thing in the bar because that is the side it is on
+            (design-00002 §17.1). */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={sidebarOpen ? 'Hide navigation' : 'Show navigation'}
+          onClick={toggleSidebar}
+        >
+          {sidebarOpen ? <PanelLeftClose aria-hidden /> : <PanelLeft aria-hidden />}
+        </Button>
         <LayoutDashboard className="size-5" aria-hidden />
         {/* The breadcrumb takes the title's place, and only in a sub-canvas:
             the top-level board is not a step of any trail (spec-00001-AC-35.6). */}
@@ -569,183 +619,209 @@ function Canvas() {
 
       <ResizablePanelGroup orientation="vertical" {...rows} className="min-h-0 flex-1">
         <ResizablePanel id="work" defaultSize={65} minSize={25}>
-          <ResizablePanelGroup
-            orientation="horizontal"
-            {...(inspector ? inspectorColumns : shown ? detailColumns : columns)}
-          >
-            <ResizablePanel id="canvas" defaultSize={board.editing || inspector || shown ? 62 : 100} minSize={30}>
-              <div className="relative h-full">
-                <ReactFlow
-                  nodes={sub ? sub.nodes : nodes}
-                  edges={sub ? sub.edges : edges}
-                  nodeTypes={nodeTypes}
-                  // A sub-canvas node is not a document: selecting is the top
-                  // level's act, and so is dropping the selection — losing it
-                  // here would take the items the sub-canvas is drawn from.
-                  // In the sub-canvas a click opens the node's detail instead
-                  // (spec-00001-FR-37), and the blank closes it (AC-37.4).
-                  onNodeClick={sub ? (_event, node) => setDetail(node.id) : (_event, node) => select(node.id)}
-                  onPaneClick={sub ? () => setDetail(undefined) : board.deselect}
-                  // Handles exist to anchor edges, not to draw them: every edge
-                  // comes from front matter (spec-00001-AC-1.14).
-                  nodesConnectable={false}
-                  onError={onFlowError}
-                  minZoom={minZoom}
-                  fitView
-                >
-                  <Background />
-                  <Controls />
-                  {/* The sub-canvas is read-only: no editing, no review, no
-                      transition, and no document node to hang them on. */}
-                  {selected && sub === undefined ? (
-                    <NodeToolbar nodeId={selected.id} isVisible position={Position.Top}>
-                      <Toolbar
-                        node={selected}
-                        transitions={board.transitions}
-                        nextSteps={board.nextSteps}
-                        relations={relationsOf(board.graph, selected.id, board.relationOrder)}
-                        clarifiable={board.clarifiable.includes(selected.type ?? '')}
-                        auditable={board.auditable.includes(selected.type ?? '')}
-                        // The two concurrency rules, each read where it holds:
-                        // this document's own terminal-form session, and the cap
-                        // on all of them (spec-00003-FR-2, FR-3). Another
-                        // document's session locks nothing here
-                        // (spec-00001-AC-12.8), and neither does an ask on this
-                        // one (spec-00005-FR-6).
-                        docBusy={docBusy(selected.id)}
-                        capReached={board.running.length >= board.maxSessions}
-                        agents={board.agents}
-                        askAgents={board.askAgents}
-                        agent={board.agent}
-                        onPickAgent={board.setAgent}
-                        onPickRelation={focus}
-                        onEdit={() => board.edit(selected.id)}
-                        onStatus={(to) => void board.run(() => api.setStatus(selected.id, to))}
-                        onAccept={() => void board.run(() => api.accept(selected.id))}
-                        onClarify={() => void board.startSession(() => api.clarify(selected.id, board.agent))}
-                        onAsk={(question, agent) => board.ask({ docId: selected.id, question, agent })}
-                        // The status lock's one reading, and the entry's own
-                        // materials check against the board (spec-00006-FR-10, FR-3).
-                        cowriting={cowriteOn(selected.id) !== undefined}
-                        knownDoc={knownDoc}
-                        onCowrite={(materials, agent) =>
-                          board.cowrite({ docId: selected.id, materials, agent })
-                        }
-                        onAudit={() => void board.startSession(() => api.audit(selected.id, board.agent))}
-                        onAdvance={(targetType) => void board.advance(selected.id, targetType)}
-                      />
-                    </NodeToolbar>
-                  ) : null}
-                </ReactFlow>
-
-                {board.graph.nodes.length === 0 ? (
-                  <div className="text-muted-foreground pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
-                    <FileQuestionMark className="size-8" aria-hidden />
-                    <p className="text-sm">no documents under docs/ yet</p>
-                  </div>
-                ) : null}
-              </div>
-            </ResizablePanel>
-
-            {board.editing ? (
+          {/* The sidebar takes a slot of the work row of its own, outside the
+              right slot's three layouts: the widths are separate memories and
+              neither reads the other's (design-00002 §17.1). */}
+          <ResizablePanelGroup orientation="horizontal" {...sidebarColumns}>
+            {sidebarOpen ? (
               <>
-                <ResizableHandle withHandle />
-                <ResizablePanel id="editor" defaultSize={38} minSize={20}>
-                  <Editor
-                    docId={board.editing}
-                    draft={board.draft}
-                    mode={board.editorMode}
-                    onMode={(mode) => board.showEditorMode(board.editing!, mode)}
-                    ask={askEntry}
-                    asks={
-                      <AskList
-                        threads={board.threads}
-                        located={board.located}
-                        onLocate={board.locate}
-                        onFollowUp={(threadId, question) =>
-                          board.ask({ docId: board.editing!, question, threadId })
-                        }
-                        onResend={(threadId, question) =>
-                          void board.ask({ docId: board.editing!, question, threadId, resend: true })
-                        }
-                      />
-                    }
-                    annotate={annotate}
-                    annotations={
-                      annotationView === undefined ? undefined : (
-                        <AnnotationList
-                          rows={annotationRowList}
-                          preview={annotationView.submitPreview}
-                          // A row is locatable when its anchor lands somewhere:
-                          // the payload's own fresh reading, and no second
-                          // judgment of it here (design-00002 §16.4).
-                          locatable={(row) => row.range !== undefined}
-                          located={board.locatedAnnotation}
-                          reanchoring={board.reanchoring}
-                          unsaved={board.unsavedBuffer}
-                          submitting={board.submitting}
-                          agents={board.agents}
-                          askAgents={board.askAgents}
-                          onLocate={(row) => board.locateAnnotation(annotated, row.id)}
-                          // The question path's navigation reuses
-                          // spec-00005-FR-9 whole, whatever state the thread is
-                          // in; a thread that has left the payload is the
-                          // close-nearest case — a toast, and the view stays
-                          // (design-00002 §16.6).
-                          onThread={(row) => {
-                            if (!board.threads.some((one) => one.id === row.threadId)) {
-                              toast.error(`no thread ${row.threadId} on this document`)
-                              return
-                            }
-                            board.showEditorMode(annotated, 'asks')
-                            board.locate(row.threadId)
-                          }}
-                          onSession={(row) => row.sessionId !== undefined && board.showSession(row.sessionId)}
-                          onChange={(id, change) => board.changeAnnotation(annotated, id, change)}
-                          onRemove={(id) => board.removeAnnotation(annotated, id)}
-                          onReanchor={(id) => board.startReanchor(annotated, id)}
-                          onSubmit={(agents) => void board.submitAnnotations(annotated, agents)}
-                        />
-                      )
-                    }
-                    // The workspace half of a cowrite (spec-00006-FR-4): the
-                    // target's text on disk, re-read with each refresh, and the
-                    // lock while the agent has the pen — a running session that
-                    // is not waiting on the user.
-                    disk={board.disk}
-                    readOnly={editorCowrite !== undefined && editorCowrite.awaiting !== true}
-                    // A creation ends differently from a revision: the document
-                    // is new to the board, so it is taken in and selected
-                    // (spec-00001-FR-53).
-                    onSaved={
-                      board.draft === undefined ? () => void board.refresh() : () => void board.created()
-                    }
-                    onClose={() => board.edit(undefined)}
-                  />
+                <ResizablePanel id="sidebar" defaultSize={18} minSize={12}>
+                  <Sidebar groups={groups} selected={board.selected} onPick={focus} />
                 </ResizablePanel>
-              </>
-            ) : inspector && selected ? (
-              <>
                 <ResizableHandle withHandle />
-                <ResizablePanel id="inspector" defaultSize={38} minSize={20}>
-                  <Inspector
-                    docId={selected.id}
-                    view={inspector}
-                    onInspect={setInspecting}
-                    onExpand={() => setDrilled(selected.id)}
-                    idOwners={board.graph.idOwners}
-                    onJump={focus}
-                  />
-                </ResizablePanel>
-              </>
-            ) : shown ? (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel id="detail" defaultSize={38} minSize={20}>
-                  <Details target={shown} onGoToRecord={focus} idOwners={board.graph.idOwners} onJump={focus} />
-                </ResizablePanel>
               </>
             ) : null}
+
+            <ResizablePanel id="board" defaultSize={82}>
+              <ResizablePanelGroup
+                orientation="horizontal"
+                {...(inspector ? inspectorColumns : shown ? detailColumns : columns)}
+              >
+                <ResizablePanel id="canvas" defaultSize={board.editing || inspector || shown ? 62 : 100} minSize={30}>
+                  <div className="relative h-full">
+                    <ReactFlow
+                      nodes={sub ? sub.nodes : nodes}
+                      edges={sub ? sub.edges : edges}
+                      nodeTypes={nodeTypes}
+                      // A sub-canvas node is not a document: selecting is the top
+                      // level's act, and so is dropping the selection — losing it
+                      // here would take the items the sub-canvas is drawn from.
+                      // In the sub-canvas a click opens the node's detail instead
+                      // (spec-00001-FR-37), and the blank closes it (AC-37.4).
+                      onNodeClick={sub ? (_event, node) => setDetail(node.id) : (_event, node) => select(node.id)}
+                      onPaneClick={sub ? () => setDetail(undefined) : board.deselect}
+                      // Handles exist to anchor edges, not to draw them: every edge
+                      // comes from front matter (spec-00001-AC-1.14).
+                      nodesConnectable={false}
+                      // Positions come from the layout (spec-00001-AC-1.2), and
+                      // a controlled flow with no `onNodesChange` has nowhere
+                      // for a drag to land: the gesture layer only ever
+                      // swallowed the clicks on the controls inside a node
+                      // (issue-00024).
+                      nodesDraggable={false}
+                      onError={onFlowError}
+                      minZoom={minZoom}
+                      fitView
+                    >
+                      <Background />
+                      <Controls />
+                      {/* Where in the whole graph the viewport is (spec-00008-FR-7).
+                          One React Flow instance holds both datasets, so the
+                          sub-canvas gets its own minimap for free. */}
+                      <MiniMap pannable zoomable nodeClassName={minimapClass} />
+                      {/* The sub-canvas is read-only: no editing, no review, no
+                          transition, and no document node to hang them on. */}
+                      {selected && sub === undefined ? (
+                        <NodeToolbar nodeId={selected.id} isVisible position={Position.Top}>
+                          <Toolbar
+                            node={selected}
+                            transitions={board.transitions}
+                            nextSteps={board.nextSteps}
+                            relations={relationsOf(board.graph, selected.id, board.relationOrder)}
+                            clarifiable={board.clarifiable.includes(selected.type ?? '')}
+                            auditable={board.auditable.includes(selected.type ?? '')}
+                            // The two concurrency rules, each read where it holds:
+                            // this document's own terminal-form session, and the cap
+                            // on all of them (spec-00003-FR-2, FR-3). Another
+                            // document's session locks nothing here
+                            // (spec-00001-AC-12.8), and neither does an ask on this
+                            // one (spec-00005-FR-6).
+                            docBusy={docBusy(selected.id)}
+                            capReached={board.running.length >= board.maxSessions}
+                            agents={board.agents}
+                            askAgents={board.askAgents}
+                            agent={board.agent}
+                            onPickAgent={board.setAgent}
+                            onPickRelation={focus}
+                            onEdit={() => board.edit(selected.id)}
+                            onStatus={(to) => void board.run(() => api.setStatus(selected.id, to))}
+                            onAccept={() => void board.run(() => api.accept(selected.id))}
+                            onClarify={() => void board.startSession(() => api.clarify(selected.id, board.agent))}
+                            onAsk={(question, agent) => board.ask({ docId: selected.id, question, agent })}
+                            // The status lock's one reading, and the entry's own
+                            // materials check against the board (spec-00006-FR-10, FR-3).
+                            cowriting={cowriteOn(selected.id) !== undefined}
+                            knownDoc={knownDoc}
+                            onCowrite={(materials, agent) =>
+                              board.cowrite({ docId: selected.id, materials, agent })
+                            }
+                            onAudit={() => void board.startSession(() => api.audit(selected.id, board.agent))}
+                            onAdvance={(targetType) => void board.advance(selected.id, targetType)}
+                          />
+                        </NodeToolbar>
+                      ) : null}
+                    </ReactFlow>
+
+                    {board.graph.nodes.length === 0 ? (
+                      <div className="text-muted-foreground pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
+                        <FileQuestionMark className="size-8" aria-hidden />
+                        <p className="text-sm">no documents under docs/ yet</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </ResizablePanel>
+
+                {board.editing ? (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel id="editor" defaultSize={38} minSize={20}>
+                      <Editor
+                        docId={board.editing}
+                        draft={board.draft}
+                        mode={board.editorMode}
+                        onMode={(mode) => board.showEditorMode(board.editing!, mode)}
+                        ask={askEntry}
+                        asks={
+                          <AskList
+                            threads={board.threads}
+                            located={board.located}
+                            onLocate={board.locate}
+                            onFollowUp={(threadId, question) =>
+                              board.ask({ docId: board.editing!, question, threadId })
+                            }
+                            onResend={(threadId, question) =>
+                              void board.ask({ docId: board.editing!, question, threadId, resend: true })
+                            }
+                          />
+                        }
+                        annotate={annotate}
+                        annotations={
+                          annotationView === undefined ? undefined : (
+                            <AnnotationList
+                              rows={annotationRowList}
+                              preview={annotationView.submitPreview}
+                              // A row is locatable when its anchor lands somewhere:
+                              // the payload's own fresh reading, and no second
+                              // judgment of it here (design-00002 §16.4).
+                              locatable={(row) => row.range !== undefined}
+                              located={board.locatedAnnotation}
+                              reanchoring={board.reanchoring}
+                              unsaved={board.unsavedBuffer}
+                              submitting={board.submitting}
+                              agents={board.agents}
+                              askAgents={board.askAgents}
+                              onLocate={(row) => board.locateAnnotation(annotated, row.id)}
+                              // The question path's navigation reuses
+                              // spec-00005-FR-9 whole, whatever state the thread is
+                              // in; a thread that has left the payload is the
+                              // close-nearest case — a toast, and the view stays
+                              // (design-00002 §16.6).
+                              onThread={(row) => {
+                                if (!board.threads.some((one) => one.id === row.threadId)) {
+                                  toast.error(`no thread ${row.threadId} on this document`)
+                                  return
+                                }
+                                board.showEditorMode(annotated, 'asks')
+                                board.locate(row.threadId)
+                              }}
+                              onSession={(row) => row.sessionId !== undefined && board.showSession(row.sessionId)}
+                              onChange={(id, change) => board.changeAnnotation(annotated, id, change)}
+                              onRemove={(id) => board.removeAnnotation(annotated, id)}
+                              onReanchor={(id) => board.startReanchor(annotated, id)}
+                              onSubmit={(agents) => void board.submitAnnotations(annotated, agents)}
+                            />
+                          )
+                        }
+                        // The workspace half of a cowrite (spec-00006-FR-4): the
+                        // target's text on disk, re-read with each refresh, and the
+                        // lock while the agent has the pen — a running session that
+                        // is not waiting on the user.
+                        disk={board.disk}
+                        readOnly={editorCowrite !== undefined && editorCowrite.awaiting !== true}
+                        // A creation ends differently from a revision: the document
+                        // is new to the board, so it is taken in and selected
+                        // (spec-00001-FR-53).
+                        onSaved={
+                          board.draft === undefined ? () => void board.refresh() : () => void board.created()
+                        }
+                        onClose={() => board.edit(undefined)}
+                      />
+                    </ResizablePanel>
+                  </>
+                ) : inspector && selected ? (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel id="inspector" defaultSize={38} minSize={20}>
+                      <Inspector
+                        docId={selected.id}
+                        view={inspector}
+                        onInspect={setInspecting}
+                        onExpand={() => setDrilled(selected.id)}
+                        idOwners={board.graph.idOwners}
+                        onJump={focus}
+                      />
+                    </ResizablePanel>
+                  </>
+                ) : shown ? (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel id="detail" defaultSize={38} minSize={20}>
+                      <Details target={shown} onGoToRecord={focus} idOwners={board.graph.idOwners} onJump={focus} />
+                    </ResizablePanel>
+                  </>
+                ) : null}
+              </ResizablePanelGroup>
+            </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>
 

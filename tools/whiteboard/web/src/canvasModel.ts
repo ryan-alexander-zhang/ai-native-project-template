@@ -1,7 +1,7 @@
 import { type Edge, MarkerType, type Node, Position } from '@xyflow/react'
 import type { DocEdge, DocGraph, DocNode } from '../../src/docRepository.ts'
 import type { RequirementItem } from '../../src/requirements.ts'
-import type { Placed } from './layout.ts'
+import { NODE_HEIGHT, NODE_WIDTH, type Placed } from './layout.ts'
 
 /** The four sides a relation edge can leave from or arrive at. */
 export const SIDES = ['top', 'right', 'bottom', 'left'] as const
@@ -19,7 +19,14 @@ export function handleId(kind: 'source' | 'target', side: Side): string {
   return `${kind}-${side}`
 }
 
-/** Graph plus layout as React Flow nodes; an unplaced node still lands on the canvas. */
+/**
+ * Graph plus layout as React Flow nodes; an unplaced node still lands on the
+ * canvas. The size is declared rather than left to be measured — the card is
+ * exactly the one the layout reserves for it — which is what lets anything
+ * reading the graph off the store size a node before it has been drawn: the
+ * minimap's block, above all (spec-00008-FR-7). `subCanvas` declares its own
+ * for the same reason.
+ */
 export function toFlowNodes(graph: DocGraph, placed: Placed[], selected?: string): Node[] {
   return graph.nodes.map((node) => {
     const at = placed.find((position) => position.id === node.id)
@@ -27,7 +34,14 @@ export function toFlowNodes(graph: DocGraph, placed: Placed[], selected?: string
       id: node.id,
       type: 'doc',
       position: { x: at?.x ?? 0, y: at?.y ?? 0 },
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
       data: { node },
+      // Not draggable is not «free for the pane to pan from»: React Flow marks a
+      // draggable node `nopan` itself, and dropping the drag drops that with it,
+      // which hands the press on a node's own control to the pan gesture — the
+      // same swallowed click, one layer down (issue-00024).
+      className: 'nopan',
       selected: node.id === selected,
     }
   })

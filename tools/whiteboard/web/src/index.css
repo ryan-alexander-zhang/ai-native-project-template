@@ -139,6 +139,37 @@
   --xy-controls-button-background-color: var(--card);
   --xy-controls-button-color: var(--foreground);
   --xy-controls-button-border-color: var(--border);
+  --xy-minimap-background-color: var(--background);
+  --xy-minimap-mask-background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+}
+
+/*
+  A minimap block per node, coloured by its document's status and by the
+  anomaly colour when the front matter does not parse (spec-00008-FR-7). Two
+  classes, so each rule outweighs the library's own single-class fill without
+  depending on which stylesheet was imported first; the values are the same
+  tokens the node cards take, so the minimap follows the theme.
+*/
+.react-flow__minimap-node.minimap-status-draft {
+  fill: var(--status-draft);
+}
+.react-flow__minimap-node.minimap-status-active {
+  fill: var(--status-active);
+}
+.react-flow__minimap-node.minimap-status-open {
+  fill: var(--status-open);
+}
+.react-flow__minimap-node.minimap-status-resolved {
+  fill: var(--status-resolved);
+}
+.react-flow__minimap-node.minimap-status-wontfix {
+  fill: var(--status-wontfix);
+}
+.react-flow__minimap-node.minimap-status-archived {
+  fill: var(--status-archived);
+}
+.react-flow__minimap-node.minimap-anomaly {
+  fill: var(--destructive);
 }
 
 /*

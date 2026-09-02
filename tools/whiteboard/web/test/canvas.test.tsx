@@ -531,6 +531,38 @@ describe('the board', () => {
     expect(screen.getByText('no issues')).toBeTruthy()
   })
 
+  // issue-00024 — positions come from the layout (spec-00001-AC-1.2), so the
+  // drag gesture has nowhere to land and only ever swallowed clicks on the
+  // controls inside a node. React Flow marks a draggable node with the class.
+  it('a document node is not draggable', async () => {
+    render(<Board />)
+
+    await waitFor(() => expect(screen.getByTestId('node-prd-00001-x')).toBeTruthy())
+    const wrapper = screen.getByTestId('node-prd-00001-x').closest('.react-flow__node')
+
+    expect(wrapper).toBeTruthy()
+    expect(wrapper!.classList.contains('draggable')).toBe(false)
+  })
+
+  // issue-00024 — the gesture itself, on the anomaly badge inside a node: press,
+  // move, release. While the node was draggable, d3-drag took the press and, on
+  // a release that had moved, swallowed the click that followed.
+  it('a press that moves on a node control still opens what it opens', async () => {
+    const bad = node({ id: 'spec-00002-bad', type: 'spec', path: 'spec/b.md', ok: false, problems: ['no status'] })
+    vi.spyOn(api, 'graph').mockResolvedValue({ ...GRAPH, nodes: [bad], edges: [] })
+
+    render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00002-bad')).toBeTruthy())
+    const badge = screen.getByLabelText('Front matter problems of spec-00002-bad')
+
+    fireEvent.mouseDown(badge, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(document, { clientX: 12, clientY: 12 })
+    fireEvent.mouseUp(document, { clientX: 12, clientY: 12 })
+    fireEvent.click(badge, { clientX: 12, clientY: 12 })
+
+    await waitFor(() => expect(screen.getByText('no status')).toBeTruthy())
+  })
+
   // issue-00002 / spec-00001-AC-1.1 — asserted on the DOM, not on the model:
   // toFlowEdges() was right all along while the canvas stayed empty.
   it('draws an edge for each declared relation', async () => {
@@ -1136,5 +1168,111 @@ describe('the board', () => {
     await userEvent.keyboard('{Meta>}k{/Meta}')
 
     expect(await screen.findByPlaceholderText('Find a document by id or title')).toBeTruthy()
+  })
+})
+
+/**
+ * spec-00008-FR-7: where in the whole graph the viewport is. The blocks take
+ * their colour from a class per status, so the theme's tokens carry it
+ * (design-00002 §17.4); the classes are what a test can read, the fill is CSS.
+ */
+describe('the minimap', () => {
+  const SPEC = node({ id: 'spec-00001-x', type: 'spec', status: 'active', title: 'Whiteboard spec', path: 'spec/a.md' })
+  const BAD = node({
+    id: 'spec-00002-bad',
+    type: 'spec',
+    status: 'nope',
+    title: 'Governance spec',
+    path: 'spec/bad.md',
+    ok: false,
+    problems: ['status "nope" is not a status of a living document'],
+  })
+  const STATUSES: DocGraph = {
+    nodes: [node(), IDEA, SPEC, BAD],
+    edges: [],
+    issues: [],
+    idOwners: {},
+    diagnostics: [],
+  }
+  const ITEMS = {
+    items: [
+      {
+        id: 'spec-00001-FR-1',
+        text: 'what FR-1 asks of the system',
+        criteria: [{ id: 'spec-00001-AC-1.1', text: 'Given a board When it loads Then it works', rows: [] }],
+        rows: [],
+        coverage: 'uncovered' as const,
+      },
+    ],
+    diagnostics: [],
+  }
+
+  function serve(served: DocGraph) {
+    vi.spyOn(api, 'graph').mockResolvedValue(served)
+    vi.spyOn(api, 'items').mockResolvedValue(ITEMS)
+    vi.spyOn(api, 'transitions').mockResolvedValue([])
+    vi.spyOn(api, 'nextSteps').mockResolvedValue([])
+    vi.spyOn(api, 'sessions').mockResolvedValue([])
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { prd: 'living', idea: 'living', spec: 'living' },
+      relations: [],
+      flow: {},
+      focus: {},
+      agents: [{ name: 'claude', command: 'claude', args: [] }],
+      entry: [],
+      carries: {},
+      maxSessions: 3,
+      clarifiable: [],
+      auditable: [],
+    })
+  }
+
+  const blocks = (container: HTMLElement) => Array.from(container.querySelectorAll('.react-flow__minimap-node'))
+
+  afterEach(() => vi.restoreAllMocks())
+
+  // spec-00008-AC-7.1
+  it('draws a block per node, coloured by its status and by the anomaly colour', async () => {
+    serve(STATUSES)
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00002-bad')).toBeTruthy())
+
+    await waitFor(() => expect(blocks(container)).toHaveLength(4))
+    expect(blocks(container).map((block) => block.getAttribute('class'))).toEqual([
+      'react-flow__minimap-node minimap-status-draft',
+      'react-flow__minimap-node minimap-status-active',
+      'react-flow__minimap-node minimap-status-active',
+      'react-flow__minimap-node minimap-anomaly',
+    ])
+    expect(container.querySelector('.react-flow__minimap-mask')).toBeTruthy()
+  })
+
+  // spec-00008-AC-7.2
+  it('shows the sub-canvas’s nodes once the board has drilled into one', async () => {
+    serve(STATUSES)
+    const { container } = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-spec-00001-x')).toBeTruthy())
+    fireEvent.click(screen.getByTestId('node-spec-00001-x'))
+    await waitFor(() => expect(screen.getByLabelText('Requirements of spec-00001-x')).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: /Expand as sub-canvas/ }))
+
+    await waitFor(() => expect(screen.getByTestId('sub-item-spec-00001-FR-1')).toBeTruthy())
+    // The item and its one criterion, and no status to colour either by.
+    await waitFor(() => expect(blocks(container)).toHaveLength(2))
+    expect(blocks(container).map((block) => block.getAttribute('class'))).toEqual([
+      'react-flow__minimap-node',
+      'react-flow__minimap-node',
+    ])
+  })
+
+  // spec-00008-AC-7.3
+  it('is still drawn, and empty, when no document is on the board', async () => {
+    serve({ nodes: [], edges: [], issues: [], idOwners: {}, diagnostics: [] })
+    const { container } = render(<Board />)
+
+    await waitFor(() => expect(screen.getByText('no documents under docs/ yet')).toBeTruthy())
+    expect(container.querySelector('.react-flow__minimap')).toBeTruthy()
+    expect(blocks(container)).toEqual([])
   })
 })
