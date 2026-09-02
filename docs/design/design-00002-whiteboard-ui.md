@@ -1384,8 +1384,11 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   中间态进测试。
 - **开合态**持久于 `localStorage`（键 `whiteboard-sidebar`，值 `open` /
   `closed`；**无键即展开**），与 `notify.ts` 走同一本地层、同样的两函数形态，
-  但缺省相反（通知开关无键读作 off）；**各组折叠态**同一路径（键
-  `whiteboard-sidebar-collapsed`，值为折叠组键的 JSON 数组；无键即全展开）。
+  但缺省相反（通知开关无键读作 off）；**各组展开态**同一路径（键
+  `whiteboard-sidebar-expanded`，值为已展开组键的 JSON 数组；**无键即全折叠**
+  ——首屏只有类型组目录，域主第二次裁定；初版记的是折叠组、缺省全展开，其键
+  `whiteboard-sidebar-collapsed` 不读、不迁移、不清理——上线数小时内的改口，
+  装机面只有域主本人）。
   两者都是呈现状态（§10 的族增两项，`CONTEXT.md` 随 spec 接收同步），**但跨
   页面重载保持**——这一点与主题、通知开关同、与其余呈现状态不同，理由是它们
   是用户对界面的**偏好**而非对某份文档的**位置**。宽度不进这一族：它走既有
@@ -1406,7 +1409,7 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   靶测一致（落地据实校正：初稿写的是导出 `columnKey` 与 `byIdThenPath` 这一对
   函数，那会让归组循环在两处各写一遍；`plan-00024` 实现期裁定）。
   `TypeGroup` 为 `{ key, type, nodes }`：`key` 是声明的 `type` 原文（缺失为空
-  串），折叠态按它记；`type` 是组头文案，缺失者呈现 `untyped`（配置未声明的
+  串），展开态按它记；`type` 是组头文案，缺失者呈现 `untyped`（配置未声明的
   类型呈现其原名）。
 - **组头**：一个 `Button`，含 §4 的类型图标（`typeIcon`）、类型名、计数
   `Badge`、折叠指示的 `ChevronRight`（展开时旋转 90°）；`aria-expanded`
@@ -1433,7 +1436,7 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   子画布与详情、居中、选中。导航栏不新增一行跳转逻辑。
 - **选中 → 高亮与滚入视野**：行以 `board.selected` 判高亮，选中行
   `aria-current="true"` 并取 `bg-accent`；一个 `useEffect` 盯 `selected`：
-  变化时若所在组折叠则先展开（写回折叠态），再对该行 `scrollIntoView({
+  变化时若所在组折叠则先展开（写回展开态），再对该行 `scrollIntoView({
   block: 'nearest' })`。取消选中即无 `aria-current`。展开只挂在**选中变化**
   上：用户随后手动折叠含选中行的组，组保持折叠（`spec-00008-FR-4`）。导航栏收起时组件不挂载、效果不跑；重新展开即重新挂载，同一
   效果在挂载时按当前 `selected` 补做一次——这就是「重新展开时补做高亮与滚入
