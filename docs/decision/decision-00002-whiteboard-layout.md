@@ -3,7 +3,7 @@ id: decision-00002-whiteboard-layout
 type: decision
 status: active
 motivated_by: [issue-00003-stage-flow-reads-backwards, spec-00001-docs-whiteboard]
-constrains: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui, plan-00003-whiteboard-relation-edges]
+constrains: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui, plan-00003-whiteboard-relation-edges, plan-00024-whiteboard-navigation-sidebar]
 ---
 
 # Decision: 白板布局改为「类型分列」，去掉 ELK

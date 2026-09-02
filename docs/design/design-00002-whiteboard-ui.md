@@ -2,7 +2,7 @@
 id: design-00002-whiteboard-ui
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00008-whiteboard-navigation-sidebar]
 ---
 
 # Design: Docs 白板界面
@@ -59,17 +59,20 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 
 ```mermaid
 flowchart TB
-  TB[Top bar<br/>标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 桌面通知开关（第十七轮）· 主题切换]
+  TB[Top bar<br/>导航栏开关（第二十四轮）· 标题 · 搜索触发 · 覆盖率总览 · 异常计数 · 诊断计数 · 会话面板（第十六轮）· 桌面通知开关（第十七轮）· 主题切换]
   subgraph Work[工作区]
     direction LR
-    CV[Canvas<br/>React Flow] ---|可拖动分隔| EP[Editor panel<br/>宽度可调]
+    NV[Navigation sidebar<br/>可收起 · 宽度可调（第二十四轮）] ---|可拖动分隔| CV[Canvas<br/>React Flow]
+    CV ---|可拖动分隔| EP[Editor panel<br/>宽度可调]
   end
   TB --- Work
   Work --- TP[Terminal panel<br/>高度可调]
 ```
 
-浮于其上的三者不占布局：**浮窗工具栏**贴选中节点悬浮于画布；**命令面板**是
-覆盖全屏的对话框；**提示条**堆叠在画布一角。（澄清对话框第八轮废弃——澄清
+浮于其上的四者不占布局：**浮窗工具栏**贴选中节点悬浮于画布；**命令面板**是
+覆盖全屏的对话框；**提示条**堆叠在画布一角；**缩略图**贴画布右下角（第二十四
+轮，§17）。左侧的**导航栏**是工作区行内、画布与右槽之外的第三个区域（第二十四
+轮，§17）：与右槽三态和终端面板互不占位、不参与右槽互斥，可收起。（澄清对话框第八轮废弃——澄清
 改为发起会话，见 decision-00006。）
 
 与当前实现的结构差异，以及每项的代价：
@@ -1356,12 +1359,126 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
     预览、标注列表并列）」**——去掉序数而不是把三改成四：序数排到第四
     就还会排到第五，而「与谁并列」才是这句真正要说的事。
 
-## 17. Open Questions
+## 17. 导航栏与缩略图（第二十四轮）
+
+承载 `spec-00008` 的界面侧；取舍全部在案于 `decision-00016`。零服务端改动：
+导航栏的归组、排序与行内容全部从 `GET /api/graph` 与 `GET /api/config` 的既有
+载荷推导。本节只管界面；归组与排序**规则**归 `decision-00002` §2，此处只复用。
+
+### 17.1 停靠与持久化
+
+- **工作区行内的第三个区域，不进右槽**：导航栏是工作区最左的
+  `ResizablePanel`。实现上在 §2 既有的水平 `ResizablePanelGroup`（右槽三态）
+  **外再包一层**水平组 `sidebar | board`（内侧面板不叫 `work`——那是
+  `whiteboard-rows` 里既有的行面板 id，而新组恰嵌在它里面），既有三个右槽布局
+  （`whiteboard-columns` / `whiteboard-inspector-columns` /
+  `whiteboard-detail-columns`）的 `panelIds` 与持久化键一个不动——导航栏的宽度
+  由自己的 `useDefaultLayout({ id: 'whiteboard-sidebar-columns', panelIds:
+  ['sidebar', 'board'] })` 持有，与 §9「各占一槽者各记各的宽」同口径。外层
+  `defaultSize` 取 `sidebar` 18 / `board` 82，`sidebar` 的 `minSize` 12；内层
+  `canvas` 面板的 `defaultSize`（62 / 100）不动——它的百分比基准从此是 `board`
+  而不是整个工作区，画布因此在缺省态比现在窄约 18%，`decision-00016` §4 已
+  接受。
+- **收起 = 卸载**：与终端面板同形——收起时面板与分隔条都不渲染，画布占满
+  左侧；不用 `react-resizable-panels` 的 collapsed 语义，避免「0 宽但仍在」的
+  中间态进测试。
+- **开合态**持久于 `localStorage`（键 `whiteboard-sidebar`，值 `open` /
+  `closed`；**无键即展开**），与 `notify.ts` 走同一本地层、同样的两函数形态，
+  但缺省相反（通知开关无键读作 off）；**各组折叠态**同一路径（键
+  `whiteboard-sidebar-collapsed`，值为折叠组键的 JSON 数组；无键即全展开）。
+  两者都是呈现状态（§10 的族增两项，`CONTEXT.md` 随 spec 接收同步），**但跨
+  页面重载保持**——这一点与主题、通知开关同、与其余呈现状态不同，理由是它们
+  是用户对界面的**偏好**而非对某份文档的**位置**。宽度不进这一族：它走既有
+  面板尺寸记忆的口径（§8）。
+- **顶栏开关**：顶栏最左、标题图标之前，一个图标 `Button`（`PanelLeftClose`
+  展开时 / `PanelLeft` 收起时），`aria-label` 为 `Hide navigation` /
+  `Show navigation`。
+- **收起或展开不动视口**：画布宽度随之改变，但 issue-00006 的重居中只挂在
+  选中动作后（`pendingFocus`），本处不触发——与打开终端面板同口径，代价在
+  `decision-00016` §4 明写。
+
+### 17.2 内容构造
+
+- **纯函数归组**：`layout.ts` 的 `columnKey` 与 `byIdThenPath`（现为模块私有）
+  导出，新模块 `sidebarModel.ts` 用**同一对函数**把 `graph.nodes` 归为有序的
+  类型组列表 `{ key, type, nodes }[]`——组序与画布列序、组内序与画布行序由
+  同一段代码保证，不是两处各写一份规则再靶测一致。`type` 缺失的组名呈现为
+  `untyped`（配置未声明的类型呈现其原名）。
+- **组头**：一个 `Button`，含 §4 的类型图标（`typeIcon`）、类型名、计数
+  `Badge`、折叠指示的 `ChevronRight`（展开时旋转 90°）；`aria-expanded`
+  如实。
+- **行**：一个 `Button`，两行：第一行**状态点**（`statusColour(node)` 喂
+  背景色的圆点，`aria-hidden`）+ **id**（等宽小字）+ **状态词**（`statusLabel`，
+  靠右、`text-muted-foreground`）；第二行**标题**（单行 `truncate`）。状态词
+  是「不只靠颜色」的那一半（§6）。异常节点：状态点取 `--destructive`，状态词
+  位呈现 `TriangleAlert` 图标 + `front matter problem`（`statusLabel` 的既有
+  返回）。`statusColour` 对「`ok` 为真而 `status` 缺失」的兜底分支在此不可达：
+  服务端把非字符串或不合法的 `status` 记为 problem（`docRepository.ts`
+  `validate`），`ok` 为真即 `status` 在。撞 id 节点：id 位呈现 `node.id`（此时
+  即路径）并列 `duplicateOf`——与 §4 节点 ④ 行一致。
+- **区域语义**：整条导航栏是 `<nav aria-label="Documents">`；组头与行都是真
+  控件（§6 的既有约定），Tab 可达、Enter 激活。
+- **空图**：没有组就没有内容，不另写空态文案——画布中央的「no documents
+  under docs/ yet」已在说这件事。
+
+### 17.3 与选中的联动
+
+- **行点击 → `focus(id)`**：`Board.tsx` 既有的 `focus` 是命令面板、三份
+  清单与行内 id 跳转共用的那条通路（`spec-00001-FR-27`）：先查图上有没有
+  （没有即提示条拒绝、什么都不动——`spec-00008-FR-8` 就落在这一步）、退出
+  子画布与详情、居中、选中。导航栏不新增一行跳转逻辑。
+- **选中 → 高亮与滚入视野**：行以 `board.selected` 判高亮，选中行
+  `aria-current="true"` 并取 `bg-accent`；一个 `useEffect` 盯 `selected`：
+  变化时若所在组折叠则先展开（写回折叠态），再对该行 `scrollIntoView({
+  block: 'nearest' })`。取消选中即无 `aria-current`。展开只挂在**选中变化**
+  上：用户随后手动折叠含选中行的组，组保持折叠（`spec-00008-FR-4`）。导航栏收起时组件不挂载、效果不跑；重新展开即重新挂载，同一
+  效果在挂载时按当前 `selected` 补做一次——这就是「重新展开时补做高亮与滚入
+  视野」的实现。
+- **子画布期间**：导航栏照常呈现与可点（点行即退出子画布，`spec-00008-FR-2`）；
+  高亮的仍是顶层选中（下钻的文档正是选中的那份，§9）。
+
+### 17.4 缩略图
+
+- `ReactFlow` 子元素加 `<MiniMap pannable zoomable nodeClassName={…} />`，
+  贴右下角（`Controls` 在左下，不撞）。子画布与顶层是同一个 `ReactFlow`
+  实例换 `nodes`，缩略图随之切换，不另加条件。
+- **着色走类名不走内联色**：`nodeClassName` 返回 `minimap-status-<status>`
+  （异常节点 `minimap-anomaly`，子画布节点无状态则不加类），`index.css` 以
+  `.react-flow__minimap-node.minimap-status-draft { fill: var(--status-draft) }`
+  等逐状态映射（双类选择器，压过库的单类规则，不靠导入顺序）；容器背景与
+  遮罩走 `index.css` 既有的 `.react-flow { --xy-* }` 覆写块，加两行
+  `--xy-minimap-background-color: var(--background)` 与
+  `--xy-minimap-mask-background-color`（取 `--muted` 的半透明），不另立令牌。
+  这样深色主题切换时缩略图随 §1 的令牌一起变，不用向组件传颜色字面量。
+- 拖动平移与滚轮缩放是库承诺，不写 AC（§6 末段的口径）。
+
+### 17.5 可访问性
+
+- 顶栏开关、组头、行三类控件均为真 `Button`，各带可访问名（组头与行的可访问
+  名即其可见文本）；选中行由 `aria-current` 而非仅背景色标识；组头
+  `aria-expanded` 如实。
+- 缩略图的 `<svg>` 由库固定为 `role="img"` 加可访问名（`ariaLabel` prop，
+  缺省 `Mini map`），组件不接受 `aria-hidden`；保留库缺省的名字即可——它是
+  视觉辅助，信息在画布与导航栏里都有。
+
+### 17.6 对既有测试的影响与验收归属
+
+- 挂载结构多了一层 `ResizablePanelGroup`，`panels.test.tsx`、
+  `viewport.test.tsx`、`focus.test.tsx` 若按面板层级或 `panelIds` 断言需对齐；
+  `setup.ts` 已桩 `scrollIntoView` 与 `ResizeObserver`，缩略图与滚入视野无需
+  新桩。
+- 新增用例落 `web/test/sidebar.test.tsx`，缩略图用例并入 `canvas.test.tsx`。
+- 本节全部用户可见行为的验收归 `spec-00008`（FR-1 … FR-8 及其 AC）；跳转本身
+  仍由 `spec-00001-FR-27`/`FR-36` 持有，缩略图的拖动与缩放为库承诺、导航栏
+  宽度记忆为非功能项，两者不写 GWT（§6 末段与 §8 的既有口径）。
+
+## 18. Open Questions
 
 - 本文档当前无未决项（第十五轮审计的两问已由域主裁定，见 spec-00001 §8；
   就近关闭的裁定已回写 §9；第十六轮的取舍全部由 decision-00009 在案；
   第十七轮的取舍全部由 decision-00010 在案；第二十一轮的取舍全部由
   decision-00012 在案；第二十二轮的取舍全部由 decision-00015 在案；
+  第二十四轮的取舍全部由 decision-00016 在案；
   第二十三轮的取舍由本文 §16 就地裁定——其中标注列表的**呈现归属**
   （§16.1）是 `spec-00007-FR-9` 明写委给本文的一项，随本轮接收由域主
   确认，不作为未决项挂起）。
