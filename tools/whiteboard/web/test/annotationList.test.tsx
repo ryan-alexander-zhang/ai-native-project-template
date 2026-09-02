@@ -50,7 +50,7 @@ function list(overrides: Partial<AnnotationListProps> = {}) {
     onReanchor: vi.fn(),
     onSubmit: vi.fn(),
   }
-  render(
+  const tree = (props: Partial<AnnotationListProps>) => (
     <TooltipProvider>
       <AnnotationList
         rows={[row()]}
@@ -62,10 +62,13 @@ function list(overrides: Partial<AnnotationListProps> = {}) {
         askAgents={['claude']}
         {...spies}
         {...overrides}
+        {...props}
       />
-    </TooltipProvider>,
+    </TooltipProvider>
   )
-  return spies
+  const { rerender } = render(tree({}))
+  /** The same list drawn again with something changed — what a save that reached the board looks like here. */
+  return { ...spies, relist: (props: Partial<AnnotationListProps>) => rerender(tree(props)) }
 }
 
 const rows = () => within(screen.getByRole('list', { name: 'Annotations' })).getAllByRole('listitem')
@@ -411,6 +414,29 @@ describe('the unified submit entry', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Submit/ }))
 
     expect(spies.onSubmit).toHaveBeenCalledWith({ question: 'claude', cowrite: 'codex' })
+  })
+
+  // spec-00009-FR-8 — the settings panel took the picked agent off the list while
+  // the statement was open. A name the list no longer carries would come back a 422,
+  // so each of the two picks falls back to the first of its own set (design-00002 §18.3).
+  it('falls back to the first agent once the picked one leaves the list', async () => {
+    const spies = list({
+      preview: preview({ questions: 1, issues: 1 }),
+      agents: ['claude', 'codex'],
+      askAgents: ['claude', 'codex'],
+    })
+    await userEvent.click(screen.getByRole('button', { name: /Submit/ }))
+    await screen.findByRole('dialog')
+    await userEvent.click(screen.getByLabelText('Question agent'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'codex' }))
+    await userEvent.click(screen.getByLabelText('Co-write agent'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'codex' }))
+    expect(screen.getByLabelText('Question agent').textContent).toContain('codex')
+
+    spies.relist({ agents: ['claude', 'gemini'], askAgents: ['claude', 'gemini'] })
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Submit/ }))
+
+    expect(spies.onSubmit).toHaveBeenCalledWith({ question: 'claude', cowrite: 'claude' })
   })
 
   /** Nothing is submitted by opening the statement: it is a confirmation. */

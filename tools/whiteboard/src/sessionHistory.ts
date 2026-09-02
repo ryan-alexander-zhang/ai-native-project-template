@@ -23,7 +23,7 @@ export interface SessionHistoryMeta {
   kind: SessionKind
   /** The document it was about — the source of an advance, the subject of the other kinds. */
   docId: string
-  /** Which agent of the flow config ran it (spec-00001-FR-55). */
+  /** Which agent of the effective agent list ran it (spec-00001-FR-55). */
   agent: string
   startedAt: string
   endedAt: string

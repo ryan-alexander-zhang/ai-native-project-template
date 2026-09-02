@@ -2,10 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentConfig } from '../../src/config.ts'
 import type { DocGraph, DocNode } from '../../src/docRepository.ts'
 import { Board } from '../src/Board.tsx'
-import { type ConfigPayload, api } from '../src/api.ts'
+import { type ConfigPayload, type EffectiveAgent, api } from '../src/api.ts'
 
 function node(overrides: Partial<DocNode> = {}): DocNode {
   return {
@@ -21,16 +20,12 @@ function node(overrides: Partial<DocNode> = {}): DocNode {
   }
 }
 
-/** A headless declaration is what puts an agent in an ask's choice (spec-00005-FR-8). */
-const HEADLESS: AgentConfig['headless'] = {
-  first: ['-p', '{question}'],
-  resume: ['-p', '--resume', '{session}', '{question}'],
-  capture: 'claude-json',
-}
-const CLAUDE: AgentConfig = { name: 'claude', command: 'claude', args: [], headless: { ...HEADLESS } }
-const CODEX: AgentConfig = { name: 'codex', command: 'codex', args: [], headless: { ...HEADLESS } }
+/** A headless declaration is what puts an agent in an ask's choice (spec-00005-FR-8);
+    the payload says only whether there is one (design-00001 §7, spec-00009-FR-8). */
+const CLAUDE: EffectiveAgent = { name: 'claude', headless: true, source: 'project' }
+const CODEX: EffectiveAgent = { name: 'codex', headless: true, source: 'project' }
 /** The same agent with no headless form: it runs terminal sessions and answers no question. */
-const TERMINAL_ONLY: AgentConfig = { name: 'claude', command: 'claude', args: [] }
+const TERMINAL_ONLY: EffectiveAgent = { name: 'claude', headless: false, source: 'project' }
 
 /** A started session only needs a socket that answers; the terminal opens one on mount. */
 function stubWebSocket() {
@@ -216,7 +211,7 @@ describe('the agent an ask is put to', () => {
    * picker is drawn and no agent is named on the wire.
    */
   it('narrows the choice to the agents that declare a headless form', async () => {
-    serve({ agents: [{ ...CODEX, headless: undefined }, CLAUDE] })
+    serve({ agents: [{ ...CODEX, headless: false }, CLAUDE] })
     const ask = vi.spyOn(api, 'ask').mockResolvedValue({ sessionId: 's1', threadId: 't-1' })
     await selectNode()
 

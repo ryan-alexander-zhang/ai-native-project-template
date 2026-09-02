@@ -38,6 +38,8 @@ export interface Captured {
 
 export const QUESTION_PLACEHOLDER = '{question}'
 export const SESSION_PLACEHOLDER = '{session}'
+/** The model of the entry that runs the call (spec-00009-FR-1); the one placeholder both forms share with `args`. */
+export const MODEL_PLACEHOLDER = '{model}'
 
 /**
  * Read `claude-json` stdout (design-00001 §10.1): the answer is `.result` —
@@ -126,12 +128,40 @@ function trimTail(text: string): string {
  * and a second pass would go looking for placeholders inside what it had just
  * substituted — a question that mentions `{session}` would come out gutted.
  */
-export function headlessArgs(headless: HeadlessConfig, question: string, resumeId?: string): string[] {
+export function headlessArgs(
+  headless: HeadlessConfig,
+  question: string,
+  resumeId?: string,
+  // Empty for an entry with no model: the entry check has already guaranteed
+  // that such a declaration holds no `{model}` for this to stand in for.
+  model = '',
+): string[] {
   const template = resumeId === undefined ? headless.first : headless.resume
-  const pattern = new RegExp(`\\${QUESTION_PLACEHOLDER}|\\${SESSION_PLACEHOLDER}`, 'g')
-  return template.map((arg) =>
-    arg.replace(pattern, (found) => (found === QUESTION_PLACEHOLDER ? question : (resumeId ?? ''))),
+  const pattern = new RegExp(
+    `\\${QUESTION_PLACEHOLDER}|\\${SESSION_PLACEHOLDER}|\\${MODEL_PLACEHOLDER}`,
+    'g',
   )
+  return template.map((arg) =>
+    arg.replace(pattern, (found) => {
+      if (found === QUESTION_PLACEHOLDER) return question
+      // `{model}` joins the same pass rather than getting one of its own, for
+      // the reason the pass is single at all (spec-00009-FR-1, design-00001
+      // §10.1): a question that says `{model}` is a person's own words.
+      if (found === MODEL_PLACEHOLDER) return model
+      return resumeId ?? ''
+    }),
+  )
+}
+
+/**
+ * The interactive form's argv with its model filled in (spec-00009-FR-1,
+ * design-00001 §13.4): every `{model}`, wherever in an element it stands. An
+ * entry with no model is left exactly as it is — the entry check has already
+ * guaranteed there is no placeholder in it to fill.
+ */
+export function fillModel(argv: string[], model?: string): string[] {
+  if (model === undefined) return argv
+  return argv.map((arg) => arg.split(MODEL_PLACEHOLDER).join(model))
 }
 
 /** A running headless call: its output captured rather than streamed to a terminal. */
@@ -144,7 +174,13 @@ export interface HeadlessProcess {
 }
 
 /** The second spawn seam (design-00001 §10.1), beside `SpawnPty` and never through it. */
-export type SpawnHeadless = (command: string, args: string[], cwd: string) => HeadlessProcess
+export type SpawnHeadless = (
+  command: string,
+  args: string[],
+  cwd: string,
+  /** The whole environment the child runs in — the board's own with the entry's `env` over it (spec-00009-FR-1). */
+  env: Record<string, string>,
+) => HeadlessProcess
 
 /**
  * How long after the process itself is gone the call waits for its pipes to
@@ -158,8 +194,8 @@ const DRAIN_MS = 1_000
 
 /** The headless spawner, with the grace as a parameter so a test can wait it out. */
 export function headlessSpawner(graceMs: number = KILL_GRACE_MS): SpawnHeadless {
-  return (command, args, cwd): HeadlessProcess => {
-    const child = spawn(command, args, { cwd })
+  return (command, args, cwd, env): HeadlessProcess => {
+    const child = spawn(command, args, { cwd, env })
     const exits: Array<(event: { exitCode: number }) => void> = []
     let drain: NodeJS.Timeout | undefined
     // SIGTERM first, not SIGHUP: hanging up is what a terminal does, and this

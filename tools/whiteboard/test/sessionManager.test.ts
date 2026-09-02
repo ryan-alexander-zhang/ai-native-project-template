@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentConfig } from '../src/config.ts'
+import { type AgentConfig, readAgentEntry } from '../src/config.ts'
+import type { HeadlessConfig } from '../src/headless.ts'
 import { type Expectation, taskInstruction } from '../src/advance.ts'
 import { spawnPty } from '../src/pty.ts'
 import {
@@ -11,6 +12,7 @@ import {
   SessionManager,
   type SessionOutcome,
   type SessionPlan,
+  childEnv,
 } from '../src/sessionManager.ts'
 import { SESSION_WAIT, makeRepo } from './helpers.ts'
 
@@ -50,7 +52,7 @@ const managers: SessionManager[] = []
 function makeManager(agent: Partial<AgentConfig>, onExit = vi.fn(async () => OUTCOME), maxSessions = 3) {
   const { repoRoot, docsDir } = makeRepo({})
   const manager = new SessionManager({
-    agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs', ...agent }],
+    agents: () => [{ name: 'test', command: 'node', args: [], cwd: 'docs', ...agent }],
     maxSessions,
     repoRoot,
     spawn: spawnPty,
@@ -278,7 +280,7 @@ describe('start', () => {
     let attempts = 0
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [] }],
+      agents: () => [{ name: 'test', command: 'node', args: [] }],
       maxSessions: 1,
       repoRoot,
       spawn: () => {
@@ -335,13 +337,115 @@ describe('start', () => {
   })
 })
 
+/**
+ * spec-00009-FR-1: the model of the entry reaches both forms of the command, and
+ * the entry's `env` reaches both children. The entries below are built through
+ * the very check start-up runs (`readAgentEntry`), so «the board starts on this»
+ * is part of what each of these proves.
+ */
+describe('the model and environment an entry runs on', () => {
+  const ASK: SessionPlan = { kind: 'ask', sourceId: 'spec-00001-a', instruction: 'why two gates?', threadId: 't-1' }
+
+  /** A recorded spawn: everything either seam is handed, which is the whole of what these ACs are about. */
+  interface Spawned {
+    command: string
+    args: string[]
+    cwd: string
+    env: Record<string, string>
+  }
+
+  /** A manager on one entry, with both seams recording rather than starting anything. */
+  function recordingManager(entry: Partial<AgentConfig>) {
+    const { repoRoot } = makeRepo({})
+    const terminal: Spawned[] = []
+    const headless: Spawned[] = []
+    const agent = readAgentEntry('test', { command: 'node', args: [], cwd: 'docs', ...entry }, 'agents.test')
+    const manager = new SessionManager({
+      agents: () => [agent],
+      maxSessions: 3,
+      repoRoot,
+      spawn: (command, args, cwd, env) => {
+        terminal.push({ command, args, cwd, env })
+        return { onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} }
+      },
+      spawnHeadless: (command, args, cwd, env) => {
+        headless.push({ command, args, cwd, env })
+        return { onStdout: () => {}, onStderr: () => {}, onExit: () => {}, kill: () => {} }
+      },
+      onExit: async () => OUTCOME,
+    })
+    managers.push(manager)
+    return { manager, repoRoot, terminal, headless }
+  }
+
+  /** The declared headless form, with the model named in each of its two argvs. */
+  const HEADLESS_WITH_MODEL: HeadlessConfig = {
+    first: ['-p', '--model', '{model}', '{question}'],
+    resume: ['-p', '--model', '{model}', '--resume', '{session}', '{question}'],
+    capture: 'claude-json',
+  }
+
+  // spec-00009-AC-1.1
+  it('fills the model into the interactive args and into a headless call alike', () => {
+    const { manager, terminal, headless } = recordingManager({
+      args: ['--model={model}'],
+      model: 'm1',
+      headless: HEADLESS_WITH_MODEL,
+    })
+
+    manager.start(ADVANCE)
+    manager.launch(manager.start(ASK).id)
+
+    expect(terminal[0]!.args).toEqual(['--model=m1'])
+    expect(headless[0]!.args).toEqual(['-p', '--model', 'm1', 'why two gates?'])
+  })
+
+  // spec-00009-AC-1.2
+  it('lays the entry’s env over the board’s own for both seams', () => {
+    const { manager, terminal, headless } = recordingManager({
+      env: { FOO: 'bar' },
+      headless: { ...HEADLESS_WITH_MODEL, first: ['-p', '{question}'], resume: ['-p', '--resume', '{session}', '{question}'] },
+    })
+
+    manager.start(ADVANCE)
+    manager.launch(manager.start(ASK).id)
+
+    for (const spawned of [terminal[0]!, headless[0]!]) {
+      expect(spawned.env.FOO).toBe('bar')
+      expect(spawned.env.HOME).toBe(process.env.HOME)
+      expect(spawned.env.PATH).toBe(process.env.PATH)
+    }
+  })
+
+  // spec-00009-AC-1.3
+  it('starts an entry that declares neither key exactly as it did before', () => {
+    const { manager, repoRoot, terminal } = recordingManager({ command: 'c', args: ['a', 'b'] })
+
+    manager.start(ADVANCE)
+
+    expect(terminal[0]).toMatchObject({ command: 'c', args: ['a', 'b'], cwd: join(repoRoot, 'docs') })
+    expect(terminal[0]!.env.FOO).toBeUndefined()
+    expect(terminal[0]!.env.HOME).toBe(process.env.HOME)
+  })
+
+  // spec-00009-AC-1.4
+  it('starts on an empty env, whose child gets the board’s environment unchanged', () => {
+    const { manager, terminal } = recordingManager({ args: ['--model={model}'], model: 'm1', env: {} })
+
+    manager.start(ADVANCE)
+
+    expect(terminal[0]!.args).toEqual(['--model=m1'])
+    expect(terminal[0]!.env).toEqual(childEnv({ name: 'test', command: 'node', args: [] }))
+  })
+})
+
 // spec-00001-AC-13.1
 describe('the write-scope constraint', () => {
   it('starts the session under the working directory the flow config constrains it to', () => {
     const spawned: Array<{ command: string; args: string[]; cwd: string }> = []
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: ['--version'], cwd: 'docs' }],
+      agents: () => [{ name: 'test', command: 'node', args: ['--version'], cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       spawn: (command, args, cwd) => {
@@ -360,7 +464,7 @@ describe('the write-scope constraint', () => {
     const spawned: string[] = []
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [] }],
+      agents: () => [{ name: 'test', command: 'node', args: [] }],
       maxSessions: 3,
       repoRoot,
       spawn: (_command, _args, cwd) => {
@@ -457,7 +561,7 @@ describe('submitting the instruction', () => {
     const hooks: { data?: (data: string) => void; exit?: (event: { exitCode: number }) => void } = {}
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [] }],
+      agents: () => [{ name: 'test', command: 'node', args: [] }],
       maxSessions: 3,
       repoRoot,
       submitDelayMs: DELAY,
@@ -540,7 +644,7 @@ describe('waiting on the user', () => {
     const onAwaitingChange = vi.fn()
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [] }],
+      agents: () => [{ name: 'test', command: 'node', args: [] }],
       maxSessions: 3,
       repoRoot,
       awaitThresholdMs: THRESHOLD,
@@ -987,7 +1091,7 @@ describe('cowrite sessions', () => {
     const exits: Array<(exitCode: number) => void> = []
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: ['--interactive'], cwd: 'docs' }],
+      agents: () => [{ name: 'test', command: 'node', args: ['--interactive'], cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       contentSnapshot,
@@ -1041,7 +1145,7 @@ describe('cowrite sessions', () => {
     const { repoRoot } = makeRepo({})
     let killed = 0
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
+      agents: () => [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       // A pty that ends when it is killed, which is what a real one does.
@@ -1098,7 +1202,7 @@ describe('cowrite sessions', () => {
     const hooks: { data?: (data: string) => void; exit?: (event: { exitCode: number }) => void } = {}
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: ['--interactive'], cwd: 'docs' }],
+      agents: () => [{ name: 'test', command: 'node', args: ['--interactive'], cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       // The submit presses that follow the CLI's first output are the
@@ -1336,7 +1440,7 @@ describe('cowrite sessions', () => {
     const exits: Array<(event: { exitCode: number }) => void> = []
     let seen = ''
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
+      agents: () => [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       spawn: () => ({
@@ -1385,7 +1489,7 @@ describe('cowrite sessions', () => {
     const snapshots = [first, second]
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
+      agents: () => [{ name: 'test', command: 'node', args: [], cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       snapshot: () => snapshots.shift() ?? new Map(),
@@ -1432,7 +1536,7 @@ describe('the end callback', () => {
   function endReporting(onSessionEnd: (info: SessionInfo) => Promise<void>, command = 'node') {
     const { repoRoot } = makeRepo({})
     const manager = new SessionManager({
-      agents: [{ name: 'test', command, args: HOLD, cwd: 'docs' }],
+      agents: () => [{ name: 'test', command, args: HOLD, cwd: 'docs' }],
       maxSessions: 3,
       repoRoot,
       spawn: spawnPty,

@@ -6,6 +6,7 @@ import {
   CAPTURES,
   type CaptureName,
   type HeadlessConfig,
+  MODEL_PLACEHOLDER,
   QUESTION_PLACEHOLDER,
   SESSION_PLACEHOLDER,
 } from './headless.ts'
@@ -24,6 +25,18 @@ export interface AgentConfig {
   command: string
   args: string[]
   cwd?: string
+  /**
+   * The model this entry runs on (spec-00009-FR-1), substituted for every
+   * `{model}` in `args` and in the headless declaration. A name the board never
+   * reads: which flag carries it is the entry's own business, which is what
+   * keeps no CLI's model flag in the code (decision-00017 §5).
+   */
+  model?: string
+  /**
+   * What this entry adds to the board's own process environment when it spawns
+   * (spec-00009-FR-1). An empty mapping is a legal reading and the same as none.
+   */
+  env?: Record<string, string>
   /**
    * The agent's non-interactive form, if it declares one (spec-00005-FR-8). An
    * agent without it answers no ask: it is simply out of the choice
@@ -55,9 +68,17 @@ export interface FlowConfig {
 
 /** Startup-blocking configuration problem; the message always names the offending entry. */
 export class ConfigError extends Error {
-  constructor(message: string) {
+  /**
+   * The key the problem is at, as a dotted path. Carried beside the message
+   * because the same entry checks run over the local agent settings, whose
+   * refusal answers `{error, at}` (design-00001 §13.2).
+   */
+  readonly at?: string
+
+  constructor(message: string, at?: string) {
     super(message)
     this.name = 'ConfigError'
+    this.at = at
   }
 }
 
@@ -68,7 +89,7 @@ export const DEFAULT_MAX_SESSIONS = 3
 
 function asRecord(value: unknown, field: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new ConfigError(`config: \`${field}\` must be a mapping`)
+    throw new ConfigError(`config: \`${field}\` must be a mapping`, field)
   }
   return value as Record<string, unknown>
 }
@@ -224,14 +245,17 @@ function readMaxSessions(raw: unknown): number {
 function readAgentCwd(value: unknown, at: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || (value !== 'docs' && !value.startsWith('docs/')) || value.includes('..')) {
-    throw new ConfigError(`config: \`${at}.cwd\` must be "docs" or a path inside it, got ${JSON.stringify(value)}`)
+    throw new ConfigError(
+      `config: \`${at}.cwd\` must be "docs" or a path inside it, got ${JSON.stringify(value)}`,
+      `${at}.cwd`,
+    )
   }
   return value
 }
 
 function readArgv(value: unknown, at: string): string[] {
   if (!Array.isArray(value) || value.length === 0 || value.some((arg) => typeof arg !== 'string')) {
-    throw new ConfigError(`config: \`${at}\` must be a non-empty list of strings`)
+    throw new ConfigError(`config: \`${at}\` must be a non-empty list of strings`, at)
   }
   return value as string[]
 }
@@ -244,7 +268,7 @@ function placeholders(argv: string[], placeholder: string): number {
 function requirePlaceholder(argv: string[], placeholder: string, times: number, at: string): void {
   const found = placeholders(argv, placeholder)
   if (found !== times) {
-    throw new ConfigError(`config: \`${at}\` must hold ${times} \`${placeholder}\` placeholder, not ${found}`)
+    throw new ConfigError(`config: \`${at}\` must hold ${times} \`${placeholder}\` placeholder, not ${found}`, at)
   }
 }
 
@@ -270,28 +294,99 @@ function readHeadless(value: unknown, at: string): HeadlessConfig | undefined {
   if (typeof capture !== 'string' || !(CAPTURES as readonly string[]).includes(capture)) {
     throw new ConfigError(
       `config: \`${at}.capture\` must be one of ${CAPTURES.join(', ')}, got ${JSON.stringify(capture)}`,
+      `${at}.capture`,
     )
   }
   return { first, resume, capture: capture as CaptureName }
 }
 
-function readAgent(name: string, value: unknown): AgentConfig {
-  const at = `agents.${name}`
+/** The model of one entry (spec-00009-FR-1): free text, since no CLI publishes a list to check it against. */
+function readModel(value: unknown, at: string): string | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new ConfigError(
+      `config: \`${at}.model\` must be a non-empty string, got ${JSON.stringify(value)}`,
+      `${at}.model`,
+    )
+  }
+  return value
+}
+
+/**
+ * What the entry adds to the child's environment (spec-00009-FR-1). No key is
+ * off limits — `PATH` included: the only person who can write this file is the
+ * one whose machine it runs on (spec-00009 §7).
+ */
+function readEnv(value: unknown, at: string): Record<string, string> | undefined {
+  if (value === undefined || value === null) return undefined
+  const env = asRecord(value, `${at}.env`)
+  for (const [key, item] of Object.entries(env)) {
+    if (typeof item !== 'string') {
+      throw new ConfigError(
+        `config: \`${at}.env.${key}\` must be a string, got ${JSON.stringify(item)}`,
+        `${at}.env.${key}`,
+      )
+    }
+  }
+  return env as Record<string, string>
+}
+
+/**
+ * `model` and `{model}` are paired per form (spec-00009-FR-2): a placeholder
+ * with no value would spawn the word `{model}` itself, and a value no array
+ * stands for is a model that silently never reaches the CLI — which is the very
+ * failure the key exists to make visible. «Holds it» is at least once, unlike
+ * `{question}`: a model may legitimately be named twice in one command line.
+ */
+function requireModel(agent: AgentConfig, at: string): void {
+  const arrays: Array<[string[], string]> = [[agent.args, `${at}.args`]]
+  if (agent.headless) {
+    arrays.push([agent.headless.first, `${at}.headless.first`], [agent.headless.resume, `${at}.headless.resume`])
+  }
+  for (const [argv, where] of arrays) {
+    const found = placeholders(argv, MODEL_PLACEHOLDER) > 0
+    if (agent.model === undefined && found) {
+      throw new ConfigError(
+        `config: \`${where}\` holds a \`${MODEL_PLACEHOLDER}\` placeholder, but \`${at}.model\` is not set`,
+        `${at}.model`,
+      )
+    }
+    if (agent.model !== undefined && !found) {
+      throw new ConfigError(
+        `config: \`${at}.model\` is set, so \`${where}\` must hold a \`${MODEL_PLACEHOLDER}\` placeholder`,
+        where,
+      )
+    }
+  }
+}
+
+/**
+ * One agent entry, checked whole (design-00001 §3). The error prefix is the
+ * caller's rather than this function's: the project layer is at
+ * `agents.<name>` and the local one at `overrides.<name>` / `entries.<name>`,
+ * and one function checking both is what makes «one set of rules over the two
+ * layers» (spec-00009-FR-3) mechanical rather than a promise.
+ */
+export function readAgentEntry(name: string, value: unknown, at: string): AgentConfig {
   const agent = asRecord(value, at)
   if (typeof agent.command !== 'string' || agent.command.trim() === '') {
-    throw new ConfigError(`config: \`${at}.command\` must be a non-empty string`)
+    throw new ConfigError(`config: \`${at}.command\` must be a non-empty string`, `${at}.command`)
   }
   const args = agent.args ?? []
   if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
-    throw new ConfigError(`config: \`${at}.args\` must be a list of strings`)
+    throw new ConfigError(`config: \`${at}.args\` must be a list of strings`, `${at}.args`)
   }
-  return {
+  const entry: AgentConfig = {
     name,
     command: agent.command,
     args: args as string[],
     cwd: readAgentCwd(agent.cwd, at),
+    model: readModel(agent.model, at),
+    env: readEnv(agent.env, at),
     headless: readHeadless(agent.headless, `${at}.headless`),
   }
+  requireModel(entry, at)
+  return entry
 }
 
 function readAgents(raw: unknown): AgentConfig[] {
@@ -299,7 +394,7 @@ function readAgents(raw: unknown): AgentConfig[] {
   if (entries.length === 0) {
     throw new ConfigError('config: `agents` must declare at least one agent')
   }
-  return entries.map(([name, value]) => readAgent(name, value))
+  return entries.map(([name, value]) => readAgentEntry(name, value, `agents.${name}`))
 }
 
 /** Parse and validate flow config text. `source` only labels errors. */

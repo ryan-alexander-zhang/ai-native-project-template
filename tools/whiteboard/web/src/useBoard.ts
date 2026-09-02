@@ -14,6 +14,7 @@ import {
   type CoverageRow,
   type CowriteSubmit,
   type DocContent,
+  type EffectiveAgent,
   type SessionInfo,
   type SessionListing,
   api,
@@ -935,6 +936,28 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     if (!held) setDisk(undefined)
   }, [sessions, editing])
 
+  /**
+   * The two agent lists, taken off an effective agent list (spec-00009-FR-3).
+   * The board holds no config object — it holds these two arrays, which every
+   * starting point reads — so this is the one place the list becomes them, for
+   * the first read and for a save alike (design-00002 §18.4). `headless` is a
+   * boolean from the twenty-sixth round on, so the ask's set is a truth test and
+   * not a «declared» test (design-00001 §7).
+   *
+   * The agent on show is corrected as it goes: one the settings panel has just
+   * removed would otherwise be named on the next request and refused, so a name
+   * the new list does not carry falls back to the first — which is also the
+   * reading «one agent is no choice at all» keeps (spec-00001-AC-55.4).
+   */
+  const applyAgents = useCallback((effective: EffectiveAgent[]) => {
+    const names = effective.map((one) => one.name)
+    setAgents(names)
+    setAskAgents(effective.filter((one) => one.headless).map((one) => one.name))
+    setAgent((current) =>
+      names.length > 1 ? (current !== undefined && names.includes(current) ? current : names[0]) : undefined,
+    )
+  }, [])
+
   // The first read of everything. Sessions outlive the browser, so this read is
   // also where a board opening fresh finds the ones still running and reattaches
   // to one of them — `refresh` above holds that (spec-00003-FR-9).
@@ -951,16 +974,10 @@ export function useBoard(openSession: (session: SessionListing) => void) {
         setAuditable(config.auditable)
         setEntry(config.entry)
         setMaxSessions(config.maxSessions)
-        const names = config.agents.map((declared) => declared.name)
-        setAgents(names)
         // An ask can only be put to an agent that says how to run it headlessly
         // (spec-00005-FR-8); the entries follow this set the way they follow the
         // clarifiable and auditable ones (spec-00001-FR-56).
-        setAskAgents(config.agents.filter((declared) => declared.headless !== undefined).map((one) => one.name))
-        // One agent is no choice at all: it is left unnamed so the request
-        // carries no agent field (spec-00001-AC-55.4). More than one, and the
-        // first is the one on show until the user picks another.
-        setAgent(names.length > 1 ? names[0] : undefined)
+        applyAgents(config.agents)
       } catch (error) {
         // A board with no column order still beats no board: the graph is the
         // thing the user came for, so draw it and say why it looks odd.
@@ -968,7 +985,7 @@ export function useBoard(openSession: (session: SessionListing) => void) {
       }
       await refresh()
     })()
-  }, [refresh])
+  }, [refresh, applyAgents])
 
   // docs/ moves under the board more often than the board moves it — an agent
   // or an editor elsewhere — so the change is pushed and the board re-reads
@@ -1038,6 +1055,9 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     edit,
     setTerminalOpen,
     setAgent,
+    // What a settings save hands back: the list it made effective, which this
+    // page — and only this page — shows from then on (spec-00009-FR-8).
+    applyAgents,
     refresh,
     select,
     deselect,

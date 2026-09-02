@@ -59,12 +59,110 @@ export interface CowriteSubmit {
 }
 
 /**
+ * One entry of the effective agent list as a payload carries it (design-00001
+ * §7). `headless` is a **boolean** from the twenty-sixth round on — whether the
+ * merged entry declares the form, which is the only part of it a caller needs —
+ * and `source` says which layer the entry came from (spec-00009-FR-7). Disabled
+ * entries are not in the list at all (spec-00009-AC-3.8).
+ *
+ * It is the front end's own type rather than the server's `AgentConfig`: the
+ * payload is narrower than an entry now, and reusing the entry would let a field
+ * that is not on the wire be read as if it were (design-00002 §18.4).
+ */
+export interface EffectiveAgent {
+  name: string
+  headless: boolean
+  source: AgentSource
+  default?: boolean
+}
+
+/** Which layer an effective entry came from (spec-00009-FR-3). */
+export type AgentSource = 'project' | 'local' | 'overridden'
+
+/** An agent's headless declaration as the settings panel edits it, structure for structure (design-00002 §18.3). */
+export interface HeadlessDecl {
+  first: string[]
+  resume: string[]
+  /** One of the captures the code holds; the panel offers the set `captures` names. */
+  capture: string
+}
+
+/** One whole agent entry — the project layer's form (design-00001 §3). */
+export interface AgentEntry {
+  name: string
+  command: string
+  args: string[]
+  cwd?: string
+  model?: string
+  env?: Record<string, string>
+  headless?: HeadlessDecl
+}
+
+/**
+ * What the local layer may say about one project entry: any key but `cwd`, which
+ * is the write-scope barrier and never local (design-00001 §13.1). Each key it
+ * carries replaces the project's whole key — undoing one is deleting it. The one
+ * null the file admits is `headless: null`, which takes the project entry's
+ * declaration away rather than replacing it.
+ */
+export type AgentOverride = Partial<Omit<AgentEntry, 'name' | 'cwd' | 'headless'>> & {
+  headless?: HeadlessDecl | null
+}
+
+/**
+ * An entry only this machine declares: an override that must carry a `command`,
+ * and that has no project declaration to take away, so no null of its own.
+ */
+export type LocalAgentEntry = Omit<AgentOverride, 'headless'> & { command: string; headless?: HeadlessDecl }
+
+/** The local layer file, whole (design-00001 §13.1). A save PUTs one of these. */
+export interface LocalAgentSettings {
+  default?: string
+  disabled?: string[]
+  overrides?: Record<string, AgentOverride>
+  entries?: Record<string, LocalAgentEntry>
+}
+
+/** One thing the local layer says that points at nothing; the layer still holds (spec-00009-FR-4). */
+export interface AgentNotice {
+  name: string
+  message: string
+}
+
+/** Why the local layer is being ignored whole, and at which key (spec-00009-FR-4). */
+export interface AgentSettingsError {
+  message: string
+  at?: string
+}
+
+/** What the settings panel reads on every open (design-00001 §7, design-00002 §18.1). */
+export interface AgentSettingsView {
+  project: AgentEntry[]
+  /** The local file as it stands, or nothing when there is none the board could read. */
+  local: LocalAgentSettings | null
+  effective: EffectiveAgent[]
+  /** The capture names the code holds, for the headless dropdown. */
+  captures: string[]
+  error?: AgentSettingsError
+  notices: AgentNotice[]
+}
+
+/** What a save answers with: the list it just made effective, and what pointed at nothing. */
+export interface AgentSettingsSaved {
+  effective: EffectiveAgent[]
+  notices: AgentNotice[]
+}
+
+/**
  * What `GET /api/config` hands the board: the effective flow config, plus the
  * two type sets the code — not the config file — owns (spec-00001-FR-56). The
  * board keeps no copy of either: what it shows follows this payload, so the
- * front end and the server cannot drift apart (spec-00001-AC-56.2).
+ * front end and the server cannot drift apart (spec-00001-AC-56.2). `agents` is
+ * the effective agent list rather than the config's own `agents`, which is only
+ * the project layer of it (spec-00009-FR-3).
  */
-export type ConfigPayload = FlowConfig & {
+export type ConfigPayload = Omit<FlowConfig, 'agents'> & {
+  agents: EffectiveAgent[]
   clarifiable: string[]
   auditable: string[]
 }
@@ -123,13 +221,21 @@ export class ApiError extends Error {
    * board offers is the right one (spec-00006-AC-10.3).
    */
   readonly reason?: string
+  /**
+   * The key a refusal is at, as the dotted path the local layer is addressed by
+   * — `overrides.claude.model` (design-00001 §13.1). It is what puts a save's
+   * 422 under the field it is about rather than at the top of the panel
+   * (design-00002 §18.3).
+   */
+  readonly at?: string
 
-  constructor(status: number, message: string, gaps?: string[], reason?: string) {
+  constructor(status: number, message: string, gaps?: string[], reason?: string, at?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.gaps = gaps
     this.reason = reason
+    this.at = at
   }
 }
 
@@ -141,7 +247,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
   const payload = await response.json()
   if (!response.ok) {
-    throw new ApiError(response.status, payload.error ?? response.statusText, payload.gaps, payload.reason)
+    throw new ApiError(response.status, payload.error ?? response.statusText, payload.gaps, payload.reason, payload.at)
   }
   return payload as T
 }
@@ -263,6 +369,20 @@ export const api = {
   createPrefill: (type: string) =>
     request<CreatePrefill>('GET', `/api/create?type=${encodeURIComponent(type)}`),
   createDoc: (id: string, content: string) => request<ActionResult>('POST', '/api/docs', { id, content }),
+  /**
+   * Both agent layers as they stand (spec-00009-FR-7). Read on every open of the
+   * settings panel rather than kept: a local file edited by hand shows its error
+   * the next time the panel is opened (design-00002 §18.1).
+   */
+  agentSettings: () => request<AgentSettingsView>('GET', '/api/settings/agents'),
+  /**
+   * The local layer, saved whole (spec-00009-FR-5). What comes back is the list
+   * the save just made effective, which is what the page it was saved from shows
+   * from then on — no re-read of the config, and no other page told
+   * (spec-00009-FR-8, design-00001 §13.3).
+   */
+  saveAgentSettings: (local: LocalAgentSettings) =>
+    request<AgentSettingsSaved>('PUT', '/api/settings/agents', local),
   // The sessions that have already ended, and any one of them read whole
   // (spec-00001-FR-54).
   sessionHistory: () => request<SessionHistoryMeta[]>('GET', '/api/sessions/history'),

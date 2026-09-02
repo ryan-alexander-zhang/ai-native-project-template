@@ -130,14 +130,7 @@ function serve(sessions: SessionListing[] = [], lists: AskThread[] = []) {
     focus: {},
     // The one agent that declares a headless form, which is what makes an ask
     // possible at all (spec-00005-FR-8).
-    agents: [
-      {
-        name: 'claude',
-        command: 'claude',
-        args: [],
-        headless: { first: ['-p', '{question}'], resume: ['-p', '--resume', '{session}', '{question}'], capture: 'claude-json' },
-      },
-    ],
+    agents: [{ name: 'claude', headless: true, source: 'project' }],
     entry: [],
     carries: {},
     maxSessions: 3,

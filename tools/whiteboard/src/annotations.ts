@@ -114,7 +114,8 @@ export interface SubmitResult {
 export type OpenAskThread = (input: {
   docId: string
   question: string
-  agent: string
+  /** The entry the batch resolved when it was received, not a name to resolve again (spec-00009-AC-5.5). */
+  agent: AgentConfig
   selection: SelectionAnchor
 }) => Promise<{ sessionId: string; threadId: string }>
 
@@ -122,8 +123,12 @@ export interface AnnotationOptions {
   repoRoot: string
   docs: DocService
   sessions: SessionManager
-  /** Every agent the flow config declares: the two paths choose from it, each from its own subset. */
-  agents: AgentConfig[]
+  /**
+   * The effective agent list as it stands: the two paths choose from it, each
+   * from its own subset. A function, for the reason the registry's is
+   * (spec-00009-FR-3) — the list is never frozen at start-up.
+   */
+  agents: () => AgentConfig[]
   openAsk: OpenAskThread
 }
 
@@ -530,7 +535,7 @@ export class Annotations {
           issueMaterialLines(issues, target.path),
           this.options.sessions.reservedNumbers(REFERENCE_TYPE),
         ),
-        agent.name,
+        agent,
       )
     } catch (cause) {
       // The second reading of the two rules, the one that keeps the books
@@ -612,7 +617,8 @@ export class Annotations {
       return {
         annotationId: annotation.id,
         reason: 'no-headless-agent',
-        message: 'no agent in the flow config declares a headless form, so nothing can answer a question',
+        message:
+          'no agent in the effective agent list declares a headless form, so nothing can answer a question',
       }
     }
     await this.claim(docId, annotation.id)
@@ -621,7 +627,7 @@ export class Annotations {
       opened = await this.options.openAsk({
         docId,
         question: annotation.text,
-        agent: agent.name,
+        agent,
         selection: annotation.anchor,
       })
     } catch (cause) {
@@ -708,7 +714,7 @@ export class Annotations {
     }
     if (change.type === 'question' && this.headlessAgent() === undefined) {
       throw new AnnotationError(
-        'no agent in the flow config declares a headless form, so a question could not be answered',
+        'no agent in the effective agent list declares a headless form, so a question could not be answered',
         'type-ineligible',
       )
     }
@@ -745,17 +751,26 @@ export class Annotations {
    * (spec-00007-AC-10.5).
    */
   private chooseAgents(named: { question?: string; cowrite?: string }): ChosenAgents {
+    // Read once, for the whole batch (spec-00009-AC-5.5): the entries chosen
+    // here are what every session of this submit runs, whatever is saved while
+    // it is in flight (design-00001 §13.2 整批一次解析).
+    const agents = this.options.agents()
     return {
-      cowrite: named.cowrite === undefined ? this.options.agents[0]! : this.namedAgent(named.cowrite),
+      cowrite: named.cowrite === undefined ? agents[0]! : this.namedAgent(agents, named.cowrite),
       question:
-        named.question === undefined ? this.headlessAgent() : this.headlessNamedAgent(this.namedAgent(named.question)),
+        named.question === undefined
+          ? headlessOf(agents)
+          : this.headlessNamedAgent(this.namedAgent(agents, named.question)),
     }
   }
 
-  private namedAgent(name: string): AgentConfig {
-    const agent = this.options.agents.find((candidate) => candidate.name === name)
+  private namedAgent(agents: AgentConfig[], name: string): AgentConfig {
+    const agent = agents.find((candidate) => candidate.name === name)
     if (!agent) {
-      throw new AnnotationError(`${JSON.stringify(name)} is not an agent in the flow config`, 'unknown-agent')
+      throw new AnnotationError(
+        `${JSON.stringify(name)} is not an agent in the effective agent list`,
+        'unknown-agent',
+      )
     }
     return agent
   }
@@ -771,7 +786,7 @@ export class Annotations {
   }
 
   private headlessAgent(): AgentConfig | undefined {
-    return this.options.agents.find((agent) => agent.headless !== undefined)
+    return headlessOf(this.options.agents())
   }
 
   /** The target read off a freshly parsed tree (design-00001 §12.3's «not the graph cache»). */
@@ -830,6 +845,11 @@ const BATCH_END = {
   failed: 'failed',
   running: undefined,
 } as const
+
+/** The question path's default: the first entry of the list that declares a headless form (spec-00007-AC-5.6). */
+function headlessOf(agents: AgentConfig[]): AgentConfig | undefined {
+  return agents.find((agent) => agent.headless !== undefined)
+}
 
 function find(list: AnnotationList, annotationId: string): Annotation | undefined {
   return list.annotations.find((candidate) => candidate.id === annotationId)
@@ -910,7 +930,7 @@ function submitRequest(body: unknown): { unsavedChanges: boolean; agents: { ques
   const { question, cowrite } = (agents ?? {}) as Record<string, unknown>
   for (const [path, name] of Object.entries({ question, cowrite })) {
     if (name !== undefined && typeof name !== 'string') {
-      throw new WorkflowError(`agents.${path} must name one of the agents in the flow config`)
+      throw new WorkflowError(`agents.${path} must name one of the agents in the effective agent list`)
     }
   }
   return {

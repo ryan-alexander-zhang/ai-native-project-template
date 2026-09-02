@@ -64,12 +64,7 @@ function config(agents = ['claude']): ConfigPayload {
     focus: {},
     // Every agent here also declares a headless form, so the question entry is
     // drawn: spec-00005 must be seen to be untouched by the lock (AC-4.6).
-    agents: agents.map((name) => ({
-      name,
-      command: name,
-      args: [],
-      headless: { first: ['-p', '{question}'], resume: ['-p', '--resume', '{session}', '{question}'], capture: 'claude-json' as const },
-    })),
+    agents: agents.map((name) => ({ name, headless: true, source: 'project' as const })),
     entry: ['idea'],
     carries: {},
     maxSessions: 3,
