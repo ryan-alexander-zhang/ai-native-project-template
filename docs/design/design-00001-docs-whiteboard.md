@@ -1799,8 +1799,9 @@ headless 形态」拒绝——两条用户可见文案里的 "flow config" 随�
 `mergeAgents(project, body)` 试合并——抛错即 422 `{error, at}`，不写盘；③ 写
 `.whiteboard/agents.json`：`mkdir -p .whiteboard` → 写 `agents.json.tmp` →
 `rename`——rename 原子，失败面上磁盘要么是旧文件要么是新文件，没有半写
-（`spec-00009-AC-6.4`）；写失败 500，不改内存里任何东西（本来也没有——
-有效列表按次重读）。④ 返回新的 `effective` 与 `notices`。**不广播
+（`spec-00009-AC-6.4`）；写入或 rename 任一步失败时**尽力删掉暂存文件**
+（`unlink` 自身的错误吞掉，原错误照常抛出），不留 `agents.json.tmp`；写失败
+500，不改内存里任何东西（本来也没有——有效列表按次重读）。④ 返回新的 `effective` 与 `notices`。**不广播
 `/api/events`**：变更推送的三个来源不加第四个（`decision-00017` §2 第 8 条），
 发起保存的页面用返回值就地更新选择器，其他页面下次重新加载见新列表。
 

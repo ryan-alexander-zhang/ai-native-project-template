@@ -1541,7 +1541,7 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
 | `args` | 每元素一个 `Input` 的列表，增删按钮 | 可覆盖 | 可填 |
 | `cwd` | 只读文本 | 项目值 | `docs` |
 | `env` | 键值对列表，值列见下 | 可覆盖 | 可填 |
-| `headless` | 三个子字段：`first` / `resume` 各为元素列表，`capture` 为下拉（选项来自 `GET /api/settings/agents` 的 `captures`，今天只有 `claude-json`）；另有「无 headless」开关——项目条目打开即写 `headless: null` 覆盖（design-00001 §13.1），追加条目打开即不写该键 | 可覆盖 | 可填 |
+| `headless` | 三个子字段：`first` / `resume` 各为元素列表，`capture` 为下拉（选项来自 `GET /api/settings/agents` 的 `captures`，今天只有 `claude-json`）；另有「无 headless」开关——项目条目打开即写 `headless: null` 覆盖（design-00001 §13.1），**关掉即撤销该键的本地覆盖**（项目声明回来；覆盖对象因此为空则整条删掉）；追加条目打开即不写该键，关掉写回表单内容（没有项目值可回） | 可覆盖 | 可填 |
 | 禁用 | `Switch` | 可 | 可 |
 | 设为缺省 | 单选（列表级） | 可 | 可 |
 
