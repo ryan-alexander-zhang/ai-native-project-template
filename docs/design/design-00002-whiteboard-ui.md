@@ -1399,11 +1399,15 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
 
 ### 17.2 内容构造
 
-- **纯函数归组**：`layout.ts` 的 `columnKey` 与 `byIdThenPath`（现为模块私有）
-  导出，新模块 `sidebarModel.ts` 用**同一对函数**把 `graph.nodes` 归为有序的
-  类型组列表 `{ key, type, nodes }[]`——组序与画布列序、组内序与画布行序由
-  同一段代码保证，不是两处各写一份规则再靶测一致。`type` 缺失的组名呈现为
-  `untyped`（配置未声明的类型呈现其原名）。
+- **纯函数归组**：`layout.ts` 把「按列键分桶、桶按键排序、桶内按 id 与路径
+  排序」抽成一个导出的 `orderedColumns(graph, typeOrder): DocNode[][]`，
+  `layoutGraph` 与新模块 `sidebarModel.ts` 的 `typeGroups` 都只是它的映射——
+  组序与画布列序、组内序与画布行序由同一段代码保证，不是两处各写一份规则再
+  靶测一致（落地据实校正：初稿写的是导出 `columnKey` 与 `byIdThenPath` 这一对
+  函数，那会让归组循环在两处各写一遍；`plan-00024` 实现期裁定）。
+  `TypeGroup` 为 `{ key, type, nodes }`：`key` 是声明的 `type` 原文（缺失为空
+  串），折叠态按它记；`type` 是组头文案，缺失者呈现 `untyped`（配置未声明的
+  类型呈现其原名）。
 - **组头**：一个 `Button`，含 §4 的类型图标（`typeIcon`）、类型名、计数
   `Badge`、折叠指示的 `ChevronRight`（展开时旋转 90°）；`aria-expanded`
   如实。
@@ -1442,6 +1446,12 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
 - `ReactFlow` 子元素加 `<MiniMap pannable zoomable nodeClassName={…} />`，
   贴右下角（`Controls` 在左下，不撞）。子画布与顶层是同一个 `ReactFlow`
   实例换 `nodes`，缩略图随之切换，不另加条件。
+- **节点须声明尺寸**（落地实测，`plan-00024` 实现期裁定）：缩略块的大小取自
+  节点对象自带的 `width`/`height`，而本板是不接 `onNodesChange` 的受控图，
+  React Flow 量出的 `measured` 尺寸不会写回节点——不声明尺寸，缩略图一个块
+  也画不出来。`toFlowNodes` 因此给每个文档节点声明 `NODE_WIDTH × NODE_HEIGHT`
+  （卡片本就是布局为它保留的那个尺寸），与 `subCanvas` 为条目节点声明尺寸
+  同一做法。
 - **着色走类名不走内联色**：`nodeClassName` 返回 `minimap-status-<status>`
   （异常节点 `minimap-anomaly`，子画布节点无状态则不加类），`index.css` 以
   `.react-flow__minimap-node.minimap-status-draft { fill: var(--status-draft) }`

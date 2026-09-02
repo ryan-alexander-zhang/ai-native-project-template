@@ -1,7 +1,7 @@
 ---
 id: plan-00024-whiteboard-navigation-sidebar
 type: plan
-status: open
+status: resolved
 implements: [spec-00008-whiteboard-navigation-sidebar]
 ---
 
