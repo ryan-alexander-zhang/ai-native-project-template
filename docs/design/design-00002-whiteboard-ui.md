@@ -1541,7 +1541,7 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
 | `args` | 每元素一个 `Input` 的列表，增删按钮 | 可覆盖 | 可填 |
 | `cwd` | 只读文本 | 项目值 | `docs` |
 | `env` | 键值对列表，值列见下 | 可覆盖 | 可填 |
-| `headless` | 三个子字段：`first` / `resume` 各为元素列表，`capture` 为下拉（选项来自配置下发的内建集合，今天只有 `claude-json`） | 可覆盖 | 可填 |
+| `headless` | 三个子字段：`first` / `resume` 各为元素列表，`capture` 为下拉（选项来自 `GET /api/settings/agents` 的 `captures`，今天只有 `claude-json`）；另有「无 headless」开关——项目条目打开即写 `headless: null` 覆盖（design-00001 §13.1），追加条目打开即不写该键 | 可覆盖 | 可填 |
 | 禁用 | `Switch` | 可 | 可 |
 | 设为缺省 | 单选（列表级） | 可 | 可 |
 
@@ -1562,6 +1562,9 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   `destructive` 文案并滚入视野；`at` 无法映射到字段时落在顶部说明行。
 - 删除追加条目：卡片上的 `destructive` 图标按钮，一步删除、无二次确认——
   保存前都在表单里，关掉对话框即放弃。
+- 已选 agent 名的校正（18.4）覆盖**每一处**持有选择的控件：`AskEntry`、
+  `MaterialsInput`、以及标注列表统一提交的 question / issue 两个选择
+  （`AnnotationList.tsx`）——实施期据实补，初稿只点了前两处。
 
 ### 18.4 保存与就地更新
 
