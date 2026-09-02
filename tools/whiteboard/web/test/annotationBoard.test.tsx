@@ -156,18 +156,7 @@ function serve(options: { sessions?: SessionListing[]; lists?: AskThread[]; view
     relations: ['parent'],
     flow: {},
     focus: {},
-    agents: [
-      {
-        name: 'claude',
-        command: 'claude',
-        args: [],
-        headless: {
-          first: ['-p', '{question}'],
-          resume: ['-p', '--resume', '{session}', '{question}'],
-          capture: 'claude-json',
-        },
-      },
-    ],
+    agents: [{ name: 'claude', headless: true, source: 'project' }],
     entry: [],
     carries: {},
     maxSessions: 3,

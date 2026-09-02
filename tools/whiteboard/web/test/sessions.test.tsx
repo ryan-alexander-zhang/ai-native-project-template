@@ -108,7 +108,7 @@ function serve(sessions: SessionListing[] = [], maxSessions = 3) {
     relations: ['parent'],
     flow: { prd: [{ next: 'spec', carry: 'parent' }] },
     focus: { prd: 'roles, scope, and the value trade-offs' },
-    agents: [{ name: 'claude', command: 'claude', args: [] }],
+    agents: [{ name: 'claude', headless: false, source: 'project' }],
     entry: [],
     carries: {},
     maxSessions,

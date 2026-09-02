@@ -45,10 +45,14 @@ export function AskEntry({ agents, onSubmit, disabled = false }: AskEntryProps) 
   const [agent, setAgent] = useState<string>()
   /** A question already on its way, so a second press cannot open a second thread. */
   const [sending, setSending] = useState(false)
+  // A name the settings panel has since taken off the list is no longer a choice:
+  // sent, it would be refused as unknown, so a pick the list no longer carries
+  // falls back to the first (spec-00009-FR-8, design-00002 §18.4).
+  const held = agent !== undefined && agents.includes(agent) ? agent : undefined
   // One agent is no choice at all: nothing is drawn and nothing is sent, so the
   // server takes the first that declares a headless form (spec-00001-AC-55.4's
   // reading, narrowed by spec-00005-FR-2).
-  const chosen = agent ?? (agents.length > 1 ? agents[0] : undefined)
+  const chosen = held ?? (agents.length > 1 ? agents[0] : undefined)
   // An empty question is nothing to ask, and it is refused here rather than sent
   // for the server's 422 to bounce back (design-00002 §14).
   const empty = question.trim() === ''

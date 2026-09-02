@@ -22,6 +22,7 @@ import {
   PanelLeft,
   PanelLeftClose,
   Search,
+  Settings,
   Terminal as TerminalIcon,
   TriangleAlert,
 } from 'lucide-react'
@@ -58,6 +59,7 @@ import { NodeCard } from './NodeCard.tsx'
 import { NotifySwitch } from './NotifySwitch.tsx'
 import { SessionHistory } from './SessionHistory.tsx'
 import { SessionPanel } from './SessionPanel.tsx'
+import { SettingsDialog } from './SettingsDialog.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { AcceptanceRowNode, CriterionNode, ItemNode } from './SubNodes.tsx'
 import { Terminal } from './Terminal.tsx'
@@ -145,6 +147,10 @@ function Canvas() {
   // (spec-00002-FR-13, FR-14).
   const [issuesOpen, setIssuesOpen] = useState(false)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  // The settings panel (spec-00009-FR-7). Presentation state that is not kept:
+  // it is a one-off way in, unlike the theme and the notification switch beside
+  // it, which are choices made once and remembered (design-00002 §10, §18.1).
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [inspecting, setInspecting] = useState<string>()
   // The document whose sub-canvas has taken the canvas over (spec-00001-FR-35);
   // `undefined` is the top-level board.
@@ -613,6 +619,18 @@ function Canvas() {
               choice made once and remembered, so its switch is resident next to
               the theme (spec-00004-FR-1, design-00002 §3). */}
           <NotifySwitch state={board.notifyState} onToggle={board.toggleNotify} />
+          {/* Where the two agent layers are read and the local one written
+              (spec-00009-FR-7). Before the theme toggle, and a dialog rather
+              than a slot: settings are not an act upon a document
+              (design-00002 §2, §18.1). */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Agent settings"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings aria-hidden />
+          </Button>
           <ThemeMenu theme={theme.theme} onChoose={theme.choose} />
         </div>
       </header>
@@ -916,6 +934,10 @@ function Canvas() {
         onStop={(session) => void board.stopSession(session.id)}
       />
       <SessionHistory open={history} onOpenChange={setHistory} />
+      {/* A save changes the agent lists of this page at once and of no other
+          (spec-00009-FR-8); the dialog stays open, since more than one entry may
+          be on the way (design-00002 §18.4). */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} onSaved={board.applyAgents} />
       <Toaster position="bottom-right" theme={theme.isDark ? 'dark' : 'light'} richColors closeButton />
     </div>
     </JumpContext.Provider>

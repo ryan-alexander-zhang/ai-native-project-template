@@ -281,6 +281,56 @@ describe('the api client', () => {
     expect(moved.reason).toBeUndefined()
   })
 
+  /**
+   * spec-00009-FR-7 — both agent layers, read on every open of the settings
+   * panel (design-00002 §18.1).
+   */
+  it('reads both agent layers', async () => {
+    const payload = {
+      project: [{ name: 'claude', command: 'claude', args: [], cwd: 'docs' }],
+      local: null,
+      effective: [{ name: 'claude', headless: false, source: 'project' }],
+      captures: ['claude-json'],
+      notices: [],
+    }
+    const fetchMock = mockFetch(200, payload)
+
+    expect(await api.agentSettings()).toEqual(payload)
+    expect(fetchMock).toHaveBeenCalledWith('/api/settings/agents', expect.objectContaining({ method: 'GET' }))
+  })
+
+  // spec-00009-FR-5 — the local layer goes over the wire whole, never key by key
+  it('saves the local agent layer whole', async () => {
+    const local = { overrides: { claude: { model: 'm2' } } }
+    const fetchMock = mockFetch(200, { effective: [], notices: [] })
+
+    await api.saveAgentSettings(local)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/settings/agents',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify(local) }),
+    )
+  })
+
+  /**
+   * spec-00009-FR-6 — a refused save names the key it is at, and that is what
+   * puts the message under the right field rather than at the top of the panel
+   * (design-00002 §18.3). A refusal that names none grows none.
+   */
+  it('carries the key a settings refusal is at', async () => {
+    mockFetch(422, { error: 'agent settings: `claude` has no `{model}` in `args`', at: 'overrides.claude.model' })
+
+    const refused = await api.saveAgentSettings({}).catch((thrown) => thrown)
+
+    expect(refused.at).toBe('overrides.claude.model')
+
+    mockFetch(500, { error: 'EACCES: permission denied' })
+
+    const unwritten = await api.saveAgentSettings({}).catch((thrown) => thrown)
+
+    expect(unwritten.at).toBeUndefined()
+  })
+
   it('falls back to the status text when the body carries no error', async () => {
     mockFetch(500, {})
     await expect(api.graph()).rejects.toThrowError('Error')

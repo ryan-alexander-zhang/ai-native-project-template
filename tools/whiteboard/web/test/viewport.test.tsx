@@ -146,7 +146,7 @@ beforeEach(() => {
     relations: ['verifies'],
     flow: {},
     focus: {},
-    agents: [{ name: 'claude', command: 'claude', args: [] }],
+    agents: [{ name: 'claude', headless: false, source: 'project' }],
     entry: [],
     carries: {},
     maxSessions: 3,

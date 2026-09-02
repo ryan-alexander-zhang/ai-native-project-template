@@ -35,9 +35,13 @@ export function useMaterialsDraft(agents: string[], known: (id: string) => boole
   const [references, setReferences] = useState('')
   const [agent, setAgent] = useState<string>()
   const { materials, unusable } = readMaterials(text, references, known)
+  // A name the settings panel has since taken off the list is no longer a choice:
+  // sent, it would be refused as unknown, so a pick the list no longer carries
+  // falls back to the first (spec-00009-FR-8, design-00002 §18.4).
+  const held = agent !== undefined && agents.includes(agent) ? agent : undefined
   // One agent is no choice at all: nothing is drawn and nothing is sent, so the
   // server takes the first (spec-00001-AC-55.4).
-  const chosen = agent ?? (agents.length > 1 ? agents[0] : undefined)
+  const chosen = held ?? (agents.length > 1 ? agents[0] : undefined)
   return {
     materials,
     unusable,
