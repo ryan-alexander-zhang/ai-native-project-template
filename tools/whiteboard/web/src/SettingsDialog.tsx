@@ -327,10 +327,11 @@ function Row(props: RowProps) {
           ))}
         </p>
       )}
+      {/* The write scope an appended CLI is not held to (design-00001 §11.5, spec-00009-FR-7). */}
       {card.appended ? (
         <p className="text-muted-foreground text-xs">
-          This CLI has not been checked against the write scope (design-00001 §11.5): a write outside docs/ is not
-          stopped by the board, and that is yours to answer for.
+          This CLI has not been checked against the write scope: a write outside docs/ is not stopped by the board, and
+          that is yours to answer for.
         </p>
       ) : null}
       {expanded ? <Form {...props} /> : null}

@@ -152,6 +152,19 @@ describe('the settings panel', () => {
     expect(within(card('codex-local')).getByText(/has not been checked against the write scope/)).toBeTruthy()
   })
 
+  // issue-00025 — the notice is copy a user reads; a doc id in it is a leak
+  // spec-00009-AC-7.9
+  it('warns about the write scope without citing an internal doc', async () => {
+    serve(
+      { local: { overrides: {}, entries: { 'codex-local': { command: 'codex', args: [] } } } },
+      [listed('codex-local', false, 'local')],
+    )
+    await openBoardAndSettings()
+
+    const notice = within(card('codex-local')).getByText(/has not been checked against the write scope/)
+    expect(notice.textContent).not.toMatch(/(design|spec|decision|rule|plan|issue|record)-\d{5}|§/)
+  })
+
   // spec-00009-AC-7.2
   it('puts a field back to the project value when its override is undone', async () => {
     serve({ local: { overrides: { claude: { model: 'm2' } } } }, [listed('claude', true, 'overridden')])

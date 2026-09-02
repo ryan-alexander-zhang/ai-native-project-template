@@ -83,6 +83,7 @@ verifies: [spec-00009-whiteboard-agent-settings]
 | spec-00009-AC-7.6 | shows an added entry as running in docs, uneditably (web/test/settings.test.tsx) | pass |
 | spec-00009-AC-7.7 | masks every env value (web/test/settings.test.tsx) | pass |
 | spec-00009-AC-7.8 | shows one env value in the clear when it is asked for (web/test/settings.test.tsx) · masks an env value again when it is hidden (web/test/settings.test.tsx) | pass |
+| spec-00009-AC-7.9 | warns about the write scope without citing an internal doc (web/test/settings.test.tsx)；全仓守卫 web/test/copy.test.tsx（issue-00025） | pass |
 | spec-00009-AC-8.1 | draws the agent picker once a saved local entry makes the list two long (web/test/settings.test.tsx) | pass |
 | spec-00009-AC-8.2 | takes the picker away once a saved deletion makes the list one long (web/test/settings.test.tsx) | pass |
 | spec-00009-AC-8.3 | widens the ask choice once a saved entry declares a headless form (web/test/settings.test.tsx) | pass |
