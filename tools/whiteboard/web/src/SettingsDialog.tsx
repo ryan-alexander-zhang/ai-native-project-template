@@ -41,6 +41,7 @@ import {
   withDisabled,
   withEntry,
   withField,
+  withHeadless,
   withoutEntry,
   withoutHeadless,
   withoutOverride,
@@ -239,7 +240,9 @@ export function SettingsDialog({ open, onOpenChange, onSaved }: SettingsDialogPr
                     )
                   }
                   onField={(key, value) => edit(withField(local, card, key, value))}
-                  onNoHeadless={() => edit(withoutHeadless(local, card))}
+                  onNoHeadless={(off, headless) =>
+                    edit(off ? withoutHeadless(local, card) : withHeadless(local, card, headless))
+                  }
                   onUndo={(key) => edit(withoutOverride(local, card.name, key))}
                   onDisabled={(off) => edit(withDisabled(local, card.name, off))}
                   onDefault={() => edit(withDefault(local, card.name))}
@@ -275,7 +278,7 @@ interface RowProps {
   onToggle: () => void
   onShow: (key: string) => void
   onField: <K extends OverridableKey>(key: K, value: FieldValue[K]) => void
-  onNoHeadless: () => void
+  onNoHeadless: (off: boolean, headless: HeadlessDecl) => void
   onUndo: (key: OverridableKey) => void
   onDisabled: (off: boolean) => void
   onDefault: () => void
@@ -440,12 +443,14 @@ function Form({ card, captures, error, onField, onNoHeadless, onUndo, onDisabled
       </Field>
       <Field label="No headless">
         {/* The entry declares no headless form, and so leaves the ask option set
-            (design-00002 §18.3). Turning it back off writes the form on show,
-            which for an entry that has none is the blank one above. */}
+            (design-00002 §18.3). Turning it back off gives a project entry its own
+            declaration back by undoing the override, and writes an appended
+            entry's form on show, which for one that has none is the blank one
+            above (spec-00009-FR-7). */}
         <Switch
           aria-label="No headless"
           checked={card.entry.headless === undefined}
-          onCheckedChange={(off) => (off ? onNoHeadless() : onField('headless', headless))}
+          onCheckedChange={(off) => onNoHeadless(off, headless)}
         />
       </Field>
       {said('headless')}

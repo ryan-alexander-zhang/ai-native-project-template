@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { type AgentConfig, type ConfigError, readAgentEntry } from './config.ts'
 
@@ -303,8 +303,21 @@ export class EffectiveAgents {
     const merged = mergeAgents(this.project, local)
     mkdirSync(dirname(this.path), { recursive: true })
     const staging = `${this.path}.tmp`
-    writeFileSync(staging, `${JSON.stringify(local, null, 2)}\n`)
-    renameSync(staging, this.path)
+    try {
+      writeFileSync(staging, `${JSON.stringify(local, null, 2)}\n`)
+      renameSync(staging, this.path)
+    } catch (cause) {
+      // A write that got as far as the temporary name and no further would leave
+      // it behind, and the next save would find a file it never wrote. Clearing
+      // it is best-effort: the write's own failure is what the caller is told
+      // about (spec-00009-FR-6).
+      try {
+        unlinkSync(staging)
+      } catch {
+        // Nothing to clear, or nothing that can be.
+      }
+      throw cause
+    }
     this.warn(undefined)
     return { ...merged, local }
   }

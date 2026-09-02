@@ -367,6 +367,53 @@ describe('the list a save makes effective', () => {
     expect(put).toHaveBeenCalledWith({ entries: { 'codex-local': { command: 'codex' } } })
   })
 
+  // spec-00009-FR-7 — the same switch turned back off on a project entry undoes
+  // the local override rather than writing a copy of what it took away: the
+  // entry's own headless declaration is what comes back (design-00002 §18.3)
+  it('gives a project entry its own headless declaration back when the switch is turned off again', async () => {
+    serve({ project: [CLAUDE, OTHER] }, [listed('claude', true), listed('other', false)])
+    const put = vi
+      .spyOn(api, 'saveAgentSettings')
+      .mockResolvedValue({ effective: [listed('claude', true), listed('other', false)], notices: [] })
+    await openBoardAndSettings()
+
+    await expand('claude')
+    const noHeadless = () => within(card('claude')).getByRole('switch', { name: 'No headless' })
+    await userEvent.click(noHeadless())
+    expect(within(card('claude')).queryByText('headless')).toBeNull()
+    await userEvent.click(noHeadless())
+
+    expect(within(card('claude')).getByText('headless')).toBeTruthy()
+    expect(within(card('claude')).getByText('project')).toBeTruthy()
+    await save()
+    // The override is gone whole: an empty one would still read as «the local
+    // layer says something about this entry» (design-00001 §13.1)
+    expect(put).toHaveBeenCalledWith({ overrides: {} })
+  })
+
+  // spec-00009-FR-7 — an added entry has no other layer to fall back to, so the
+  // switch turned back off writes the form on show as edited (design-00002 §18.3)
+  it('writes the form on show when the switch is turned off again on an added entry', async () => {
+    serve({ local: { entries: { 'codex-local': { command: 'codex', headless: HEADLESS } } } }, [
+      listed('claude', true),
+      listed('codex-local', true, 'local'),
+    ])
+    const put = vi
+      .spyOn(api, 'saveAgentSettings')
+      .mockResolvedValue({ effective: [listed('claude', true), listed('codex-local', true, 'local')], notices: [] })
+    await openBoardAndSettings()
+
+    await expand('codex-local')
+    const noHeadless = () => within(card('codex-local')).getByRole('switch', { name: 'No headless' })
+    await userEvent.click(noHeadless())
+    await userEvent.click(noHeadless())
+    await save()
+
+    expect(put).toHaveBeenCalledWith({
+      entries: { 'codex-local': { command: 'codex', headless: { first: [], resume: [], capture: 'claude-json' } } },
+    })
+  })
+
   // spec-00009-AC-8.4 — the board's half: with no headless agent left, neither
   // ask entry is drawn. The refusal of one put through the API is the server's
   it('draws neither ask entry once the one headless agent is disabled and saved', async () => {

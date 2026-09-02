@@ -155,6 +155,23 @@ export function withoutHeadless(local: LocalAgentSettings, card: AgentCard): Loc
 }
 
 /**
+ * «No headless» turned back off. On an appended entry there is no other layer to
+ * fall back to, so the form on show is written as edited; on a project entry the
+ * entry's own headless declaration is what the switch gives back, so the local
+ * override is undone rather than a copy of that declaration written over it
+ * (design-00002 §18.3).
+ */
+export function withHeadless(
+  local: LocalAgentSettings,
+  card: AgentCard,
+  headless: FieldValue['headless'],
+): LocalAgentSettings {
+  return card.appended
+    ? withField(local, card, 'headless', headless)
+    : withoutOverride(local, card.name, 'headless')
+}
+
+/**
  * One override undone: the key is deleted, and with the last key the whole entry
  * goes — an empty override object would still read as «the local layer says
  * something about this entry» (design-00001 §13.1).

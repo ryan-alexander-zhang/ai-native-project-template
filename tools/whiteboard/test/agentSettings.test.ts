@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -163,6 +163,19 @@ describe('EffectiveAgents', () => {
 
     expect(state.agents.map((agent) => agent.name)).toEqual(['claude', 'other'])
     expect(state.error!.message).toMatch(/could not be read/)
+  })
+
+  // spec-00009-FR-6 — a save that got as far as the staging file and no further
+  // leaves nothing of itself behind; a directory where the file should be is the
+  // portable way to make the rename, and only the rename, fail
+  it('clears the staging file when the rename it was written for fails', () => {
+    const repoRoot = repoWith()
+    const path = join(repoRoot, '.whiteboard', 'agents.json')
+    mkdirSync(path, { recursive: true })
+    writeFileSync(join(path, 'in-the-way'), 'x')
+
+    expect(() => new EffectiveAgents(PROJECT, repoRoot).save({ default: 'other' })).toThrowError()
+    expect(existsSync(`${path}.tmp`)).toBe(false)
   })
 
   /**
