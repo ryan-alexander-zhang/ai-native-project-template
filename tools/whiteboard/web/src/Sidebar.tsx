@@ -24,44 +24,66 @@ export interface SidebarProps {
   onPick: (id: string) => void
 }
 
+/**
+ * One level of the tree, as the row's own left padding: the level times
+ * `--tree-indent` and nothing else, so the levels can never drift from each
+ * other the way three hand-written paddings did (design-00002 §17.2,
+ * issue-00026).
+ */
+function indentOf(level: number) {
+  return { paddingLeft: `calc(var(--tree-indent) * ${level})` }
+}
+
 interface RowProps {
   node: DocNode
   selected?: string
-  /** The left padding of this row's level: a top document's, or a group member's one deeper. */
-  indent: string
+  /** This row's depth in the tree: 1 for a top-level document, 2 for a directory group's member. */
+  level: number
   rowRef?: RefObject<HTMLButtonElement | null>
   onPick: (id: string) => void
 }
 
 /** One document's row (design-00002 §17.2), the same at either indentation level. */
-function Row({ node, selected, indent, rowRef, onPick }: RowProps) {
+function Row({ node, selected, level, rowRef, onPick }: RowProps) {
   return (
     <Button
       ref={rowRef}
       variant="ghost"
-      className={`h-auto w-full flex-col items-stretch gap-0.5 py-1.5 pr-2 font-normal ${indent} ${
+      className={`h-auto w-full items-start justify-start gap-2 py-1.5 pr-2 font-normal ${
         node.id === selected ? 'bg-accent' : ''
       }`}
+      data-level={level}
+      style={indentOf(level)}
       // Not colour alone: the highlighted row says what it is
       // (design-00002 §17.5).
       aria-current={node.id === selected ? 'true' : undefined}
       onClick={() => onPick(node.id)}
     >
-      <span className="flex items-center gap-1.5">
+      {/* The two fixed 16px columns every row opens with, a header's included:
+          the fold column, which a leaf row keeps empty, and the icon column,
+          where the status dot goes. A document row's text therefore starts
+          exactly where a sibling header's name starts, and one level down is one
+          indent along and nothing else (design-00002 §17.2). */}
+      <span className="h-4 w-4 shrink-0" />
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
         <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColour(node) }} aria-hidden />
-        <span className="truncate font-mono text-xs">{node.id}</span>
-        {/* An id two documents declare is not a key: the row is the path, and
-            the id it collides on sits beside it (spec-00002-FR-8,
-            design-00002 §4). */}
-        {node.duplicateOf === undefined ? null : (
-          <span className="text-muted-foreground shrink-0 font-mono text-[10px]">{node.duplicateOf}</span>
-        )}
-        <span className="text-muted-foreground ml-auto flex shrink-0 items-center gap-1 text-[10px]">
-          {node.ok ? null : <TriangleAlert className="size-3" aria-hidden />}
-          {statusLabel(node)}
-        </span>
       </span>
-      <span className="truncate text-left text-xs">{node.title}</span>
+      <span className="flex min-w-0 flex-1 flex-col items-stretch gap-0.5">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate font-mono text-xs">{node.id}</span>
+          {/* An id two documents declare is not a key: the row is the path, and
+              the id it collides on sits beside it (spec-00002-FR-8,
+              design-00002 §4). */}
+          {node.duplicateOf === undefined ? null : (
+            <span className="text-muted-foreground shrink-0 font-mono text-[10px]">{node.duplicateOf}</span>
+          )}
+          <span className="text-muted-foreground ml-auto flex shrink-0 items-center gap-1 text-[10px]">
+            {node.ok ? null : <TriangleAlert className="size-3" aria-hidden />}
+            {statusLabel(node)}
+          </span>
+        </span>
+        <span className="truncate text-left text-xs">{node.title}</span>
+      </span>
     </Button>
   )
 }
@@ -122,13 +144,15 @@ export function Sidebar({ groups, selected, expandedGroups, onToggleGroup, onPic
             <Button
               variant="ghost"
               size="sm"
-              className="w-full justify-start gap-2 px-2"
+              className="w-full justify-start gap-2 pr-2"
+              data-level={0}
+              style={indentOf(0)}
               aria-expanded={open}
               onClick={() => toggle(group.key)}
             >
-              <ChevronRight className={`size-3 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
+              <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
               <Icon className="size-4" aria-hidden />
-              {group.type}
+              <span className="truncate">{group.type}</span>
               <Badge variant="secondary" className="ml-auto">
                 {group.nodes.length}
               </Badge>
@@ -140,7 +164,7 @@ export function Sidebar({ groups, selected, expandedGroups, onToggleGroup, onPic
                     key={node.path}
                     node={node}
                     selected={selected}
-                    indent="pl-4"
+                    level={1}
                     rowRef={node.id === selected ? selectedRow : undefined}
                     onPick={onPick}
                   />
@@ -150,24 +174,28 @@ export function Sidebar({ groups, selected, expandedGroups, onToggleGroup, onPic
                   return (
                     <div key={directory.expandKey}>
                       {/* The directory group's header, one level in from the type
-                          group's. `Folder` is a shape, not a term — the vocabulary
-                          is still «directory group» (design-00002 §19.2, §19.4). */}
+                          group's, and the same syntax: the fold chevron in the
+                          leading slot, the count at the right edge. `Folder` is
+                          a shape, not a term — the vocabulary is still
+                          «directory group» (design-00002 §19.2, §19.4). */}
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full justify-start gap-2 pr-2 pl-4"
+                        className="w-full justify-start gap-2 pr-2"
+                        data-level={1}
+                        style={indentOf(1)}
                         aria-expanded={openDirectory}
                         onClick={() => onToggleGroup(directory.expandKey)}
                       >
-                        <Folder className="size-3.5" aria-hidden />
+                        <ChevronRight
+                          className={`size-4 transition-transform ${openDirectory ? 'rotate-90' : ''}`}
+                          aria-hidden
+                        />
+                        <Folder className="size-4" aria-hidden />
                         <span className="truncate">{directory.name}</span>
                         <Badge variant="secondary" className="ml-auto">
                           {directory.nodes.length}
                         </Badge>
-                        <ChevronRight
-                          className={`size-3 transition-transform ${openDirectory ? 'rotate-90' : ''}`}
-                          aria-hidden
-                        />
                       </Button>
                       {openDirectory
                         ? directory.nodes.map((node) => (
@@ -175,7 +203,7 @@ export function Sidebar({ groups, selected, expandedGroups, onToggleGroup, onPic
                               key={node.path}
                               node={node}
                               selected={selected}
-                              indent="pl-6"
+                              level={2}
                               rowRef={node.id === selected ? selectedRow : undefined}
                               onPick={onPick}
                             />
