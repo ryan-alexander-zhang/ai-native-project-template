@@ -29,6 +29,7 @@ Write the document description or comment after the front matter.
   through the **revision round** (`rule-00001-BR-3`): demote it to `draft` on
   the board, revise, audit, and re-accept — never edit the `active` file in
   place. Typo-level fixes are exempt; when in doubt, it is substantive.
+- `decided_by` (`decision` only, not a relation): `human` when a person made the choice, `agent` when an agent made it unattended. Written only by autopilot runs (`AUTOPILOT.md`); absent means a human was in the loop.
 - Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
 - There are exactly two requirement id namespaces, and both carry their doc id:
   - `spec` owns **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.

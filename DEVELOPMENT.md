@@ -75,6 +75,7 @@ Use this stage when the change needs durable docs, notes, or decisions.
 - [CODE_STYLE.md](CODE_STYLE.md): naming, formatting, consistency.
 - [CODE_QUALITY.md](CODE_QUALITY.md): quality gates, thresholds, refactoring order.
 - [DOCUMENT.md](DOCUMENT.md): doc taxonomy and management.
+- [AUTOPILOT.md](AUTOPILOT.md): the unattended idea-to-PR run and what it replaces.
 
 ## Commands
 

@@ -30,6 +30,12 @@ Add more when useful.
   later falls under an `active` decision, add it here: the list is metadata about
   reach, not content, so updating it is not an amendment to the decision.
 
+## Provenance
+
+- `decided_by` — `human` or `agent`; written only by autopilot runs
+  (`AUTOPILOT.md`) so a reviewer can list every choice an agent made in a
+  human's place. Omit it otherwise.
+
 ## Exclude
 
 - temporary discussion or brainstorming notes

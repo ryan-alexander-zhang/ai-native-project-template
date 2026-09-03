@@ -3,6 +3,10 @@
   "frozen": [
     "AGENTS.md",
     "DOCUMENT.md",
+    "AUTOPILOT.md",
+    ":(glob)skills/autopilot/**",
+    ".claude/skills",
+    ".codex/skills",
     "ACCEPTANCE.md",
     "COMMIT.md",
     "PR.md",

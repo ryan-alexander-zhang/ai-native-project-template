@@ -26,6 +26,16 @@ Sketch level: enough to judge the idea, not enough to build it.>
 
 - <…>
 
+## 范围
+
+**做**
+
+- <what this delivers>
+
+**不做**
+
+- <what is explicitly out, so the PRD does not drift into it>
+
 ## 早期价值判断
 
 <Why this is worth doing, and for whom. Name the value, not the feature.>
