@@ -783,4 +783,71 @@ describe('a directory group in the sidebar', () => {
 
     await waitFor(() => expect(names()).toEqual(['reference 5', ...TOP_ROWS, 'stripe 3']))
   })
+
+  // issue-00026 — the tree's own indent model: one level is one `--tree-indent`,
+  // and every row opens with the same two fixed columns, so a child's text starts
+  // one indent past its parent's text instead of under its parent's chevron.
+  it('indents each level past its parent’s label', async () => {
+    await openReference()
+    await expand('reference')
+    await userEvent.click(header('ccbill'))
+    await waitFor(() => expect(row('reference-00021-c')).toBeTruthy())
+
+    // jsdom resolves no CSS variable, so the derivation itself is what is read.
+    const indent = (control: HTMLElement) => [control.getAttribute('data-level'), control.style.paddingLeft]
+
+    expect(indent(header('reference'))).toEqual(['0', 'calc(var(--tree-indent) * 0)'])
+    expect(indent(row('reference-00001-a'))).toEqual(['1', 'calc(var(--tree-indent) * 1)'])
+    expect(indent(header('ccbill'))).toEqual(['1', 'calc(var(--tree-indent) * 1)'])
+    expect(indent(row('reference-00021-c'))).toEqual(['2', 'calc(var(--tree-indent) * 2)'])
+
+    // …and jsdom lays nothing out either, so where a row's text starts is read
+    // structurally and then computed: every row opens with the same two fixed
+    // 16px columns — the fold column and the icon column — and its text is the
+    // third, so the text starts at the row's own indent plus that constant and
+    // one level down is one indent along and nothing else.
+    const INDENT = 16
+    const GAP = 8
+    function textStart(control: HTMLElement, label: string): number {
+      const columns = Array.from(control.children)
+      // `class`, not `className`: an svg's is an object, a span's a string.
+      expect(columns[0]!.getAttribute('class')).toMatch(/\b(size-4|w-4)\b/)
+      expect(columns[1]!.getAttribute('class')).toMatch(/\b(size-4|w-4)\b/)
+      expect(columns[2]!.textContent).toContain(label)
+      return Number(control.getAttribute('data-level')) * INDENT + 2 * (INDENT + GAP)
+    }
+
+    const type = textStart(header('reference'), 'reference')
+    const top = textStart(row('reference-00001-a'), 'reference-00001-a')
+    const directory = textStart(header('ccbill'), 'ccbill')
+    const member = textStart(row('reference-00021-c'), 'reference-00021-c')
+
+    // A document row and a directory header are siblings: one level, one text column.
+    expect(top).toBe(directory)
+    expect(top).toBe(type + INDENT)
+    expect(member).toBe(directory + INDENT)
+
+    // A leaf row's fold column is empty — no chevron to fold it by — and the
+    // status dot holds the icon column, the very one a header's icon holds.
+    const [fold, icon] = Array.from(row('reference-00021-c').children)
+    expect(fold!.children).toHaveLength(0)
+    expect(fold!.textContent).toBe('')
+    expect(icon!.querySelector('span.rounded-full')).toBeTruthy()
+  })
+
+  // issue-00026 — the fold chevron is the leading slot of a directory header as
+  // it is of a type header, and the count badge is what the row ends with.
+  it('puts the fold chevron first on a directory header, as on a type header', async () => {
+    await openReference()
+    await expand('reference')
+
+    const parts = (control: HTMLElement) => Array.from(control.children)
+    const directory = parts(header('ccbill'))
+
+    expect(parts(header('reference'))[0]!.classList.contains('lucide-chevron-right')).toBe(true)
+    expect(directory[0]!.classList.contains('lucide-chevron-right')).toBe(true)
+    expect(directory[1]!.classList.contains('lucide-folder')).toBe(true)
+    expect(directory.at(-1)!.getAttribute('data-slot')).toBe('badge')
+    expect(directory.filter((part) => part.classList.contains('lucide-chevron-right'))).toHaveLength(1)
+  })
 })

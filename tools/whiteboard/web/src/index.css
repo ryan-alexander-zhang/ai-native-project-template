@@ -28,6 +28,12 @@
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.705 0.015 286.067);
 
+  /* One level of the navigation sidebar's tree, and the width of the slot its
+     rows open with (design-00002 §17.2). A starting point, not a fixed value:
+     nothing derives from it but the indent itself. No dark counterpart — a
+     geometry, not a colour. */
+  --tree-indent: 16px;
+
   /* Document status — one pair per status of rule-00001's vocabulary. */
   --status-draft: oklch(0.552 0.016 285.938);
   --status-draft-foreground: oklch(0.985 0 0);
