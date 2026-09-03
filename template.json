@@ -1,6 +1,5 @@
 {
   "exclude": [
-    ".codex/",
     ".understand-anything/",
     "docs/*/[^A-Z]*",
     "docs/*/*/*",
@@ -13,19 +12,53 @@
     "scripts/check-config-coverage.py"
   ],
   "vars": {
-    "PROJECT_NAME": { "prompt": "Project name", "default": "{{name}}" },
-    "APP_GROUP_ID": { "when_variant": "ddd", "prompt": "Application groupId", "default": "com.example" },
-    "APP_ARTIFACT_ID": { "when_variant": "ddd", "prompt": "Application artifactId", "default": "{{name}}" },
-    "APP_VERSION": { "when_variant": "ddd", "prompt": "Application version", "default": "0.0.1-SNAPSHOT" },
-    "APP_PACKAGE": { "when_variant": "ddd", "prompt": "Application base package, e.g. com.acme.myddd (no default: it cannot be guessed from a hyphenated artifactId)" },
-    "ARCHETYPE_SOURCE": { "when_variant": "ddd", "prompt": "local (derive from the bundled scaffold) or published", "default": "local" },
-    "ARCHETYPE_VERSION": { "when_variant": "ddd", "prompt": "Archetype version", "default": "0.0.1-SNAPSHOT" },
-    "ARCHETYPE_REPOSITORY": { "when_variant": "ddd", "prompt": "Repository holding a published archetype", "default": "https://maven.pkg.github.com/ryan-alexander-zhang/ai-native-project-template" }
+    "PROJECT_NAME": {
+      "prompt": "Project name",
+      "default": "{{name}}"
+    },
+    "APP_GROUP_ID": {
+      "when_variant": "ddd",
+      "prompt": "Application groupId",
+      "default": "com.example"
+    },
+    "APP_ARTIFACT_ID": {
+      "when_variant": "ddd",
+      "prompt": "Application artifactId",
+      "default": "{{name}}"
+    },
+    "APP_VERSION": {
+      "when_variant": "ddd",
+      "prompt": "Application version",
+      "default": "0.0.1-SNAPSHOT"
+    },
+    "APP_PACKAGE": {
+      "when_variant": "ddd",
+      "prompt": "Application base package, e.g. com.acme.myddd (no default: it cannot be guessed from a hyphenated artifactId)"
+    },
+    "ARCHETYPE_SOURCE": {
+      "when_variant": "ddd",
+      "prompt": "local (derive from the bundled scaffold) or published",
+      "default": "local"
+    },
+    "ARCHETYPE_VERSION": {
+      "when_variant": "ddd",
+      "prompt": "Archetype version",
+      "default": "0.0.1-SNAPSHOT"
+    },
+    "ARCHETYPE_REPOSITORY": {
+      "when_variant": "ddd",
+      "prompt": "Repository holding a published archetype",
+      "default": "https://maven.pkg.github.com/ryan-alexander-zhang/ai-native-project-template"
+    }
   },
   "substitute": [],
   "post_create": [
-    { "cmd": "git init -q" },
-    { "cmd": "git config core.hooksPath .githooks" },
+    {
+      "cmd": "git init -q"
+    },
+    {
+      "cmd": "git config core.hooksPath .githooks"
+    },
     {
       "when_variant": "ddd",
       "cmd": "APP_GROUP_ID='{{APP_GROUP_ID}}' APP_ARTIFACT_ID='{{APP_ARTIFACT_ID}}' APP_VERSION='{{APP_VERSION}}' APP_PACKAGE='{{APP_PACKAGE}}' ARCHETYPE_SOURCE='{{ARCHETYPE_SOURCE}}' ARCHETYPE_VERSION='{{ARCHETYPE_VERSION}}' ARCHETYPE_REPOSITORY='{{ARCHETYPE_REPOSITORY}}' sh scripts/new-app.sh && rm -f scripts/new-app.sh && { rmdir scripts 2>/dev/null || :; }"

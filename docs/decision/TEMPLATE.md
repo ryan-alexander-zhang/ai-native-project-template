@@ -4,6 +4,7 @@ type: decision
 status: draft|active|archived
 motivated_by: [<id>, ...]                     # what created the need for this choice
 constrains: [<id>, ...]                       # docs this choice binds that don't declare `implements` on it
+decided_by: human|agent                       # autopilot runs only (AUTOPILOT.md); omit otherwise
 ---
 
 # Decision: <the choice, in one line>

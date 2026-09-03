@@ -7,6 +7,7 @@ Use `TEMPLATE.md` for front matter.
 
 - product ideas
 - problem statements
+- scope — what is in, and what is explicitly out
 - early value judgment
 - open questions — what is still undecided
 

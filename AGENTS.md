@@ -100,3 +100,10 @@ or bullets over a single conclusion. This applies to documents too.
   with a failing test, following `docs/issue/README.md`. Only then apply the fix.
 - Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
 - Before a feature-sized `plan` becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test and that no `spec-<n>-FR-<i>` or `rule-<n>-BR-<i>` is unverified, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.
+
+## 9. Autopilot Mode
+
+- When invoked as `/autopilot <prompt>` (or asked to run `AUTOPILOT.md`), follow `AUTOPILOT.md`:
+  one intake round, then unattended through to a PR on an `autopilot/` branch. The human rounds
+  in §1, §5, §6 and `DOCUMENT.md` are replaced exactly as that file states; a choice made in a
+  human's place is a `decision` with `decided_by: agent`.

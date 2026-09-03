@@ -103,6 +103,7 @@ and details in [tools/whiteboard/README.md](tools/whiteboard/README.md).
   project glossary
 - [DEVELOPMENT.md](DEVELOPMENT.md): implementation workflow and Definition of Done
 - [DOCUMENT.md](DOCUMENT.md): document management rules
+- [AUTOPILOT.md](AUTOPILOT.md): unattended idea-to-PR run
 - [ACCEPTANCE.md](ACCEPTANCE.md): how to derive the acceptance criteria a requirement owes
 - [TESTING.md](TESTING.md): test-level policy and testing Definition of Done
 - [CODE_QUALITY.md](CODE_QUALITY.md): quality gates and refactoring order
