@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
   "description": "Visual operations board for the docs workflow",
   "bin": {
     "whiteboard": "./bin/whiteboard.js"

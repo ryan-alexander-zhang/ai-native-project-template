@@ -40,6 +40,18 @@ entry: [idea, prd, design, analysis, decision, integration, reference, operation
 # positive integer refuses to start the board.
 max_sessions: 5
 
+# Exclude (spec-00010-FR-1): glob patterns relative to docs/, matched
+# case-sensitively against '/'-separated file paths. `**` crosses directories,
+# `*` stays within one segment, a directory-shaped pattern does not match the
+# files under it — write `reference/*/source/**`, not `reference/*/source`.
+# `!` negation is not supported. A file a pattern hits does not exist to the
+# board: no node, no anomaly, not searchable, its id neither resolvable nor
+# counted (spec-00010-FR-3, FR-11, FR-12). Missing, null or empty = nothing
+# excluded. Anything but a list of strings, or an entry that is empty, holds a
+# `..` segment or a `\`, or starts with `/` or `!`, refuses to start the board
+# (spec-00010-FR-2). Read at startup only — restart the board after changing it.
+exclude: []
+
 relations:
   - parent
   - implements
