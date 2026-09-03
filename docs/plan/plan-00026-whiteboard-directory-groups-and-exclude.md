@@ -1,7 +1,7 @@
 ---
 id: plan-00026-whiteboard-directory-groups-and-exclude
 type: plan
-status: open
+status: resolved
 implements: [spec-00010-whiteboard-directory-groups-and-exclude]
 ---
 

@@ -1751,15 +1751,21 @@ classDiagram
   `NodeCard` 同构，**不是** `Button`——`<button>` 内不得再嵌 `<button>`），三个
   同层控件：
   1. **组名行 `Button`**：`Folder` 图标 + 组名 + 计数 `Badge`，`aria-expanded`
-     如实、可访问名「<组名>, <n> documents」，点击即 `toggleGroup`。图标取
+     如实、可访问名「<组名>, <n> document(s)」（按数量取单复数，与 `NodeCard`
+     同），点击即 `toggleGroup`。**它与会话标记都 `stopPropagation` 后各自调
+     `onToggle`**（落地据实校正）：让组名行冒泡到 `onNodeClick` 也能切换，但那样
+     它自己没有处理器、一处多余的 `stopPropagation` 就会静默弄死它；卡片空白处
+     的点击仍经 `onNodeClick` 分流到 `toggleGroup`——一次点击永远只切换一次。图标取
      `Folder` 只是形状，词汇仍是「目录组」——`CONTEXT.md` 的 _Avoid_ 管的是
      术语，不管图形。
   2. **异常标记 `Badge`**（成员任一 `!ok`）：`TriangleAlert`，取 `--destructive`，
-     可访问名「<n> documents with problems」。**不带 `Popover`、不可激活**：
+     可访问名「<n> document(s) with problems」（按数量取单复数）。**不带 `Popover`、不可激活**：
      `spec-00010-FR-5` 只要求标记，哪一份坏了在展开后的真节点上看（异常清单也
      逐份列着）；给组节点加一个列成员路径的弹层是 spec 之外的交互，本轮不加。
   3. **会话标记 `Button`**（成员任一有会话）：把 `NodeCard` 内联的标记 JSX
-     抽成 `SessionMarker`，两处共用。组上的态按 `spec-00010-FR-5` 聚合，**两态**：
+     抽成 `SessionMarker`，两处共用；聚合函数 `groupMarker(sessions)` 与它同住
+     `SessionMarker.tsx`、由装饰 memo 调用；可访问名「<态> session in <组名>」，
+     镜像 `NodeCard` 的「<态> session of <id>」。组上的态按 `spec-00010-FR-5` 聚合，**两态**：
      任一成员的任一会话等待输入 → 等待态（`Keyboard`）；否则运行态。运行态的
      图标沿 `spec-00005-FR-9` 单文档的既有读法：组内有终端形态会话取
      `TerminalIcon`，仅答疑取 `CircleHelp`——这是运行态的图标规则，不是第三态
@@ -1769,7 +1775,10 @@ classDiagram
      `toggleGroup`**（`AC-6.7`），不打开终端、不呈现问题列表——会话从展开后真
      节点的标记进入，`spec-00003-FR-10` 的呈现分支不在组上重演。
   卡片尺寸声明为 `NODE_WIDTH × NODE_HEIGHT`（缩略图与布局都要它，§17.4 同一
-  理由）；8 个锚点与 `NodeCard` 同一契约（汇聚边要落脚，§4 的锚点规则照抄）。
+  理由）；8 个锚点抽成 `NodeHandles.tsx` 与 `NodeCard` 共用（落地据实校正：照抄
+  是三十行重复加两段 issue 注记；§4 的锚点规则不变，`NodeCard` 的 DOM 不变）。
+  卡片的 `data-testid` 取 `group-<columnKey>-<groupKey>` 而非展开键——展开键含
+  NUL，不能进 DOM 属性或 CSS 属性选择器。
   **描边**取所在列 `kind` 的 `--kind-*`（成员同列即同 kind），**含异常成员时
   描边不转 `--destructive`**——组不是一份坏文档，坏的是其中某几份，异常标记已
   在说这件事。**选中态**：`holdsSelection` 时取 `--ring` 描边并加
@@ -1823,7 +1832,11 @@ classDiagram
   加 `centred` 设防是为了堵一个窗口：宽度变化若先于布局落位到达，第二支不能
   在 `placed` 还没有该 id 时先跑、把 `pendingFocus` 清掉，否则一次都不居中。只有第二支清，
   否则顶层文档第一支跑完就清、右槽打开引起的宽度变化再也补不到，issue-00006
-  回归。`focus.test.tsx` 以「展开组后居中一次 + 宽度变化后再居中一次」两条断言
+  回归。**`centred` 的初值按来源定**（落地据实校正）：`focus`（命令面板、清单、
+  导航栏、关系列表、行内 id 等跳转）置 `centred: false`——跳转欠一次落位后的
+  居中；`select`（画布点选）置 `centred: true`——点选不欠居中，只武装宽度补偿。
+  不分来源则第一支会让每次画布点选都居中，`viewport.test.tsx`「选中不改变画布
+  宽度时视口不动」即破。`focus.test.tsx` 以「展开组后居中一次 + 宽度变化后再居中一次」两条断言
   钉住。用户手动展开或折叠不动视口（`decision-00016` §4 口径，spec §6 明写）。
 - **刷新重建（`spec-00010-FR-9`）——零新代码**：目录组不是持有的状态，是每次
   渲染从 `graph.nodes` 的 `path` 推导的纯结果，刷新即重建：新组键自然出现、不在
@@ -1868,7 +1881,8 @@ classDiagram
   `foldGraph.test.ts`（边的映射与丢弃、`representative`、`holdsSelection`）、
   `canvas.test.tsx`（`AC-5.x`、`AC-6.x`、`AC-7.x`、`AC-10.x`——`AC-5.6` 断言
   点击组节点后 `selected` 不变、`AC-6.6` 断言工具栏 DOM 不在、`AC-7.1` 断言
-  `setCenter` 在组展开后的那次渲染被调用）、`sidebar.test.tsx`（`AC-8.x`）、
+  `setCenter` 恰被调用一次、坐标是**展开后**布局给该成员的位置——折叠时该位置
+  不存在，故证明了先后；不探 DOM，React Flow 提交节点比 `placed` 慢一拍）、`sidebar.test.tsx`（`AC-8.x`）、
   `refresh.test.tsx`（`AC-9.x`）。`toFlowEdges` 不加新用例——它没改。
 - 既有测试影响：按 `orderedColumns` 返回 `DocNode[][]` 断言的用例改读
   `Column.top`；`toFlowNodes` 的节点计数用例需给出 `expanded` 或用无子目录的
