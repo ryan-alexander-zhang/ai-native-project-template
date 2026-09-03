@@ -257,8 +257,11 @@ export class Board {
       // board offers are is the two layers merged (spec-00009-FR-3). A disabled
       // entry is simply not in it (spec-00009-AC-3.8).
       const { agents, notices, error } = this.agents.current()
+      // `exclude` is dropped rather than sent: the page has no consumer for it —
+      // the directory groups read each node's own `path` (design-00001 §14.1).
+      const { exclude: _exclude, ...rest } = config
       res.json({
-        ...config,
+        ...rest,
         agents: listed(agents),
         clarifiable: clarifiableTypes(),
         auditable: auditableTypes(),

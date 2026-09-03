@@ -1,7 +1,74 @@
 import { type Edge, MarkerType, type Node, Position } from '@xyflow/react'
 import type { DocEdge, DocGraph, DocNode } from '../../src/docRepository.ts'
 import type { RequirementItem } from '../../src/requirements.ts'
-import { NODE_HEIGHT, NODE_WIDTH, type Placed } from './layout.ts'
+import { type Column, type DirectoryGroup, NODE_HEIGHT, NODE_WIDTH, type Placed, groupNodeId } from './layout.ts'
+
+/** A collapsed or expanded directory group as a node on the canvas (spec-00010-FR-5). */
+export interface GroupNode {
+  /** `group:` + the group's expand key; see `groupNodeId`. */
+  id: string
+  group: DirectoryGroup
+  expanded: boolean
+  /** Whether any member is an anomalous node — the marker the card carries. */
+  anomalous: boolean
+}
+
+/**
+ * The graph the canvas draws: the folded members are gone, the group nodes are
+ * in their place, and every edge end has moved onto whichever of the two is
+ * visible (design-00002 §19.2). Nothing else reads it — the anomaly and
+ * diagnostic counts, the three lists, the command palette and the relation list
+ * all keep reading `board.graph`.
+ */
+export interface FoldedGraph {
+  nodes: (DocNode | GroupNode)[]
+  edges: DocEdge[]
+  /** A document id → the node standing for it: itself, or the group node folding it away. */
+  representative: (id: string) => string
+}
+
+/** Group nodes are the only ones carrying a `group`; a document node never does. */
+export function isGroupNode(node: DocNode | GroupNode): node is GroupNode {
+  return 'group' in node
+}
+
+/**
+ * Folding as one pure transformation of the graph (design-00002 §19.2): the
+ * members of a collapsed group leave the node list (spec-00010-AC-5.1) and
+ * every edge end that pointed at one moves onto the group node, so an edge with
+ * both ends inside a single collapsed group has nothing left to draw
+ * (spec-00010-AC-5.4).
+ *
+ * Nothing is merged here: `toFlowEdges` merges by from + to, which on the moved
+ * ends is exactly the FR-28 rule the spec asks for on group nodes
+ * (spec-00010-AC-5.3, AC-5.7 … AC-5.9). Sessions and the selection are not here
+ * either — they are decoration the board injects.
+ */
+export function foldGraph(graph: DocGraph, columns: Column[], expanded: ReadonlySet<string> | string[]): FoldedGraph {
+  const open = new Set(expanded)
+  const nodes: (DocNode | GroupNode)[] = []
+  const folded = new Map<string, string>()
+  for (const column of columns) {
+    nodes.push(...column.top)
+    for (const group of column.groups) {
+      const id = groupNodeId(group)
+      const isOpen = open.has(group.expandKey)
+      nodes.push({ id, group, expanded: isOpen, anomalous: group.nodes.some((node) => !node.ok) })
+      if (isOpen) nodes.push(...group.nodes)
+      else for (const member of group.nodes) folded.set(member.id, id)
+    }
+  }
+
+  const representative = (id: string) => folded.get(id) ?? id
+  const edges = graph.edges.flatMap((edge) => {
+    const from = representative(edge.from)
+    const to = representative(edge.to)
+    // A document's own loop is drawn as long as the document is on the canvas;
+    // two folded members pointing at each other are not.
+    return from === to && from !== edge.from ? [] : [{ ...edge, from, to }]
+  })
+  return { nodes, edges, representative }
+}
 
 /** The four sides a relation edge can leave from or arrive at. */
 export const SIDES = ['top', 'right', 'bottom', 'left'] as const
@@ -26,24 +93,30 @@ export function handleId(kind: 'source' | 'target', side: Side): string {
  * reading the graph off the store size a node before it has been drawn: the
  * minimap's block, above all (spec-00008-FR-7). `subCanvas` declares its own
  * for the same reason.
+ *
+ * Dispatched by node shape: a group node is a `docGroup` carrying its group,
+ * and the React Flow `selected` flag is not given to it — a group is never the
+ * selection (spec-00010-AC-5.6, design-00002 §19.2).
  */
-export function toFlowNodes(graph: DocGraph, placed: Placed[], selected?: string): Node[] {
+export function toFlowNodes(graph: Pick<FoldedGraph, 'nodes'>, placed: Placed[], selected?: string): Node[] {
   return graph.nodes.map((node) => {
     const at = placed.find((position) => position.id === node.id)
-    return {
+    const common = {
       id: node.id,
-      type: 'doc',
       position: { x: at?.x ?? 0, y: at?.y ?? 0 },
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      data: { node },
       // Not draggable is not «free for the pane to pan from»: React Flow marks a
       // draggable node `nopan` itself, and dropping the drag drops that with it,
       // which hands the press on a node's own control to the pan gesture — the
       // same swallowed click, one layer down (issue-00024).
       className: 'nopan',
-      selected: node.id === selected,
     }
+    // `docGroup`, not `group`: React Flow's built-in `group` type comes with a
+    // container style sheet of its own (design-00002 §19.2).
+    return isGroupNode(node)
+      ? { ...common, type: 'docGroup', data: { group: node } }
+      : { ...common, type: 'doc', data: { node }, selected: node.id === selected }
   })
 }
 
@@ -90,9 +163,14 @@ function edgeLabel(acIds: string[]): string {
  * `evidence` is the hovered item's, keyed by the record that verified it: those
  * edges take the emphasis and the label becomes the cited AC ids
  * (spec-00001-FR-34).
+ *
+ * Fed the folded graph, the merge key lands on the moved ends, which is the same
+ * FR-28 rule read on group nodes (spec-00010-AC-5.3, AC-5.7 … AC-5.9). `selected`
+ * is then the caller's own `representative(selected)` — the mapping belongs to
+ * whoever folded the graph, not here (design-00002 §19.2).
  */
 export function toFlowEdges(
-  graph: DocGraph,
+  graph: Pick<FoldedGraph, 'edges'>,
   placed: Placed[],
   selected?: string,
   evidence?: Map<string, string[]>,
@@ -166,8 +244,13 @@ export function evidenceOf(item: RequirementItem): Map<string, string[]> {
   return byRecord
 }
 
-/** Nodes that neither are the selection nor share an edge with it. */
-export function suppressedNodes(graph: DocGraph, selected?: string): Set<string> {
+/**
+ * Nodes that neither are the selection nor share an edge with it. Fed the folded
+ * graph and the selection's `representative`, this is also what leaves a group
+ * node holding the selection, or one an aggregated edge reaches, unsuppressed
+ * (spec-00010-AC-5.10, AC-5.11).
+ */
+export function suppressedNodes(graph: Pick<FoldedGraph, 'nodes' | 'edges'>, selected?: string): Set<string> {
   if (selected === undefined) return new Set()
   const keep = new Set([selected])
   for (const edge of graph.edges) {

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
   "description": "Visual operations board for the docs workflow",
   "bin": {
     "whiteboard": "./bin/whiteboard.js"
@@ -54,7 +57,7 @@
     "@testing-library/user-event": "^14.6.4",
     "@types/express": "^5.0.3",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^22.15.3",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/ws": "^8.18.1",

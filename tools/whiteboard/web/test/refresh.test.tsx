@@ -682,3 +682,227 @@ describe('what a refresh keeps', () => {
     expect(screen.getByTestId('item-spec-00001-FR-2')).toBeTruthy()
   })
 })
+
+/**
+ * spec-00010-FR-9: the directory groups are not state the board holds — they
+ * are derived from each node's `path` on every render — so a refresh rebuilds
+ * them, while the expanded set, which is a set of keys and knows nothing of the
+ * graph, stays exactly as the user left it (design-00002 §19.3).
+ */
+describe('a refresh rebuilding the directory groups', () => {
+  const DESIGN = node({ id: 'design-00002-ui', type: 'design', title: 'Board UI', path: 'design/design-00002-ui.md' })
+
+  function reference(id: string, path: string, overrides: Partial<DocNode> = {}): DocNode {
+    return node({ id, type: 'reference', title: id, path, ...overrides })
+  }
+
+  const TOP = reference('reference-00001-a', 'reference/a.md')
+  const MOVER = reference('reference-00002-b', 'reference/b.md')
+  const STRIPE = [
+    reference('reference-00011-s', 'reference/stripe/one.md'),
+    reference('reference-00012-t', 'reference/stripe/two.md'),
+    reference('reference-00013-u', 'reference/stripe/three.md'),
+  ]
+  const CCBILL = [
+    reference('reference-00020-c', 'reference/ccbill/one.md'),
+    reference('reference-00021-d', 'reference/ccbill/two.md'),
+  ]
+
+  const GROUPED: DocGraph = {
+    nodes: [DESIGN, TOP, MOVER, ...STRIPE, ...CCBILL],
+    edges: [],
+    issues: [],
+    idOwners: {},
+    diagnostics: [],
+  }
+
+  /** The group's name row, which is also how many documents it says it holds. */
+  const groupRow = (name: string, count: number) =>
+    screen.getByRole('button', { name: `${name}, ${count} document${count === 1 ? '' : 's'}` })
+  const groupCards = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('[data-testid^="group-"]')).map((card) =>
+      card.getAttribute('data-testid'),
+    )
+
+  async function openGroupedBoard() {
+    const rendered = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-design-00002-ui')).toBeTruthy(), SETTLED)
+    expect(ChannelSocket.opened).toHaveLength(1)
+    await act(async () => ChannelSocket.last.connect())
+    await settle()
+    return rendered
+  }
+
+  /** Open the group and prove it: its members are nodes of their own. */
+  async function expandStripe() {
+    await userEvent.click(groupRow('stripe', 3))
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy(), SETTLED)
+  }
+
+  beforeEach(() => {
+    serve()
+    graph = GROUPED
+    localStorage.removeItem('whiteboard-directory-groups-expanded')
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { design: 'living', spec: 'living', reference: 'living', analysis: 'work' },
+      relations: ['verifies'],
+      flow: {},
+      focus: {},
+      agents: [{ name: 'claude', headless: false, source: 'project' }],
+      entry: [],
+      carries: {},
+      maxSessions: 3,
+      clarifiable: [],
+      auditable: [],
+    })
+  })
+
+  // spec-00010-AC-9.1 — a new subdirectory is a new group, collapsed, in key order
+  it('takes in a new directory group between the two it already had', async () => {
+    const { container } = await openGroupedBoard()
+    expect(groupCards(container)).toEqual(['group-reference-reference/ccbill', 'group-reference-reference/stripe'])
+    graph = { ...GROUPED, nodes: [...GROUPED.nodes, reference('reference-00030-x', 'reference/netbilling/x.md')] }
+
+    await push()
+
+    await waitFor(() => expect(groupRow('netbilling', 1)).toBeTruthy(), SETTLED)
+    expect(groupCards(container)).toEqual([
+      'group-reference-reference/ccbill',
+      'group-reference-reference/netbilling',
+      'group-reference-reference/stripe',
+    ])
+    expect(screen.queryByTestId('node-reference-00030-x')).toBeNull()
+  })
+
+  // spec-00010-AC-9.2 — a group with no visible document left is no group at all
+  it('drops a group whose last document is deleted', async () => {
+    graph = { ...GROUPED, nodes: [DESIGN, TOP, MOVER, ...STRIPE, CCBILL[0]!] }
+    await openGroupedBoard()
+    expect(groupRow('ccbill', 1)).toBeTruthy()
+    graph = { ...GROUPED, nodes: [DESIGN, TOP, MOVER, ...STRIPE] }
+
+    await push()
+
+    await waitFor(() => expect(screen.queryByTestId('group-reference-reference/ccbill')).toBeNull(), SETTLED)
+    expect(groupRow('stripe', 3)).toBeTruthy()
+  })
+
+  // spec-00010-AC-9.3 — an unrelated refresh moves no group's expanded state
+  it('leaves the open group open and the collapsed one collapsed', async () => {
+    await openGroupedBoard()
+    await expandStripe()
+    graph = { ...GROUPED, nodes: [...GROUPED.nodes, node({ id: 'spec-00009-new', type: 'spec', title: 'A new spec', path: 'spec/new.md' })] }
+
+    await push()
+
+    await waitFor(() => expect(screen.getByTestId('node-spec-00009-new')).toBeTruthy(), SETTLED)
+    expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy()
+    expect(screen.queryByTestId('node-reference-00020-c')).toBeNull()
+  })
+
+  // spec-00010-AC-9.4 — a document moved into a subdirectory joins its group
+  it('moves a top-level document into the group it was filed under', async () => {
+    await openGroupedBoard()
+    expect(screen.getByTestId('node-reference-00002-b')).toBeTruthy()
+    graph = {
+      ...GROUPED,
+      nodes: [DESIGN, TOP, reference('reference-00002-b', 'reference/stripe/b.md'), ...STRIPE, ...CCBILL],
+    }
+
+    await push()
+
+    await waitFor(() => expect(screen.queryByTestId('node-reference-00002-b')).toBeNull(), SETTLED)
+    expect(groupRow('stripe', 4)).toBeTruthy()
+  })
+
+  // spec-00010-AC-9.5 — close nearest: the selection goes with the document, the group stays open
+  it('keeps the group open when the selected document inside it is deleted', async () => {
+    await openGroupedBoard()
+    await expandStripe()
+    fireEvent.click(screen.getByTestId('node-reference-00012-t'))
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /reference-00012-t/ })).toBeTruthy(), SETTLED)
+    graph = { ...GROUPED, nodes: [DESIGN, TOP, MOVER, STRIPE[0]!, STRIPE[2]!, ...CCBILL] }
+
+    await push()
+
+    await waitFor(() => expect(screen.queryByTestId('node-reference-00012-t')).toBeNull(), SETTLED)
+    expect(screen.queryByRole('toolbar')).toBeNull()
+    expect(groupRow('stripe', 2)).toBeTruthy()
+    expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy()
+  })
+
+  // spec-00010-AC-9.6 — the key carries the directory name, so a rename expires it
+  it('starts a renamed directory collapsed again', async () => {
+    await openGroupedBoard()
+    await expandStripe()
+    graph = {
+      ...GROUPED,
+      nodes: [
+        DESIGN,
+        TOP,
+        MOVER,
+        reference('reference-00011-s', 'reference/stripe-v2/one.md'),
+        reference('reference-00012-t', 'reference/stripe-v2/two.md'),
+        reference('reference-00013-u', 'reference/stripe-v2/three.md'),
+        ...CCBILL,
+      ],
+    }
+
+    await push()
+
+    await waitFor(() => expect(groupRow('stripe-v2', 3)).toBeTruthy(), SETTLED)
+    expect(screen.queryByTestId('group-reference-reference/stripe')).toBeNull()
+    expect(screen.queryByTestId('node-reference-00011-s')).toBeNull()
+  })
+
+  // spec-00010-AC-9.7 — the group and the selection go together
+  it('drops the group and the selection when the only document in it is deleted', async () => {
+    graph = { ...GROUPED, nodes: [DESIGN, TOP, MOVER, ...STRIPE, CCBILL[0]!] }
+    await openGroupedBoard()
+    await userEvent.click(groupRow('ccbill', 1))
+    fireEvent.click(await screen.findByTestId('node-reference-00020-c'))
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /reference-00020-c/ })).toBeTruthy(), SETTLED)
+    graph = { ...GROUPED, nodes: [DESIGN, TOP, MOVER, ...STRIPE] }
+
+    await push()
+
+    await waitFor(() => expect(screen.queryByTestId('group-reference-reference/ccbill')).toBeNull(), SETTLED)
+    expect(screen.queryByRole('toolbar')).toBeNull()
+  })
+
+  // spec-00010-AC-9.8 — a move between two subdirectories moves both counts
+  it('moves a document from one group to the other, counts and all', async () => {
+    await openGroupedBoard()
+    graph = {
+      ...GROUPED,
+      nodes: [DESIGN, TOP, MOVER, STRIPE[0]!, STRIPE[2]!, ...CCBILL, reference('reference-00012-t', 'reference/ccbill/two.md')],
+    }
+
+    await push()
+
+    await waitFor(() => expect(groupRow('stripe', 2)).toBeTruthy(), SETTLED)
+    expect(groupRow('ccbill', 3)).toBeTruthy()
+  })
+
+  /**
+   * spec-00010-AC-9.9 — the expand key names the column too, so a document that
+   * changes `type` takes its group to another column, where it starts collapsed.
+   */
+  it('rebuilds the group in the column the changed type puts it in', async () => {
+    graph = { ...GROUPED, nodes: [DESIGN, TOP, MOVER, STRIPE[0]!, ...CCBILL] }
+    await openGroupedBoard()
+    await userEvent.click(groupRow('stripe', 1))
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy(), SETTLED)
+    graph = {
+      ...GROUPED,
+      nodes: [DESIGN, TOP, MOVER, node({ id: 'reference-00011-s', type: 'analysis', title: 'reference-00011-s', path: 'reference/stripe/one.md' }), ...CCBILL],
+    }
+
+    await push()
+
+    await waitFor(() => expect(screen.getByTestId('group-analysis-reference/stripe')).toBeTruthy(), SETTLED)
+    expect(screen.queryByTestId('group-reference-reference/stripe')).toBeNull()
+    expect(screen.queryByTestId('node-reference-00011-s')).toBeNull()
+    expect(groupRow('reference/stripe', 1)).toBeTruthy()
+  })
+})

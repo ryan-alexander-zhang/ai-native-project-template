@@ -11,6 +11,7 @@ import {
   commitCount,
   cowriteConfig,
   doc,
+  excludeConfig,
   git,
   lastCommitFiles,
   lastCommitMessage,
@@ -1397,6 +1398,30 @@ describe('the parse cache', () => {
 })
 
 /**
+ * spec-00010-AC-1.12: `exclude` is read once, when the flow config is loaded, and
+ * a `DocService` carries the reading it was constructed with. A refresh is a
+ * re-read of the tree against that same reading — the changed file takes effect
+ * on the next start, which is what a second service standing on the same docs
+ * directory is.
+ */
+describe('the exclusions a service was started on', () => {
+  const RAW = '# Stripe Webhooks\n\nscraped material\n'
+
+  // spec-00010-AC-1.12
+  it('survives a refresh, and only a service started on the new config excludes', () => {
+    const { repoRoot, docsDir } = makeRepo({ 'prd/a.md': DRAFT_PRD, 'reference/stripe/source/a.md': RAW })
+    const running = new DocService(repoRoot, docsDir, excludeConfig([]))
+    const paths = (service: DocService) => service.graph().nodes.map((node) => node.path)
+    expect(paths(running)).toContain('reference/stripe/source/a.md')
+
+    running.invalidate()
+
+    expect(paths(running)).toContain('reference/stripe/source/a.md')
+    expect(paths(new DocService(repoRoot, docsDir, excludeConfig(['reference/*/source/**'])))).toEqual(['prd/a.md'])
+  })
+})
+
+/**
  * Addressing a document by an id two of them declare (spec-00002-FR-9). The id
  * points at no single document, so a write addressed by it is refused as a
  * conflict — and the way out is the editor, which addresses the node's own file
@@ -2385,6 +2410,30 @@ describe('commitCowriteChanges', () => {
 
     expect(existsSync(join(docsDir, 'reference/notes.txt'))).toBe(false)
     expect(outcome.committed).toBe(false)
+  })
+
+  /**
+   * spec-00010-AC-1.13, which is the collapse standing where it already stood
+   * (decision-00018 §5): a cowrite session has no business writing into a corpus
+   * directory, and a product the board cannot read as a document is deleted, which
+   * is the restore — the file was not there when the session started.
+   */
+  // spec-00010-AC-1.13
+  it('deletes a reference the session filed under an excluded path', async () => {
+    const { repoRoot, docsDir } = makeRepo({ 'prd/a.md': DRAFT_PRD })
+    const excluding = cowriteConfig()
+    excluding.exclude = ['reference/*/source/**']
+    const service = new DocService(repoRoot, docsDir, excluding)
+    const { before, plan } = admit(service, 'prd-00001-x', 'prd/a.md')
+    write(docsDir, 'prd/a.md', `${DRAFT_PRD}written together\n`)
+    const stray = 'reference/stripe/source/reference-00031-x.md'
+    write(docsDir, stray, REFERENCE('reference-00031-x'))
+
+    const outcome = await service.commitCowriteChanges(plan, before)
+
+    expect(existsSync(join(docsDir, stray))).toBe(false)
+    expect(outcome.problems).toEqual([`docs/${stray} did not land: it is no document the board can read`])
+    expect(lastCommitFiles(repoRoot)).toEqual(['docs/prd/a.md'])
   })
 
   // spec-00006-AC-8.3 — the commit does not distinguish a stop from a natural end;

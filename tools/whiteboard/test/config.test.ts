@@ -374,6 +374,94 @@ describe('the session cap', () => {
 })
 
 /**
+ * The scan exclusions (spec-00010-FR-1 and FR-2): globs relative to `docs/`
+ * whose matches do not exist for the board. Missing, null or empty is a legal
+ * reading — nothing is excluded, which is how every config in the field reads —
+ * and every other shape refuses to start, naming the offending item by position.
+ */
+describe('the scan exclusions', () => {
+  /** `VALID` with an `exclude` value spliced in before `relations`. */
+  function withExclude(value: string): string {
+    return VALID.replace('relations:', `exclude: ${value}\nrelations:`)
+  }
+
+  /** The refusal message of one parse, so two starts on the same text can be compared. */
+  function refusal(text: string): string {
+    try {
+      parse(text)
+      return 'no refusal'
+    } catch (error) {
+      return (error as Error).message
+    }
+  }
+
+  it('reads a declared list of patterns', () => {
+    expect(parse(withExclude("['reference/*/source/**']")).exclude).toEqual(['reference/*/source/**'])
+  })
+
+  // spec-00010-AC-1.6 — an empty list starts the board and excludes nothing
+  it('reads an empty list as nothing excluded', () => {
+    expect(parse(withExclude('[]')).exclude).toEqual([])
+  })
+
+  // spec-00010-AC-1.7 — the key present with a null value, and no key at all, read the same way
+  it('reads a null exclude, and a missing one, as nothing excluded', () => {
+    expect(parse(withExclude('')).exclude).toEqual([])
+    expect(parse(VALID).exclude).toEqual([])
+  })
+
+  // spec-00010-AC-2.1 — a scalar is not a list: the key is named, with what it must be
+  it('rejects a scalar exclude, naming the key', () => {
+    expectConfigError(withExclude("'reference/*/source/**'"), /`exclude` must be a list of strings/)
+  })
+
+  // spec-00010-AC-2.2 — the item that is not a string is the one named
+  it('rejects an item that is not a string, naming its position', () => {
+    expectConfigError(withExclude("['reference/*/source/**', 42]"), /`exclude\[1\]` must be a non-empty string, got 42/)
+  })
+
+  // spec-00010-AC-2.3 — nothing is remembered between starts: the same config refuses the same way
+  it('refuses a second start on the unchanged config with the same message', () => {
+    const text = withExclude("'reference/*/source/**'")
+
+    const first = refusal(text)
+
+    expect(refusal(text)).toBe(first)
+    expect(first).toMatch(/`exclude` must be a list of strings/)
+  })
+
+  // spec-00010-AC-2.4 — a mapping is not a list either
+  it('rejects a mapping exclude, naming the key', () => {
+    expectConfigError(withExclude('{ reference: true }'), /`exclude` must be a list of strings/)
+  })
+
+  // spec-00010-AC-2.5
+  it('rejects an empty pattern, naming its position', () => {
+    expectConfigError(withExclude("['']"), /`exclude\[0\]` must be a non-empty string/)
+  })
+
+  // spec-00010-AC-2.6
+  it('rejects a pattern holding a `..` segment, naming its position', () => {
+    expectConfigError(withExclude("['../secrets/**']"), /`exclude\[0\]` must not hold a `\.\.` segment/)
+  })
+
+  // spec-00010-AC-2.7
+  it('rejects a pattern starting with a slash, naming its position', () => {
+    expectConfigError(withExclude("['/reference/**']"), /`exclude\[0\]`.*not start with `\/`/)
+  })
+
+  // spec-00010-AC-2.8 — the message says why, since `!` is a pattern elsewhere
+  it('rejects a negated pattern, saying negation is not supported', () => {
+    expectConfigError(withExclude("['!reference/**']"), /`exclude\[0\]`.*negation is not supported/)
+  })
+
+  // spec-00010-AC-2.9 — the message says which separator patterns use
+  it('rejects a backslash pattern, saying patterns separate segments with a slash', () => {
+    expectConfigError(withExclude("['reference\\stripe\\**']"), /`exclude\[0\]` must separate path segments with `\/`/)
+  })
+})
+
+/**
  * The relation matrix (spec-00002-FR-5 and FR-6): the startup check of
  * spec-00001-FR-15 extended to `carries`. Missing is a legal reading — the
  * check is then off — so the whole block is opt-in, and so is each type in it.

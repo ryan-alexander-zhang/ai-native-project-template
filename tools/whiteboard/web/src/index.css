@@ -46,6 +46,11 @@
   --kind-living: oklch(0.809 0.105 251.813);
   --kind-work: oklch(0.828 0.111 84.429);
 
+  /* The card and the minimap block of a collapsed directory group (design-00002 §19.5).
+     A shade deeper than --muted, and a token of its own: a group has no status, and
+     borrowing a status colour would have the minimap read as «one draft document». */
+  --group-node: oklch(0.921 0.004 286.32);
+
   /* Requirement coverage — one pair per state of the inspector panel (design-00002 §9).
      Deliberately not the --status-* set: coverage and document status are two vocabularies. */
   --coverage-verified: oklch(0.527 0.154 150.069);
@@ -87,6 +92,8 @@
 
   --kind-living: oklch(0.623 0.188 259.813);
   --kind-work: oklch(0.769 0.188 70.08);
+
+  --group-node: oklch(0.322 0.007 286.033);
 
   --coverage-verified: oklch(0.696 0.17 162.48);
   --coverage-failing: oklch(0.704 0.191 22.216);
@@ -170,6 +177,11 @@
 }
 .react-flow__minimap-node.minimap-anomaly {
   fill: var(--destructive);
+}
+/* A directory group, collapsed or open, is one block of its own colour
+   (spec-00010-FR-10); an anomalous member outranks it through the rule above. */
+.react-flow__minimap-node.minimap-group {
+  fill: var(--group-node);
 }
 
 /*

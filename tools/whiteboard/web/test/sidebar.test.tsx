@@ -625,3 +625,162 @@ describe('a row whose document has left the board', () => {
     expect(current()[0]!.textContent).toContain('spec-00001')
   })
 })
+
+/**
+ * The directory groups the sidebar mirrors from the column (spec-00010-FR-8).
+ * Every fixture here is three `docs/`-relative segments deep, which is what
+ * makes a group at all (spec-00010-FR-4); the fixtures above are two segments,
+ * so the cases above see no directory group and read exactly as they did.
+ */
+describe('a directory group in the sidebar', () => {
+  function reference(id: string, path: string, title: string): DocNode {
+    return node({ id, type: 'reference', status: 'active', title, path })
+  }
+
+  const TOP_A = reference('reference-00001-a', 'reference/a.md', 'First top-level reference')
+  const TOP_B = reference('reference-00002-b', 'reference/b.md', 'Second top-level reference')
+  const STRIPE = [
+    reference('reference-00011-s', 'reference/stripe/one.md', 'Stripe one'),
+    reference('reference-00012-t', 'reference/stripe/two.md', 'Stripe two'),
+    reference('reference-00013-u', 'reference/stripe/three.md', 'Stripe three'),
+  ]
+  const CCBILL = [
+    reference('reference-00021-c', 'reference/ccbill/one.md', 'Ccbill one'),
+    reference('reference-00022-d', 'reference/ccbill/two.md', 'Ccbill two'),
+  ]
+
+  /** The two top-level rows, which every case below reads before the group headers. */
+  const TOP_ROWS = [
+    'reference-00001-a active First top-level reference',
+    'reference-00002-b active Second top-level reference',
+  ]
+  const STRIPE_ROWS = ['reference-00011-s active Stripe one', 'reference-00012-t active Stripe two', 'reference-00013-u active Stripe three']
+
+  /** The group's card on the canvas, by the testid `GroupNodeCard` carries. */
+  const card = (name: string) => screen.getByTestId(`group-reference-reference/${name}`)
+
+  /** Choosing a document from the command palette — one of FR-7's ways in (spec-00010-AC-7.1). */
+  async function pick(id: string) {
+    await userEvent.click(screen.getByRole('button', { name: /Find a document/ }))
+    const search = screen.getByPlaceholderText('Find a document by id or title')
+    // The palette keeps what was typed into it last, so a second pick clears it.
+    await userEvent.clear(search)
+    await userEvent.type(search, id)
+    await userEvent.click(await screen.findByRole('option', { name: new RegExp(id) }))
+  }
+
+  /**
+   * The board with one reference column: two top-level documents and the two
+   * directory groups of AC-8.1. The type group is left as the browser has it —
+   * collapsed, with nothing remembered — so each case expands what it reads.
+   */
+  async function openReference(nodes: DocNode[] = [TOP_A, TOP_B, ...STRIPE, ...CCBILL]) {
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { spec: 'living', reference: 'living' },
+      relations: [],
+      flow: {},
+      focus: {},
+      agents: [{ name: 'claude', headless: false, source: 'project' }],
+      entry: [],
+      carries: {},
+      maxSessions: 3,
+      clarifiable: [],
+      auditable: [],
+    })
+    graph = graphOf(nodes)
+    const rendered = await openBoard()
+    await waitFor(() => expect(header('reference')).toBeTruthy())
+    return rendered
+  }
+
+  // spec-00010-AC-8.1
+  it('lists the top documents, then a header per directory group, counting them all', async () => {
+    await openReference()
+
+    await expand('reference')
+
+    expect(names()).toEqual(['reference 7', ...TOP_ROWS, 'ccbill 2', 'stripe 3'])
+    expect(header('ccbill').getAttribute('aria-expanded')).toBe('false')
+    expect(header('stripe').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  // spec-00010-AC-8.2 — one expanded state, so the press is felt in both places
+  it('opens the group in the list and on the canvas when its header is pressed', async () => {
+    await openReference()
+    await expand('reference')
+    expect(screen.queryByTestId('node-reference-00011-s')).toBeNull()
+
+    await userEvent.click(header('stripe'))
+
+    await waitFor(() => expect(row('reference-00011-s')).toBeTruthy())
+    expect(names()).toEqual(['reference 7', ...TOP_ROWS, 'ccbill 2', 'stripe 3', ...STRIPE_ROWS])
+    expect(header('stripe').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByTestId('node-reference-00012-t')).toBeTruthy()
+    expect(screen.getByTestId('node-reference-00013-u')).toBeTruthy()
+  })
+
+  // spec-00010-AC-8.3 — and felt the other way round just the same
+  it('opens the group in the list when the canvas group node is clicked', async () => {
+    await openReference()
+    await expand('reference')
+
+    fireEvent.click(card('stripe'))
+
+    await waitFor(() => expect(row('reference-00011-s')).toBeTruthy())
+    expect(names()).toEqual(['reference 7', ...TOP_ROWS, 'ccbill 2', 'stripe 3', ...STRIPE_ROWS])
+    expect(header('stripe').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  // spec-00010-AC-8.4
+  it('opens the type group and the directory group the selection lands in', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    await openReference()
+    expect(header('reference').getAttribute('aria-expanded')).toBe('false')
+
+    await pick('reference-00012-t')
+
+    await waitFor(() => expect(row('reference-00012-t')).toBeTruthy())
+    expect(header('reference').getAttribute('aria-expanded')).toBe('true')
+    expect(header('stripe').getAttribute('aria-expanded')).toBe('true')
+    expect(row('reference-00012-t').getAttribute('aria-current')).toBe('true')
+    expect(scrollIntoView.mock.contexts).toContain(row('reference-00012-t'))
+
+    // …and again with the type group already open, so that only the directory
+    // group has to give way: the row is still scrolled to, which it can only be
+    // once that expansion has drawn it. The call is read by its receiver — the
+    // command palette scrolls its own option into view the same way.
+    scrollIntoView.mockClear()
+    await pick('reference-00021-c')
+
+    await waitFor(() => expect(row('reference-00021-c').getAttribute('aria-current')).toBe('true'))
+    expect(header('ccbill').getAttribute('aria-expanded')).toBe('true')
+    expect(scrollIntoView.mock.contexts).toContain(row('reference-00021-c'))
+  })
+
+  // spec-00010-AC-8.5 — the expansion follows a change of selection and nothing
+  // else, so the press that closes the group around the highlighted row holds
+  it('stays collapsed when the group closed is the selected row’s own', async () => {
+    await openReference()
+    await expand('reference')
+    await userEvent.click(header('stripe'))
+    await userEvent.click(row('reference-00012-t'))
+    await waitFor(() => expect(row('reference-00012-t').getAttribute('aria-current')).toBe('true'))
+
+    await userEvent.click(header('stripe'))
+
+    expect(names()).toEqual(['reference 7', ...TOP_ROWS, 'ccbill 2', 'stripe 3'])
+    expect(header('stripe').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  // spec-00010-AC-9.2 — the sidebar half: a group with no document left is no
+  // group at all, so its header goes with the last of them
+  it('drops a directory group header with its last document', async () => {
+    await openReference([TOP_A, TOP_B, ...STRIPE, CCBILL[0]!])
+    await expand('reference')
+    expect(header('ccbill')).toBeTruthy()
+
+    await refreshWith(graphOf([TOP_A, TOP_B, ...STRIPE]))
+
+    await waitFor(() => expect(names()).toEqual(['reference 5', ...TOP_ROWS, 'stripe 3']))
+  })
+})

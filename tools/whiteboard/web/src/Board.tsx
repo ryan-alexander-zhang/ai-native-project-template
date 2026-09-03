@@ -53,11 +53,13 @@ import { CreateDialog } from './CreateDialog.tsx'
 import { Details } from './Details.tsx'
 import { DiagnosticList, IssueList } from './Drilldowns.tsx'
 import { Editor, type EditorAnnotate } from './Editor.tsx'
+import { GroupNodeCard } from './GroupNodeCard.tsx'
 import { Inspector } from './Inspector.tsx'
 import { NODE_HEIGHT, NODE_WIDTH } from './layout.ts'
 import { NodeCard } from './NodeCard.tsx'
 import { NotifySwitch } from './NotifySwitch.tsx'
 import { SessionHistory } from './SessionHistory.tsx'
+import { type SessionMarkerState, groupMarker } from './SessionMarker.tsx'
 import { SessionPanel } from './SessionPanel.tsx'
 import { SettingsDialog } from './SettingsDialog.tsx'
 import { Sidebar } from './Sidebar.tsx'
@@ -65,7 +67,15 @@ import { AcceptanceRowNode, CriterionNode, ItemNode } from './SubNodes.tsx'
 import { Terminal } from './Terminal.tsx'
 import { ThemeMenu } from './ThemeMenu.tsx'
 import { Toolbar } from './Toolbar.tsx'
-import { evidenceOf, relationsOf, suppressedNodes, toFlowEdges, toFlowNodes } from './canvasModel.ts'
+import {
+  type GroupNode,
+  evidenceOf,
+  foldGraph,
+  relationsOf,
+  suppressedNodes,
+  toFlowEdges,
+  toFlowNodes,
+} from './canvasModel.ts'
 import { onFlowError } from './flowError.ts'
 import { JumpContext } from './jump.ts'
 import { readSidebarOpen, writeSidebarOpen } from './sidebar.ts'
@@ -83,6 +93,22 @@ type DocNodeData = {
   onShowSession?: (id: string) => void
 }
 
+/**
+ * The other node shape on the board (design-00002 §19.2). `foldGraph` puts the
+ * group here; everything beside it is the decorating memo's, exactly as it is
+ * for a document node.
+ */
+type GroupNodeData = {
+  group: GroupNode
+  kind?: string
+  suppressed?: boolean
+  /** The members' sessions, aggregated (spec-00010-FR-5). */
+  session?: SessionMarkerState
+  /** Whether the selected document is folded away inside it (spec-00010-AC-6.6). */
+  holdsSelection?: boolean
+  onToggle: () => void
+}
+
 const nodeTypes = {
   doc: ({ data, selected }: { data: DocNodeData; selected?: boolean }) => (
     <NodeCard
@@ -92,6 +118,18 @@ const nodeTypes = {
       suppressed={data.suppressed}
       sessions={data.sessions}
       onShowSession={data.onShowSession}
+    />
+  ),
+  // `docGroup`, not `group`: React Flow's own `group` type comes with a
+  // container style sheet of its own (design-00002 §19.2).
+  docGroup: ({ data }: { data: GroupNodeData }) => (
+    <GroupNodeCard
+      node={data.group}
+      kind={data.kind}
+      suppressed={data.suppressed}
+      holdsSelection={data.holdsSelection}
+      session={data.session}
+      onToggle={data.onToggle}
     />
   ),
   item: ItemNode,
@@ -125,6 +163,12 @@ function minZoomFor(sub: { nodes: FlowNode[] }, width: number, height: number): 
  * themselves are in index.css, so the theme carries them.
  */
 function minimapClass(node: FlowNode): string {
+  // A collapsed group is one block, and an expanded one still is: the group has
+  // no status to borrow, so it takes its own token — unless a member is broken,
+  // which is the one reading that outranks it (spec-00010-FR-10, §19.5).
+  if (node.type === 'docGroup') {
+    return (node.data as GroupNodeData).group.anomalous ? 'minimap-anomaly' : 'minimap-group'
+  }
   if (node.type !== 'doc') return ''
   const doc = (node.data as DocNodeData).node
   return doc.ok ? `minimap-status-${doc.status}` : 'minimap-anomaly'
@@ -160,8 +204,11 @@ function Canvas() {
   const [detail, setDetail] = useState<string>()
   // A document the board was told to go to, carried with the canvas width that
   // was current when it was asked for: the slot has settled once React Flow
-  // reports a different one (issue-00006).
-  const [pendingFocus, setPendingFocus] = useState<{ id: string; width: number }>()
+  // reports a different one (issue-00006). `centred` says whether the first
+  // move has been made yet — a jump owes one as soon as its node is laid out,
+  // which for a document inside a collapsed group is only after the group has
+  // opened (spec-00010-AC-7.1, design-00002 §19.3).
+  const [pendingFocus, setPendingFocus] = useState<{ id: string; width: number; centred: boolean }>()
   // React Flow's own measurement of the canvas, which is the width `setCenter`
   // and `fitView` divide by. It lands a frame after the panel mounts, so it —
   // not the commit that mounted the panel — is the signal that the layout is
@@ -294,10 +341,43 @@ function Canvas() {
           onUnsaved: board.setUnsavedBuffer,
         }
 
+  /**
+   * The graph the canvas draws: folding is one pure transformation, and its
+   * result feeds these three memos and nothing else — the anomaly and
+   * diagnostic counts, the three lists, the command palette, the relation list,
+   * `focus`'s existence guard and the empty-board reading all keep reading
+   * `board.graph` (design-00002 §19.2).
+   */
+  const folded = useMemo(
+    () => foldGraph(board.graph, board.columns, board.expandedGroups),
+    [board.graph, board.columns, board.expandedGroups],
+  )
+  // What stands for the selection on the canvas: itself, or the group node that
+  // has folded it away (spec-00010-AC-5.10, AC-6.6).
+  const selectedRep = board.selected === undefined ? undefined : folded.representative(board.selected)
+
   const nodes = useMemo(() => {
-    const laid = toFlowNodes(board.graph, board.placed, board.selected)
-    const suppressed = suppressedNodes(board.graph, board.selected)
+    const laid = toFlowNodes(folded, board.placed, board.selected)
+    const suppressed = suppressedNodes(folded, selectedRep)
+    // Dispatched by node shape: a group node's data carries no document, so
+    // reading one out of it is what would throw here (design-00002 §19.2).
     return laid.map((node) => {
+      if (node.type === 'docGroup') {
+        // What `toFlowNodes` emits, which is the group and nothing else yet.
+        const groupNode = (node.data as { group: GroupNode }).group
+        const { group } = groupNode
+        return {
+          ...node,
+          data: {
+            group: groupNode,
+            kind: board.kinds[group.columnKey],
+            suppressed: suppressed.has(node.id),
+            session: groupMarker(group.nodes.flatMap((member) => runningOn.get(member.id) ?? [])),
+            holdsSelection: selectedRep === node.id,
+            onToggle: () => board.toggleGroup(group.expandKey),
+          },
+        }
+      }
       const data = node.data as DocNodeData
       return {
         ...node,
@@ -310,12 +390,12 @@ function Canvas() {
         },
       }
     })
-  }, [board.graph, board.placed, board.selected, board.kinds, runningOn, board.showSession])
+  }, [folded, board.placed, board.selected, selectedRep, board.kinds, runningOn, board.showSession, board.toggleGroup])
 
   // The sidebar's list of every document on the board, grouped and ordered by
-  // the canvas's own rule (spec-00008-FR-1). `kinds` is the flow config's type
-  // map, so its key order is the declared column order.
-  const groups = useMemo(() => typeGroups(board.graph, Object.keys(board.kinds)), [board.graph, board.kinds])
+  // the canvas's own rule (spec-00008-FR-1): the board's own columns, read as a
+  // list — the one grouping the canvas folds (design-00002 §19.2).
+  const groups = useMemo(() => typeGroups(board.columns), [board.columns])
 
   // Hovering a panel row asks "where is this item's evidence": the records that
   // verified it, and the AC ids they cited (spec-00001-FR-34).
@@ -325,8 +405,8 @@ function Canvas() {
   }, [board.items, inspecting])
 
   const edges = useMemo(
-    () => toFlowEdges(board.graph, board.placed, board.selected, evidence),
-    [board.graph, board.placed, board.selected, evidence],
+    () => toFlowEdges(folded, board.placed, selectedRep, evidence),
+    [folded, board.placed, selectedRep, evidence],
   )
   const selected = board.selectedNode
   // The dataset the one React Flow instance is showing: the document graph, or
@@ -404,6 +484,17 @@ function Canvas() {
   // width alone never gets here, so the viewport only moves when the slot moved.
   useEffect(() => {
     if (pendingFocus === undefined || selected?.id !== pendingFocus.id) return
+    // First: the jump's own centring, held back until the node has a place to
+    // be centred on. A top-level document has one in the same commit, so this
+    // runs at once; one inside a collapsed group waits for the group to open
+    // (spec-00010-AC-7.1). The pending focus is kept, or the slot compensation
+    // below would have nothing left to fire on.
+    if (!pendingFocus.centred) {
+      if (!board.placed.some((position) => position.id === pendingFocus.id)) return
+      centre(pendingFocus.id)
+      setPendingFocus({ ...pendingFocus, centred: true })
+      return
+    }
     if (canvasWidth === pendingFocus.width) return
     centre(pendingFocus.id)
     setPendingFocus(undefined)
@@ -425,8 +516,10 @@ function Canvas() {
     }
     setDrilled(undefined)
     setDetail(undefined)
-    centre(id)
-    setPendingFocus({ id, width: canvasWidth })
+    // The centring itself is the effect's, not this call's: the node may not be
+    // laid out yet — its group opens off the selection this call is about to
+    // make (design-00002 §19.3).
+    setPendingFocus({ id, width: canvasWidth, centred: false })
     void board.select(id)
   }
 
@@ -460,8 +553,21 @@ function Canvas() {
    * with the node back in the middle of what is left (issue-00006).
    */
   function select(id: string) {
-    setPendingFocus({ id, width: canvasWidth })
+    // `centred: true` from the start: a click is not a jump — the node is
+    // already where the user put the pointer, so no move is owed and only
+    // issue-00006's compensation is armed.
+    setPendingFocus({ id, width: canvasWidth, centred: true })
     void board.select(id)
+  }
+
+  /**
+   * A click on the canvas, dispatched by node shape: a group node opens or
+   * closes, a document node is selected — so a group never enters the selection
+   * or the pending focus at all (spec-00010-AC-5.6, design-00002 §19.2).
+   */
+  function clickNode(node: FlowNode) {
+    if (node.type === 'docGroup') board.toggleGroup((node.data as GroupNodeData).group.group.expandKey)
+    else select(node.id)
   }
 
   return (
@@ -644,7 +750,13 @@ function Canvas() {
             {sidebarOpen ? (
               <>
                 <ResizablePanel id="sidebar" defaultSize={18} minSize={12}>
-                  <Sidebar groups={groups} selected={board.selected} onPick={focus} />
+                  <Sidebar
+                    groups={groups}
+                    selected={board.selected}
+                    expandedGroups={board.expandedGroups}
+                    onToggleGroup={board.toggleGroup}
+                    onPick={focus}
+                  />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
               </>
@@ -666,7 +778,7 @@ function Canvas() {
                       // here would take the items the sub-canvas is drawn from.
                       // In the sub-canvas a click opens the node's detail instead
                       // (spec-00001-FR-37), and the blank closes it (AC-37.4).
-                      onNodeClick={sub ? (_event, node) => setDetail(node.id) : (_event, node) => select(node.id)}
+                      onNodeClick={sub ? (_event, node) => setDetail(node.id) : (_event, node) => clickNode(node)}
                       onPaneClick={sub ? () => setDetail(undefined) : board.deselect}
                       // Handles exist to anchor edges, not to draw them: every edge
                       // comes from front matter (spec-00001-AC-1.14).

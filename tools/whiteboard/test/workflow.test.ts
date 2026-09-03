@@ -15,7 +15,7 @@ import {
   nextStepsFor,
   transitionsFor,
 } from '../src/workflow.ts'
-import { doc, makeDocsDir, testConfig } from './helpers.ts'
+import { doc, excludeConfig, makeDocsDir, testConfig } from './helpers.ts'
 
 const config = testConfig()
 
@@ -292,6 +292,38 @@ describe('allocateNumber and idPrefix', () => {
   it('starts at one for a type with no documents', () => {
     const graph = readGraph(makeDocsDir({}), config)
     expect(idPrefix('task', allocateNumber(graph, 'task'))).toBe('task-00001-')
+  })
+
+  /**
+   * spec-00010-FR-12: the «highest existing number» of rule-00001-BR-18 counts the
+   * documents the board can see. A number an excluded file declares is not held by
+   * a document the board has, so it is handed out (design-00001 §14.4 names the
+   * boundary this leaves: a same-numbered excluded file away from the canonical
+   * path is not reported).
+   */
+  // spec-00010-AC-12.1
+  it('passes over the number an excluded file declares', () => {
+    const graph = readGraph(
+      makeDocsDir({
+        'reference/reference-00003-c.md': doc({ id: 'reference-00003-c', type: 'reference', status: 'active' }),
+        'reference/stripe/source/b.md': doc({ id: 'reference-00099-b', type: 'reference', status: 'draft' }),
+      }),
+      excludeConfig(['reference/*/source/**']),
+    )
+
+    expect(idPrefix('reference', allocateNumber(graph, 'reference'))).toBe('reference-00004-')
+  })
+
+  // spec-00010-AC-12.2 — the same tree without the excluded file allocates the same number
+  it('takes the next number after the highest visible one when nothing is excluded', () => {
+    const graph = readGraph(
+      makeDocsDir({
+        'reference/reference-00003-c.md': doc({ id: 'reference-00003-c', type: 'reference', status: 'active' }),
+      }),
+      excludeConfig(),
+    )
+
+    expect(idPrefix('reference', allocateNumber(graph, 'reference'))).toBe('reference-00004-')
   })
 })
 

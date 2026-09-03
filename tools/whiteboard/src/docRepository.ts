@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, join, posix } from 'node:path'
 import matter from 'gray-matter'
 import type { FlowConfig } from './config.ts'
 import { type GraphDiagnostic, declaredIds, declaresItems, requirementViewFrom, scanRecords } from './requirements.ts'
@@ -80,8 +80,18 @@ interface ParsedDoc {
   parseError?: string
 }
 
-/** Repo-relative paths of the documents under `docsDir`, excluding README/TEMPLATE files. */
-function listDocFiles(docsDir: string): string[] {
+/**
+ * Repo-relative paths of the documents under `docsDir`, excluding README/TEMPLATE
+ * files and every path a configured `exclude` pattern matches — those do not
+ * exist for the board at all (spec-00010-FR-1).
+ *
+ * The glob filter sits **after** the separator normalisation, and matches with
+ * posix semantics: the template filter above it still sees the platform's own
+ * separators, so the two filters are not interchangeable, and `path.win32`
+ * would read case and separators differently from the semantics FR-1 fixes
+ * (design-00001 §14.2).
+ */
+function listDocFiles(docsDir: string, exclude: readonly string[]): string[] {
   let entries: string[]
   try {
     entries = readdirSync(docsDir, { recursive: true }) as string[]
@@ -91,6 +101,7 @@ function listDocFiles(docsDir: string): string[] {
   return entries
     .filter((entry) => entry.endsWith('.md') && !EXCLUDED_FILES.has(basename(entry)))
     .map((entry) => entry.split(/[\\/]/).join('/'))
+    .filter((rel) => !exclude.some((pattern) => posix.matchesGlob(rel, pattern)))
     .sort()
 }
 
@@ -330,7 +341,7 @@ function buildGraph(docs: ParsedDoc[], config: FlowConfig): DocGraph {
 /** Scan `docsDir` and build the node graph. An unreadable or empty directory yields an empty graph. */
 export function readGraph(docsDir: string, config: FlowConfig): DocGraph {
   return buildGraph(
-    listDocFiles(docsDir).map((relPath) => parseDoc(docsDir, relPath)),
+    listDocFiles(docsDir, config.exclude).map((relPath) => parseDoc(docsDir, relPath)),
     config,
   )
 }
