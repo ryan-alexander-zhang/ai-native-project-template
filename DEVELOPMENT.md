@@ -32,8 +32,10 @@ Decide how before building.
   create or refresh a `docs/plan/` doc before implementing, then work it
   task-by-task. The plan declares `implements: [<the spec>]`; the product flow
   ahead of it is `idea -> prd -> spec`, per [docs/README.md](docs/README.md).
-- Put the spec's design in a `docs/design/` doc and link it. Never inline design
-  in a `spec` or a `plan`, however small.
+- Link the `docs/design/` docs the spec already links. Whether a design is
+  needed is settled when the spec is written, per
+  [docs/spec/README.md](docs/spec/README.md); never inline design in a `spec`
+  or a `plan`, however small.
 - For small or localized changes, inline reasoning is enough — do not create a
   plan doc.
 

@@ -13,7 +13,11 @@ Use `TEMPLATE.md` for front matter.
 - acceptance for every requirement: each `spec-<n>-FR-<i>` needs at least one
   `spec-<n>-AC-<i>.<k>`; an `FR` no acceptance references is unverified
 - links to the `rule/` docs the feature obeys
-- links to the `design/` docs it builds
+- links to the `design/` docs it builds. Required before the spec turns `active`
+  whenever any `FR` introduces or changes structure that outlives one `plan` — a
+  module or boundary, a data model, an API or file-format contract, a state
+  lifecycle, a cross-component interaction. When none does, say so in one line
+  (`No design: <why>`) so the omission is a decision, not a gap
 - open questions — what is still undecided
 
 Add more when useful.
