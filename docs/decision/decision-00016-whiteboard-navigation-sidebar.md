@@ -3,7 +3,7 @@ id: decision-00016-whiteboard-navigation-sidebar
 type: decision
 status: active
 motivated_by: [prd-00001-docs-whiteboard]
-constrains: [spec-00008-whiteboard-navigation-sidebar, design-00002-whiteboard-ui, plan-00024-whiteboard-navigation-sidebar]
+constrains: [spec-00008-whiteboard-navigation-sidebar, design-00002-whiteboard-ui, plan-00024-whiteboard-navigation-sidebar, plan-00026-whiteboard-directory-groups-and-exclude]
 ---
 
 # Decision: 白板增设左侧导航栏与缩略图，作为「浏览」的出路
@@ -45,8 +45,8 @@ constrains: [spec-00008-whiteboard-navigation-sidebar, design-00002-whiteboard-u
 | --- | --- |
 | 只加缩略图 | **否决**。缩略图里的节点没有名字，解决不了「按名字翻」；它是补充，不是方案 |
 | 导航栏带过滤框 / 恢复常驻搜索框 | **否决**（域主裁定）。与 design-00002 §2 的命令面板裁定相悖，且产生第二个检索入口；⌘K 继续承担检索 |
-| 按物理目录归组 | **否决**。与画布的列序规则（front matter `type`）在 `type` 缺失或不符时分歧；导航栏应镜像画布 |
-| 画布内折叠或分页长列 | **否决**。改变布局规则本身，`decision-00002` 已明确不做纵向分页或折叠；且折叠后节点位置不再可预期 |
+| 按物理目录归组 | **否决**。与画布的列序规则（front matter `type`）在 `type` 缺失或不符时分歧；导航栏应镜像画布（decision-00018 部分推翻：分列仍按 `type`，目录得作类型列内的第二级归组） |
+| 画布内折叠或分页长列 | **否决**。改变布局规则本身，`decision-00002` 已明确不做纵向分页或折叠；且折叠后节点位置不再可预期（decision-00018 推翻：按目录折叠，位置在给定展开态下仍可预期） |
 | 导航栏放右槽、与编辑器/检视面板共用槽位 | **否决**。右槽的编辑器优先规则（§9）会让导航在编辑期间消失；导航须常在 |
 | 手动排序或收藏 | **否决**。引入 `docs/` 之外的用户状态与工具的无状态前提相悖（`decision-00002` §3 同一理由） |
 | 切换导航栏的快捷键 | **搁置**。未提出需求；顶栏按钮足够，有实际需要再加 |
@@ -86,5 +86,6 @@ constrains: [spec-00008-whiteboard-navigation-sidebar, design-00002-whiteboard-u
   缩略图的界面设计（第二十四轮修订轮）。
 - `plan-00024-whiteboard-navigation-sidebar`：落地本决定与 spec-00008。
 - 站立约束：导航栏不得引入检索输入框（检索归命令面板）；归组依据不得改为
-  物理目录；不得为导航栏引入 `docs/` 之外的排序或收藏状态。后续落到本决定
+  物理目录（decision-00018 部分推翻：分列依据不得改为目录，目录得作类型列内的
+  第二级归组）；不得为导航栏引入 `docs/` 之外的排序或收藏状态。后续落到本决定
   之下的 `plan` 回填进本文件的 `constrains`。

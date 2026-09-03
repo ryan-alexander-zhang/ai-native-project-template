@@ -2,7 +2,7 @@
 id: design-00002-whiteboard-ui
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00008-whiteboard-navigation-sidebar, spec-00009-whiteboard-agent-settings]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00004-whiteboard-desktop-notifications, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00008-whiteboard-navigation-sidebar, spec-00009-whiteboard-agent-settings, spec-00010-whiteboard-directory-groups-and-exclude]
 ---
 
 # Design: Docs 白板界面
@@ -38,6 +38,7 @@ shadcn/ui 的组件读的就是这套，因此改主题只改一处。
 | `--status-*` | `draft` `active` `open` `resolved` `wontfix` `archived` | 文档状态，每个状态一组前景/背景对 |
 | `--kind-*` | `living` `work` | 文档种类，用于节点的类型标记 |
 | `--coverage-*` | `verified` `failing` `uncovered` | 需求条目的覆盖状态（§9），每态一组前景/背景对；不复用 `--status-*`——覆盖与文档状态是两套词汇 |
+| `--group-node` | 单值 | 目录组节点的卡片背景与缩略块（第二十七轮，§19.5）；组没有 status，不借状态色 |
 
 异常态不进 `--status-*`：它不是一个状态值，取 `--destructive`。`status.ts` 现有的
 硬编码十六进制（6 个状态色 + `ANOMALY_COLOUR`）随之退场，`statusColour()` 改为
@@ -109,7 +110,8 @@ row3                                                                            
 ```
 
 读法：横向是阶段，纵向是同一类型内的序号。图宽等于**实际用到的类型数**（此处 9）
-而非配置里声明的 16——没有文档的类型不占列。
+而非配置里声明的 16——没有文档的类型不占列。（第二十七轮：列内在顶层文档之后
+接目录组，每组折叠时占一行，§19.1。）
 
 这套规则是同步纯函数，不需要布局引擎；它换掉的 ELK 与所接受的代价（无交叉
 最小化、纵向无界、列序由 YAML 声明顺序承载）见 decision-00002 §4。
@@ -237,6 +239,9 @@ flowchart LR
   治理轮起再匹配 `duplicateOf`——键即路径，输入路径片段只命中该一份
   （`AC-8.5`）；输入那个撞的 id 则两份都命中，各自可分别定位（`AC-8.4`）。
 - **选中态**：`--ring` 描边，与 React Flow 自身的选中样式统一。
+- **组节点（第二十七轮，§19.2）**：目录组折叠时在列内占一个节点位的第二种
+  节点形态——组名、计数、聚合的异常与会话标记；不进 `selected`、无工具栏，
+  点击即展开或折叠。它不改本节文档节点的四槽层级。
 
 **边有三个呈现态**，各有一个类名——`spec-00001-AC-28.x`/`AC-29.x` 的断言落在
 类名上，不落在「更淡」这种无法观察的比较级上（承载 `spec-00001-FR-28`/`FR-29`，
@@ -447,6 +452,7 @@ FR-26/FR-27 及其 AC 需要新的验收行。
 | 两份清单点击一条即定位选中（治理轮） | `spec-00002-FR-15` 及其 AC |
 | 撞 id 节点的路径标签与命令面板按撞的 id 检索（治理轮） | `spec-00002-FR-8` 及其 AC；异常样式本身仍由 `spec-00001-FR-2` 持有，本文 §4 不新增呈现态 |
 | 三份清单的键盘可达、计数不只靠颜色（治理轮） | `spec-00002` §7 非功能项，不写 GWT——与 §6 的既有约定同路线 |
+| 目录组的归组与列内顺序、组节点的呈现与汇聚边、展开折叠与本地持久、选中落入即展开、导航栏镜像、刷新重建、缩略图块（第二十七轮） | `spec-00010-FR-4`…`FR-10` 及其 AC；组节点的令牌色值与缩进量为可调起点，不写 GWT |
 
 不写 GWT 的项没有回归保护，这是明知的取舍。两处例外：空画布「无错误」由 AC-1.4
 保证（§7 只涉及它长什么样），异常计数为零时的 `no issues` 文案有现存断言守着。
@@ -572,7 +578,8 @@ AC ≤3 条逐项并列，>3 条折叠为「首个 id +N」——标签管指路
 
 **保持的粒度是 id，不是索引**：条目行的展开、详情的目标、下钻的文档、
 **全局覆盖率视图的展开行**（治理轮）全部按 id 比对——按位置保持会在文档新增
-或重排后指向别的东西。`CONTEXT.md` 的「呈现状态」条目已同步列入这一项。
+或重排后指向别的东西；**目录组的展开态**按「列 × 组键」比对且跨页面重载保持
+（第二十七轮，§19.3）。`CONTEXT.md` 的「呈现状态」条目已同步列入这一项。
 **第十六轮增两项**（与 `CONTEXT.md`「呈现状态」的枚举一致）：当前呈现的
 会话；各会话终端滚动位置——均按会话保持（`spec-00003-FR-5`；呈现的会话
 消失时按就近关闭只关终端呈现）。**第二十一轮再增两项**（枚举同步已随
@@ -1395,7 +1402,8 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   两者都是呈现状态（§10 的族增两项，`CONTEXT.md` 随 spec 接收同步），**但跨
   页面重载保持**——这一点与主题、通知开关同、与其余呈现状态不同，理由是它们
   是用户对界面的**偏好**而非对某份文档的**位置**。宽度不进这一族：它走既有
-  面板尺寸记忆的口径（§8）。
+  面板尺寸记忆的口径（§8）。（第二十七轮：目录组的展开态是第三项跨重载保持的
+  呈现状态，但它由 `useBoard` 持有、画布与导航栏共享，不在本节的两键里，§19.3。）
 - **顶栏开关**：顶栏最左、标题图标之前，一个图标 `Button`（`PanelLeftClose`
   展开时 / `PanelLeft` 收起时），`aria-label` 为 `Hide navigation` /
   `Show navigation`。
@@ -1413,7 +1421,8 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   函数，那会让归组循环在两处各写一遍；`plan-00024` 实现期裁定）。
   `TypeGroup` 为 `{ key, type, nodes }`：`key` 是声明的 `type` 原文（缺失为空
   串），展开态按它记；`type` 是组头文案，缺失者呈现 `untyped`（配置未声明的
-  类型呈现其原名）。
+  类型呈现其原名）。（第二十七轮：`orderedColumns` 改返回 `Column`，`TypeGroup`
+  增 `top` 与 `directories`，组内先顶层文档、再目录组，§19.4。）
 - **组头**：一个 `Button`，含 §4 的类型图标（`typeIcon`）、类型名、计数
   `Badge`、折叠指示的 `ChevronRight`（展开时旋转 90°）；`aria-expanded`
   如实。
@@ -1441,7 +1450,8 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   `aria-current="true"` 并取 `bg-accent`；一个 `useEffect` 盯 `selected`：
   变化时若所在组折叠则先展开（写回展开态），再对该行 `scrollIntoView({
   block: 'nearest' })`。取消选中即无 `aria-current`。展开只挂在**选中变化**
-  上：用户随后手动折叠含选中行的组，组保持折叠（`spec-00008-FR-4`）。导航栏收起时组件不挂载、效果不跑；重新展开即重新挂载，同一
+  上：用户随后手动折叠含选中行的组，组保持折叠（`spec-00008-FR-4`）。（第二十七
+  轮：目录组的展开由 `useBoard` 的同形效果负责，本效果只管类型组，§19.3。）导航栏收起时组件不挂载、效果不跑；重新展开即重新挂载，同一
   效果在挂载时按当前 `selected` 补做一次——这就是「重新展开时补做高亮与滚入
   视野」的实现。
 - **子画布期间**：导航栏照常呈现与可点（点行即退出子画布，`spec-00008-FR-2`）；
@@ -1459,7 +1469,8 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   （卡片本就是布局为它保留的那个尺寸），与 `subCanvas` 为条目节点声明尺寸
   同一做法。
 - **着色走类名不走内联色**：`nodeClassName` 返回 `minimap-status-<status>`
-  （异常节点 `minimap-anomaly`，子画布节点无状态则不加类），`index.css` 以
+  （异常节点 `minimap-anomaly`，子画布节点无状态则不加类；第二十七轮：组节点
+  `minimap-group`，有异常成员时 `minimap-anomaly`，§19.5），`index.css` 以
   `.react-flow__minimap-node.minimap-status-draft { fill: var(--status-draft) }`
   等逐状态映射（双类选择器，压过库的单类规则，不靠导入顺序）；容器背景与
   遮罩走 `index.css` 既有的 `.react-flow { --xy-* }` 覆写块，加两行
@@ -1598,7 +1609,274 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
 - 遮罩按钮与撤销覆盖按钮是图标按钮，`aria-label` 如上；遮罩状态以
   `aria-pressed` 反映。
 
-## 19. Open Questions
+## 19. 目录组（第二十七轮）
+
+承载 `spec-00010-FR-4` … `FR-10` 的界面侧；取舍全部在案于 `decision-00018`。
+**零服务端改动**：归组、折叠与导航栏镜像全部从 `GET /api/graph` 节点既有的
+`path` 字段推导；配置排除在服务端（design-00001 §14），页面不知道它存在。
+本节的设计原则只有一条：**折叠是对图的一次纯变换**，变换之后的图只喂画布的
+三个消费者，其余一切继续读原图。
+
+```mermaid
+classDiagram
+  class Column {
+    key: string  «类型原文，缺失为空串；即 TypeGroup.key，也是 kinds 的查键»
+    type: string  «组头显示名；无类型列为 untyped，即 TypeGroup.type»
+    top: DocNode[]
+    groups: DirectoryGroup[]
+  }
+  class DirectoryGroup {
+    key: string  «组键：path 前两段»
+    columnKey: string  «所在列的 Column.key，查 kind 用»
+    expandKey: string  «Column.key + NUL + 组键»
+    name: string  «组名，19.1»
+    nodes: DocNode[]
+  }
+  class FoldedGraph {
+    nodes: DocNode|GroupNode[]
+    edges: DocEdge[]  «端点已映射，组内边已丢弃»
+    representative(id) string
+  }
+  class GroupNode {
+    id: string  «group:expandKey»
+    group: DirectoryGroup
+    expanded: boolean
+    anomalous: boolean
+  }
+  class GroupNodeData {
+    group: GroupNode
+    kind: string  «board.kinds 按 columnKey 查得»
+    session: SessionMarkerState  «可缺，装饰 memo 注入»
+    holdsSelection: boolean  «装饰 memo 注入»
+  }
+  Column "1" *-- "*" DirectoryGroup
+  FoldedGraph ..> DirectoryGroup : 由 Column[] + expanded 推导
+  FoldedGraph "1" *-- "*" GroupNode
+  GroupNodeData --> GroupNode : Board 装饰 memo 包装
+```
+
+### 19.1 归组模型（纯函数，`layout.ts`）
+
+- **组键**：`groupKey(node)`——`node.path` 按 `/` 切段，段数 ≥ 3 时取前两段
+  `<文件夹>/<子目录>`，否则 `undefined`（顶层文档，含直接位于 `docs/` 下者，
+  `spec-00010-AC-4.6`）。更深层级自然归入前两段（`AC-4.2`）。
+- **列内构造**：`orderedColumns` 的返回从 `DocNode[][]` 改为 `Column[]`。
+  **`Column.key` 就是今天 `TypeGroup.key` 的语义**——声明的 `type` 原文、缺失为
+  空串——它是导航栏类型组展开态（`whiteboard-sidebar-expanded`）的持久键，改
+  语义会让用户既有的展开态静默失效；今天 `columnKey` 那个带序号前缀的排序键
+  留作函数内局部变量，不外露。`top` 按既有 `byIdThenPath`；`groups` 按组键
+  `localeCompare`（与 `byIdThenPath` 同一排序口径，spec 的「字典序」即此）；
+  组内按 `byIdThenPath`。一个目录里不同 `type` 的文档按列各成一组（`AC-4.3`）
+  ——归组在列内做，所以这一条不需要任何代码。**只含一份文档的子目录也成组、
+  可见文档为零的目录不成组**（`AC-4.7`/`AC-4.8`）：后者是「组由节点归出来」的
+  直接结果，前者是不加阈值。
+- **组名**：组键第一段与列的 `Column.key`（类型原文）相同时取第二段，否则取
+  两段（`decision-00018` §2 第 11 条，域主裁定；`AC-5.13`/`AC-5.14`）。无声明
+  类型的列其 `key` 为空串、与任何目录名都不相等，故永远呈现两段；一个恰叫
+  `untyped` 的目录落在无类型列时同样呈现两段——比对的是 `key`（空串），不是组头
+  显示名 `type`（「untyped」）。
+- **展开键**：`Column.key`（缺失为空串）+ NUL + 组键（与 `toFlowEdges` 合并键
+  同一做法），即 spec 的「列 × 组键」。**一律用 `key` 不用 `type`**：`type` 是
+  显示名，无类型列上是 `untyped`，拿它拼键会把持久键写成 `untyped␀…`，与
+  §17 的类型组持久键（用 `key`）分道。以这个键而不以组键本身，是因为同一目录的
+  文档可能分在两列（上一条）。
+- **`layoutGraph(columns, expanded)`**（`columns` 即上款 `orderedColumns` 的
+  产物，§19.3 只算一次）：行序为 `top` → 各组的**组
+  节点行** → 展开的组紧随其组节点的成员行。组节点的 `Placed.id` 为
+  `group:<展开键>`。不撞文档节点键的理由：文档节点键或合 `ID_PATTERN`
+  （`^[a-z]+-\d{5}-…$`，无冒号），或是 `docs/` 相对路径；只有 front matter 写
+  `id: group:…` 这种畸形 id 才有理论碰撞——它不合 `ID_PATTERN`、节点键回落为
+  路径，碰撞实际不发生。行距不变（`NODE_HEIGHT + ROW_GAP`），组节点占恰一行，
+  所以展开一个组把下方行整体下移 `nodes.length` 行（`AC-6.1`），跨列位置不受
+  影响。
+
+### 19.2 折叠变换与画布（`canvasModel.ts`）
+
+**消费边界（先立）**：`foldGraph` 的输出**只**喂 `Board.tsx` 的三个 memo——
+`toFlowNodes`、`toFlowEdges`、`suppressedNodes`。顶栏异常与诊断计数、异常
+清单与诊断清单、命令面板、全局覆盖率视图、`focus` 的存在性守卫、关系列表、
+空板态判定（`board.graph.nodes.length === 0`）一律继续读 `board.graph`
+（`AC-5.2`、`AC-7.1`、`AC-1.10` 的空态提示由此成立）；导航栏读 `Column`，其
+类型组计数是全体节点（`AC-8.1`）。落地时任何把 `board.graph` 换成折叠图的改动
+都要回到这一句。
+
+- **`foldGraph(graph, columns, expanded): FoldedGraph`**——一次纯变换：
+  - `nodes`：顶层文档 + 展开组的成员（原 `DocNode`）+ 每个组的**组节点**
+    （`GroupNode`：`id`、`group`、`expanded`、`anomalous`——全部可从图与展开态
+    算出，所以 `foldGraph` 的签名只有这三样输入）；折叠组的成员**不在其中**
+    （`AC-5.1`）。会话与选中态**不在这里**：`foldGraph` 拿不到 `runningOn` 与
+    `selected`，它们由下一款的装饰 memo 注入。
+  - `representative(id)`：文档 id → 它在画布上的代表——自己（可见）或所属
+    折叠组的 `group:` id。
+  - `edges`：每条 `DocEdge` 的两端各经 `representative` 映射；映射后两端相同的
+    边（组内互指）丢弃（`AC-5.4`）；其余原样保留 `relation`/`ok`/
+    `declaredTargets`。**不在这里合并**——合并留给既有的 `toFlowEdges`：它的
+    合并键是「from + 分隔符 + to」，作用在映射后的端点上，于是「同一对、同方向
+    合一条、标签并列全部字段名、反向不合并」（`spec-00001-FR-28` 口径）对组
+    节点自动成立（`AC-5.3`、`AC-5.7`…`AC-5.9`），边合并这一处一行新代码都
+    没有。一个明写的副作用：`spec-00001-FR-34` 的悬停证据标签按文档 id 查
+    `evidence`，端点换成 `group:` id 后查不到——**汇聚边不承载 FR-34 的 AC
+    标签**，展开后恢复；折叠组内的 record 不是悬停条目的近邻，接受。
+- **`toFlowNodes` 与装饰 memo 都按节点形态分派**：今天 `toFlowNodes` 写死
+  `type: 'doc'`、`data: { node }`、`selected: node.id === selected`；`Board.tsx`
+  随后还有一个装饰 memo，对每个结果 `data as DocNodeData` 读 `data.node.type`
+  查 `board.kinds`、按 `data.node.id` 查 `runningOn` 注入会话——组节点的 `data`
+  里没有 `node`，这个 memo 不分派就会在第一个组节点上抛。故两处同改：文档节点
+  照旧；组节点 `toFlowNodes` 出 `type: 'docGroup'`、`data: { group }`，React
+  Flow 的 `selected` 标志**不给组节点**（组不进 `selected`）；装饰 memo 对
+  `docGroup` 注入 `kind`（`board.kinds[groupNode.group.columnKey]`——
+  `columnKey` 即所在列的 `Column.key`，为此进 `DirectoryGroup`）、`session`
+  （把 `groupNode.group.nodes` 每份在 `runningOn` 里的会话合并后按下文聚合）、
+  `holdsSelection`（`representative(selected) === groupNode.id`），得到类图的
+  `GroupNodeData`。
+  节点类型名取 `docGroup` 而不是 `group`：`group` 是 React Flow 的内置类型名，
+  库的 `style.css` 为 `.react-flow__node-group` 预置了背景、边框与 `.selected`
+  阴影，撞名会白拿一套容器样式。
+- **`columns` 只算一次**：`orderedColumns` 的结果与 `placed` 出自 `useBoard`
+  同一个 memo（§19.3），`Board` 的 `foldGraph` 与 `Sidebar` 的 `typeGroups` 都读
+  它，不再各自从 `Object.keys(board.kinds)` 重算——两处各算一遍，列序或展开键
+  拼法有一丝分歧，`group:<展开键>` 就在 `placed` 里查不到、组节点整体落到
+  (0,0)。
+- **选中的代表**：`toFlowEdges`/`suppressedNodes` 收到的 `selected` 先过
+  `representative`——选中文档所在的组折叠时，其代表是组节点：与组节点相连的边
+  取强调、组节点不被压弱（`AC-6.6`、`AC-5.10`）；无选中时一切弱化（`AC-5.11`）。
+  `suppressedNodes` 本就按「选中及与之有边相连者」算 keep 集，喂折叠后的图即得
+  组节点的压弱（`AC-5.10` 的 `ccbill`）。
+- **点击分流**：`Board.tsx` 的 `onNodeClick` 今天对任何节点调 `select(node.id)`。
+  改为先按 `node.type` 分流——`docGroup` 调 `toggleGroup(展开键)`、`doc` 照旧
+  `select`——组节点因此**从不进入** `select`/`pendingFocus`（`AC-5.6`）。卡片内
+  的两个标记按钮各自 `stopPropagation`（与 `NodeCard` 会话标记按钮同一约定），
+  免得一次点击既触发标记又触发切换。
+- **组节点卡片 `GroupNodeCard`**（节点类型 `docGroup`）：外壳是 `div`（与
+  `NodeCard` 同构，**不是** `Button`——`<button>` 内不得再嵌 `<button>`），三个
+  同层控件：
+  1. **组名行 `Button`**：`Folder` 图标 + 组名 + 计数 `Badge`，`aria-expanded`
+     如实、可访问名「<组名>, <n> documents」，点击即 `toggleGroup`。图标取
+     `Folder` 只是形状，词汇仍是「目录组」——`CONTEXT.md` 的 _Avoid_ 管的是
+     术语，不管图形。
+  2. **异常标记 `Badge`**（成员任一 `!ok`）：`TriangleAlert`，取 `--destructive`，
+     可访问名「<n> documents with problems」。**不带 `Popover`、不可激活**：
+     `spec-00010-FR-5` 只要求标记，哪一份坏了在展开后的真节点上看（异常清单也
+     逐份列着）；给组节点加一个列成员路径的弹层是 spec 之外的交互，本轮不加。
+  3. **会话标记 `Button`**（成员任一有会话）：把 `NodeCard` 内联的标记 JSX
+     抽成 `SessionMarker`，两处共用。组上的态按 `spec-00010-FR-5` 聚合，**两态**：
+     任一成员的任一会话等待输入 → 等待态（`Keyboard`）；否则运行态。运行态的
+     图标沿 `spec-00005-FR-9` 单文档的既有读法：组内有终端形态会话取
+     `TerminalIcon`，仅答疑取 `CircleHelp`——这是运行态的图标规则，不是第三态
+     （`AC-5.5`/`AC-5.12`）。**这与 `NodeCard` `markerOf` 的选法不同，故意如此**：
+     `markerOf` 先挑一个会话（终端优先）再看它是否等待，组上是先看任一成员是否
+     等待——FR-5 要的是「有人在等」一眼可见，单文档的挑选序不适用。**激活只
+     `toggleGroup`**（`AC-6.7`），不打开终端、不呈现问题列表——会话从展开后真
+     节点的标记进入，`spec-00003-FR-10` 的呈现分支不在组上重演。
+  卡片尺寸声明为 `NODE_WIDTH × NODE_HEIGHT`（缩略图与布局都要它，§17.4 同一
+  理由）；8 个锚点与 `NodeCard` 同一契约（汇聚边要落脚，§4 的锚点规则照抄）。
+  **描边**取所在列 `kind` 的 `--kind-*`（成员同列即同 kind），**含异常成员时
+  描边不转 `--destructive`**——组不是一份坏文档，坏的是其中某几份，异常标记已
+  在说这件事。**选中态**：`holdsSelection` 时取 `--ring` 描边并加
+  `aria-current="true"`——与文档节点的选中态同一呈现，不另立「强调」。压弱态
+  复用 `node--suppressed`。卡片背景取 `--group-node`，文字取 `--foreground`
+  （该色定为 `--muted` 偏深一档，前景不必成对）。
+- **折叠含选中文档的组**：`selected` 不变。浮窗工具栏消失的真机制：`Board.tsx`
+  渲染 `<NodeToolbar nodeId={selected.id}>`，`selected` 取自未折叠的
+  `board.graph`，条件仍成立；但 React Flow 的 `NodeToolbar` 从内部 `nodeLookup`
+  取节点，节点不在 `nodes` 里即 `return null`。这是**库行为**——`AC-6.6` 的
+  用例要断言工具栏 DOM 不在，不能断言 `selected` 为空。右槽由 `selected`
+  驱动，不受影响。
+
+### 19.3 展开态——一份、共享、本地持久（`directoryGroups.ts`）
+
+- **状态住在 `useBoard`，不在 `Board` 或 `Sidebar`**：`placed` 今天是
+  `useBoard` 的 `useState`、只在图加载路径里 `setPlaced(layoutGraph(…))` 一次。
+  切换一个目录组必须重算整幅布局，所以 `expandedGroups: string[]` 与
+  `toggleGroup(key)` 下沉进 `useBoard`，`placed` 与 `columns` 改为同一个
+  `useMemo`：`columns = orderedColumns(graph, typeOrder.current)`，
+  `placed = layoutGraph(columns, expandedGroups)`——顺带去掉那一处命令式赋值。
+  `typeOrder` 是 `useRef`，**不进依赖数组**；正确性靠既有时序——config 先
+  `await` 落地、再首次 `setGraph`，`spec-00001-AC-1.12` 钉的正是它。`placed`
+  仍从 `useBoard` 暴露，既有消费者（画布 memo、`centre`、缩略图）不动，
+  `columns` 新暴露给 `Board` 与 `Sidebar`（§19.2）。§17 的类型组展开态是导航栏
+  私有的，仍留在 `Sidebar`。
+- **持久化**：`localStorage` 键 `whiteboard-directory-groups-expanded`，值为
+  展开键的 JSON 数组，**无键即全折叠**（`AC-6.5`）——与 `sidebar.ts` 两函数
+  同形，也继承了它裸 `JSON.parse` 的既有弱点（存储被外部写坏即抛错；既有缺陷，
+  本轮不修、不扩大）。呈现状态族（§10）增此一项，`CONTEXT.md` 已随 spec 接收
+  同步；跨页面重载保持的理由与导航栏两项相同：用户对界面的偏好。键含列与组键，
+  目录改名或文档换列即旧键失效、该组从缺省折叠起（`spec-00010-FR-9`，
+  `AC-9.6`/`AC-9.9`）；过期键**留在存储里不清理**——无害，且清理要在每次刷新
+  对比一遍。
+- **选中变化 → 展开**：`useBoard` 一个 `useEffect` 盯 `selected`：变化时若其组
+  折叠则加入展开键。所有改变选中的通路（命令面板、三份清单、关系列表、导航栏、
+  会话面板、行内 id 跳转、详情面板的 record 跳转）都汇到 `focus`/`select`，效果
+  挂在 `selected` 上即覆盖全部（`AC-7.1`…`AC-7.6`），不逐通路加代码；面包屑
+  返回不改变 `selected`，自然不触发（`spec-00010-FR-7`）。只随**变化**发生：
+  依赖数组只有 `selected`，与 §17.3 的类型组同一写法，手动折叠不反弹
+  （`AC-6.6`、`AC-8.5`）。
+- **居中要等布局**：今天 `focus(id)` 同步调 `centre(id)`，而 `centre` 在
+  `board.placed` 里找该 id——组还折叠时找不到，`setCenter` 不会执行；补做居中的
+  `pendingFocus` 效果只在画布宽度变化时跑、跑完即清（issue-00006 的右槽补偿）。
+  本轮把 `centre` 从 `focus` 的同步调用挪进那个效果，`pendingFocus` 增一个
+  `centred` 位，效果分两支：**第一支**「`board.placed` 中出现了
+  `pendingFocus.id` 且未 `centred`」→ 居中、置 `centred`、**不清**
+  `pendingFocus`——覆盖折叠组展开后的第一次落位（`AC-7.1`）；顶层文档在同一帧
+  `placed` 已含该 id，这一支立刻跑，与今天观感一致。**第二支**「画布宽度变了
+  **且已 `centred`**」→ 居中、清 `pendingFocus`——原样保留 issue-00006 的补偿；
+  加 `centred` 设防是为了堵一个窗口：宽度变化若先于布局落位到达，第二支不能
+  在 `placed` 还没有该 id 时先跑、把 `pendingFocus` 清掉，否则一次都不居中。只有第二支清，
+  否则顶层文档第一支跑完就清、右槽打开引起的宽度变化再也补不到，issue-00006
+  回归。`focus.test.tsx` 以「展开组后居中一次 + 宽度变化后再居中一次」两条断言
+  钉住。用户手动展开或折叠不动视口（`decision-00016` §4 口径，spec §6 明写）。
+- **刷新重建（`spec-00010-FR-9`）——零新代码**：目录组不是持有的状态，是每次
+  渲染从 `graph.nodes` 的 `path` 推导的纯结果，刷新即重建：新组键自然出现、不在
+  `expandedGroups` 里故折叠、落在组键序位（`AC-9.1`）；成员归零的组键自然不再
+  产出（`AC-9.2`/`AC-9.7`）；文档移动即换组、计数随之（`AC-9.4`/`AC-9.8`）；
+  `expandedGroups` 是一个键的集合、与图无关，不相干的刷新不改变它（`AC-9.3`）；
+  选中文档消失时沿 `spec-00001-FR-44` 的就近关闭清空（`AC-9.5`/`AC-9.7`）。
+  `refresh.test.tsx` 的 `AC-9.x` 用例钉的是这些推导，不是新逻辑。
+
+### 19.4 导航栏（`sidebarModel.ts`、`Sidebar.tsx`）
+
+- `typeGroups` 直接映射 §19.1 的 `Column`：`TypeGroup` 增 `top` 与
+  `directories`，`nodes` 保留为全体（组头计数含组内文档，`AC-8.1`；`Sidebar`
+  既有的「按 `selected` 找所在类型组并展开」效果因此对目录组内的行同样命中，
+  `AC-8.4` 的类型组一并展开不加代码）。
+- **渲染**：类型组展开后先 `top` 的行，再每个目录组一个**目录组头**
+  （`Button`，缩进一级：`Folder` 图标 + 组名 + 计数 `Badge` + `ChevronRight`，
+  `aria-expanded`），展开时其下列成员行（再缩进一级，行内容同 §17.2）。目录组头
+  点击调 `onToggleGroup(展开键)`——与画布组节点的组名行是同一个函数。
+- **选中联动**：§17.3 的效果只管类型组；目录组的展开由 §19.3 在 `useBoard` 里
+  做，`Sidebar` 收到新的 `expandedGroups` 后照常渲染，`selectedRow` 的
+  `scrollIntoView` 依赖数组加 `expandedGroups`（`AC-8.4`）。
+
+### 19.5 缩略图
+
+- `minimapClass`：`type === 'docGroup'` 的节点返回 `minimap-anomaly`（有异常
+  成员）或 `minimap-group`（`AC-10.1`/`AC-10.3`）；展开态下组节点仍是一块、取
+  `minimap-group`，成员各按状态（`AC-10.2`）。
+- **新令牌 `--group-node`**（§1 表增一行）：组节点的卡片背景与缩略块取它——
+  组没有 `status`，借状态色会让缩略图读成「一份 draft」。浅色取 `--muted` 偏深
+  一档、深色对称，落地按真实缩略图看一眼再定（§4 不透明度的同一口径）。
+  `index.css` 增 `.react-flow__minimap-node.minimap-group { fill: var(--group-node) }`。
+
+### 19.6 可访问性与测试
+
+- 组节点的两个控件（组名行、会话标记）与导航栏目录组头都是真 `Button`、彼此
+  同层不嵌套：Tab 可达、Enter/Space 激活，组名行与目录组头 `aria-expanded`
+  如实；异常标记是带可访问名的 `Badge`；两个标记都带图标不只靠颜色；持有选中
+  的组节点除 `--ring` 外加 `aria-current="true"`（spec §7）。
+- 用例落点：新增 `web/test/layout.test.ts`（19.1 全部纯函数，`AC-4.x`；今天
+  `orderedColumns`/`layoutGraph` 的用例在 `board.test.tsx`，随本轮迁入）、新增
+  `foldGraph.test.ts`（边的映射与丢弃、`representative`、`holdsSelection`）、
+  `canvas.test.tsx`（`AC-5.x`、`AC-6.x`、`AC-7.x`、`AC-10.x`——`AC-5.6` 断言
+  点击组节点后 `selected` 不变、`AC-6.6` 断言工具栏 DOM 不在、`AC-7.1` 断言
+  `setCenter` 在组展开后的那次渲染被调用）、`sidebar.test.tsx`（`AC-8.x`）、
+  `refresh.test.tsx`（`AC-9.x`）。`toFlowEdges` 不加新用例——它没改。
+- 既有测试影响：按 `orderedColumns` 返回 `DocNode[][]` 断言的用例改读
+  `Column.top`；`toFlowNodes` 的节点计数用例需给出 `expanded` 或用无子目录的
+  夹具（无子目录时行为与今天完全相同，`AC-4.5`）；`useBoard` 的 `placed` 从
+  `useState` 改 `useMemo`，按 `setPlaced` 时序断言的用例（若有）改为按渲染结果
+  断言；`focus.test.tsx` 的居中断言从「同步调用」改为「效果内调用」。
+
+## 20. Open Questions
 
 - 本文档当前无未决项（第十五轮审计的两问已由域主裁定，见 spec-00001 §8；
   就近关闭的裁定已回写 §9；第十六轮的取舍全部由 decision-00009 在案；
@@ -1606,7 +1884,8 @@ destructive 色、不弹提示条**——这是文档往前走之后的自然结
   decision-00012 在案；第二十二轮的取舍全部由 decision-00015 在案；
   第二十四轮的取舍全部由 decision-00016 在案；
   第二十六轮的取舍全部由 decision-00017 在案，`env` 值的遮罩由域主
-  2026-09-02 裁定、条文在 §18.3；
+  2026-09-02 裁定、条文在 §18.3；第二十七轮的取舍全部由 decision-00018 在案，
+  组名与选中态呈现两项由域主 2026-09-03 裁定、条文在 §19.1/§19.2；
   第二十三轮的取舍由本文 §16 就地裁定——其中标注列表的**呈现归属**
   （§16.1）是 `spec-00007-FR-9` 明写委给本文的一项，随本轮接收由域主
   确认，不作为未决项挂起）。

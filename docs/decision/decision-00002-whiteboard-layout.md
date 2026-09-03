@@ -3,7 +3,7 @@ id: decision-00002-whiteboard-layout
 type: decision
 status: active
 motivated_by: [issue-00003-stage-flow-reads-backwards, spec-00001-docs-whiteboard]
-constrains: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui, plan-00003-whiteboard-relation-edges, plan-00024-whiteboard-navigation-sidebar]
+constrains: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00002-whiteboard-ui, plan-00003-whiteboard-relation-edges, plan-00024-whiteboard-navigation-sidebar, plan-00026-whiteboard-directory-groups-and-exclude]
 ---
 
 # Decision: 白板布局改为「类型分列」，去掉 ELK
@@ -38,7 +38,7 @@ constrains: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00
 | 维度 | 规则 |
 | --- | --- |
 | 列（x） | 文档 front matter 的 **`type`**（不取 id 前缀）。列序取 `whiteboard.config.yaml` 中 `types` 的**声明顺序**；没有文档的类型不占列 |
-| 行（y） | 同列内按**文档 id 升序**；id 相同时按文件路径升序，使本函数的输出恒为全序。**这并不改善撞 id 的呈现**——`toFlowNodes` 按 id 取位置，两个同 id 节点仍取到同一条，缺陷见 `issue-00004` |
+| 行（y） | 同列内按**文档 id 升序**（decision-00018 追注：顶层文档在前、目录组按组键序在后，组内仍按此行序）；id 相同时按文件路径升序，使本函数的输出恒为全序。**这并不改善撞 id 的呈现**——`toFlowNodes` 按 id 取位置，两个同 id 节点仍取到同一条，缺陷见 `issue-00004` |
 | 方向 | 左→右 |
 | 异常/未知类型 | `type` 缺失或不在 `types` 内的节点，排在全部已声明类型之后，按类型名字典序；`type` 缺失者最后一列 |
 | 落位时机 | 列序来自 `GET /api/config`，图来自 `GET /api/graph`；**两者都到位后才落位**，不先画一遍无序布局再重排 |
@@ -98,7 +98,7 @@ constrains: [spec-00001-docs-whiteboard, design-00001-docs-whiteboard, design-00
 - **一列一类型会让图变宽**：16 个类型全用上时是 16 列。缓解是空类型不占列，
   实际宽度等于「用到的类型数」。
 - **纵向无界**。列高等于该类型的文档数，某一类型文档很多时该列会长过视窗，
-  只能靠画布平移与缩放看完。本决定不做纵向分页或折叠；命令面板
+  只能靠画布平移与缩放看完。本决定不做纵向分页或折叠（decision-00018 部分推翻：仍不按数量分页或折叠，按目录折叠）；命令面板
   （`spec-00001-FR-26`/`FR-27`）是「找到某一份」的既有出路。
 
 **得到的**

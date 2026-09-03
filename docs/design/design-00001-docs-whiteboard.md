@@ -2,7 +2,7 @@
 id: design-00001-docs-whiteboard
 type: design
 status: active
-informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00009-whiteboard-agent-settings]
+informs: [spec-00001-docs-whiteboard, spec-00002-whiteboard-governance, spec-00003-whiteboard-parallel-sessions, spec-00005-whiteboard-ask-threads, spec-00006-whiteboard-co-write, spec-00007-doc-annotations, spec-00009-whiteboard-agent-settings, spec-00010-whiteboard-directory-groups-and-exclude]
 ---
 
 # Design: Docs 白板 MVP
@@ -58,7 +58,8 @@ flowchart LR
   GL --> GIT[(git repo)]
 ```
 
-- **Doc Repository**：扫描 `docs/**/*.md`（排除 `README.md`、`TEMPLATE.md`），
+- **Doc Repository**：扫描 `docs/**/*.md`（排除 `README.md`、`TEMPLATE.md`；
+  **第二十七轮起再减去流程配置 `exclude` 命中的文件**，§14），
   产出图模型 `{nodes, edges, issues}`；类型集与关系字段集取自流程配置，front
   matter 缺失/非法、断链（无法解析的引用——可解析的细粒度引用不算，见下）进
   `issues` 并在节点/边上打异常标记（spec FR-1/FR-2 的载体）。节点标题取正文
@@ -294,6 +295,8 @@ entry: [idea, prd]          # rule-00001-BR-26 的流程入口类型（spec FR-5
 
 max_sessions: 3             # 会话并发上限（spec-00003-FR-3，第十六轮）；缺失取缺省 3，非正整数拒绝启动
 
+exclude: []                 # 配置排除（spec-00010-FR-1，第二十七轮，§14）：相对 docs/ 的 glob 列表；缺失/null/空 = 不排除，形态非法拒绝启动
+
 carries:                    # 治理轮（spec-00002-FR-5）的关系矩阵：类型 → 该类型允许声明的关系字段
   spec:   [parent]
   design: [informs]
@@ -318,6 +321,7 @@ agents:
   `agents` 至少一项，`command` 非空字符串、`args` 为字符串数组、`cwd` 若有必须
   是 `docs` 内路径；`max_sessions` 若有必须是正整数（缺失取缺省 3——
   spec-00003-AC-3.4/AC-3.5，第十六轮）。任何违规 → 启动失败并指明条目。
+  **第二十七轮增（`spec-00010-FR-2`）**：`exclude` 的读法与逐项校验见 §14.1。
   **第二十六轮增（`spec-00009-FR-2`）**：`model` 若有须是非空字符串；`env`
   若有须是字符串到字符串的映射；`{model}` 与 `model` **按形态成对**——
   `args` 或 `headless` 任一数组含 `{model}` 而无 `model` → 拒绝；有 `model`
@@ -1055,6 +1059,8 @@ POST /api/sessions/cowrite   {create: {type, slug}, agent?, materials?}
   2. **`docs/reference/` 下的新建文件**：过**合式**判定——front
      matter 可解析、`type: reference`、`status: draft`、文件在规范
      路径 `docs/reference/<id>.md` 且文件名与 id 一致、id 形态合法。
+     （第二十七轮：写进流程配置 `exclude` 命中路径的候选，白板读不出文档、
+     按本款判不合式并删除——域主裁定沿用，§14.3。）
      **取号按集合判，不逐文件判**（`rule-00001-BR-18` 是「现有最大
      编号加一」，逐文件读则第二份永远不合式）：本会话的全部新建
      reference 的编号，须两两不同、且自「收束时点既有 reference 的
@@ -1826,7 +1832,113 @@ headless 形态」拒绝——两条用户可见文案里的 "flow config" 随�
 版本实测 `--model` 在交互与 `-p` 两种形态下生效，实测记录写进 YAML 注释——
 与既有条目同一纪律。
 
-## 14. Open Questions
+## 14. 配置排除——扫描范围与 `exclude` 契约（第二十七轮）
+
+承载 `spec-00010-FR-1` … `FR-3`、`FR-11`、`FR-12` 的服务端；取舍全部在案于
+`decision-00018`。界面侧（目录组）零服务端改动，归 design-00002 §19。本节只
+改两处代码——流程配置多读一个键、`listDocFiles` 多过一遍过滤——其余全部是
+「图上没有即不存在」的既有推导自然带出的后果，逐条点名以免被当成未做。
+
+### 14.1 `exclude` 字段契约
+
+```yaml
+exclude: []                 # 第二十七轮（spec-00010-FR-1）：相对 docs/ 的 glob 列表，命中的文件对白板不存在
+# exclude:
+#   - reference/*/source/**   # 供应商文档镜像
+```
+
+- **读法**（`readExclude(raw): string[]`，与 `readMaxSessions` 同一层）：
+  `undefined` 与 `null` 都读作缺失 → `[]`（`spec-00010-AC-1.7`）；不是数组
+  （标量、映射）→ `ConfigError`「`exclude` must be a list of strings」
+  （`AC-2.1`/`AC-2.4`）；逐项校验，错误位置点名 `exclude[<i>]`：非字串
+  （`AC-2.2`）、空串（`AC-2.5`）、含 `\`（`AC-2.9`，说明模式一律用 `/`）、以
+  `/` 起头（`AC-2.7`）、以 `!` 起头（`AC-2.8`，说明不支持取反）、任一段为
+  `..`（`AC-2.6`）——任一违规即拒绝启动，与 `carries` 的逐项点名同口径。
+  `FlowConfig` 增 `exclude: string[]`。
+- **只在启动时读取**：`loadFlowConfig` 是唯一读点、`FlowConfig` 经构造函数传进
+  `Board`/`DocService`（`server.ts`），`DocsWatcher` 只看 `docsDir`——这与其余
+  字段完全一致，`spec-00010-AC-1.12` 只是把既有事实钉住，不加热重载。
+- **不下发**：`GET /api/config` 不带 `exclude`。页面没有消费者——目录组的归组
+  与折叠只读节点的 `path`；`FR-56` 的单一来源原则只约束有前端消费的键。需要时
+  再加，不预留。**机制**：今天 `server.ts` 的该路由是 `res.json({ ...config,
+  agents, … })`——整份 `FlowConfig` 展开下发，`FlowConfig` 一加字段它就跟着出去；
+  故路由改为剔除 `exclude`（与已被替换的 `agents` 同一处），前端
+  `ConfigPayload` 的 `Omit<FlowConfig, 'agents'>` 同步改为
+  `Omit<FlowConfig, 'agents' | 'exclude'>`，`server.test.ts` 的 `GET /api/config`
+  用例加一条 `body.exclude` 为 `undefined` 的断言钉住。
+
+### 14.2 匹配与扫描
+
+- **匹配器取 `node:path` 的 `path.posix.matchesGlob`**（Node ≥ 22.5；本机
+  Node 26 实测无实验警告）。选它而不引 `picomatch`/`minimatch` 的理由：零依赖，
+  且实测语义正是 `spec-00010-FR-1` 钉的那一套——`*` 不跨 `/`、`**` 跨任意层、
+  目录形态的模式不命中其下文件（`matchesGlob('reference/stripe/a.md',
+  'reference/stripe')` 为 false）、区分大小写。**显式用 `posix` 变体**：
+  `path.win32.matchesGlob` 对大小写与分隔符的读法不同，而 `listDocFiles` 已把
+  路径归一为 `/` 分隔（`entry.split(/[\\/]/).join('/')`），匹配必须在归一化
+  **之后**、用 posix 语义进行（spec §7 第三条）。落地前以 `AC-1.8`/`AC-1.9`
+  钉住这两个语义点，防 Node 升级改口。`tools/whiteboard/package.json` 今天没有
+  `engines`，仓内也没有任何 Node 地板的声明；本轮同时声明
+  `engines.node: ">=23.6"`——原生 TypeScript 剥离（`bin/whiteboard.js` 直接
+  跑 `.ts`）已隐含这个地板，`matchesGlob` 的可用性从此有一处可查。
+  `@types/node` 今天是 `^22.15.3`（22.20.1 已带 `matchesGlob` 的类型，typecheck
+  不受阻）；与地板对齐到 24 系随 plan-00026 T2 一并做，不在本文档承诺版本号。
+- **过滤点**：`listDocFiles(docsDir, exclude)` 今天的链是 `.filter(.md 且非
+  模板文件) → .map(归一化为 '/') → .sort()`。glob 过滤**加在 `.map` 之后**——
+  `.filter(rel => !exclude.some(pattern => posix.matchesGlob(rel, pattern)))`
+  ——不能并进第一个 `.filter`：那一步拿到的还是原始分隔符的路径，Windows 上正是
+  反斜杠。两套过滤因此分处归一化前后、互不替代（`AC-1.4`）。`readGraph` 把
+  `config.exclude` 传下去；`DocService` 不需要知道排除的存在。
+- **命中为空或命中全部都不是错误**（`AC-1.10`/`AC-1.11`）：过滤器不计数、不
+  提示；空板走既有的空态路径（`spec-00001-AC-1.4`）。这是 `decision-00018` §4
+  明写接受的「远距离作用」，不在服务端补提示。
+
+### 14.3 下游后果——全部由「图上没有」推导，无新代码
+
+被排除的文件不进 `listDocFiles`，于是从未成为 `ParsedDoc`，以下每一条都是
+既有代码在新输入上的行为，本节只点名、不改动：
+
+| 后果 | 载体 | 验收 |
+| --- | --- | --- |
+| 不成节点、不进 `issues`/`diagnostics`，命令面板检索不到（`matchDocuments` 只扫节点） | `readGraph` | `AC-1.1`、`AC-1.5` |
+| 其文档 id 与条目 id 不在 `knownIds`/`itemOwners`/`idOwners` 中：指向它的关系边断链、归属声明方；行内 id 不可点击 | `toEdges`、`itemOwners`、§7 `idOwners` | `AC-3.1`…`AC-3.4` |
+| 与可见文档同 id 不构成撞 id（撞 id 判定只在 `docs` 数组内两两比对）；两个被排除文件同 id 无任何异常 | `readGraph` 的 duplicate 判定 | `AC-11.1`、`AC-11.2` |
+| 新建取号只计可见文档：`highestNumber(graph, type)` 读图上节点的声明 id | `workflow.ts` `allocateNumber` | `AC-12.1`、`AC-12.2` |
+| 文件变更触发 watcher → 重读 → 图相同 → 推送一次内容不变的刷新 | `DocsWatcher` | `AC-1.3` |
+| 共写收口：写进被排除路径的候选 `nodeAt` 为 `undefined` → `malformed` 返回「it is no document the board can read」→ 删除（复原） | `docService.ts` 收束、`cowrite.ts` `judgeReferences` | `AC-1.13` |
+
+最后一行是域主 2026-09-03 的裁定（`decision-00018` §5）：**沿用现状**，共写
+会话不该往语料目录写，写了即越界，删除即复原。§11.3 第 2 款原地加注。
+
+「文件变更 → 一次内容不变的刷新」这一行是有意留下的：`AC-1.3` 断言的是**图**
+不变，不是「不推送」。在 watcher 里预判路径是否被排除能省一次推送，但要把
+`exclude` 传进 `DocsWatcher`、并复制一份匹配逻辑；一次空刷新的代价（去抖后一
+次 `readGraph`）远低于两处匹配。
+
+### 14.4 对 `rule-00001-BR-18` 与 `docs/README.md` 的追注
+
+取号与撞 id 都以白板可见文档为准（`spec-00010-FR-11`/`FR-12`），
+`rule-00001-BR-18`「现有最大编号」与 `docs/README.md`「全仓唯一」两处随
+spec-00010 接收已追注。**已知边界**（`decision-00018` §4）：一份带 id 的被排除
+文件与新建文档可能在磁盘上同号而白板不报；`DocService.create` 对规范路径的
+`existsSync` 拦截（`ConflictError`）仍在，故被排除文件恰在规范路径上时新建会被
+拒，窗口只剩非规范路径的那部分。不加任何为被排除文件单独扫盘的代码——那就是
+「不存在」的第一条例外，站立约束禁止。
+
+### 14.5 测试与配置
+
+- `config.test.ts`：`AC-2.1`…`AC-2.9` 各一例，`AC-1.6`/`AC-1.7` 各一例。
+  `server.test.ts`：`GET /api/config` 不带 `exclude`（§14.1）。
+- `docRepository.test.ts`（或 `docService.test.ts` 的读图用例）：`AC-1.1`…
+  `AC-1.5`、`AC-1.8`…`AC-1.11`、`AC-3.1`…`AC-3.4`、`AC-11.1`/`AC-11.2`；
+  `AC-1.12` 以「同一 `docsDir`、两份 config 各起一个 `DocService`」写，不模拟
+  重启。
+- `workflow` 取号用例：`AC-12.1`/`AC-12.2`。`cowrite.test.ts`：`AC-1.13`。
+- 本仓 `whiteboard.config.yaml` 本轮就写入 `exclude: []` 与注释——与 §3 写入
+  `carries` 时同一理由：`parseFlowConfig` 只读认识的键，落地前这一行被忽略、
+  不拦启动；落地后它就是空排除。
+
+## 15. Open Questions
 
 - 本文档当前无未决项（第二十一轮的取舍全部由 decision-00012 在案；
   接续失效的出路已由域主裁定取「诚实标注」并回写 §10.2，2026-08-26；
@@ -1835,4 +1947,5 @@ headless 形态」拒绝——两条用户可见文案里的 "flow config" 随�
   第二十三轮委给本文档的三项——锚的数据形态、恰一处命中的判定细则、
   统一提交 API 的语义——已在 §12 逐项落定，随本轮评审一并接受或推翻，
   未留待定项；第二十六轮的取舍全部由 decision-00017 在案，委给本文档的
-  本地层文件形态与读取点已在 §13 落定）。
+  本地层文件形态与读取点已在 §13 落定；第二十七轮的取舍全部由
+  decision-00018 在案，`exclude` 的匹配器选型与三处下游后果已在 §14 落定）。

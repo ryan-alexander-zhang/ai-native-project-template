@@ -75,7 +75,8 @@ Hit policy: `UNIQUE`
 
 - **rule-00001-BR-18** (Definition) 新文档 id：`<type>-<五位数>-<slug>`，五位数
   取该类型现有最大编号加一（该类型无存量时为 `00001`）；slug 为小写连字符串，
-  语义自取。
+  语义自取。（spec-00010 追注：「现有」以白板可见文档为准，被流程配置 `exclude`
+  命中的文件不计，`spec-00010-FR-12`。）
 - **rule-00001-BR-19** (Constraint) 文档得处于 `archived` 的前提是仓库中存在
   以 `supersedes` 列出其 id 的替代文档（`archived` 意为「被替代」，不是
   「被否决」或「做完」）。On violation: 归档被拒绝。
