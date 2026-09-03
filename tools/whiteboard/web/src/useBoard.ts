@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { DocKind, FlowStep } from '../../src/config.ts'
 import type { DocGraph } from '../../src/docRepository.ts'
@@ -22,7 +22,8 @@ import {
 import type { EditorMode } from './Editor.tsx'
 import { connectEvents } from './eventSocket.ts'
 import { prefillFrontMatter } from './frontMatter.ts'
-import { type Placed, layoutGraph } from './layout.ts'
+import { readExpandedGroups, writeExpandedGroups } from './directoryGroups.ts'
+import { layoutGraph, orderedColumns } from './layout.ts'
 import { useDesktopNotifications } from './notify.ts'
 
 const EMPTY_GRAPH: DocGraph = { nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} }
@@ -75,7 +76,13 @@ function refusalText(error: unknown): string {
  */
 export function useBoard(openSession: (session: SessionListing) => void) {
   const [graph, setGraph] = useState<DocGraph>(EMPTY_GRAPH)
-  const [placed, setPlaced] = useState<Placed[]>([])
+  /**
+   * Which directory groups are open, by expand key (spec-00010-FR-6). The state
+   * lives here and not in `Board` or `Sidebar`, because toggling one group
+   * re-lays out the whole canvas and both places read the same set
+   * (design-00002 §19.3).
+   */
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(readExpandedGroups)
   const [kinds, setKinds] = useState<Record<string, DocKind>>({})
   // Relation field order drives the relation list's grouping (spec-00001-FR-30).
   const [relationOrder, setRelationOrder] = useState<string[]>([])
@@ -231,6 +238,33 @@ export function useBoard(openSession: (session: SessionListing) => void) {
    * the diff below is right as long as it sees every reading, in order.
    */
   const reading = useRef<Promise<unknown>>(Promise.resolve())
+
+  /**
+   * The one grouping and the one layout, from one memo: the canvas folds these
+   * columns and the navigation sidebar mirrors them, and two readings that
+   * disagreed by a hair on column order or on how an expand key is spelt would
+   * leave every group node unplaced at the origin (design-00002 §19.2, §19.3).
+   *
+   * `typeOrder` is a ref and deliberately **not** a dependency: correctness
+   * rests on the existing order of the first read — the config is awaited and
+   * only then is the graph set, which is exactly what spec-00001-AC-1.12 pins.
+   */
+  const { columns, placed } = useMemo(() => {
+    const laid = orderedColumns(graph, typeOrder.current)
+    return { columns: laid, placed: layoutGraph(laid, expandedGroups) }
+  }, [graph, expandedGroups])
+
+  /** Open a collapsed directory group or collapse an open one, and remember which (spec-00010-FR-6). */
+  const toggleGroup = useCallback(
+    (expandKey: string) => {
+      const next = expandedGroups.includes(expandKey)
+        ? expandedGroups.filter((one) => one !== expandKey)
+        : [...expandedGroups, expandKey]
+      writeExpandedGroups(next)
+      setExpandedGroups(next)
+    },
+    [expandedGroups],
+  )
 
   // The desktop side of the same two events (spec-00004): it is fed from the
   // diff below and posts nothing while the user is looking at the board.
@@ -423,7 +457,6 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     const first = seen.current === undefined
     announce(listing)
     setGraph(next)
-    setPlaced(layoutGraph(next, typeOrder.current))
     setSessions(listing)
     if (first) {
       // Nothing has been shown yet, so the board picks: the newest running
@@ -926,6 +959,30 @@ export function useBoard(openSession: (session: SessionListing) => void) {
     }
   }, [graph, selected])
 
+  /**
+   * A selection that lands inside a collapsed directory group opens it
+   * (spec-00010-FR-7). Every way of changing the selection — the command
+   * palette, the three lists, the relation list, the navigation sidebar, the
+   * session panel, an inline id, the detail panel's record — comes through
+   * `select`, so hanging the effect on `selected` covers all of them and no
+   * caller carries a line of its own.
+   *
+   * Only a **change** of the selection gets here: `selected` is the whole
+   * dependency, the same way §17.3's type groups are written, so collapsing the
+   * group the selected document sits in leaves it collapsed
+   * (spec-00010-AC-6.6, design-00002 §19.3).
+   */
+  useEffect(() => {
+    const group = columns
+      .flatMap((column) => column.groups)
+      .find((one) => one.nodes.some((node) => node.id === selected))
+    if (group === undefined || expandedGroups.includes(group.expandKey)) return
+    const next = [...expandedGroups, group.expandKey]
+    writeExpandedGroups(next)
+    setExpandedGroups(next)
+    // Only the selection may open a group, so the effect watches nothing else.
+  }, [selected])
+
   // Which document the fifth read is for: the one in the editor, and only while
   // a cowrite session is running on it (spec-00006-FR-4). The moment there is
   // none — the session ended, another document was opened — the disk text goes
@@ -999,6 +1056,11 @@ export function useBoard(openSession: (session: SessionListing) => void) {
   return {
     graph,
     placed,
+    // The columns the canvas folds and the sidebar mirrors, and the expanded
+    // state both of them share (design-00002 §19.2, §19.3).
+    columns,
+    expandedGroups,
+    toggleGroup,
     kinds,
     relationOrder,
     clarifiable,

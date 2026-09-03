@@ -199,6 +199,17 @@ describe('GET /api/config', () => {
     expect(body.clarifiable).toEqual(['idea', 'prd', 'spec', 'rule', 'design'])
     expect(body.auditable).toEqual(['spec', 'rule', 'design'])
   })
+
+  // design-00001 §14.1 — the scan exclusions are not sent: the page has no consumer for them
+  it('leaves the scan exclusions out of the payload', async () => {
+    const { repoRoot, docsDir } = makeRepo({})
+    const { call } = boardOnRepo(repoRoot, docsDir, testConfig("exclude: ['reference/**']\n"))
+
+    const { body } = await call('GET', '/api/config')
+
+    expect(body.exclude).toBeUndefined()
+    expect('exclude' in body).toBe(false)
+  })
 })
 
 describe('document reads', () => {

@@ -37,6 +37,10 @@ split, the relation fields, the product flow, and the agent commands. It is
 validated at startup, and a missing or invalid config stops the board — there is
 no built-in default.
 
+`exclude` is a list of glob patterns relative to `docs/`: a matched file does not
+exist for the board — no node, no anomaly, no id — and the list is read at
+startup, so a change to it takes effect on the next start (`spec-00010`).
+
 ### Adding an agent CLI
 
 The `agents` block names the CLI a session runs. A session's working directory is
@@ -59,6 +63,9 @@ your own machine is your own call.
 - `node-pty` ships prebuilt binaries whose `spawn-helper` needs the executable
   bit. npm blocks dependency install scripts, so `postinstall` restores it here;
   without it every session fails with `posix_spawnp failed`.
+- The first-level subdirectories of a type's directory fold into one directory
+  group node in that type's column, and the navigation sidebar mirrors it; the
+  two share one expand state, and a group starts collapsed (`spec-00010`).
 - The source runs on Node's native TypeScript stripping, so intra-package imports
   carry the real `.ts` extension and the code avoids constructor parameter
   properties, which strip-only mode rejects.

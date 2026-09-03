@@ -63,6 +63,8 @@ export interface FlowConfig {
   carries: Record<string, string[]>
   /** How many agent sessions may run at once (spec-00003-FR-3); a missing key reads as {@link DEFAULT_MAX_SESSIONS}. */
   maxSessions: number
+  /** Glob patterns relative to `docs/` whose matches do not exist for the board (spec-00010-FR-1); empty = nothing excluded. */
+  exclude: string[]
   agents: AgentConfig[]
 }
 
@@ -242,6 +244,48 @@ function readMaxSessions(raw: unknown): number {
   return raw
 }
 
+/**
+ * One exclusion pattern (spec-00010-FR-2), checked at its position in the list
+ * so the offending item is the one named. What is refused is what would read as
+ * a pattern in some other dialect than the one spec-00010-FR-1 fixes: a
+ * backslash separator, an absolute path, a `!` negation, and a `..` segment
+ * that would reach outside `docs/`.
+ */
+function readExcludePattern(value: unknown, at: string): void {
+  const seen = JSON.stringify(value)
+  if (typeof value !== 'string' || value === '') {
+    throw new ConfigError(`config: \`${at}\` must be a non-empty string, got ${seen}`)
+  }
+  if (value.includes('\\')) {
+    throw new ConfigError(`config: \`${at}\` must separate path segments with \`/\`, got ${seen}`)
+  }
+  if (value.startsWith('/')) {
+    throw new ConfigError(`config: \`${at}\` must be relative to docs/ and not start with \`/\`, got ${seen}`)
+  }
+  if (value.startsWith('!')) {
+    throw new ConfigError(`config: \`${at}\` must not start with \`!\`; negation is not supported, got ${seen}`)
+  }
+  if (value.split('/').includes('..')) {
+    throw new ConfigError(`config: \`${at}\` must not hold a \`..\` segment, got ${seen}`)
+  }
+}
+
+/**
+ * The scan exclusions of spec-00010-FR-1: glob patterns relative to `docs/`
+ * whose matches do not exist for the board. Missing, null or empty is a legal
+ * reading — nothing is excluded and the board behaves as it did before the key
+ * existed (spec-00010-AC-1.6, AC-1.7) — and every other shape refuses to start,
+ * naming the offending item by position the way `carries` names its type.
+ */
+function readExclude(raw: unknown): string[] {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) {
+    throw new ConfigError(`config: \`exclude\` must be a list of strings, got ${JSON.stringify(raw)}`)
+  }
+  raw.forEach((pattern, i) => readExcludePattern(pattern, `exclude[${i}]`))
+  return raw as string[]
+}
+
 function readAgentCwd(value: unknown, at: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || (value !== 'docs' && !value.startsWith('docs/')) || value.includes('..')) {
@@ -416,6 +460,7 @@ export function parseFlowConfig(text: string, source: string): FlowConfig {
     entry: readEntry(root.entry, types),
     carries: readCarries(root.carries, types, relations),
     maxSessions: readMaxSessions(root.max_sessions),
+    exclude: readExclude(root.exclude),
     agents: readAgents(root.agents),
   }
 }

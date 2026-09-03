@@ -1,28 +1,31 @@
-import type { DocGraph, DocNode } from '../../src/docRepository.ts'
-import { orderedColumns } from './layout.ts'
+import type { DocNode } from '../../src/docRepository.ts'
+import type { Column, DirectoryGroup } from './layout.ts'
 
-/** What a group is remembered and shown as (design-00002 §17.2). */
+/** What a group is remembered and shown as (design-00002 §17.2, §19.4). */
 export interface TypeGroup {
   /** The declared type as written, empty for a document carrying none: what a collapsed group is remembered by. */
   key: string
   /** The name on the header — the type itself, or `untyped` for the group of the documents without one. */
   type: string
+  /** Every document of the type, the directory groups' members included: what the header counts (spec-00010-AC-8.1). */
   nodes: DocNode[]
+  /** The documents of the type that belong to no directory group. */
+  top: DocNode[]
+  directories: DirectoryGroup[]
 }
-
-/** The name a group of documents without a declared type goes under. */
-const UNTYPED = 'untyped'
 
 /**
  * The navigation sidebar's groups: the canvas columns read as a list
- * (spec-00008-FR-1). Group order is column order and row order is row order
- * because both come from `orderedColumns` — there is no second rule here to
- * drift from the first (design-00002 §17.2).
+ * (spec-00008-FR-1). It is the board's own `columns` that comes in — the same
+ * array the canvas folds — so group order is column order and row order is row
+ * order with nothing here to drift from (design-00002 §17.2, §19.2, §19.4).
  */
-export function typeGroups(graph: DocGraph, typeOrder: string[]): TypeGroup[] {
-  return orderedColumns(graph, typeOrder).map((nodes) => {
-    // Every node of a column shares its type, so the first one names the group.
-    const key = nodes[0]!.type ?? ''
-    return { key, type: key === '' ? UNTYPED : key, nodes }
-  })
+export function typeGroups(columns: Column[]): TypeGroup[] {
+  return columns.map((column) => ({
+    key: column.key,
+    type: column.type,
+    nodes: [...column.top, ...column.groups.flatMap((group) => group.nodes)],
+    top: column.top,
+    directories: column.groups,
+  }))
 }

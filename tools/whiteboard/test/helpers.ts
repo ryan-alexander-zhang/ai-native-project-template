@@ -82,6 +82,18 @@ export function cowriteConfig(): FlowConfig {
   return config
 }
 
+/**
+ * The test config with `reference` as a type — the type spec-00010's exclusion
+ * criteria are written over — and the scan exclusions of spec-00010-FR-1 in
+ * `exclude`. Without `patterns` the key is absent altogether, which is the
+ * config as it reads today (spec-00010-AC-1.2).
+ */
+export function excludeConfig(patterns?: string[]): FlowConfig {
+  const config = testConfig(patterns === undefined ? '' : `exclude: ${JSON.stringify(patterns)}`)
+  config.types.reference = 'living'
+  return config
+}
+
 /** Create a temporary docs tree; keys are paths relative to the docs dir. */
 export function makeDocsDir(files: Record<string, string>): string {
   const docsDir = join(mkdtempSync(join(tmpdir(), 'wb-docs-')), 'docs')

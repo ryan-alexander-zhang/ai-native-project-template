@@ -1,6 +1,8 @@
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { contentHash, findNode, highestNumber, readDocContent, readGraph } from '../src/docRepository.ts'
-import { doc, makeDocsDir, relationEdge, testConfig } from './helpers.ts'
+import { doc, excludeConfig, makeDocsDir, relationEdge, testConfig } from './helpers.ts'
 
 const config = testConfig()
 
@@ -487,6 +489,237 @@ describe('idOwners', () => {
     expect(graph.edges).toEqual([])
     expect(graph.diagnostics).toEqual([])
     expect(graph.idOwners['spec-00001-FR-1']).toBe('spec-00001-whiteboard')
+  })
+})
+
+/**
+ * The scan exclusions of spec-00010-FR-1: a file a pattern matches does not exist
+ * for the board. Everything below the first two cases is a downstream consequence
+ * of that one omission and of nothing else — design-00001 §14.3 names them one by
+ * one precisely because no code carries them.
+ */
+describe('files an exclude pattern matches', () => {
+  const SOURCE_PATTERN = 'reference/*/source/**'
+  const SUMMARY = doc({ id: 'reference-00001-stripe', type: 'reference', status: 'active' }, '# Stripe\n')
+  const RAW = '# Stripe Webhooks\n\nscraped material, no front matter\n'
+  const CORPUS = { 'reference/stripe/source/a.md': RAW, 'reference/stripe/summary.md': SUMMARY }
+
+  function graphWith(files: Record<string, string>, patterns?: string[]) {
+    return readGraph(makeDocsDir(files), excludeConfig(patterns))
+  }
+
+  // spec-00010-AC-1.1
+  it('keeps a matched file out of the nodes, the issues, and the diagnostics', () => {
+    const graph = graphWith(CORPUS, [SOURCE_PATTERN])
+
+    expect(graph.nodes.map((node) => node.path)).toEqual(['reference/stripe/summary.md'])
+    expect(graph.issues).toEqual([])
+    expect(graph.diagnostics).toEqual([])
+  })
+
+  // spec-00010-AC-1.2
+  it('reads the same file as an anomalous node keyed by its path when no pattern is configured', () => {
+    const graph = graphWith(CORPUS)
+
+    const raw = graph.nodes.find((node) => node.path === 'reference/stripe/source/a.md')!
+    expect(raw.id).toBe('reference/stripe/source/a.md')
+    expect(raw.ok).toBe(false)
+    expect(graph.issues).toEqual([
+      { path: 'reference/stripe/source/a.md', nodeId: 'reference/stripe/source/a.md', message: 'front matter is missing' },
+    ])
+  })
+
+  // spec-00010-AC-1.3
+  it('gives back the same graph after a matched file changes on disk', () => {
+    const docsDir = makeDocsDir(CORPUS)
+    const config = excludeConfig([SOURCE_PATTERN])
+    const before = readGraph(docsDir, config)
+
+    writeFileSync(join(docsDir, 'reference/stripe/source/a.md'), doc({ id: 'reference-00099-a', type: 'reference', status: 'draft' }, '# Rewritten\n'))
+
+    expect(readGraph(docsDir, config)).toEqual(before)
+  })
+
+  // spec-00010-AC-1.4 — the template filter and the glob filter are two filters, not one
+  it('leaves out a README the glob does not reach and one it reaches too', () => {
+    const graph = graphWith(
+      { ...CORPUS, 'reference/stripe/README.md': '# Stripe\n', 'reference/stripe/source/README.md': '# Source\n' },
+      [SOURCE_PATTERN],
+    )
+
+    expect(graph.nodes.map((node) => node.path)).toEqual(['reference/stripe/summary.md'])
+  })
+
+  /**
+   * spec-00010-AC-1.5 at the level it is decided: the command palette matches over
+   * the graph's nodes (`matchDocuments`), so a title that is on no node is a title
+   * nothing can search up.
+   */
+  // spec-00010-AC-1.5
+  it('puts the title of a matched file on no node for the command palette to find', () => {
+    const graph = graphWith(CORPUS, [SOURCE_PATTERN])
+
+    expect(graph.nodes.map((node) => node.title)).toEqual(['Stripe'])
+    expect(graph.nodes.some((node) => node.title === 'Stripe Webhooks')).toBe(false)
+  })
+
+  // spec-00010-AC-1.8 — `*` matches within one segment and does not cross `/`
+  it('matches a single segment with `*` and no deeper', () => {
+    const graph = graphWith(
+      {
+        'reference/stripe/notes.md': doc({ id: 'reference-00001-notes', type: 'reference', status: 'active' }),
+        'reference/stripe/source/notes.md': doc({ id: 'reference-00002-deep', type: 'reference', status: 'active' }),
+      },
+      ['reference/*/notes.md'],
+    )
+
+    expect(graph.nodes.map((node) => node.path)).toEqual(['reference/stripe/source/notes.md'])
+  })
+
+  // spec-00010-AC-1.9 — a directory-shaped pattern matches the directory, not the files under it
+  it('matches nothing for a pattern naming a directory', () => {
+    const graph = graphWith(
+      {
+        'reference/stripe/summary.md': SUMMARY,
+        'reference/stripe/webhooks.md': doc({ id: 'reference-00002-hooks', type: 'reference', status: 'active' }),
+      },
+      ['reference/stripe'],
+    )
+
+    expect(graph.nodes.map((node) => node.path)).toEqual([
+      'reference/stripe/summary.md',
+      'reference/stripe/webhooks.md',
+    ])
+    expect(graph.nodes.every((node) => node.ok)).toBe(true)
+  })
+
+  // spec-00010-AC-1.10 — matching everything is no error and raises no prompt of its own
+  it('yields the empty graph, and no issue, for a pattern matching everything', () => {
+    expect(graphWith(CORPUS, ['**'])).toEqual({ nodes: [], edges: [], issues: [], diagnostics: [], idOwners: {} })
+  })
+
+  // spec-00010-AC-1.11 — matching nothing is no error either
+  it('yields the graph it would without any pattern for one matching nothing', () => {
+    const docsDir = makeDocsDir(CORPUS)
+
+    expect(readGraph(docsDir, excludeConfig(['nowhere/**']))).toEqual(readGraph(docsDir, excludeConfig()))
+  })
+})
+
+/**
+ * The ids a matched file declares are declared by nobody the board can see
+ * (spec-00010-FR-3, FR-11): the edges aimed at them break where they were
+ * declared, the inline-id table has no entry for them, and two matched files
+ * colliding on an id collide in no graph at all.
+ */
+describe('ids only an excluded file declares', () => {
+  const SOURCE_PATTERN = 'reference/*/source/**'
+  const EXCLUDED_REFERENCE = doc({ id: 'reference-00099-stripe-b', type: 'reference', status: 'draft' }, '# B\n')
+  const DESIGN = doc(
+    { id: 'design-00002-ui', type: 'design', status: 'active', informs: '[reference-00099-stripe-b]' },
+    '# UI\n',
+  )
+  const ARCHIVED_SPEC = doc(
+    { id: 'spec-00042-old', type: 'spec', status: 'active' },
+    '# Old\n\n- **spec-00042-FR-1** (Event) the old boundary.\n',
+  )
+  const RECORD = doc(
+    { id: 'record-00001-acceptance', type: 'record', status: 'active', verifies: '[spec-00042-FR-1]' },
+    '# Record\n',
+  )
+
+  const BROKEN_LINK = {
+    'design/ui.md': DESIGN,
+    'reference/stripe/source/b.md': EXCLUDED_REFERENCE,
+  }
+  const ARCHIVE = { 'spec/archive/spec-00042-old.md': ARCHIVED_SPEC, 'record/r.md': RECORD }
+
+  function graphWith(files: Record<string, string>, patterns: string[]) {
+    return readGraph(makeDocsDir(files), excludeConfig(patterns))
+  }
+
+  // spec-00010-AC-3.1
+  it('breaks a relation edge into an excluded document and files the issue on the declaring one', () => {
+    const graph = graphWith(BROKEN_LINK, [SOURCE_PATTERN])
+
+    expect(graph.edges).toEqual([relationEdge('design-00002-ui', 'reference-00099-stripe-b', 'informs', false)])
+    expect(graph.issues).toEqual([
+      {
+        path: 'design/ui.md',
+        nodeId: 'design-00002-ui',
+        message: 'informs points at unknown document "reference-00099-stripe-b"',
+      },
+    ])
+  })
+
+  // spec-00010-AC-3.2 — the item id of an excluded spec is owned by nobody either
+  it('breaks a record’s verifies into an item only an excluded spec declares', () => {
+    const graph = graphWith(ARCHIVE, ['spec/archive/**'])
+
+    expect(graph.edges).toEqual([relationEdge('record-00001-acceptance', 'spec-00042-FR-1', 'verifies', false)])
+    expect(graph.issues).toEqual([
+      {
+        path: 'record/r.md',
+        nodeId: 'record-00001-acceptance',
+        message: 'verifies points at unknown document "spec-00042-FR-1"',
+      },
+    ])
+  })
+
+  /**
+   * spec-00010-AC-3.3 at the level the server decides it: `idOwners` is the one
+   * basis of the inline-id jump's clickability (spec-00001-FR-57), so an id with
+   * no entry there is an id the panel renders unclickable. The rendering itself is
+   * the page's (web/test).
+   */
+  // spec-00010-AC-3.3
+  it('keeps an item id only an excluded spec declares out of idOwners', () => {
+    const graph = graphWith(ARCHIVE, ['spec/archive/**'])
+
+    expect(graph.idOwners['spec-00042-FR-1']).toBeUndefined()
+    expect(graph.idOwners['spec-00042-old']).toBeUndefined()
+  })
+
+  // spec-00010-AC-3.4 — a second read is the same read
+  it('breaks the same edge, once, on a second read', () => {
+    const docsDir = makeDocsDir(BROKEN_LINK)
+    const config = excludeConfig([SOURCE_PATTERN])
+    const first = readGraph(docsDir, config)
+
+    const second = readGraph(docsDir, config)
+
+    expect(second).toEqual(first)
+    expect(second.edges.filter((edge) => !edge.ok)).toHaveLength(1)
+    expect(second.issues).toHaveLength(1)
+  })
+
+  // spec-00010-AC-11.1 — an excluded file is in nobody's collision set
+  it('leaves a visible document sole owner of an id an excluded file also declares', () => {
+    const graph = graphWith(
+      { ...BROKEN_LINK, 'reference/reference-00099-stripe-b.md': EXCLUDED_REFERENCE },
+      [SOURCE_PATTERN],
+    )
+
+    const node = graph.nodes.find((one) => one.path === 'reference/reference-00099-stripe-b.md')!
+    expect(node.id).toBe('reference-00099-stripe-b')
+    expect(node.duplicateOf).toBeUndefined()
+    expect(node.ok).toBe(true)
+    expect(graph.edges).toEqual([relationEdge('design-00002-ui', 'reference-00099-stripe-b', 'informs')])
+    expect(graph.issues).toEqual([])
+  })
+
+  // spec-00010-AC-11.2 — two excluded files colliding on an id collide nowhere
+  it('reports nothing at all for two excluded files declaring one id', () => {
+    const graph = graphWith(
+      {
+        'reference/stripe/source/b.md': doc({ id: 'reference-00099-dup', type: 'reference', status: 'draft' }),
+        'reference/ccbill/source/c.md': doc({ id: 'reference-00099-dup', type: 'reference', status: 'draft' }),
+      },
+      [SOURCE_PATTERN],
+    )
+
+    expect(graph.nodes).toEqual([])
+    expect(graph.issues).toEqual([])
   })
 })
 

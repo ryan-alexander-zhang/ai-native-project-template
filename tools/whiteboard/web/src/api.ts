@@ -161,7 +161,7 @@ export interface AgentSettingsSaved {
  * the effective agent list rather than the config's own `agents`, which is only
  * the project layer of it (spec-00009-FR-3).
  */
-export type ConfigPayload = Omit<FlowConfig, 'agents'> & {
+export type ConfigPayload = Omit<FlowConfig, 'agents' | 'exclude'> & {
   agents: EffectiveAgent[]
   clarifiable: string[]
   auditable: string[]

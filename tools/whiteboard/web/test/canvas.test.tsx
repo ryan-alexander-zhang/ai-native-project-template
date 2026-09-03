@@ -1276,3 +1276,314 @@ describe('the minimap', () => {
     expect(blocks(container)).toEqual([])
   })
 })
+
+/**
+ * The directory groups on the canvas (spec-00010-FR-5 … FR-7, FR-10). Every
+ * fixture here has `docs/`-relative paths three segments deep, which is what
+ * makes a group at all (spec-00010-FR-4).
+ */
+describe('a directory group on the canvas', () => {
+  const DESIGN = node({ id: 'design-00002-ui', type: 'design', status: 'active', title: 'Board UI', path: 'design/design-00002-ui.md' })
+  const TOP = node({ id: 'reference-00001-a', type: 'reference', status: 'active', title: 'A top-level reference', path: 'reference/a.md' })
+
+  function reference(id: string, path: string, overrides: Partial<DocNode> = {}): DocNode {
+    return node({ id, type: 'reference', status: 'active', title: id, path, ...overrides })
+  }
+
+  const STRIPE_ONE = reference('reference-00011-s', 'reference/stripe/one.md')
+  const STRIPE_TWO = reference('reference-00012-t', 'reference/stripe/two.md')
+  const STRIPE_THREE = reference('reference-00013-u', 'reference/stripe/three.md')
+  const CCBILL_ONE = reference('reference-00021-c', 'reference/ccbill/one.md')
+  const CCBILL_TWO = reference('reference-00022-d', 'reference/ccbill/two.md')
+
+  /** The card of the collapsed or expanded group, and the row that toggles it. */
+  const STRIPE_CARD = 'group-reference-reference/stripe'
+  const CCBILL_CARD = 'group-reference-reference/ccbill'
+  const STRIPE_ROW = 'stripe, 3 documents'
+
+  const GROUPED: DocGraph = {
+    nodes: [DESIGN, TOP, STRIPE_ONE, STRIPE_TWO, STRIPE_THREE, CCBILL_ONE, CCBILL_TWO],
+    edges: [relationEdge('design-00002-ui', 'reference-00012-t', 'informs')],
+    issues: [],
+    idOwners: {},
+    diagnostics: [],
+  }
+
+  function serve(graph: DocGraph = GROUPED) {
+    vi.spyOn(api, 'graph').mockResolvedValue(graph)
+    vi.spyOn(api, 'transitions').mockResolvedValue([])
+    vi.spyOn(api, 'nextSteps').mockResolvedValue([])
+    vi.spyOn(api, 'items').mockResolvedValue({ items: [], diagnostics: [] })
+    vi.spyOn(api, 'sessions').mockImplementation(async () => served)
+    vi.spyOn(api, 'config').mockResolvedValue({
+      types: { design: 'living', spec: 'living', reference: 'living' },
+      relations: ['informs'],
+      flow: {},
+      focus: {},
+      agents: [{ name: 'claude', headless: false, source: 'project' }],
+      entry: [],
+      carries: {},
+      maxSessions: 3,
+      clarifiable: [],
+      auditable: [],
+    })
+  }
+
+  /** The board, open, with every group in the state the browser remembers. */
+  async function openBoard(graph: DocGraph = GROUPED) {
+    serve(graph)
+    const rendered = render(<Board />)
+    await waitFor(() => expect(screen.getByTestId('node-design-00002-ui')).toBeTruthy())
+    return rendered
+  }
+
+  beforeEach(() => {
+    served = []
+    // Collapsed by default is the state with no key at all (spec-00010-AC-6.5);
+    // an expanded set left by another case would be this one's starting point.
+    localStorage.removeItem('whiteboard-directory-groups-expanded')
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  // spec-00010-AC-5.1
+  it('stands one group node in for the three documents it holds', async () => {
+    await openBoard()
+
+    expect(screen.getByRole('button', { name: STRIPE_ROW })).toBeTruthy()
+    expect(screen.queryByTestId('node-reference-00011-s')).toBeNull()
+    expect(screen.queryByTestId('node-reference-00012-t')).toBeNull()
+    expect(screen.queryByTestId('node-reference-00013-u')).toBeNull()
+    // The top-level document of the same column is still a node of its own.
+    expect(screen.getByTestId('node-reference-00001-a')).toBeTruthy()
+  })
+
+  // spec-00010-AC-5.2 — the group carries a marker; the counts stay per document
+  it('marks a group holding an anomalous document without changing the counts', async () => {
+    const broken = reference('reference/stripe/bad.md', 'reference/stripe/bad.md', {
+      ok: false,
+      problems: ['no status'],
+    })
+    const elsewhere = node({ id: 'design/bad.md', type: 'design', path: 'design/bad.md', ok: false, problems: ['no id'] })
+    await openBoard({
+      ...GROUPED,
+      nodes: [...GROUPED.nodes, broken, elsewhere],
+      issues: [
+        { path: 'reference/stripe/bad.md', nodeId: 'reference/stripe/bad.md', message: 'no status' },
+        { path: 'design/bad.md', nodeId: 'design/bad.md', message: 'no id' },
+      ],
+    })
+
+    expect(screen.getByLabelText('1 document with problems')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Open the anomaly list' }))
+    const list = await screen.findByRole('dialog')
+    expect(within(list).getByText('reference/stripe/bad.md')).toBeTruthy()
+    expect(within(list).getByText('design/bad.md')).toBeTruthy()
+    expect(screen.getByText('2 issues')).toBeTruthy()
+  })
+
+  // spec-00010-AC-5.5 — one member is being worked on, so the group says so
+  it('carries a session marker for a session running on a member', async () => {
+    stubWebSocket()
+    served = [listing({ sourceId: 'reference-00012-t' })]
+    await openBoard()
+
+    expect(screen.getByLabelText('Running session in stripe')).toBeTruthy()
+  })
+
+  // spec-00010-AC-5.12 — one member running, another waiting: the group waits
+  it('reads as waiting when any member’s session awaits input', async () => {
+    stubWebSocket()
+    served = [
+      listing({ sourceId: 'reference-00012-t' }),
+      listing({ id: 's2', kind: 'ask', sourceId: 'reference-00013-u', awaiting: true }),
+    ]
+    await openBoard()
+
+    expect(screen.getByLabelText('Awaiting input session in stripe')).toBeTruthy()
+    expect(screen.queryByLabelText('Running session in stripe')).toBeNull()
+  })
+
+  // spec-00010-AC-5.6 — a group is not a document: clicking one selects nothing
+  it('leaves the selection and the toolbar alone when the group node is clicked', async () => {
+    await openBoard()
+    fireEvent.click(screen.getByTestId('node-design-00002-ui'))
+    await waitFor(() => expect(screen.getByRole('toolbar', { name: /design-00002-ui/ })).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId(STRIPE_CARD))
+
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+    expect(screen.getByRole('toolbar', { name: /design-00002-ui/ })).toBeTruthy()
+    expect(screen.queryByRole('toolbar', { name: /stripe/ })).toBeNull()
+  })
+
+  // spec-00010-AC-6.1
+  it('puts the members below the group node when the name row is activated', async () => {
+    await openBoard()
+
+    await userEvent.click(screen.getByRole('button', { name: STRIPE_ROW }))
+
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+    expect(screen.getByTestId('node-reference-00012-t')).toBeTruthy()
+    expect(screen.getByTestId('node-reference-00013-u')).toBeTruthy()
+    // The group node stays where it was, still counting all three.
+    expect(screen.getByRole('button', { name: STRIPE_ROW })).toBeTruthy()
+    // …and the group below it is untouched by its neighbour opening.
+    expect(screen.getByTestId(CCBILL_CARD)).toBeTruthy()
+    expect(screen.queryByTestId('node-reference-00021-c')).toBeNull()
+  })
+
+  /**
+   * spec-00010-AC-6.1 by the keyboard: the name row is a real button, so Tab
+   * reaches it and Enter fires it, and the key is stopped here rather than
+   * reaching the canvas under it (design-00002 §19.6).
+   */
+  it('opens the group from the keyboard', async () => {
+    await openBoard()
+
+    screen.getByRole('button', { name: STRIPE_ROW }).focus()
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+    expect(screen.getByRole('button', { name: STRIPE_ROW }).getAttribute('aria-expanded')).toBe('true')
+
+    // …and Space closes it again, the other key a button answers to.
+    screen.getByRole('button', { name: STRIPE_ROW }).focus()
+    await userEvent.keyboard(' ')
+
+    await waitFor(() => expect(screen.queryByTestId('node-reference-00011-s')).toBeNull())
+    expect(screen.getByRole('button', { name: STRIPE_ROW }).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  // spec-00010-AC-6.3
+  it('folds the members away again on the second activation', async () => {
+    await openBoard()
+    await userEvent.click(screen.getByRole('button', { name: STRIPE_ROW }))
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: STRIPE_ROW }))
+
+    await waitFor(() => expect(screen.queryByTestId('node-reference-00011-s')).toBeNull())
+    expect(screen.getByRole('button', { name: STRIPE_ROW })).toBeTruthy()
+  })
+
+  // spec-00010-AC-6.4 — the expanded set is the browser's, so it outlives the page
+  it('opens again on the group the user left open', async () => {
+    const first = await openBoard()
+    await userEvent.click(screen.getByRole('button', { name: STRIPE_ROW }))
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+    first.unmount()
+
+    render(<Board />)
+
+    await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+    expect(screen.queryByTestId('node-reference-00021-c')).toBeNull()
+  })
+
+  // spec-00010-AC-6.5
+  it('opens with every group collapsed when none was ever opened', async () => {
+    await openBoard()
+
+    expect(screen.getByTestId(STRIPE_CARD)).toBeTruthy()
+    expect(screen.getByTestId(CCBILL_CARD)).toBeTruthy()
+    expect(screen.queryByTestId('node-reference-00011-s')).toBeNull()
+    expect(screen.queryByTestId('node-reference-00021-c')).toBeNull()
+  })
+
+  /**
+   * spec-00010-AC-6.6 — folding the group of the selected document keeps the
+   * selection: the toolbar goes because React Flow draws none for a node that
+   * has left the canvas, and the right slot, which is driven by the selection
+   * itself, does not move (design-00002 §19.2).
+   */
+  it('keeps the selection, and hands the group node its presentation, when the group folds', async () => {
+    const inside = node({ id: 'spec-00042-x', type: 'spec', status: 'active', title: 'An archived spec', path: 'spec/archive/x.md' })
+    await openBoard({ ...GROUPED, nodes: [...GROUPED.nodes, inside] })
+    await userEvent.click(screen.getByRole('button', { name: 'archive, 1 document' }))
+    fireEvent.click(await screen.findByTestId('node-spec-00042-x'))
+    await waitFor(() => expect(screen.getByLabelText('Requirements of spec-00042-x')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('group-spec-spec/archive'))
+
+    await waitFor(() => expect(screen.queryByTestId('node-spec-00042-x')).toBeNull())
+    expect(screen.queryByRole('toolbar')).toBeNull()
+    expect(screen.getByLabelText('Requirements of spec-00042-x')).toBeTruthy()
+    expect(screen.getByTestId('group-spec-spec/archive').getAttribute('aria-current')).toBe('true')
+  })
+
+  // spec-00010-AC-6.7 — the aggregated marker only opens the group
+  it('opens the group when its session marker is activated', async () => {
+    served = [listing({ id: 's3', kind: 'ask', sourceId: 'reference-00012-t' })]
+    await openBoard()
+
+    await userEvent.click(screen.getByLabelText('Running session in stripe'))
+
+    await waitFor(() => expect(screen.getByTestId('node-reference-00012-t')).toBeTruthy())
+    expect(screen.queryByRole('toolbar')).toBeNull()
+  })
+
+  describe('on the minimap', () => {
+    const blocks = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('.react-flow__minimap-node')).map((block) => block.getAttribute('class'))
+
+    // spec-00010-AC-10.1 — one block for the group, in the anomaly colour
+    it('draws a collapsed group holding an anomalous document as one anomalous block', async () => {
+      const broken = reference('reference/stripe/bad.md', 'reference/stripe/bad.md', { ok: false, problems: ['no status'] })
+      const { container } = await openBoard({
+        ...GROUPED,
+        nodes: [DESIGN, TOP, STRIPE_ONE, STRIPE_TWO, STRIPE_THREE, broken],
+        edges: [],
+      })
+
+      await waitFor(() => expect(blocks(container)).toHaveLength(3))
+      expect(blocks(container)).toEqual([
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-anomaly',
+      ])
+    })
+
+    // spec-00010-AC-10.2 — open, the group is still one block, and its members are their own
+    it('keeps the group’s own block when it is expanded and colours each member by its status', async () => {
+      const { container } = await openBoard({
+        ...GROUPED,
+        nodes: [
+          DESIGN,
+          TOP,
+          reference('reference-00011-s', 'reference/stripe/one.md', { status: 'draft' }),
+          reference('reference-00012-t', 'reference/stripe/two.md', { status: 'active' }),
+          reference('reference-00013-u', 'reference/stripe/three.md', { status: 'archived' }),
+        ],
+        edges: [],
+      })
+      await userEvent.click(screen.getByRole('button', { name: STRIPE_ROW }))
+      await waitFor(() => expect(screen.getByTestId('node-reference-00011-s')).toBeTruthy())
+
+      await waitFor(() => expect(blocks(container)).toHaveLength(6))
+      expect(blocks(container)).toEqual([
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-group',
+        'react-flow__minimap-node minimap-status-draft',
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-status-archived',
+      ])
+    })
+
+    // spec-00010-AC-10.3 — no anomaly in it, so it takes the group node's own token
+    it('draws a sound collapsed group as one block of the group colour', async () => {
+      const { container } = await openBoard({
+        ...GROUPED,
+        nodes: [DESIGN, TOP, CCBILL_ONE, CCBILL_TWO],
+        edges: [],
+      })
+
+      await waitFor(() => expect(blocks(container)).toHaveLength(3))
+      expect(blocks(container)).toEqual([
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-status-active',
+        'react-flow__minimap-node minimap-group',
+      ])
+    })
+  })
+})
