@@ -47,11 +47,43 @@ decision trail, the ledger, the stop conditions.
   maintenance activity. Web lookup is allowed to verify versions; cite what was
   consulted.
 
+## Agents
+
+Two roles do the work; the orchestrating session only reads and writes the
+ledger and dispatches. A role is a contract on what it may write and how strong
+its model must be. Model names never appear in this file: each harness binds the
+roles to its own models (see Bindings), so the same run reads the same under any
+harness.
+
+| Role | Runs | May write | Model |
+| --- | --- | --- | --- |
+| `doc-agent` | `intake`, `prd`, `architecture`, `spec`, `plan`, `pr`; in `acceptance` the GWT verification, the code review and the `record`; every audit and pre-promotion check; every `decision`; every `issue` doc | anything | not weaker than the orchestrator's |
+| `code-agent` | `implement`, task by task; in `acceptance` the manual or browser smoke runs and the fixes for review findings | code, tests, config and build files the tasks name; its own ledger lines | may be one tier below the orchestrator's |
+
+- `code-agent` never creates or edits a file under `docs/`. When a task meets a
+  defect or an ambiguity, it writes what it found into the ledger and returns;
+  the orchestrator dispatches `doc-agent` for the `issue` or `decision`, then
+  resumes the task with `code-agent`.
+- `doc-agent` is the only role that stands in for a human round (Human rounds
+  replaced). It is never bound to a model below the orchestrator's — a cheaper
+  gate is no gate.
+- A harness without subagents, or without per-role model binding, runs every
+  stage in the orchestrator's own context at `doc-agent` strength. The fallback
+  is always the stronger side.
+- Each ledger stage row records the role and the model that actually ran it.
+
+### Bindings
+
+| Harness | Where the roles are bound |
+| --- | --- |
+| Claude Code | `.claude/agents/autopilot-doc.md`, `.claude/agents/autopilot-code.md` (`model` in the front matter) |
+| Codex | `.codex/agents/autopilot-doc.toml`, `.codex/agents/autopilot-code.toml` (`model` and `model_reasoning_effort`). Do not set `agents.default_subagent_model` in any `config.toml`: it overrides the role files |
+| any other | add a row here before the first run; until then, fallback above |
+
 ## Stages
 
-Each stage runs in a fresh context (a subagent where the agent has one); the
-orchestrating session only reads and writes the ledger and dispatches. Each
-stage ends with a commit. A stage the idea does not need is marked `n/a` in the
+Each stage runs in a fresh context under the role the Agents table assigns it.
+Each stage ends with a commit. A stage the idea does not need is marked `n/a` in the
 ledger with a one-line reason. Ledger row names:
 
 1. `intake` — branch, `idea` active, ledger.
@@ -69,8 +101,11 @@ ledger with a one-line reason. Ledger row names:
    found on the way gets its `issue` doc first (`docs/issue/README.md`) and is
    fixed within the run. Exit: the `DEVELOPMENT.md` and `TESTING.md`
    Definitions of Done hold.
-7. `acceptance` — the verification subagent and the `record` acceptance
-   checklist; `plan` -> `resolved` (`AGENTS.md` §8, last bullet).
+7. `acceptance` — the verification subagent, one `doc-agent` code review of
+   the run's whole diff per `REVIEW.md` (findings are fixed by `code-agent`
+   before the stage ends), the smoke runs `TESTING.md` asks for (`code-agent`,
+   results written into the ledger), and the `record` acceptance checklist;
+   `plan` -> `resolved` (`AGENTS.md` §8, last bullet).
 8. `pr` — open the PR per `PR.md` against the branch the run started from. The
    PR body links the ledger and lists every `decided_by: agent` decision. Stop.
 
@@ -81,7 +116,7 @@ document of record, so it needs no front matter and no exception to any rule. It
 is the run's single source of progress and the reviewer's index afterwards. Body:
 
 - a stage table: stage | progress (`pending` / `running` / `done` / `n/a` /
-  `blocked`) | docs produced (ids);
+  `blocked`) | agent (role and the model that ran it) | docs produced (ids);
 - a decisions list: id, `decided_by`, the choice in one line;
 - a Blocked section: empty until a stop condition fires.
 
@@ -103,6 +138,8 @@ lower a threshold or suppress a finding to get past a gate (`CODE_QUALITY.md`).
 - An `issue` cannot be fixed within the plan's scope.
 - A root guide requires a human approval the run cannot obtain: the exception to
   `TESTING.md`'s completion bar, anything `SECURITY.md` escalates.
+- The harness has no row in Bindings and cannot run at `doc-agent` strength, or
+  a `doc-agent` stage would run on a model below the orchestrator's.
 
 ## Done
 
