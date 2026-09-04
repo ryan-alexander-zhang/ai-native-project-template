@@ -76,9 +76,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-#   Anchored: a bare `lib/` matches at every depth and swallowed
-#   tools/whiteboard/web/src/lib/ (issue-00017). setuptools writes this one at
-#   the repo root, which is all this rule ever meant.
+#   Anchored: a bare `lib/` matches at every depth and swallows any source
+#   directory of that name. setuptools writes this one at the repo root, which
+#   is all this rule ever meant.
 /lib/
 lib64/
 parts/
@@ -314,5 +314,5 @@ coverage/
 *.orig
 *.rej
 
-#   Whiteboard clarify session state (spec-00001-FR-46)
+#   Local state written by the persimmon docs whiteboard
 .whiteboard/

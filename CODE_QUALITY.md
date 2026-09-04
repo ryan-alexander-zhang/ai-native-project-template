@@ -41,8 +41,6 @@ List every check that fails the build. A check that only warns is not a gate.
 | Complexity + duplication | PMD + CPD (`failOnViolation=true`) | all modules | `aipersimmon-ddd-quality-config` → `pmd-ruleset.xml` |
 | Bytecode defects | SpotBugs (`failOnError=true`) | all modules | `aipersimmon-ddd-quality-config` → `spotbugs-exclude.xml` |
 | Coverage + mutation | JaCoCo + PIT | opt-in per domain module (`design-00007` §4.3) | per-module pom — bar per [TESTING.md](TESTING.md) |
-| Static analysis (whiteboard) | `tsc --noEmit` | `tools/whiteboard/{src,web/src,test,web/test}` | `tools/whiteboard/tsconfig.json` |
-| Coverage (whiteboard) | `vitest` + `@vitest/coverage-v8` | `tools/whiteboard/{src,web/src}`, less `web/src/main.tsx` and the vendored `web/src/components/ui/**` — bar per [TESTING.md](TESTING.md) | `tools/whiteboard/vitest.config.ts` |
 
 Shared config lives in `aipersimmon-ddd-quality-config`. There is no shared
 provider parent, so **two** build files carry the plugin block by hand and must

@@ -1,4 +1,6 @@
 # Docs whiteboard flow config — the machine-readable carrier of rule-00001-docs-workflow.
+# Read by the persimmon docs whiteboard (github.com/ryan-alexander-zhang/persimmon);
+# the rule, spec, and decision ids cited below live in that repository's docs/.
 # Carries the type split (BR-1) and the product flow (BR-13…BR-17), and — since
 # spec-00002 — the relation matrix (`carries`) that holds each folder README's
 # "Relations" section.
