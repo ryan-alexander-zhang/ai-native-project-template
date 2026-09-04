@@ -19,14 +19,14 @@ Write the document description or comment after the front matter.
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
-- An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the whiteboard's `exclude` config hits are not documents here: they take no number and count as no collision, `spec-00010-FR-11`/`FR-12`.) Allocating the next free number per type (`rule-00001-BR-18`) is what keeps a new document from colliding; a collision that already exists is surfaced by the whiteboard as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
+- An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the whiteboard's `exclude` config hits are not documents here: they take no number and count as no collision.) Allocating the next free number per type is what keeps a new document from colliding; a collision that already exists is surfaced by the whiteboard as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]` and set the old doc to `archived`.
 - `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
 - A **substantive revision** of an `active` `spec`, `rule`, or `design` goes
-  through the **revision round** (`rule-00001-BR-3`): demote it to `draft` on
+  through the **revision round**: demote it to `draft` on
   the board, revise, audit, and re-accept — never edit the `active` file in
   place. Typo-level fixes are exempt; when in doubt, it is substantive.
 - `decided_by` (`decision` only, not a relation): `human` when a person made the choice, `agent` when an agent made it unattended. Written only by autopilot runs (`AUTOPILOT.md`); absent means a human was in the loop.
@@ -57,9 +57,8 @@ Write the document description or comment after the front matter.
     **requirement-item ids** (`spec-<nnnnn>-FR-<i>`, `rule-<nnnnn>-BR-<i>`, or
     an `AC-<i>.<j>`) of items that exist: a `record`'s `verifies` (what it
     checked), and a `plan`'s `implements` — item ids there declare the plan's
-    **delivery scope** (`rule-00001-BR-24`): the items whose acceptance must be
-    verified by that plan's records before the plan may turn `resolved`
-    (`rule-00001-BR-25`). An AC id in `implements` puts its owning item in
+    **delivery scope**: the items whose acceptance must be verified by that
+    plan's records before the plan may turn `resolved`. An AC id in `implements` puts its owning item in
     scope; a whole spec/rule doc id puts every item of that doc in scope.
 
 ## Relations

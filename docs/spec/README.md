@@ -24,8 +24,7 @@ Add more when useful.
 
 ## 机器可读形态（条目文法）
 
-白板按以下形态解析本文件夹文档的正文；不合式的行进解析诊断
-（`spec-00001-FR-40`，取舍见 `decision-00005-whiteboard-parsing-contract`）：
+白板按以下形态解析本文件夹文档的正文；不合式的行进解析诊断：
 
 - 需求条目声明，二选一，整行起头：
   - 列表项：`- **spec-<n>-FR-<i>** (<EARS 类型>) <正文>`，后续缩进行为续行
@@ -78,7 +77,7 @@ How to split:
    `active` spec. This is the default.
 2. **Decomposing an oversized spec.** Write the replacement specs, each
    carrying `supersedes: [<old spec id>]`; set the old spec to `archived`
-   (this satisfies `rule-00001-BR-19`). Requirement ids are namespaced by doc
+   Requirement ids are namespaced by doc
    id, so they are **not** renumbered or migrated: existing `record` rows and
    `plan` scopes keep pointing at the archived spec's items, which remain
    resolvable — history is evidence, not content to rewrite. New work cites

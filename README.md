@@ -79,7 +79,7 @@ once and point it at any repository created from this template. What stays
 here is [whiteboard.config.yaml](whiteboard.config.yaml), the flow
 configuration the board reads, and the `.whiteboard/` local-state directory it
 writes (git-ignored). The board was developed inside this repository and moved
-out; see persimmon's `decision-00019`.
+out; its own docs record why.
 
 ## Repo Map
 

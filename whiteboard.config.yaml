@@ -1,18 +1,16 @@
-# Docs whiteboard flow config — the machine-readable carrier of rule-00001-docs-workflow.
-# Read by the persimmon docs whiteboard (github.com/ryan-alexander-zhang/persimmon);
-# the rule, spec, and decision ids cited below live in that repository's docs/.
-# Carries the type split (BR-1) and the product flow (BR-13…BR-17), and — since
-# spec-00002 — the relation matrix (`carries`) that holds each folder README's
-# "Relations" section.
-# The status transition table (BR-2…BR-9), the clarifiable set (BR-20), the
-# auditable set (BR-23), the resolved gate (BR-24, BR-25), the Open Questions
-# promotion gate and the archive `supersedes` gate (spec-00002-FR-1, FR-3), and
-# the "`parent` is single-valued" rule of docs/README.md are all built into the
-# code and are not configured here.
+# Docs whiteboard flow config — the machine-readable form of this repo's docs
+# workflow, read by the persimmon docs whiteboard
+# (github.com/ryan-alexander-zhang/persimmon). Its field contracts are specified
+# in that repository's docs/; this file carries only what a project may tune.
+# Carries the type split, the product flow, and the relation matrix (`carries`)
+# that holds each folder README's "Relations" section.
+# The status transition table, the clarifiable set, the auditable set, the
+# resolved gate, the Open Questions promotion gate, the archive `supersedes`
+# gate, and the "`parent` is single-valued" rule of docs/README.md are all built
+# into the code and are not configured here.
 
 # The declaration order below IS the whiteboard's column order, left to right
-# (decision-00002-whiteboard-layout §2). Reordering these lines reorders the
-# board; add a new type at the position you want its column to appear.
+# Reordering these lines reorders the board; add a new type at the position you want its column to appear.
 types:
   idea: { kind: living }
   prd: { kind: living }
@@ -31,27 +29,27 @@ types:
   operation: { kind: living }
   prompt: { kind: living }
 
-# Flow entry types (rule-00001-BR-26, spec-00001-FR-53): the types the board's
+# Flow entry types: the types the board's
 # create entry offers. Every name must be a declared type; omit or empty = no
 # create entry on the board. Several of these are situational folders —
 # projects that do not use them should drop those from this list.
 entry: [idea, prd, design, analysis, decision, integration, reference, operation, prompt, report]
 
-# Session concurrency cap (spec-00003-FR-3): how many agent sessions may run at
+# Session concurrency cap: how many agent sessions may run at
 # once. Omit it and the board runs with the default 3; anything that is not a
 # positive integer refuses to start the board.
 max_sessions: 5
 
-# Exclude (spec-00010-FR-1): glob patterns relative to docs/, matched
+# Exclude: glob patterns relative to docs/, matched
 # case-sensitively against '/'-separated file paths. `**` crosses directories,
 # `*` stays within one segment, a directory-shaped pattern does not match the
 # files under it — write `reference/*/source/**`, not `reference/*/source`.
 # `!` negation is not supported. A file a pattern hits does not exist to the
 # board: no node, no anomaly, not searchable, its id neither resolvable nor
-# counted (spec-00010-FR-3, FR-11, FR-12). Missing, null or empty = nothing
+# counted. Missing, null or empty = nothing
 # excluded. Anything but a list of strings, or an entry that is empty, holds a
 # `..` segment or a `\`, or starts with `/` or `!`, refuses to start the board
-# (spec-00010-FR-2). Read at startup only — restart the board after changing it.
+# Read at startup only — restart the board after changing it.
 exclude: []
 
 relations:
@@ -64,7 +62,7 @@ relations:
   - verifies
   - supersedes
 
-# The relation matrix (spec-00002-FR-5): type -> the relation fields a document of
+# The relation matrix: type -> the relation fields a document of
 # that type may declare. This is the only thing that answers "does this relation
 # field belong to this type"; the board reads it instead of the prose in each
 # folder's README, and every list below is copied from that README's "Relations"
@@ -118,9 +116,9 @@ flow:
     - { next: issue, carry: blocks }
     - { next: record, carry: parent }
 
-# Focus lines (spec-00001-FR-48): one line per clarifiable type, the questioning
+# Focus lines: one line per clarifiable type, the questioning
 # weight a clarify session leans on. The clarifiable set — idea, prd, spec, rule,
-# design (rule-00001-BR-20) — is built into the code, and the shared questioning
+# design — is built into the code, and the shared questioning
 # skeleton with it; this file owns only the one line per type, so the weight is
 # yours to retune at any time. A clarifiable type with no line here, or a line
 # given to any other type, refuses to start the board.
@@ -135,10 +133,9 @@ agents:
   claude:
     command: claude
     # Write-scope constraint: the session runs with docs/ as its working directory.
-    # Any CLI added here must first be verified against spec-00001-AC-13.2
-    # (a write outside docs/ must not land) before it ships in this file — and,
-    # since the co-write round, in the co-write form too (spec-00006-FR-7,
-    # design-00001 §11.5): out-of-repo reads are decided by the CLI's own
+    # Any CLI added here must first be verified: a write outside docs/ must not
+    # land before it ships in this file — and,
+    # since the co-write round, in the co-write form too: out-of-repo reads are decided by the CLI's own
     # permission mechanism — the board never pre-authorises a read, answers a
     # prompt, or suppresses one. Whether a prompt appears at all is that CLI
     # version's own policy; if one does appear and the owner denies it, the
@@ -149,7 +146,7 @@ agents:
     # auto-allowed out-of-repo reads with no prompt shown.
     args: []
     cwd: docs
-    # The non-interactive form an ask thread calls (spec-00005-FR-8): one
+    # The non-interactive form an ask thread calls: one
     # question in, one answer out, the process gone. `{question}` is the whole
     # payload — the read-only instruction plus the question on a first call, the
     # follow-up alone on a resume — and `{session}` is the resume id the capture
@@ -158,7 +155,7 @@ agents:
     # `.session_id` is that resume id.
     #
     # Verified against this CLI (claude 2.1.246) before it was written here, the
-    # four checks design-00001 §10.1 requires: the stdout of
+    # four checks the headless contract requires: the stdout of
     # `-p --output-format json` is one JSON object; its `.result` and
     # `.session_id` are the answer and the resume id; `--resume` takes that id
     # and continues the conversation; and `--permission-mode plan` holds — a
@@ -168,9 +165,9 @@ agents:
       first:  [-p, --output-format, json, --permission-mode, plan, "{question}"]
       resume: [-p, --output-format, json, --permission-mode, plan, --resume, "{session}", "{question}"]
       capture: claude-json
-    # Model (spec-00009-FR-1, design-00001 §13.5): `model` plus a `{model}`
+    # Model: `model` plus a `{model}`
     # placeholder in `args` AND in both headless forms — the three must go in
-    # together, or startup refuses the entry (spec-00009-FR-2). Verified against
+    # together, or startup refuses the entry. Verified against
     # claude 2.1.258 (2026-09-02) with `--model sonnet`: the interactive form's
     # banner and `/status` report `sonnet (claude-sonnet-5)`; the `-p` first and
     # `--resume` calls both answered with `.modelUsage` keyed `claude-sonnet-5`,

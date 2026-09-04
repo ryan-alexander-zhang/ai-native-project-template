@@ -6,8 +6,8 @@ An unattended run from a one-line idea prompt to a review-ready PR. Entry is the
 `autopilot` skill (`/autopilot <prompt>`), or asking any agent to "run
 AUTOPILOT.md with: <prompt>".
 
-The stages follow the product flow [docs/README.md](docs/README.md) and
-`rule-00001` define, and every root guide applies as written. This file lists only
+The stages follow the product flow [docs/README.md](docs/README.md) defines,
+and every root guide applies as written. This file lists only
 what autopilot adds: the intake round, the human rounds it stands in for, the
 decision trail, the ledger, the stop conditions.
 
@@ -30,7 +30,7 @@ decision trail, the ledger, the stop conditions.
 | `AGENTS.md` §5: a term conflicting with `CONTEXT.md` — stop | Resolve it as a decision, update `CONTEXT.md`, continue |
 | `AGENTS.md` §6: what only a domain owner can settle is never an assumption | Still never an assumption — it becomes a `decision` with `decided_by: agent`, so the owner can find and overturn it |
 | `DOCUMENT.md`: a doc with open questions stays `draft` | Each open question is closed by a `decision` before the doc is promoted; the Open Questions section is deleted |
-| `DOCUMENT.md`: ask if a draft is reviewed, then promote | For `spec` / `rule` / `design`: the audit (`AGENTS.md` §6) with zero unresolved findings. For `prd` and `plan`, which `rule-00001-BR-23` keeps outside the audit: a pre-promotion check by a subagent that did not write it, against the folder README |
+| `DOCUMENT.md`: ask if a draft is reviewed, then promote | For `spec` / `rule` / `design`: the audit (`AGENTS.md` §6) with zero unresolved findings. For `prd` and `plan`, which are outside the audit: a pre-promotion check by a subagent that did not write it, against the folder README |
 | Harness default: commit only when asked | The invocation authorises commits on `autopilot/<slug>`, per `COMMIT.md`. Never commit to `main`, never merge, never force-push |
 | `PR.md` / `REVIEW.md`: human review before merge | Not replaced. The run ends at an open PR |
 
