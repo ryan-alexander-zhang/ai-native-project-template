@@ -39,8 +39,8 @@ List every check that fails the build. A check that only warns is not a gate.
 |---|---|---|---|
 | Format | *(none yet)* | — | — |
 | Complexity + duplication | *(none yet)* | — | — |
-| Static analysis | `tsc --noEmit` | `tools/whiteboard/{src,web/src,test,web/test}` | `tools/whiteboard/tsconfig.json` |
-| Coverage | `vitest` + `@vitest/coverage-v8` | `tools/whiteboard/{src,web/src}`, less `web/src/main.tsx` and the vendored `web/src/components/ui/**` (see §6 and [decision-00001](docs/decision/decision-00001-whiteboard-ui-stack.md) §4) — bar per [TESTING.md](TESTING.md) | `tools/whiteboard/vitest.config.ts` |
+| Static analysis | *(none yet)* | — | — |
+| Coverage | *(none yet)* | — | — |
 
 Record where the shared config lives. If more than one build file carries the
 same gate configuration, name each one here — they must be changed together.
