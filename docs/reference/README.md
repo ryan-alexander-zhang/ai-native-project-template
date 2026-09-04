@@ -8,7 +8,7 @@ Use `TEMPLATE.md` for front matter.
 - `reference-<five-digit-number>-<slug>.md`, the standard id format from
   [docs/README.md](../README.md) — for example
   `reference-00001-api-provider-docs-summary.md`.
-- A reference is a `living` doc like any other (`rule-00001-BR-1`) and appears
+- A reference is a `living` doc like any other and appears
   on the board, so it carries the same `id` / `type` / `status` front matter.
   Record when the material was captured in the body, not in the filename.
 

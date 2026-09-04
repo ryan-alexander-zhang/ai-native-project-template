@@ -37,8 +37,7 @@ names no violation response leaves the implementer to invent one.
 ### Condition notation
 
 Rule text and table cells are prose the whiteboard does not parse; precision is
-the author's job, checked at review. Checklist items, not grammar
-(`decision-00013-rule-notation-not-dmn`):
+the author's job, checked at review. Checklist items, not grammar:
 
 1. Ranges use explicit interval notation with stated boundaries — `(30, 60]`,
    `>= 2` — never "over 30" or "about a month".
@@ -60,8 +59,7 @@ Every `BR` needs at least one example; an unreferenced rule is unverified.
 
 ## 机器可读形态（条目文法）
 
-白板按以下形态解析本文件夹文档的正文；不合式的行进解析诊断
-（`spec-00001-FR-40`，取舍见 `decision-00005-whiteboard-parsing-contract`）：
+白板按以下形态解析本文件夹文档的正文；不合式的行进解析诊断：
 
 - 规则声明，二选一，整行起头：
   - 列表项：`- **rule-<n>-BR-<i>** (<Kind>) <正文>`，后续缩进行为续行
@@ -109,7 +107,7 @@ Definition rule (or its own small table), add it to Terms, and let the
 downstream table take it as an input. Chains of small tables through named
 intermediate values, not one wide table (DMN's decision-requirements pattern,
 in text). Restructuring an `active` rule doc this way is a substantive
-revision — it goes through the revision round (`rule-00001-BR-3`).
+revision — it goes through the revision round.
 
 When the doc itself has grown into two policy areas, split the doc per
 `docs/README.md` (`supersedes` + `archived`), like an oversized spec.

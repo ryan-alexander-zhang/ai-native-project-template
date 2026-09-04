@@ -1,5 +1,5 @@
 {
-  "note": "Paths owned by the main branch. They define the docs-system skeleton and must stay byte-identical on every lang/* branch. Everything not listed here (language-specific docs like CODE_STYLE.md / *_TESTING.md / ARCHITECTURE.md, template.json, README.md, source files, and docs/<kind>/ instance documents) is free to customize on a lang branch. See decision-00003 and DEVELOPMENT.md.",
+  "note": "Paths owned by the main branch. They define the docs-system skeleton and must stay byte-identical on every lang/* branch. Everything not listed here (language-specific docs like CODE_STYLE.md / *_TESTING.md / ARCHITECTURE.md, template.json, README.md, source files, and docs/<kind>/ instance documents) is free to customize on a lang branch. See DEVELOPMENT.md.",
   "frozen": [
     "AGENTS.md",
     "DOCUMENT.md",

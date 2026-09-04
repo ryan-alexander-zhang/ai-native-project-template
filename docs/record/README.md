@@ -16,7 +16,7 @@ Add more when useful.
 ## Relations
 
 - `parent` — the `plan` this record accepts. **Required when the record is a
-  plan's acceptance record**: the resolved gate (`rule-00001-BR-25`) only counts
+  plan's acceptance record**: the resolved gate only counts
   rows from records whose `parent` points at the plan being resolved — a record
   without it is invisible to the gate.
 - `verifies` — what was verified: `spec` / `rule` ids, or requirement ids down to
@@ -45,8 +45,7 @@ unreferenced rule row is an unverified rule.
 
 ## 机器可读形态（条目文法）
 
-白板按以下形态解析验收清单；不合式的行进解析诊断（`spec-00001-FR-40`，取舍见
-`decision-00005-whiteboard-parsing-contract`）：
+白板按以下形态解析验收清单；不合式的行进解析诊断：
 
 - 验收清单表的识别：表头含「测试/Test」与「结果/Result」字样（子串即可，两列
   都不得是首列），且首列单元格是**条目/AC id 的全匹配**
