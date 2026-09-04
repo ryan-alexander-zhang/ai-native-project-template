@@ -77,7 +77,7 @@ harness.
 | Harness | Where the roles are bound |
 | --- | --- |
 | Claude Code | `.claude/agents/autopilot-doc.md`, `.claude/agents/autopilot-code.md` (`model` in the front matter) |
-| Codex | its agent / profile configuration, same two role names, top-tier model for `doc-agent` |
+| Codex | `.codex/agents/autopilot-doc.toml`, `.codex/agents/autopilot-code.toml` (`model` and `model_reasoning_effort`). Do not set `agents.default_subagent_model` in any `config.toml`: it overrides the role files |
 | any other | add a row here before the first run; until then, fallback above |
 
 ## Stages
