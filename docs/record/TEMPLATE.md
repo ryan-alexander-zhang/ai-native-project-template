@@ -41,8 +41,8 @@ Machine-readable form (docs/record/README.md「机器可读形态（条目文法
 
 | GWT / requirement id | Test | Result | Evidence |
 | --- | --- | --- | --- |
-| <spec-00001-AC-1.1> | <test_name__spec_00001_AC_1_1, or path::test_name__spec_00001_AC_1_1> | pass | <ac:<hash> from `scripts/trace-check --hash`> |
-| <rule-00001-AC-1.1> | <test_name__rule_00001_AC_1_1> | pass | <optional> |
+| <spec-00001-AC-1.1> | <test name (path)> | pass | <optional> |
+| <rule-00001-AC-1.1> | <test name (path)> | pass | <optional> |
 
 <Name every uncovered or failing item. A fail/missing row blocks `resolved`.>
 

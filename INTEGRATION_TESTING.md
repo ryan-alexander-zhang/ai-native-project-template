@@ -31,7 +31,3 @@ Define the minimum rule that must pass for integration testing at this repo.
 ## Report
 
 Describe where to check integration test results, logs, or CI output.
-
-## AC id suffix
-
-Same as [UNIT_TESTING.md](UNIT_TESTING.md): the JUnit 5 method name carries `__spec_<n>_AC_<i>_<k>`; Testcontainers changes nothing about naming.

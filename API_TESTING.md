@@ -172,7 +172,3 @@ tests {
 Reference: Bruno docs — `https://docs.usebruno.com/bru-cli/commandOptions`,
 `https://docs.usebruno.com/bru-lang/tag-reference`,
 `https://docs.usebruno.com/testing/tests/assertions`.
-
-## AC id suffix
-
-A Bruno request's `meta { name: ... }` is the test name: end it with the suffix, e.g. `name: rejects a replayed command__spec_00002_AC_3_1`. The `.bru` file is tracked, so `scripts/trace-check` finds the suffix there.

@@ -34,11 +34,6 @@ Prefer Mermaid:
 5. Branching process — flowchart.
 6. API — the contract itself, not a diagram.
 
-A section that describes one module opens with `anchor: <repo-relative path>` on
-its own line (a file or a directory). `scripts/trace-check` uses the anchors to
-tell which commits touch this design (`decision-90003-doc-freshness`) and
-rejects a path that is not tracked.
-
 ## Note
 
 No fixed structure. Domain, database, API, integration, process, deployment —

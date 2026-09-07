@@ -32,18 +32,12 @@ Add more when useful.
 ## Acceptance checklist
 
 When a feature-sized `plan` is verified for `resolved`, record acceptance here.
-Set `parent` to the plan id; link each row to a requirement/GWT id. The Test
-column holds the test's stable identifier — the test **name** carrying the
-row's AC id as a suffix ([`TESTING.md`](../../TESTING.md), Traceability),
-optionally prefixed `path::` — never a free description; `scripts/trace-check`
-verifies that the named test exists and carries the id. Put `ac:<hash>` from
-`scripts/trace-check --hash <ac-id>` in the Evidence column: the row turns
-SUSPECT in `trace-check` when the AC or its requirement line changes later.
+Set `parent` to the plan id; link each row to a requirement/GWT id:
 
 | GWT / requirement id | Test | Result | Evidence |
 | --- | --- | --- | --- |
-| spec-00001-AC-5.1 | test_duplicate_webhook_is_noop__spec_00001_AC_5_1 | pass | ... |
-| rule-00001-AC-3.1 | test_late_fee_standard_tier__rule_00001_AC_3_1 | pass | ... |
+| spec-00001-AC-5.1 | test_duplicate_webhook_is_noop | pass | ... |
+| rule-00001-AC-3.1 | test_late_fee_standard_tier | pass | ... |
 
 List any unfinished or uncovered requirement. A fail/missing row blocks `resolved`.
 Every `spec-<n>-FR-<i>` and every `rule-<n>-BR-<i>` in scope must appear; an

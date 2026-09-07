@@ -302,7 +302,7 @@ public final class EventEnvelopes {
 
 ### P2-2 删除 `aipersimmon-ddd-saga` / `-saga-spring`（已确认废弃）
 
-这两个模块目前仍在反应堆 `<modules>` 和 BOM 里，仍会被构建和发布。`saga` 包里有一个 `@ProcessManager` 注解，与 `aipersimmon-ddd-process-manager` 的整套概念**同名冲突**；`CONTEXT.md` 自己写着 "_Avoid_: Saga when naming the toolkit's generic coordinator"。同时 `SagaState` 有 `version` 字段和乐观锁语义，而业务聚合没有（P0-1）——保留它只会让人误以为这是推荐路径。 <!-- term-check: allow — quotes the glossary line -->
+这两个模块目前仍在反应堆 `<modules>` 和 BOM 里，仍会被构建和发布。`saga` 包里有一个 `@ProcessManager` 注解，与 `aipersimmon-ddd-process-manager` 的整套概念**同名冲突**；`CONTEXT.md` 自己写着 "_Avoid_: Saga when naming the toolkit's generic coordinator"。同时 `SagaState` 有 `version` 字段和乐观锁语义，而业务聚合没有（P0-1）——保留它只会让人误以为这是推荐路径。
 
 **方案**：直接删除两个模块目录，从根 pom `<modules>` 和 BOM 中移除。既然废弃，不需要 `@Deprecated` 过渡期（无外部使用者）。
 

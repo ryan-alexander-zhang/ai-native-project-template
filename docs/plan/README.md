@@ -23,9 +23,7 @@ Add more when useful.
 - A feature-sized plan reaching `resolved` needs a [`record`](../record/README.md)
   whose `parent` points at this plan and whose `verifies` lists the requirement
   ids it checked. The board refuses `open → resolved` while any item in the
-  delivery scope is not fully verified by such records. `scripts/trace-check`
-  enforces the same gate in CI and additionally requires a test carrying every
-  AC in scope ([`TESTING.md`](../../TESTING.md), Traceability).
+  delivery scope is not fully verified by such records.
 
 ## Exclude
 

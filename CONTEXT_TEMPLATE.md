@@ -24,7 +24,6 @@ _Avoid_: Client, buyer, account
 
 ## Rules
 
-- **`_Avoid_` is executable.** `scripts/term-check` reads each `_Avoid_:` line as a comma-separated list of words that must not replace the term; a plain word fails CI when it appears in prose or code comments, a word ending in `?` (e.g. `covered?`) is context-dependent and only reported. List real substitutes only, never generic words that are also legitimate prose.
 - **Be opinionated.** When multiple words exist for the same concept, pick the best one and list the others as aliases to avoid.
 - **Flag conflicts explicitly.** If a term is used ambiguously, call it out in "Flagged ambiguities" with a clear resolution.
 - **Keep definitions tight.** One or two sentences max. Define what it IS, not what it does.

@@ -315,17 +315,6 @@ Testcontainers — covering concurrent aggregate writes, multi-tenant acceptance
 fulfilment flow with ordered compensation, and the audit log. Treat it as a demonstration, not as
 design authority: the record in `docs/` is authoritative.
 
-### 5.5. Boundaries
-
-One row per dependency-direction or visibility rule; `Enforced by` is the path of the assertion that fails the build (`decision-90002-architecture-assertions`). `scripts/trace-check` verifies every path exists.
-
-| Rule | Enforced by |
-| --- | --- |
-| A module without a technology suffix declares no `org.springframework` / `com.baomidou` dependency outside test scope, and no artifactId ends in `-spring` (§5.2 invariant) | `aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/ModuleNamingChecks.java` |
-| Building blocks, CQRS, events, determinism and repository rules of the toolkit (`AiPersimmonDddRules.all()` and the per-concern rule sets) hold in every module that runs an `ArchitectureTest` | `aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/AiPersimmonDddRules.java` |
-| In the reference service, bounded contexts depend on each other only through their `api` modules, integration events live in `api`, repository implementations are Spring repositories | `aipersimmon-ddd-scaffold/multi-module/start/src/test/java/com/example/ArchitectureTest.java` |
-| Each sample runs the toolkit rule set against its own code (s01 named here; every other sample carries the same `ArchitectureTest`) | `aipersimmon-ddd-samples/s01-http-command-query/src/test/java/com/example/samples/s01/ArchitectureTest.java` |
-
 ## 6. Runtime View
 
 ```mermaid

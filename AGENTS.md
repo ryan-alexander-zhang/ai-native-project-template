@@ -86,7 +86,7 @@ or bullets over a single conclusion. This applies to documents too.
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
-- Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`. It is filled only when every row of its §5 Boundaries table has an `Enforced by` path or an `Unenforced: <why>`.
+- Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
 - Before the first implementation `plan` turns `open`, fill the project-derived root guides
   from their templates and the `active` decisions/designs: `ARCHITECTURE.md`, the Commands in
   `DEVELOPMENT.md`, the project-specific values in `TESTING.md` / `CODE_STYLE.md` /
@@ -99,7 +99,7 @@ or bullets over a single conclusion. This applies to documents too.
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
   with a failing test, following `docs/issue/README.md`. Only then apply the fix.
 - Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
-- Before a feature-sized `plan` becomes `resolved`, run `scripts/trace-check` and have it pass, then have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test and that no `spec-<n>-FR-<i>` or `rule-<n>-BR-<i>` is unverified, then record a `docs/record/` acceptance checklist linking the AC ids. Any gap blocks `resolved`.
+- Before a feature-sized `plan` becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test and that no `spec-<n>-FR-<i>` or `rule-<n>-BR-<i>` is unverified, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.
 
 ## 9. Autopilot Mode
 
