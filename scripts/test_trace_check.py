@@ -21,12 +21,12 @@ def sfx(ac):  # built at runtime so this file never carries a literal AC suffix
 TEST = "test_pays" + sfx(AC)
 
 
-def spec(extra_ac=""):
+def spec(extra_ac="", extra_fm=""):
     return f"""---
 id: {SPEC}
 type: spec
 status: active
----
+{extra_fm}---
 ## 4. System Requirements
 - **spec-00001-FR-1** (Event) When paid, the system shall mark it.
 
@@ -62,7 +62,34 @@ def code(name=TEST):
     return f"def {name}():\n    assert True\n"
 
 
+GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+
+
 class TraceCheck(unittest.TestCase):
+    def run_committed(self, files, touch, edits=None):
+        """Commit `files`, then commit `touch` `len(touch)` more times; `edits(sha)` may rewrite files after the first commit."""
+        with tempfile.TemporaryDirectory() as tmp:
+            def write(rel, text):
+                p = pathlib.Path(tmp, rel)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(text)
+            for rel, text in files.items():
+                write(rel, text)
+            subprocess.run([*GIT, "init", "-q"], cwd=tmp, check=True)
+            subprocess.run([*GIT, "add", "-A"], cwd=tmp, check=True)
+            subprocess.run([*GIT, "commit", "-q", "-m", "base"], cwd=tmp, check=True)
+            sha = subprocess.check_output(["git", "rev-parse", "--short=8", "HEAD"], cwd=tmp, text=True).strip()
+            for rel, text in (edits(sha) if edits else {}).items():
+                write(rel, text)
+            subprocess.run([*GIT, "add", "-A"], cwd=tmp, check=True)
+            subprocess.run([*GIT, "commit", "-q", "--allow-empty", "-m", "stamp"], cwd=tmp, check=True)
+            for i, rel in enumerate(touch):
+                write(rel, pathlib.Path(tmp, rel).read_text() + f"# {i}\n")
+                subprocess.run([*GIT, "add", "-A"], cwd=tmp, check=True)
+                subprocess.run([*GIT, "commit", "-q", "-m", f"touch {i}"], cwd=tmp, check=True)
+            r = subprocess.run([sys.executable, SCRIPT], cwd=tmp, capture_output=True, text=True)
+            return r.returncode, r.stdout + r.stderr
+
     def run_check(self, files, *args):
         with tempfile.TemporaryDirectory() as tmp:
             for rel, text in files.items():
@@ -166,6 +193,33 @@ class TraceCheck(unittest.TestCase):
         self.assertEqual(code_, 1)
         self.assertIn("tests/gone.py, which is not a tracked file", out)
         self.assertIn("has no Enforced by", out)
+
+
+    def test_stale_spec_fails_resolved_plan(self):
+        stamp = lambda sha: {f"docs/spec/{SPEC}.md": spec(extra_fm=f"verified_against: {sha}\n")}
+        code_, out = self.run_committed(self.base(), ["tests/test_pay.py"] * 11, stamp)
+        self.assertEqual(code_, 1, out)
+        self.assertIn(f"STALE docs/spec/{SPEC}.md", out)
+        self.assertIn(f"resolved but implements STALE {SPEC}", out)
+        code_, out = self.run_committed(self.base(), ["tests/test_pay.py"] * 10, stamp)
+        self.assertEqual(code_, 0, out)
+        self.assertNotIn("STALE", out)
+
+    def test_missing_verified_against_only_reports(self):
+        code_, out = self.run_check(self.base())
+        self.assertEqual(code_, 0, out)
+        self.assertIn(f"UNVERIFIED-AGE docs/spec/{SPEC}.md", out)
+
+    def test_design_anchor_and_unbound_decision(self):
+        design = ("---\nid: design-00001-pay\ntype: design\nstatus: active\ninforms: [" + SPEC + "]\n---\n"
+                  "## 1. Webhook\n\nanchor: src/gone.py\n\ntext\n")
+        decision = "---\nid: decision-00001-x\ntype: decision\nstatus: active\n---\n# D\n"
+        files = self.base(**{"docs/design/design-00001-pay.md": design, "docs/decision/decision-00001-x.md": decision,
+                             f"docs/spec/{SPEC}.md": spec() + "\nPer decision-00001-x.\n"})
+        code_, out = self.run_check(files)
+        self.assertEqual(code_, 1)
+        self.assertIn("anchor src/gone.py is not a tracked path", out)
+        self.assertIn(f"UNBOUND docs/spec/{SPEC}.md: cites decision-00001-x", out)
 
 
 if __name__ == "__main__":

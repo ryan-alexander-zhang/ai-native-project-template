@@ -2,6 +2,7 @@
 id: decision-00001-example-slug
 type: decision
 status: draft|active|archived
+verified_against: <sha8>                      # commit at which this doc was last confirmed true; written when it turns active
 motivated_by: [<id>, ...]                     # what created the need for this choice
 constrains: [<id>, ...]                       # docs this choice binds that don't declare `implements` on it
 decided_by: human|agent                       # autopilot runs only (AUTOPILOT.md); omit otherwise

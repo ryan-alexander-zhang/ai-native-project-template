@@ -30,6 +30,7 @@ Write the document description or comment after the front matter.
   the board, revise, audit, and re-accept — never edit the `active` file in
   place. Typo-level fixes are exempt; when in doubt, it is substantive.
 - `decided_by` (`decision` only, not a relation): `human` when a person made the choice, `agent` when an agent made it unattended. Written only by autopilot runs (`AUTOPILOT.md`); absent means a human was in the loop.
+- `verified_against` (`spec`, `rule`, `design`, `decision` only, not a relation): the first 8 characters of the commit at which the doc was last confirmed true. Written when the doc turns `active`, refreshed by a revision round or by an explicit re-read. `scripts/trace-check` counts the commits since then that touched the doc's related code — the files of its ACs' carrying tests, a design's `anchor:` paths, a decision's `constrains` — and reports `STALE` past 10; a `resolved` plan whose `implements` doc is STALE fails (`decision-00003-doc-freshness`).
 - Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
 - There are exactly two requirement id namespaces, and both carry their doc id:
   - `spec` owns **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.

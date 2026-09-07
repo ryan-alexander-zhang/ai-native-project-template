@@ -2,6 +2,7 @@
 id: decision-00005-term-check
 type: decision
 status: active
+verified_against: 9d3547ce
 motivated_by: [analysis-00001-doc-code-drift]
 ---
 

@@ -2,6 +2,7 @@
 id: rule-00001-example-slug
 type: rule
 status: draft|active|archived
+verified_against: <sha8>                      # commit at which this doc was last confirmed true; written when it turns active
 informs: [<spec-id | design-id | plan-id>, ...]   # the docs these rules are input for
 ---
 

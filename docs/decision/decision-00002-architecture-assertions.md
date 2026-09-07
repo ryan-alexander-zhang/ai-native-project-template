@@ -2,6 +2,7 @@
 id: decision-00002-architecture-assertions
 type: decision
 status: active
+verified_against: 4f233b24
 motivated_by: [analysis-00001-doc-code-drift]
 ---
 

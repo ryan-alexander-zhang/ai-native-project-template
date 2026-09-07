@@ -2,6 +2,7 @@
 id: spec-00001-example-slug
 type: spec
 status: draft|active|archived
+verified_against: <sha8>                      # commit at which this doc was last confirmed true; written when it turns active
 parent: <prd-id | idea-id | empty = spec is the entry point>
 ---
 

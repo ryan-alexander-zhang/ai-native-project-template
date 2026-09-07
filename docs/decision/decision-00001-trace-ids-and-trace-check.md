@@ -2,6 +2,7 @@
 id: decision-00001-trace-ids-and-trace-check
 type: decision
 status: active
+verified_against: 8ec8c9e3
 motivated_by: [analysis-00001-doc-code-drift]
 ---
 

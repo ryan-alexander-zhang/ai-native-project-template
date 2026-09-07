@@ -74,6 +74,14 @@ _Avoid_: dangling, unknown id
 An AC in a plan's delivery scope that no test carries. Failing on a `resolved` plan, reported on an `open` one.
 _Avoid_: missing test, gap
 
+**Stale**:
+An `active` spec, rule, design, or decision whose related code has taken more than 10 commits since its `verified_against`. Derived by `trace-check` every run, never stored as a status.
+_Avoid_: outdated, expired, rotten, a `stale` status value
+
+**Unbound**:
+An `active` doc that cites an `active` decision which neither lists it in `constrains` nor is declared in the doc's `implements`.
+_Avoid_: unlinked, missing constraint
+
 **Board**:
 The external tool (the persimmon repository) that renders `docs/`, runs the status transitions and the parse diagnostics. This template ships only its configuration, `whiteboard.config.yaml`, and ignores its local state, `.whiteboard/`; no board code lives here.
 _Avoid_: whiteboard (only in those two file names and in persimmon's own product name), dashboard, 看板

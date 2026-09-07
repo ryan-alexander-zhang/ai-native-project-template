@@ -19,6 +19,11 @@ Checks, over every tracked file of the repo the cwd is in:
      whiteboard.config.yaml `carries:` must agree with it
   j. every `Enforced by` path in ARCHITECTURE.md's Boundaries table is a tracked file;
      `Unenforced: <why>` rows are counted, empty cells fail
+  k. an active spec/rule/design/decision is STALE when more than 10 commits since its
+     `verified_against` touched its related code (carrying-test files, design `anchor:`
+     paths, a decision's constrains); reported — fails only a resolved plan that implements it
+  l. an active doc citing an active decision that neither constrains it nor is implemented
+     by it is UNBOUND (reported)
 Exit 1 on any ERROR line; stdlib only.
 """
 import hashlib
@@ -36,7 +41,11 @@ ITEM_ID = re.compile(r"^((?:spec|rule)-\d{5})-(FR|BR|AC)-(\d+)(?:\.(\d+))?$")
 DECL = re.compile(r"^(?:- |\| )\*\*((?:spec|rule)-\d{5}-(?:FR|BR)-\d+)\*\*")
 AC_DECL = re.compile(r"^- \*\*((?:spec|rule)-\d{5}-AC-\d+\.\d+)\*\* \(((?:spec|rule)-\d{5}-(?:FR|BR)-\d+)\)")
 SUFFIX = re.compile(r"__((?:spec|rule)_\d{5}_AC_\d+_\d+)\b")
-NON_RELATION = {"id", "type", "status", "decided_by"}
+NON_RELATION = {"id", "type", "status", "decided_by", "verified_against"}
+ANCHOR = re.compile(r"^anchor:\s*(\S+)\s*$", re.M)
+DEC_ID = re.compile(r"\bdecision-\d{5}-[a-z0-9][a-z0-9-]*")
+FRESH_TYPES = {"spec", "rule", "design", "decision"}
+STALE_AFTER = 10  # commits touching related code; decision-00003
 ITEM_FIELDS = {("plan", "implements"), ("record", "verifies")}
 SKIP_FILES = {"scripts/trace-check", ".trace-check-allow"}
 
@@ -296,6 +305,77 @@ def main(root, hash_ids=()):
             acs |= doc["items"][item]
         return acs
 
+    # k. freshness
+    def tracked_under(p):
+        p = p.rstrip("/")
+        return any(f == p or f.startswith(p + "/") for f in files)
+
+    def related_paths(d, seen=()):
+        if d["type"] in ("spec", "rule"):
+            return {f for ac in d["acs"] for f in carried.get(suffix_of(ac), ())}
+        if d["type"] == "design":
+            return {a for a in ANCHOR.findall(d["body"]) if tracked_under(a)}
+        if d["type"] == "decision":
+            out, seen = set(), seen + (d["id"],)
+            bound = set(d["fm"].get("constrains", [])) | {o["id"] for o in docs.values() if d["id"] in o["fm"].get("implements", [])}
+            for cid in bound:
+                c = docs.get(cid)
+                if c and c["type"] in FRESH_TYPES and cid not in seen:
+                    out |= related_paths(c, seen)
+            return out
+        return set()
+
+    def commits_since(sha, paths):
+        ok = subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=root, capture_output=True)
+        if ok.returncode:
+            return None
+        out = subprocess.check_output(["git", "rev-list", "--count", f"{sha}..HEAD", "--", *sorted(paths)], cwd=root, text=True)
+        return int(out.strip())
+
+    for d in docs.values():
+        if d["type"] == "design":
+            for a in ANCHOR.findall(d["body"]):
+                if not tracked_under(a):
+                    err(f"{d['path']}: anchor {a} is not a tracked path")
+
+    stale = set()
+    for d in docs.values():
+        if d["type"] not in FRESH_TYPES or d["fm"].get("status") != "active":
+            continue
+        va = d["fm"].get("verified_against")
+        if not va:
+            notes.append(f"UNVERIFIED-AGE {d['path']}: no verified_against")
+            continue
+        if not isinstance(va, str) or not re.fullmatch(r"[0-9a-f]{7,40}", va):
+            err(f"{d['path']}: verified_against {va!r} is not a commit hash")
+            continue
+        paths = related_paths(d)
+        if not paths:
+            continue
+        n = commits_since(va, paths)
+        if n is None:
+            notes.append(f"NOTE {d['path']}: verified_against {va} is not in this history (shallow clone?)")
+        elif n > STALE_AFTER:
+            stale.add(d["id"])
+            notes.append(f"STALE {d['path']}: verified_against {va}, {n} commits since touched {', '.join(sorted(paths))}")
+
+    # l. unbound decision citations
+    for d in docs.values():
+        if d["type"] not in ("spec", "rule", "design", "plan") or d["fm"].get("status") not in ("active", "open", "resolved"):
+            continue
+        cited = set(DEC_ID.findall(d["body"]))
+        for v in d["fm"].values():
+            for i in (v if isinstance(v, list) else [v]):
+                if isinstance(i, str) and DEC_ID.fullmatch(i):
+                    cited.add(i)
+        for cid in sorted(cited):
+            c = docs.get(cid)
+            if not c or c["fm"].get("status") != "active":
+                continue
+            if d["id"] in c["fm"].get("constrains", []) or cid in d["fm"].get("implements", []):
+                continue
+            notes.append(f"UNBOUND {d['path']}: cites {cid}, which neither constrains it nor is implemented by it")
+
     allow_path = root / ".trace-check-allow"
     allowed = set(allow_path.read_text().split()) if allow_path.exists() else set()
     for p in sorted(allowed):
@@ -349,6 +429,11 @@ def main(root, hash_ids=()):
         if d["fm"]["status"] == "resolved":
             for ac in sorted(scope - passing.get(d["id"], set())):
                 err(f"{d['path']}: resolved without a passing record row for {ac}")
+            for i in d["fm"].get("implements", []):
+                m = ITEM_ID.match(i)
+                target = by_prefix[m.group(1)]["id"] if m and m.group(1) in by_prefix else i
+                if target in stale:
+                    err(f"{d['path']}: resolved but implements STALE {target}")
 
     # f. orphans
     for s, where in sorted(carried.items()):
