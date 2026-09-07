@@ -16,6 +16,10 @@ jobs:
         run: python3 scripts/test_trace_check.py
       - name: Check traceability
         run: scripts/trace-check
+      - name: Self-test and run the canonical-term gate (decision-00005)
+        run: |
+          python3 scripts/test_term_check.py
+          scripts/term-check
       - name: Spec impact of this PR (decision-00004)
         if: github.event_name == 'pull_request'
         run: |

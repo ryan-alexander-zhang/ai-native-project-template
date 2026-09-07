@@ -18,6 +18,8 @@
     ":(glob)docs/**/TEMPLATE.md",
     "scripts/trace-check",
     "scripts/test_trace_check.py",
-    ".github/workflows/trace-check.yml"
+    ".github/workflows/trace-check.yml",
+    "scripts/term-check",
+    "scripts/test_term_check.py"
   ]
 }

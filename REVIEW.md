@@ -5,7 +5,8 @@ It starts empty on purpose — fill it in as the project's real risk areas
 become clear.
 
 Keep review comments and docs in the canonical terms from
-[CONTEXT.md](CONTEXT.md) once that file exists.
+[CONTEXT.md](CONTEXT.md) once that file exists; `scripts/term-check` enforces its
+`_Avoid_` lists on prose and code comments (`decision-00005-term-check`).
 
 ## Spec impact
 
