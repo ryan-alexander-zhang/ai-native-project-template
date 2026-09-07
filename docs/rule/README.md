@@ -36,7 +36,7 @@ names no violation response leaves the implementer to invent one.
 
 ### Condition notation
 
-Rule text and table cells are prose the board does not parse; precision is
+Rule text and table cells are prose the whiteboard does not parse; precision is
 the author's job, checked at review. Checklist items, not grammar:
 
 1. Ranges use explicit interval notation with stated boundaries — `(30, 60]`,

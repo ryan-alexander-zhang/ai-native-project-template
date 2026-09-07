@@ -172,7 +172,3 @@ tests {
 Reference: Bruno docs — `https://docs.usebruno.com/bru-cli/commandOptions`,
 `https://docs.usebruno.com/bru-lang/tag-reference`,
 `https://docs.usebruno.com/testing/tests/assertions`.
-
-## AC id suffix
-
-State how the `__<AC id>` test-name suffix ([TESTING.md](TESTING.md), Traceability) fits this framework's naming rules.

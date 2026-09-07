@@ -1,3 +1,0 @@
-# Project-specific glossary: a lang branch keeps its own when main merges in
-# (scripts/sync-docs.sh runs the merge with merge.ours.driver=true).
-CONTEXT.md merge=ours

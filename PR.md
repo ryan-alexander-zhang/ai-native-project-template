@@ -11,8 +11,6 @@
 - State what changed.
 - State why it changed.
 - Call out risk, reviewer context, and follow-up when relevant.
-- Carry the Spec impact verdicts ([REVIEW.md](REVIEW.md)) — one line per AC the
-  job summary lists, or the `IMPACT none` confirmation.
 
 ## Rules
 
