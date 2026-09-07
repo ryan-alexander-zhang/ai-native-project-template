@@ -2,6 +2,7 @@
 id: design-00001-example-slug
 type: design
 status: draft|active|archived
+verified_against: <sha8>                      # commit at which this doc was last confirmed true; written when it turns active
 informs: [<spec-id | plan-id>, ...]           # may be empty while the design waits to be picked up (BR-26: a design can precede any spec)
 ---
 
@@ -10,6 +11,8 @@ informs: [<spec-id | plan-id>, ...]           # may be empty while the design wa
 > One sentence: the structure this design settles and for what.
 
 ## 1. <Structure the body around the subject>
+
+anchor: <src/module/ — the code this section describes; one per section, tracked path>
 
 No fixed structure — domain, database, API, integration, process, deployment.
 Prefer Mermaid per the folder README's guideline:

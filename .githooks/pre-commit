@@ -48,3 +48,17 @@ case "$branch" in
     fi
     ;;
 esac
+
+# Docs<->code traceability gate (decision-90001) and canonical-term gate
+# (decision-90005). Mirror .github/workflows/trace-check.yml locally. Bypass
+# with --no-verify.
+if command -v python3 >/dev/null 2>&1; then
+  for gate in scripts/trace-check scripts/term-check; do
+    [ -x "$gate" ] || continue
+    if ! out=$($gate 2>&1); then
+      echo "$out"
+      echo "Commit aborted: $gate failed."
+      exit 1
+    fi
+  done
+fi

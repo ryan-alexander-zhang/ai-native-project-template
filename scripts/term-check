@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Canonical-term gate (decision-90005-term-check).
+
+Reads CONTEXT.md (and, if CONTEXT-MAP.md exists, every CONTEXT.md it links): each
+`**Term**:` entry's `_Avoid_:` line is the list of words that must not stand in for
+the term. Scans Markdown prose and source-code comment lines of every tracked file.
+
+  TERM <path>:<line> "<hit>" -> use "<Term>"          hard hit, fails
+  TERM <path>:<line> "<hit>" -> use "<Term>"? (soft)   the avoid word ends with `?`: context-dependent, reported
+
+Exempt: CONTEXT*.md themselves; a line containing `term-check: allow`.
+No CONTEXT.md: `term-check: skipped` and exit 0. Stdlib only.
+"""
+import pathlib
+import re
+import subprocess
+import sys
+
+TERM = re.compile(r"^\*\*(.+?)\*\*:\s*$")
+AVOID = re.compile(r"^_Avoid_:\s*(.+?)\s*$")
+COMMENT = re.compile(r"^\s*(#|//|/\*|\*|<!--|--|;)")
+CJK = re.compile(r"[一-鿿]")
+
+
+def glossaries(root):
+    paths = []
+    cmap = root / "CONTEXT-MAP.md"
+    if cmap.exists():
+        for m in re.finditer(r"\]\(([^)]+CONTEXT\.md)\)", cmap.read_text(encoding="utf-8")):
+            p = (cmap.parent / m.group(1)).resolve()
+            if p.exists():
+                paths.append(p)
+    if (root / "CONTEXT.md").exists():
+        paths.append(root / "CONTEXT.md")
+    return paths
+
+
+def vocabulary(paths):
+    """[(avoid_word, canonical_term, soft)]"""
+    vocab, term = [], None
+    for p in paths:
+        for line in p.read_text(encoding="utf-8").splitlines():
+            m = TERM.match(line)
+            if m:
+                term = m.group(1)
+                continue
+            m = AVOID.match(line)
+            if m and term:
+                for item in m.group(1).split(","):
+                    item = re.sub(r"\s*\([^)]*\)", "", item).strip().strip("`")
+                    if not item:
+                        continue
+                    soft = item.endswith("?")
+                    vocab.append((item.rstrip("?").strip(), term, soft))
+    return vocab
+
+
+def pattern(word):
+    if CJK.search(word):
+        return re.compile(re.escape(word))
+    # not inside an identifier, and not a file name (`whiteboard.config.yaml`, `.whiteboard/`)
+    return re.compile(r"(?<![\w.-])" + re.escape(word) + r"(?![\w-]|\.\w|/)", re.I)
+
+
+def main(root):
+    paths = glossaries(root)
+    if not paths:
+        print("term-check: skipped (no CONTEXT.md)")
+        return 0
+    vocab = [(w, t, soft, pattern(w)) for w, t, soft in vocabulary(paths)]
+    if not vocab:
+        print("term-check: skipped (no _Avoid_ lines)")
+        return 0
+    files = [f for f in subprocess.check_output(["git", "ls-files", "-z"], cwd=root, text=True).split("\0") if f]
+    skip = {str(p.relative_to(root)) for p in paths} | {"CONTEXT-MAP.md", "CONTEXT_TEMPLATE.md", "scripts/term-check"}
+    hard = soft_n = 0
+    for f in files:
+        if f in skip:
+            continue
+        try:
+            text = (root / f).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        prose = f.endswith(".md")
+        for n, line in enumerate(text.splitlines(), 1):
+            if "term-check: allow" in line:
+                continue
+            if not prose and not COMMENT.match(line):
+                continue
+            for w, t, soft, rx in vocab:
+                if rx.search(line):
+                    if soft:
+                        soft_n += 1
+                        print(f'TERM {f}:{n} "{w}" -> use "{t}"? (soft)')
+                    else:
+                        hard += 1
+                        print(f'TERM {f}:{n} "{w}" -> use "{t}"')
+    print(f"term-check: {'FAIL' if hard else 'OK'} ({hard} hard, {soft_n} soft, {len(vocab)} avoid words)")
+    return 1 if hard else 0
+
+
+if __name__ == "__main__":
+    top = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    sys.exit(main(pathlib.Path(top)))

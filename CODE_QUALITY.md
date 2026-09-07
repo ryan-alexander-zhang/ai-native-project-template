@@ -41,6 +41,7 @@ List every check that fails the build. A check that only warns is not a gate.
 | Complexity + duplication | PMD + CPD (`failOnViolation=true`) | all modules | `aipersimmon-ddd-quality-config` → `pmd-ruleset.xml` |
 | Bytecode defects | SpotBugs (`failOnError=true`) | all modules | `aipersimmon-ddd-quality-config` → `spotbugs-exclude.xml` |
 | Coverage + mutation | JaCoCo + PIT | opt-in per domain module (`design-00007` §4.3) | per-module pom — bar per [TESTING.md](TESTING.md) |
+| Architecture | ArchUnit — `aipersimmon-ddd-archunit` rule sets (`AiPersimmonDddRules.all()`, `BoundedContextRules`, `CqrsRules`, `EventRules`, …) run from each module's `ArchitectureTest` | the invariants in `ARCHITECTURE.md` §5 Boundaries | `aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/` |
 
 Shared config lives in `aipersimmon-ddd-quality-config`. There is no shared
 provider parent, so **two** build files carry the plugin block by hand and must

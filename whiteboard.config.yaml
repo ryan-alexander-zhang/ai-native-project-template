@@ -62,6 +62,9 @@ relations:
   - verifies
   - supersedes
 
+# `verified_against` (docs/README.md) is not a relation field: it is never
+# listed below and must not raise a relation-field diagnostic.
+#
 # The relation matrix: type -> the relation fields a document of
 # that type may declare. This is the only thing that answers "does this relation
 # field belong to this type"; the board reads it instead of the prose in each
