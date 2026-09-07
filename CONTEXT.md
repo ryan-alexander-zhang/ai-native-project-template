@@ -14,11 +14,11 @@ _Avoid_: Workflow engine, aggregate state machine
 
 **Process Lifecycle**:
 The runtime condition of a Process Manager instance, distinct from both its Business Step and every aggregate status.
-_Avoid_: Order status, workflow step
+_Avoid_: Order status?, workflow step
 
 **Business Step**:
 Consumer-owned vocabulary describing where a Process Manager is within a particular business process.
-_Avoid_: Process Lifecycle, aggregate status
+_Avoid_: aggregate status?
 
 **Effect**:
 A durable request produced by a Process Definition for later external dispatch or deadline management.
@@ -26,7 +26,7 @@ _Avoid_: Side effect already completed
 
 **Deadline**:
 A durable, named future input associated with one Process Manager instance.
-_Avoid_: In-memory timer, callback
+_Avoid_: In-memory timer, callback?
 
 **Process Provider**:
 One execution implementation behind a bounded-context-owned process port.
@@ -54,7 +54,7 @@ Canonical terms for the Operation Log component. Definitions and rationale live 
 
 **Operation Log**:
 A business-readable record of who did what to which business object, with what outcome and which key fields changed.
-_Avoid_: Audit Log, Technical Log, Domain Event, generic application/SLF4J log
+_Avoid_: Technical Log?, generic application/SLF4J log
 
 **Audit Log**:
 A separate compliance/security-grade evidence record (strong identity, tamper-evident, enforced retention); not delivered by this component.
@@ -62,7 +62,7 @@ _Avoid_: labeling an append-only Operation Log as an audit log
 
 **Operation Outcome**:
 The business result of an operation — `SUCCEEDED`, `REJECTED`, or `FAILED`.
-_Avoid_: HTTP status, exception type, aggregate status
+_Avoid_: HTTP status?, exception type?, aggregate status?
 
 **Transaction Completion**:
 Whether the business transaction took effect — `COMMITTED`, `ROLLED_BACK`, `NOT_STARTED`, `UNKNOWN`; orthogonal to Operation Outcome.
@@ -108,7 +108,7 @@ _Avoid_: `NULL` to mean "no tenant" (silently voids composite unique keys); trea
 
 **Sentinel Tenant (`__root__`)**:
 The reserved tenant used when multi-tenancy is disabled — single-tenant is N=1 multi-tenancy, not a separate code path.
-_Avoid_: `0`, empty string, or `NULL` as the sentinel; a user tenant id beginning with `__`.
+_Avoid_: a `0` sentinel, an empty-string sentinel, a `NULL` sentinel, a user tenant id beginning with `__`
 
 **TenantContext**:
 The request-scoped, trusted-boundary, immutable, single-valued ambient holder of the current tenant, read by the read side

@@ -32,4 +32,4 @@ Describe where to check E2E test results, screenshots, videos, or CI output.
 
 ## AC id suffix
 
-State how the `__<AC id>` test-name suffix ([TESTING.md](TESTING.md), Traceability) fits this framework's naming rules.
+No E2E framework is chosen yet. Whichever is picked, the scenario or method name carries `__spec_<n>_AC_<i>_<k>` as in [UNIT_TESTING.md](UNIT_TESTING.md).

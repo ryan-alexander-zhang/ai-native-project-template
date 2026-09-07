@@ -28,4 +28,4 @@ Describe where to check unit test results, coverage, or CI output.
 
 ## AC id suffix
 
-State how the `__<AC id>` test-name suffix ([TESTING.md](TESTING.md), Traceability) fits this framework's naming rules.
+JUnit 5 method names carry the suffix verbatim: `void recordsTheUserWhoMadeIt__spec_00001_AC_5_1()`. Double underscores and digits are legal Java identifier characters, so no `@DisplayName` or tag is needed and `scripts/trace-check` greps the method name as written.

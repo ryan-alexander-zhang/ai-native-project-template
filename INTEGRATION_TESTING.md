@@ -34,4 +34,4 @@ Describe where to check integration test results, logs, or CI output.
 
 ## AC id suffix
 
-State how the `__<AC id>` test-name suffix ([TESTING.md](TESTING.md), Traceability) fits this framework's naming rules.
+Same as [UNIT_TESTING.md](UNIT_TESTING.md): the JUnit 5 method name carries `__spec_<n>_AC_<i>_<k>`; Testcontainers changes nothing about naming.
