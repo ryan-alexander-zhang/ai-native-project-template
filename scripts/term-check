@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical-term gate (decision-00005-term-check).
+"""Canonical-term gate (decision-90005-term-check).
 
 Reads CONTEXT.md (and, if CONTEXT-MAP.md exists, every CONTEXT.md it links): each
 `**Term**:` entry's `_Avoid_:` line is the list of words that must not stand in for

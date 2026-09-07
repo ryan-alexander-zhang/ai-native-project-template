@@ -46,7 +46,7 @@ flowchart LR
 ## 5. Building Block View
 
 > Annotated directory tree, then C4 L2 container diagram, then the Boundaries table. Component internals (L3) → `docs/design/`.
-> Boundaries: one row per dependency-direction, layering, or visibility rule. `Enforced by` is the repo-relative path of the assertion (architecture test or dependency-lint config) that fails the build when the rule is broken; a rule nothing enforces says `Unenforced: <why>`. The table is complete only when no cell is empty (`decision-00002-architecture-assertions`); `scripts/trace-check` verifies every path exists.
+> Boundaries: one row per dependency-direction, layering, or visibility rule. `Enforced by` is the repo-relative path of the assertion (architecture test or dependency-lint config) that fails the build when the rule is broken; a rule nothing enforces says `Unenforced: <why>`. The table is complete only when no cell is empty (`decision-90002-architecture-assertions`); `scripts/trace-check` verifies every path exists.
 
 ```
 <root>/

@@ -1,9 +1,9 @@
 ---
-id: decision-00004-doc-impact-review
+id: decision-90004-doc-impact-review
 type: decision
 status: active
 verified_against: 9d3547ce
-motivated_by: [analysis-00001-doc-code-drift]
+motivated_by: [analysis-90001-doc-code-drift]
 ---
 
 # Decision: PR 上由 diff 反查受影响的 AC，doc-agent 逐条判定是否仍成立
@@ -12,7 +12,7 @@ motivated_by: [analysis-00001-doc-code-drift]
 
 ## 1. 需要做这个决定的原因
 
-- 行为改了、测试没动、spec 没动、id 全在、hash 全对，现有全部检查都绿（`analysis-00001-doc-code-drift` §3 第 2 条）。这是 decision-00001 / 00003 明确留下的洞。
+- 行为改了、测试没动、spec 没动、id 全在、hash 全对，现有全部检查都绿（`analysis-90001-doc-code-drift` §3 第 2 条）。这是 decision-90001 / 00003 明确留下的洞。
 - 业界唯一能触及这一层的手段是 LLM 判官（DocDrift、Mintlify Workflows、Kiro hooks），且全部停在「建议、不做硬门禁」。
 - 现有 REVIEW.md 是空清单，PR 复审没有任何与 spec 相关的检查项。
 
@@ -30,7 +30,7 @@ motivated_by: [analysis-00001-doc-code-drift]
 
 | 选项 | 结论与理由 |
 | --- | --- |
-| 用 AST 哈希锚（Fiberplane Drift 形态）替代 LLM 判定 | **否决为唯一手段**。哈希只能说「变了」，说不出「还对不对」；作为 design anchor 的补充在 decision-00003 里已有等价物。 |
+| 用 AST 哈希锚（Fiberplane Drift 形态）替代 LLM 判定 | **否决为唯一手段**。哈希只能说「变了」，说不出「还对不对」；作为 design anchor 的补充在 decision-90003 里已有等价物。 |
 | 让判官读整份 spec 与整个 diff | **否决**。成本随 diff 增长，且大部分 AC 与本次 diff 无关。 |
 | 把判定做成硬门禁（CI 里跑模型，红灯阻塞） | **否决**。非确定、会误报堵合并；由复审者贴结论，`不再成立` 阻塞是人的决定不是脚本的。 |
 | 在保存时用 hook 让代理顺手改文档（Kiro 形态） | **否决**。把「文档还对不对」的判断交给正在改代码的同一个上下文，没有独立性。 |

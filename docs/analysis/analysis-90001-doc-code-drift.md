@@ -1,8 +1,8 @@
 ---
-id: analysis-00001-doc-code-drift
+id: analysis-90001-doc-code-drift
 type: analysis
 status: active
-informs: [decision-00001-trace-ids-and-trace-check]
+informs: [decision-90001-trace-ids-and-trace-check]
 ---
 
 # Analysis: 多轮迭代后 code↔doc 与 doc↔doc 的漂移
@@ -56,4 +56,4 @@ informs: [decision-00001-trace-ids-and-trace-check]
 
 ## 4. Conclusion
 
-两类漂移都会出现，且现状下几乎全部静默。业界可迁移的做法按杠杆排序：让 GWT 与测试成为同一条可校验的边（代码携带 AC id）；把反向边与覆盖率做成仓库内脚本进 CI（消除对外部白板的依赖，下游开箱即有）；上游修订时沿反向边打 suspect 并重关 resolved gate；代码变更触发文档复核（机械锚 + LLM 判官）；架构断言可执行；living docs 加 `verified_against` 与 `stale` 状态；用 Vale 类 linter 强制 CONTEXT.md 术语；消灭 Relations 双写。前两项是一条规则改动加一个脚本，能把缺口 1、2、3、5、6、8 从不可见变成 CI 红灯，应先做；决定见 `decision-00001-trace-ids-and-trace-check`。
+两类漂移都会出现，且现状下几乎全部静默。业界可迁移的做法按杠杆排序：让 GWT 与测试成为同一条可校验的边（代码携带 AC id）；把反向边与覆盖率做成仓库内脚本进 CI（消除对外部白板的依赖，下游开箱即有）；上游修订时沿反向边打 suspect 并重关 resolved gate；代码变更触发文档复核（机械锚 + LLM 判官）；架构断言可执行；living docs 加 `verified_against` 与 `stale` 状态；用 Vale 类 linter 强制 CONTEXT.md 术语；消灭 Relations 双写。前两项是一条规则改动加一个脚本，能把缺口 1、2、3、5、6、8 从不可见变成 CI 红灯，应先做；决定见 `decision-90001-trace-ids-and-trace-check`。

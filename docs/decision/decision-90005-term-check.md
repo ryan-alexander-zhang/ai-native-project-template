@@ -1,9 +1,9 @@
 ---
-id: decision-00005-term-check
+id: decision-90005-term-check
 type: decision
 status: active
 verified_against: 9d3547ce
-motivated_by: [analysis-00001-doc-code-drift]
+motivated_by: [analysis-90001-doc-code-drift]
 ---
 
 # Decision: 从 CONTEXT.md 生成词表，`scripts/term-check` 在 CI 上拦截被规避的术语
@@ -12,7 +12,7 @@ motivated_by: [analysis-00001-doc-code-drift]
 
 ## 1. 需要做这个决定的原因
 
-- 「一个概念一个词」（`AGENTS.md` §5）只靠代理自觉；CONTEXT.md 在模板里默认不存在，`REVIEW.md:8` 以「once that file exists」让步（`analysis-00001-doc-code-drift` §3 第 10 条）。
+- 「一个概念一个词」（`AGENTS.md` §5）只靠代理自觉；CONTEXT.md 在模板里默认不存在，`REVIEW.md:8` 以「once that file exists」让步（`analysis-90001-doc-code-drift` §3 第 10 条）。
 - 本仓库自己的 CONTEXT.md 建立后立刻发现三处已经漂移的用词（GWT ids、COVERED、whiteboard），由人肉 grep 修正（`4ff53716`）。
 - 业界做法（Datadog 用 Vale 词表）成熟，但 Vale 是外部二进制、YAML 规则、中文分词弱，与本仓库「只依赖 python3 与 git」的脚本面不一致。
 

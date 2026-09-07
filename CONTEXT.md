@@ -103,7 +103,7 @@ _Avoid_: auto mode, unattended mode
 
 ## Machine-readable `_Avoid_` lines
 
-`scripts/term-check` (`decision-00005-term-check`) reads every `_Avoid_:` line as a comma-separated list of words that must not stand in for the term: a plain word fails the check, a word ending in `?` is context-dependent and only reported. Keep the lines to real substitutes; a generic English word that is also legitimate prose does not belong here.
+`scripts/term-check` (`decision-90005-term-check`) reads every `_Avoid_:` line as a comma-separated list of words that must not stand in for the term: a plain word fails the check, a word ending in `?` is context-dependent and only reported. Keep the lines to real substitutes; a generic English word that is also legitimate prose does not belong here.
 
 ## Flagged ambiguities
 

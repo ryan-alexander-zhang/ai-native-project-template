@@ -19,6 +19,7 @@ Write the document description or comment after the front matter.
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
+- Numbers `90000`–`99999` are reserved for the template repository's own documents about the docs system (`analysis-90001-…`, `decision-9000n-…`); they reach `lang/*` branches by merge and must never collide with a project's own numbering, which starts at `00001`.
 - An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the board's `exclude` config hits are not documents here: they take no number and count as no collision.) Allocating the next free number per type is what keeps a new document from colliding; a collision that already exists is surfaced by the board as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]` and set the old doc to `archived`.
 - `status` has two sub-vocabularies, by document kind:
@@ -30,7 +31,7 @@ Write the document description or comment after the front matter.
   the board, revise, audit, and re-accept — never edit the `active` file in
   place. Typo-level fixes are exempt; when in doubt, it is substantive.
 - `decided_by` (`decision` only, not a relation): `human` when a person made the choice, `agent` when an agent made it unattended. Written only by autopilot runs (`AUTOPILOT.md`); absent means a human was in the loop.
-- `verified_against` (`spec`, `rule`, `design`, `decision` only, not a relation): the first 8 characters of the commit at which the doc was last confirmed true. Written when the doc turns `active`, refreshed by a revision round or by an explicit re-read. `scripts/trace-check` counts the commits since then that touched the doc's related code — the files of its ACs' carrying tests, a design's `anchor:` paths, a decision's `constrains` — and reports `STALE` past 10; a `resolved` plan whose `implements` doc is STALE fails (`decision-00003-doc-freshness`).
+- `verified_against` (`spec`, `rule`, `design`, `decision` only, not a relation): the first 8 characters of the commit at which the doc was last confirmed true. Written when the doc turns `active`, refreshed by a revision round or by an explicit re-read. `scripts/trace-check` counts the commits since then that touched the doc's related code — the files of its ACs' carrying tests, a design's `anchor:` paths, a decision's `constrains` — and reports `STALE` past 10; a `resolved` plan whose `implements` doc is STALE fails (`decision-90003-doc-freshness`).
 - Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
 - There are exactly two requirement id namespaces, and both carry their doc id:
   - `spec` owns **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.

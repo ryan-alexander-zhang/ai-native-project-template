@@ -49,8 +49,8 @@ case "$branch" in
     ;;
 esac
 
-# Docs<->code traceability gate (decision-00001) and canonical-term gate
-# (decision-00005). Mirror .github/workflows/trace-check.yml locally. Bypass
+# Docs<->code traceability gate (decision-90001) and canonical-term gate
+# (decision-90005). Mirror .github/workflows/trace-check.yml locally. Bypass
 # with --no-verify.
 if command -v python3 >/dev/null 2>&1; then
   for gate in scripts/trace-check scripts/term-check; do

@@ -1,9 +1,9 @@
 ---
-id: decision-00001-trace-ids-and-trace-check
+id: decision-90001-trace-ids-and-trace-check
 type: decision
 status: active
 verified_against: 8ec8c9e3
-motivated_by: [analysis-00001-doc-code-drift]
+motivated_by: [analysis-90001-doc-code-drift]
 ---
 
 # Decision: 测试携带 AC id，仓库内 trace-check 脚本进 CI
@@ -12,9 +12,9 @@ motivated_by: [analysis-00001-doc-code-drift]
 
 ## 1. 需要做这个决定的原因
 
-- 代码不携带任何需求 id：没有规则要求测试或源码引用 `spec-<n>-FR-<i>` / `AC-<i>.<k>`，record 的 Test 列是自由文本（`docs/record/README.md:37-40`）。GWT→测试这条边单向、手写、不可校验（`analysis-00001-doc-code-drift` §2）。
+- 代码不携带任何需求 id：没有规则要求测试或源码引用 `spec-<n>-FR-<i>` / `AC-<i>.<k>`，record 的 Test 列是自由文本（`docs/record/README.md:37-40`）。GWT→测试这条边单向、手写、不可校验（`analysis-90001-doc-code-drift` §2）。
 - 反向边「靠读或靠脚本推导」（`docs/README.md:46`），仓库内不存在该脚本；ID 唯一、关系合法、resolved gate 全在外部白板执行，下游项目出厂零文档 CI。
-- 由此缺口 1、2、3、5、6、8（`analysis-00001-doc-code-drift` §3）全部静默：spec 修订后已验证的 record 仍「看起来通过」，测试改名后证据指向空，孤儿 FR 与孤儿行为均不可见。
+- 由此缺口 1、2、3、5、6、8（`analysis-90001-doc-code-drift` §3）全部静默：spec 修订后已验证的 record 仍「看起来通过」，测试改名后证据指向空，孤儿 FR 与孤儿行为均不可见。
 
 ## 2. 决定
 

@@ -75,7 +75,7 @@ in turn. The test name is the only carrier — no annotations, no comments — s
 `scripts/trace-check` can grep it and a `record` can cite it verbatim. Each
 `*_TESTING.md` states how the suffix fits its framework's naming rules.
 `scripts/trace-check` fails CI on a `resolved` plan with an uncovered AC and on
-a suffix naming no existing AC (`decision-00001-trace-ids-and-trace-check`).
+a suffix naming no existing AC (`decision-90001-trace-ids-and-trace-check`).
 
 ## Testing Matrix
 

@@ -1,9 +1,9 @@
 ---
-id: decision-00003-doc-freshness
+id: decision-90003-doc-freshness
 type: decision
 status: active
 verified_against: 9d3547ce
-motivated_by: [analysis-00001-doc-code-drift]
+motivated_by: [analysis-90001-doc-code-drift]
 ---
 
 # Decision: living docs 携带 `verified_against`，过期由 trace-check 派生为 STALE
@@ -12,7 +12,7 @@ motivated_by: [analysis-00001-doc-code-drift]
 
 ## 1. 需要做这个决定的原因
 
-- 状态词表只有 `draft → active → archived`，没有「仍 active 但已不再为真」的表达；`archived` 要求先有替代文档（`docs/README.md:23,26`）。文档过期没有任何信号（`analysis-00001-doc-code-drift` §2、§3 第 7 条）。
+- 状态词表只有 `draft → active → archived`，没有「仍 active 但已不再为真」的表达；`archived` 要求先有替代文档（`docs/README.md:23,26`）。文档过期没有任何信号（`analysis-90001-doc-code-drift` §2、§3 第 7 条）。
 - ADR 的公认失败模式是「superseded 靠人记得改状态字段，实践中没人改」；任何要人手工维护的过期标记会重蹈覆辙。
 - 本仓库自己的旧 ARCHITECTURE.md 五个月无人发现是占位符，直到 `a35d0d67` 才删除。
 - decision 的 `constrains` 回填只有 prose（`docs/decision/README.md:28-31`），新 spec 落在 active decision 下却未被列入，无人标记。
@@ -22,7 +22,7 @@ motivated_by: [analysis-00001-doc-code-drift]
 | # | 做法 | 理由 |
 | --- | --- | --- |
 | 1 | `spec` / `rule` / `design` / `decision` 转 `active` 时写入 `verified_against: <commit sha1 前 8 位>`，值为该次确认时的 HEAD。修订轮重新接受时更新；一次显式的「重读确认」也可只更新此字段并提交。 | 一个字段，由转 active 的动作顺手写，不需要额外记忆。 |
-| 2 | 文档的「相关代码」由已有锚点推导：spec / rule 为其 AC 的携带测试所在文件；design 为 §中以 `anchor: <path>` 标注的模块路径（本决定新增该写法，见 4）；decision 为其 `constrains` 所列文档的相关代码之并集。 | 复用 decision-00001 的后缀与 decision-00002 的路径，不引入新的绑定机制。 |
+| 2 | 文档的「相关代码」由已有锚点推导：spec / rule 为其 AC 的携带测试所在文件；design 为 §中以 `anchor: <path>` 标注的模块路径（本决定新增该写法，见 4）；decision 为其 `constrains` 所列文档的相关代码之并集。 | 复用 decision-90001 的后缀与 decision-90002 的路径，不引入新的绑定机制。 |
 | 3 | `scripts/trace-check` 新增检查 (k)：对每份 `active` 且有 `verified_against` 的文档，统计 `verified_against..HEAD` 中触及其相关代码的提交数；超过阈值（写死为 10，不加配置文件）即打印 `STALE <path> verified_against <sha> N commits since touched <paths>`。STALE 只报告。无 `verified_against` 的 active 文档报告 `UNVERIFIED-AGE`，同样只报告。 | 报告不失败，避免变成没人理的红灯；失败点放在下一条。 |
 | 4 | 检查 (k) 的失败点：`resolved` plan 的 `implements` 所指文档若 STALE，失败；`design` TEMPLATE 增加 `anchor: <repo-relative path>` 行的写法说明，放在描述具体模块的小节首行。 | 只在有人声称「做完了」时强制，与 (d)(g) 同一原则。 |
 | 5 | 检查 (l)：一份 `active` spec / rule / design / plan 的正文或 front matter 引用某 `active` decision 的 id，而该 decision 的 `constrains` 未列出它且它也未声明 `implements` 该 decision，报告 `UNBOUND`。只报告。 | 把 `docs/decision/README.md:28-31` 的回填要求从 prose 变成可见。 |

@@ -36,7 +36,7 @@ Prefer Mermaid:
 
 A section that describes one module opens with `anchor: <repo-relative path>` on
 its own line (a file or a directory). `scripts/trace-check` uses the anchors to
-tell which commits touch this design (`decision-00003-doc-freshness`) and
+tell which commits touch this design (`decision-90003-doc-freshness`) and
 rejects a path that is not tracked.
 
 ## Note

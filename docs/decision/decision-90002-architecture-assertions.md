@@ -1,9 +1,9 @@
 ---
-id: decision-00002-architecture-assertions
+id: decision-90002-architecture-assertions
 type: decision
 status: active
 verified_against: 4f233b24
-motivated_by: [analysis-00001-doc-code-drift]
+motivated_by: [analysis-90001-doc-code-drift]
 ---
 
 # Decision: ARCHITECTURE.md 的每条边界配一条构建时运行的断言
@@ -12,9 +12,9 @@ motivated_by: [analysis-00001-doc-code-drift]
 
 ## 1. 需要做这个决定的原因
 
-- `ARCHITECTURE.md` 只有两条约束：首个 plan 开始前从模板填写（`AGENTS.md:89-94`），以及「只链 active 文档」一句 prose（`ARCHITECTURE_TEMPLATE.md:8`）。模块边界变了没有任何触发（`analysis-00001-doc-code-drift` §3 第 4 条）。
+- `ARCHITECTURE.md` 只有两条约束：首个 plan 开始前从模板填写（`AGENTS.md:89-94`），以及「只链 active 文档」一句 prose（`ARCHITECTURE_TEMPLATE.md:8`）。模块边界变了没有任何触发（`analysis-90001-doc-code-drift` §3 第 4 条）。
 - 本仓库自己的 `ARCHITECTURE.md` 直到 `a35d0d67` 之前一直是 5 月的旧版占位符，与 9 月的 arc42 模板形态都不一致，五个月无人发现——prose 架构文档腐烂的实证。
-- 业界对应做法成熟：ArchUnit / ArchUnitTS / dependency-cruiser / arch-go / import-linter 把「A 层不得依赖 B 层」写成每次构建都跑的断言（fitness function）；ADR 与架构文档的公认失败模式是「状态和边界靠人记得改」（`analysis-00001-doc-code-drift` §2）。
+- 业界对应做法成熟：ArchUnit / ArchUnitTS / dependency-cruiser / arch-go / import-linter 把「A 层不得依赖 B 层」写成每次构建都跑的断言（fitness function）；ADR 与架构文档的公认失败模式是「状态和边界靠人记得改」（`analysis-90001-doc-code-drift` §2）。
 
 ## 2. 决定
 

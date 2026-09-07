@@ -6,12 +6,12 @@ become clear.
 
 Keep review comments and docs in the canonical terms from
 [CONTEXT.md](CONTEXT.md) once that file exists; `scripts/term-check` enforces its
-`_Avoid_` lists on prose and code comments (`decision-00005-term-check`).
+`_Avoid_` lists on prose and code comments (`decision-90005-term-check`).
 
 ## Spec impact
 
 The PR's job summary carries the `IMPACT` list from `scripts/trace-check --impact`
-(`decision-00004-doc-impact-review`): for each changed file, the ACs whose tests
+(`decision-90004-doc-impact-review`): for each changed file, the ACs whose tests
 live in or import it, and the designs whose `anchor:` covers it. For every AC
 listed, read its Given / When / Then against the new code and record one of:
 

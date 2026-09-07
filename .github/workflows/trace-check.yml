@@ -1,4 +1,4 @@
-# Docs<->code traceability gate (decision-00001-trace-ids-and-trace-check).
+# Docs<->code traceability gate (decision-90001-trace-ids-and-trace-check).
 # Runs on every branch: ids, relations, FR/BR coverage, AC test suffixes,
 # record evidence, resolved-plan gate. See scripts/trace-check --help text.
 name: trace-check
@@ -16,11 +16,11 @@ jobs:
         run: python3 scripts/test_trace_check.py
       - name: Check traceability
         run: scripts/trace-check
-      - name: Self-test and run the canonical-term gate (decision-00005)
+      - name: Self-test and run the canonical-term gate (decision-90005)
         run: |
           python3 scripts/test_term_check.py
           scripts/term-check
-      - name: Spec impact of this PR (decision-00004)
+      - name: Spec impact of this PR (decision-90004)
         if: github.event_name == 'pull_request'
         run: |
           git fetch --quiet origin "${{ github.base_ref }}"
