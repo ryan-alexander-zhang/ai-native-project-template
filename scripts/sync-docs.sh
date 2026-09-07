@@ -31,7 +31,9 @@ start=$(git rev-parse --abbrev-ref HEAD)
 for b in $branches; do
   echo "==> $b"
   git switch "$b" >/dev/null 2>&1 || git switch -c "$b" --track "origin/$b"
-  if git merge --no-edit origin/main; then
+  # merge.ours.driver honours the `merge=ours` attribute (.gitattributes) so a
+  # lang branch keeps its own CONTEXT.md instead of conflicting with main's.
+  if git -c merge.ours.driver=true merge --no-edit origin/main; then
     [ "${PUSH:-0}" = "1" ] && git push origin "$b"
   else
     echo "!! merge conflict on $b — resolve, commit, then re-run (skipping the rest)."
