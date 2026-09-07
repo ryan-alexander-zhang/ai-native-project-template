@@ -102,12 +102,13 @@ ledger with a one-line reason. Ledger row names:
    fixed within the run. Exit: the `DEVELOPMENT.md` and `TESTING.md`
    Definitions of Done hold.
 7. `acceptance` — the verification subagent, one `doc-agent` code review of
-   the run's whole diff per `REVIEW.md` (findings are fixed by `code-agent`
+   the run's whole diff per `REVIEW.md`, Spec impact verdicts included (findings are fixed by `code-agent`
    before the stage ends), the smoke runs `TESTING.md` asks for (`code-agent`,
    results written into the ledger), and the `record` acceptance checklist;
    `plan` -> `resolved` (`AGENTS.md` §8, last bullet).
 8. `pr` — open the PR per `PR.md` against the branch the run started from. The
-   PR body links the ledger and lists every `decided_by: agent` decision. Stop.
+   PR body links the ledger, carries the Spec impact verdicts, and lists every
+   `decided_by: agent` decision. Stop.
 
 ## Ledger
 

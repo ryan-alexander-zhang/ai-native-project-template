@@ -25,6 +25,10 @@ Checks, over every tracked file of the repo the cwd is in:
   l. an active doc citing an active decision that neither constrains it nor is implemented
      by it is UNBOUND (reported)
 Exit 1 on any ERROR line; stdlib only.
+
+`trace-check --impact <git range>` is read-only and always exits 0: for every non-Markdown
+file the range changed it lists the carried ACs of tests in that file, the tests that import
+it, the designs whose `anchor:` covers it, and the spec/rule docs those ACs belong to.
 """
 import hashlib
 import pathlib
@@ -154,7 +158,58 @@ def test_name(cell):
     return name.split("/")[-1]
 
 
-def main(root, hash_ids=()):
+IMPORT_LINE = re.compile(r"^\s*(?:import|from|require|use|using|#include)\b|require\(|import\(", re.M)
+
+
+def import_refs(text, path):
+    """True when an import/require line in `text` names `path` (same-repo relative form)."""
+    stem = re.sub(r"\.[^./]+$", "", path)
+    needles = {stem, stem.replace("/", "."), "./" + stem, stem.split("/")[-1]}
+    for line in text.splitlines():
+        if IMPORT_LINE.match(line) or "require(" in line or "import(" in line:
+            for n in needles:
+                if re.search(r"(?<![\w])" + re.escape(n) + r"(?![\w])", line):
+                    return True
+    return False
+
+
+def impact(root, rng, files, docs, by_prefix, carried, texts):
+    changed = [f for f in subprocess.check_output(["git", "diff", "--name-only", rng, "--"], cwd=root, text=True).split("\n") if f and not f.endswith(".md")]
+    by_file = {}
+    for sfx, where in carried.items():
+        for f in where:
+            by_file.setdefault(f, set()).add(id_of_suffix(sfx))
+    designs = [d for d in docs.values() if d["type"] == "design" and d["fm"].get("status") == "active"]
+    hit = False
+    for f in changed:
+        acs = set(by_file.get(f, ()))
+        importers = [t for t in texts if t != f and t in by_file and import_refs(texts[t], f)]
+        for t in importers:
+            acs |= by_file[t]
+        anchored = [(d, a) for d in designs for a in ANCHOR.findall(d["body"]) if f == a.rstrip("/") or f.startswith(a.rstrip("/") + "/")]
+        if not acs and not anchored:
+            continue
+        hit = True
+        print(f"IMPACT {f}")
+        if f in by_file:
+            print(f"  tests:   {f} carries {len(by_file[f])} AC(s)")
+        for t in importers:
+            print(f"  imports: {t} carries {len(by_file[t])} AC(s)")
+        for ac in sorted(acs):
+            m = ITEM_ID.match(ac)
+            doc = by_prefix.get(m.group(1))
+            item = doc["acs"].get(ac) if doc else None
+            print(f"  AC:      {ac} ({item or 'unknown item'})")
+        for doc in sorted({by_prefix[ITEM_ID.match(ac).group(1)]["path"] for ac in acs if ITEM_ID.match(ac).group(1) in by_prefix}):
+            print(f"  doc:     {doc}")
+        for d, a in anchored:
+            print(f"  design:  {d['path']} (anchor {a})")
+    if not hit:
+        print("IMPACT none: no carried test or design anchor touches this diff")
+    return 0
+
+
+def main(root, hash_ids=(), impact_range=None):
     errors, notes = [], []
     err = errors.append
     files = [f for f in subprocess.check_output(["git", "ls-files", "-z"], cwd=root, text=True).split("\0") if f]
@@ -238,6 +293,20 @@ def main(root, hash_ids=()):
 
     def hash_of(ac):
         return ac_hash(by_prefix[ITEM_ID.match(ac).group(1)]["text"][ac])
+
+    if impact_range:
+        # texts/carried are built below; jump ahead by building them here
+        texts, carried = {}, {}
+        for f in files:
+            if f.endswith(".md") or f in SKIP_FILES:
+                continue
+            try:
+                texts[f] = (root / f).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for s in SUFFIX.findall(texts[f]):
+                carried.setdefault(s, set()).add(f)
+        return impact(root, impact_range, files, docs, by_prefix, carried, texts)
 
     if hash_ids:
         for i in hash_ids:
@@ -472,6 +541,8 @@ def main(root, hash_ids=()):
 if __name__ == "__main__":
     top = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
     args = sys.argv[1:]
+    if args and args[0] == "--impact" and len(args) == 2:
+        sys.exit(main(pathlib.Path(top), impact_range=args[1]))
     if args and args[0] != "--hash":
-        sys.exit(f"usage: trace-check [--hash <ac-id>...]")
+        sys.exit("usage: trace-check [--hash <ac-id>...] | --impact <git range>")
     sys.exit(main(pathlib.Path(top), tuple(args[1:])))

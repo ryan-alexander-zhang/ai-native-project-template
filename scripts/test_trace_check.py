@@ -66,7 +66,7 @@ GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign
 
 
 class TraceCheck(unittest.TestCase):
-    def run_committed(self, files, touch, edits=None):
+    def run_committed(self, files, touch, edits=None, *args):
         """Commit `files`, then commit `touch` `len(touch)` more times; `edits(sha)` may rewrite files after the first commit."""
         with tempfile.TemporaryDirectory() as tmp:
             def write(rel, text):
@@ -87,7 +87,7 @@ class TraceCheck(unittest.TestCase):
                 write(rel, pathlib.Path(tmp, rel).read_text() + f"# {i}\n")
                 subprocess.run([*GIT, "add", "-A"], cwd=tmp, check=True)
                 subprocess.run([*GIT, "commit", "-q", "-m", f"touch {i}"], cwd=tmp, check=True)
-            r = subprocess.run([sys.executable, SCRIPT], cwd=tmp, capture_output=True, text=True)
+            r = subprocess.run([sys.executable, SCRIPT, *args], cwd=tmp, capture_output=True, text=True)
             return r.returncode, r.stdout + r.stderr
 
     def run_check(self, files, *args):
@@ -220,6 +220,24 @@ class TraceCheck(unittest.TestCase):
         self.assertEqual(code_, 1)
         self.assertIn("anchor src/gone.py is not a tracked path", out)
         self.assertIn(f"UNBOUND docs/spec/{SPEC}.md: cites decision-00001-x", out)
+
+
+    def test_impact_lists_acs_designs_and_importers(self):
+        design = ("---\nid: design-00001-pay\ntype: design\nstatus: active\ninforms: [" + SPEC + "]\n---\n"
+                  "## 1. Pay\n\nanchor: src/pay.py\n\ntext\n")
+        files = self.base(**{"src/pay.py": "def pay():\n    return 1\n", "src/other.py": "x = 1\n",
+                             "tests/test_pay.py": "from src.pay import pay\n" + code(),
+                             "docs/design/design-00001-pay.md": design})
+        code_, out = self.run_committed(files, ["src/pay.py"], None, "--impact", "HEAD~1..HEAD")
+        self.assertEqual(code_, 0, out)
+        self.assertIn("IMPACT src/pay.py", out)
+        self.assertIn("imports: tests/test_pay.py carries 1 AC(s)", out)
+        self.assertIn(f"AC:      {AC} (spec-00001-FR-1)", out)
+        self.assertIn(f"doc:     docs/spec/{SPEC}.md", out)
+        self.assertIn("design:  docs/design/design-00001-pay.md (anchor src/pay.py)", out)
+        code_, out = self.run_committed(files, ["src/other.py"], None, "--impact", "HEAD~1..HEAD")
+        self.assertEqual(code_, 0, out)
+        self.assertIn("IMPACT none", out)
 
 
 if __name__ == "__main__":

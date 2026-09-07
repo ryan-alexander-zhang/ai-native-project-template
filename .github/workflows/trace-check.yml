@@ -10,7 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # verified_against ages and --impact ranges need history
       - name: Self-test the checker
         run: python3 scripts/test_trace_check.py
       - name: Check traceability
         run: scripts/trace-check
+      - name: Spec impact of this PR (decision-00004)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --quiet origin "${{ github.base_ref }}"
+          { echo '## Spec impact'; echo '```'; scripts/trace-check --impact "origin/${{ github.base_ref }}..HEAD"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

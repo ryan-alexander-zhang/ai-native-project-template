@@ -74,6 +74,10 @@ _Avoid_: dangling, unknown id
 An AC in a plan's delivery scope that no test carries. Failing on a `resolved` plan, reported on an `open` one.
 _Avoid_: missing test, gap
 
+**Impact**:
+The list `trace-check --impact` derives from a diff: the ACs whose carrying tests live in or import a changed file, and the designs whose `anchor:` covers it. Each listed AC gets a reviewer verdict of holds, broken, or revise.
+_Avoid_: affected requirements, blast radius, coverage of the diff
+
 **Stale**:
 An `active` spec, rule, design, or decision whose related code has taken more than 10 commits since its `verified_against`. Derived by `trace-check` every run, never stored as a status.
 _Avoid_: outdated, expired, rotten, a `stale` status value
