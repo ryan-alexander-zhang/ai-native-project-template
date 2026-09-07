@@ -75,8 +75,8 @@ An AC in a plan's delivery scope that no test carries. Failing on a `resolved` p
 _Avoid_: missing test, gap
 
 **Board**:
-The external whiteboard (the persimmon repository) that parses docs, runs the status transitions and the parse diagnostics. Configured by `whiteboard.config.yaml`.
-_Avoid_: whiteboard, dashboard, 白板 and board mixed in one doc — pick `board` in English text, 白板 in Chinese text
+The external tool (the persimmon repository) that renders `docs/`, runs the status transitions and the parse diagnostics. This template ships only its configuration, `whiteboard.config.yaml`, and ignores its local state, `.whiteboard/`; no board code lives here.
+_Avoid_: whiteboard (only in those two file names and in persimmon's own product name), dashboard, 看板
 
 **Boundary rule**:
 One row of `ARCHITECTURE.md` §5 Boundaries: a dependency-direction, layering, or visibility rule with the assertion that enforces it.
@@ -94,9 +94,9 @@ _Avoid_: auto mode, unattended mode, pipeline
 
 ## Flagged ambiguities
 
-- **GWT vs AC** — `AGENTS.md` says "GWT ids"; the id belongs to the AC, GWT is its shape. Use "AC id". Fix the wording when that line is next touched.
-- **Covered vs carried** — `trace-check` prints `COVERED n/m` for carried ACs. In prose say *carried*; keep `COVERED` only as the printed label.
-- **Whiteboard / board / 白板** — three names for one thing across `README.md`, `docs/*/README.md`, and `whiteboard.config.yaml`. Canonical: board / 白板.
+- **GWT vs AC** — the id belongs to the AC; GWT is the shape its text takes. Say "AC id", never "GWT id"; say GWT only when speaking of the Given / When / Then text itself.
+- **Covered vs carried** — *covered* is a coverage-percentage word (`TESTING.md`); an AC with a test is *carried*. `trace-check` prints `CARRIED n/m`.
+- **Board / whiteboard / 白板** — one thing. English prose says *board*, Chinese prose says 白板; *whiteboard* survives only in `whiteboard.config.yaml`, `.whiteboard/`, and persimmon's product name.
 
 ## Example dialogue
 

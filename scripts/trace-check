@@ -340,7 +340,7 @@ def main(root, hash_ids=()):
         in_scope |= scope
         uncovered = sorted(ac for ac in scope if suffix_of(ac) not in carried)
         hard = d["fm"]["status"] == "resolved" and d["id"] not in allowed
-        print(f"{d['id']}: COVERED {len(scope) - len(uncovered)}/{len(scope)}")
+        print(f"{d['id']}: CARRIED {len(scope) - len(uncovered)}/{len(scope)}")
         for ac in uncovered:
             if hard:
                 err(f"{d['path']}: UNCOVERED no test carries {ac}")

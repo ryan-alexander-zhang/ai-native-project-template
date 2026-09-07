@@ -87,7 +87,7 @@ class TraceCheck(unittest.TestCase):
     def test_clean_repo_passes(self):
         code_, out = self.run_check(self.base())
         self.assertEqual(code_, 0, out)
-        self.assertIn(f"{PLAN}: COVERED 1/1", out)
+        self.assertIn(f"{PLAN}: CARRIED 1/1", out)
 
     def test_resolved_plan_with_untested_ac_fails(self):
         files = self.base(**{"tests/test_pay.py": code("test_pays"), f"docs/record/{REC}.md": record("test_pays")})
