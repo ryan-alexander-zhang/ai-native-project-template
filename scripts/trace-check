@@ -13,8 +13,13 @@ Checks, over every tracked file of the repo the cwd is in:
   f. every AC suffix found in code resolves to an existing AC — ORPHANED fails;
      an AC outside every plan's scope is reported
   g. a resolved plan has a passing record row for every AC in its scope
+  h. a record row whose Evidence carries `ac:<hash>` is SUSPECT when the AC (or
+     its FR line) changed since — `scripts/trace-check --hash <ac-id>...` prints hashes
+  i. the relation matrix is read from each docs/<type>/README.md Relations section;
+     whiteboard.config.yaml `carries:` must agree with it
 Exit 1 on any ERROR line; stdlib only.
 """
+import hashlib
 import pathlib
 import re
 import subprocess
@@ -62,7 +67,21 @@ def front_matter(text):
     return fm, text[end + 4:]
 
 
-def carries_matrix(root):
+def readme_matrix(root):
+    """type -> relation fields, from the field bullets of each README Relations section."""
+    out = {}
+    for p in sorted((root / "docs").glob("*/README.md")):
+        fields, on = [], False
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if line.startswith("## "):
+                on = line.strip() == "## Relations"
+            elif on and (m := re.match(r"^- `([a-z_]+)`", line)):
+                fields.append(m.group(1))
+        out[p.parent.name] = fields
+    return out
+
+
+def yaml_matrix(root):
     p = root / "whiteboard.config.yaml"
     if not p.exists():
         return None
@@ -76,6 +95,10 @@ def carries_matrix(root):
     return out
 
 
+def ac_hash(text):
+    return hashlib.sha1(" ".join(text.split()).encode()).hexdigest()[:8]
+
+
 def checklist_rows(body):
     rows, header = [], None
     for line in body.splitlines():
@@ -87,11 +110,13 @@ def checklist_rows(body):
             low = [c.lower() for c in cells]
             ti = next((i for i, c in enumerate(low) if "test" in c or "测试" in c), None)
             ri = next((i for i, c in enumerate(low) if "result" in c or "结果" in c), None)
+            ei = next((i for i, c in enumerate(low) if "evidence" in c or "证据" in c), None)
             if ti and ri:
-                header = (ti, ri)
+                header = (ti, ri, ei)
             continue
-        if cells and ITEM_ID.match(cells[0]) and len(cells) > max(header):
-            rows.append((cells[0], cells[header[0]], cells[header[1]].lower()))
+        if cells and ITEM_ID.match(cells[0]) and len(cells) > max(header[:2]):
+            ev = cells[header[2]] if header[2] is not None and len(cells) > header[2] else ""
+            rows.append((cells[0], cells[header[0]], cells[header[1]].lower(), ev))
     return rows
 
 
@@ -100,7 +125,7 @@ def test_name(cell):
     return name.split("/")[-1]
 
 
-def main(root):
+def main(root, hash_ids=()):
     errors, notes = [], []
     err = errors.append
     files = [f for f in subprocess.check_output(["git", "ls-files", "-z"], cwd=root, text=True).split("\0") if f]
@@ -133,7 +158,7 @@ def main(root):
         vocab = WORK if t in WORK_TYPES else LIVING
         if fm.get("status") not in vocab:
             err(f"{f}: status {fm.get('status')!r} not in {sorted(vocab)}")
-        d = dict(path=f, fm=fm, body=body, type=t, prefix=prefix, id=did, items={}, acs={})
+        d = dict(path=f, fm=fm, body=body, type=t, prefix=prefix, id=did, items={}, acs={}, text={})
         docs[did] = d
         by_prefix.setdefault(prefix, d)
 
@@ -141,17 +166,25 @@ def main(root):
     for d in docs.values():
         if d["type"] not in ("spec", "rule"):
             continue
-        pending = []
+        pending, cur = [], None
         for line in d["body"].splitlines():
             m = DECL.match(line)
             if m and m.group(1).startswith(d["prefix"] + "-"):
                 if m.group(1) in d["items"]:
                     err(f"{d['path']}: {m.group(1)} declared twice")
                 d["items"].setdefault(m.group(1), set())
+                d["text"][m.group(1)] = line
+                cur = None
                 continue
             m = AC_DECL.match(line)
             if m and m.group(1).startswith(d["prefix"] + "-"):
                 pending.append(m.groups())
+                cur = m.group(1)
+                d["text"][cur] = line
+            elif cur and line[:1].isspace() and line.strip():
+                d["text"][cur] += "\n" + line  # Given / When / Then continuation
+            else:
+                cur = None
         for ac, parent in pending:
             if ac in d["acs"]:
                 err(f"{d['path']}: {ac} declared twice")
@@ -160,6 +193,7 @@ def main(root):
             else:
                 d["acs"][ac] = parent
                 d["items"][parent].add(ac)
+                d["text"][ac] = d["text"][parent] + "\n" + d["text"][ac]
         # c. unverified items
         if d["fm"].get("status") == "active":
             for item, acs in d["items"].items():
@@ -173,10 +207,20 @@ def main(root):
             return False
         return iid in (doc["acs"] if m.group(2) == "AC" else doc["items"])
 
-    # b. relation fields
-    matrix = carries_matrix(root)
-    if matrix is None:
-        notes.append("NOTE whiteboard.config.yaml carries: block not found; relation-field legality not checked")
+    def hash_of(ac):
+        return ac_hash(by_prefix[ITEM_ID.match(ac).group(1)]["text"][ac])
+
+    if hash_ids:
+        for i in hash_ids:
+            print(i, f"ac:{hash_of(i)}" if item_exists(i) and ITEM_ID.match(i).group(2) == "AC" else "no such AC")
+        return 0
+
+    # b. + i. relation fields; matrix from READMEs, yaml must agree
+    matrix = readme_matrix(root)
+    ymatrix = yaml_matrix(root)
+    for t, fields in (ymatrix or {}).items():
+        if t in matrix and set(fields) != set(matrix[t]):
+            err(f"whiteboard.config.yaml carries: {t}: {fields} != docs/{t}/README.md Relations {matrix[t]}")
     for d in docs.values():
         for k, v in d["fm"].items():
             if k == "decided_by" and d["type"] != "decision":
@@ -243,7 +287,8 @@ def main(root):
         if d["type"] != "record" or d["fm"].get("status") != "active":
             continue
         rows = checklist_rows(d["body"])
-        for iid, tcell, result in rows:
+        unhashed = 0
+        for iid, tcell, result, ev in rows:
             if not item_exists(iid):
                 err(f"{d['path']}: row names missing item {iid}")
                 continue
@@ -255,8 +300,16 @@ def main(root):
                 err(f"{d['path']}: test {name!r} does not carry {iid}")
             elif not any(re.search(rf"\b{re.escape(name)}\b", t) for t in texts.values()):
                 err(f"{d['path']}: test {name!r} not found in any tracked file")
+            hm = re.search(r"\bac:([0-9a-f]{8})\b", ev)
+            if hm and m.group(2) == "AC":
+                if hm.group(1) != hash_of(iid):
+                    err(f"{d['path']}: SUSPECT {iid} changed since this record (ac:{hm.group(1)} -> ac:{hash_of(iid)})")
+            elif m.group(2) == "AC":
+                unhashed += 1
             if result == "pass":
                 passing.setdefault(d["fm"].get("parent"), set()).update(acs)
+        if unhashed:
+            notes.append(f"NOTE {d['path']}: {unhashed} AC row(s) without ac:<hash> in Evidence; suspect detection off for them")
 
     # d. + g. plans
     in_scope = set()
@@ -298,4 +351,7 @@ def main(root):
 
 if __name__ == "__main__":
     top = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
-    sys.exit(main(pathlib.Path(top)))
+    args = sys.argv[1:]
+    if args and args[0] != "--hash":
+        sys.exit(f"usage: trace-check [--hash <ac-id>...]")
+    sys.exit(main(pathlib.Path(top), tuple(args[1:])))

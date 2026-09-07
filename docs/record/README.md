@@ -36,7 +36,9 @@ Set `parent` to the plan id; link each row to a requirement/GWT id. The Test
 column holds the test's stable identifier — the test **name** carrying the
 row's AC id as a suffix ([`TESTING.md`](../../TESTING.md), Traceability),
 optionally prefixed `path::` — never a free description; `scripts/trace-check`
-verifies that the named test exists and carries the id.
+verifies that the named test exists and carries the id. Put `ac:<hash>` from
+`scripts/trace-check --hash <ac-id>` in the Evidence column: the row turns
+SUSPECT in `trace-check` when the AC or its requirement line changes later.
 
 | GWT / requirement id | Test | Result | Evidence |
 | --- | --- | --- | --- |

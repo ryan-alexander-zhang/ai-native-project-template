@@ -41,7 +41,7 @@ def plan(status="resolved", implements=SPEC):
     return f"---\nid: {PLAN}\ntype: plan\nstatus: {status}\nimplements: [{implements}]\n---\n"
 
 
-def record(test=TEST):
+def record(test=TEST, evidence=""):
     return f"""---
 id: {REC}
 type: record
@@ -49,10 +49,13 @@ status: active
 parent: {PLAN}
 verifies: [{AC}]
 ---
-| GWT / requirement id | Test | Result |
-| --- | --- | --- |
-| {AC} | `{test}` | pass |
+| GWT / requirement id | Test | Result | Evidence |
+| --- | --- | --- | --- |
+| {AC} | `{test}` | pass | {evidence} |
 """
+
+
+SPEC_README = "# Specs\n\n## Relations\n\n- `parent` — a prd.\n\n## Exclude\n"
 
 
 def code(name=TEST):
@@ -60,7 +63,7 @@ def code(name=TEST):
 
 
 class TraceCheck(unittest.TestCase):
-    def run_check(self, files):
+    def run_check(self, files, *args):
         with tempfile.TemporaryDirectory() as tmp:
             for rel, text in files.items():
                 p = pathlib.Path(tmp, rel)
@@ -68,7 +71,7 @@ class TraceCheck(unittest.TestCase):
                 p.write_text(text)
             subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
             subprocess.run(["git", "add", "-A"], cwd=tmp, check=True)
-            r = subprocess.run([sys.executable, SCRIPT], cwd=tmp, capture_output=True, text=True)
+            r = subprocess.run([sys.executable, SCRIPT, *args], cwd=tmp, capture_output=True, text=True)
             return r.returncode, r.stdout + r.stderr
 
     def base(self, **over):
@@ -123,12 +126,31 @@ class TraceCheck(unittest.TestCase):
         files = self.base()
         files[f"docs/spec/{SPEC}.md"] = spec().replace("status: active\n", "status: active\nimplements: [x]\n")
         files["docs/spec/spec-00001-dup.md"] = spec().replace(SPEC, "spec-00001-dup")
-        with_matrix = dict(files, **{"whiteboard.config.yaml": "carries:\n  spec: [parent]\n\nflow:\n"})
-        code_, out = self.run_check(with_matrix)
+        files["docs/spec/README.md"] = SPEC_README
+        code_, out = self.run_check(files)
         self.assertEqual(code_, 1)
         self.assertIn("not carried by type spec", out)
         self.assertIn("malformed id 'x'", out)
         self.assertIn("number spec-00001 already used", out)
+
+    def test_yaml_matrix_must_match_readme(self):
+        files = self.base(**{"docs/spec/README.md": SPEC_README,
+                             "whiteboard.config.yaml": "carries:\n  spec: [parent, informs]\n\nflow:\n"})
+        code_, out = self.run_check(files)
+        self.assertEqual(code_, 1)
+        self.assertIn("whiteboard.config.yaml carries: spec", out)
+
+    def test_ac_hash_marks_changed_ac_suspect(self):
+        _, out = self.run_check(self.base(), "--hash", AC)
+        h = out.split()[1]
+        self.assertRegex(h, r"^ac:[0-9a-f]{8}$")
+        code_, out = self.run_check(self.base(**{f"docs/record/{REC}.md": record(evidence=h)}))
+        self.assertEqual(code_, 0, out)
+        self.assertNotIn("SUSPECT", out)
+        changed = spec().replace("Then c", "Then not c")
+        code_, out = self.run_check(self.base(**{f"docs/record/{REC}.md": record(evidence=h), f"docs/spec/{SPEC}.md": changed}))
+        self.assertEqual(code_, 1)
+        self.assertIn(f"SUSPECT {AC} changed", out)
 
 
 if __name__ == "__main__":
