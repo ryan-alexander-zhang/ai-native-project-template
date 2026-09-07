@@ -86,7 +86,7 @@ or bullets over a single conclusion. This applies to documents too.
 
 - For implementation work, follow `DEVELOPMENT.md`.
 - After implementation, follow `TESTING.md`.
-- Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
+- Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`. It is filled only when every row of its §5 Boundaries table has an `Enforced by` path or an `Unenforced: <why>`.
 - Before the first implementation `plan` turns `open`, fill the project-derived root guides
   from their templates and the `active` decisions/designs: `ARCHITECTURE.md`, the Commands in
   `DEVELOPMENT.md`, the project-specific values in `TESTING.md` / `CODE_STYLE.md` /

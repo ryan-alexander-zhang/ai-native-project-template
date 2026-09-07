@@ -17,6 +17,8 @@ Checks, over every tracked file of the repo the cwd is in:
      its FR line) changed since — `scripts/trace-check --hash <ac-id>...` prints hashes
   i. the relation matrix is read from each docs/<type>/README.md Relations section;
      whiteboard.config.yaml `carries:` must agree with it
+  j. every `Enforced by` path in ARCHITECTURE.md's Boundaries table is a tracked file;
+     `Unenforced: <why>` rows are counted, empty cells fail
 Exit 1 on any ERROR line; stdlib only.
 """
 import hashlib
@@ -117,6 +119,24 @@ def checklist_rows(body):
         if cells and ITEM_ID.match(cells[0]) and len(cells) > max(header[:2]):
             ev = cells[header[2]] if header[2] is not None and len(cells) > header[2] else ""
             rows.append((cells[0], cells[header[0]], cells[header[1]].lower(), ev))
+    return rows
+
+
+def boundary_rows(text):
+    """(rule, enforced_by) rows of the `| Rule | Enforced by |` table in ARCHITECTURE.md."""
+    rows, on = [], False
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            on = False
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        low = [c.lower() for c in cells]
+        if not on:
+            on = len(cells) >= 2 and low[0] == "rule" and low[1] == "enforced by"
+            continue
+        if set("".join(cells)) <= set("-: "):
+            continue
+        rows.append((cells[0], cells[1] if len(cells) > 1 else ""))
     return rows
 
 
@@ -340,6 +360,21 @@ def main(root, hash_ids=()):
             err(f"ORPHANED test id {s} in {', '.join(sorted(where))} names no existing AC")
         elif ac not in in_scope:
             notes.append(f"ORPHANED {ac} is tested in {', '.join(sorted(where))} but in no plan's delivery scope")
+
+    # j. architecture boundaries
+    arch = root / "ARCHITECTURE.md"
+    if "ARCHITECTURE.md" in files:
+        unenforced = 0
+        for rule, by in boundary_rows(arch.read_text(encoding="utf-8")):
+            by = by.strip("`")
+            if by.startswith("Unenforced:"):
+                unenforced += 1
+            elif not by:
+                err(f"ARCHITECTURE.md: boundary {rule!r} has no Enforced by and no Unenforced: reason")
+            elif by not in files:
+                err(f"ARCHITECTURE.md: boundary {rule!r} enforced by {by}, which is not a tracked file")
+        if unenforced:
+            notes.append(f"NOTE ARCHITECTURE.md: {unenforced} boundary rule(s) marked Unenforced")
 
     for n in notes:
         print(n)

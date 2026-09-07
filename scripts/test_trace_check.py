@@ -153,6 +153,21 @@ class TraceCheck(unittest.TestCase):
         self.assertIn(f"SUSPECT {AC} changed", out)
 
 
+    def test_architecture_boundaries(self):
+        arch = ("# Architecture Overview\n\n## 5. Building Block View\n\n**Boundaries**\n\n"
+                "| Rule | Enforced by |\n| --- | --- |\n"
+                "| domain imports no infra | `tests/arch.py` |\n"
+                "| only gateway calls http | Unenforced: no lint yet |\n")
+        code_, out = self.run_check(self.base(**{"ARCHITECTURE.md": arch, "tests/arch.py": "x = 1\n"}))
+        self.assertEqual(code_, 0, out)
+        self.assertIn("1 boundary rule(s) marked Unenforced", out)
+        broken = arch.replace("`tests/arch.py`", "`tests/gone.py`") + "| empty cell | |\n"
+        code_, out = self.run_check(self.base(**{"ARCHITECTURE.md": broken, "tests/arch.py": "x = 1\n"}))
+        self.assertEqual(code_, 1)
+        self.assertIn("tests/gone.py, which is not a tracked file", out)
+        self.assertIn("has no Enforced by", out)
+
+
 if __name__ == "__main__":
     os.environ.setdefault("GIT_AUTHOR_NAME", "t")
     unittest.main()

@@ -78,6 +78,10 @@ _Avoid_: missing test, gap
 The external whiteboard (the persimmon repository) that parses docs, runs the status transitions and the parse diagnostics. Configured by `whiteboard.config.yaml`.
 _Avoid_: whiteboard, dashboard, 白板 and board mixed in one doc — pick `board` in English text, 白板 in Chinese text
 
+**Boundary rule**:
+One row of `ARCHITECTURE.md` §5 Boundaries: a dependency-direction, layering, or visibility rule with the assertion that enforces it.
+_Avoid_: architecture rule, constraint (that word is arc42 §2), layer rule
+
 ### Branches and roles
 
 **Lang branch**:

@@ -41,6 +41,7 @@ List every check that fails the build. A check that only warns is not a gate.
 | Complexity + duplication | *(none yet)* | — | — |
 | Static analysis | *(none yet)* | — | — |
 | Coverage | *(none yet)* | — | — |
+| Architecture | *(none yet — e.g. ArchUnit, dependency-cruiser, arch-go, import-linter)* | the rules in `ARCHITECTURE.md` §5 Boundaries | — |
 
 Record where the shared config lives. If more than one build file carries the
 same gate configuration, name each one here — they must be changed together.

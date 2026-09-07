@@ -87,6 +87,7 @@ a suffix naming no existing AC (`decision-00001-trace-ids-and-trace-check`).
 | API or HTTP contract change | Add or update the relevant API and/or integration tests. Verify the request, response, and key side effects. |
 | Messaging or async workflow change | Add or update the relevant unit and/or integration tests. Verify the contract or workflow behavior. |
 | Critical user or system flow change | Add or update the relevant tests and run an E2E or smoke check for the changed flow. |
+| Module boundary or dependency-direction change | Update the architecture assertion named in `ARCHITECTURE.md` §5 Boundaries; add one if the rule is new. |
 | Bug fix | Add or update a regression test that would have caught the bug. |
 | Refactor with no intended behavior change | Keep existing tests green. Add tests only if coverage is too weak to prove safety. |
 
