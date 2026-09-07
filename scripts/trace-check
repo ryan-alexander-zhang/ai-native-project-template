@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""Docs<->code traceability gate. See decision-00001-trace-ids-and-trace-check.
+
+Checks, over every tracked file of the repo the cwd is in:
+  a. doc ids well-formed and unique; type/folder match the id
+  b. relation fields legal for the type (matrix read from whiteboard.config.yaml),
+     every listed id resolves to an existing doc or requirement item
+  c. every FR/BR of an active spec/rule has at least one AC
+  d. every AC in a plan's delivery scope is carried by a test name suffix
+     (`__spec_00001_AC_5_1`) — UNCOVERED fails a resolved plan, reports an open one
+  e. every row of an active record names an existing id and a test that exists
+     and carries that id
+  f. every AC suffix found in code resolves to an existing AC — ORPHANED fails;
+     an AC outside every plan's scope is reported
+  g. a resolved plan has a passing record row for every AC in its scope
+Exit 1 on any ERROR line; stdlib only.
+"""
+import pathlib
+import re
+import subprocess
+import sys
+
+TYPES = "analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec|task"
+LIVING = {"draft", "active", "archived"}
+WORK = {"draft", "open", "resolved", "wontfix", "archived"}
+WORK_TYPES = {"issue", "plan", "task"}
+DOC_ID = re.compile(rf"^({TYPES})-\d{{5}}-[a-z0-9][a-z0-9-]*$")
+ITEM_ID = re.compile(r"^((?:spec|rule)-\d{5})-(FR|BR|AC)-(\d+)(?:\.(\d+))?$")
+DECL = re.compile(r"^(?:- |\| )\*\*((?:spec|rule)-\d{5}-(?:FR|BR)-\d+)\*\*")
+AC_DECL = re.compile(r"^- \*\*((?:spec|rule)-\d{5}-AC-\d+\.\d+)\*\* \(((?:spec|rule)-\d{5}-(?:FR|BR)-\d+)\)")
+SUFFIX = re.compile(r"__((?:spec|rule)_\d{5}_AC_\d+_\d+)\b")
+NON_RELATION = {"id", "type", "status", "decided_by"}
+ITEM_FIELDS = {("plan", "implements"), ("record", "verifies")}
+SKIP_FILES = {"scripts/trace-check", ".trace-check-allow"}
+
+
+def suffix_of(ac_id):
+    return ac_id.replace("-", "_").replace(".", "_")
+
+
+def id_of_suffix(s):
+    t, n, _, i, k = s.split("_")
+    return f"{t}-{n}-AC-{i}.{k}"
+
+
+def front_matter(text):
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---", 4)
+    if end < 0:
+        return None
+    fm = {}
+    for line in text[4:end].splitlines():
+        line = line.split("#", 1)[0].rstrip()
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        v = v.strip()
+        if v.startswith("[") and v.endswith("]"):
+            v = [x.strip() for x in v[1:-1].split(",") if x.strip()]
+        fm[k.strip()] = v
+    return fm, text[end + 4:]
+
+
+def carries_matrix(root):
+    p = root / "whiteboard.config.yaml"
+    if not p.exists():
+        return None
+    m = re.search(r"^carries:\n((?:[ \t]+\S.*\n)+)", p.read_text(encoding="utf-8"), re.M)
+    if not m:
+        return None
+    out = {}
+    for line in m.group(1).splitlines():
+        k, v = line.strip().split(":", 1)
+        out[k] = [x.strip() for x in v.strip()[1:-1].split(",") if x.strip()]
+    return out
+
+
+def checklist_rows(body):
+    rows, header = [], None
+    for line in body.splitlines():
+        if not line.startswith("|"):
+            header = None
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            low = [c.lower() for c in cells]
+            ti = next((i for i, c in enumerate(low) if "test" in c or "测试" in c), None)
+            ri = next((i for i, c in enumerate(low) if "result" in c or "结果" in c), None)
+            if ti and ri:
+                header = (ti, ri)
+            continue
+        if cells and ITEM_ID.match(cells[0]) and len(cells) > max(header):
+            rows.append((cells[0], cells[header[0]], cells[header[1]].lower()))
+    return rows
+
+
+def test_name(cell):
+    name = cell.strip("`").split("::")[-1].split(" (")[0].strip()
+    return name.split("/")[-1]
+
+
+def main(root):
+    errors, notes = [], []
+    err = errors.append
+    files = [f for f in subprocess.check_output(["git", "ls-files", "-z"], cwd=root, text=True).split("\0") if f]
+    docs, by_prefix = {}, {}
+
+    # a. ids, types, folders, status vocabulary
+    for f in files:
+        if not (f.startswith("docs/") and f.endswith(".md")) or pathlib.Path(f).name in ("README.md", "TEMPLATE.md"):
+            continue
+        parsed = front_matter((root / f).read_text(encoding="utf-8"))
+        if not parsed:
+            err(f"{f}: missing front matter")
+            continue
+        fm, body = parsed
+        did = fm.get("id")
+        if not isinstance(did, str) or not DOC_ID.match(did):
+            err(f"{f}: bad or missing id {did!r}")
+            continue
+        t = did.split("-")[0]
+        prefix = did[: len(t) + 6]
+        if did in docs:
+            err(f"{f}: duplicate id {did} (also {docs[did]['path']})")
+            continue
+        if prefix in by_prefix:
+            err(f"{f}: number {prefix} already used by {by_prefix[prefix]['path']}")
+        if fm.get("type") != t:
+            err(f"{f}: type {fm.get('type')!r} does not match id prefix {t!r}")
+        if not f.startswith(f"docs/{t}/"):
+            err(f"{f}: a {t} doc must live under docs/{t}/")
+        vocab = WORK if t in WORK_TYPES else LIVING
+        if fm.get("status") not in vocab:
+            err(f"{f}: status {fm.get('status')!r} not in {sorted(vocab)}")
+        d = dict(path=f, fm=fm, body=body, type=t, prefix=prefix, id=did, items={}, acs={})
+        docs[did] = d
+        by_prefix.setdefault(prefix, d)
+
+    # items and ACs of spec/rule docs
+    for d in docs.values():
+        if d["type"] not in ("spec", "rule"):
+            continue
+        pending = []
+        for line in d["body"].splitlines():
+            m = DECL.match(line)
+            if m and m.group(1).startswith(d["prefix"] + "-"):
+                if m.group(1) in d["items"]:
+                    err(f"{d['path']}: {m.group(1)} declared twice")
+                d["items"].setdefault(m.group(1), set())
+                continue
+            m = AC_DECL.match(line)
+            if m and m.group(1).startswith(d["prefix"] + "-"):
+                pending.append(m.groups())
+        for ac, parent in pending:
+            if ac in d["acs"]:
+                err(f"{d['path']}: {ac} declared twice")
+            elif parent not in d["items"]:
+                err(f"{d['path']}: {ac} attributed to undeclared {parent}")
+            else:
+                d["acs"][ac] = parent
+                d["items"][parent].add(ac)
+        # c. unverified items
+        if d["fm"].get("status") == "active":
+            for item, acs in d["items"].items():
+                if not acs:
+                    err(f"{d['path']}: {item} has no acceptance (unverified)")
+
+    def item_exists(iid):
+        m = ITEM_ID.match(iid)
+        doc = by_prefix.get(m.group(1)) if m else None
+        if not doc:
+            return False
+        return iid in (doc["acs"] if m.group(2) == "AC" else doc["items"])
+
+    # b. relation fields
+    matrix = carries_matrix(root)
+    if matrix is None:
+        notes.append("NOTE whiteboard.config.yaml carries: block not found; relation-field legality not checked")
+    for d in docs.values():
+        for k, v in d["fm"].items():
+            if k == "decided_by" and d["type"] != "decision":
+                err(f"{d['path']}: decided_by is decision-only")
+            if k in NON_RELATION:
+                continue
+            if matrix is not None and d["type"] in matrix and k not in set(matrix[d["type"]]) | {"supersedes"}:
+                err(f"{d['path']}: field {k} is not carried by type {d['type']}")
+            if k == "parent" and isinstance(v, list):
+                err(f"{d['path']}: parent is single-valued")
+            ids = v if isinstance(v, list) else [v]
+            if not ids or ids == [""]:
+                err(f"{d['path']}: empty field {k} must be omitted")
+                continue
+            for i in ids:
+                if DOC_ID.match(i):
+                    if i not in docs:
+                        err(f"{d['path']}: {k} names missing doc {i}")
+                elif ITEM_ID.match(i):
+                    if (d["type"], k) not in ITEM_FIELDS:
+                        err(f"{d['path']}: item id {i} not allowed in {k}")
+                    elif not item_exists(i):
+                        err(f"{d['path']}: {k} names missing item {i}")
+                else:
+                    err(f"{d['path']}: {k} has malformed id {i!r}")
+
+    # tests carrying AC ids
+    texts, carried = {}, {}
+    for f in files:
+        if f.endswith(".md") or f in SKIP_FILES:
+            continue
+        try:
+            texts[f] = (root / f).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for s in SUFFIX.findall(texts[f]):
+            carried.setdefault(s, set()).add(f)
+
+    def scope_acs(plan):
+        acs = set()
+        for i in plan["fm"].get("implements", []):
+            if DOC_ID.match(i):
+                d = docs.get(i)
+                if d and d["type"] in ("spec", "rule"):
+                    for item_acs in d["items"].values():
+                        acs |= item_acs
+                continue
+            m = ITEM_ID.match(i)
+            doc = by_prefix.get(m.group(1)) if m else None
+            if not doc or not item_exists(i):
+                continue
+            item = doc["acs"][i] if m.group(2) == "AC" else i
+            acs |= doc["items"][item]
+        return acs
+
+    allow_path = root / ".trace-check-allow"
+    allowed = set(allow_path.read_text().split()) if allow_path.exists() else set()
+    for p in sorted(allowed):
+        notes.append(f"NOTE {p} is in .trace-check-allow: UNCOVERED reported, not failed")
+
+    # e. record rows; passing rows per plan
+    passing = {}
+    for d in docs.values():
+        if d["type"] != "record" or d["fm"].get("status") != "active":
+            continue
+        rows = checklist_rows(d["body"])
+        for iid, tcell, result in rows:
+            if not item_exists(iid):
+                err(f"{d['path']}: row names missing item {iid}")
+                continue
+            m = ITEM_ID.match(iid)
+            doc = by_prefix[m.group(1)]
+            acs = {iid} if m.group(2) == "AC" else doc["items"][iid]
+            name = test_name(tcell)
+            if not any(f"__{suffix_of(ac)}" in name for ac in acs):
+                err(f"{d['path']}: test {name!r} does not carry {iid}")
+            elif not any(re.search(rf"\b{re.escape(name)}\b", t) for t in texts.values()):
+                err(f"{d['path']}: test {name!r} not found in any tracked file")
+            if result == "pass":
+                passing.setdefault(d["fm"].get("parent"), set()).update(acs)
+
+    # d. + g. plans
+    in_scope = set()
+    for d in docs.values():
+        if d["type"] != "plan" or d["fm"].get("status") not in ("open", "resolved"):
+            continue
+        scope = scope_acs(d)
+        in_scope |= scope
+        uncovered = sorted(ac for ac in scope if suffix_of(ac) not in carried)
+        hard = d["fm"]["status"] == "resolved" and d["id"] not in allowed
+        print(f"{d['id']}: COVERED {len(scope) - len(uncovered)}/{len(scope)}")
+        for ac in uncovered:
+            if hard:
+                err(f"{d['path']}: UNCOVERED no test carries {ac}")
+            else:
+                notes.append(f"UNCOVERED {d['path']}: no test carries {ac}")
+        if d["fm"]["status"] == "resolved":
+            for ac in sorted(scope - passing.get(d["id"], set())):
+                err(f"{d['path']}: resolved without a passing record row for {ac}")
+
+    # f. orphans
+    for s, where in sorted(carried.items()):
+        try:
+            ac = id_of_suffix(s)
+        except ValueError:
+            ac = None
+        if not ac or not item_exists(ac):
+            err(f"ORPHANED test id {s} in {', '.join(sorted(where))} names no existing AC")
+        elif ac not in in_scope:
+            notes.append(f"ORPHANED {ac} is tested in {', '.join(sorted(where))} but in no plan's delivery scope")
+
+    for n in notes:
+        print(n)
+    for e in errors:
+        print("ERROR", e)
+    print("trace-check:", "FAIL" if errors else "OK", f"({len(docs)} docs, {len(carried)} AC ids in tests)")
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    top = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    sys.exit(main(pathlib.Path(top)))

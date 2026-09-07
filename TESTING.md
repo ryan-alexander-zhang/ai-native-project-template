@@ -65,6 +65,18 @@ Use the following docs to define the project-specific framework choice for each 
 - [API_TESTING.md](API_TESTING.md): fill in the API testing guide for this repo.
 - [E2E_TESTING.md](E2E_TESTING.md): fill in the E2E testing guide for this repo.
 
+## Traceability
+
+Every acceptance criterion (`spec-<n>-AC-<i>.<k>` / `rule-<n>-AC-<i>.<k>`) in a
+plan's delivery scope is carried by at least one test **name**: the name ends
+with `__<id>` where `-` and `.` become `_`, for example
+`test_duplicate_webhook_is_noop__spec_00001_AC_5_1`; several ids are appended
+in turn. The test name is the only carrier — no annotations, no comments — so
+`scripts/trace-check` can grep it and a `record` can cite it verbatim. Each
+`*_TESTING.md` states how the suffix fits its framework's naming rules.
+`scripts/trace-check` fails CI on a `resolved` plan with an uncovered AC and on
+a suffix naming no existing AC (`decision-00001-trace-ids-and-trace-check`).
+
 ## Testing Matrix
 
 | Change type | Minimum requirement |

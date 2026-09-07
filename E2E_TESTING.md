@@ -29,3 +29,7 @@ Define the minimum rule that must pass for E2E testing at this repo.
 ## Report
 
 Describe where to check E2E test results, screenshots, videos, or CI output.
+
+## AC id suffix
+
+State how the `__<AC id>` test-name suffix ([TESTING.md](TESTING.md), Traceability) fits this framework's naming rules.

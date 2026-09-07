@@ -15,6 +15,9 @@
     "ARCHITECTURE_TEMPLATE.md",
     "SECURITY.md",
     ":(glob)docs/**/README.md",
-    ":(glob)docs/**/TEMPLATE.md"
+    ":(glob)docs/**/TEMPLATE.md",
+    "scripts/trace-check",
+    "scripts/test_trace_check.py",
+    ".github/workflows/trace-check.yml"
   ]
 }

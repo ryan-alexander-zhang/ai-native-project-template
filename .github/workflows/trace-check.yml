@@ -1,0 +1,16 @@
+# Docs<->code traceability gate (decision-00001-trace-ids-and-trace-check).
+# Runs on every branch: ids, relations, FR/BR coverage, AC test suffixes,
+# record evidence, resolved-plan gate. See scripts/trace-check --help text.
+name: trace-check
+
+on: [push, pull_request]
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-test the checker
+        run: python3 scripts/test_trace_check.py
+      - name: Check traceability
+        run: scripts/trace-check

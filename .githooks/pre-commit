@@ -48,3 +48,13 @@ case "$branch" in
     fi
     ;;
 esac
+
+# Docs<->code traceability gate (decision-00001-trace-ids-and-trace-check).
+# Mirrors .github/workflows/trace-check.yml locally. Bypass with --no-verify.
+if [ -x scripts/trace-check ] && command -v python3 >/dev/null 2>&1; then
+  if ! out=$(scripts/trace-check 2>&1); then
+    echo "$out"
+    echo "Commit aborted: scripts/trace-check failed."
+    exit 1
+  fi
+fi

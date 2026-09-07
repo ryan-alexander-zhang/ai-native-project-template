@@ -54,6 +54,7 @@ Prove the change and check that scope stayed focused.
 - Run tests per [TESTING.md](TESTING.md). Testing is part of Verify, not a
   separate phase after it.
 - Inspect the diff before completion.
+- Run `scripts/trace-check`; it must pass before a `plan` turns `resolved`.
 - Confirm the requested behavior is complete.
 
 ### Record
