@@ -1,7 +1,7 @@
 ---
 id: analysis-00017-samples-http-idempotency
 type: analysis
-status: draft
+status: active
 parent: analysis-00014-ddd-samples-scenario-catalog
 ---
 
@@ -75,25 +75,25 @@ sample 在 s01 的写路径上加了两个东西：一个 `POST /orders` 的幂�
 注意"抢占"始终发生，**没有只读路径**：claim 自带 lease（默认 1 分钟），所以进程猝死后键会在
 lease 到期时释放，而不是等结果保留期（默认 24 小时）。
 
-### 2.3 指纹**不包含 body**——本篇最重要的一条限制
+### 2.3 指纹覆盖 body（issue-00172 起）
 
 指纹是这五样东西的 SHA-256：
 
 ```
-method + "\n" + requestURI + "\n" + queryString + "\n" + contentType + "\n" + contentLength
+method + "\n" + requestURI + "\n" + queryString + "\n" + contentType + "\n" + body
 ```
 
-**body 不在里面。** 后果是具体的：两个 body 不同、但方法/路径/查询串/Content-Type/**长度**都相同的
-请求，指纹一致，于是第二个请求被判为 `Replay`，拿到第一个请求的响应，**业务代码根本没跑**。
+**body 在里面，content-length 不在。** 同键、同端点、body 不同的第二个请求被判为 `Mismatch`，
+返回 **422** `/problems/idempotency-key-reused`，业务代码不跑、也不回放别人的结果。sample 里的
+`aDifferentBodyUnderTheSameKeyIsRefused` 断言的就是这一条。
 
-sample 里有一个名字就叫 `aDifferentBodyOfTheSameShapeIsNOTDetected` 的测试，断言第二个请求
-（不同的 clientReference、不同的金额，恰好等长）拿回了第一个的响应体。这不是 bug 演示，是使用
-约束：
+代价是 body 要先读进内存：`idempotency.max-body-size`（默认 1MB）是上限，超限 **413**
+`/problems/request-too-large`——给不出保证的请求直接拒绝，不退回"只看描述符"的弱指纹。
+带 `Idempotency-Key` 的大 body 端点要么调高上限，要么不走幂等键。
 
-- 幂等键必须**按操作**分配，不能一个客户端会话复用一个键；
-- 不要指望 `Mismatch` 能挡住"载荷被改了"——它只挡长度/路径/方法/类型层面的差异（sample 里
-  `reusingAKeyForAMeasurablyDifferentRequestIsRefused` 用不同数量级的金额造成长度差异，才触发
-  422）。
+issue-00172 之前指纹用 content-length 代替 body（issue-00101 为规避缓冲而做的取舍）：等长的不同请求会
+拿到上一次的响应，chunked 传输下任意两个 body 都相等。那个版本的约束"不要指望 Mismatch 挡住载荷被改"
+已不再成立。
 
 ### 2.4 什么结果会被存下来
 
@@ -230,7 +230,7 @@ sample 的 `adifferentKeyForTheSameBusinessOrderIsTheUniqueIndexsJob` 演示的�
 | --- | --- |
 | 开了 `replay.enabled` 但没有 verifier bean | 启动成功、无警告、**完全不验签** |
 | 开了防重放但 nonce 保持默认关闭 | 同一份签名字节可在容差窗口内无限重放 |
-| 指望指纹能挡住"body 变了" | 等长的不同请求会拿到上一次的响应 |
+| 带幂等键的端点收大 body 却没调 `idempotency.max-body-size` | 超过 1MB 的请求全部 413 |
 | 一个客户端会话复用一个幂等键 | 第二个操作被判重放，静默不执行 |
 | 在既接口又接回调的服务上打开 `require-key` | 三方回调全部 400 |
 | `rate-limit.key` 写成 `apiKey` 之类 | 静默退化成按 IP 限流 |
