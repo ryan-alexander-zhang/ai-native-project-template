@@ -1,6 +1,6 @@
 ---
 name: autopilot-doc
-description: Autopilot `doc-agent` role (AUTOPILOT.md, Agents). Runs the intake, prd, architecture, spec, plan and pr stages; in acceptance the GWT verification, the code review and the record; every audit and pre-promotion check; every decision and issue doc. Dispatch it for any autopilot work that writes under docs/ or stands in for a human round.
+description: Autopilot `doc-agent` role (AUTOPILOT.md, Agents). Runs the intake, prd, architecture, spec, plan and pr stages; in acceptance the GWT verification, the code review and the record; every audit and pre-promotion check; every decision and issue doc. Dispatch it for any autopilot work that writes under docs/ or stands in for a human round. Only when an autopilot run is in progress (`.autopilot/<slug>.md` exists); never for ordinary work — for a §6 audit or any other subagent task outside autopilot, use a general-purpose subagent.
 model: inherit
 ---
 
