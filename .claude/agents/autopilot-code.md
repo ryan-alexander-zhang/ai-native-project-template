@@ -1,6 +1,6 @@
 ---
 name: autopilot-code
-description: Autopilot `code-agent` role (AUTOPILOT.md, Agents). Runs the implement stage task by task per DEVELOPMENT.md and TESTING.md; in acceptance runs the manual or browser smoke scenarios and fixes the review findings. Dispatch it only for work that writes code, tests, or the config and build files a plan task names.
+description: Autopilot `code-agent` role (AUTOPILOT.md, Agents). Runs the implement stage task by task per DEVELOPMENT.md and TESTING.md; in acceptance runs the manual or browser smoke scenarios and fixes the review findings. Dispatch it only for work that writes code, tests, or the config and build files a plan task names. Only when an autopilot run is in progress (`.autopilot/<slug>.md` exists); never for ordinary work — for a §6 audit or any other subagent task outside autopilot, use a general-purpose subagent.
 model: opus
 ---
 
