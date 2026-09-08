@@ -204,9 +204,13 @@ Boot 自动装配(`AutoConfiguration.imports`)。
 - **5xx 不落库**:瞬时失败被冻结在键上会让此后每次重试都拿到那个失败,正好废掉幂等键的用途,
   故 `abandon` 释放;4xx 是已决结果,照常落库回放。响应体在 `finally` 里回写,
   使落定阶段的存储故障不会吞掉一个副作用已提交的响应。
-- **fingerprint 不含请求体**:为哈希而缓冲每个请求体会给未认证调用方一个内存放大面;
-  而"读到别人的响应"这个真问题由 `principal` 关闭,不靠摘要。取舍写明:
-  同一键换端点/换载荷形状能抓到,同端点下两个等长同类型的不同请求体抓不到。
+- **fingerprint 覆盖请求本身**(`issue-00172`):method + URI + query + content-type + **body 字节**的 SHA-256。
+  fingerprint 的唯一职责是判定"是不是同一个请求",对 POST 而言请求由 payload 定义,所以 body 必须在里面;
+  content-length 不在里面——它是 body 的派生量,且 chunked 时为 -1,会把同一 body 判成两个请求。
+  为此 body 经 `CachedBodyRequestWrapper` 有界缓冲(`idempotency.max-body-size`,默认 1MB),超限 **413**:
+  给不出保证的请求就拒绝,不静默降级。DoS 由上限承担,不由放弃契约承担(issue-00101 曾反向取舍,已推翻)。
+  防重放过滤器已缓冲过的请求(到达时已是 `CachedBodyRequestWrapper`)直接复用,不再拷贝、不再按第二个上限截断:
+  先缓冲者的上限管用。指纹按字节比对,不做 JSON 规范化——重试发的是同一串字节,而在 handler 之前解析未信任的 body 不是过滤器的事。
 
 ### 5.6 防重放(opt-in,`replay.enabled`)
 
@@ -261,7 +265,7 @@ Boot 自动装配(`AutoConfiguration.imports`)。
 | `problem-details.enabled` | `true` | 异常→ProblemDetail 映射 |
 | `trace.enabled` / `trace.header` / `trace.generate-if-absent` | `true` / `X-Trace-Id` / `true` | traceId |
 | `i18n.basename` | (缺省英文 bundle) | 错误文案 i18n |
-| `idempotency.enabled` / `.header` / `.ttl` / `.require-key` | `false` / `Idempotency-Key` / `24h` / `false` | 幂等键 |
+| `idempotency.enabled` / `.header` / `.ttl` / `.require-key` / `.max-body-size` | `false` / `Idempotency-Key` / `24h` / `false` / `1MB` | 幂等键(body 进指纹,超限 413) |
 | `replay.enabled` / `.tolerance` / `.timestamp-header` / `.signature-header` | `false` / `5m` / — / — | 防重放(时间窗 + 签名) |
 | `replay.nonce.enabled` / `.nonce-header` | `false` / — | nonce 单次去重(需 store) |
 | `rate-limit.enabled` / `.policies` / `.key` / `.headers` | `false` / — / `ip` / `ietf` | 限流 |

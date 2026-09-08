@@ -60,6 +60,7 @@ Two zero-risk concerns default **on**; three stateful ones default **off**.
 | `idempotency.claim-lease` | `1m` | How long a claim survives without completing. Must outlast the slowest covered request (see below). |
 | `idempotency.require-key` | `false` | Reject a covered request that carries no key, rather than letting it through unprotected. |
 | `idempotency.methods` | `POST, PUT, PATCH, DELETE` | Which methods are covered. |
+| `idempotency.max-body-size` | `1MB` | Largest body buffered to fingerprint the request before answering `413`. Raise it only to the largest covered request you actually accept. When replay protection is also on, its filter buffers first and `replay.max-body-size` governs; a body already in memory is reused, not copied or re-capped. |
 
 The key is claimed **before** the request runs, which is what makes "executed once" true. Looking the
 key up, running, then saving the response cannot: two concurrent first attempts both miss the lookup
@@ -93,12 +94,13 @@ Three consequences worth knowing:
   where keys are scoped by tenant alone. Supply your own bean to key on something else, such as the
   client a token was issued to rather than the end user acting through it.
 
-A `fingerprint` of the request (method, path, query, content type and length) is compared but is not
-part of the identity — that is what produces the `422`. It deliberately excludes the body: buffering
-every request body to hash it would hand an unauthenticated caller a memory cost, and the leak this
-guards alongside — one caller reading another's response — is closed by the principal, not the digest.
-A key reused against a different endpoint or a differently shaped payload is caught; two distinct
-bodies of identical length and type against the same endpoint are not.
+A `fingerprint` of the request (method, path, query, content type and body) is compared but is not
+part of the identity — that is what produces the `422`. It covers the body because that is what
+defines the request a key names: the same key with a different payload is a different request and is
+refused, never replayed. Buffering the body is bounded by `idempotency.max-body-size`; a body over the
+cap is answered `413`, since a request that cannot be fingerprinted cannot be given the guarantee.
+Content length is not part of the fingerprint: it is derived from the body and is `-1` under chunked
+transfer, so the same body would otherwise read as two requests.
 
 ### Replay protection (off by default; needs a `RequestSignatureVerifier` bean)
 

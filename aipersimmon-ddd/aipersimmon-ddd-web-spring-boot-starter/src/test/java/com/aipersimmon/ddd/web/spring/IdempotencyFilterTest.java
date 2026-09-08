@@ -2,11 +2,19 @@ package com.aipersimmon.ddd.web.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +25,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -130,6 +140,122 @@ class IdempotencyFilterTest {
     mvc.perform(post("/idem").header("Idempotency-Key", "k".repeat(256)))
         .andExpect(status().isBadRequest());
     assertEquals(before, counter.value.get(), "the handler must not have run");
+  }
+
+  /**
+   * Two bodies of the same length are two different requests. The fingerprint answers exactly one
+   * question — "is this the same request?" — so a key reused for a different payload against the
+   * same endpoint must be refused rather than answered with the first request's response.
+   */
+  @Test
+  void aKeyReusedWithADifferentBodyOfTheSameLengthIsRefused() throws Exception {
+    mvc.perform(post("/idem").header("Idempotency-Key", "b1").content("aaaa"))
+        .andExpect(status().isOk());
+    int afterFirst = counter.value.get();
+
+    mvc.perform(post("/idem").header("Idempotency-Key", "b1").content("bbbb"))
+        .andExpect(status().isUnprocessableEntity());
+
+    assertEquals(afterFirst, counter.value.get(), "the second body must not have executed");
+  }
+
+  /**
+   * The same bytes are the same request however they arrived. {@code Content-Length} is absent
+   * under chunked transfer encoding, so a fingerprint built from it called one body two requests
+   * and refused a genuine retry; built from the body itself, the transfer framing is invisible.
+   */
+  @Test
+  void theSameBodyIsTheSameRequestWhateverItsContentLengthHeaderSays() throws Exception {
+    IdempotencyFilter filter = filter(1024);
+    byte[] body = "{\"amount\":10}".getBytes(StandardCharsets.UTF_8);
+
+    filter.doFilter(
+        request("len-1", body, false), new MockHttpServletResponse(), new MockFilterChain());
+
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+    filter.doFilter(request("len-1", body, true), response, chain);
+
+    assertEquals(200, response.getStatus());
+    assertNull(chain.getRequest(), "the same body is a retry, so it replays instead of executing");
+  }
+
+  /**
+   * A body cannot be fingerprinted without being held, so the cap is what bounds that allocation. A
+   * request over it is refused: a request that cannot be fingerprinted cannot be given the
+   * guarantee the key asks for, and silently falling back to a weaker digest is the defect this
+   * filter had.
+   */
+  @Test
+  void aBodyOverTheCapIsRefusedBeforeExecuting() throws Exception {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter(16).doFilter(request("cap-1", new byte[17], false), response, chain);
+
+    assertEquals(413, response.getStatus());
+    assertTrue(response.getContentAsString().contains("request-too-large"));
+    assertNull(chain.getRequest(), "the handler must not have run");
+  }
+
+  /**
+   * With replay protection on, the body is already buffered by the time this filter sees the
+   * request. That buffer is reused rather than re-read, and the handler still gets the body — but
+   * reuse must not cost the fingerprint the bytes it is built from.
+   */
+  @Test
+  void anAlreadyBufferedBodyIsStillPartOfTheFingerprint() throws Exception {
+    IdempotencyFilter filter = filter(1024);
+
+    MockFilterChain firstChain = new MockFilterChain();
+    filter.doFilter(prebuffered("pre-1", "aaaa"), new MockHttpServletResponse(), firstChain);
+    assertEquals(
+        "aaaa",
+        new String(firstChain.getRequest().getInputStream().readAllBytes(), StandardCharsets.UTF_8),
+        "the handler still reads the body");
+
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+    filter.doFilter(prebuffered("pre-1", "bbbb"), response, chain);
+
+    assertEquals(422, response.getStatus());
+    assertNull(chain.getRequest(), "a different body under the same key must not execute");
+  }
+
+  private static CachedBodyRequestWrapper prebuffered(String key, String body) throws Exception {
+    return new CachedBodyRequestWrapper(
+        request(key, body.getBytes(StandardCharsets.UTF_8), false), 1024);
+  }
+
+  private static IdempotencyFilter filter(int maxBodyBytes) {
+    return new IdempotencyFilter(
+        new InMemoryIdempotencyStore(Clock.systemUTC()),
+        Optional::empty,
+        new ProblemHttpResponseWriter(new ObjectMapper()),
+        "Idempotency-Key",
+        Duration.ofHours(1),
+        Duration.ofMinutes(1),
+        false,
+        Set.of("POST"),
+        maxBodyBytes);
+  }
+
+  /**
+   * MockMvc always reports a content length, so chunked transfer — where the servlet API reports
+   * {@code -1} — is only reachable by overriding the accessor.
+   */
+  private static MockHttpServletRequest request(String key, byte[] body, boolean chunked) {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/idem") {
+          @Override
+          public long getContentLengthLong() {
+            return chunked ? -1 : super.getContentLengthLong();
+          }
+        };
+    request.setContentType("application/json");
+    request.setContent(body);
+    request.addHeader("Idempotency-Key", key);
+    return request;
   }
 
   static class Counter {

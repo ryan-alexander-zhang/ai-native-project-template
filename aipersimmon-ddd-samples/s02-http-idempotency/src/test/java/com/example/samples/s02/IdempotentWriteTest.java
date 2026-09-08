@@ -57,10 +57,10 @@ class IdempotentWriteTest extends EdgeProtectionTestBase {
   }
 
   @Test
-  void reusingAKeyForAMeasurablyDifferentRequestIsRefused() {
+  void reusingAKeyForADifferentAmountIsRefused() {
     place("key-5", "ref-5", 1000);
 
-    // A different content length is part of the fingerprint, so this is caught.
+    // The body is part of the fingerprint, so a different amount is a different request.
     ResponseEntity<String> response = place("key-5", "ref-5", 1000000);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
@@ -70,18 +70,19 @@ class IdempotentWriteTest extends EdgeProtectionTestBase {
   }
 
   @Test
-  void aDifferentBodyOfTheSameShapeIsNOTDetected() {
-    ResponseEntity<String> first = place("key-6", "ref-6", 1000);
+  void aDifferentBodyUnderTheSameKeyIsRefused() {
+    place("key-6", "ref-6", 1000);
 
-    // Same method, path, query, content type and content length — so the same fingerprint. The
-    // library hashes those five things and NOT the body, so this second, genuinely different request
-    // is served the first one's response and never reaches the handler. Scope keys per operation and
-    // do not rely on the fingerprint to catch a changed payload.
+    // Same method, path, query, content type and even the same content length — but a different
+    // payload, and the fingerprint covers the body, so this is a different request wearing an
+    // already-used key. Neither answer would be right (executing breaks the caller's own assumption
+    // that the key names one operation, replaying returns an outcome for something else), so it is
+    // refused and the order is not placed.
     ResponseEntity<String> second = place("key-6", "ref-7", 2000);
 
-    assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    assertThat(second.getBody()).isEqualTo(first.getBody());
-    assertThat(JsonPath.<String>read(second.getBody(), "$.clientReference")).isEqualTo("ref-6");
+    assertThat(second.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(JsonPath.<String>read(second.getBody(), "$.type"))
+        .isEqualTo("/problems/idempotency-key-reused");
     assertThat(orderCount()).isEqualTo(1);
   }
 

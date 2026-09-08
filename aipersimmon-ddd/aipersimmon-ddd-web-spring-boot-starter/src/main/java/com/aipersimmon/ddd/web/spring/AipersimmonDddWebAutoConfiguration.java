@@ -205,7 +205,8 @@ public class AipersimmonDddWebAutoConfiguration {
             config.isRequireKey(),
             config.getMethods().stream()
                 .map(m -> m.toUpperCase(Locale.ROOT))
-                .collect(Collectors.toSet()));
+                .collect(Collectors.toSet()),
+            (int) Math.min(Integer.MAX_VALUE, config.getMaxBodySize().toBytes()));
     FilterRegistrationBean<IdempotencyFilter> registration = new FilterRegistrationBean<>(filter);
     // After the security filter chain, unlike the framework's other filters. A key is scoped to the
     // caller who owns it, so this filter has to see an established principal — and serving a stored

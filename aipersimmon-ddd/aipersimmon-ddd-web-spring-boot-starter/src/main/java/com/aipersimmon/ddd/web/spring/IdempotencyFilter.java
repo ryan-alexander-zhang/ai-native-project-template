@@ -61,6 +61,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
   private final Duration claimLease;
   private final boolean requireKey;
   private final Set<String> methods;
+  private final int maxBodyBytes;
 
   public IdempotencyFilter(
       IdempotencyStore store,
@@ -70,7 +71,8 @@ public class IdempotencyFilter extends OncePerRequestFilter {
       Duration ttl,
       Duration claimLease,
       boolean requireKey,
-      Set<String> methods) {
+      Set<String> methods,
+      int maxBodyBytes) {
     this.store = store;
     this.principals = principals;
     this.problemWriter = problemWriter;
@@ -79,6 +81,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     this.claimLease = claimLease;
     this.requireKey = requireKey;
     this.methods = methods;
+    this.maxBodyBytes = maxBodyBytes;
   }
 
   @Override
@@ -116,42 +119,76 @@ public class IdempotencyFilter extends OncePerRequestFilter {
       return;
     }
 
+    // The body is part of what makes this request this request, so it has to be read before the
+    // key can be looked up — and read into a bounded buffer, since the controller must still be
+    // able to read it afterwards.
+    CachedBodyRequestWrapper cached;
+    try {
+      cached = buffer(request);
+    } catch (CachedBodyRequestWrapper.BodyTooLargeException tooLarge) {
+      problemWriter.write(
+          response,
+          HttpStatus.PAYLOAD_TOO_LARGE,
+          "/problems/request-too-large",
+          "Request body exceeds " + tooLarge.limit() + " bytes",
+          Map.of());
+      return;
+    }
+
     IdempotencyKey key =
         new IdempotencyKey(
             TenantContext.effective().value(),
             principals.currentPrincipal().orElse(""),
             rawKey,
-            fingerprint(request));
+            fingerprint(cached));
 
     IdempotencyClaim claim = store.claim(key, claimLease);
-    if (claim instanceof IdempotencyClaim.Replay replay) {
-      writeStored(response, replay.response());
+    if (claim instanceof IdempotencyClaim.Won) {
+      execute(cached, response, filterChain, key);
       return;
     }
-    if (claim instanceof IdempotencyClaim.InProgress) {
-      // No outcome to return yet and executing would duplicate the side effect, so the honest
-      // answer
-      // is "ask again shortly" rather than a second execution or a fabricated success.
-      response.setHeader(HttpHeaders.RETRY_AFTER, "1");
-      problemWriter.write(
-          response,
-          HttpStatus.CONFLICT,
-          "/problems/idempotency-in-progress",
-          "A request with this " + header + " is still being processed",
-          Map.of());
-      return;
-    }
-    if (claim instanceof IdempotencyClaim.Mismatch) {
-      problemWriter.write(
-          response,
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          "/problems/idempotency-key-reused",
-          "This " + header + " was used for a different request",
-          Map.of());
-      return;
-    }
+    answerExistingClaim(response, claim);
+  }
 
-    execute(request, response, filterChain, key);
+  /**
+   * The body, buffered so it can be fingerprinted and still read by the controller.
+   *
+   * <p>A request that arrives already buffered — replay protection runs earlier and buffers to
+   * verify its signature — is reused as it is: the first filter to buffer governs the cap, and a
+   * body already in memory is neither copied a second time nor measured against a second limit.
+   */
+  private CachedBodyRequestWrapper buffer(HttpServletRequest request) throws IOException {
+    return request instanceof CachedBodyRequestWrapper cached
+        ? cached
+        : new CachedBodyRequestWrapper(request, maxBodyBytes);
+  }
+
+  /** Answers a key that an earlier attempt already claimed, without executing anything. */
+  private void answerExistingClaim(HttpServletResponse response, IdempotencyClaim claim)
+      throws IOException {
+    switch (claim) {
+      case IdempotencyClaim.Replay replay -> writeStored(response, replay.response());
+      case IdempotencyClaim.InProgress ignored -> {
+        // No outcome to return yet and executing would duplicate the side effect, so the honest
+        // answer is "ask again shortly" rather than a second execution or a fabricated success.
+        response.setHeader(HttpHeaders.RETRY_AFTER, "1");
+        problemWriter.write(
+            response,
+            HttpStatus.CONFLICT,
+            "/problems/idempotency-in-progress",
+            "A request with this " + header + " is still being processed",
+            Map.of());
+      }
+      case IdempotencyClaim.Mismatch ignored ->
+          problemWriter.write(
+              response,
+              HttpStatus.UNPROCESSABLE_ENTITY,
+              "/problems/idempotency-key-reused",
+              "This " + header + " was used for a different request",
+              Map.of());
+      case IdempotencyClaim.Won ignored ->
+          throw new IllegalStateException("a won claim is executed, not answered");
+    }
   }
 
   /**
@@ -211,17 +248,20 @@ public class IdempotencyFilter extends OncePerRequestFilter {
   }
 
   /**
-   * A digest of what was requested, so one key cannot answer for two different requests.
+   * A digest of the request itself, so one key cannot answer for two different requests.
    *
-   * <p>Deliberately built from the request line and content descriptors — method, path, query,
-   * content type and length — and <em>not</em> from the body. Buffering every request body to hash
-   * it would add a memory cost an unauthenticated caller can trigger, and the leak this guard
-   * exists alongside (one caller reading another's response) is closed by the principal in the key,
-   * not by the digest. The trade is explicit: a key reused against a different endpoint or a
-   * differently shaped payload is caught; two distinct bodies of identical length and type against
-   * the same endpoint are not.
+   * <p>It covers the request line, the content type and the body, because for a write it is the
+   * payload that says which request this is: two same-length bodies against the same endpoint are
+   * two requests, and answering the second with the first's stored response silently swallows a
+   * write the caller expected to happen. {@code Content-Length} is deliberately absent — it is a
+   * lossy projection of the body, and not even a function of it, since chunked transfer reports
+   * {@code -1} and would make one body look like two requests.
+   *
+   * <p>Hashing the body means holding it, which is what {@code max-body-size} bounds; a body over
+   * that cap is refused rather than fingerprinted from its descriptors alone, because a request
+   * that cannot be fingerprinted cannot be given the guarantee the key asks for.
    */
-  private static String fingerprint(HttpServletRequest request) {
+  private static String fingerprint(CachedBodyRequestWrapper request) {
     StringBuilder material =
         new StringBuilder()
             .append(request.getMethod())
@@ -231,13 +271,12 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             .append(request.getQueryString() == null ? "" : request.getQueryString())
             .append('\n')
             .append(request.getContentType() == null ? "" : request.getContentType())
-            .append('\n')
-            .append(request.getContentLengthLong());
+            .append('\n');
     try {
-      byte[] digest =
-          MessageDigest.getInstance("SHA-256")
-              .digest(material.toString().getBytes(StandardCharsets.UTF_8));
-      return HexFormat.of().formatHex(digest);
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update(material.toString().getBytes(StandardCharsets.UTF_8));
+      digest.update(request.body());
+      return HexFormat.of().formatHex(digest.digest());
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 is required by the JDK and must be present", e);
     }

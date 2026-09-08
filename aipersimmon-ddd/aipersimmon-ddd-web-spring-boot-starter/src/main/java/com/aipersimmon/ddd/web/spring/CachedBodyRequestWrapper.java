@@ -14,14 +14,13 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Buffers the request body up front so it can be read twice: once by a filter (to verify a
- * signature over it) and again by the controller. The body is read fully in the constructor and
- * served from memory on each access.
+ * signature over it, or to fingerprint the request it belongs to) and again by the controller. The
+ * body is read fully in the constructor and served from memory on each access.
  *
- * <p>The buffer is capped. A signature cannot be checked without the bytes it covers, so this
- * buffering necessarily happens <em>before</em> the request is known to be authentic — which means
- * an unbounded {@code readAllBytes()} lets an unauthenticated caller choose how much heap to take.
- * The cap is enforced while reading, not after: checking {@code length} on a fully-read array has
- * already made the allocation it was meant to prevent.
+ * <p>The buffer is capped. Whatever the filter needs the bytes for, it needs them before the
+ * request has been judged — so an unbounded {@code readAllBytes()} lets the caller choose how much
+ * heap to take. The cap is enforced while reading, not after: checking {@code length} on a
+ * fully-read array has already made the allocation it was meant to prevent.
  */
 class CachedBodyRequestWrapper extends HttpServletRequestWrapper {
 
@@ -32,10 +31,7 @@ class CachedBodyRequestWrapper extends HttpServletRequestWrapper {
     private final int limit;
 
     BodyTooLargeException(int limit) {
-      super(
-          "Request body exceeds the configured replay-protection buffer limit of "
-              + limit
-              + " bytes");
+      super("Request body exceeds the configured buffer limit of " + limit + " bytes");
       this.limit = limit;
     }
 
@@ -71,6 +67,10 @@ class CachedBodyRequestWrapper extends HttpServletRequestWrapper {
       buffer.write(chunk, 0, read);
     }
     return buffer.toByteArray();
+  }
+
+  byte[] body() {
+    return body;
   }
 
   String bodyAsString() {

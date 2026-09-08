@@ -147,17 +147,39 @@ class OrderIdempotencyTest {
         "a second tenant's request must not be mistaken for the first tenant's retry");
   }
 
+  @Test
+  void theSameKeyOnADifferentOrderIsRefused() {
+    long ordersBefore = orderCount(TENANT);
+    assertEquals(201, placeOrder(TENANT, "key-body", orderBody(1)).getStatusCode().value());
+
+    // Same length, different order: the fingerprint covers the body, so this is not the retry it
+    // looks like from the outside, and answering it with the first order's response would swallow
+    // a write the caller expected to happen.
+    ResponseEntity<String> different = placeOrder(TENANT, "key-body", orderBody(2));
+
+    assertEquals(422, different.getStatusCode().value());
+    assertEquals(
+        ordersBefore + 1, orderCount(TENANT), "the second order must not have been placed");
+  }
+
   private ResponseEntity<String> placeOrder(String tenant, String idempotencyKey) {
-    String body =
-        """
-        {"customerId":"CUST-1",
-         "lines":[{"sku":"SKU-1","quantity":1,"unitAmountMinor":100,"currency":"USD"}]}
-        """;
+    return placeOrder(tenant, idempotencyKey, orderBody(1));
+  }
+
+  private ResponseEntity<String> placeOrder(String tenant, String idempotencyKey, String body) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.set("X-Tenant-Id", tenant);
     headers.set("Idempotency-Key", idempotencyKey);
     return http.postForEntity("/orders", new HttpEntity<>(body, headers), String.class);
+  }
+
+  private static String orderBody(int quantity) {
+    return """
+        {"customerId":"CUST-1",
+         "lines":[{"sku":"SKU-1","quantity":%d,"unitAmountMinor":100,"currency":"USD"}]}
+        """
+        .formatted(quantity);
   }
 
   private long orderCount(String tenant) {

@@ -38,7 +38,7 @@ contract — read it rather than reconstructing it.
 | A retry buys once, answer replayed | config only; no application code | `IdempotentWriteTest` |
 | Only 4 headers survive a replay | — | `IdempotentWriteTest` |
 | 4xx is a decided outcome and replays; 5xx does not | — | `IdempotentWriteTest` |
-| The fingerprint does **not** include the body | — | `IdempotentWriteTest.aDifferentBodyOfTheSameShapeIsNOTDetected` |
+| Same key, different body → 422, never a replay | — | `IdempotentWriteTest.aDifferentBodyUnderTheSameKeyIsRefused` |
 | Idempotency-Key vs a business unique index | `ClientReference` + `uq_s02_order_client_reference` | `IdempotentWriteTest.adifferentKeyForTheSameBusinessOrderIsTheUniqueIndexsJob` |
 | Signature verification (the one bean with no library default) | `HmacRequestSignatureVerifier` | `WebhookReplayProtectionTest` |
 | A signature alone does not stop a replay — the nonce does | `replay.nonce.enabled: true` | `WebhookReplayProtectionTest.theSameSignedBytesCannotBeSentTwice` |
@@ -61,9 +61,9 @@ turning `require-key` on covers every POST in the application — including the 
 and no payment provider sends an `Idempotency-Key`. That is why it is off here and demonstrated in a
 separate context instead.
 
-**The fingerprint hashes method, path, query, content type and content *length* — not the body.** Two
-different requests of the same length collide, and the second is served the first's response. Scope
-keys per operation.
+**The fingerprint hashes method, path, query, content type and the body.** A key reused with a different
+payload is refused with `422`, not served the earlier response. The body is buffered to do this, capped by
+`idempotency.max-body-size` (1MB by default; over it is `413`). Scope keys per operation all the same.
 
 ## Not demonstrated here, on purpose
 

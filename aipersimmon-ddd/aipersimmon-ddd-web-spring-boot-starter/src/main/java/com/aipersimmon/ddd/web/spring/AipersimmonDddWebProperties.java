@@ -143,6 +143,16 @@ public class AipersimmonDddWebProperties {
     /** HTTP methods the filter applies to. */
     private List<String> methods = List.of("POST", "PUT", "PATCH", "DELETE");
 
+    /**
+     * Largest request body this filter will buffer before rejecting with 413.
+     *
+     * <p>The fingerprint covers the body, so the body must be held in memory before the request can
+     * be told apart from another under the same key — an unbounded buffer therefore lets a caller
+     * pick the allocation. Raise it only to the largest covered request the application actually
+     * accepts.
+     */
+    private DataSize maxBodySize = DataSize.ofMegabytes(1);
+
     public boolean isEnabled() {
       return enabled;
     }
@@ -189,6 +199,14 @@ public class AipersimmonDddWebProperties {
 
     public void setMethods(List<String> methods) {
       this.methods = methods;
+    }
+
+    public DataSize getMaxBodySize() {
+      return maxBodySize;
+    }
+
+    public void setMaxBodySize(DataSize maxBodySize) {
+      this.maxBodySize = maxBodySize;
     }
   }
 

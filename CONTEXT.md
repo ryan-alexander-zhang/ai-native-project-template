@@ -120,6 +120,11 @@ A natural key that can legitimately repeat across tenants (e.g. process `busines
 enters its unique constraint. Framework-generated globally-unique ids (`event_id`, `correlation_id`, …) do not.
 _Avoid_: putting the tenant into globally-unique id dedup keys; omitting it from a tenant-relative key (cross-tenant collision = data leak).
 
+**Request Fingerprint**:
+The SHA-256 over method, URI, query, content type and body that decides whether a request under a reused `Idempotency-Key` is
+the same request (replay) or a different one (`422`). Compared, not part of the key's identity.
+_Avoid_: content length as a stand-in for the body; a fingerprint that silently degrades when the body cannot be read.
+
 **Missing-Tenant Policy**:
 What happens when multi-tenancy is enabled but no tenant resolves from a request — `REJECT` (default) or `SYSTEM` (fall back to the sentinel).
 _Avoid_: silently defaulting to `__root__` while tenancy is enabled.
