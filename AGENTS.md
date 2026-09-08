@@ -84,7 +84,9 @@ or bullets over a single conclusion. This applies to documents too.
 
 ## 8. Development Workflow
 
-- For implementation work, follow `DEVELOPMENT.md`.
+- For implementation work, follow `DEVELOPMENT.md`. Dispatch it — an `open` plan task, an
+  `open` issue fix, or a small change with no plan — to a subagent that writes only code,
+  tests and the files the task names.
 - After implementation, follow `TESTING.md`.
 - Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
 - Before the first implementation `plan` turns `open`, fill the project-derived root guides
