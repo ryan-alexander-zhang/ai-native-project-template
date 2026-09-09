@@ -16,6 +16,8 @@
     "CONTEXT_TEMPLATE.md",
     "ARCHITECTURE_TEMPLATE.md",
     "SECURITY.md",
+    "scripts/check-docs-drift.sh",
+    ".github/workflows/docs-drift.yml",
     ":(glob)docs/**/README.md",
     ":(glob)docs/**/TEMPLATE.md"
   ]
