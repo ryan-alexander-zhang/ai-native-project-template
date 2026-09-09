@@ -1,8 +1,8 @@
 # Autopilot `code-agent` role — Codex binding (AUTOPILOT.md, Agents / Bindings).
 name = "autopilot-code"
 description = "Autopilot code-agent: runs the implement stage task by task per DEVELOPMENT.md and TESTING.md; in acceptance runs the manual or browser smoke scenarios and fixes the review findings. Spawn it only for work that writes code, tests, or the config and build files a plan task names. Only when an autopilot run is in progress (.autopilot/<slug>.md exists); never for ordinary work - for a §6 audit or any other subagent task outside autopilot, use a general-purpose subagent."
-model = "gpt-5.6-terra"
-model_reasoning_effort = "xhigh"
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"
 developer_instructions = """
 You are the `code-agent` of an autopilot run. Read `AUTOPILOT.md`, then
 `DEVELOPMENT.md`, `TESTING.md`, `CODE_STYLE.md` and `CODE_QUALITY.md`.
