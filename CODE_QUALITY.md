@@ -25,6 +25,8 @@ Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them.
 | Members per type | methods or functions | often per-item types | split / tune |
 | God class | size + reach into other types + low cohesion | several types glued into one | Extract Class |
 | Duplication | repeated token runs across files | copy-paste | DRY-extract |
+| Dependency direction | imports that cross a layer or module boundary against `ARCHITECTURE.md` §5 | boundary erosion | move code / invert dependency |
+| Dependency cycle | cycles between modules or packages | unsplittable, untestable in isolation | break the cycle |
 
 Rule names differ per tool; the metric is what matters.
 
@@ -41,6 +43,9 @@ List every check that fails the build. A check that only warns is not a gate.
 | Complexity + duplication | *(none yet)* | — | — |
 | Static analysis | *(none yet)* | — | — |
 | Coverage | *(none yet)* | — | — |
+| Architecture | *(none yet)* | — | — |
+
+Architecture gate: `ARCHITECTURE.md` §5 boundaries and every `docs/decision` `enforced_by` rule as failing tests — direction, cycles, layer and module access.
 
 Record where the shared config lives. If more than one build file carries the
 same gate configuration, name each one here — they must be changed together.
