@@ -4,6 +4,7 @@ type: decision
 status: active
 motivated_by: [issue-00116-the-uuidv7-monotonicity-flake-was-the-wall-clock]
 constrains: [design-00010-time-ordered-identifiers, plan-00012-time-ordered-identifiers-implementation]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/DeterminismRules.java, aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/ProcessRules.java]
 ---
 
 # 框架生成的 per-row 标识符改用时间有序 UUIDv7

@@ -111,6 +111,7 @@ import 什么都不引。但**命令住在 application 层**,其职责本就是�
   [decision-00009-event-type-markers-and-handler-contracts](decision-00009-event-type-markers-and-handler-contracts.md) 的事件侧非对称结论同源(命令 1:1 有返回值→类型化接口;
   领域事件订阅是一等 application 概念→注解)。
 - 若将来满足"重开条件",按叠加元数据方式引入注解,并同步新增按注解判定的 ArchUnit 规则;在此之前无待办。
+- 无 `enforced_by`：禁令由库内不存在 `@Command` / `@CommandHandler` 本身成立；项目自造同名注解不在现有规则覆盖内，随上述重开条件一并补规则。
 
 ## Sources
 

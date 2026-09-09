@@ -3,6 +3,7 @@ id: decision-00005-package-per-aggregate
 type: decision
 status: active
 motivated_by: [analysis-00003-aggregate-first-vs-layer-first, analysis-00004-bounded-context-module-structure]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/BuildingBlockRules.java]
 ---
 
 # Package per aggregate, with aggregate internals package-private

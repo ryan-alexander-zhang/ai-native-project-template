@@ -4,6 +4,7 @@ type: decision
 status: active
 motivated_by: [decision-00013-command-context-and-causation-propagation]
 constrains: [design-00004-durable-process-manager-runtime, spec-00001-operation-log-component, spec-00002-multi-tenancy]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/CqrsRules.java]
 ---
 
 # 增补：durable runtime 是 staged effect 的合法消息身份铸造方；`CommandBus` 新增 `sendAs`

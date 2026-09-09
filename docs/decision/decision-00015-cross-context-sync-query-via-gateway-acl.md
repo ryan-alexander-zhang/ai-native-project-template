@@ -3,6 +3,7 @@ id: decision-00015-cross-context-sync-query-via-gateway-acl
 type: decision
 status: active
 motivated_by: [analysis-00011-event-send-consume-mechanisms]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/BoundedContextRules.java]
 ---
 
 # 跨上下文同步调用:Open Host Service + 消费方 Gateway ACL,且只用于读

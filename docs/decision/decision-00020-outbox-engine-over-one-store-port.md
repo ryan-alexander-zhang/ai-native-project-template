@@ -4,6 +4,7 @@ type: decision
 status: active
 motivated_by: [report-00003-ddd-library-review-2026-07-29]
 constrains: [design-00004-durable-process-manager-runtime, design-00008-operation-log-component, design-00012-module-naming-and-spring-freedom]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/ModuleNamingChecks.java]
 ---
 
 # outbox 的投递逻辑归入 `-outbox-engine`，两个后端只提供一个 store 端口的适配器

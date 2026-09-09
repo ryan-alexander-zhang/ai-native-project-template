@@ -3,6 +3,7 @@ id: decision-00009-event-type-markers-and-handler-contracts
 type: decision
 status: active
 motivated_by: [analysis-00002-domain-vs-integration-events, analysis-00009-saga-implementation-deep-dive]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/EventRules.java]
 ---
 
 # 事件类型标记与三种 Handler 的契约形态

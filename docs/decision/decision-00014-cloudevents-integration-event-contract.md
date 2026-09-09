@@ -4,6 +4,7 @@ type: decision
 status: active
 motivated_by: [analysis-00002-domain-vs-integration-events]
 constrains: [spec-00002-multi-tenancy]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/EventRules.java]
 ---
 
 # 集成事件对外契约对齐 CloudEvents(逻辑类型 + 聚合分区键 + source)

@@ -3,6 +3,7 @@ id: decision-00008-event-subscriber-layer-placement
 type: decision
 status: active
 motivated_by: [analysis-00009-saga-implementation-deep-dive]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/EventRules.java, aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/LayeringRules.java]
 ---
 
 # 事件订阅者的分层归属:领域事件归 application、集成事件归 adapter 并转 command

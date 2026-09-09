@@ -4,6 +4,7 @@ type: decision
 status: active
 motivated_by: [analysis-00013-operation-log-component]
 constrains: [spec-00001-operation-log-component, design-00008-operation-log-component, plan-00010-operation-log-implementation]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/OperationLogRules.java, aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/LayeringRules.java, aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/ModuleNamingChecks.java]
 ---
 
 # 通用操作日志组件：定位、模块、事务与安全边界

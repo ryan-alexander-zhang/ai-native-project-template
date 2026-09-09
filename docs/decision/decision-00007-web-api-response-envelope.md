@@ -4,6 +4,7 @@ type: decision
 status: active
 motivated_by: [analysis-00008-web-api-response-envelope]
 constrains: [design-00002-web-layer, design-00003-exception-model]
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/ModuleNamingChecks.java, aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/WebRules.java]
 ---
 
 # Web 层封装:无通用信封 + RFC 9457,横切能力全做但都 opt-in + 可插拔

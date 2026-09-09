@@ -2,6 +2,7 @@
 id: decision-00021-command-handler-reuse-and-cross-aggregate-placement
 type: decision
 status: active
+enforced_by: [aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/CqrsRules.java, aipersimmon-ddd/aipersimmon-ddd-archunit/src/main/java/com/aipersimmon/ddd/archunit/BuildingBlockRules.java]
 ---
 
 # CommandHandler 不得依赖 CommandHandler;复用逻辑按类型分流与分层落点
