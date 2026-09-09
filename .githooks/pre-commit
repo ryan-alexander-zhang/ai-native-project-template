@@ -50,5 +50,5 @@ case "$branch" in
 esac
 
 # Doc drift (dangling links, dead relation ids, ARCHITECTURE.md §5 tree, enforced_by paths;
-# placeholders on lang/*). Mirrors .github/workflows/docs-drift.yml.
+# placeholders once .ainpt.json marks a generated project). Mirrors .github/workflows/docs-drift.yml.
 scripts/check-docs-drift.sh || exit 1
