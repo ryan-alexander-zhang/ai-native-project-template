@@ -5,6 +5,7 @@
     "DOCUMENT.md",
     "AUTOPILOT.md",
     ":(glob)skills/autopilot/**",
+    ":(glob)skills/audit-architecture/**",
     ".claude/skills",
     ".claude/agents",
     ".codex/skills",
