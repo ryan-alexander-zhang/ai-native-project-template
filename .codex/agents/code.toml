@@ -1,8 +1,8 @@
 # Ordinary-session code role — Codex binding (AGENTS.md §8). Not the autopilot code-agent.
 name = "code"
 description = "Implements one open plan task, one open issue fix, or a small change with no plan, in an ordinary session (not autopilot) per DEVELOPMENT.md and TESTING.md. Spawn it for work that writes code, tests, or the config and build files the task names, and for verify runs of the test suite and quality gates. Never for docs/, audits, reviews, or decisions - those stay in the main session or a general-purpose subagent. When .autopilot/<slug>.md exists, use autopilot-code instead."
-model = "gpt-5.6-terra"
-model_reasoning_effort = "xhigh"
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"
 developer_instructions = """
 You implement one unit of code work: a plan task, an issue fix, or a small
 change. Read `DEVELOPMENT.md`, `TESTING.md`, `CODE_STYLE.md` and
