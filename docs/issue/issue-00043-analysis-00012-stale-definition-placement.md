@@ -10,7 +10,7 @@ blocks: [analysis-00012-multi-module-process-manager-layering]
 ## 问题（现状，file:line 为证）
 
 - **等级：Low**（文档漂移，非代码缺陷，亦非内部矛盾）。
-- 一次 review 反馈称 [`analysis-00012`](/Users/ryan/GitHubProjects/ryan-alexander-zhang/ai-native-project-template/docs/analysis/analysis-00012-multi-module-process-manager-layering.md) “前半段说 Definition 在 application、后半段说已迁入 provider，自相矛盾”。**该定性不成立**：
+- 一次 review 反馈称 [`analysis-00012`](../analysis/analysis-00012-multi-module-process-manager-layering.md) “前半段说 Definition 在 application、后半段说已迁入 provider，自相矛盾”。**该定性不成立**：
   - 文档 `:11` 自述是“一份『读代码、不改代码』的梳理与 review 文档”——§1–§6 描述的是**梳理当时的代码现状**。
   - §1（`:31-33` “结论”，及组件表 `:56`）描述当时现状：决策大脑 `OrderFulfilmentDefinition` 落在 `ordering-application`。
   - §6（`:271` 表行标 `⚠️`）把该落点标为**待评审偏差**。
@@ -18,7 +18,7 @@ blocks: [analysis-00012-multi-module-process-manager-layering]
   - `:281-282` 有一段 blockquote **显式桥接**两半：“这一条已在 §7 定案 …… 其余章节是对既有代码的忠实描述。”
   - 故文档结构是“观察现状 → review 发现 → 采纳决策”的叙事，并已自我标注，**不是**未解决的内部矛盾。
 - **真实问题是文档漂移**：§7 定的决策此后**已执行**——被 review 的文件现已位于
-  [`ordering-process-jdbc/.../fulfilment/OrderFulfilmentDefinition.java`](/Users/ryan/GitHubProjects/ryan-alexander-zhang/ai-native-project-template/aipersimmon-ddd-scaffold/multi-module/ordering/ordering-process-jdbc/src/main/java/com/example/ordering/process/fulfilment/OrderFulfilmentDefinition.java:1)（`package com.example.ordering.process.fulfilment`）。于是 §1 的**现在时**表述“Definition …… 就在 `ordering-application` 里”已与代码不符。
+  [`ordering-process/.../fulfilment/OrderFulfilmentDefinition.java`](../../aipersimmon-ddd-scaffold/multi-module/ordering/ordering-process/src/main/java/com/example/ordering/process/fulfilment/OrderFulfilmentDefinition.java)（`package com.example.ordering.process.fulfilment`）。于是 §1 的**现在时**表述“Definition …… 就在 `ordering-application` 里”已与代码不符。
 
 ## 根因（第一性）
 

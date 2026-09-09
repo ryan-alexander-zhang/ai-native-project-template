@@ -80,8 +80,11 @@ flowchart LR
 │   └── CONFIGURATION.md             every aipersimmon.ddd.* property
 ├── aipersimmon-ddd-scaffold/
 │   └── multi-module/                reference service: 3 bounded contexts, 5 layers each
+├── aipersimmon-ddd-samples/         runnable scenario samples (s01…), one concern each
 ├── docs/                            the design record — analysis, decision, design, plan,
 │                                    spec, issue, report, record (internal, id-referenced)
+├── scripts/                         release, new-app, docs sync and drift checks
+├── skills/                          agent skills: autopilot, audit-architecture
 ├── AGENTS.md  DEVELOPMENT.md  TESTING.md  CODE_QUALITY.md  DOCUMENT.md  CONTEXT.md
 └── ARCHITECTURE.md                  this file
 ```
