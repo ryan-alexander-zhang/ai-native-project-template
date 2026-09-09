@@ -4,7 +4,7 @@
 
 SOP for keeping code inside this repo's quality gates.
 
-Sections 2 and 3 are **fill-in**: the gates and thresholds depend on the language
+Sections 2, 3 and 9 are **fill-in**: the gates and thresholds depend on the language
 and toolchain you bring. Everything else is language-neutral — keep it as written
 unless you are deliberately changing the way of working.
 
@@ -100,3 +100,17 @@ indistinguishable from a value that was raised to silence a failure.
 
 Block **new** violations at the gate. Record legacy as debt and ratchet
 thresholds down over time — do not mass-rewrite a working system in one pass.
+
+## 9. Structural baseline — fill in
+
+Whole-repo counts no per-file gate sees. Lower is better for every row. CI
+fails when a value exceeds its committed baseline; when it drops, lower the
+baseline in the same change. Placeholders left here block implementation
+(`AGENTS.md` §8).
+
+| metric | baseline file | check command |
+|---|---|---|
+| Dependency cycles | `<path>` | `<command>` |
+| Cross-module edges | `<path>` | `<command>` |
+| Largest file (lines) | `<path>` | `<command>` |
+| Public API surface | `<path>` | `<command>` |
