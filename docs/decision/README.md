@@ -36,6 +36,14 @@ Add more when useful.
   (`AUTOPILOT.md`) so a reviewer can list every choice an agent made in a
   human's place. Omit it otherwise.
 
+## Enforcement
+
+- `enforced_by` — the tests that fail when the choice is violated; they run
+  under the `Architecture` gate (`CODE_QUALITY.md` §2). Required on every
+  decision that binds code structure: dependency direction, module boundary,
+  layering, banned API. Omit only with the reason in §4 "接受的代价"; a
+  structural decision without either is unverified.
+
 ## Exclude
 
 - temporary discussion or brainstorming notes
