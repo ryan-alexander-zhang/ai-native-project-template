@@ -31,6 +31,7 @@ Status values are defined in [docs/README.md](docs/README.md). Never change stat
 A documentation change is done when:
 
 - the doc is in the correct location with valid front matter
+- `scripts/check-docs-drift.sh` passes
 - links, paths, and examples were checked
 - no topic has two live docs
 - no doc it governs is left in `draft`

@@ -4,9 +4,9 @@
 
 SOP for keeping code inside this repo's quality gates.
 
-Sections 2 and 3 record this repo's Java toolchain — the gates that fail the
-build and every threshold tuned away from its default. Everything else is
-language-neutral and comes from the template.
+Sections 2, 3 and 9 record this repo's Java toolchain — the gates that fail the
+build, every threshold tuned away from its default, and the structural baseline.
+Everything else is language-neutral and comes from the template.
 
 When a gate fails, or a review flags complexity or duplication:
 **solve it per this file. Never raise a threshold or suppress a finding just to
@@ -25,6 +25,8 @@ Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them.
 | Members per type | methods or functions | often per-item types | split / tune |
 | God class | size + reach into other types + low cohesion | several types glued into one | Extract Class |
 | Duplication | repeated token runs across files | copy-paste | DRY-extract |
+| Dependency direction | imports that cross a layer or module boundary against `ARCHITECTURE.md` §5 | boundary erosion | move code / invert dependency |
+| Dependency cycle | cycles between modules or packages | unsplittable, untestable in isolation | break the cycle |
 
 Rule names differ per tool; the metric is what matters.
 
@@ -41,6 +43,9 @@ List every check that fails the build. A check that only warns is not a gate.
 | Complexity + duplication | PMD + CPD (`failOnViolation=true`) | all modules | `aipersimmon-ddd-quality-config` → `pmd-ruleset.xml` |
 | Bytecode defects | SpotBugs (`failOnError=true`) | all modules | `aipersimmon-ddd-quality-config` → `spotbugs-exclude.xml` |
 | Coverage + mutation | JaCoCo + PIT | opt-in per domain module (`design-00007` §4.3) | per-module pom — bar per [TESTING.md](TESTING.md) |
+| Architecture | ArchUnit via `aipersimmon-ddd-archunit` | every scaffold / sample module's `ArchitectureTest`; library `ModuleNamingChecks` | rule classes in that module |
+
+Architecture gate: `ARCHITECTURE.md` §5 boundaries and every `docs/decision` `enforced_by` rule as failing tests — direction, cycles, layer and module access.
 
 Shared config lives in `aipersimmon-ddd-quality-config`. There is no shared
 provider parent, so **two** build files carry the plugin block by hand and must
@@ -102,3 +107,17 @@ indistinguishable from a value that was raised to silence a failure.
 
 Block **new** violations at the gate. Record legacy as debt and ratchet
 thresholds down over time — do not mass-rewrite a working system in one pass.
+
+## 9. Structural baseline — fill in
+
+Whole-repo counts no per-file gate sees. Lower is better for every row. CI
+fails when a value exceeds its committed baseline; when it drops, lower the
+baseline in the same change. Placeholders left here block implementation
+(`AGENTS.md` §8).
+
+| metric | baseline file | check command |
+|---|---|---|
+| Dependency cycles | `<path>` | `<command>` |
+| Cross-module edges | `<path>` | `<command>` |
+| Largest file (lines) | `<path>` | `<command>` |
+| Public API surface | `<path>` | `<command>` |

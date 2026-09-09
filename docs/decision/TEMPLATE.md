@@ -5,6 +5,7 @@ status: draft|active|archived
 motivated_by: [<id>, ...]                     # what created the need for this choice
 constrains: [<id>, ...]                       # docs this choice binds that don't declare `implements` on it
 decided_by: human|agent                       # autopilot runs only (AUTOPILOT.md); omit otherwise
+enforced_by: [<test path>, ...]               # tests that fail when the choice is violated; omit only per README Enforcement
 ---
 
 # Decision: <the choice, in one line>

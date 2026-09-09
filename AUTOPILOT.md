@@ -105,7 +105,7 @@ ledger with a one-line reason. Ledger row names:
    the run's whole diff per `REVIEW.md` (findings are fixed by `code-agent`
    before the stage ends), the smoke runs `TESTING.md` asks for (`code-agent`,
    results written into the ledger), and the `record` acceptance checklist;
-   `plan` -> `resolved` (`AGENTS.md` §8, last bullet).
+   `plan` -> `resolved` (`AGENTS.md` §8, last two bullets).
 8. `pr` — open the PR per `PR.md` against the branch the run started from. The
    PR body links the ledger and lists every `decided_by: agent` decision. Stop.
 

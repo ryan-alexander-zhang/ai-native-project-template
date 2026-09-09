@@ -1,0 +1,15 @@
+# Doc drift gate: scripts/check-docs-drift.sh. Strict (root-guide placeholders fail) on lang/* branches.
+name: docs-drift
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          case "$ref" in lang/*) scripts/check-docs-drift.sh --strict ;; *) scripts/check-docs-drift.sh ;; esac
