@@ -1,4 +1,4 @@
-# Doc drift gate: scripts/check-docs-drift.sh. Strict (root-guide placeholders fail) on lang/* branches.
+# Doc drift gate: scripts/check-docs-drift.sh. Strict (root-guide placeholders fail) once .ainpt.json marks a generated project.
 name: docs-drift
 
 on:
@@ -10,6 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          case "$ref" in lang/*) scripts/check-docs-drift.sh --strict ;; *) scripts/check-docs-drift.sh ;; esac
+      - run: scripts/check-docs-drift.sh

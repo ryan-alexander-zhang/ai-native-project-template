@@ -5,12 +5,12 @@
 #   3. ARCHITECTURE.md §5 tree vs tracked top-level dirs, both directions
 #   4. decision `enforced_by` paths that do not exist
 #   5. warn: `active` design nobody references
-#   6. strict only (lang/* branch or --strict): root-guide placeholders
+#   6. strict only (a generated project, marked by .ainpt.json, or --strict): root-guide placeholders
 # Runs from .githooks/pre-commit and .github/workflows/docs-drift.yml.
 set -u
 cd "$(git rev-parse --show-toplevel)"
 strict=0
-case "${1:-}$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" in --strict*|lang/*) strict=1 ;; esac
+{ [ "${1:-}" = --strict ] || [ -f .ainpt.json ]; } && strict=1
 fail=0
 err() { echo "  $*"; fail=1; }
 
