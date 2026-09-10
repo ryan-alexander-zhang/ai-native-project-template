@@ -49,7 +49,7 @@ Add more when useful.
 - Wording, links, `constrains` backfill, `enforced_by` paths: amend in place.
 - The choice itself changes (a §2 row replaced, removed, narrowed, or widened;
   a §4 consequence flips): new decision with `supersedes: [<old id>]`, old doc
-  `archived`, body untouched. Repoint `implements` / `constrains` / `enforced_by`
+  `archived` + `superseded_by: [<new id>]`, body untouched. Repoint `implements` / `constrains` / `enforced_by`
   to the new id; `check-docs-drift.sh` fails on any left behind.
 - In doubt, supersede.
 

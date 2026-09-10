@@ -20,7 +20,7 @@ Write the document description or comment after the front matter.
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
 - An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the whiteboard's `exclude` config hits are not documents here: they take no number and count as no collision.) Allocating the next free number per type is what keeps a new document from colliding; a collision that already exists is surfaced by the whiteboard as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
-- One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]` and set the old doc to `archived`. A `decision` is stricter: a change to the choice itself always supersedes (`docs/decision/README.md` Revision).
+- One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]`; set the old doc to `archived` with `superseded_by: [<new id>]`. A `decision` is stricter: a change to the choice itself always supersedes (`docs/decision/README.md` Revision).
 - `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
@@ -73,6 +73,7 @@ Write the document description or comment after the front matter.
 | `blocks` | what this doc blocks or clarifies |
 | `verifies` | the requirements or docs this doc verifies |
 | `supersedes` | the doc this one replaces, paired with `archived` on the old doc |
+| `superseded_by` | the doc that replaced this one; the only edit an `archived` doc takes |
 
 Everything except `parent` is multi-valued: write ids as an inline list, and omit
 the field entirely when it is empty.

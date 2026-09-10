@@ -7,6 +7,7 @@ constrains: [<id>, ...]                       # docs this choice binds that don'
 decided_by: human|agent                       # autopilot runs only (AUTOPILOT.md); omit otherwise
 enforced_by: [<test path>, ...]               # tests that fail when the choice is violated; omit only per README Enforcement
 supersedes: [<id>]                            # only when this replaces an archived decision; see README Revision
+superseded_by: [<id>]                         # only on an archived decision: the one that replaced it
 ---
 
 # Decision: <the choice, in one line>
