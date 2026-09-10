@@ -44,6 +44,15 @@ Add more when useful.
   layering, banned API. Omit only with the reason in §4 "接受的代价"; a
   structural decision without either is unverified.
 
+## Revision
+
+- Wording, links, `constrains` backfill, `enforced_by` paths: amend in place.
+- The choice itself changes (a §2 row replaced, removed, narrowed, or widened;
+  a §4 consequence flips): new decision with `supersedes: [<old id>]`, old doc
+  `archived`, body untouched. Repoint `implements` / `constrains` / `enforced_by`
+  to the new id; `check-docs-drift.sh` fails on any left behind.
+- In doubt, supersede.
+
 ## Exclude
 
 - temporary discussion or brainstorming notes
