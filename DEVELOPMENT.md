@@ -96,6 +96,7 @@ Canonical commands for this repo (fill in for the project):
 | Small code change | Make the smallest useful change and run the smallest relevant checks. |
 | Behavior change | Update implementation, tests, and any affected docs together. |
 | Public contract or workflow change | Update implementation, tests, and durable documentation together. |
+| HTTP API change | Also regenerate `api-tests/openapi.json` in the same change ([API_TESTING.md](API_TESTING.md) § OpenAPI). |
 | Refactor with no intended behavior change | Keep behavior unchanged, keep tests green, and keep the diff narrowly scoped. |
 | Bug fix | For any bug worth tracking, first create the matching `docs/issue` doc (first-principles root cause + failing-test reproduction, per `docs/issue/README.md`), then fix and keep its regression test green. |
 

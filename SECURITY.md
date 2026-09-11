@@ -36,6 +36,12 @@ Review how sensitive data is accepted, stored, logged, returned, and deleted.
 
 Review new dependencies, external integrations, and generated artifacts before trusting them.
 
+### API Surface Exposure
+
+Generated API documentation (OpenAPI spec, Swagger UI) and other debug
+endpoints are served only under non-production profiles. Production returns
+404 by default; a test proves it.
+
 ### Change Review
 
 Escalate unclear security impact and review sensitive changes with extra care.
