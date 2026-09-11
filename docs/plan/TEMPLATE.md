@@ -23,8 +23,8 @@ inline here.
 one waits on which, and which task closes the round.>
 
 - **T1 — <name>** (<the FR/BR ids it delivers>): <what is built, named down to
-  the module or file it lands in>
-- **T2 — <name>** (<ids>): <…>
+  the module or file it lands in>. reuse: <repo path | framework artifact | library>
+- **T2 — <name>** (<ids>): <…>. build: <decision-id that rejects reuse>
 - **Tn — tests and acceptance**: cover every AC in the delivery scope; hold the
   quality gates (no threshold lowered); write the `record` whose `parent` points
   at this plan.

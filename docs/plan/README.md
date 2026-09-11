@@ -7,7 +7,9 @@ Use `TEMPLATE.md` for front matter.
 
 - Design — links to the [`design/`](../design/README.md) docs this plan builds.
   The design itself lives there, never inline here.
-- Tasks
+- Tasks — a task that adds a capability names its source: `reuse:` the repo
+  path, framework artifact, or library that supplies it, or `build:` with the
+  `decision` that rejects reuse. A new library also needs its own `decision`.
 - Detailed Acceptance Path
 
 Add more when useful.
