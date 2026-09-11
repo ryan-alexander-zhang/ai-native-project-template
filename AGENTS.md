@@ -18,6 +18,11 @@ Before implementing:
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
+- Reuse before build. Look in this order: this repo, the project framework or
+  starters, dependencies already present, a maintained open-source library. Build
+  only when none fits, and record why in a `decision`.
+- Every new dependency or open-source library is a `decision`: what it supplies,
+  what was compared, why it won.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
