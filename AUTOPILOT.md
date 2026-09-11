@@ -91,12 +91,16 @@ ledger with a one-line reason. Ledger row names:
    requirements, constraints); checked; `active`.
 3. `architecture` — technology selection: one `decision` per choice, `active`.
    In an existing project, only what `ARCHITECTURE.md` and the `active`
-   decisions do not already cover.
+   decisions do not already cover. Reuse before build (`AGENTS.md` §2): each
+   capability the `prd` needs is sourced from the repo, the framework, an
+   existing dependency, or a library — a `decision` per new library, a
+   `decision` per `build`.
 4. `spec` — `spec`, its `rule` and `design` docs (the system-level design
    included, `informs` set), acceptance per `ACCEPTANCE.md`, `CONTEXT.md`
    terms; audited; `active`. Then the root guides are filled per `AGENTS.md`
    §8.
-5. `plan` — the `plan`; checked; `open`.
+5. `plan` — the `plan`; checked, every task sourced (`docs/plan/README.md`);
+   `open`.
 6. `implement` — task by task per `DEVELOPMENT.md` and `TESTING.md`; a defect
    found on the way gets its `issue` doc first (`docs/issue/README.md`) and is
    fixed within the run. Exit: the `DEVELOPMENT.md` and `TESTING.md`
