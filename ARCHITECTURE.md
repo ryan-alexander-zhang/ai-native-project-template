@@ -11,11 +11,16 @@ document is about how the modules are arranged and why, which is what you need b
 Building blocks for Java services practicing tactical DDD, consumed by Spring Boot applications.
 Quality goals, ranked:
 
-1. **Framework freedom** — domain code compiles and unit-tests without Spring (§5.2's invariant).
-2. **Correctness under concurrency and redelivery** — no lost updates, no duplicate effects (§10).
-3. **Piecemeal adoption** — every concern usable alone; bundles are convenience, not lock-in.
+1. **Framework freedom** — domain code compiles and unit-tests without Spring (§5.2's invariant) —
+   `quality-00001-QR-1`.
+2. **Correctness under concurrency and redelivery** — no lost updates, no duplicate effects — four
+   behaviours the runtime shape guarantees (§6); system requirements, not measured qualities.
+3. **Piecemeal adoption** — every concern usable alone; bundles are convenience, not lock-in — no
+   measured scenario yet (§10).
 
-System requirements live in `docs/spec/`:
+Quality requirements live in `docs/quality/`:
+[library baseline](docs/quality/quality-00001-aipersimmon-ddd-baseline.md). System requirements
+live in `docs/spec/`:
 [operation log](docs/spec/spec-00001-operation-log-component.md),
 [multi-tenancy](docs/spec/spec-00002-multi-tenancy.md).
 
@@ -341,7 +346,20 @@ flowchart LR
     Process --> Bus
 ```
 
-The properties this shape guarantees are §10. Per-scenario sequence detail:
+Four properties this shape guarantees — behaviours, so system requirements rather than measured
+qualities; the specs owning them are legacy debt (§11):
+
+1. **One command, one aggregate, one version-checked write.** A stale write matches no row and is
+   refused, surfacing as 409 rather than as a lost update.
+2. **State change and its events commit together.** The aggregate write, the domain-event handling and
+   the outbox row are one transaction; the broker hop happens afterwards, from committed state.
+3. **Redelivery is safe.** Publishing is at-least-once, so the consumer side is guarded by an inbox
+   keyed on the producer-assigned event id, inside the handling transaction.
+4. **A long flow is not a long transaction.** Cross-aggregate coordination lives in the process
+   manager as a pure `(state, input) → decision` function over durable state, so an out-of-order or
+   repeated fact is a no-op rather than a corruption.
+
+Per-scenario sequence detail:
 
 | Scenario | Design |
 | --- | --- |
@@ -369,6 +387,7 @@ service runs locally against PostgreSQL and Kafka Testcontainers; it is not depl
 | Observability and tracing | [design-00005](docs/design/design-00005-observability-and-distributed-tracing.md) |
 | Multi-tenancy | [design-00009](docs/design/design-00009-multi-tenancy-tenant-id.md), [decision-00018](docs/decision/decision-00018-multi-tenancy-boundaries.md) |
 | Identifiers (UUIDv7) | [design-00010](docs/design/design-00010-time-ordered-identifiers.md), [decision-00019](docs/decision/decision-00019-time-ordered-uuidv7-identifiers.md) |
+| Quality requirements | [quality-00001](docs/quality/quality-00001-aipersimmon-ddd-baseline.md), [QUALITY.md](QUALITY.md) |
 | Quality gates | [design-00007](docs/design/design-00007-code-quality-gates.md), [CODE_QUALITY.md](CODE_QUALITY.md), [TESTING.md](TESTING.md) |
 | Security | [SECURITY.md](SECURITY.md) |
 | Code style | [CODE_STYLE.md](CODE_STYLE.md) |
@@ -400,22 +419,20 @@ Index of `active` decisions; content stays in each doc.
 
 ## 10. Quality Requirements
 
-Four properties the runtime shape (§6) exists to guarantee:
+Index of the `active` `docs/quality/` docs refining §1's goals; scenarios and measures live there
+([QUALITY.md](QUALITY.md)).
 
-1. **One command, one aggregate, one version-checked write.** A stale write matches no row and is
-   refused, surfacing as 409 rather than as a lost update.
-2. **State change and its events commit together.** The aggregate write, the domain-event handling and
-   the outbox row are one transaction; the broker hop happens afterwards, from committed state.
-3. **Redelivery is safe.** Publishing is at-least-once, so the consumer side is guarded by an inbox
-   keyed on the producer-assigned event id, inside the handling transaction.
-4. **A long flow is not a long transaction.** Cross-aggregate coordination lives in the process
-   manager as a pure `(state, input) → decision` function over durable state, so an out-of-order or
-   repeated fact is a no-op rather than a corruption.
+| Quality doc | Tags | Scenarios |
+| --- | --- | --- |
+| [quality-00001](docs/quality/quality-00001-aipersimmon-ddd-baseline.md) — library baseline | Maintainable, Operable | contract modules declare no framework dependency (QS-1.1); operation-log metric labels are exactly `operationCode` / `outcome` / `sinkType` (QS-2.1) |
 
-Enforced at build time: `mvn -f aipersimmon-ddd/pom.xml install` runs, per module, Spotless
-(google-java-format), PMD + CPD, SpotBugs, JaCoCo, and PIT mutation coverage on the framework-free
-contract modules; the ArchUnit rules run as ordinary tests. A failing gate is fixed, never raised or
-suppressed ([CODE_QUALITY.md](CODE_QUALITY.md), [TESTING.md](TESTING.md)).
+Both scenarios are `build`-stage, run by `mvn -f aipersimmon-ddd/pom.xml install`: QS-1.1 is the
+`CODE_QUALITY.md` §2 Architecture gate, QS-2.1 an ordinary Surefire test. The same build runs
+Spotless, PMD + CPD, SpotBugs, JaCoCo, and PIT on the contract modules; a failing gate is fixed,
+never raised or suppressed ([CODE_QUALITY.md](CODE_QUALITY.md), [TESTING.md](TESTING.md)). The
+library ships no deployment, so `release` and `runtime` scenarios belong to the consuming service.
+Goal 3 (piecemeal adoption) has no measured scenario yet; defining one is the next revision of
+`quality-00001`.
 
 ## 11. Risks & Technical Debt
 

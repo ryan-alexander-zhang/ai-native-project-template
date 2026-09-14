@@ -221,11 +221,14 @@ Story 面向**消费方开发者**（记录侧）；业务查询者（读取侧�
 - repeatable annotation / 多记录 / 多 target（需先定义原子 `appendAll`）
 - retention/purge 端口（P3 定义，本 MVP 仅遵守"可真正删除"原则）
 
-## 6. Non-Functional
-- 无高基数 metric（label 仅 `operationCode`/`outcome`/`sinkType`）；`recordId`/`correlationId` 关联技术日志与 span。
-- 质量门：按 `TESTING.md` / [design-00007-code-quality-gates](../design/design-00007-code-quality-gates.md)，覆盖率/静态分析/mutation/集成测试达标；core 模块 framework-free（ArchUnit 守护）。
+## 6. Quality
+
+| Quality | Doc | Scenarios held |
+| --- | --- | --- |
+| 库基线 | [quality-00001-aipersimmon-ddd-baseline](../quality/quality-00001-aipersimmon-ddd-baseline.md) | quality-00001-QS-1.1（contract 模块不声明框架依赖）、quality-00001-QS-2.1（metric label 仅 `operationCode`/`outcome`/`sinkType`） |
 
 ## Links
+- Quality: [quality-00001-aipersimmon-ddd-baseline](../quality/quality-00001-aipersimmon-ddd-baseline.md)
 - Design: [design-00008-operation-log-component](../design/design-00008-operation-log-component.md)
 - Decision: [decision-00017-operation-log-component-boundaries](../decision/decision-00017-operation-log-component-boundaries.md)
 - Plan: [plan-00010-operation-log-implementation](../plan/plan-00010-operation-log-implementation.md)
