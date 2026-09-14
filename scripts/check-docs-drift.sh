@@ -27,6 +27,18 @@ err() { echo "  $*"; fail=1; }
 md=$(git ls-files | grep -E '^([^/]+|docs/.+)\.md$' | grep -v 'TEMPLATE\.md$')
 inst=$(echo "$md" | grep -E '^docs/[^/]+/[^/]+\.md$' | grep -v '/README\.md$')
 
+# yaml `exclude:` — files it hits are not documents (docs/README.md): raw material such as
+# docs/reference/<slug>/source/**. Dropped from every check, the link check included.
+cfg=whiteboard.config.yaml
+if [ -f "$cfg" ]; then
+  rx=$(awk '/^exclude:/{s=1;sub(/^exclude: */,"");if($0!="")print;next} s&&/^ *- /{sub(/^ *- */,"");print;next} s&&/^[^ #]/{exit}' "$cfg" |
+       tr -d '[],"'"'" | tr ' ' '\n' | grep . | sed 's/\./\\./g; s/\*\*/\x01/g; s/\*/[^\/]*/g; s/\x01/.*/g' | paste -sd'|' -)
+  if [ -n "$rx" ]; then
+    md=$(echo "$md" | grep -vE "^docs/($rx)$")
+    inst=$(echo "$inst" | grep -vE "^docs/($rx)$")
+  fi
+fi
+
 # 1. links
 for f in $md; do
   d=$(dirname "$f")
@@ -39,7 +51,6 @@ done
 
 # type -> living|work. Source: whiteboard.config.yaml `types:` when present (the one table the
 # board and this script share); else the docs/README.md default split. Empty = type not declared.
-cfg=whiteboard.config.yaml
 kind_of() {
   if [ -f "$cfg" ]; then sed -n "s/^  $1: *{ *kind: *\([a-z]*\).*/\1/p" "$cfg" | head -1; return; fi
   case "$1" in
@@ -65,12 +76,6 @@ carries_of() {
     *) echo - ;;
   esac
 }
-# yaml `exclude:` — files it hits are not documents (docs/README.md): drop them before any check.
-if [ -f "$cfg" ]; then
-  rx=$(awk '/^exclude:/{s=1;sub(/^exclude: */,"");if($0!="")print;next} s&&/^ *- /{sub(/^ *- */,"");print;next} s&&/^[^ #]/{exit}' "$cfg" |
-       tr -d '[],"'"'" | tr ' ' '\n' | grep . | sed 's/\./\\./g; s/\*\*/\x01/g; s/\*/[^\/]*/g; s/\x01/.*/g' | paste -sd'|' -)
-  [ -n "$rx" ] && inst=$(echo "$inst" | grep -vE "^docs/($rx)$")
-fi
 
 # 2. front matter: id well-formed, prefix = type, = filename, unique; status in the kind's vocabulary
 #    (docs/README.md Front Matter Rules)

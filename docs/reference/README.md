@@ -11,6 +11,10 @@ Use `TEMPLATE.md` for front matter.
 - A reference is a `living` doc like any other and appears
   on the board, so it carries the same `id` / `type` / `status` front matter.
   Record when the material was captured in the body, not in the filename.
+- Raw material (copied vendor docs, schemas, excerpts) lives in
+  `<slug>/source/` next to the document. It is excluded from the board and the
+  drift checks and carries no front matter; only the distilled
+  `reference-<nnnnn>-<slug>.md` is a document. Its §1 Source points at the raw path.
 
 ## Must Include
 

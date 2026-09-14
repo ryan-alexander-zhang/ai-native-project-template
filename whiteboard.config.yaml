@@ -49,7 +49,7 @@ max_sessions: 5
 # excluded. Anything but a list of strings, or an entry that is empty, holds a
 # `..` segment or a `\`, or starts with `/` or `!`, refuses to start the board
 # Read at startup only — restart the board after changing it.
-exclude: []
+exclude: [reference/*/source/**]
 
 relations:
   - parent
