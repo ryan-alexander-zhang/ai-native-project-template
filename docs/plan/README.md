@@ -24,8 +24,8 @@ Add more when useful.
   scope. Prefer item ids when the plan delivers a slice of a larger spec.
 - A feature-sized plan reaching `resolved` needs a [`record`](../record/README.md)
   whose `parent` points at this plan and whose `verifies` lists the requirement
-  ids it checked. The board refuses `open → resolved` while any item in the
-  delivery scope is not fully verified by such records.
+  ids it checked. `open → resolved` is refused while any AC of any item in the
+  delivery scope lacks a `pass` row in such a record.
 
 ## Exclude
 
