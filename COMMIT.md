@@ -2,16 +2,13 @@
 
 ## Scope
 
-- Keep one logical change per commit.
-- Split unrelated changes into separate commits.
-- Stage only the files that belong to the change.
+- One logical change per commit; unrelated changes split.
+- Stage only the files of the change.
 
 ## Message
 
-- Format: `<type>(<scope>): <description>`
-- Scope is optional.
-- Keep the description lowercase and do not end it with a period.
-- Keep the first line short and precise.
+- `<type>(<scope>): <description>`; scope optional.
+- Description lowercase, no trailing period; first line short and precise.
 
 ## Types
 
@@ -24,16 +21,15 @@
 
 ## Rules
 
-- Review the staged diff before committing.
-- Do not commit secrets, generated noise, or unrelated local changes.
+- Review the staged diff first.
+- No secrets, generated noise, or unrelated local changes.
 
 ## Hooks
 
-This repo ships a `pre-commit` hook that blocks committing docs still in `draft`.
-Enable it once per clone:
+The `pre-commit` hook blocks committing `draft` docs. Enable once per clone:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-To intentionally commit work in progress, bypass with `git commit --no-verify`.
+Work in progress on purpose: `git commit --no-verify`.
