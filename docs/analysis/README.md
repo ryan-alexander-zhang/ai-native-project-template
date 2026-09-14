@@ -1,7 +1,6 @@
 # Analyses
 
-This directory stores analysis docs.
-Use `TEMPLATE.md` for front matter.
+Analysis docs. Front matter: `TEMPLATE.md`.
 
 ## Must Include
 
@@ -14,10 +13,8 @@ Add more when useful.
 
 ## Relations
 
-- `parent` — empty, or the catalog `analysis` that enumerates this entry when it
-  really is part of one.
-- `informs` — the docs this analysis feeds: a `spec`, `design`, `plan`, or the
-  `decision` it led to.
+- `parent` — empty, or the catalog `analysis` this entry is part of.
+- `informs` — the `spec`, `design`, `plan`, or `decision` this analysis feeds.
 
 ## Exclude
 
