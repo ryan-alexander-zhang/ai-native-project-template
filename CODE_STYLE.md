@@ -2,59 +2,37 @@
 
 ## Purpose
 
-This file defines the minimum code style standard for this repo.
-
-Use it to decide:
-- how code should read
-- how naming and structure should stay consistent
-- when a style-sensitive change is done
+Minimum code style standard: how code reads, how naming and structure stay
+consistent, when a style-sensitive change is done.
 
 ## Style Pattern
 
-Keep code style simple:
-- prefer clarity over cleverness
-- follow existing local patterns before introducing new ones
-- keep naming explicit and consistent
-- keep formatting stable and predictable
-- keep comments short and useful
+- clarity over cleverness
+- existing local patterns before new ones
+- explicit, consistent naming
+- stable formatting; comments short and useful
 
 ## Style Areas
 
-### Naming
-
-Use clear, consistent names for files, modules, functions, types, and variables.
-
-### Structure
-
-Keep related logic together and keep code organization easy to follow.
-
-### Formatting
-
-Use the canonical formatting rules and avoid manual style drift.
-
-### Comments
-
-Write comments only when they add meaning that the code does not already show.
-
-### Consistency
-
-Match the surrounding code style unless there is a clear approved reason to change it.
+- **Naming** — clear, consistent names for files, modules, functions, types, variables.
+- **Structure** — related logic together; organization easy to follow.
+- **Formatting** — the canonical rules; no manual drift.
+- **Comments** — only where they add meaning the code does not show.
+- **Consistency** — match surrounding style unless there is an approved reason to change it.
 
 ## Style Matrix
 
 | Change type | Minimum requirement |
 | --- | --- |
-| New code | Match the existing naming, structure, and formatting rules. |
-| Edited code | Keep the touched area consistent without reformatting unrelated code. |
-| New abstraction | Use only when it improves clarity and fits the existing style. |
-| Comment change | Keep comments precise, necessary, and aligned with behavior. |
-| Style cleanup | Keep the scope narrow and avoid mixing style-only edits with behavior changes. |
+| New code | Match existing naming, structure, formatting. |
+| Edited code | Touched area consistent; no reformatting of unrelated code. |
+| New abstraction | Only when it improves clarity and fits the existing style. |
+| Comment change | Precise, necessary, aligned with behavior. |
+| Style cleanup | Narrow scope; never mixed with behavior changes. |
 
 ## Definition of Done
 
-A style-sensitive change is done only when all of these are true:
-
-- the code follows the local style rules
-- naming and structure are consistent
-- formatting drift was not introduced
-- unrelated style churn was avoided
+- local style rules followed
+- naming and structure consistent
+- no formatting drift
+- no unrelated style churn
