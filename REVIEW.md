@@ -1,16 +1,12 @@
 # Review Checklist
 
-Use this file to record the project-specific review checklist for this repo.
-It starts empty on purpose — fill it in as the project's real risk areas
-become clear.
-
-Keep review comments and docs in the canonical terms from
-[CONTEXT.md](CONTEXT.md) once that file exists.
+Project-specific review checklist; starts empty, filled as real risk areas
+appear. Review comments use the canonical terms of [CONTEXT.md](CONTEXT.md).
 
 ## Checklist
 
 - [ ] <add the correctness, safety, and consistency checks this project cares about>
 
-Add checks as risk areas surface, for example: data integrity, money and
-accounting, auth and tenancy isolation, error handling, concurrency, and
-idempotency. Each check should say what to reject, not just what to look at.
+Candidate areas: data integrity, money and accounting, auth and tenancy
+isolation, error handling, concurrency, idempotency. Each check says what to
+reject, not only what to look at.

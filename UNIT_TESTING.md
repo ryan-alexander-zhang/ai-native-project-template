@@ -1,27 +1,24 @@
 # Unit Testing
 
-Use this file to record the project-specific unit testing choice for this repo.
+Project-specific unit testing choice.
 
 ## Test Framework
 
-Framework: `<fill in for this project>`. Note the short reason it is the chosen default.
-
-This level has no template default. The repo template only pins
-[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) to Testcontainers; pick the
-unit framework that fits the project's language and toolchain.
+Framework: `<fill in for this project>`, with the short reason. No template
+default; pick what fits the language and toolchain.
 
 ## Command
 
-List the command used to run unit tests locally and in CI.
+The command that runs unit tests locally and in CI.
 
 ## Scope
 
-Define what unit tests must cover and what should stay out of unit tests.
+What unit tests cover, and what stays out.
 
 ## Gate
 
-Define the minimum rule that must pass for unit testing at this repo.
+The minimum rule that must pass.
 
 ## Report
 
-Describe where to check unit test results, coverage, or CI output.
+Where results, coverage, or CI output are checked.

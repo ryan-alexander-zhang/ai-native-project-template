@@ -2,68 +2,44 @@
 
 ## Purpose
 
-This file defines the workflow stages, commands, and Definition of Done for
-implementation work in this repo.
-
-Behavioral principles (think before coding, simplicity, surgical changes,
-goal-driven execution) live in [AGENTS.md](AGENTS.md) and are not repeated here.
-
-Use this file to decide:
-- what stage the work is in
-- which commands and checks to run
-- when a change is done
+Workflow stages, commands, and Definition of Done for implementation work.
+Behavioral principles live in [AGENTS.md](AGENTS.md).
 
 ## Development Stages
 
 ### Understand
 
-Confirm the goal, constraints, and affected boundaries.
-
-- Identify the files and interfaces that matter.
-- Separate facts from assumptions.
-- Avoid silent scope expansion.
+Confirm goal, constraints, affected boundaries. Identify the files and
+interfaces that matter; separate facts from assumptions; no silent scope
+expansion.
 
 ### Plan
 
-Decide how before building.
-
 - Never build against a `draft` doc; promote it first.
-- For a feature-sized `spec` (multiple files, real ordering or design choices),
-  create or refresh a `docs/plan/` doc before implementing, then work it
-  task-by-task. The plan declares `implements: [<the spec>]` and takes the
-  spec's §7 quality scenarios into scope; the product flow ahead of it is
-  `idea -> prd -> quality -> spec`, per [docs/README.md](docs/README.md).
-- Link the `docs/design/` docs the spec already links. Whether a design is
-  needed is settled when the spec is written, per
-  [docs/spec/README.md](docs/spec/README.md); never inline design in a `spec`
-  or a `plan`, however small.
-- For small or localized changes, inline reasoning is enough — do not create a
-  plan doc.
+- A feature-sized `spec` (multiple files, real ordering or design choices):
+  create or refresh a `docs/plan/` doc, then work it task by task. The plan
+  declares `implements: [<the spec>]` and takes the spec's §7 quality
+  scenarios into scope; flow ahead of it is `idea -> prd -> quality -> spec`
+  ([docs/README.md](docs/README.md)).
+- Link the `docs/design/` docs the spec links. Whether a design is needed is
+  settled in the spec ([docs/spec/README.md](docs/spec/README.md)); never
+  inline design in a `spec` or `plan`.
+- Small or localized change: inline reasoning, no plan doc.
 
 ### Implement
 
-Make the change.
-
-- Keep unrelated code untouched.
-- Match existing style and structure.
-- Remove only unused code created by the change.
+Unrelated code untouched; existing style and structure matched; only unused
+code the change created removed.
 
 ### Verify
 
-Prove the change and check that scope stayed focused.
-
-- Run tests per [TESTING.md](TESTING.md). Testing is part of Verify, not a
-  separate phase after it.
-- Inspect the diff before completion.
-- Confirm the requested behavior is complete.
+Run tests per [TESTING.md](TESTING.md) — part of Verify, not a phase after it.
+Inspect the diff; confirm the requested behavior is complete.
 
 ### Record
 
-Use this stage when the change needs durable docs, notes, or decisions.
-
-- Update docs when behavior, workflow, or contract changed.
-- Record decisions in the correct place per [DOCUMENT.md](DOCUMENT.md).
-- Keep long-term documentation consistent.
+When behavior, workflow, or contract changed: update docs; record decisions per
+[DOCUMENT.md](DOCUMENT.md).
 
 ## Development Guides
 
@@ -71,17 +47,17 @@ Use this stage when the change needs durable docs, notes, or decisions.
 - [ACCEPTANCE.md](ACCEPTANCE.md): deriving the acceptance set for a spec or rule.
 - [QUALITY.md](QUALITY.md): quality requirements — attributes, scenarios, verification methods and stages.
 - [TESTING.md](TESTING.md): test levels, required tests, coverage.
-- [COMMIT.md](COMMIT.md): commit scope, message rules, commit hygiene.
+- [COMMIT.md](COMMIT.md): commit scope, message rules, hygiene.
 - [PR.md](PR.md): PR readiness, review flow, merge rules.
 - [SECURITY.md](SECURITY.md): security rules, risk handling.
 - [CODE_STYLE.md](CODE_STYLE.md): naming, formatting, consistency.
 - [CODE_QUALITY.md](CODE_QUALITY.md): quality gates, thresholds, refactoring order.
 - [DOCUMENT.md](DOCUMENT.md): doc taxonomy and management.
-- [AUTOPILOT.md](AUTOPILOT.md): the unattended idea-to-PR run and what it replaces.
+- [AUTOPILOT.md](AUTOPILOT.md): the unattended idea-to-PR run.
 
 ## Commands
 
-Canonical commands for this repo (fill in for the project):
+Fill in for the project:
 
 - Setup: `<command>`
 - Test: `mvn -f aipersimmon-ddd/pom.xml test`
@@ -98,26 +74,22 @@ Canonical commands for this repo (fill in for the project):
 
 | Change type | Minimum requirement |
 | --- | --- |
-| Docs-only change | Follow the document management workflow and verify links, examples, and location. |
-| New feature (spec-sized) | Write or refresh a `docs/plan/` first, then implement task-by-task and test per the plan's acceptance path. |
-| Small code change | Make the smallest useful change and run the smallest relevant checks. |
-| Behavior change | Update implementation, tests, and any affected docs together. |
-| Public contract or workflow change | Update implementation, tests, and durable documentation together. |
-| HTTP API change | Also regenerate `api-tests/openapi.json` in the same change ([API_TESTING.md](API_TESTING.md) § OpenAPI). |
-| Refactor with no intended behavior change | Keep behavior unchanged, keep tests green, and keep the diff narrowly scoped. |
-| Bug fix | For any bug worth tracking, first create the matching `docs/issue` doc (first-principles root cause + failing-test reproduction, per `docs/issue/README.md`), then fix and keep its regression test green. |
+| Docs-only change | Document workflow; verify links, examples, location. |
+| New feature (spec-sized) | `docs/plan/` first, then task by task, tested per the plan's acceptance path. |
+| Small code change | Smallest useful change, smallest relevant checks. |
+| Behavior change | Implementation, tests, and affected docs together. |
+| Public contract or workflow change | Implementation, tests, and durable documentation together. |
+| HTTP API change | Also regenerate `api-tests/openapi.json` ([API_TESTING.md](API_TESTING.md) § OpenAPI). |
+| Refactor with no intended behavior change | Behavior unchanged, tests green, diff narrow. |
+| Bug fix | For any bug worth tracking, the `docs/issue` doc first (root cause + failing-test reproduction, `docs/issue/README.md`), then the fix with its regression test green. |
 
 ## Definition of Done
 
-A change is done only when all of these are true:
-
-- the requested behavior is complete
-- the change scope stays focused
-- tracked or non-trivial bug fixes have a matching `docs/issue` record
-- relevant tests pass and meet the [TESTING.md](TESTING.md) DoD
-- relevant docs are updated per the [DOCUMENT.md](DOCUMENT.md) DoD
-- code style meets the [CODE_STYLE.md](CODE_STYLE.md) DoD
-- quality gates pass per [CODE_QUALITY.md](CODE_QUALITY.md), with no raised
-  threshold and no suppressed finding
+- requested behavior complete; scope focused
+- tracked or non-trivial bug fixes have a `docs/issue` record
+- tests pass and meet the [TESTING.md](TESTING.md) DoD
+- docs updated per the [DOCUMENT.md](DOCUMENT.md) DoD
+- style meets the [CODE_STYLE.md](CODE_STYLE.md) DoD
+- quality gates pass per [CODE_QUALITY.md](CODE_QUALITY.md), no raised threshold, no suppressed finding
 - security-sensitive changes meet the [SECURITY.md](SECURITY.md) DoD
-- no known regression is left behind
+- no known regression left behind

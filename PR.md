@@ -2,18 +2,15 @@
 
 ## Scope
 
-- Keep one reviewable topic per PR.
-- Keep the diff focused.
-- Call out anything intentionally left out of scope.
+- One reviewable topic per PR; diff focused.
+- Call out what is intentionally out of scope.
 
 ## Description
 
-- State what changed.
-- State why it changed.
-- Call out risk, reviewer context, and follow-up when relevant.
+- What changed, and why.
+- Risk, reviewer context, follow-up when relevant.
 
 ## Rules
 
-- Open a PR only when it is ready for review.
-- Resolve required review feedback before merge.
-- Merge only after the required checks pass.
+- Open only when ready for review.
+- Required feedback resolved and required checks green before merge.

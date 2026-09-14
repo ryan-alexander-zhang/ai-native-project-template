@@ -1,20 +1,17 @@
 # References
 
-This directory stores external reference materials.
-Use `TEMPLATE.md` for front matter.
+External reference materials. Front matter: `TEMPLATE.md`.
 
 ## Naming
 
-- `reference-<five-digit-number>-<slug>.md`, the standard id format from
-  [docs/README.md](../README.md) — for example
-  `reference-00001-api-provider-docs-summary.md`.
-- A reference is a `living` doc like any other and appears
-  on the board, so it carries the same `id` / `type` / `status` front matter.
-  Record when the material was captured in the body, not in the filename.
-- Raw material (copied vendor docs, schemas, excerpts) lives in
-  `<slug>/source/` next to the document. It is excluded from the board and the
-  drift checks and carries no front matter; only the distilled
-  `reference-<nnnnn>-<slug>.md` is a document. Its §1 Source points at the raw path.
+- `reference-<five-digit-number>-<slug>.md`, per [docs/README.md](../README.md),
+  e.g. `reference-00001-api-provider-docs-summary.md`.
+- A living doc like any other: same `id` / `type` / `status` front matter, on
+  the board. Capture date in the body, not the filename.
+- Raw material (copied vendor docs, schemas, excerpts) lives in `<slug>/source/`
+  next to the document: no front matter, excluded from board and drift checks.
+  Only the distilled `reference-<nnnnn>-<slug>.md` is a document; its §1 Source
+  points at the raw path.
 
 ## Must Include
 
@@ -36,4 +33,4 @@ Add more when useful.
 
 ## Note
 
-References are for input only. They do not replace formal documents.
+Input only; never a replacement for formal documents.

@@ -2,33 +2,27 @@
 
 ## Purpose
 
-This file defines how to derive the acceptance criteria (GWT) a `spec`
-requirement or a business `rule` owes, and how to tell when the set is complete.
+How to derive the acceptance criteria (GWT) a `spec` requirement or a `rule`
+owes — which examples, how many, how written — and when the set is complete.
 
-Use it to decide:
-- which examples a requirement or a rule owes
-- how many are enough
-- how to write each one
+This file says **what must be shown**; [TESTING.md](TESTING.md) says at which
+level and coverage. Acceptance never names a test level or framework; testing
+never derives a GWT. Quality requirements are not derived here: scenarios,
+methods, stages come from [QUALITY.md](QUALITY.md). An FR whose acceptance wants
+a number that is not a boundary of its own behaviour cites a `QS`.
 
-Scope boundary: this file says **what must be shown**. [TESTING.md](TESTING.md)
-says at which level it runs and what coverage it must reach. Acceptance never
-names a test level or a framework; testing never derives a GWT. Quality
-requirements — how well, with a measure — are not derived here: their scenarios,
-methods, and stages come from [QUALITY.md](QUALITY.md). An FR whose acceptance
-wants a number that is not a boundary of its own behaviour is citing a `QS`.
-
-The form is Given-When-Then (North, 2006) used as Specification by Example
-(Adzic, 2011); the collaborative version is Example Mapping (Wynne, 2015),
-which `AGENTS.md` already carries as the pre-review audit.
+Form: Given-When-Then (North, 2006) as Specification by Example (Adzic, 2011);
+the collaborative version, Example Mapping (Wynne, 2015), is the `AGENTS.md`
+pre-review audit.
 
 ## Acceptance Pattern
 
-- One behaviour per criterion — an `And` in the `When` usually means two criteria.
-- `Given` states the precondition, not the steps that reached it.
-- `Then` states one observable outcome, not an implementation detail.
-- Write declaratively: "an invoice is overdue", not a click path.
-- Examples **sample** the input space; they do not enumerate it.
-- A criterion that restates its requirement in other words verifies nothing.
+- One behaviour per criterion; an `And` in the `When` usually means two.
+- `Given` = the precondition, not the steps that reached it.
+- `Then` = one observable outcome, not an implementation detail.
+- Declarative: "an invoice is overdue", not a click path.
+- Examples **sample** the input space, never enumerate it.
+- A criterion restating its requirement verifies nothing.
 
 ## Minimum Set — by rule kind
 
@@ -50,15 +44,13 @@ which `AGENTS.md` already carries as the pre-review audit.
 | Unwanted | `If <trigger>, then` | the failure and its defined response; a second occurrence when that response must be idempotent |
 | Complex | combined clauses | decompose into the types above, then apply each |
 
-For a state machine, 0-switch coverage (every transition once) is the floor; add
-1-switch (every pair of consecutive transitions) where an out-of-order
-transition is costly. When inputs combine past what one table can express,
-sample pairwise rather than enumerating.
+State machine: 0-switch coverage (every transition once) is the floor; 1-switch
+(every consecutive pair) where an out-of-order transition is costly. Inputs
+combining past one table: sample pairwise.
 
 ## Omission Heuristics
 
-The tables above complete the set against what is written. They cannot find a
-case nobody wrote down. Sweep these before closing the set:
+The tables cannot find a case nobody wrote down. Sweep before closing:
 
 - **cardinality** — zero, one, many
 - **timing** — too early, too late, timeout, out of order, duplicate delivery, concurrent
@@ -72,11 +64,9 @@ Fill in the omissions this domain actually produces:
 
 ## Definition of Done
 
-An acceptance set is done when:
-
-- every `FR` and every `BR` in scope carries at least the minimum set for its
-  kind or EARS type
-- the omission heuristics were swept, and what they raised became a criterion or
-  an Open Question
+- every `FR` and `BR` in scope carries at least the minimum set for its kind or
+  EARS type
+- the omission heuristics were swept; what they raised is a criterion or an
+  Open Question
 - no criterion restates its requirement
 - each criterion names a single observable outcome

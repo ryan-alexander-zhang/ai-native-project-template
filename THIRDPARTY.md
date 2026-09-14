@@ -1,14 +1,12 @@
 # Third-Party References
 
-External code and specs used **for reference only** — not vendored into this
-repo, not a build dependency. Keep clones **outside** the repo so they do not
-pollute version control. Copy only the files you actually rely on into
-`docs/reference/<slug>/source/` (raw material, not a document — excluded from
-the board and the drift checks), and distill what they say into a
-`docs/reference/reference-<nnnnn>-<slug>.md` document.
+External code and specs used **for reference only**: not vendored, not a build
+dependency. Clones stay **outside** the repo. Copy only the files relied on
+into `docs/reference/<slug>/source/` (raw material, excluded from board and
+drift checks); distill them into `docs/reference/reference-<nnnnn>-<slug>.md`.
 
-Add one section per third-party reference. Record only what a contributor needs
-to find and pin the source; the working notes live under `docs/reference/`.
+One section per reference, holding only what a contributor needs to find and
+pin the source; working notes live under `docs/reference/`.
 
 The DDD references below back the Java DDD template on this branch
 (`lang/java/ddd`). Recommended reading order: library → factory → jmolecules →

@@ -2,29 +2,27 @@
 
 ## Purpose
 
-The document-work companion to [DEVELOPMENT.md](DEVELOPMENT.md) and
-[TESTING.md](TESTING.md). [docs/README.md](docs/README.md) is the source of
-truth for the `docs/` taxonomy, folders, and front matter; this file does not
-restate them — it covers placement, status transitions, and done.
+Document-work companion to [DEVELOPMENT.md](DEVELOPMENT.md) and
+[TESTING.md](TESTING.md): placement, status transitions, done. Taxonomy,
+folders, front matter: [docs/README.md](docs/README.md).
 
 ## Placement
 
-- Place anything under `docs/` via [docs/README.md](docs/README.md); choose the smallest correct folder.
-- Keep repo-wide policy and workflow in the root canonical docs, not under `docs/`.
-- Keep one current doc per topic; do not create parallel structures.
-- When a taxonomy or folder rule changes, update `docs/README.md` and the affected templates and folder `README.md` files together.
+- Anything under `docs/` goes where [docs/README.md](docs/README.md) says; smallest correct folder.
+- Repo-wide policy and workflow stay in the root docs, not under `docs/`.
+- One current doc per topic; no parallel structures.
+- A taxonomy or folder rule change updates `docs/README.md`, the templates, and the folder `README.md` files together.
 
 ## Status Workflow
 
-Status values are defined in [docs/README.md](docs/README.md). Never change status silently.
+Values defined in [docs/README.md](docs/README.md). Never change status silently.
 
-- New docs start as `draft`.
-- A doc with open questions stays `draft`.
-- After creating or substantively updating a `draft` doc, ask if it is reviewed. If yes, promote it: living docs to `active`, work items to `open`. (In an autopilot run both rounds are replaced per `AUTOPILOT.md`.)
-- When the work is done, set the work item to `resolved`; living docs stay `active`. A `plan` whose `implements` puts `spec`/`rule`/`quality` items in scope needs its `docs/record/` acceptance checklist first.
-- When deliberately not acting, or the item became invalid, set `wontfix`. Never record an outcome by archiving.
-- Use `archived` only for a doc replaced by another; the replacement carries `supersedes`.
-- Do not commit a doc left in `draft`; promote it or confirm the exception first.
+- New docs start `draft`; a doc with open questions stays `draft`.
+- After creating or substantively updating a `draft`, ask if it is reviewed; if yes, promote: living docs `active`, work items `open` (autopilot replaces both rounds per `AUTOPILOT.md`).
+- Work done: work item `resolved`; living docs stay `active`. A `plan` with `spec`/`rule`/`quality` items in scope needs its `docs/record/` checklist first.
+- Deliberately not acting, or invalid: `wontfix`. Never record an outcome by archiving.
+- `archived` only for a doc replaced by another carrying `supersedes`.
+- Never commit a `draft` without promoting it or confirming the exception.
 
 ## Definition of Done
 

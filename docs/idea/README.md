@@ -1,7 +1,6 @@
 # Ideas
 
-This directory stores early ideas.
-Use `TEMPLATE.md` for front matter.
+Early ideas. Front matter: `TEMPLATE.md`.
 
 ## Must Include
 
@@ -20,4 +19,4 @@ Add more when useful.
 
 ## Note
 
-Before execution, move the content to `prd/` or `spec/`.
+Before execution, the content moves to `prd/` or `spec/`.

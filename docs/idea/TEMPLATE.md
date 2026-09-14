@@ -44,7 +44,9 @@ Sketch level: enough to judge the idea, not enough to build it.>
 
 ## Constraints (optional)
 
-<Directions already settled at idea stage, so the PRD does not reopen them.>
+<Directions already settled at idea stage, so the PRD does not reopen them —
+technology, platform, and any profile fact already known (`QUALITY.md`, Profile:
+scale, sensitivity, availability, operations model).>
 
 1. **<topic>**: <the settled direction>
 

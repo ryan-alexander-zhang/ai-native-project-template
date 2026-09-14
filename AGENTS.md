@@ -18,11 +18,11 @@ Before implementing:
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
-- Reuse before build. Look in this order: this repo, the project framework or
-  starters, dependencies already present, a maintained open-source library. Build
-  only when none fits, and record why in a `decision`.
-- Every new dependency or open-source library is a `decision`: what it supplies,
-  what was compared, why it won.
+- Reuse before build, in this order: this repo, the framework or starters,
+  present dependencies, a maintained open-source library. Build only when none
+  fits; record why in a `decision`.
+- Every new dependency is a `decision`: what it supplies, what was compared,
+  why it won.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
@@ -64,59 +64,62 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **Use one canonical term for one concept.**
 
-- Use `CONTEXT.md` as the project glossary. If it does not exist, create it from `CONTEXT_TEMPLATE.md`.
-- If a term conflicts with `CONTEXT.md`, stop and resolve it before moving on.
-- If language is vague or overloaded, propose one precise term and test it against concrete scenarios.
-- If the stated behavior conflicts with the code or docs, call out the mismatch explicitly.
-- Update `CONTEXT.md` as soon as a term is resolved. Keep it glossary-only: no implementation details, specs, or design decisions.
+- `CONTEXT.md` is the glossary; create it from `CONTEXT_TEMPLATE.md` if absent.
+- A term conflicting with `CONTEXT.md`: stop, resolve, then continue.
+- Vague or overloaded language: propose one precise term, test it against concrete scenarios.
+- Stated behavior conflicting with code or docs: call out the mismatch.
+- Update `CONTEXT.md` as soon as a term is resolved. Glossary only: no implementation, specs, or decisions.
 
 ## 6. Document Workflow
 
-- For document work, including status transitions, follow `DOCUMENT.md`.
-- As soon as a `spec`, `rule`, `quality`, or `design` draft is written or substantively changed — and
-  before a human is asked to review it — a subagent that did not write it audits it: first
-  against that folder's `README.md`, then against the content itself. Name the missing
-  rules, cases, and GWTs, the readings taken silently, and every value it cannot confirm.
-  Each finding becomes an amendment or a named Open Question; what only a domain owner can
-  settle is never left as an assumption.
-- When writing the acceptance for a `spec` or a `rule`, derive the set per `ACCEPTANCE.md`.
-  When writing the scenarios for a `quality` doc, derive the set per `QUALITY.md`; the audit
-  of a `design` includes its sensitivity check — each tactic against the scenario list.
+- Document work, status transitions included: `DOCUMENT.md`.
+- A `spec`, `rule`, `quality`, or `design` draft written or substantively changed is
+  audited — before any human review — by a subagent that did not write it: against the
+  folder `README.md`, then against the content. Name missing rules, cases, and GWTs,
+  readings taken silently, every value it cannot confirm. Each finding becomes an
+  amendment or a named Open Question; what only a domain owner can settle is never an
+  assumption.
+- Acceptance for a `spec` or `rule`: derive per `ACCEPTANCE.md`. Scenarios for a
+  `quality` doc: per `QUALITY.md`. A `design` audit includes the sensitivity check —
+  each tactic against the scenario list.
 
 ## 7. Output Discipline
 
-If one sentence answers it, answer in one sentence. Expand only when the user asks for
-detail. Keep the formatting as short as the content: prose for short answers, no headings
-or bullets over a single conclusion. This applies to documents too.
+One sentence when one sentence answers it; expand only on request. Formatting as
+short as the content: prose for short answers, no headings or bullets over a single
+conclusion. Documents too.
 
 ## 8. Development Workflow
 
-- For implementation work, follow `DEVELOPMENT.md`. Dispatch it — an `open` plan task, an
-  `open` issue fix, or a small change with no plan — to a subagent that writes only code,
-  tests and the files the task names.
-- After implementation, follow `TESTING.md`.
-- Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
+- Implementation: `DEVELOPMENT.md`. Dispatch it — an `open` plan task, an `open` issue
+  fix, or a small change with no plan — to a subagent that writes only code, tests, and
+  the files the task names. Then `TESTING.md`.
+- `ARCHITECTURE.md` is the architecture index; create it from `ARCHITECTURE_TEMPLATE.md` if absent.
 - Before the first implementation `plan` turns `open`, fill the project-derived root guides
   from their templates and the `active` decisions/designs: `ARCHITECTURE.md`, the Commands in
-  `DEVELOPMENT.md`, `PERFORMANCE_TESTING.md` / `RESILIENCE_TESTING.md` when any
-  `active` quality scenario is `load` / `chaos`, the project-specific values in `TESTING.md` / `CODE_STYLE.md` /
-  `CODE_QUALITY.md`. Never implement while a root guide the work depends on still holds
+  `DEVELOPMENT.md`, `PERFORMANCE_TESTING.md` / `RESILIENCE_TESTING.md` when any `active`
+  quality scenario is `load` / `chaos`, the project-specific values in `TESTING.md` /
+  `CODE_STYLE.md` / `CODE_QUALITY.md`. Never implement against a root guide still holding
   template placeholders.
-- When a quality gate fails (format / complexity / duplication / static analysis / coverage)
-  or a review flags complexity or duplication, refactor per `CODE_QUALITY.md`: solve it — do
-  not raise a threshold or suppress a finding to make the build pass.
-- When you discover a bug or defect during any task, before fixing it, create a
-  `docs/issue` doc: analyze the root cause from first principles and reproduce it
-  with a failing test, following `docs/issue/README.md`. Only then apply the fix. If no
-  `spec` / `rule` / `quality` doc covers the behaviour, write or amend it first (revision
-  round), then the issue `blocks` it.
-- Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
-- Before a `plan` whose `implements` puts `spec`/`rule`/`quality` items in scope becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test, that every linked `quality` scenario holds per its method and stage with the evidence `QUALITY.md` names, that no `spec-<n>-FR-<i>`, `rule-<n>-BR-<i>`, or `quality-<n>-QR-<i>` is unverified, and that every `active` `decision` in reach has passing `enforced_by` tests or its §4 reason, then record a `docs/record/` acceptance checklist linking the GWT and QS ids. Any gap blocks `resolved`.
-- Run `skills/audit-architecture` (fresh-context subagent) before a feature-sized `plan` becomes `resolved`, and whenever 20+ PRs merged since the last audit report. An open finding blocks `resolved`.
+- A failing quality gate, or a review flagging complexity or duplication: refactor per
+  `CODE_QUALITY.md`; never raise a threshold or suppress a finding.
+- A bug found during any task: first a `docs/issue` doc — root cause from first principles,
+  reproduced by a failing test (`docs/issue/README.md`) — then the fix. If no `spec` /
+  `rule` / `quality` doc covers the behaviour, write or amend it first (revision round);
+  the issue `blocks` it.
+- Never write code or tests against a `draft` doc; `active` (or `open` for a work item) first.
+- Before a `plan` whose `implements` puts `spec`/`rule`/`quality` items in scope becomes
+  `resolved`, a subagent verifies from the docs: every linked GWT has a passing test; every
+  linked `quality` scenario holds per its method and stage with the evidence `QUALITY.md`
+  names; no `spec-<n>-FR-<i>`, `rule-<n>-BR-<i>`, or `quality-<n>-QR-<i>` is unverified;
+  every `active` `decision` in reach has passing `enforced_by` tests or its §4 reason. Then
+  a `docs/record/` acceptance checklist linking the GWT and QS ids. Any gap blocks `resolved`.
+- `skills/audit-architecture` (fresh-context subagent) before a feature-sized `plan` becomes
+  `resolved`, and after 20+ PRs since the last audit report. An open finding blocks `resolved`.
 
 ## 9. Autopilot Mode
 
-- When invoked as `/autopilot <prompt>` (or asked to run `AUTOPILOT.md`), follow `AUTOPILOT.md`:
-  one intake round, then unattended through to a PR on an `autopilot/` branch. The human rounds
-  in §1, §5, §6 and `DOCUMENT.md` are replaced exactly as that file states; a choice made in a
-  human's place is a `decision` with `decided_by: agent`.
+- `/autopilot <prompt>` (or "run `AUTOPILOT.md`"): one intake round, then unattended to a
+  PR on an `autopilot/` branch. The human rounds in §1, §5, §6 and `DOCUMENT.md` are
+  replaced exactly as `AUTOPILOT.md` states; a choice made in a human's place is a
+  `decision` with `decided_by: agent`.
