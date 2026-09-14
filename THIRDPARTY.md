@@ -2,7 +2,10 @@
 
 External code and specs used **for reference only** — not vendored into this
 repo, not a build dependency. Keep clones **outside** the repo so they do not
-pollute version control. Distilled notes live at `docs/reference/reference-<nnnnn>-<slug>.md`.
+pollute version control. Copy only the files you actually rely on into
+`docs/reference/<slug>/source/` (raw material, not a document — excluded from
+the board and the drift checks), and distill what they say into a
+`docs/reference/reference-<nnnnn>-<slug>.md` document.
 
 Add one section per third-party reference. Record only what a contributor needs
 to find and pin the source; the working notes live under `docs/reference/`.

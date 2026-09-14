@@ -19,9 +19,10 @@ Add more when useful.
 ## Relations
 
 - `blocks` — **required**: the docs this issue blocks or clarifies. Usually a
-  `task`, `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
+  `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
   issue contradicts is just as valid. An issue that blocks nothing has no reader
-  who needs it.
+  who needs it. A defect in behaviour no doc covers means a doc is missing: write
+  or amend the `spec` / `rule` first, then block it.
 
 ## Exclude
 

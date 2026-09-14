@@ -22,7 +22,6 @@ types:
   decision: { kind: living }
   design: { kind: living }
   plan: { kind: work }
-  task: { kind: work }
   issue: { kind: work }
   record: { kind: living }
   report: { kind: living }
@@ -50,7 +49,7 @@ max_sessions: 5
 # excluded. Anything but a list of strings, or an entry that is empty, holds a
 # `..` segment or a `\`, or starts with `/` or `!`, refuses to start the board
 # Read at startup only — restart the board after changing it.
-exclude: []
+exclude: [reference/*/source/**]
 
 relations:
   - parent
@@ -94,7 +93,6 @@ carries:
   decision: [motivated_by, constrains]
   design: [informs]
   plan: [implements]
-  task: [parent]
   issue: [blocks]
   record: [parent, verifies]
   report: [informs]
@@ -112,7 +110,6 @@ flow:
     - { next: design, carry: informs }
     - { next: plan, carry: implements }
   plan:
-    - { next: task, carry: parent }
     - { next: issue, carry: blocks }
     - { next: record, carry: parent }
 

@@ -2,7 +2,7 @@
 id: plan-00001-example-slug
 type: plan
 status: draft|open|resolved|archived|wontfix
-implements: [<spec-id | rule-id | spec-<n>-FR-<i> | rule-<n>-BR-<i> | design-id | report-id>]  # required: what this plan makes real; item ids declare the delivery scope (rule-00001-BR-24)
+implements: [<spec-id | rule-id | spec-<n>-FR-<i> | rule-<n>-BR-<i> | design-id | report-id>]  # required: what this plan makes real; item ids declare the delivery scope
 ---
 
 # Plan: <what this plan delivers, in one line>
@@ -35,8 +35,8 @@ one waits on which, and which task closes the round.>
    observation that settles it>
 2. Every item in the delivery scope has a passing row in the record → verify:
    <where that is read off>
-3. This plan passes `open → resolved` on the board → verify: the resolved gate
-   clears (`rule-00001-BR-25`).
+3. This plan passes `open → resolved` → verify: the resolved gate clears
+   (`scripts/check-docs-drift.sh` exits 0 with this plan `resolved`).
 
 ## Out of Scope (optional)
 

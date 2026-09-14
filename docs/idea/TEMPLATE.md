@@ -4,16 +4,16 @@ type: idea
 status: draft|active|archived
 ---
 
-# <Idea name>：<what it is, in a few words>
+# <Idea name>: <what it is, in a few words>
 
-## 问题陈述
+## Problem Statement
 
 <The problem as it exists today, from first-hand observation — who hits it,
 how often, and what it costs them. No solution here.>
 
 - <observable symptom>
 
-## 产品设想
+## Proposal
 
 <The shape of the idea in prose, then the parts that need their own paragraph.
 Sketch level: enough to judge the idea, not enough to build it.>
@@ -26,27 +26,27 @@ Sketch level: enough to judge the idea, not enough to build it.>
 
 - <…>
 
-## 范围
+## Scope
 
-**做**
+**In scope**
 
 - <what this delivers>
 
-**不做**
+**Out of scope**
 
 - <what is explicitly out, so the PRD does not drift into it>
 
-## 早期价值判断
+## Value
 
 <Why this is worth doing, and for whom. Name the value, not the feature.>
 
 - <value>
 
-## 已定方向（optional）
+## Constraints (optional)
 
 <Directions already settled at idea stage, so the PRD does not reopen them.>
 
-1. **<topic>**：<the settled direction>
+1. **<topic>**: <the settled direction>
 
 ## Open Questions
 

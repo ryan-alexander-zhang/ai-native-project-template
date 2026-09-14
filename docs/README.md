@@ -9,7 +9,7 @@ Every doc should start with:
 ```md
 ---
 id: <type>-<five-digit-number>-<slug>
-type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec|task
+type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec
 status: draft   # start here; promote per kind (see Front Matter Rules below)
 ---
 ```
@@ -19,15 +19,15 @@ Write the document description or comment after the front matter.
 ## Front Matter Rules
 
 - `id` uses `<type>-<five-digit-number>-<slug>`, for example `spec-00001-doc-front-matter`.
-- An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the whiteboard's `exclude` config hits are not documents here: they take no number and count as no collision.) Allocating the next free number per type is what keeps a new document from colliding; a collision that already exists is surfaced by the whiteboard as an anomaly on **every** file declaring that id, and every action addressed by it is refused until one of them is given a free id.
+- An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the `exclude` list in `whiteboard.config.yaml` hits are not documents here: they take no number and count as no collision.) Allocating the next free number per type is what keeps a new document from colliding; a collision that already exists is an error on **every** file declaring that id until one of them is given a free id.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]`; set the old doc to `archived` with `superseded_by: [<new id>]`. A `decision` is stricter: a change to the choice itself always supersedes (`docs/decision/README.md` Revision).
 - `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
-  - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
+  - **Work items** (`issue`, `plan`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
 - A **substantive revision** of an `active` `spec`, `rule`, or `design` goes
-  through the **revision round**: demote it to `draft` on
-  the board, revise, audit, and re-accept — never edit the `active` file in
+  through the **revision round**: demote it to `draft`,
+  revise, audit, and re-accept — never edit the `active` file in
   place. Typo-level fixes are exempt; when in doubt, it is substantive.
 - `decided_by` (`decision` only, not a relation): `human` when a person made the choice, `agent` when an agent made it unattended. Written only by autopilot runs (`AUTOPILOT.md`); absent means a human was in the loop.
 - Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
@@ -60,6 +60,9 @@ Write the document description or comment after the front matter.
     **delivery scope**: the items whose acceptance must be verified by that
     plan's records before the plan may turn `resolved`. An AC id in `implements` puts its owning item in
     scope; a whole spec/rule doc id puts every item of that doc in scope.
+
+Every rule above is checked by `scripts/check-docs-drift.sh` (pre-commit and CI); the
+whiteboard is optional and adds a board view, clarify and co-write sessions on top.
 
 ## Relations
 
@@ -102,7 +105,6 @@ Each folder is marked **core** (most projects need it) or **situational**
 - `idea/` — **core** — early ideas (some projects skip and start at `prd/`)
 - `design/` — situational — durable structural design docs
 - `analysis/` — situational — codebase and business analysis docs
-- `task/` — situational — execution tasks (only for large plans)
 - `integration/` — situational — third-party integration notes
 - `record/` — situational — reports and process records
 - `reference/` — situational — external references
@@ -115,7 +117,6 @@ Each folder is marked **core** (most projects need it) or **situational**
 - `rule` says what is true in the business, with or without the software.
 - `spec` says what the system should do.
 - `plan` says how to do it.
-- Use `task` only for large plans.
 - Use `issue` for a development problem, the fix, and the verification result.
 - Use `analysis` for exploratory codebase or business analysis that informs later docs.
 - Write a decision record for major business, architecture, product-shape, or technology choices with real trade-offs.

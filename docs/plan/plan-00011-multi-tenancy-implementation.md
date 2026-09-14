@@ -136,7 +136,7 @@ observability / archunit / flyway。
 >   rate_limit `(tenant_id, bucket_key, window_start)`）；键由**客户端提供=租户相对**，不含租户会跨租户读回响应/共享限流计数
 >   （PK-drop 方言差异：H2/MySQL `DROP PRIMARY KEY`、PG `DROP CONSTRAINT <table>_pkey`）。租户源=**请求边界的环境
 >   TenantContext**（T2 filter 绑定），SPI 签名不变。jdbc 三 store 全 SQL 带 tenant_id 谓词/列；redis 三 store key 前缀加
->   `{tenant}` 段；in-memory 三 store map key 用 `tenant + " " + key` 限定（三 web pom 加 tenancy 依赖）。
+>   `{tenant}` 段；in-memory 三 store map key 用 `tenant + "\0" + key` 限定（三 web pom 加 tenancy 依赖）。
 >   web-store-jdbc 测试 `application.properties` 加 V2。**验证**：web/web-spring/web-store-jdbc/web-store-redis 全绿
 >   （WebLayerTest 12 + 三 filter + JdbcWebStoreTest H2 复合 PK + RedisWebStoreTest 真 Redis 租户前缀键）。
 > - ✅ **T12（MP TenantLineInnerInterceptor，新模块 `aipersimmon-ddd-tenancy-mybatis-plus`）**：勘察发现全树**无任何
