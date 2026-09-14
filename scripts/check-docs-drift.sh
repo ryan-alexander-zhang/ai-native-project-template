@@ -23,6 +23,7 @@ strict=0
 { [ "${1:-}" = --strict ] || [ -f .ainpt.json ]; } && strict=1
 fail=0
 err() { echo "  $*"; fail=1; }
+grep() { command grep -a "$@"; }   # docs are text; never let a stray byte turn a match into "Binary file … matches"
 
 md=$(git ls-files | grep -E '^([^/]+|docs/.+)\.md$' | grep -v 'TEMPLATE\.md$')
 inst=$(echo "$md" | grep -E '^docs/[^/]+/[^/]+\.md$' | grep -v '/README\.md$')
@@ -84,6 +85,7 @@ for f in $inst; do
   id=$(grep -m1 '^id: ' "$f" | cut -d' ' -f2)
   t=$(grep -m1 '^type: ' "$f" | cut -d' ' -f2)
   s=$(grep -m1 '^status: ' "$f" | cut -d' ' -f2)
+  [ "$(tr -cd '\000' < "$f" | wc -c)" -eq 0 ] || err "$f: contains a NUL byte"
   [ -z "$id" ] && { err "$f: no id"; continue; }
   echo "$id" | grep -qE '^[a-z]+-[0-9]{5}-[a-z0-9-]+$' || err "$f: id $id is not <type>-<nnnnn>-<slug>"
   [ "${id%%-*}" = "$t" ] || err "$f: id prefix ${id%%-*} does not match type"
