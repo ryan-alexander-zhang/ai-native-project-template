@@ -54,7 +54,7 @@ is a parse error:
 - business rules of any size (use `rule/`)
 - implementation shape of any size or kind (use `design/`)
 - long product background (use `prd/`)
-- task breakdown (use `plan/` or `task/`)
+- task breakdown (use `plan/`)
 - process reports (use `record/`)
 
 ## Note

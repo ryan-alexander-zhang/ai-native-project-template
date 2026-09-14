@@ -43,7 +43,7 @@ cfg=whiteboard.config.yaml
 kind_of() {
   if [ -f "$cfg" ]; then sed -n "s/^  $1: *{ *kind: *\([a-z]*\).*/\1/p" "$cfg" | head -1; return; fi
   case "$1" in
-    plan|task|issue) echo work ;;
+    plan|issue) echo work ;;
     idea|prd|analysis|reference|integration|spec|rule|decision|design|record|report|operation|prompt) echo living ;;
   esac
 }
@@ -57,7 +57,7 @@ carries_of() {
     return
   fi
   case "$1" in
-    prd|task) echo parent ;;              analysis) echo parent informs ;;
+    prd) echo parent ;;                   analysis) echo parent informs ;;
     reference|integration|rule|design|report) echo informs ;;
     spec) echo parent ;;                  decision) echo motivated_by constrains ;;
     plan|operation) echo implements ;;    issue) echo blocks ;;

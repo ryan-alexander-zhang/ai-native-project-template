@@ -39,7 +39,5 @@ Add more when useful.
 
 ## Note
 
-If a plan is small, do not split it into `task/` dir.
-
 A plan is a work item and uses the work-item status vocabulary. See
 [docs/README.md](../README.md) for the shared definition.

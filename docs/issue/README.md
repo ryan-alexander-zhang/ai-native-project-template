@@ -19,7 +19,7 @@ Add more when useful.
 ## Relations
 
 - `blocks` — **required**: the docs this issue blocks or clarifies. Usually a
-  `task`, `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
+  `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
   issue contradicts is just as valid. An issue that blocks nothing has no reader
   who needs it.
 

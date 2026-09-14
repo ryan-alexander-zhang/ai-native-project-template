@@ -9,7 +9,7 @@ Every doc should start with:
 ```md
 ---
 id: <type>-<five-digit-number>-<slug>
-type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec|task
+type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec
 status: draft   # start here; promote per kind (see Front Matter Rules below)
 ---
 ```
@@ -23,7 +23,7 @@ Write the document description or comment after the front matter.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]`; set the old doc to `archived` with `superseded_by: [<new id>]`. A `decision` is stricter: a change to the choice itself always supersedes (`docs/decision/README.md` Revision).
 - `status` has two sub-vocabularies, by document kind:
   - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
-  - **Work items** (`issue`, `plan`, `task`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
+  - **Work items** (`issue`, `plan`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
 - A **substantive revision** of an `active` `spec`, `rule`, or `design` goes
   through the **revision round**: demote it to `draft`,
@@ -105,7 +105,6 @@ Each folder is marked **core** (most projects need it) or **situational**
 - `idea/` — **core** — early ideas (some projects skip and start at `prd/`)
 - `design/` — situational — durable structural design docs
 - `analysis/` — situational — codebase and business analysis docs
-- `task/` — situational — execution tasks (only for large plans)
 - `integration/` — situational — third-party integration notes
 - `record/` — situational — reports and process records
 - `reference/` — situational — external references
@@ -118,7 +117,6 @@ Each folder is marked **core** (most projects need it) or **situational**
 - `rule` says what is true in the business, with or without the software.
 - `spec` says what the system should do.
 - `plan` says how to do it.
-- Use `task` only for large plans.
 - Use `issue` for a development problem, the fix, and the verification result.
 - Use `analysis` for exploratory codebase or business analysis that informs later docs.
 - Write a decision record for major business, architecture, product-shape, or technology choices with real trade-offs.
