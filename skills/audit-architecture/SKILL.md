@@ -5,8 +5,8 @@ description: Whole-repo architecture audit by a fresh-context subagent — code 
 
 # Audit Architecture
 
-The main session never audits: the fresh context is the point. Dispatch one
-general-purpose subagent with this file and nothing else from the conversation.
+The main session never audits; dispatch one general-purpose subagent with this
+file and nothing else from the conversation.
 
 ## Inputs
 
@@ -31,7 +31,7 @@ One finding per line, each with `path:line` evidence.
 ## Output
 
 `docs/report/report-<n>-architecture-audit-<YYYYMMDD>.md` per its `TEMPLATE.md`,
-`active`. Zero findings still writes the report. Per finding:
+`active`; written even with zero findings. Per finding:
 
 - doc stale — revision round on that doc (`docs/README.md`)
 - code wrong — `docs/issue`
