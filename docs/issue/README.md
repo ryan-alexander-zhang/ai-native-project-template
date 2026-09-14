@@ -1,7 +1,6 @@
 # Issues
 
-This directory stores development issues.
-Use `TEMPLATE.md` for front matter and section structure.
+Development issues. Front matter and sections: `TEMPLATE.md`.
 
 ## Must Include
 
@@ -18,11 +17,10 @@ Add more when useful.
 
 ## Relations
 
-- `blocks` — **required**: the docs this issue blocks or clarifies. Usually a
-  `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
-  issue contradicts is just as valid. An issue that blocks nothing has no reader
-  who needs it. A defect in behaviour no doc covers means a doc is missing: write
-  or amend the `spec` / `rule` / `quality` doc first (a blown measure with no
+- `blocks` — **required**: the docs this issue blocks or clarifies — a `plan`,
+  `spec`, `prd`, or a `decision` / `report` it contradicts. An issue blocking
+  nothing has no reader. A defect no doc covers means a missing doc: write or
+  amend the `spec` / `rule` / `quality` doc first (a blown measure with no
   scenario is a missing `QS`), then block it.
 
 ## Exclude
@@ -33,18 +31,11 @@ Add more when useful.
 
 ## Note
 
-Use this for problems found during development and how they were resolved.
-
-A root cause that explains only the reported symptom is not finished: it must
-also say which change made the defect possible, and where else that mechanism
-lives.
+A root cause explaining only the reported symptom is unfinished: it names the
+change that made the defect possible and every other site of that mechanism.
 
 ## Status Lifecycle
 
-An issue is a work item, so it uses the work-item status vocabulary:
-
-- `draft` - pre-triage, still being written up.
-- `open` - tracked, not yet fixed or only partially fixed.
-- `resolved` - fix applied and verified by the regression test or verification result.
-- `wontfix` - deliberately not fixing, or the issue turned out invalid / overtaken by events.
-- `archived` - only when the document itself is superseded; it does not mean "fixed".
+Work-item vocabulary: `draft` (pre-triage) · `open` (tracked, not fixed) ·
+`resolved` (fix applied and verified) · `wontfix` (deliberately not fixing, or
+invalid) · `archived` (document superseded; never "fixed").
