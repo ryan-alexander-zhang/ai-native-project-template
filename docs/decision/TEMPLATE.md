@@ -14,41 +14,41 @@ superseded_by: [<id>]                         # only on an archived decision: th
 
 > <One or two sentences: what is decided, and what it overturns or replaces.>
 
-## 1. 需要做这个决定的原因
+## 1. Context
 
 <The situation that forces a choice: what is broken, missing, or ambiguous
 today, stated as observable facts rather than preferences. Cite the doc,
 requirement id, or issue that surfaced it — or name the review conversation
 when no doc exists (then omit `motivated_by`).>
 
-## 2. 决定
+## 2. Decision
 
-| # | 做法 | 理由 |
+| # | Choice | Reason |
 | --- | --- | --- |
 | 1 | <what is decided, precisely enough to implement> | <why this one> |
 | 2 | <…> | <…> |
 
-## 3. 考虑过的其他选项
+## 3. Alternatives Considered
 
-| 选项 | 结论与理由 |
+| Alternative | Verdict |
 | --- | --- |
-| <the option> | **否决**。<why not — the concrete cost or the premise it gets wrong> |
+| <the option> | **Rejected.** <why not — the concrete cost or the premise it gets wrong> |
 
-## 4. 后果
+## 4. Consequences
 
-**接受的代价**
+**Negative**
 
 - <what this choice costs, and the mitigation if there is one>
 
-**得到的**
+**Positive**
 
 - <what it buys>
 
-**不变的**
+**Not affected**
 
 - <what is explicitly unaffected, so readers do not over-read the decision>
 
-## 5. 这个决定约束什么
+## 5. Constraints
 
 - `<doc-id>`：<the sections or requirement ids this decision binds>
 - <config file / code location the choice reaches, when it does>

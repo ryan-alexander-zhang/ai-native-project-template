@@ -57,20 +57,25 @@ the author's job, checked at review. Checklist items, not grammar:
 
 Every `BR` needs at least one example; an unreferenced rule is unverified.
 
-## 机器可读形态（条目文法）
+## Machine-readable form (item grammar)
 
-白板按以下形态解析本文件夹文档的正文；不合式的行进解析诊断：
+Documents in this folder are parsed in the form below; a line that does not fit
+is a parse error:
 
-- 规则声明，二选一，整行起头：
-  - 列表项：`- **rule-<n>-BR-<i>** (<Kind>) <正文>`，后续缩进行为续行
-  - 决策表行：`| **rule-<n>-BR-<i>** | <单元格>… |`，不支持续行
-  - `(<Kind>)` 是约定的推荐标注，缺失暂不进诊断
-- 验收标准：`- **rule-<n>-AC-<i>.<k>** (rule-<n>-BR-<i>)` 起头，归属标注必写
-  （缺失即进解析诊断的无法归属类）；Given / When / Then 各占续行。
-- 只有以**本文档 id** 为前缀的声明才属于本文档；整行引用他文档的条目不构成
-  声明，也不进诊断。
-- 条目 id 在散文中一律用反引号引用；**粗体 id 是声明专用形态**——整行以粗体
-  条目 id 起头而不合上述形态的行进解析诊断。
+- A rule declaration is a whole line, in one of two forms:
+  - list item: `- **rule-<n>-BR-<i>** (<Kind>) <text>`; indented lines that
+    follow are continuation lines
+  - decision-table row: `| **rule-<n>-BR-<i>** | <cell>… |`; no continuation lines
+  - `(<Kind>)` is the recommended annotation; its absence is not an error yet
+- An acceptance criterion starts `- **rule-<n>-AC-<i>.<k>** (rule-<n>-BR-<i>)`;
+  the attribution in parentheses is required (missing = unattributable parse
+  error). Given / When / Then each take a continuation line.
+- Only declarations prefixed with **this document's id** belong to this
+  document; a whole-line reference to another document's item is not a
+  declaration and is not diagnosed.
+- In prose, item ids are always in backticks; **a bold id is the declaration
+  form only** — a line that starts with a bold item id and does not fit the
+  forms above is a parse error.
 
 ## Relations
 

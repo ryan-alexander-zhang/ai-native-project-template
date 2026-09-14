@@ -41,7 +41,7 @@ Add more when useful.
 - `enforced_by` — the tests that fail when the choice is violated; they run
   under the `Architecture` gate (`CODE_QUALITY.md` §2). Required on every
   decision that binds code structure: dependency direction, module boundary,
-  layering, banned API. Omit only with the reason in §4 "接受的代价"; a
+  layering, banned API. Omit only with the reason in §4 "Negative"; a
   structural decision without either is unverified.
 
 ## Revision

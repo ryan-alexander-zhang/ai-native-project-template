@@ -43,19 +43,23 @@ List any unfinished or uncovered requirement. A fail/missing row blocks `resolve
 Every `spec-<n>-FR-<i>` and every `rule-<n>-BR-<i>` in scope must appear; an
 unreferenced rule row is an unverified rule.
 
-## 机器可读形态（条目文法）
+## Machine-readable form (checklist grammar)
 
-白板按以下形态解析验收清单；不合式的行进解析诊断：
+The acceptance checklist is parsed in the form below; a row that does not fit
+is a parse error:
 
-- 验收清单表的识别：表头含「测试/Test」与「结果/Result」字样（子串即可，两列
-  都不得是首列），且首列单元格是**条目/AC id 的全匹配**
-  （`<type>-<五位数>-(FR|BR|AC)-…`）。文档 id 不算——首列是文档 id 的表格
-  （如「缺陷关闭的证据」表）不会被当作验收清单。
-- 「Evidence/证据」列可有可无。
-- 验收行的首列为被验 id：**恰一个**。禁止区间写法（`AC-2.1 … AC-9.2`）与一格
-  多 id——每行一个 id，逐条可核对。
-- 其它含条目/AC id 首列的表格（修订对照表等）不得同时含测试与结果表头，否则
-  会被当作验收清单解析。
+- A table is an acceptance checklist when its header contains `Test` and
+  `Result` (substring match; neither may be the first column) and its first
+  column holds **full item / AC ids** (`<type>-<nnnnn>-(FR|BR|AC)-…`). Document
+  ids do not count — a table whose first column is document ids (such as an
+  evidence table for closed issues) is not read as a checklist.
+- An `Evidence` column is optional.
+- The first cell of a row is the id verified: **exactly one**. No ranges
+  (`AC-2.1 … AC-9.2`) and no several ids in one cell — one id per row, so every
+  row can be checked on its own.
+- Any other table whose first column holds item / AC ids (a revision map, for
+  example) must not also carry `Test` and `Result` headers, or it will be read
+  as a checklist.
 
 ## Note
 

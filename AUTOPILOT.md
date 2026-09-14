@@ -17,8 +17,8 @@ decision trail, the ledger, the stop conditions.
 2. Unless the prompt says `--no-ask`, ask one round covering only the open items
    (the question list is in the skill). "You decide" hands an item to the agent.
 3. Create branch `autopilot/<slug>` from the current branch.
-4. Write the `idea` doc from the prompt and the answers — scope in 范围, settled
-   constraints in 已定方向. Items still open (always the case under `--no-ask`)
+4. Write the `idea` doc from the prompt and the answers — scope in Scope, settled
+   constraints in Constraints. Items still open (always the case under `--no-ask`)
    are closed by decisions as below. Set it `active`, create the ledger, commit.
    From here on the run asks nothing.
 

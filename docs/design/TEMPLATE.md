@@ -2,7 +2,7 @@
 id: design-00001-example-slug
 type: design
 status: draft|active|archived
-informs: [<spec-id | plan-id>, ...]           # may be empty while the design waits to be picked up (BR-26: a design can precede any spec)
+informs: [<spec-id | plan-id>, ...]           # may be empty while the design waits to be picked up (a design can precede any spec)
 ---
 
 # Design: <subject>
