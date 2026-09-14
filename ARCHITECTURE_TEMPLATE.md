@@ -1,12 +1,12 @@
 # ARCHITECTURE.md Template
 
-Template for `ARCHITECTURE.md`: an arc42-shaped index. Each section is a short summary plus links; detail lives in the linked docs. C4 depth: L1 in §3, L2 in §5, L3 in `docs/design/`, never L4.
+Template for `ARCHITECTURE.md`: an arc42-shaped index — short summary plus links per section, detail in the linked docs. C4 depth: L1 in §3, L2 in §5, L3 in `docs/design/`, never L4.
 
 ## Usage
 
-- Copy everything below the `---` into `ARCHITECTURE.md`; delete each `>` block as you fill its section.
-- Summarize and link; never duplicate linked content. Link only `active` docs — superseding a linked doc includes updating the link here.
-- Empty section: keep the heading, write `None.` Delete unused scaffold rows and stubs; leave no placeholders.
+- Copy everything below the `---` into `ARCHITECTURE.md`; delete each `>` block as its section is filled.
+- Summarize and link; never duplicate. Link only `active` docs; superseding a linked doc updates the link here.
+- Empty section: keep the heading, write `None.` No placeholders left.
 - Diagrams in Mermaid.
 
 ---
@@ -82,8 +82,8 @@ flowchart LR
 
 ## 10. Quality Requirements
 
-> Index of the `active` `docs/quality/` docs refining §1's goals — one row per doc, the tags it covers, and the scenarios a reader should know exist. Scenarios and Measures live in the quality docs (`QUALITY.md`), functional acceptance in `spec` ACs; neither is restated here.
-> An `ARCHITECTURE.md` filled before `docs/quality/` existed keeps its inline scenarios until each has moved into a quality doc; then the row points there.
+> Index of the `active` `docs/quality/` docs refining §1's goals: one row per doc, its tags, the scenarios a reader should know exist. Measures stay in the quality docs (`QUALITY.md`), functional acceptance in `spec` ACs.
+> An `ARCHITECTURE.md` filled before `docs/quality/` existed keeps inline scenarios until each has moved into a quality doc.
 
 | Quality doc | Tags | Scenarios |
 | --- | --- | --- |
