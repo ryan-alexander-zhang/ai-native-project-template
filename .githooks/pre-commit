@@ -34,7 +34,8 @@ fi
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 case "$branch" in
   lang/*)
-    if [ -f .template-sync.json ] && command -v jq >/dev/null 2>&1; then
+    # A merge from main legitimately brings frozen files along (scripts/sync-docs.sh); skip then.
+    if [ ! -f "$(git rev-parse --git-dir)/MERGE_HEAD" ] && [ -f .template-sync.json ] && command -v jq >/dev/null 2>&1; then
       globs=$(jq -r '.frozen[]' .template-sync.json)
       # shellcheck disable=SC2086
       frozen=$(git diff --cached --name-only --diff-filter=ACMRD -- $globs)
