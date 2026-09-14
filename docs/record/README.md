@@ -31,7 +31,7 @@ Add more when useful.
 
 ## Acceptance checklist
 
-When a feature-sized `plan` is verified for `resolved`, record acceptance here.
+When a `plan` with `spec`/`rule` items in its delivery scope is verified for `resolved`, record acceptance here.
 Set `parent` to the plan id; link each row to a requirement/GWT id:
 
 | GWT / requirement id | Test | Result | Evidence |

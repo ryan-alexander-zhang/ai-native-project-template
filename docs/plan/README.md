@@ -22,7 +22,7 @@ Add more when useful.
   (`spec-<n>-FR-<i>` / `rule-<n>-BR-<i>`) declare the plan's **delivery scope**;
   a whole spec/rule doc id puts every item of that doc in
   scope. Prefer item ids when the plan delivers a slice of a larger spec.
-- A feature-sized plan reaching `resolved` needs a [`record`](../record/README.md)
+- A plan whose `implements` puts `spec`/`rule` items in scope needs, to reach `resolved`, a [`record`](../record/README.md)
   whose `parent` points at this plan and whose `verifies` lists the requirement
   ids it checked. `open → resolved` is refused while any AC of any item in the
   delivery scope lacks a `pass` row in such a record.
