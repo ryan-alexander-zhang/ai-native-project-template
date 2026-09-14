@@ -9,6 +9,11 @@ Use it to decide:
 - what tests are required for a change
 - when work is done
 
+Scope boundary: a test here proves a behaviour under one controlled stimulus —
+the `test` method of [QUALITY.md](QUALITY.md). The Performance and Resilience
+levels below run the `load` and `chaos` methods; what they must show, and the
+evidence they owe, is defined by the quality scenario, not here.
+
 ## Test Pattern
 
 Keep tests simple:
@@ -56,6 +61,29 @@ E2E tests should:
 - cover the full happy path first
 - cover only the most valuable failure paths
 
+### Performance
+
+Use performance tests to run a `load` quality scenario: a stated volume and
+concurrency against the artifact, in the environment the scenario names.
+
+Performance tests should:
+- reproduce the scenario's Source, Stimulus, and Environment lines, not a convenient subset
+- run long enough for the Measure's window and percentile to be meaningful
+- produce a report artifact (percentiles, throughput, error rate, duration, environment) that the `record` links
+- run at the stage the scenario declares — `release` before the plan resolves, `build` only for micro-benchmarks
+
+### Resilience
+
+Use resilience tests to run a `chaos` quality scenario: inject the fault the
+scenario names and observe the response.
+
+Resilience tests should:
+- state the hypothesis (the scenario's Response and Measure) before injecting
+- inject one fault at a time, with the blast radius bounded and written down
+- restore the system and prove it, or the experiment is not finished
+- produce an experiment report (hypothesis, fault, observed response, blast radius, restore) that the `record` links
+- run at the stage the scenario declares — `release` in a test or staging environment, `runtime` as a game day
+
 ## Test Level Guides
 
 Use the following docs to define the project-specific framework choice for each test level.
@@ -64,6 +92,8 @@ Use the following docs to define the project-specific framework choice for each 
 - [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md): fill in the integration testing guide for this repo.
 - [API_TESTING.md](API_TESTING.md): fill in the API testing guide for this repo.
 - [E2E_TESTING.md](E2E_TESTING.md): fill in the E2E testing guide for this repo.
+- [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md): fill in the load tooling for this repo.
+- [RESILIENCE_TESTING.md](RESILIENCE_TESTING.md): fill in the fault-injection tooling for this repo.
 
 ## Testing Matrix
 
@@ -75,6 +105,7 @@ Use the following docs to define the project-specific framework choice for each 
 | API or HTTP contract change | Add or update the relevant API and/or integration tests. Verify the request, response, and key side effects. |
 | Messaging or async workflow change | Add or update the relevant unit and/or integration tests. Verify the contract or workflow behavior. |
 | Critical user or system flow change | Add or update the relevant tests and run an E2E or smoke check for the changed flow. |
+| Change to an artifact a `quality` scenario covers | Keep the `build`-stage scenarios green — they run in CI with every commit. A `release`-stage scenario is not re-run per change: it is owed once by the delivering `plan` before `resolved` and again by each release that ships the artifact (`QUALITY.md`, Verification Axis). Note in the change which `release` scenarios it touches, so the plan's `record` re-runs them. |
 | Bug fix | Add or update a regression test that would have caught the bug. |
 | Refactor with no intended behavior change | Keep existing tests green. Add tests only if coverage is too weak to prove safety. |
 
@@ -85,6 +116,7 @@ A change is done only when all of these are true:
 - the requested behavior is complete
 - the required tests from the matrix are added or updated
 - the relevant tests pass
+- no `build`-stage quality scenario fails; `release`-stage scenarios are the plan's Definition of Done, not the change's ([QUALITY.md](QUALITY.md))
 - no known regression is left behind
 - for executable code changes, line coverage is at least 90%
 - for executable code changes, branch coverage is at least 90%

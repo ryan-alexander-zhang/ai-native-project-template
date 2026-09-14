@@ -30,7 +30,7 @@ decision trail, the ledger, the stop conditions.
 | `AGENTS.md` §5: a term conflicting with `CONTEXT.md` — stop | Resolve it as a decision, update `CONTEXT.md`, continue |
 | `AGENTS.md` §6: what only a domain owner can settle is never an assumption | Still never an assumption — it becomes a `decision` with `decided_by: agent`, so the owner can find and overturn it |
 | `DOCUMENT.md`: a doc with open questions stays `draft` | Each open question is closed by a `decision` before the doc is promoted; the Open Questions section is deleted |
-| `DOCUMENT.md`: ask if a draft is reviewed, then promote | For `spec` / `rule` / `design`: the audit (`AGENTS.md` §6) with zero unresolved findings. For `prd` and `plan`, which are outside the audit: a pre-promotion check by a subagent that did not write it, against the folder README |
+| `DOCUMENT.md`: ask if a draft is reviewed, then promote | For `spec` / `rule` / `quality` / `design`: the audit (`AGENTS.md` §6) with zero unresolved findings. For `prd` and `plan`, which are outside the audit: a pre-promotion check by a subagent that did not write it, against the folder README |
 | Harness default: commit only when asked | The invocation authorises commits on `autopilot/<slug>`, per `COMMIT.md`. Never commit to `main`, never merge, never force-push |
 | `PR.md` / `REVIEW.md`: human review before merge | Not replaced. The run ends at an open PR |
 
@@ -57,8 +57,8 @@ harness.
 
 | Role | Runs | May write | Model |
 | --- | --- | --- | --- |
-| `doc-agent` | `intake`, `prd`, `architecture`, `spec`, `plan`, `pr`; in `acceptance` the GWT verification, the code review and the `record`; every audit and pre-promotion check; every `decision`; every `issue` doc | anything | not weaker than the orchestrator's |
-| `code-agent` | `implement`, task by task; in `acceptance` the manual or browser smoke runs and the fixes for review findings | code, tests, config and build files the tasks name; its own ledger lines | may be one tier below the orchestrator's |
+| `doc-agent` | `intake`, `prd`, `quality`, `architecture`, `spec`, `plan`, `pr`; in `acceptance` the GWT and QS verification, the code review and the `record`; every audit and pre-promotion check; every `decision`; every `issue` doc | anything | not weaker than the orchestrator's |
+| `code-agent` | `implement`, task by task; in `acceptance` the manual or browser smoke runs, the `load` and `chaos` runs, and the fixes for review findings | code, tests, load and chaos scripts, config and build files the tasks name; its own ledger lines | may be one tier below the orchestrator's |
 
 - `code-agent` never creates or edits a file under `docs/`. When a task meets a
   defect or an ambiguity, it writes what it found into the ledger and returns;
@@ -87,30 +87,41 @@ Each stage ends with a commit. A stage the idea does not need is marked `n/a` in
 ledger with a one-line reason. Ledger row names:
 
 1. `intake` — branch, `idea` active, ledger.
-2. `prd` — the `idea` completed into a `prd` (audience, scope, non-functional
-   requirements, constraints); checked; `active`.
-3. `architecture` — technology selection: one `decision` per choice, `active`.
-   In an existing project, only what `ARCHITECTURE.md` and the `active`
-   decisions do not already cover. Reuse before build (`AGENTS.md` §2): each
-   capability the `prd` needs is sourced from the repo, the framework, an
-   existing dependency, or a library — a `decision` per new library, a
-   `decision` per `build`.
-4. `spec` — `spec`, its `rule` and `design` docs (the system-level design
-   included, `informs` set), acceptance per `ACCEPTANCE.md`, `CONTEXT.md`
-   terms; audited; `active`. Then the root guides are filled per `AGENTS.md`
-   §8.
-5. `plan` — the `plan`; checked, every task sourced (`docs/plan/README.md`);
-   `open`.
-6. `implement` — task by task per `DEVELOPMENT.md` and `TESTING.md`; a defect
+2. `prd` — the `idea` completed into a `prd` (audience, scope, functional
+   requirements, ranked quality goals, constraints); checked; `active`.
+3. `quality` — the `prd`'s ranked Quality Goals refined into `quality` docs:
+   `QR`s tagged per `QUALITY.md`, each with its six-part `QS`, method, and
+   stage; a Measure the prompt and intake did not settle is a `decision`, never
+   a guess; audited; `active`. These are the drivers the next stage must cite.
+4. `architecture` — technology selection: one `decision` per choice, each
+   naming in `motivated_by` the `QS` ids it serves; `active`. In an existing
+   project, only what `ARCHITECTURE.md` and the `active` decisions do not
+   already cover. Reuse before build (`AGENTS.md` §2): each capability the
+   `prd` needs is sourced from the repo, the framework, an existing dependency,
+   or a library — a `decision` per new library, a `decision` per `build`.
+5. `spec` — `spec` (§7 citing the scenarios it must hold), its `rule` and
+   `design` docs (the system-level design included, `informs` set, `implements`
+   naming the scenarios each design realises), acceptance per `ACCEPTANCE.md`,
+   `CONTEXT.md` terms; audited; `active`. `runtime`-stage scenarios get their
+   `operation` doc here (SLI, SLO, alert, error budget policy), `active`. Then
+   the root guides are filled per `AGENTS.md` §8, `PERFORMANCE_TESTING.md` and
+   `RESILIENCE_TESTING.md` included when any scenario is `load` or `chaos`.
+6. `plan` — the `plan`, its `implements` taking the spec's §7 scenarios into
+   delivery scope; checked, every task sourced (`docs/plan/README.md`); `open`.
+7. `implement` — task by task per `DEVELOPMENT.md` and `TESTING.md`; a defect
    found on the way gets its `issue` doc first (`docs/issue/README.md`) and is
    fixed within the run. Exit: the `DEVELOPMENT.md` and `TESTING.md`
    Definitions of Done hold.
-7. `acceptance` — the verification subagent, one `doc-agent` code review of
+8. `acceptance` — the verification subagent, one `doc-agent` code review of
    the run's whole diff per `REVIEW.md` (findings are fixed by `code-agent`
-   before the stage ends), the smoke runs `TESTING.md` asks for (`code-agent`,
-   results written into the ledger), and the `record` acceptance checklist;
-   `plan` -> `resolved` (`AGENTS.md` §8, last two bullets).
-8. `pr` — open the PR per `PR.md` against the branch the run started from. The
+   before the stage ends), the smoke runs `TESTING.md` asks for and the `load`
+   and `chaos` runs the `release`-stage scenarios ask for (`code-agent`, results
+   and report paths written into the ledger), the alert wiring for
+   `runtime`-stage scenarios (`code-agent`; the `record` row's evidence is the
+   operation doc and the alert rule's location, per `QUALITY.md`), and the
+   `record` acceptance checklist; `plan` -> `resolved` (`AGENTS.md` §8, last
+   two bullets).
+9. `pr` — open the PR per `PR.md` against the branch the run started from. The
    PR body links the ledger and lists every `decided_by: agent` decision. Stop.
 
 ## Ledger
@@ -140,6 +151,9 @@ lower a threshold or suppress a finding to get past a gate (`CODE_QUALITY.md`).
 - The same gate fails twice in a row for the same root cause with no effective
   change between the attempts.
 - An `issue` cannot be fixed within the plan's scope.
+- A `release`-stage scenario needs an environment the run cannot provision
+  (production-sized data, a staging cluster) and no substitute the scenario's
+  Environment line allows.
 - A root guide requires a human approval the run cannot obtain: the exception to
   `TESTING.md`'s completion bar, anything `SECURITY.md` escalates.
 - The harness has no row in Bindings and cannot run at `doc-agent` strength, or

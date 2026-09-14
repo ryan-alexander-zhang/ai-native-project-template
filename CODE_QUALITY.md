@@ -12,7 +12,10 @@ When a gate fails, or a review flags complexity or duplication:
 **solve it per this file. Never raise a threshold or suppress a finding just to
 make a build pass.**
 
-Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them.
+Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them. The
+gates below are the `fitness` verification, at the `build` stage, of the
+maintainability requirements in `docs/quality/` ([QUALITY.md](QUALITY.md)); a
+quality doc with a `build`-stage scenario lists the gate's test in `enforced_by`.
 
 ## 1. Metrics — what each catches
 
@@ -45,7 +48,7 @@ List every check that fails the build. A check that only warns is not a gate.
 | Coverage | *(none yet)* | — | — |
 | Architecture | *(none yet)* | — | — |
 
-Architecture gate: `ARCHITECTURE.md` §5 boundaries and every `docs/decision` `enforced_by` rule as failing tests — direction, cycles, layer and module access.
+Architecture gate: `ARCHITECTURE.md` §5 boundaries and every `docs/decision` and `docs/quality` `enforced_by` rule as failing tests — direction, cycles, layer and module access, and every `build`-stage quality scenario.
 
 Record where the shared config lives. If more than one build file carries the
 same gate configuration, name each one here — they must be changed together.

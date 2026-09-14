@@ -19,6 +19,7 @@ types:
   integration: { kind: living }
   spec: { kind: living }
   rule: { kind: living }
+  quality: { kind: living }
   decision: { kind: living }
   design: { kind: living }
   plan: { kind: work }
@@ -32,7 +33,7 @@ types:
 # create entry offers. Every name must be a declared type; omit or empty = no
 # create entry on the board. Several of these are situational folders —
 # projects that do not use them should drop those from this list.
-entry: [idea, prd, design, analysis, decision, integration, reference, operation, prompt, report]
+entry: [idea, prd, quality, design, analysis, decision, integration, reference, operation, prompt, report]
 
 # Session concurrency cap: how many agent sessions may run at
 # once. Omit it and the board runs with the default 3; anything that is not a
@@ -90,8 +91,9 @@ carries:
   integration: [informs]
   spec: [parent]
   rule: [informs]
+  quality: [parent, informs]
   decision: [motivated_by, constrains]
-  design: [informs]
+  design: [informs, implements]
   plan: [implements]
   issue: [blocks]
   record: [parent, verifies]
@@ -104,9 +106,15 @@ flow:
     - { next: prd, carry: parent }
     - { next: spec, carry: parent }
   prd:
+    - { next: quality, carry: parent }
     - { next: spec, carry: parent }
   spec:
     - { next: rule, carry: informs }
+    # quality precedes spec in the product flow (docs/README.md), but the edge it
+    # declares toward a spec is `informs`, carried on the quality doc — so, as for
+    # rule, the board step runs spec -> quality. `prd -> quality` above is the
+    # flow-order entry.
+    - { next: quality, carry: informs }
     - { next: design, carry: informs }
     - { next: plan, carry: implements }
   plan:
@@ -116,7 +124,8 @@ flow:
 # Focus lines: one line per clarifiable type, the questioning
 # weight a clarify session leans on. The clarifiable set — idea, prd, spec, rule,
 # design — is built into the code, and the shared questioning
-# skeleton with it; this file owns only the one line per type, so the weight is
+# skeleton with it; `quality` is not in that set yet (a persimmon change: add it
+# to the clarifiable and auditable sets, then a focus line lands here); this file owns only the one line per type, so the weight is
 # yours to retune at any time. A clarifiable type with no line here, or a line
 # given to any other type, refuses to start the board.
 focus:

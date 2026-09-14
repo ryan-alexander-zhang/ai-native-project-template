@@ -13,6 +13,11 @@ Use `TEMPLATE.md` for front matter.
 - acceptance for every requirement: each `spec-<n>-FR-<i>` needs at least one
   `spec-<n>-AC-<i>.<k>`; an `FR` no acceptance references is unverified
 - links to the `rule/` docs the feature obeys
+- links to the `quality/` docs and the `quality-<n>-QS-<i>.<k>` scenarios the
+  feature must hold (§7). Every spec cites at least the system's baseline
+  quality doc; a scenario the feature alone introduces is written in `quality/`
+  first and cited here, never inlined. When the spec is itself the entry point
+  (no `prd`), the quality doc it cites is one too (`parent` empty)
 - links to the `design/` docs it builds. Required before the spec turns `active`
   whenever any `FR` introduces or changes structure that outlives one `plan` — a
   module or boundary, a data model, an API or file-format contract, a state
@@ -46,12 +51,14 @@ is a parse error:
 ## Relations
 
 - `parent` — a `prd`, an `idea`, or empty when the spec is itself the entry point.
-- The `plan` declares `implements: [<this spec>]`; the `design` and the `rule`
-  declare `informs: [<this spec>]`.
+- The `plan` declares `implements: [<this spec>]`; the `design`, the `rule`, and
+  the `quality` doc declare `informs: [<this spec>]`.
 
 ## Exclude
 
 - business rules of any size (use `rule/`)
+- quality requirements and their measures (use `quality/`); the behaviour when
+  a quality target is exceeded stays here as an Unwanted requirement
 - implementation shape of any size or kind (use `design/`)
 - long product background (use `prd/`)
 - task breakdown (use `plan/`)

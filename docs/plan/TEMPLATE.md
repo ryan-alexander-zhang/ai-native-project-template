@@ -2,7 +2,7 @@
 id: plan-00001-example-slug
 type: plan
 status: draft|open|resolved|archived|wontfix
-implements: [<spec-id | rule-id | spec-<n>-FR-<i> | rule-<n>-BR-<i> | design-id | report-id>]  # required: what this plan makes real; item ids declare the delivery scope
+implements: [<spec-id | rule-id | quality-id | spec-<n>-FR-<i> | rule-<n>-BR-<i> | quality-<n>-QR-<i> | quality-<n>-QS-<i>.<k> | design-id | report-id>]  # required: what this plan makes real; item ids declare the delivery scope
 ---
 
 # Plan: <what this plan delivers, in one line>
@@ -25,9 +25,10 @@ one waits on which, and which task closes the round.>
 - **T1 — <name>** (<the FR/BR ids it delivers>): <what is built, named down to
   the module or file it lands in>. reuse: <repo path | framework artifact | library>
 - **T2 — <name>** (<ids>): <…>. build: <decision-id that rejects reuse>
-- **Tn — tests and acceptance**: cover every AC in the delivery scope; hold the
-  quality gates (no threshold lowered); write the `record` whose `parent` points
-  at this plan.
+- **Tn — tests and acceptance**: cover every AC in the delivery scope; run every
+  `release`-stage QS per `QUALITY.md` and link its report; wire every
+  `runtime`-stage QS in its `operation` doc; hold the quality gates (no
+  threshold lowered); write the `record` whose `parent` points at this plan.
 
 ## Detailed Acceptance Path
 

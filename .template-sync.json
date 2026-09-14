@@ -11,6 +11,7 @@
     ".codex/skills",
     ".codex/agents",
     "ACCEPTANCE.md",
+    "QUALITY.md",
     "COMMIT.md",
     "PR.md",
     "CONTEXT_TEMPLATE.md",

@@ -73,13 +73,15 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## 6. Document Workflow
 
 - For document work, including status transitions, follow `DOCUMENT.md`.
-- As soon as a `spec`, `rule`, or `design` draft is written or substantively changed — and
+- As soon as a `spec`, `rule`, `quality`, or `design` draft is written or substantively changed — and
   before a human is asked to review it — a subagent that did not write it audits it: first
   against that folder's `README.md`, then against the content itself. Name the missing
   rules, cases, and GWTs, the readings taken silently, and every value it cannot confirm.
   Each finding becomes an amendment or a named Open Question; what only a domain owner can
   settle is never left as an assumption.
 - When writing the acceptance for a `spec` or a `rule`, derive the set per `ACCEPTANCE.md`.
+  When writing the scenarios for a `quality` doc, derive the set per `QUALITY.md`; the audit
+  of a `design` includes its sensitivity check — each tactic against the scenario list.
 
 ## 7. Output Discipline
 
@@ -96,7 +98,8 @@ or bullets over a single conclusion. This applies to documents too.
 - Use `ARCHITECTURE.md` as the architecture index. If it does not exist, create it from `ARCHITECTURE_TEMPLATE.md`.
 - Before the first implementation `plan` turns `open`, fill the project-derived root guides
   from their templates and the `active` decisions/designs: `ARCHITECTURE.md`, the Commands in
-  `DEVELOPMENT.md`, the project-specific values in `TESTING.md` / `CODE_STYLE.md` /
+  `DEVELOPMENT.md`, `PERFORMANCE_TESTING.md` / `RESILIENCE_TESTING.md` when any
+  `active` quality scenario is `load` / `chaos`, the project-specific values in `TESTING.md` / `CODE_STYLE.md` /
   `CODE_QUALITY.md`. Never implement while a root guide the work depends on still holds
   template placeholders.
 - When a quality gate fails (format / complexity / duplication / static analysis / coverage)
@@ -105,10 +108,10 @@ or bullets over a single conclusion. This applies to documents too.
 - When you discover a bug or defect during any task, before fixing it, create a
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
   with a failing test, following `docs/issue/README.md`. Only then apply the fix. If no
-  `spec` / `rule` covers the behaviour, write or amend it first (revision round), then the
-  issue `blocks` it.
+  `spec` / `rule` / `quality` doc covers the behaviour, write or amend it first (revision
+  round), then the issue `blocks` it.
 - Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
-- Before a `plan` whose `implements` puts `spec`/`rule` items in scope becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test, that no `spec-<n>-FR-<i>` or `rule-<n>-BR-<i>` is unverified, and that every `active` `decision` in reach has passing `enforced_by` tests or its §4 reason, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.
+- Before a `plan` whose `implements` puts `spec`/`rule`/`quality` items in scope becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test, that every linked `quality` scenario holds per its method and stage with the evidence `QUALITY.md` names, that no `spec-<n>-FR-<i>`, `rule-<n>-BR-<i>`, or `quality-<n>-QR-<i>` is unverified, and that every `active` `decision` in reach has passing `enforced_by` tests or its §4 reason, then record a `docs/record/` acceptance checklist linking the GWT and QS ids. Any gap blocks `resolved`.
 - Run `skills/audit-architecture` (fresh-context subagent) before a feature-sized `plan` becomes `resolved`, and whenever 20+ PRs merged since the last audit report. An open finding blocks `resolved`.
 
 ## 9. Autopilot Mode

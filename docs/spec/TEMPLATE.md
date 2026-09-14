@@ -35,6 +35,7 @@ parent: <prd-id | idea-id | empty = spec is the entry point>
 - **spec-00001-FR-4** (Unwanted) If the provider rejects the payment, the system shall keep the invoice unpaid and surface the decline reason.
 - **spec-00001-FR-5** (Unwanted) If the same webhook is delivered more than once, the system shall apply it at most once.
 - **spec-00001-FR-6** (Unwanted) If the provider does not respond before timeout, the system shall keep the attempt PROCESSING and reconcile it later.
+- **spec-00001-FR-7** (Unwanted) If the request rate exceeds the load `quality-00001-QS-1.1` is held at, the system shall reject the excess with 429 rather than queue it.
 
 **Acceptance (GWT)**
 
@@ -52,8 +53,14 @@ parent: <prd-id | idea-id | empty = spec is the entry point>
 ## 6. Out of Scope (optional)
 - …
 
-## 7. Non-Functional (optional)
-- performance / security / observability constraints
+## 7. Quality
+
+| Quality | Doc | Scenarios held |
+| --- | --- | --- |
+| Payment API baseline | [quality-00001-payment-api-baseline](../quality/quality-00001-payment-api-baseline.md) | quality-00001-QS-1.1, quality-00001-QS-1.2, quality-00001-QS-2.1 |
+
+Requirements and measures live in `quality/`, never here; the behaviour when a
+target is exceeded is an Unwanted requirement above (`spec-00001-FR-7`).
 
 ## 8. Open Questions
 
@@ -67,5 +74,6 @@ Delete this section once every question is closed.
 
 ## Links
 - Rules: <rule-ids>
+- Quality: <quality-ids>
 - Design: <design-ids>
 - Plan: <plan-id> · Issue: <issue-id> · Analysis: <analysis-id>

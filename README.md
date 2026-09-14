@@ -11,9 +11,12 @@ agents:
 - a project glossary template for keeping product, code, and docs vocabulary
   consistent
 - a `docs/` taxonomy for durable product, engineering, and operational docs
-- test-level guides that let each repo choose its own unit and E2E stack while
-  pinning integration testing to Testcontainers and API testing to Bruno by
-  default
+- test-level guides that let each repo choose its own unit, E2E, performance,
+  and resilience stack while pinning integration testing to Testcontainers and
+  API testing to Bruno by default
+- a quality-requirements method (`QUALITY.md`, `docs/quality/`) that puts
+  non-functional requirements in the flow between the PRD and the architecture,
+  each with a measured scenario and a verification stage
 - a `whiteboard.config.yaml` flow configuration that lets the
   [persimmon](https://github.com/ryan-alexander-zhang/persimmon) docs whiteboard
   render the `docs/` tree as a board and drive the review / promote / ask /
@@ -38,6 +41,8 @@ Start here after creating a repo from this template:
    - [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md)
    - [API_TESTING.md](API_TESTING.md)
    - [E2E_TESTING.md](E2E_TESTING.md)
+   - [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md)
+   - [RESILIENCE_TESTING.md](RESILIENCE_TESTING.md)
    - [CODE_QUALITY.md](CODE_QUALITY.md)
 5. Use [docs/README.md](docs/README.md) to decide where durable docs belong.
 6. Add your runtime code in the structure that fits the project.
@@ -50,6 +55,8 @@ Start here after creating a repo from this template:
 - [DEVELOPMENT.md](DEVELOPMENT.md) — the setup / build / test / lint / run commands
 - [UNIT_TESTING.md](UNIT_TESTING.md) — choose the unit framework
 - [E2E_TESTING.md](E2E_TESTING.md) — choose the E2E framework
+- [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md) — choose the load tool, list the scenario profiles
+- [RESILIENCE_TESTING.md](RESILIENCE_TESTING.md) — choose the fault-injection tool, list the experiments
 - [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) — Testcontainers is pinned; fill in commands and environment
 - [API_TESTING.md](API_TESTING.md) — Bruno is pinned; fill in base URL, auth, and command
 - [CODE_QUALITY.md](CODE_QUALITY.md) — fill in the build-failing gates and any tuned
@@ -67,7 +74,7 @@ Start here after creating a repo from this template:
 **Generic policy — keep as-is unless you are deliberately changing the way of working:**
 
 - [CODE_STYLE.md](CODE_STYLE.md), [COMMIT.md](COMMIT.md), [PR.md](PR.md),
-  [DOCUMENT.md](DOCUMENT.md), [SECURITY.md](SECURITY.md),
+  [DOCUMENT.md](DOCUMENT.md), [SECURITY.md](SECURITY.md), [QUALITY.md](QUALITY.md),
   [TESTING.md](TESTING.md) (policy only — the framework choices live in the
   `*_TESTING.md` guides), and the [docs/](docs/README.md) taxonomy
 
@@ -91,6 +98,7 @@ out; its own docs record why.
 - [DOCUMENT.md](DOCUMENT.md): document management rules
 - [AUTOPILOT.md](AUTOPILOT.md): unattended idea-to-PR run
 - [ACCEPTANCE.md](ACCEPTANCE.md): how to derive the acceptance criteria a requirement owes
+- [QUALITY.md](QUALITY.md): quality requirements — attribute vocabulary, scenario form, verification methods and stages
 - [TESTING.md](TESTING.md): test-level policy and testing Definition of Done
 - [CODE_QUALITY.md](CODE_QUALITY.md): quality gates and refactoring order
 - [REVIEW.md](REVIEW.md): project-specific review checklist (starts empty)

@@ -12,7 +12,10 @@ Use it to decide:
 
 Scope boundary: this file says **what must be shown**. [TESTING.md](TESTING.md)
 says at which level it runs and what coverage it must reach. Acceptance never
-names a test level or a framework; testing never derives a GWT.
+names a test level or a framework; testing never derives a GWT. Quality
+requirements — how well, with a measure — are not derived here: their scenarios,
+methods, and stages come from [QUALITY.md](QUALITY.md). An FR whose acceptance
+wants a number that is not a boundary of its own behaviour is citing a `QS`.
 
 The form is Given-When-Then (North, 2006) used as Specification by Example
 (Adzic, 2011); the collaborative version is Example Mapping (Wynne, 2015),

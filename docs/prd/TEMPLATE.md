@@ -41,6 +41,16 @@ formal requirement ids — `spec/` does.>
 1. **<capability>**: <what it must do>
 2. **<capability>**: <…>
 
+## Quality Goals
+
+<The quality attributes this product is judged on, ranked top first, in the
+user's language and without numbers. Each names its `QUALITY.md` tag. The
+`quality` doc that takes this PRD as `parent` turns each into measured
+requirements.>
+
+1. **<goal>** (<tag>): <why it ranks here, and what happens when it is missed>
+2. **<goal>** (<tag>): <…>
+
 ## User Experience
 
 - <the experience bar this product is held to, stated so it can be judged>
