@@ -24,19 +24,19 @@ _Avoid_: Client, buyer, account
 
 ## Rules
 
-- **Be opinionated.** When multiple words exist for the same concept, pick the best one and list the others as aliases to avoid.
-- **Flag conflicts explicitly.** If a term is used ambiguously, call it out in "Flagged ambiguities" with a clear resolution.
-- **Keep definitions tight.** One or two sentences max. Define what it IS, not what it does.
-- **Show relationships.** Use bold term names and express cardinality where obvious.
-- **Only include terms specific to this project's context.** General programming concepts (timeouts, error types, utility patterns) don't belong even if the project uses them extensively. Before adding a term, ask: is this a concept unique to this context, or a general programming concept? Only the former belongs.
-- **Group terms under subheadings** when natural clusters emerge. If all terms belong to a single cohesive area, a flat list is fine.
-- **Write an example dialogue.** A conversation between a dev and a domain expert that demonstrates how the terms interact naturally and clarifies boundaries between related concepts.
+- **Be opinionated.** One word per concept; the others are aliases to avoid.
+- **Flag conflicts.** An ambiguous term goes under "Flagged ambiguities" with its resolution.
+- **Tight definitions.** One or two sentences; what it IS, not what it does.
+- **Show relationships.** Bold term names; cardinality where obvious.
+- **Context-specific terms only.** General programming concepts (timeouts, error types, utility patterns) do not belong, however often used.
+- **Group under subheadings** when clusters emerge; a flat list otherwise.
+- **Example dialogue.** A dev and a domain expert, showing how the terms interact and where related concepts part.
 
 ## Single vs multi-context repos
 
-**Single context (most repos):** One `CONTEXT.md` at the repo root.
+**Single context (most repos):** one `CONTEXT.md` at the repo root.
 
-**Multiple contexts:** A `CONTEXT-MAP.md` at the repo root lists the contexts, where they live, and how they relate to each other:
+**Multiple contexts:** `CONTEXT-MAP.md` at the root lists the contexts, their locations, their relations:
 
 ```md
 # Context Map
@@ -54,10 +54,7 @@ _Avoid_: Client, buyer, account
 - **Ordering ↔ Billing**: Shared types for `CustomerId` and `Money`
 ```
 
-The reader infers which structure applies:
-
-- If `CONTEXT-MAP.md` exists, read it to find contexts
-- If only a root `CONTEXT.md` exists, single context
-- If neither exists, create a root `CONTEXT.md` lazily when the first term is resolved
-
-When multiple contexts exist, infer which one the current topic relates to. If unclear, ask.
+`CONTEXT-MAP.md` exists: read it to find contexts. Only a root `CONTEXT.md`:
+single context. Neither: create a root `CONTEXT.md` when the first term is
+resolved. With several contexts, infer the one the topic belongs to; if unclear,
+ask.
