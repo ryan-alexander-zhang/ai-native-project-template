@@ -30,7 +30,6 @@ Add more when useful.
 ## Exclude
 
 - pure product requirements
-- detailed task lists
 
 ## Guideline
 
