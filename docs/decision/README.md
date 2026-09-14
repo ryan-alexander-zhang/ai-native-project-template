@@ -21,9 +21,10 @@ Add more when useful.
 ## Relations
 
 - `motivated_by` — what created the need: an `analysis`, `report`, `spec`,
-  `prd`, `idea`, or the `quality-<n>-QS-<i>.<k>` scenarios served. A technology
-  or structure decision names the scenarios it serves (`QUALITY.md`); a trade
-  between two quality requirements names both. A decision from a review
+  `prd`, `idea`, the `quality-<n>-QS-<i>.<k>` scenarios served, or the `quality`
+  doc whose profile takes the no-runtime exception (`QUALITY_PROFILE.md` Rules).
+  A technology or structure decision names the scenarios it serves
+  (`QUALITY.md`); a trade between two quality requirements names both. A decision from a review
   conversation with no doc to cite omits the field and names the conversation
   in §1.
 - `constrains` — the `prd` / `quality` / `spec` / `rule` / `design` / `plan` /
