@@ -125,6 +125,7 @@ Each `QS` declares `[<method> | <stage>]`.
 ## Definition of Done
 
 - every Profile dimension has one value citing its source or `decision`
+  (`n/a` only under the no-runtime exception, `QUALITY_PROFILE.md` Rules)
 - everything the Profile drives exists: `QR`s, scenario stages, the
   `decision`s the `architecture` stage owes
 - every ranked `prd` Quality Goal is refined by at least one `QR`
