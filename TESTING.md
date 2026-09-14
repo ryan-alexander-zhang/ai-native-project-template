@@ -2,132 +2,100 @@
 
 ## Purpose
 
-This file defines the minimum testing standard for this repo.
+Minimum testing standard for this repo: which level to test at, which tests a
+change requires, when work is done.
 
-Use it to decide:
-- what level to test at
-- what tests are required for a change
-- when work is done
-
-Scope boundary: a test here proves a behaviour under one controlled stimulus —
-the `test` method of [QUALITY.md](QUALITY.md). The Performance and Resilience
-levels below run the `load` and `chaos` methods; what they must show, and the
-evidence they owe, is defined by the quality scenario, not here.
+A test here proves a behaviour under one controlled stimulus — the `test`
+method of [QUALITY.md](QUALITY.md). The Performance and Resilience levels run
+the `load` and `chaos` methods; what they must show and the evidence they owe
+is defined by the quality scenario.
 
 ## Test Pattern
 
-Keep tests simple:
 - test the behavior you changed
-- use the lowest test level that proves the behavior
-- keep tests deterministic and easy to read
-- prefer one clear behavior per test
-- every bug fix must add or update a regression test
+- lowest test level that proves it
+- deterministic, easy to read, one behavior per test
+- every bug fix adds or updates a regression test
 
 ## Test Levels
 
 ### Unit
 
-Use unit tests for business logic, validation, mapping, and small decision logic.
-
-Unit tests should:
-- be fast
-- be deterministic
-- avoid real infrastructure
+Business logic, validation, mapping, small decision logic. Fast, deterministic,
+no real infrastructure.
 
 ### Integration
 
-Use integration tests when correctness depends on real boundaries such as the database, migrations, messaging, filesystem, framework wiring, or external service clients.
-
-Integration tests should:
-- test the real boundary that matters
-- isolate their data
-- not depend on execution order
+When correctness depends on a real boundary: database, migrations, messaging,
+filesystem, framework wiring, external service clients. Test the boundary that
+matters; isolate data; independent of execution order.
 
 ### API
 
-Use API tests when the behavior is an HTTP contract or endpoint workflow and does not require full UI coverage.
-
-API tests should:
-- verify request and response behavior at the boundary
-- check status, shape, and key side effects
-- stay smaller and cheaper than E2E tests
+When the behavior is an HTTP contract or endpoint workflow without full UI
+coverage. Verify request and response at the boundary — status, shape, key
+side effects; smaller and cheaper than E2E.
 
 ### E2E
 
-Use E2E tests only for critical user flows, high-risk system flows, and smoke checks.
-
-E2E tests should:
-- stay small in number
-- cover the full happy path first
-- cover only the most valuable failure paths
+Only critical user flows, high-risk system flows, smoke checks. Few; full happy
+path first; only the most valuable failure paths.
 
 ### Performance
 
-Use performance tests to run a `load` quality scenario: a stated volume and
-concurrency against the artifact, in the environment the scenario names.
+Runs a `load` quality scenario: stated volume and concurrency against the
+artifact, in the scenario's environment.
 
-Performance tests should:
-- reproduce the scenario's Source, Stimulus, and Environment lines, not a convenient subset
+- reproduce the scenario's Source, Stimulus, and Environment lines, not a subset
 - run long enough for the Measure's window and percentile to be meaningful
-- produce a report artifact (percentiles, throughput, error rate, duration, environment) that the `record` links
-- run at the stage the scenario declares — `release` before the plan resolves, `build` only for micro-benchmarks
+- produce a report (percentiles, throughput, error rate, duration, environment) the `record` links
+- run at the declared stage — `release` before the plan resolves, `build` only for micro-benchmarks
 
 ### Resilience
 
-Use resilience tests to run a `chaos` quality scenario: inject the fault the
-scenario names and observe the response.
+Runs a `chaos` quality scenario: inject the named fault, observe the response.
 
-Resilience tests should:
 - state the hypothesis (the scenario's Response and Measure) before injecting
-- inject one fault at a time, with the blast radius bounded and written down
+- one fault at a time, blast radius bounded and written down
 - restore the system and prove it, or the experiment is not finished
-- produce an experiment report (hypothesis, fault, observed response, blast radius, restore) that the `record` links
-- run at the stage the scenario declares — `release` in a test or staging environment, `runtime` as a game day
+- produce an experiment report (hypothesis, fault, observed response, blast radius, restore) the `record` links
+- run at the declared stage — `release` in a test or staging environment, `runtime` as a game day
 
 ## Test Level Guides
 
-Use the following docs to define the project-specific framework choice for each test level.
+Project-specific framework choice per level:
 
-- [UNIT_TESTING.md](UNIT_TESTING.md): fill in the unit testing guide for this repo.
-- [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md): fill in the integration testing guide for this repo.
-- [API_TESTING.md](API_TESTING.md): fill in the API testing guide for this repo.
-- [E2E_TESTING.md](E2E_TESTING.md): fill in the E2E testing guide for this repo.
-- [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md): fill in the load tooling for this repo.
-- [RESILIENCE_TESTING.md](RESILIENCE_TESTING.md): fill in the fault-injection tooling for this repo.
+- [UNIT_TESTING.md](UNIT_TESTING.md)
+- [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md)
+- [API_TESTING.md](API_TESTING.md)
+- [E2E_TESTING.md](E2E_TESTING.md)
+- [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md): load tooling
+- [RESILIENCE_TESTING.md](RESILIENCE_TESTING.md): fault-injection tooling
 
 ## Testing Matrix
 
 | Change type | Minimum requirement |
 | --- | --- |
 | Docs-only change | Manually verify the edited text, links, commands, and examples. |
-| Pure logic change | Add or update relevant unit tests. |
-| Database or persistence change | Add or update relevant unit tests and integration tests. Verify migrations if schema changed. |
-| API or HTTP contract change | Add or update the relevant API and/or integration tests. Verify the request, response, and key side effects. |
-| Messaging or async workflow change | Add or update the relevant unit and/or integration tests. Verify the contract or workflow behavior. |
-| Critical user or system flow change | Add or update the relevant tests and run an E2E or smoke check for the changed flow. |
-| Change to an artifact a `quality` scenario covers | Keep the `build`-stage scenarios green — they run in CI with every commit. A `release`-stage scenario is not re-run per change: it is owed once by the delivering `plan` before `resolved` and again by each release that ships the artifact (`QUALITY.md`, Verification Axis). Note in the change which `release` scenarios it touches, so the plan's `record` re-runs them. |
-| Bug fix | Add or update a regression test that would have caught the bug. |
-| Refactor with no intended behavior change | Keep existing tests green. Add tests only if coverage is too weak to prove safety. |
+| Pure logic change | Unit tests. |
+| Database or persistence change | Unit and integration tests. Verify migrations if schema changed. |
+| API or HTTP contract change | API and/or integration tests. Verify request, response, key side effects. |
+| Messaging or async workflow change | Unit and/or integration tests. Verify the contract or workflow behavior. |
+| Critical user or system flow change | Relevant tests plus an E2E or smoke check of the changed flow. |
+| Change to an artifact a `quality` scenario covers | `build`-stage scenarios stay green (CI, every commit). A `release`-stage scenario is not re-run per change: the delivering `plan` owes it once before `resolved`, and each release that ships the artifact owes it again (`QUALITY.md`, Verification Axis). Note which `release` scenarios the change touches, so the plan's `record` re-runs them. |
+| Bug fix | A regression test that would have caught the bug. |
+| Refactor with no intended behavior change | Existing tests stay green. Add tests only if coverage is too weak to prove safety. |
 
 ## Definition of Done
 
-A change is done only when all of these are true:
-
-- the requested behavior is complete
-- the required tests from the matrix are added or updated
-- the relevant tests pass
+- requested behavior complete
+- matrix tests added or updated, and passing
 - no `build`-stage quality scenario fails; `release`-stage scenarios are the plan's Definition of Done, not the change's ([QUALITY.md](QUALITY.md))
-- no known regression is left behind
-- for executable code changes, line coverage is at least 90%
-- for executable code changes, branch coverage is at least 90%
-- for executable code changes, function coverage is at least 90%
+- no known regression left behind
+- executable code changes: line, branch, and function coverage each ≥ 90%
 
 ## Coverage
 
-- Line coverage: the percentage of executable lines run by tests
-- Branch coverage: the percentage of decision paths run by tests
-- Function coverage: the percentage of functions or methods called by tests
-
-For executable code changes, the minimum acceptable coverage is `90%` for line coverage, branch coverage, and function coverage.
-
-Do not mark work complete below this bar unless an explicit exception is approved in advance.
+Line = executable lines run; branch = decision paths run; function = functions
+or methods called. Minimum `90%` each for executable code changes. Never mark
+work complete below this bar without an explicit exception approved in advance.
