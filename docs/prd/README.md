@@ -8,6 +8,10 @@ Use `TEMPLATE.md` for front matter.
 - one-line summary
 - vision and goals
 - actors
+- scale and context — the facts the `quality` profile is derived from: how many
+  actors and how often they act, data volume and kinds, sensitivity, where actors
+  and data live, operating hours, expected growth, budget. Facts about the
+  business, in orders of magnitude; not targets
 - in-scope and out-of-scope boundaries
 - functional requirements (what the product must do)
 - quality goals — the quality attributes that matter for this product, ranked

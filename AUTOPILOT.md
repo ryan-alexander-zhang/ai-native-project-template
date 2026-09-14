@@ -18,9 +18,9 @@ decision trail, the ledger, the stop conditions.
    (the question list is in the skill). "You decide" hands an item to the agent.
 3. Create branch `autopilot/<slug>` from the current branch.
 4. Write the `idea` doc from the prompt and the answers — scope in Scope, settled
-   constraints in Constraints. Items still open (always the case under `--no-ask`)
-   are closed by decisions as below. Set it `active`, create the ledger, commit.
-   From here on the run asks nothing.
+   constraints and every profile fact given in Constraints. Items still open
+   (always the case under `--no-ask`) are closed by decisions as below. Set it
+   `active`, create the ledger, commit. From here on the run asks nothing.
 
 ## Human rounds replaced
 
@@ -89,12 +89,20 @@ ledger with a one-line reason. Ledger row names:
 1. `intake` — branch, `idea` active, ledger.
 2. `prd` — the `idea` completed into a `prd` (audience, scope, functional
    requirements, ranked quality goals, constraints); checked; `active`.
-3. `quality` — the `prd`'s ranked Quality Goals refined into `quality` docs:
-   `QR`s tagged per `QUALITY.md`, each with its six-part `QS`, method, and
-   stage; a Measure the prompt and intake did not settle is a `decision`, never
-   a guess; audited; `active`. These are the drivers the next stage must cite.
+3. `quality` — first the profile (`QUALITY.md`, Profile), every dimension
+   valued from the `idea` and `prd`; a dimension neither settles takes the
+   first value in its list, and all such defaults go into **one** `decision`
+   (`decided_by: agent`, `motivated_by` the quality doc) that the PR body lists
+   first as its top-line risk — a system sized by default is the run's largest
+   assumption. Then the `prd`'s ranked Quality Goals refined into `QR`s tagged
+   per `QUALITY.md`, each with its six-part `QS`, method, and stage, owing at
+   least what the profile drives; a Measure the prompt and intake did not
+   settle is a `decision`, never a guess; audited; `active`. These are the
+   drivers the next stage must cite.
 4. `architecture` — technology selection: one `decision` per choice, each
-   naming in `motivated_by` the `QS` ids it serves; `active`. In an existing
+   naming in `motivated_by` the `QS` ids it serves and, in §1, the profile
+   dimensions that force it; every `decision` the profile's Drives column
+   obliges is written here; `active`. In an existing
    project, only what `ARCHITECTURE.md` and the `active` decisions do not
    already cover. Reuse before build (`AGENTS.md` §2): each capability the
    `prd` needs is sourced from the repo, the framework, an existing dependency,
@@ -122,7 +130,8 @@ ledger with a one-line reason. Ledger row names:
    `record` acceptance checklist; `plan` -> `resolved` (`AGENTS.md` §8, last
    two bullets).
 9. `pr` — open the PR per `PR.md` against the branch the run started from. The
-   PR body links the ledger and lists every `decided_by: agent` decision. Stop.
+   PR body opens with the profile and the dimensions that were defaulted, links
+   the ledger, and lists every `decided_by: agent` decision. Stop.
 
 ## Ledger
 

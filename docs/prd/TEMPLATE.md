@@ -23,6 +23,20 @@ each, each one observable.>
 - **<actor>**: <what this actor does with the product>
 - **<actor>**: <…>
 
+## Scale and Context
+
+<The facts the `quality` doc's profile is derived from (`QUALITY.md`, Profile).
+Orders of magnitude and classes, not targets; each is a fact about the business
+someone can vouch for.>
+
+- **Actors and frequency**: <how many of each actor, how often they act, when>
+- **Data**: <what is stored and moved, how much, how fast it grows, how long it is kept>
+- **Sensitivity**: <whose data, which regulation if any>
+- **Geography**: <where actors and data live>
+- **Operations**: <who runs it, when; what an hour of downtime costs>
+- **Growth**: <launches, campaigns, the horizon this version must hold for>
+- **Budget**: <the cost posture, if one is set>
+
 ## Scope
 
 ### In scope (MVP)

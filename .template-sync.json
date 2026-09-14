@@ -12,6 +12,8 @@
     ".codex/agents",
     "ACCEPTANCE.md",
     "QUALITY.md",
+    "QUALITY_PROFILE.md",
+    "QUALITY_SCENARIOS.md",
     "COMMIT.md",
     "PR.md",
     "CONTEXT_TEMPLATE.md",

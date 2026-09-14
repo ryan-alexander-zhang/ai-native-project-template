@@ -12,6 +12,11 @@ Flow.
 
 - context: the artifacts the requirements cover, and the ranked Quality Goals
   from the `prd` they refine
+- the profile: one value per dimension of `QUALITY.md` Profile, each citing the
+  `idea` / `prd` passage it was read from or the `decision` that chose it; a
+  dimension with neither is an open question. The profile precedes the
+  requirements because it decides which ones are owed. Prose the script does
+  not parse; the audit checks every dimension is valued and sourced
 - quality requirements, numbered `quality-<n>-QR-<i>`, each tagged with exactly
   one attribute from the `QUALITY.md` Attribute Axis
 - quality scenarios, numbered `quality-<n>-QS-<i>.<k>`, one or more per `QR`,
@@ -73,7 +78,7 @@ is a parse error:
   violated; same semantics as on a `decision`, not a relation. Required when
   any `QS` is at the `build` stage; the script checks it once the doc is
   `active`, and that every path exists. Doc-level, as on a `decision`: the
-  test-to-scenario mapping is the §4 Verification Plan.
+  test-to-scenario mapping is the §5 Verification Plan.
 - A `runtime`-stage scenario is verified by an `operation` doc that
   `implements` it. Missing while the quality doc is `active` is a warning
   (the operation doc is written in the `spec` stage, after `quality` turns
@@ -84,6 +89,8 @@ is a parse error:
 
 - what the system does (use `spec/`)
 - business rules (use `rule/`)
+- the raw facts the profile is derived from — actor counts, usage frequency,
+  data kinds (use the `prd` Scale and Context section; the profile cites it)
 - the tactic that achieves a measure — cache, replica, queue, retry (use `design/`)
 - the SLI query, alert rule, dashboard, or runbook (use `operation/`)
 - load or chaos tooling and commands (use `PERFORMANCE_TESTING.md` /

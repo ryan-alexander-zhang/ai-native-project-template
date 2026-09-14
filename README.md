@@ -98,7 +98,7 @@ out; its own docs record why.
 - [DOCUMENT.md](DOCUMENT.md): document management rules
 - [AUTOPILOT.md](AUTOPILOT.md): unattended idea-to-PR run
 - [ACCEPTANCE.md](ACCEPTANCE.md): how to derive the acceptance criteria a requirement owes
-- [QUALITY.md](QUALITY.md): quality requirements — attribute vocabulary, scenario form, verification methods and stages
+- [QUALITY.md](QUALITY.md): quality requirements — entry point; routes to [QUALITY_PROFILE.md](QUALITY_PROFILE.md) (the profile catalogue) and [QUALITY_SCENARIOS.md](QUALITY_SCENARIOS.md) (writing scenarios)
 - [TESTING.md](TESTING.md): test-level policy and testing Definition of Done
 - [CODE_QUALITY.md](CODE_QUALITY.md): quality gates and refactoring order
 - [REVIEW.md](REVIEW.md): project-specific review checklist (starts empty)
