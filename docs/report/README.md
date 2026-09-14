@@ -1,7 +1,7 @@
 # Reports
 
-This directory stores generated reports and rendered deliverables.
-Use `TEMPLATE.md` for front matter on the Markdown source.
+Generated reports and rendered deliverables. Front matter on the Markdown
+source: `TEMPLATE.md`.
 
 ## Must Include
 
@@ -10,8 +10,8 @@ Use `TEMPLATE.md` for front matter on the Markdown source.
 
 ## Relations
 
-- `informs` — the docs this report feeds. A plan opened off the back of a review
-  report declares `implements: [<this report>]` on its own side.
+- `informs` — the docs this report feeds. A remediation plan declares
+  `implements: [<this report>]` on its own side.
 
 ## Exclude
 
@@ -20,6 +20,5 @@ Use `TEMPLATE.md` for front matter on the Markdown source.
 
 ## Note
 
-A report is a polished, human-facing deliverable produced from project work,
-as opposed to `record/`, which holds internal process evidence. Keep the
-Markdown source as the source of truth; rendered files are exports of it.
+A report is a polished, human-facing deliverable; `record/` holds internal
+process evidence. The Markdown source is the truth; rendered files are exports.
