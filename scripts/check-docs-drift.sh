@@ -13,6 +13,7 @@
 #       whose parent is the plan; a load / chaos / observe QS row carries Evidence; a runtime QS in
 #       scope has an active operation doc implementing it; record verifies matches its checklist
 #   2f. active quality doc: a build QS needs `enforced_by`; warn on a runtime QS no operation implements
+#   2g. profile `n/a` cells only under the no-runtime exception: decision cited, mandatory rows valued, all rows present
 #   3.  ARCHITECTURE.md §5 tree vs tracked top-level dirs, both directions
 #   4.  decision / quality `enforced_by` paths that do not exist
 #   5.  warn: `active` design nobody references
@@ -271,6 +272,30 @@ for f in $(echo "$inst" | grep '^docs/quality/'); do
   for q in $(echo "$qsmeta" | awk -v f="$f" '$4==f && $3=="runtime"{print $1}'); do
     operated "$q" || echo "  warn: $f: runtime $q has no operation doc implementing it yet"
   done
+done
+
+# 2g. profile n/a cells (QUALITY_PROFILE.md Rules, no-runtime exception): a quality doc whose §2 table holds
+#     an `n/a` cell needs every catalogue dimension as a row, no `n/a` on a mandatory dimension, an `active`
+#     decision motivated by that doc cited in every `n/a` cell, and no runtime QS anywhere in the repo.
+dims=$(grep -aoE '^\| `[a-z-]+` \|' QUALITY_PROFILE.md 2>/dev/null | tr -d '`| ')
+for f in $(echo "$inst" | grep '^docs/quality/'); do
+  [ "$(grep -m1 '^status: ' "$f" | cut -d' ' -f2)" = archived ] && continue
+  na=$(awk 'BEGIN{FS="|"} /^\| `[a-z-]+` \|/{d=$2;gsub(/[` ]/,"",d); v=$3;gsub(/^ +| +$/,"",v); if(tolower(v)~/^n\/a/)print d "\t" $0}' "$f")
+  [ -n "$na" ] || continue
+  id=$(grep -m1 '^id: ' "$f" | cut -d' ' -f2)
+  echo "$qsmeta" | awk '$3=="runtime"' | grep -q . && err "$f: profile has n/a cells but a runtime QS exists in the repo (no-runtime exception void)"
+  for d in $dims; do grep -qE "^\| \`$d\` \|" "$f" || err "$f: profile row \`$d\` missing (every catalogue dimension needs a row)"; done
+  while IFS=$'\t' read -r d row; do
+    case "$d" in maturity|team-shape|integration-surface|portability|harm) err "$f: profile \`$d\` is n/a — mandatory dimension" ;; esac
+    dec=$(echo "$row" | grep -oE 'decision-[0-9]{5}-[a-z0-9-]+' | head -1)
+    if [ -z "$dec" ]; then err "$f: profile \`$d\` n/a cites no decision"; continue; fi
+    df=$(echo "$inst" | grep -m1 "^docs/decision/$dec\.md$")
+    if [ -z "$df" ]; then err "$f: profile \`$d\` cites $dec, not found"; continue; fi
+    [ "$(grep -m1 '^status: ' "$df" | cut -d' ' -f2)" = active ] || err "$f: profile \`$d\` cites $dec, not active"
+    echo " $(fld "$df" motivated_by) " | grep -q " $id " || err "$f: profile \`$d\` cites $dec, whose motivated_by does not name $id"
+  done <<EOF2
+$na
+EOF2
 done
 
 # 3. ARCHITECTURE.md §5 tree

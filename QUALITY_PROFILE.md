@@ -20,6 +20,25 @@ FR / QR test, tags, stages, Definition of Done stay in `QUALITY.md`.
   interactive system) names the deviating dimension in its own `QR`.
 - Changing a value is a revision round; every `decision` whose `motivated_by`
   reaches the doc is re-read.
+- **No-runtime exception** — the only case a cell may read `n/a`, and only
+  while every condition holds; one fails, the exception is void and the doc is
+  in revision:
+  1. This repo deploys, schedules, and serves nothing: the artifact is a
+     library, SDK, or build-time tool consumed as a dependency. `ARCHITECTURE.md`
+     §7 states it. An example or scaffold service that is not deployed does not
+     void this; a service this repo runs anywhere does.
+  2. No `quality` doc in the repo declares a `runtime` `QS`, and no `operation`
+     doc `implements` one. The script checks this.
+  3. An `active` `decision` records the exception, `motivated_by` this quality
+     doc, §1 naming the artifact and the consuming systems that own the `n/a`
+     dimensions. Every `n/a` cell cites that decision id; the script checks the
+     id exists, is `active`, and is motivated by this doc.
+  4. `maturity`, `team-shape`, `integration-surface`, `portability`, `harm` are
+     always valued from a source; `n/a` there is an error.
+  5. Every catalogue dimension still has its row. A missing row is an error, not
+     an implied `n/a`.
+  6. Autopilot may take it only when the `idea` names the deliverable as a
+     library (intake-settled); never by `decided_by: agent`.
 
 ## Catalogue
 

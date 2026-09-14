@@ -9,8 +9,11 @@ Quality requirements: how well the system does something, each with a measure.
 - context: the artifacts covered, and the ranked `prd` Quality Goals refined
 - the profile: one value per `QUALITY.md` Profile dimension, each citing the
   `idea` / `prd` passage or the `decision` that chose it; neither = open
-  question. Precedes the requirements because it decides which are owed. Prose;
-  the audit checks every dimension is valued and sourced
+  question. Precedes the requirements because it decides which are owed. The
+  audit checks every dimension is valued and sourced; the script checks only
+  `n/a` cells (no-runtime exception, `QUALITY_PROFILE.md` Rules): each cites an
+  `active` `decision` motivated by this doc, none sits on a mandatory
+  dimension, no `runtime` `QS` exists in the repo, every catalogue row is present
 - quality requirements `quality-<n>-QR-<i>`, each with exactly one tag from the
   `QUALITY.md` Attribute Axis
 - quality scenarios `quality-<n>-QS-<i>.<k>`, one or more per `QR`, six-part

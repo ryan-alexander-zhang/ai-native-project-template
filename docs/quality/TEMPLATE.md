@@ -21,7 +21,8 @@ enforced_by: [<test path>, ...]                    # required when any QS is at 
 
 One value per dimension of `QUALITY.md` Profile, least obliging first in each list; every value
 cites where it was read or the `decision` that chose it. The Drives column says what this value
-obliges in this doc and downstream.
+obliges in this doc and downstream. `n/a` only under the no-runtime exception
+(`QUALITY_PROFILE.md` Rules), each cell citing the decision id.
 
 | Dimension | Value | Source | Drives here |
 | --- | --- | --- | --- |
