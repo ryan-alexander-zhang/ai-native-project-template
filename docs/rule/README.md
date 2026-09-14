@@ -1,7 +1,6 @@
 # Business Rules
 
-This directory stores business rules.
-Use `TEMPLATE.md` for front matter.
+Business rules. Front matter: `TEMPLATE.md`.
 
 ## Must Include
 
@@ -15,7 +14,7 @@ Add more when useful.
 
 ### Rule kinds
 
-Tag every rule. The kind decides what else it must state.
+The kind decides what else a rule must state.
 
 | Kind | States | Must also state |
 | --- | --- | --- |
@@ -23,35 +22,30 @@ Tag every rule. The kind decides what else it must state.
 | Constraint | what must never be true | the response when it is violated |
 | Decision | which outcome applies to which case | a hit policy, and an otherwise row |
 
-A Definition cannot be violated; it defines. A Constraint can, so a rule that
-names no violation response leaves the implementer to invent one.
+A Constraint without a violation response leaves the implementer to invent one.
 
 ### Decision tables
 
-1. Hit policy, taken from DMN: `UNIQUE` (exclusive rows, order irrelevant) or
-   `FIRST` (ordered, first match wins). Prefer `UNIQUE` — non-overlap is
-   checkable, first-match is not.
-2. End a `FIRST` table with an explicit otherwise row, numbered like any other.
-3. `—` means the column does not participate in that row. Never empty or false.
+1. Hit policy (DMN): `UNIQUE` (exclusive rows, order irrelevant) or `FIRST`
+   (ordered, first match wins). Prefer `UNIQUE`: non-overlap is checkable.
+2. A `FIRST` table ends with an explicit otherwise row, numbered like any other.
+3. `—` = the column does not participate in that row. Never empty or false.
 
 ### Condition notation
 
-Rule text and table cells are prose the whiteboard does not parse; precision is
-the author's job, checked at review. Checklist items, not grammar:
+Rule text and cells are unparsed prose; precision is checked at review:
 
-1. Ranges use explicit interval notation with stated boundaries — `(30, 60]`,
-   `>= 2` — never "over 30" or "about a month".
+1. Ranges in interval notation with stated boundaries — `(30, 60]`, `>= 2` —
+   never "over 30" or "about a month".
 2. A calendar quantity (month, day) states its carry semantics in Terms before
-   a rule uses it (e.g. "one month later: the same day next month; when that
-   day does not exist, the last day of that month").
-3. A quantified condition over a collection states its predicate and threshold
-   ("count of unpaid invoices `>= 2`"), with the predicate's term defined in
-   Terms.
+   use ("one month later: same day next month; when absent, last day of that
+   month").
+3. A quantified condition over a collection states predicate and threshold
+   ("count of unpaid invoices `>= 2`"), predicate defined in Terms.
 4. A derived number states rounding direction, precision, and where rounding
-   applies, in its owning Definition.
-5. An input that can be missing is decided by some row — in a `UNIQUE` table an
-   explicit row, in a `FIRST` table the otherwise row — never left to fall
-   through silently.
+   applies, in its Definition.
+5. A possibly missing input is decided by some row — explicit in `UNIQUE`, the
+   otherwise row in `FIRST` — never silent fall-through.
 
 ### Acceptance
 
@@ -59,8 +53,7 @@ Every `BR` needs at least one example; an unreferenced rule is unverified.
 
 ## Machine-readable form (item grammar)
 
-Documents in this folder are parsed in the form below; a line that does not fit
-is a parse error:
+A line that does not fit is a parse error:
 
 - A rule declaration is a whole line, in one of two forms:
   - list item: `- **rule-<n>-BR-<i>** (<Kind>) <text>`; indented lines that
@@ -70,12 +63,10 @@ is a parse error:
 - An acceptance criterion starts `- **rule-<n>-AC-<i>.<k>** (rule-<n>-BR-<i>)`;
   the attribution in parentheses is required (missing = unattributable parse
   error). Given / When / Then each take a continuation line.
-- Only declarations prefixed with **this document's id** belong to this
-  document; a whole-line reference to another document's item is not a
-  declaration and is not diagnosed.
-- In prose, item ids are always in backticks; **a bold id is the declaration
-  form only** — a line that starts with a bold item id and does not fit the
-  forms above is a parse error.
+- Only declarations prefixed with **this document's id** belong to it; a
+  whole-line reference to another doc's item is not a declaration.
+- In prose, item ids are in backticks; **a bold id is the declaration form
+  only**.
 
 ## Relations
 
@@ -83,37 +74,25 @@ is a parse error:
 
 ## Exclude
 
-- system behaviour: idempotency, retries, timeouts (use the consuming `spec`)
-- quality requirements — latency, availability, capacity (use `quality/`)
-- where and when a rule is checked, and by which component (use `design/`)
-- technical design (use `design/`)
+- system behaviour: idempotency, retries, timeouts (the consuming `spec`)
+- quality requirements — latency, availability, capacity (`quality/`)
+- where, when, and by which component a rule is checked; technical design (`design/`)
 - lessons learned and pitfalls
 - task breakdown
 
 ## Note
 
-Every rule must be decidable. "appropriately", "where necessary" — not finished.
-
-The test against a system requirement: remove the software. If it still holds,
-it is a rule.
+Every rule is decidable; "appropriately", "where necessary" = not finished.
+Test: remove the software. Still holds → rule.
 
 ## Sizing and Splitting
 
-One rule doc is one policy area, and one table answers one question. Review
-triggers, not hard gates — when one fires, decide deliberately instead of
-appending by default:
+One rule doc = one policy area; one table answers one question. Review
+triggers, not gates: a table unreadable in one pass (~6 input columns or ~15
+rows); rows multiplying because two questions share one table.
 
-- a table can no longer be read in one pass (as an order of magnitude: past
-  ~6 input columns or ~15 rows)
-- rows keep multiplying because two independent questions are answered in one
-  table
-
-How to split a table: name the intermediate value — define it with a
-Definition rule (or its own small table), add it to Terms, and let the
-downstream table take it as an input. Chains of small tables through named
-intermediate values, not one wide table (DMN's decision-requirements pattern,
-in text). Restructuring an `active` rule doc this way is a substantive
-revision — it goes through the revision round.
-
-When the doc itself has grown into two policy areas, split the doc per
-`docs/README.md` (`supersedes` + `archived`), like an oversized spec.
+Split a table by naming the intermediate value: a Definition rule (or its own
+small table), added to Terms, taken as input by the downstream table — chains
+of small tables, not one wide one (DMN decision requirements, in text).
+Restructuring an `active` rule doc is a substantive revision. A doc grown into
+two policy areas splits per `docs/README.md` (`supersedes` + `archived`).
