@@ -1,23 +1,20 @@
 # PRDs
 
-This directory stores product requirement documents.
-Use `TEMPLATE.md` for front matter.
+Product requirement documents. Front matter: `TEMPLATE.md`.
 
 ## Must Include
 
 - one-line summary
 - vision and goals
 - actors
-- scale and context — the facts the `quality` profile is derived from: how many
-  actors and how often they act, data volume and kinds, sensitivity, where actors
-  and data live, operating hours, expected growth, budget. Facts about the
-  business, in orders of magnitude; not targets
+- scale and context — the facts the `quality` profile is derived from: actor
+  count and frequency, data volume and kinds, sensitivity, where actors and
+  data live, operating hours, growth, budget. Orders of magnitude, not targets
 - in-scope and out-of-scope boundaries
 - functional requirements (what the product must do)
-- quality goals — the quality attributes that matter for this product, ranked
-  top first, in business language and without numbers; each names its
-  `QUALITY.md` tag. The numbers are written in the `quality` docs this PRD
-  parents
+- quality goals — the attributes that matter, ranked top first, business
+  language, no numbers; each names its `QUALITY.md` tag. Numbers live in the
+  `quality` docs this PRD parents
 - user experience expectations
 - risks and dependencies
 - open questions — what is still undecided
@@ -36,8 +33,7 @@ Add more when useful.
 
 ## Note
 
-PRDs explain why and what, not how, for a human audience. A PRD does not own
-formal requirement ids. Its functional requirements are carried by `spec/` docs
-and its quality goals by `quality/` docs; both take the `prd` as `parent`, and
-the `quality` docs come first because architecture decisions wait on them
-(`QUALITY.md`).
+Why and what, not how, for a human audience. A PRD owns no requirement ids:
+functional requirements go to `spec/`, quality goals to `quality/`, both with
+the `prd` as `parent`; `quality` comes first because architecture decisions
+wait on it (`QUALITY.md`).
