@@ -104,7 +104,9 @@ or bullets over a single conclusion. This applies to documents too.
   not raise a threshold or suppress a finding to make the build pass.
 - When you discover a bug or defect during any task, before fixing it, create a
   `docs/issue` doc: analyze the root cause from first principles and reproduce it
-  with a failing test, following `docs/issue/README.md`. Only then apply the fix.
+  with a failing test, following `docs/issue/README.md`. Only then apply the fix. If no
+  `spec` / `rule` covers the behaviour, write or amend it first (revision round), then the
+  issue `blocks` it.
 - Never write code or tests against a `draft` doc; it must be `active` (or `open` for a work item) first.
 - Before a feature-sized `plan` becomes `resolved`, have a subagent verify from the docs that every linked `spec`/`rule` GWT has a passing test, that no `spec-<n>-FR-<i>` or `rule-<n>-BR-<i>` is unverified, and that every `active` `decision` in reach has passing `enforced_by` tests or its §4 reason, then record a `docs/record/` acceptance checklist linking the GWT ids. Any gap blocks `resolved`.
 - Run `skills/audit-architecture` (fresh-context subagent) before a feature-sized `plan` becomes `resolved`, and whenever 20+ PRs merged since the last audit report. An open finding blocks `resolved`.
