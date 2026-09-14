@@ -1,36 +1,25 @@
 # Quality Profile
 
-Companion to [QUALITY.md](QUALITY.md), read when a system's profile is derived
-(the `quality` stage) or consulted (the `architecture` stage). The rules of the
-method — flow, the FR / QR test, tags, verification stages, Definition of Done —
-stay in `QUALITY.md`; this file is the dimension catalogue.
-
-A system for ten thousand users and one for ten million share a vocabulary and
-nothing else; the profile is where that difference is written down, before it
-is designed in.
+Companion to [QUALITY.md](QUALITY.md): the dimension catalogue, read when a
+profile is derived (`quality` stage) or consulted (`architecture` stage). Flow,
+FR / QR test, tags, stages, Definition of Done stay in `QUALITY.md`.
 
 ## Rules
 
-- Every dimension in the catalogue gets exactly one value from its list. The lists are
-  ordered from the value that obliges least to the one that obliges most.
-- A value is **derived, not invented**: it cites the `idea` or `prd` passage it
-  was read from (Problem Statement, Actors, Scope, Scale and Context, Risks,
-  Constraints). A value with no source is a choice, and a choice is a `decision`.
-- A dimension nobody can value is an Open Question; the quality doc stays
-  `draft` until it is settled or decided. In an autopilot run it takes the
-  first value in its list, and all such defaults are recorded in one `decision`
-  (`AUTOPILOT.md`, stage `quality`).
-- The profile carries orders of magnitude and classes, never targets; the
-  numbers live in `QS` Measures, which the profile constrains.
-- The **Drives** column is the minimum a value obliges — a `QR`, a scenario
-  stage, a `decision` the `architecture` stage must write. It is policy: a
-  project that wants less changes this file, not its quality doc.
-- The profile is per artifact scope — the quality doc's §1 scope. A feature or
-  endpoint that deviates (a batch endpoint in an interactive system) states the
-  deviating dimension in its own `QR` text.
-- Changing a value is a substantive revision of the quality doc (revision
-  round), and every `decision` whose `motivated_by` reaches the doc is
-  re-read.
+- One value per dimension, from its list; lists run least → most obliging.
+- Derived, not invented: cite the `idea` / `prd` passage (Problem Statement,
+  Actors, Scope, Scale and Context, Risks, Constraints). No source = a choice =
+  a `decision`.
+- Unvaluable dimension = Open Question; doc stays `draft` until settled or
+  decided. Autopilot takes the first value and records all defaults in one
+  `decision` (`AUTOPILOT.md`, stage `quality`).
+- Orders of magnitude and classes only; numbers live in `QS` Measures.
+- **Drives** = the minimum a value obliges (a `QR`, a stage, a `decision`). It is
+  policy: to owe less, change this file, not the quality doc.
+- Scope = the quality doc's §1. A deviating feature (a batch endpoint in an
+  interactive system) names the deviating dimension in its own `QR`.
+- Changing a value is a revision round; every `decision` whose `motivated_by`
+  reaches the doc is re-read.
 
 ## Catalogue
 
@@ -115,26 +104,18 @@ is designed in.
 | `cost-posture` | prd Risks, Constraints: budget | minimise idle cost · predictable capacity · latency over cost | idle: a hosting `decision` (scale-to-zero); an Efficient cost-per-unit Measure · predictable: a capacity-reservation `decision` |
 | `harm` | prd Risks: what a wrong output does to a person | none · financial · physical | financial+: Safe `QR`s with fail-safe FRs; an approval or reconciliation `decision` · physical: hazard analysis in `design/` |
 
-A profile that values every dimension at its first entry is a legitimate
-small system, and the smallest one the method supports: `build` scenarios only,
-one instance, one team. It is still written out — so that the day a dimension
-moves, the doc that must change is known.
+All first values = the smallest legitimate system (`build` scenarios only, one
+instance, one team). Still written out, so the doc that changes when a
+dimension moves is known.
 
 ## Sources
 
-The dimension set is this template's synthesis; no single standard
-lists it. Scale, traffic shape, and the consistency group follow the workload
-questions of Kleppmann, *Designing Data-Intensive Applications* (2017) — read /
-write mix, access pattern, skew, ordering, delivery guarantees, consistency
-models — with `partition-preference` from Abadi's PACELC (2012). Availability,
-recovery, operations, and observability follow the SLO and on-call model of
-Beyer et al., *Site Reliability Engineering* (2016) and the reliability and
-cost questions of the AWS Well-Architected Framework; `tenancy` uses the
-pooled / siloed vocabulary of its SaaS lens. Latency classes and
-`dependency-hardness` come from the environment and stimulus categories of the
-SEI general scenarios (Bass, Clements, Kazman, 2021). `team-shape` follows
-Conway's law as used in DDD strategic design; `maturity` follows Fowler's
-sacrificial-architecture argument. Each Drives cell is derived from the
-attribute the value threatens, using the arc42 quality model's example
-requirements and solution approaches (quality.arc42.org) as the catalogue of
-what a value typically obliges. Amend the set through a `decision`.
+Template synthesis; no single standard. Scale, traffic shape, consistency:
+Kleppmann, *Designing Data-Intensive Applications* (2017); `partition-preference`:
+Abadi, PACELC (2012). Availability, recovery, operations, observability: Beyer
+et al., *Site Reliability Engineering* (2016); AWS Well-Architected (reliability,
+cost; SaaS lens for `tenancy`). Latency classes, `dependency-hardness`: SEI
+general scenarios (Bass, Clements, Kazman, 2021). `team-shape`: Conway's law via
+DDD strategic design; `maturity`: Fowler, sacrificial architecture. Drives cells:
+arc42 example requirements and solution approaches (quality.arc42.org). Amend
+through a `decision`.
