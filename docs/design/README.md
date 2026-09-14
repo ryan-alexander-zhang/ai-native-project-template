@@ -1,34 +1,31 @@
 # Designs
 
-This directory stores design docs.
-Use `TEMPLATE.md` for front matter.
+Design docs. Front matter: `TEMPLATE.md`.
 
 ## Must Include
 
 - the design for the `spec` / `plan` docs that link it — any size, reusable or
-  one-off. Design is never inlined in a `spec` or a `plan`.
+  one-off; never inlined in a `spec` or `plan`
 - open questions — what is still undecided
 
 Add more when useful.
 
 ## Relations
 
-- `informs` — the `spec` / `plan` docs this design is input for. May be empty while
+- `informs` — the `spec` / `plan` docs this design feeds; may be empty while
   the design waits to be picked up.
-- `implements` — the `quality-<n>-QS-<i>.<k>` scenarios this design realises: a
-  cache, a replica, a queue, a retry, a module boundary exists to make some
-  scenario's Measure hold, and this field says which. A design that adds such a
-  tactic and names no scenario is a finding in the `AGENTS.md` §6 audit
+- `implements` — the `quality-<n>-QS-<i>.<k>` scenarios this design realises. A
+  cache, replica, queue, retry, or module boundary exists to make some Measure
+  hold; a tactic naming no scenario is an `AGENTS.md` §6 audit finding
   (`QUALITY.md`, Omission Heuristics).
 
 ## Exclude
 
-- business rules (use `rule/`)
-- system requirements and their acceptance (use the consuming `spec`)
-- quality requirements and their measures (use `quality/`); a design cites the
-  scenarios it realises and, in §2, the ones it trades against each other
-- task breakdown
-- execution steps
+- business rules (`rule/`)
+- system requirements and acceptance (the consuming `spec`)
+- quality requirements and measures (`quality/`); a design cites the scenarios
+  it realises and, in §2, the ones it trades
+- task breakdown, execution steps
 
 ## Guideline
 
@@ -43,5 +40,4 @@ Prefer Mermaid:
 
 ## Note
 
-No fixed structure. Domain, database, API, integration, process, deployment —
-structure the body around the subject.
+No fixed structure; the body follows the subject.
