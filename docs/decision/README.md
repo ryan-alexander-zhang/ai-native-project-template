@@ -1,7 +1,6 @@
 # Decisions
 
-This directory stores durable decision records.
-Use `TEMPLATE.md` for front matter.
+Durable decision records. Front matter: `TEMPLATE.md`.
 
 ## Must Include
 
@@ -21,39 +20,37 @@ Add more when useful.
 
 ## Relations
 
-- `motivated_by` — what created the need for the choice: usually an `analysis`,
-  `report`, `spec`, `prd`, `idea`, or the `quality-<n>-QS-<i>.<k>` scenarios the
-  choice serves. A technology or structure decision names the scenarios it
-  serves (`QUALITY.md`, Where It Sits in the Flow); a trade between two quality
-  requirements names both. A decision surfaced by a review
-  conversation, with no doc to cite, omits the field (`docs/README.md`'s
-  empty-field rule) and names the conversation in §1 instead.
-- `constrains` — the `prd` / `quality` / `spec` / `rule` / `design` / `plan` / `operation` docs the choice binds,
-  minus any that already declare `implements: [<this decision>]`. When a new doc
-  later falls under an `active` decision, add it here: the list is metadata about
-  reach, not content, so updating it is not an amendment to the decision.
+- `motivated_by` — what created the need: an `analysis`, `report`, `spec`,
+  `prd`, `idea`, or the `quality-<n>-QS-<i>.<k>` scenarios served. A technology
+  or structure decision names the scenarios it serves (`QUALITY.md`); a trade
+  between two quality requirements names both. A decision from a review
+  conversation with no doc to cite omits the field and names the conversation
+  in §1.
+- `constrains` — the `prd` / `quality` / `spec` / `rule` / `design` / `plan` /
+  `operation` docs the choice binds, minus any declaring
+  `implements: [<this decision>]`. A doc later falling under an `active`
+  decision is added here; reach metadata, not content, so no amendment.
 
 ## Provenance
 
 - `decided_by` — `human` or `agent`; written only by autopilot runs
-  (`AUTOPILOT.md`) so a reviewer can list every choice an agent made in a
-  human's place. Omit it otherwise.
+  (`AUTOPILOT.md`). Omit otherwise.
 
 ## Enforcement
 
-- `enforced_by` — the tests that fail when the choice is violated; they run
-  under the `Architecture` gate (`CODE_QUALITY.md` §2). Required on every
-  decision that binds code structure: dependency direction, module boundary,
-  layering, banned API. Omit only with the reason in §4 "Negative"; a
-  structural decision without either is unverified.
+- `enforced_by` — tests that fail when the choice is violated; run under the
+  `Architecture` gate (`CODE_QUALITY.md` §2). Required on every decision
+  binding code structure: dependency direction, module boundary, layering,
+  banned API. Omit only with the reason in §4 "Negative".
 
 ## Revision
 
 - Wording, links, `constrains` backfill, `enforced_by` paths: amend in place.
-- The choice itself changes (a §2 row replaced, removed, narrowed, or widened;
-  a §4 consequence flips): new decision with `supersedes: [<old id>]`, old doc
-  `archived` + `superseded_by: [<new id>]`, body untouched. Repoint `implements` / `constrains` / `enforced_by`
-  to the new id; `check-docs-drift.sh` fails on any left behind.
+- The choice itself changes (a §2 row replaced, removed, narrowed, widened; a
+  §4 consequence flips): new decision with `supersedes: [<old id>]`; old doc
+  `archived` + `superseded_by: [<new id>]`, body untouched. Repoint
+  `implements` / `constrains` / `enforced_by`; `check-docs-drift.sh` fails on
+  any left behind.
 - In doubt, supersede.
 
 ## Exclude
