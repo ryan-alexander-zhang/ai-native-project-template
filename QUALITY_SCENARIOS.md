@@ -1,17 +1,14 @@
 # Quality Scenarios
 
 Companion to [QUALITY.md](QUALITY.md), read when `QR`s and `QS`s are written or
-audited: what each tag asks and how it is typically measured, how a scenario is
-written, how many a `QR` owes, and what to sweep for before closing the set.
-The rules of the method stay in `QUALITY.md`.
+audited: tags and typical measures, scenario form, minimum set, omission sweep.
 
 ## Attribute Axis
 
-Every `QR` carries exactly one tag from the vocabulary `QUALITY.md` names.
-Sub-characteristics (time behaviour, recoverability, …) go in the requirement
-text, not in the tag. The list is template-owned, so a project that needs a tag
-names the nearest one, puts the sub-characteristic in the text, and proposes
-the tag upstream with a `decision`; it does not fork the list.
+One tag per `QR`, from the list `QUALITY.md` owns. Sub-characteristics (time
+behaviour, recoverability, …) go in the requirement text. A project needing
+another tag uses the nearest one and proposes the tag upstream in a `decision`;
+it does not fork the list.
 
 | Tag | Asks | ISO/IEC 25010:2023 | Typical measure |
 | --- | --- | --- | --- |
@@ -24,21 +21,15 @@ the tag upstream with a `decision`; it does not fork the list.
 | Usable | can be used by its users | Interaction capability (2011: usability) | task completion time; error rate per task; accessibility conformance |
 | Safe | does not harm people, property, environment | Safety | hazard rate; fail-safe transition time |
 
-Why arc42's tags: `ARCHITECTURE.md` is arc42-shaped, so §1 and §10 read in the
-same words; one-word tags are short in the `(Tag)` annotation; and `Operable`
-names what the `runtime` stage depends on — observability, deployability,
-recoverability — which ISO scatters across sub-characteristics. One deliberate
-omission from Q42: **Suitable** (ISO Functional suitability) — what the system
-does, and whether it does it completely and correctly, is the `spec`
-namespace. This is the one exception to the FR / QR test: a measured
-functional quality (accuracy, precision, recall, coverage of a benchmark set)
-stays a `spec` FR, and its AC states the threshold and the data set it holds
-on. Cost has no tag of its own: it is resource utilization times a
-price, so it is measured under `Efficient`.
+Q42's **Suitable** (ISO Functional suitability) is omitted: what the system does
+is the `spec` namespace. The one exception to the FR / QR test follows: a
+measured functional quality (accuracy, precision, recall, benchmark coverage)
+stays a `spec` FR; its AC states threshold and data set. Cost has no tag: it is
+resource utilization × price, measured under `Efficient`.
 
 ## Scenario Form
 
-Each scenario has six parts, each on its own line:
+Six parts, each on its own line:
 
 | Part | States |
 | --- | --- |
@@ -49,47 +40,41 @@ Each scenario has six parts, each on its own line:
 | Response | what the system does |
 | Measure | how the response is judged — a number with unit; a percentile for latency; a window for rates and availability; the duration and volume the measurement ran under |
 
-For readers who know GWT: Given = Environment + Artifact, When = Source +
-Stimulus, Then = Response + Measure. The split is finer because the parts are
-what a load profile, a fault injection, and an SLI definition are built from.
+GWT: Given = Environment + Artifact, When = Source + Stimulus, Then = Response +
+Measure. The finer split is what a load profile, a fault injection, and an SLI
+are built from.
 
 ## Scenario Pattern
 
-- One stimulus per scenario — two faults, or a load and a fault, are two scenarios.
-- Measure carries a number, a unit, and the window or duration it holds over;
-  a percentile for latency, a sample size for load. A Measure without a number
-  is an Open Question, not a scenario (the script checks the label is present,
-  not that the number is).
-- Environment names what may not be substituted — data size, dependency
-  latency, cluster size. A Measure with no Environment is unfalsifiable.
-- Response is what the system does, observable from outside; the tactic that
-  achieves it belongs in a `design`.
-- A scenario that restates its `QR` with a number attached verifies nothing
-  more than the `QR`; it must add the stimulus and environment under which the
-  number holds.
-- The six parts are written in the order above; the script checks each label
-  is present, not the order.
+- One stimulus per scenario; two faults, or a load and a fault, are two scenarios.
+- Measure: number, unit, window or duration; percentile for latency, sample
+  size for load. No number = Open Question, not a scenario.
+- Environment names what may not be substituted: data size, dependency latency,
+  cluster size. No Environment = unfalsifiable.
+- Response is observable from outside; the tactic belongs in a `design`.
+- A `QS` that restates its `QR` with a number verifies nothing; it must add the
+  stimulus and environment the number holds under.
+- Parts in the order above. The script checks labels are present, not order or
+  numbers.
 
 ## Minimum Set — per QR
 
-The floor a `QR` owes, by what its measure depends on; the Profile's Drives
-column (`QUALITY_PROFILE.md`) is the floor the system owes before any `QR` is written, and the two
-compose. Rows are policy, not derivation: a project that wants a lower floor
-changes this table, not the doc.
+The floor a `QR` owes; composes with the Profile's Drives column
+(`QUALITY_PROFILE.md`). Policy, not derivation: to owe less, change this table,
+not the doc.
 
 | The QR's measure … | Minimum scenarios |
 | --- | --- |
 | any QR | one `QS` |
-| can change with data volume, traffic, or infrastructure (latency, throughput, availability, cost) | one `release` and one `runtime` scenario, so it is proven before ship and watched after |
+| can change with data volume, traffic, or infrastructure (latency, throughput, availability, cost) | one `release` and one `runtime` scenario |
 | is a structural property (dependency direction, module boundary, size, banned API) | one `fitness` scenario at `build`; cite the `CODE_QUALITY.md` gate rather than restate it |
 | concerns a dependency the artifact cannot work without | one `chaos` scenario per such dependency: it fails, the stated response happens within the stated time |
-| concerns misuse (Secure, Safe) | one scenario per stimulus, naming detection time and containment response; the stimuli are drawn from the Security Areas in `SECURITY.md` (secrets, auth and access, data handling, dependencies, API surface) and the project's threat model when it has one |
+| concerns misuse (Secure, Safe) | one scenario per stimulus, naming detection time and containment response; stimuli from the `SECURITY.md` Security Areas and the project's threat model |
 | is exceeded — load past the stated volume, fault past the stated tolerance | the degradation behaviour is an Unwanted FR in the consuming `spec`; the QR cites it |
 
 ## Omission Heuristics
 
-The tables above complete the set against what is written. Sweep these before
-closing:
+Sweep before closing the set:
 
 - **dimension without source** — a Profile value that cites no `idea` / `prd` passage and no `decision`
 - **drive without doc** — a Profile value whose Drives column names a `QR`, a scenario, or a `decision` that does not exist
