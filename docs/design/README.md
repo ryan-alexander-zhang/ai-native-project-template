@@ -15,11 +15,18 @@ Add more when useful.
 
 - `informs` — the `spec` / `plan` docs this design is input for. May be empty while
   the design waits to be picked up.
+- `implements` — the `quality-<n>-QS-<i>.<k>` scenarios this design realises: a
+  cache, a replica, a queue, a retry, a module boundary exists to make some
+  scenario's Measure hold, and this field says which. A design that adds such a
+  tactic and names no scenario is a finding in the `AGENTS.md` §6 audit
+  (`QUALITY.md`, Omission Heuristics).
 
 ## Exclude
 
 - business rules (use `rule/`)
 - system requirements and their acceptance (use the consuming `spec`)
+- quality requirements and their measures (use `quality/`); a design cites the
+  scenarios it realises and, in §2, the ones it trades against each other
 - task breakdown
 - execution steps
 

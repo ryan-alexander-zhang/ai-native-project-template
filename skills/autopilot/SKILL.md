@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Unattended run from a one-line idea prompt to a review-ready PR — idea → prd → architecture → spec/rule/design → plan → code → acceptance record. Use when the user invokes /autopilot <idea prompt>. One intake round, then no questions; every open question becomes a decision doc for later human review.
+description: Unattended run from a one-line idea prompt to a review-ready PR — idea → prd → quality → architecture → spec/rule/design → plan → code → acceptance record. Use when the user invokes /autopilot <idea prompt>. One intake round, then no questions; every open question becomes a decision doc for later human review.
 ---
 
 # Autopilot
@@ -16,5 +16,8 @@ Ask only what the prompt does not already answer, in one round.
 
 - Scope: what must this deliver, and what is explicitly out?
 - Constraints: language, storage, framework, deployment target, integrations?
+- Quality: which quality attributes matter most, in order (latency, availability,
+  security, cost, maintainability, …), and what targets do you already hold —
+  a number, a percentile, a window? What environment can the run measure in?
 - Done: what would you check first to call this finished?
 - Reserved: is there anything you want to decide yourself rather than leave to me?

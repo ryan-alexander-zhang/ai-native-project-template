@@ -17,7 +17,7 @@ Template for `ARCHITECTURE.md`: an arc42-shaped index. Each section is a short s
 
 ## 1. Introduction & Goals
 
-> What and for whom; top 3 quality goals, ranked. Requirements live in `docs/prd/` / `docs/spec/` — link, don't restate.
+> What and for whom; the ranked quality goals, mirrored from the `prd`. Requirements live in `docs/prd/` / `docs/quality/` / `docs/spec/` — link, don't restate.
 
 ## 2. Constraints
 
@@ -82,9 +82,10 @@ flowchart LR
 
 ## 10. Quality Requirements
 
-> Measurable quality scenarios refining §1's goals. Functional acceptance lives in `spec` ACs, not here.
+> Index of the `active` `docs/quality/` docs refining §1's goals — one row per doc, the tags it covers, and the scenarios a reader should know exist. Scenarios and Measures live in the quality docs (`QUALITY.md`), functional acceptance in `spec` ACs; neither is restated here.
+> An `ARCHITECTURE.md` filled before `docs/quality/` existed keeps its inline scenarios until each has moved into a quality doc; then the row points there.
 
-| Quality | Scenario | Target |
+| Quality doc | Tags | Scenarios |
 | --- | --- | --- |
 
 ## 11. Risks & Technical Debt

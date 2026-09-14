@@ -4,14 +4,17 @@
 #   1.  dangling relative links in root *.md and docs/**/*.md
 #   2.  front matter: id well-formed / prefix = type / = filename / unique; status in the kind's
 #       vocabulary; only the fields the type carries; decided_by value; parent single-valued
-#   2c. spec / rule item grammar: declarations well-formed, spec owns FR and rule owns BR, every
-#       item has an AC, every AC names a declared item
+#   2c. spec / rule / quality item grammar: declarations well-formed, spec owns FR, rule owns BR,
+#       quality owns QR; every item has an AC (QS for quality); every AC / QS names a declared item;
+#       a QR carries a vocabulary tag, a QS its [method | stage] and all six parts (QUALITY.md)
 #   2b. relation ids name an existing doc (not `archived`) or a declared item
 #   2d. supersedes / superseded_by pairing
-#   2e. plan resolved gate: every AC in the delivery scope has a pass row in an active record
-#       whose parent is the plan; record verifies matches its checklist
+#   2e. plan resolved gate: every AC / QS in the delivery scope has a pass row in an active record
+#       whose parent is the plan; a load / chaos / observe QS row carries Evidence; a runtime QS in
+#       scope has an active operation doc implementing it; record verifies matches its checklist
+#   2f. active quality doc: a build QS needs `enforced_by`; warn on a runtime QS no operation implements
 #   3.  ARCHITECTURE.md §5 tree vs tracked top-level dirs, both directions
-#   4.  decision `enforced_by` paths that do not exist
+#   4.  decision / quality `enforced_by` paths that do not exist
 #   5.  warn: `active` design nobody references
 #   6.  strict only (a generated project, marked by .ainpt.json, or --strict): root-guide placeholders
 # type -> kind and type -> relation fields are read from whiteboard.config.yaml when present (one
@@ -56,7 +59,7 @@ kind_of() {
   if [ -f "$cfg" ]; then sed -n "s/^  $1: *{ *kind: *\([a-z]*\).*/\1/p" "$cfg" | head -1; return; fi
   case "$1" in
     plan|issue) echo work ;;
-    idea|prd|analysis|reference|integration|spec|rule|decision|design|record|report|operation|prompt) echo living ;;
+    idea|prd|analysis|reference|integration|spec|rule|quality|decision|design|record|report|operation|prompt) echo living ;;
   esac
 }
 # type -> the relation fields it may declare, space-separated (docs/README.md "A field the document's
@@ -70,8 +73,9 @@ carries_of() {
   fi
   case "$1" in
     prd) echo parent ;;                   analysis) echo parent informs ;;
-    reference|integration|rule|design|report) echo informs ;;
-    spec) echo parent ;;                  decision) echo motivated_by constrains ;;
+    reference|integration|rule|report) echo informs ;;   design) echo informs implements ;;
+    spec) echo parent ;;                  quality) echo parent informs ;;
+    decision) echo motivated_by constrains ;;
     plan|operation) echo implements ;;    issue) echo blocks ;;
     record) echo parent verifies ;;       idea|prompt) echo ;;
     *) echo - ;;
@@ -96,10 +100,11 @@ for f in $inst; do
     *)      err "$f: type '$t' is not a declared type"; continue ;;
   esac
   echo "$s" | grep -qxE "$ok" || err "$f: status '$s' not allowed for $t (one of: $ok)"
-  # fields the type does not carry (docs/README.md); decided_by / enforced_by belong to decision only
+  # fields the type does not carry (docs/README.md); decided_by belongs to decision only, enforced_by to decision and quality
   allow=$(carries_of "$t")
   if [ "$allow" != - ]; then
-    allow="id type status supersedes superseded_by $allow"; [ "$t" = decision ] && allow="$allow decided_by enforced_by"
+    allow="id type status supersedes superseded_by $allow"
+    [ "$t" = decision ] && allow="$allow decided_by enforced_by"; [ "$t" = quality ] && allow="$allow enforced_by"
     for k in $(awk 'NR==1&&/^---$/{s=1;next} s&&/^---$/{exit} s&&/^[A-Za-z_]+:/{sub(/:.*/,"");print}' "$f"); do
       echo " $allow " | grep -q " $k " || err "$f: field '$k' is not carried by $t"
     done
@@ -109,22 +114,44 @@ for f in $inst; do
   grep -m1 '^parent:' "$f" | grep -qE '\[|,' && err "$f: parent is single-valued"
 done
 
-# 2c. spec / rule item grammar (docs/spec/README.md, docs/rule/README.md 机器可读形态): a declaration is a
-#     whole line starting with the bold id of THIS doc — `- **<id>-FR-<i>**`, `| **<id>-FR-<i>** |`, or
-#     `- **<id>-AC-<i>.<k>** (<id>-FR-<i>)`. spec owns FR, rule owns BR. Every item needs an AC; every AC
-#     names an item that exists. `items` collects every declared item/AC id for the checks below.
-items= acmap=
+# 2c. spec / rule / quality item grammar (docs/spec/README.md, docs/rule/README.md, docs/quality/README.md
+#     机器可读形态): a declaration is a whole line starting with the bold id of THIS doc — `- **<id>-FR-<i>**`,
+#     `| **<id>-FR-<i>** |`, `- **<id>-AC-<i>.<k>** (<id>-FR-<i>)`; for quality `- **<id>-QR-<i>** (<Tag>) …` and
+#     `- **<id>-QS-<i>.<k>** (<id>-QR-<i>) [<method> | <stage>]` followed by its six labelled parts. spec owns FR,
+#     rule owns BR, quality owns QR. Every item needs an AC / QS; every AC / QS names an item that exists.
+#     `items` collects every declared id; `acmap` maps AC / QS -> item; `qsmeta` maps QS -> method stage file.
+tags='Efficient|Reliable|Secure|Maintainable|Operable|Flexible|Usable|Safe'   # single source: QUALITY.md Attribute Axis (arc42 Q42 tags)
+items= acmap= qsmeta=
 for f in $inst; do
   t=$(grep -m1 '^type: ' "$f" | cut -d' ' -f2)
-  case "$t" in spec) k=FR; o=BR ;; rule) k=BR; o=FR ;; *) continue ;; esac
+  case "$t" in spec) k=FR; o='BR|QR' ;; rule) k=BR; o='FR|QR' ;; quality) k=QR; o='FR|BR' ;; *) continue ;; esac
   id=$(grep -m1 '^id: ' "$f" | cut -d' ' -f2 | cut -d- -f1,2)   # <type>-<nnnnn>: item ids carry this, not the slug
-  decl=$(awk 'NR==1&&/^---$/{s=1;next} s==1&&/^---$/{s=2;next} s==2' "$f" | grep -E "^(- |[|] )?\*\*$id-")
+  body=$(awk 'NR==1&&/^---$/{s=1;next} s==1&&/^---$/{s=2;next} s==2' "$f")
+  decl=$(echo "$body" | grep -E "^(- |[|] )?\*\*$id-")
   [ -z "$decl" ] && continue
-  its=$(echo "$decl" | sed -nE "s/^(- |[|] )\*\*($id-$k-[0-9]+)\*\*( .*)?$/\2/p")
-  acs=$(echo "$decl" | sed -nE "s/^- \*\*($id-AC-[0-9]+\.[0-9]+)\*\* \(($id-$k-[0-9]+)\).*$/\1 \2/p")
-  echo "$decl" | grep -E "\*\*$id-$o-" | grep -q . && err "$f: $t owns $k ids, not $o"
+  if [ "$t" = quality ]; then
+    itemrx="^- \*\*$id-QR-[0-9]+\*\* \(($tags)\) .+$"
+    acrx="^- \*\*$id-QS-[0-9]+\.[0-9]+\*\* \($id-QR-[0-9]+\) \[(fitness|test|load|chaos|observe) \| (build|release|runtime)\]$"
+    its=$(echo "$decl" | grep -E "$itemrx" | sed -nE "s/^- \*\*($id-QR-[0-9]+)\*\*.*$/\1/p")
+    acs=$(echo "$decl" | grep -E "$acrx" | sed -nE "s/^- \*\*($id-QS-[0-9]+\.[0-9]+)\*\* \(($id-QR-[0-9]+)\) \[([a-z]+) \| ([a-z]+)\]$/\1 \2 \3 \4/p")
+    # every QS carries Source / Stimulus / Artifact / Environment / Response / Measure as indented labelled lines
+    while read -r q m; do err "$f: $q lacks $m"; done < <(echo "$body" | awk -v id="$id" '
+      function flush(  i,m,p) { split("Source Stimulus Artifact Environment Response Measure", p, " ")
+        m=""; for (i=1;i<=6;i++) if (!(p[i] in seen)) m = m (m ? "," : "") p[i]
+        if (m) print q, m; q=""; split("", seen) }
+      $0 ~ "^- \\*\\*" id "-QS-" { if (q) flush(); q=$0; sub(/^- \*\*/,"",q); sub(/\*\*.*/,"",q); next }
+      q && /^  +[A-Za-z]+:/ { l=$0; sub(/^ +/,"",l); sub(/:.*/,"",l); seen[l]=1; next }
+      q && !/^  / { flush() }
+      END { if (q) flush() }')
+  else
+    itemrx="^(- |[|] )\*\*$id-$k-[0-9]+\*\*( .*)?$"
+    acrx="^- \*\*$id-AC-[0-9]+\.[0-9]+\*\* \($id-$k-[0-9]+\)"
+    its=$(echo "$decl" | sed -nE "s/^(- |[|] )\*\*($id-$k-[0-9]+)\*\*( .*)?$/\2/p")
+    acs=$(echo "$decl" | sed -nE "s/^- \*\*($id-AC-[0-9]+\.[0-9]+)\*\* \(($id-$k-[0-9]+)\).*$/\1 \2/p")
+  fi
+  echo "$decl" | grep -E "\*\*$id-($o)-" | grep -q . && err "$f: $t owns $k ids, not $(echo "$o" | tr '|' '/')"
   while read -r l; do err "$f: malformed declaration: ${l:0:60}"; done \
-    < <(echo "$decl" | grep -vE "^(- |[|] )\*\*$id-$k-[0-9]+\*\*( .*)?$|^- \*\*$id-AC-[0-9]+\.[0-9]+\*\* \($id-$k-[0-9]+\)")
+    < <(echo "$decl" | grep -vE "$itemrx|$acrx")
   for d in $(echo "$its" | sort | uniq -d); do err "$f: $d declared twice"; done
   for i in $its; do echo "$acs" | awk '{print $2}' | grep -qx "$i" || err "$f: $i has no acceptance"; done
   for i in $(echo "$acs" | awk '{print $2}' | sort -u); do echo "$its" | grep -qx "$i" || err "$f: acceptance names undeclared $i"; done
@@ -132,9 +159,11 @@ for f in $inst; do
 $its
 $(echo "$acs" | awk '{print $1}')"
   acmap="$acmap
-$acs"
+$(echo "$acs" | awk '{print $1, $2}')"
+  [ "$t" = quality ] && qsmeta="$qsmeta
+$(echo "$acs" | awk -v f="$f" '{print $1, $3, $4, f}')"
 done
-items=$(echo "$items" | grep .); acmap=$(echo "$acmap" | grep .)
+items=$(echo "$items" | grep .); acmap=$(echo "$acmap" | grep .); qsmeta=$(echo "$qsmeta" | grep .)
 for d in $(echo "$ids" | cut -d' ' -f1 | sort | uniq -d); do
   err "duplicate id $d: $(echo "$ids" | awk -v i="$d" '$1==i{print $3}' | tr '\n' ' ')"
 done
@@ -143,7 +172,7 @@ done
 for f in $inst; do
   while read -r id; do
     case "$id" in
-      *-FR-*|*-BR-*|*-AC-*) echo "$items" | grep -qx "$id" || err "$f: $id is not a declared item" ;;   # items of archived docs stay resolvable (docs/spec/README.md Splitting)
+      *-FR-*|*-BR-*|*-QR-*|*-AC-*|*-QS-*) echo "$items" | grep -qx "$id" || err "$f: $id is not a declared item" ;;   # items of archived docs stay resolvable (docs/spec/README.md Splitting)
       *) s=$(echo "$ids" | awk -v i="$id" '$1==i{print $2}')
          [ -z "$s" ] && err "$f: $id names no doc"
          [ "$s" = archived ] && err "$f: $id is archived" ;;
@@ -175,20 +204,31 @@ for f in $inst; do
 done
 
 # 2e. plan resolved gate (docs/plan/README.md, docs/record/README.md): a `resolved` plan's delivery scope —
-#     every AC of every item its `implements` puts in scope — needs a `pass` row in an `active` record whose
-#     `parent` is the plan. Row = first cell exactly one item/AC id; header has Test/测试 and Result/结果 off
-#     the first column. A record's `verifies` must expand to the same AC set as its checklist.
-acs_of() {  # doc id | item id | AC id -> the ACs in scope (docs/README.md: an AC puts its owning item in scope)
+#     every AC / QS of every item its `implements` puts in scope — needs a `pass` row in an `active` record whose
+#     `parent` is the plan. Row = first cell exactly one item/AC/QS id; header has Test/测试 and Result/结果 off
+#     the first column. A QS row whose method is load / chaos / observe needs a non-empty Evidence/证据 cell
+#     (QUALITY.md: a test name is not evidence that a measure held); a runtime QS in scope needs an active
+#     operation doc implementing it or its doc. A record's `verifies` must expand to the same set as its checklist.
+acs_of() {  # doc id | item id | AC/QS id -> the ACs / QSs in scope (docs/README.md: an AC puts its owning item in scope)
   case "$1" in
-    *-AC-*)        acs_of "$(echo "$acmap" | awk -v a="$1" '$1==a{print $2}')" ;;
-    *-FR-*|*-BR-*) echo "$acmap" | awk -v i="$1" '$2==i{print $1}' ;;
-    spec-*|rule-*) p=$(echo "$1" | cut -d- -f1,2); echo "$acmap" | awk -v p="$p-" 'index($2,p)==1{print $1}' ;;
+    *-AC-*|*-QS-*)        acs_of "$(echo "$acmap" | awk -v a="$1" '$1==a{print $2}')" ;;
+    *-FR-*|*-BR-*|*-QR-*) echo "$acmap" | awk -v i="$1" '$2==i{print $1}' ;;
+    spec-*|rule-*|quality-*) p=$(echo "$1" | cut -d- -f1,2); echo "$acmap" | awk -v p="$p-" 'index($2,p)==1{print $1}' ;;
   esac
 }
-rows_of() {  # record file -> "<first cell>\t<Result cell>" per data row of every checklist table
+qs_method() { echo "$qsmeta" | awk -v q="$1" '$1==q{print $2}'; }
+qs_stage()  { echo "$qsmeta" | awk -v q="$1" '$1==q{print $3}'; }
+operated() {  # QS id -> 0 when a non-archived operation doc `implements` it or its quality doc
+  for of in $(echo "$inst" | grep '^docs/operation/'); do
+    [ "$(grep -m1 '^status: ' "$of" | cut -d' ' -f2)" = archived ] && continue
+    echo " $(fld "$of" implements) " | grep -qE " ($1|$(echo "$1" | cut -d- -f1,2)-[a-z0-9-]+) " && return 0
+  done
+  return 1
+}
+rows_of() {  # record file -> "<first cell>\t<Result cell>\t<Evidence cell>" per data row of every checklist table
   awk 'BEGIN{FS="|"} !/^\|/{st=0;next}
-       st==0{h=tolower($0); st=2; if(h~/test|测试/&&h~/result|结果/){rc=0;for(i=3;i<NF;i++){c=tolower($i);if(c~/result|结果/)rc=i} if(rc&&tolower($2)!~/test|测试|result|结果/)st=1} next}
-       st==1{if($0~/^[| :-]+$/)next; c=$2;gsub(/^ +| +$/,"",c); r=$rc;gsub(/^ +| +$/,"",r); print c "\t" r}' "$1"
+       st==0{h=tolower($0); st=2; if(h~/test|测试/&&h~/result|结果/){rc=0;ec=0;for(i=3;i<NF;i++){c=tolower($i);if(c~/result|结果/)rc=i;if(c~/evidence|证据/)ec=i} if(rc&&tolower($2)!~/test|测试|result|结果/)st=1} next}
+       st==1{if($0~/^[| :-]+$/)next; c=$2;gsub(/^ +| +$/,"",c); r=$rc;gsub(/^ +| +$/,"",r); e=(ec?$ec:""); gsub(/^ +| +$/,"",e); print c "\t" r "\t" e}' "$1"
 }
 for pf in $inst; do
   grep -q '^type: plan$' "$pf" && grep -q '^status: resolved$' "$pf" || continue
@@ -199,13 +239,14 @@ for pf in $inst; do
   for rf in $inst; do
     grep -q '^type: record$' "$rf" && grep -q '^status: active$' "$rf" && [ "$(fld "$rf" parent)" = "$plan" ] || continue
     listed=
-    while IFS=$'\t' read -r c r; do
-      if echo "$c" | grep -qxE '[a-z]+-[0-9]{5}-(FR|BR|AC)-[0-9.]+'; then
+    while IFS=$'\t' read -r c r e; do
+      if echo "$c" | grep -qxE '[a-z]+-[0-9]{5}-(FR|BR|QR|AC|QS)-[0-9.]+'; then
         echo "$items" | grep -qx "$c" || { err "$rf: checklist row $c is not a declared item"; continue; }
-        case "$c" in *-AC-*) ;; *) err "$rf: checklist row $c names an item, not an AC — verification is per AC"; continue ;; esac
+        case "$c" in *-AC-*|*-QS-*) ;; *) err "$rf: checklist row $c names an item, not an AC / QS — verification is per AC / QS"; continue ;; esac
         listed="$listed $c"
+        case "$c" in *-QS-*) case "$(qs_method "$c")" in load|chaos|observe) [ -n "$e" ] || err "$rf: $c is $(qs_method "$c") — its Evidence cell is empty" ;; esac ;; esac
         [ "$r" = pass ] && passed="$passed $c" || err "$rf: $c result '$r'"
-      elif echo "$c" | grep -qE '[a-z]+-[0-9]{5}-(FR|BR|AC)-'; then
+      elif echo "$c" | grep -qE '[a-z]+-[0-9]{5}-(FR|BR|QR|AC|QS)-'; then
         err "$rf: malformed checklist row '${c:0:50}' — exactly one id per row"
       fi
     done < <(rows_of "$rf")
@@ -213,7 +254,23 @@ for pf in $inst; do
     for a in $want; do echo " $listed " | grep -q " $a " || err "$rf: verifies covers $a but the checklist has no row for it"; done
     for a in $(echo "$listed" | tr ' ' '\n' | sort -u); do echo "$want" | grep -qx "$a" || err "$rf: checklist row $a is not covered by verifies"; done
   done
-  for a in $scope; do echo " $passed " | grep -q " $a " || err "$pf: resolved, but $a has no pass row in an active record with parent $plan"; done
+  for a in $scope; do
+    echo " $passed " | grep -q " $a " || err "$pf: resolved, but $a has no pass row in an active record with parent $plan"
+    case "$a" in *-QS-*) [ "$(qs_stage "$a")" = runtime ] && ! operated "$a" && err "$pf: resolved, but runtime $a has no active operation doc implementing it" ;; esac
+  done
+done
+
+# 2f. active quality doc (docs/quality/README.md, QUALITY.md): a build-stage QS is verified by the tests in
+#     `enforced_by` — required; a runtime QS with no operation doc yet is a warning here and an error in 2e
+#     once a plan carrying it turns resolved.
+for f in $(echo "$inst" | grep '^docs/quality/'); do
+  grep -q '^status: active' "$f" || continue
+  if echo "$qsmeta" | awk -v f="$f" '$4==f && $3=="build"' | grep -q . && [ -z "$(fld "$f" enforced_by | tr -d ' ')" ]; then
+    err "$f: has a build-stage QS but no enforced_by"
+  fi
+  for q in $(echo "$qsmeta" | awk -v f="$f" '$4==f && $3=="runtime"{print $1}'); do
+    operated "$q" || echo "  warn: $f: runtime $q has no operation doc implementing it yet"
+  done
 done
 
 # 3. ARCHITECTURE.md §5 tree
@@ -226,8 +283,8 @@ if [ -f ARCHITECTURE.md ]; then
   done
 fi
 
-# 4. enforced_by
-for f in $(echo "$inst" | grep '^docs/decision/'); do
+# 4. enforced_by (decision and quality docs)
+for f in $(echo "$inst" | grep -E '^docs/(decision|quality)/'); do
   while read -r p; do [ -e "$p" ] || err "$f: enforced_by $p not found"; done \
     < <(grep -m1 '^enforced_by:' "$f" | sed 's/^enforced_by: *//; s/#.*//; s/[][,]/ /g' | tr ' ' '\n' | grep -v -e '^$' -e '<')
 done

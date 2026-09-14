@@ -30,8 +30,9 @@ Decide how before building.
 - Never build against a `draft` doc; promote it first.
 - For a feature-sized `spec` (multiple files, real ordering or design choices),
   create or refresh a `docs/plan/` doc before implementing, then work it
-  task-by-task. The plan declares `implements: [<the spec>]`; the product flow
-  ahead of it is `idea -> prd -> spec`, per [docs/README.md](docs/README.md).
+  task-by-task. The plan declares `implements: [<the spec>]` and takes the
+  spec's §7 quality scenarios into scope; the product flow ahead of it is
+  `idea -> prd -> quality -> spec`, per [docs/README.md](docs/README.md).
 - Link the `docs/design/` docs the spec already links. Whether a design is
   needed is settled when the spec is written, per
   [docs/spec/README.md](docs/spec/README.md); never inline design in a `spec`
@@ -68,6 +69,7 @@ Use this stage when the change needs durable docs, notes, or decisions.
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): system structure, boundaries, design constraints.
 - [ACCEPTANCE.md](ACCEPTANCE.md): deriving the acceptance set for a spec or rule.
+- [QUALITY.md](QUALITY.md): quality requirements — attributes, scenarios, verification methods and stages.
 - [TESTING.md](TESTING.md): test levels, required tests, coverage.
 - [COMMIT.md](COMMIT.md): commit scope, message rules, commit hygiene.
 - [PR.md](PR.md): PR readiness, review flow, merge rules.

@@ -2,7 +2,7 @@
 id: operation-00001-example-slug
 type: operation
 status: draft|active|archived
-implements: [<id>, ...]                       # the decision or design this procedure carries out
+implements: [<id>, ...]                       # the decision or design this procedure carries out, or the quality scenarios (QS ids) whose runtime verification this doc holds
 ---
 
 # Operation: <the procedure>
@@ -32,3 +32,9 @@ implements: [<id>, ...]                       # the decision or design this proc
 ## 5. On-call and Release Notes (optional)
 
 - <escalation path, schedule, or release cadence this procedure sits in>
+
+## 6. SLOs (when this doc implements runtime scenarios)
+
+| QS | SLI (query) | SLO (= the scenario's Measure) | Window | Alert | Error budget policy |
+| --- | --- | --- | --- | --- | --- |
+| <quality-00001-QS-1.2> | <the metric and how it is computed> | <99.5 % ≤ 300 ms> | <28 d rolling> | <rule name, burn-rate thresholds, who is paged> | <what stops when the budget is spent, who decides resumption> |

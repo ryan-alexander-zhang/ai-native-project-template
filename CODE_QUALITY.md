@@ -12,7 +12,10 @@ When a gate fails, or a review flags complexity or duplication:
 **solve it per this file. Never raise a threshold or suppress a finding just to
 make a build pass.**
 
-Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them.
+Coverage bars are not defined here — [TESTING.md](TESTING.md) owns them. The
+gates below are the `fitness` verification, at the `build` stage, of the
+maintainability requirements in `docs/quality/` ([QUALITY.md](QUALITY.md)); a
+quality doc with a `build`-stage scenario lists the gate's test in `enforced_by`.
 
 ## 1. Metrics — what each catches
 
@@ -45,7 +48,7 @@ List every check that fails the build. A check that only warns is not a gate.
 | Coverage + mutation | JaCoCo + PIT | opt-in per domain module (`design-00007` §4.3) | per-module pom — bar per [TESTING.md](TESTING.md) |
 | Architecture | ArchUnit via `aipersimmon-ddd-archunit` | every scaffold / sample module's `ArchitectureTest`; library `ModuleNamingChecks` | rule classes in that module |
 
-Architecture gate: `ARCHITECTURE.md` §5 boundaries and every `docs/decision` `enforced_by` rule as failing tests — direction, cycles, layer and module access.
+Architecture gate: `ARCHITECTURE.md` §5 boundaries and every `docs/decision` and `docs/quality` `enforced_by` rule as failing tests — direction, cycles, layer and module access, and every `build`-stage quality scenario.
 
 Shared config lives in `aipersimmon-ddd-quality-config`. There is no shared
 provider parent, so **two** build files carry the plugin block by hand and must

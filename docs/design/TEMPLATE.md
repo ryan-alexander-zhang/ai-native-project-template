@@ -3,6 +3,7 @@ id: design-00001-example-slug
 type: design
 status: draft|active|archived
 informs: [<spec-id | plan-id>, ...]           # may be empty while the design waits to be picked up (a design can precede any spec)
+implements: [<quality-<n>-QS-<i>.<k>>, ...]   # the quality scenarios this design realises; omit when it realises none
 ---
 
 # Design: <subject>
@@ -25,7 +26,9 @@ flowchart LR
 
 ## 2. Trade-offs
 
-- <the options considered, the one taken, and what it costs>
+- <the options considered, the one taken, and what it costs — named as the
+  quality scenarios it serves and the ones it costs (`quality-<n>-QS-<i>.<k>`);
+  a trade between two attributes is a `decision` with `motivated_by` naming both>
 
 ## Open Questions
 

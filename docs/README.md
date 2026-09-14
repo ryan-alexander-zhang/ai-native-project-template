@@ -9,7 +9,7 @@ Every doc should start with:
 ```md
 ---
 id: <type>-<five-digit-number>-<slug>
-type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|record|reference|report|rule|spec
+type: analysis|decision|design|idea|integration|issue|operation|plan|prd|prompt|quality|record|reference|report|rule|spec
 status: draft   # start here; promote per kind (see Front Matter Rules below)
 ---
 ```
@@ -22,21 +22,23 @@ Write the document description or comment after the front matter.
 - An `id` is **unique across the whole repo**: no two documents may declare the same one. (Files the `exclude` list in `whiteboard.config.yaml` hits are not documents here: they take no number and count as no collision.) Allocating the next free number per type is what keeps a new document from colliding; a collision that already exists is an error on **every** file declaring that id until one of them is given a free id.
 - One document per topic, amended in place. There is no addendum document. When a doc must not be rewritten (published, or cited outside this repo), write a new one carrying `supersedes: [<old id>]`; set the old doc to `archived` with `superseded_by: [<new id>]`. A `decision` is stricter: a change to the choice itself always supersedes (`docs/decision/README.md` Revision).
 - `status` has two sub-vocabularies, by document kind:
-  - **Living docs** (`spec`, `design`, `rule`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
+  - **Living docs** (`spec`, `design`, `rule`, `quality`, `decision`, `prd`, `idea`, `analysis`, `integration`, `reference`, `operation`, `record`, `prompt`, `report`): `draft` (work in progress) -> `active` (the current live version / source of truth) -> `archived` (kept for history; no longer the current live version, e.g. superseded by or folded into another doc).
   - **Work items** (`issue`, `plan`): `draft` (pre-triage) -> `open` (tracked, not yet resolved) -> `resolved` (fix/work applied **and** verified). Terminal alternatives: `wontfix` (deliberately not acting, or the item became invalid / overtaken by events) and `archived` (the *document* was superseded, independent of whether the work was done).
 - `archived` is a document-lifecycle state ("this file is no longer the live source"), not a synonym for "done". Record a work item's outcome with `resolved` or `wontfix`, never by archiving it.
-- A **substantive revision** of an `active` `spec`, `rule`, or `design` goes
+- A **substantive revision** of an `active` `spec`, `rule`, `quality`, or `design` goes
   through the **revision round**: demote it to `draft`,
   revise, audit, and re-accept — never edit the `active` file in
   place. Typo-level fixes are exempt; when in doubt, it is substantive.
 - `decided_by` (`decision` only, not a relation): `human` when a person made the choice, `agent` when an agent made it unattended. Written only by autopilot runs (`AUTOPILOT.md`); absent means a human was in the loop.
-- Product flow is `idea -> prd -> spec` when the later stage exists, and each stage carries the previous one as `parent`.
-- There are exactly two requirement id namespaces, and both carry their doc id:
+- Product flow is `idea -> prd -> quality -> spec` when the later stage exists; `quality` and `spec` both carry the `prd` as `parent`, and architecture decisions and `design` docs wait on `quality` (`QUALITY.md`).
+- There are exactly three requirement id namespaces, and all carry their doc id:
   - `spec` owns **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.
   - `rule` owns **business rules** — `rule-00001-BR-1`, acceptance `rule-00001-AC-1.1`.
-  The test for which one applies: remove the software. If the statement is still
-  true, it is a rule. A requirement that applies a rule cites it instead of
-  restating it.
+  - `quality` owns **quality requirements** — `quality-00001-QR-1`, scenario `quality-00001-QS-1.1`.
+  The tests: remove the software — if the statement is still true, it is a rule.
+  Remove the measure — if nothing is left to check, it was never a quality
+  requirement; what remains is a system requirement. A requirement that applies a
+  rule or holds a quality scenario cites it instead of restating it.
 - A **story** is a planning token, not a document: a row in the spec's Stories
   table naming one shippable slice and the requirement and rule ids it delivers.
   Stories own no id namespace and carry no acceptance of their own.
@@ -53,13 +55,16 @@ Write the document description or comment after the front matter.
     when a doc already declares `implements: [<the decision>]`, that edge exists —
     do not repeat it in the decision's `constrains`.
   - Every listed id is a **full** `<type>-<nnnnn>-<slug>` id of a document that
-    exists. Never a bare `plan-00007`. Two fields may additionally name
-    **requirement-item ids** (`spec-<nnnnn>-FR-<i>`, `rule-<nnnnn>-BR-<i>`, or
-    an `AC-<i>.<j>`) of items that exist: a `record`'s `verifies` (what it
-    checked), and a `plan`'s `implements` — item ids there declare the plan's
-    **delivery scope**: the items whose acceptance must be verified by that
-    plan's records before the plan may turn `resolved`. An AC id in `implements` puts its owning item in
-    scope; a whole spec/rule doc id puts every item of that doc in scope.
+    exists. Never a bare `plan-00007`. Four fields may additionally name
+    **requirement-item ids** (`spec-<nnnnn>-FR-<i>`, `rule-<nnnnn>-BR-<i>`,
+    `quality-<nnnnn>-QR-<i>`, an `AC-<i>.<j>`, or a `QS-<i>.<j>`) of items that
+    exist: a `record`'s `verifies` (what it checked), and a `plan`'s `implements`
+    — item ids there declare the plan's **delivery scope**: the items whose
+    acceptance must be verified by that plan's records before the plan may turn
+    `resolved`. An AC or QS id in `implements` puts its owning item in scope; a
+    whole spec/rule/quality doc id puts every item of that doc in scope. A
+    `design` may also name `QS` ids in `implements`: the scenarios it realises.
+    A `decision` may name `QS` ids in `motivated_by`: the scenarios it serves.
 
 Every rule above is checked by `scripts/check-docs-drift.sh` (pre-commit and CI); the
 whiteboard is optional and adds a board view, clarify and co-write sessions on top.
@@ -68,7 +73,7 @@ whiteboard is optional and adds a board view, clarify and co-write sessions on t
 
 | Field | Meaning |
 | --- | --- |
-| `parent` | which doc this one is *part of*, or the next stage of — single-valued, and only five types carry it |
+| `parent` | which doc this one is *part of*, or the next stage of — single-valued, and only the types whose README lists it carry it |
 | `implements` | this doc makes the listed docs real |
 | `informs` | this doc is input for the listed docs without binding them |
 | `motivated_by` | what created the need for this doc |
@@ -96,8 +101,9 @@ Each folder is marked **core** (most projects need it) or **situational**
 (use only when the project actually calls for it).
 
 - `prd/` — **core** — product requirements
-- `spec/` — **core** — feature specs: story slices, system requirements, links to rules and design
+- `spec/` — **core** — feature specs: story slices, system requirements, links to rules, quality, and design
 - `rule/` — **core** — business rules: decision tables and the examples verifying them
+- `quality/` — **core** — quality requirements: attribute-tagged `QR`s and the six-part scenarios verifying them, per `QUALITY.md`
 - `plan/` — **core** — implementation plans
 - `decision/` — **core** — durable decision records
 - `issue/` — **core** — development issues, fixes, and verification
@@ -116,6 +122,7 @@ Each folder is marked **core** (most projects need it) or **situational**
 - Keep one document per topic, and amend it in place.
 - `rule` says what is true in the business, with or without the software.
 - `spec` says what the system should do.
+- `quality` says how well, with a measure, and how that is verified at build, release, and runtime.
 - `plan` says how to do it.
 - Use `issue` for a development problem, the fix, and the verification result.
 - Use `analysis` for exploratory codebase or business analysis that informs later docs.

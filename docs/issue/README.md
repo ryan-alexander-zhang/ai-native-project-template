@@ -22,7 +22,8 @@ Add more when useful.
   `plan`, `spec`, or `prd`, but a `decision` or `report` whose text the
   issue contradicts is just as valid. An issue that blocks nothing has no reader
   who needs it. A defect in behaviour no doc covers means a doc is missing: write
-  or amend the `spec` / `rule` first, then block it.
+  or amend the `spec` / `rule` / `quality` doc first (a blown measure with no
+  scenario is a missing `QS`), then block it.
 
 ## Exclude
 

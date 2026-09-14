@@ -84,6 +84,7 @@ is a parse error:
 ## Exclude
 
 - system behaviour: idempotency, retries, timeouts (use the consuming `spec`)
+- quality requirements — latency, availability, capacity (use `quality/`)
 - where and when a rule is checked, and by which component (use `design/`)
 - technical design (use `design/`)
 - lessons learned and pitfalls
