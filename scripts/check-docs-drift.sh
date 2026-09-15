@@ -184,10 +184,20 @@ done
 
 # 2d. supersedes / superseded_by pairing (docs/README.md: the new doc carries `supersedes`, the old one is
 #     `archived` and carries `superseded_by` back — the only edit an archived doc takes)
-# A flow list may wrap over several lines (`verifies: [` ... `]`); read to the closing bracket.
-fld() { awk -v k="$2" 'BEGIN{rx="^" k ":"} $0~rx{v=substr($0,length(k)+2)
-          if (v ~ /\[/ && v !~ /\]/) while ((getline l) > 0) { if (l ~ /^---$/) break; v = v " " l; if (l ~ /\]/) break }
-          sub(/^ +/,"",v); print v; exit}' "$1" | sed "s/ *#.*//; s/[][,]/ /g"; }
+# Reads one front-matter field. A list may wrap over several lines, flow (`verifies: [` ... `]`) or
+# block (one `- <id>` per line); a trailing `# comment` is stripped per line, before they are joined
+# (stripping it after would eat a list whose opening line carries one). Front matter only: a body
+# line starting with the field name is prose, not a value.
+fld() { awk -v k="$2" 'function clean(s) { sub(/#.*/, "", s); return s }
+          BEGIN{rx="^" k ":"}
+          NR==1 && $0=="---" {fm=1; next}
+          fm && /^---$/ {exit}
+          fm && $0~rx {v=clean(substr($0,length(k)+2))
+            if (v ~ /\[/ && v !~ /\]/)
+              while ((getline l) > 0) { if (l ~ /^---$/) break; c=clean(l); v = v " " c; if (c ~ /\]/) break }
+            else if (v ~ /^[ \t]*$/)
+              while ((getline l) > 0) { if (l !~ /^[ \t]*- /) break; c=clean(l); sub(/^[ \t]*- */, "", c); v = v " " c }
+            sub(/^[ \t]+/,"",v); print v; exit}' "$1" | sed "s/[][,]/ /g"; }
 file_of() { echo "$ids" | awk -v i="$1" '$1==i{print $3}'; }
 status_of() { echo "$ids" | awk -v i="$1" '$1==i{print $2}'; }
 for f in $inst; do
