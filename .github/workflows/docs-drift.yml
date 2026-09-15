@@ -10,4 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The gate reports "no value" and "field absent" alike, as an empty string, so a parsing miss
+      # in `fld` skips a document silently instead of failing. Check the reader before the gate.
+      - run: bash scripts/test-check-docs-drift.sh
       - run: scripts/check-docs-drift.sh
