@@ -89,10 +89,12 @@ reason. Ledger row names:
    PR body as the run's top-line risk. Then the `prd`'s ranked Quality Goals
    refined into tagged `QR`s, each with six-part `QS`, method, stage, owing at
    least what the profile drives; an unsettled Measure is a `decision`, never a
-   guess; audited; `active`.
+   guess; then the obligations table from the profile's Drives entries, every
+   state `open`; audited; `active`.
 4. `architecture` — technology selection: one `decision` per choice, naming in
    `motivated_by` the `QS` ids it serves and in §1 the profile dimensions that
-   force it; every `decision` the Drives column obliges; `active`. In an
+   force it; every `open` row in the quality doc's obligations table closed —
+   the paying id, or `waived: <decision id>`; `active`. In an
    existing project, only what `ARCHITECTURE.md` and `active` decisions do not
    cover. Reuse before build (`AGENTS.md` §2): a `decision` per new library, a
    `decision` per `build`.
