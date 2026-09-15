@@ -184,7 +184,10 @@ done
 
 # 2d. supersedes / superseded_by pairing (docs/README.md: the new doc carries `supersedes`, the old one is
 #     `archived` and carries `superseded_by` back — the only edit an archived doc takes)
-fld() { grep -m1 "^$2:" "$1" | sed "s/^$2: *//; s/ *#.*//; s/[][,]/ /g"; }
+# A flow list may wrap over several lines (`verifies: [` ... `]`); read to the closing bracket.
+fld() { awk -v k="$2" 'BEGIN{rx="^" k ":"} $0~rx{v=substr($0,length(k)+2)
+          if (v ~ /\[/ && v !~ /\]/) while ((getline l) > 0) { if (l ~ /^---$/) break; v = v " " l; if (l ~ /\]/) break }
+          sub(/^ +/,"",v); print v; exit}' "$1" | sed "s/ *#.*//; s/[][,]/ /g"; }
 file_of() { echo "$ids" | awk -v i="$1" '$1==i{print $3}'; }
 status_of() { echo "$ids" | awk -v i="$1" '$1==i{print $2}'; }
 for f in $inst; do
@@ -251,7 +254,9 @@ for pf in $inst; do
         err "$rf: malformed checklist row '${c:0:50}' — exactly one id per row"
       fi
     done < <(rows_of "$rf")
-    want=$(for i in $(fld "$rf" verifies); do acs_of "$i"; done | sort -u)
+    # The widening ("an AC / QS id puts its item in scope") is stated for a plan's `implements`,
+    # not for `verifies`: here an AC / QS id stands for itself, only a doc or item id expands.
+    want=$(for i in $(fld "$rf" verifies); do case "$i" in *-AC-*|*-QS-*) echo "$i" ;; *) acs_of "$i" ;; esac; done | sort -u)
     for a in $want; do echo " $listed " | grep -q " $a " || err "$rf: verifies covers $a but the checklist has no row for it"; done
     for a in $(echo "$listed" | tr ' ' '\n' | sort -u); do echo "$want" | grep -qx "$a" || err "$rf: checklist row $a is not covered by verifies"; done
   done
@@ -301,7 +306,7 @@ done
 # 3. ARCHITECTURE.md §5 tree
 if [ -f ARCHITECTURE.md ]; then
   tree=$(awk '/^## 5[. ]/{s=1;next} s&&/^## /{exit} s&&/^```/{f=!f;if(!f&&n)exit;next} s&&f{print;n=1}' ARCHITECTURE.md |
-         grep -oE '^[├└]── [^ ]+/' | sed 's/^[├└]── //; s#/$##')
+         grep -oE '^[├└]── [^ /]+/' | sed 's/^[├└]── //; s#/$##')
   for d in $tree; do [ -d "$d" ] || err "ARCHITECTURE.md §5 lists $d/, not on disk"; done
   for d in $(git ls-tree --name-only -d HEAD | grep -v '^\.'); do
     echo "$tree" | grep -qx "$d" || err "ARCHITECTURE.md §5 misses $d/"
