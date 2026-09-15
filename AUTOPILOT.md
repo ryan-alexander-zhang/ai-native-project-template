@@ -99,7 +99,8 @@ reason. Ledger row names:
    cover. Reuse before build (`AGENTS.md` §2): a `decision` per new library, a
    `decision` per `build`.
 5. `spec` — `spec` (§7 citing its scenarios), its `rule` and `design` docs
-   (system-level design included; `informs` set; `implements` naming the
+   (one design per structural element per `docs/design/README.md` Kinds;
+   `informs` set; `implements` naming the
    scenarios each design realises), acceptance per `ACCEPTANCE.md`,
    `CONTEXT.md` terms; audited; `active`. `runtime` scenarios get their
    `operation` doc (SLI, SLO, alert, error budget policy), `active`. Then the

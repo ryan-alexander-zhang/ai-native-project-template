@@ -48,7 +48,8 @@ parent: <prd-id | idea-id | empty = spec is the entry point>
 
 | Design | Doc | Covers |
 | --- | --- | --- |
-| Card payment flow | [design-00001-card-payment-flow](../design/design-00001-card-payment-flow.md) | attempt lifecycle, provider webhooks, reconciliation |
+| Payment attempt lifecycle | [design-00001-payment-attempt-lifecycle](../design/design-00001-payment-attempt-lifecycle.md) | `lifecycle` — the states an attempt moves through |
+| Provider webhook intake | [design-00002-provider-webhook-intake](../design/design-00002-provider-webhook-intake.md) | `interaction` — provider → platform → ledger |
 
 ## 6. Out of Scope (optional)
 - …

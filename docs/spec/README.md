@@ -16,10 +16,11 @@ Feature specs. Front matter: `TEMPLATE.md`.
   feature must hold (§7): at least the system's baseline quality doc; a scenario
   the feature alone introduces is written in `quality/` first, never inlined.
   A spec that is the entry point (no `prd`) cites a quality doc that is one too
-- links to the `design/` docs it builds. Required before `active` whenever any
-  `FR` introduces or changes structure outliving one `plan` — a module or
-  boundary, a data model, an API or file-format contract, a state lifecycle, a
-  cross-component interaction. Otherwise one line: `No design: <why>`
+- links to the `design/` docs it builds, one per structural element
+  (`docs/design/README.md` Kinds). Required before `active`
+  whenever any `FR` introduces or changes structure outliving one `plan` — a
+  module or boundary, a data model, an API or file-format contract, a state
+  lifecycle, a cross-component interaction. Otherwise one line: `No design: <why>`
 - open questions — what is still undecided
 
 Add more when useful.

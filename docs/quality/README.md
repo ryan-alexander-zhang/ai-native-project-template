@@ -59,8 +59,9 @@ A line that does not fit is a parse error:
 
 - `parent` — the `prd` whose Quality Goals this doc refines; empty when the
   quality doc is the entry point.
-- `informs` — the `spec` / `design` / `plan` docs these requirements feed. A
-  `spec` cites the scenarios it must hold in its §7 Quality table.
+- `informs` — the `spec` / `plan` docs these requirements feed. A `spec` cites
+  the scenarios it must hold in its §7 Quality table. Never a `design`: that
+  edge is the design's `implements: [<QS ids>]`, declared once, on the design.
 - Downstream docs point here: a `design` declares `implements: [<QS ids>]`; an
   `operation` doc carrying a `runtime` scenario declares
   `implements: [<this doc or its QS ids>]`; a `plan` puts `QR` / `QS` ids in

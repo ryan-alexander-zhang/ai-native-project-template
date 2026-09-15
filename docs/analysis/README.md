@@ -8,6 +8,9 @@ Analysis docs. Front matter: `TEMPLATE.md`.
 - business analysis
 - gap analysis
 - comparative analysis
+- discovery artefacts — event storming boards, domain storytelling; a sibling
+  data file (a board DSL export) lives in `<slug>/source/` next to the doc, no
+  front matter, excluded from board and drift checks; the doc points at it
 
 Add more when useful.
 

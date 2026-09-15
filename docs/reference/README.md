@@ -19,6 +19,8 @@ External reference materials. Front matter: `TEMPLATE.md`.
 - paper or article summaries
 - official doc excerpts
 - benchmark research
+- provenance of a third-party asset, dataset, or snapshot bundled in the repo:
+  source URL, version, retrieval date, checksum; licence in `THIRDPARTY.md`
 
 Add more when useful.
 

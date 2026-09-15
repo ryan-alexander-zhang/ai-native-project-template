@@ -16,6 +16,10 @@
 #   2g. profile `n/a` cells only under the no-runtime exception: decision cited, mandatory rows valued, all rows present
 #   3.  ARCHITECTURE.md §5 tree vs tracked top-level dirs, both directions
 #   4.  decision / quality `enforced_by` paths that do not exist
+#   2h. design: `kind` declared and known; <= 150 lines; mermaid count per kind;
+#       numbered sections = the kind's template; `## Decisions` present;
+#       no requirement language in the body (docs/design/README.md, Gates)
+#   2i. quality doc: no design in `informs` (the design's `implements` is that edge)
 #   5.  warn: `active` design nobody references
 #   6.  strict only (a generated project, marked by .ainpt.json, or --strict): root-guide placeholders
 # type -> kind and type -> relation fields are read from whiteboard.config.yaml when present (one
@@ -29,7 +33,7 @@ fail=0
 err() { echo "  $*"; fail=1; }
 grep() { command grep -a "$@"; }   # docs are text; never let a stray byte turn a match into "Binary file … matches"
 
-md=$(git ls-files | grep -E '^([^/]+|docs/.+)\.md$' | grep -v 'TEMPLATE\.md$')
+md=$(git ls-files | grep -E '^([^/]+|docs/.+)\.md$' | grep -vE 'TEMPLATE(-[a-z]+)?\.md$')
 inst=$(echo "$md" | grep -E '^docs/[^/]+/[^/]+\.md$' | grep -v '/README\.md$')
 
 # yaml `exclude:` — files it hits are not documents (docs/README.md): raw material such as
@@ -101,11 +105,12 @@ for f in $inst; do
     *)      err "$f: type '$t' is not a declared type"; continue ;;
   esac
   echo "$s" | grep -qxE "$ok" || err "$f: status '$s' not allowed for $t (one of: $ok)"
-  # fields the type does not carry (docs/README.md); decided_by belongs to decision only, enforced_by to decision and quality
+  # fields the type does not carry (docs/README.md); decided_by belongs to decision only, enforced_by to decision and quality, kind to design
   allow=$(carries_of "$t")
   if [ "$allow" != - ]; then
     allow="id type status supersedes superseded_by $allow"
     [ "$t" = decision ] && allow="$allow decided_by enforced_by"; [ "$t" = quality ] && allow="$allow enforced_by"
+    [ "$t" = design ] && allow="$allow kind"
     for k in $(awk 'NR==1&&/^---$/{s=1;next} s&&/^---$/{exit} s&&/^[A-Za-z_]+:/{sub(/:.*/,"");print}' "$f"); do
       echo " $allow " | grep -q " $k " || err "$f: field '$k' is not carried by $t"
     done
@@ -322,6 +327,45 @@ if [ -f ARCHITECTURE.md ]; then
     echo "$tree" | grep -qx "$d" || err "ARCHITECTURE.md §5 misses $d/"
   done
 fi
+
+# 2h. design shape (docs/design/README.md: Kinds, Boundary, Gates). One structural element
+#     per doc: a known `kind`, at most 150 lines, the kind's mermaid
+#     count and numbered sections, and no requirement language — `shall`, a Given / When / Then list or continuation line (prose
+#     opening with "When" is not one), or a bold FR / BR / AC / QR /
+#     QS id (the declaration form) belong to a spec or rule, never to a design.
+design_kinds='domain storage module contract mapping lifecycle interaction algorithm mechanism deployment'
+design_check() {  # <file> -> one finding per line; empty when clean
+  local f=$1 k n m body t want have
+  k=$(fld "$f" kind | tr -d ' ')
+  echo " $design_kinds " | grep -q " $k " || echo "$f: kind '$k' is not one of: $design_kinds"
+  n=$(wc -l < "$f" | tr -d ' ')
+  [ "$n" -le 150 ] || echo "$f: $n lines, limit 150 — split along the Kinds table (docs/design/README.md, Gates)"
+  m=$(grep -c '^```mermaid' "$f")
+  case "$k" in
+    contract|mapping) [ "$m" -eq 0 ] || echo "$f: $m mermaid fences, a $k has none — its tables are the shape" ;;
+    mechanism)        [ "$m" -le 1 ] || echo "$f: more than one mermaid fence — one structure per design" ;;
+    ?*)               [ "$m" -eq 1 ] || echo "$f: $m mermaid fences, a $k has exactly one" ;;
+  esac
+  t=docs/design/TEMPLATE-$k.md
+  if [ -n "$k" ] && [ -f "$t" ]; then
+    want=$(grep -E '^## [0-9]+\. ' "$t" | sed 's/[[:space:]]*$//'); have=$(grep -E '^## [0-9]+\. ' "$f" | sed 's/[[:space:]]*$//')
+    [ "$want" = "$have" ] || echo "$f: numbered sections differ from $t — same headings, same order, n/a when not applicable"
+  fi
+  grep -q '^## Decisions$' "$f" || echo "$f: no ## Decisions section"
+  body=$(awk 'NR==1&&/^---$/{s=1;next} s&&/^---$/{s=0;next} !s' "$f")
+  echo "$body" | grep -niw 'shall' | head -1 | sed "s#^#$f:#; s#\$# — requirement language belongs to a spec#"
+  echo "$body" | grep -nE '^( {2,}| *- +)\**(Given|When|Then)\b' | head -1 | sed "s#^#$f:#; s#\$# — acceptance belongs to a spec or rule#"
+  echo "$body" | grep -nE '\*\*[a-z]+-[0-9]{5}-(FR|BR|AC|QR|QS)-[0-9.]+\*\*' | head -1 | sed "s#^#$f:#; s#\$# — a design cites requirement items, never declares them#"
+}
+for f in $(echo "$inst" | grep '^docs/design/'); do
+  while read -r l; do [ -n "$l" ] && err "$l"; done < <(design_check "$f")
+done
+
+# 2i. a quality doc never lists a design in `informs` (docs/quality/README.md): that edge is the design's
+#     `implements: [<QS ids>]`, declared once, on the design.
+for f in $(echo "$inst" | grep '^docs/quality/'); do
+  for d in $(fld "$f" informs | tr ' ' '\n' | grep '^design-'); do err "$f: informs $d — a design declares implements toward the quality doc, never the inverse"; done
+done
 
 # 4. enforced_by (decision and quality docs)
 for f in $(echo "$inst" | grep -E '^docs/(decision|quality)/'); do

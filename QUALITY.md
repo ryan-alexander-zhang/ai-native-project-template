@@ -32,10 +32,12 @@ before writing them is choosing blind.
   Measures only.
 - `quality` doc: `parent` = the `prd`. Derives the Profile first, then refines
   each ranked goal into `QR`s with `QS`s, owing at least what the profile
-  drives. `informs` the specs, designs, and plans that must hold its scenarios.
+  drives. `informs` the specs and plans that must hold its scenarios; a design
+  points here by itself through `implements: [<QS ids>]`, so it is never listed.
 - A technology or structure `decision` names the `QS`s it serves in
-  `motivated_by`. A `design` declares `implements: [<QS ids>]`; its §2
-  Trade-offs names the scenarios it trades. Two `QR`s in conflict, or a tactic
+  `motivated_by`. A `design` declares `implements: [<QS ids>]`; what a
+  tactic costs is in the `decision` that chose it, linked from the design's
+  `## Decisions`. Two `QR`s in conflict, or a tactic
   that buys one attribute with another: a `decision` with `motivated_by` naming
   both ids.
 - A `spec` cites the quality docs and `QS`s it must hold in its §7 Quality table.

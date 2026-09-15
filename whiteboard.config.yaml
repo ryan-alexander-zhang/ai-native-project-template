@@ -50,7 +50,7 @@ max_sessions: 5
 # excluded. Anything but a list of strings, or an entry that is empty, holds a
 # `..` segment or a `\`, or starts with `/` or `!`, refuses to start the board
 # Read at startup only — restart the board after changing it.
-exclude: [reference/*/source/**]
+exclude: [reference/*/source/**, analysis/*/source/**]
 
 relations:
   - parent
@@ -133,7 +133,7 @@ focus:
   prd: Actors, scope, and the value trade-off — who it serves, what this version keeps out, and why it goes first. Ask nothing a spec would settle (requirement mechanics, acceptance details); stop once the scope is firm enough to write a spec.
   spec: FR boundaries and acceptance gaps — failure paths, edge inputs, and an observable criterion for every FR. Ask nothing a design would settle (module shape, technology choices); stop once every FR carries a decidable acceptance.
   rule: The branches the decision table misses — value combinations across dimensions, the default row, and who wins on conflict. Ask nothing about system behaviour (that belongs to the consuming spec); stop once every rule is decidable.
-  design: Structural trade-offs and failure modes — the rejected options, the module boundaries, and how the system behaves when it breaks. Ask nothing a plan would settle (task order, effort); stop once the structure is buildable without silent choices.
+  design: Completeness of the one structure this doc holds — every column typed, every state reachable and leavable, every participant named, every tactic tied to a scenario in `implements` and to the decision that chose it. Ask nothing a spec or rule would settle (what the system does, what the business allows) nor a plan (task order, effort); stop once the element is buildable without silent choices.
 
 agents:
   claude:

@@ -1,6 +1,6 @@
 # ARCHITECTURE.md Template
 
-Template for `ARCHITECTURE.md`: an arc42-shaped index — short summary plus links per section, detail in the linked docs. C4 depth: L1 in §3, L2 in §5, L3 in `docs/design/`, never L4.
+Template for `ARCHITECTURE.md`: an arc42-shaped index — short summary plus links per section, detail in the linked docs. C4 depth: L1 in §3, L2 in §5, L3 in `docs/design/` (one `module` design per component), never L4.
 
 ## Usage
 
@@ -45,7 +45,7 @@ flowchart LR
 
 ## 5. Building Block View
 
-> Annotated directory tree, then C4 L2 container diagram. Component internals (L3) → `docs/design/`.
+> Annotated directory tree, then C4 L2 container diagram. Component internals (L3) → `docs/design/`: one `module` design per component.
 
 ```
 <root>/
@@ -60,18 +60,24 @@ flowchart LR
 
 ## 6. Runtime View
 
-> Key scenarios by name; sequence diagrams live in `docs/design/`.
+> Key scenarios by name; each row links one `interaction` design, the sequence lives there.
 
 | Scenario | Design |
 | --- | --- |
 
 ## 7. Deployment View
 
-> Environments, infrastructure, CI/CD, observability. Procedures and runbooks → `docs/operation/`.
+> One row per environment linking its `deployment` design; the topology lives there. CI/CD pipeline shape in one line here. Procedures and runbooks → `docs/operation/`.
+
+| Environment | Design |
+| --- | --- |
 
 ## 8. Crosscutting Concepts
 
-> System-wide rules — link, don't restate: security `SECURITY.md`, style `CODE_STYLE.md`, quality gates `CODE_QUALITY.md`, testing `TESTING.md`; domain patterns → `docs/design/`, business invariants → `docs/rule/`.
+> System-wide rules — link, don't restate: security `SECURITY.md`, style `CODE_STYLE.md`, quality gates `CODE_QUALITY.md`, testing `TESTING.md`; each technical mechanism → its `mechanism` design, business invariants → `docs/rule/`.
+
+| Concern | Design |
+| --- | --- |
 
 ## 9. Architecture Decisions
 

@@ -8,6 +8,9 @@ Integration notes for external systems. Front matter: `TEMPLATE.md`.
 - interface constraints
 - callback or webhook notes
 - auth and permission notes
+- an assumption register when behaviour is read off the wire rather than the
+  docs: fact | default taken | observed answer, each answer dated with the run
+  or commit it came from; answered rows stay
 
 Add more when useful.
 

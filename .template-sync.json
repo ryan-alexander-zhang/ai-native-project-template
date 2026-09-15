@@ -23,6 +23,7 @@
     "scripts/test-check-docs-drift.sh",
     ".github/workflows/docs-drift.yml",
     ":(glob)docs/**/README.md",
-    ":(glob)docs/**/TEMPLATE.md"
+    ":(glob)docs/**/TEMPLATE.md",
+    ":(glob)docs/**/TEMPLATE-*.md"
   ]
 }

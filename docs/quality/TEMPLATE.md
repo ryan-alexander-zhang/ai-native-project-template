@@ -3,7 +3,7 @@ id: quality-00001-example-slug
 type: quality
 status: draft|active|archived
 parent: <prd-id | empty when the quality doc is the entry point>
-informs: [<spec-id | design-id | plan-id>, ...]   # the docs these requirements are input for
+informs: [<spec-id | plan-id>, ...]               # the docs these requirements are input for; a design points here via its own implements
 enforced_by: [<test path>, ...]                    # required when any QS is at the build stage; the tests that fail when it is violated
 ---
 

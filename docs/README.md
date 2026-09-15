@@ -27,6 +27,7 @@ Description or comment follows the front matter.
 - `archived` = "no longer the live source", never "done". A work item's outcome is `resolved` or `wontfix`.
 - A **substantive revision** of an `active` `spec`, `rule`, `quality`, or `design` takes the **revision round**: demote to `draft`, revise, audit, re-accept; never edit the `active` file in place. Typo-level fixes exempt; when in doubt, substantive.
 - `decided_by` (`decision` only, not a relation): `human` or `agent`. Written only by autopilot runs (`AUTOPILOT.md`); absent = a human was in the loop.
+- `kind` (`design` only, not a relation): the one structural element the doc holds, from the ten in `docs/design/README.md` Kinds. One element per design.
 - Product flow: `idea -> prd -> quality -> spec` when the later stage exists; `quality` and `spec` both carry the `prd` as `parent`; architecture decisions and `design` docs wait on `quality` (`QUALITY.md`).
 - Exactly three requirement id namespaces, each carrying its doc id:
   - `spec` — **system requirements** — `spec-00001-FR-1`, acceptance `spec-00001-AC-1.1`.
@@ -81,7 +82,7 @@ implements: [spec-00001-operation-log-component, design-00008-operation-log-comp
 - `issue/` — **core** — development issues, fixes, and verification
 - `operation/` — **core** — runbook and operations docs
 - `idea/` — **core** — early ideas (some projects start at `prd/`)
-- `design/` — situational — durable structural design docs
+- `design/` — situational — durable structural designs, one element per doc (`docs/design/README.md` Kinds)
 - `analysis/` — situational — codebase and business analysis
 - `integration/` — situational — third-party integration notes
 - `record/` — situational — reports and process records
@@ -95,6 +96,7 @@ implements: [spec-00001-operation-log-component, design-00008-operation-log-comp
 - `rule`: what is true in the business, with or without the software.
 - `spec`: what the system does.
 - `quality`: how well, with a measure, verified at build, release, and runtime.
+- `design`: with which building block — what it is made of, what shape it has, how it computes.
 - `plan`: how to do it.
 - `issue`: a development problem, its fix, its verification.
 - `analysis`: exploratory codebase or business analysis that informs later docs.
