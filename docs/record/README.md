@@ -41,7 +41,9 @@ When a `plan` with `spec`/`rule`/`quality` items in scope is verified for
 
 List every unfinished or uncovered requirement; a fail/missing row blocks
 `resolved`. Every `spec-<n>-FR-<i>`, `rule-<n>-BR-<i>`, `quality-<n>-QR-<i>` in
-scope appears; unreferenced = unverified.
+scope is covered — an `FR` / `BR` by a row per `AC` that references it, a `QR`
+by a row per `QS`. The item id is never itself a row; it belongs in `verifies`.
+Uncovered = unverified.
 
 A `QS` row: `Test` names what ran; `Result` is `pass` only per the scenario's
 method and stage (`QUALITY.md`, Verification Axis). For `load`, `chaos`, or

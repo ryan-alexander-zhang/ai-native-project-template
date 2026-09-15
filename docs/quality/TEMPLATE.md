@@ -21,47 +21,49 @@ enforced_by: [<test path>, ...]                    # required when any QS is at 
 
 One value per dimension of `QUALITY.md` Profile, least obliging first in each list; every value
 cites where it was read or the `decision` that chose it. The Drives column says what this value
-obliges in this doc and downstream. `n/a` only under the no-runtime exception
+obliges in this doc and downstream: one `;`-separated entry per Drives entry of the value in
+`QUALITY_PROFILE.md`, each ending in its state — the `QR` / `QS` / `decision` id that pays it,
+`open`, or `waived: <decision id>`. `n/a` only under the no-runtime exception
 (`QUALITY_PROFILE.md` Rules), each cell citing the decision id.
 
 | Dimension | Value | Source | Drives here |
 | --- | --- | --- | --- |
-| `scale` | M | [prd §Scale and Context](../prd/<prd-id>.md): 40 k merchants, 300 k daily payers, peak 500 rps | quality-00001-QR-1 with QS-1.1 (release) and QS-1.2 (runtime); decision-<n> scale-out |
-| `growth` | step | prd §Vision: two marketplace launches in the horizon | QS-1.1 runs at planned peak × 2 |
-| `horizon` | 12 months | prd §Vision | Environment lines assume 12-month volume |
-| `data-volume` | large | prd §Scale and Context: 10⁸ invoices | QS-1.1 on a production-sized set |
-| `retention` | years | prd §Scope: 7-year invoice retention | Efficient storage Measure; deletion FR in spec |
+| `scale` | M | [prd §Scale and Context](../prd/<prd-id>.md): 40 k merchants, 300 k daily payers, peak 500 rps | latency QR with release + runtime QS → quality-00001-QR-1; stateless scale-out and store sizing decision → open |
+| `growth` | step | prd §Vision: two marketplace launches in the horizon | load scenario at planned peak × 2 → quality-00001-QS-1.1; Flexible QR on scale-out time → open |
+| `horizon` | 12 months | prd §Vision | every Measure Environment names the horizon → quality-00001-QS-1.1 |
+| `data-volume` | large | prd §Scale and Context: 10⁸ invoices | Efficient QR on query time at production data → quality-00001-QR-1; release load on a production-sized set → quality-00001-QS-1.1 |
+| `retention` | years | prd §Scope: 7-year invoice retention | Efficient storage cost Measure → open; Secure deletion QR → open; Operable archival runbook → open |
 | `traffic-shape` | diurnal | prd §Scale and Context | — |
-| `read-write` | read-heavy | prd §Functional Requirements: 20 reads per payment | decision-<n> read replica; staleness bound in QS |
+| `read-write` | read-heavy | prd §Functional Requirements: 20 reads per payment | read replica decision → open; staleness bound in a QS → quality-00001-QS-1.2 |
 | `access-pattern` | point lookup | prd §Functional Requirements | — |
 | `payload` | small records | prd §Functional Requirements | — |
-| `skew` | tenant skew | prd §Actors: three merchants are 40 % of volume | per-tenant limits FR; QS under skew |
-| `consistency` | strong per aggregate | prd §Functional Requirements: balance must be exact after payment | version-checked write FRs; conflict QS |
-| `partition-preference` | consistency-first | prd §Risks: a wrong balance costs more than a refused payment | QS-2.1 Response = refuse, not degrade |
-| `ordering` | per key | prd: payments on one invoice in order | partition-key decision |
-| `delivery` | at-least-once, idempotent | prd §Risks: a double charge is the top risk | outbox / inbox decision; idempotency FRs; QS-2.1 |
+| `skew` | tenant skew | prd §Actors: three merchants are 40 % of volume | per-tenant limit FR → spec-00001-FR-12; QS under skew → open |
+| `consistency` | strong per aggregate | prd §Functional Requirements: balance must be exact after payment | version-checked write FRs → spec-00001-FR-4; conflict QS → open |
+| `partition-preference` | consistency-first | prd §Risks: a wrong balance costs more than a refused payment | QS Response refuses rather than degrades → quality-00001-QS-2.1 |
+| `ordering` | per key | prd: payments on one invoice in order | partition-key decision → open |
+| `delivery` | at-least-once, idempotent | prd §Risks: a double charge is the top risk | outbox / inbox decision → open; idempotency FRs → spec-00001-FR-5; QS → quality-00001-QS-2.1 |
 | `transaction-span` | one aggregate | prd §Scope | — |
-| `availability` | 99.9 % | prd §Risks: an hour down is a day of support tickets | QR-2 with QS-2.1 (chaos) and a runtime SLO |
-| `recovery` | minutes / an hour | prd §Risks | backup decision; restore Measure in QS-2.1 |
-| `dependency-hardness` | ledger DB hard; card provider soft | prd §Risks and Dependencies | one chaos QS per hard dependency (QS-2.1); provider fallback FR |
-| `blast-radius` | one tenant | prd §Actors | per-tenant bulkhead decision |
-| `latency-class` | interactive | prd §User Experience: payer waits on the result | QR-1 Measures at p99 |
+| `availability` | 99.9 % | prd §Risks: an hour down is a day of support tickets | QR with chaos QS → quality-00001-QR-2; runtime SLO → quality-00001-QS-1.2 |
+| `recovery` | minutes / an hour | prd §Risks | backup decision → open; restore Measure → quality-00001-QS-2.1 |
+| `dependency-hardness` | ledger DB hard; card provider soft | prd §Risks and Dependencies | one chaos QS per hard dependency → quality-00001-QS-2.1; provider fallback FR → spec-00001-FR-8 |
+| `blast-radius` | one tenant | prd §Actors | per-tenant bulkhead decision → open |
+| `latency-class` | interactive | prd §User Experience: payer waits on the result | QR Measures at p99 → quality-00001-QR-1 |
 | `interaction` | request-response | prd §Functional Requirements | — |
-| `sensitivity` | regulated (payment) | prd §Scale and Context | Secure QRs; compliance decision; `auditability` regulatory |
-| `tenancy` | multi-tenant pooled | prd §Actors | tenant-isolation FRs; cross-tenant-leak QS |
-| `trust-boundary` | public internet | prd §Actors | authn decision; rate-limit FR; abuse QS |
-| `auditability` | regulatory audit trail | regulation cited in prd §Risks | audit component decision |
+| `sensitivity` | regulated (payment) | prd §Scale and Context | Secure QRs → open; compliance decision → open; regulatory `auditability` → the row below |
+| `tenancy` | multi-tenant pooled | prd §Actors | tenant-isolation FRs → spec-00001-FR-2; cross-tenant-leak QS → open |
+| `trust-boundary` | public internet | prd §Actors | authn decision → open; rate-limit FR → spec-00001-FR-12; abuse QS → open |
+| `auditability` | regulatory audit trail | regulation cited in prd §Risks | audit component decision → open |
 | `residency` | one region | prd §Scale and Context | — |
-| `topology` | several instances, one region | derived from availability / residency / scale | chaos at node level |
-| `operations-model` | 24×7 on-call | prd §Actors (operators) | Operable detection-time QR; runbooks |
-| `deploy-tolerance` | zero-downtime | prd §User Experience | rolling-deploy decision; deploy QS |
-| `observability` | metrics and alerts | derived from operations-model | telemetry decision |
-| `maturity` | growing product | prd §Vision | QR-3 fitness gates |
+| `topology` | several instances, one region | derived from availability / residency / scale | chaos at node level → quality-00001-QS-2.1 |
+| `operations-model` | 24×7 on-call | prd §Actors (operators) | Operable detection-time QR → open; runbooks → open |
+| `deploy-tolerance` | zero-downtime | prd §User Experience | rolling-deploy decision → open; deploy QS → open |
+| `observability` | metrics and alerts | derived from operations-model | telemetry decision → open |
+| `maturity` | growing product | prd §Vision | fitness gates → quality-00001-QR-3 |
 | `team-shape` | one team | prd §Constraints | — |
-| `integration-surface` | partner APIs | prd §Risks and Dependencies: card provider | contract tests; versioning decision |
+| `integration-surface` | partner APIs | prd §Risks and Dependencies: card provider | contract tests → open; versioning decision → open |
 | `portability` | one platform | idea §Constraints | — |
-| `cost-posture` | predictable capacity | prd §Constraints | Efficient cost Measure |
-| `harm` | financial | prd §Risks | Safe QR; reconciliation decision |
+| `cost-posture` | predictable capacity | prd §Constraints | Efficient cost Measure → open |
+| `harm` | financial | prd §Risks | Safe QR → open; reconciliation decision → open |
 
 ## 3. Quality Requirements
 

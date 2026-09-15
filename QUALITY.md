@@ -126,8 +126,11 @@ Each `QS` declares `[<method> | <stage>]`.
 
 - every Profile dimension has one value citing its source or `decision`
   (`n/a` only under the no-runtime exception, `QUALITY_PROFILE.md` Rules)
-- everything the Profile drives exists: `QR`s, scenario stages, the
-  `decision`s the `architecture` stage owes
+- every Drives entry of every Profile value appears in that row's Drives here
+  cell; before the doc turns `active` every entry is present, `open` states allowed
+- before a `plan` carrying this doc's scenarios turns `resolved`, no entry is
+  `open`: each names the `QR`, scenario, or `decision` that pays it, or reads
+  `waived: <decision id>` with that decision `active`
 - every ranked `prd` Quality Goal is refined by at least one `QR`
 - every `QR` has one tag and at least one `QS`
 - every `QS` declares method and stage; its Measure has a number, a unit, and

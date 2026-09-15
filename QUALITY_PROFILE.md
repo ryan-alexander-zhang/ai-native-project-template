@@ -16,6 +16,10 @@ FR / QR test, tags, stages, Definition of Done stay in `QUALITY.md`.
 - Orders of magnitude and classes only; numbers live in `QS` Measures.
 - **Drives** = the minimum a value obliges (a `QR`, a stage, a `decision`). It is
   policy: to owe less, change this file, not the quality doc.
+- Each Drives entry of a chosen value appears in the consuming quality doc's
+  Drives here cell, carrying its state (`docs/quality/README.md`). Drives stays
+  the policy; the cell is only the ledger of what the chosen value owes and
+  whether it is paid.
 - Scope = the quality doc's §1. A deviating feature (a batch endpoint in an
   interactive system) names the deviating dimension in its own `QR`.
 - Changing a value is a revision round; every `decision` whose `motivated_by`

@@ -14,6 +14,12 @@ Quality requirements: how well the system does something, each with a measure.
   `n/a` cells (no-runtime exception, `QUALITY_PROFILE.md` Rules): each cites an
   `active` `decision` motivated by this doc, none sits on a mandatory
   dimension, no `runtime` `QS` exists in the repo, every catalogue row is present
+- in the profile's Drives here cell, one entry per Drives entry of the chosen
+  value, each ending in its state: the id of the `QR`, `QS`, or `decision` that
+  pays it, `open`, or `waived: <decision id>`. `open` is allowed while the doc
+  is `active` — the `decision`s are written in the `architecture` stage;
+  `QUALITY.md` Definition of Done gates when each must close. The audit reads
+  the states; the script does not
 - quality requirements `quality-<n>-QR-<i>`, each with exactly one tag from the
   `QUALITY.md` Attribute Axis
 - quality scenarios `quality-<n>-QS-<i>.<k>`, one or more per `QR`, six-part
