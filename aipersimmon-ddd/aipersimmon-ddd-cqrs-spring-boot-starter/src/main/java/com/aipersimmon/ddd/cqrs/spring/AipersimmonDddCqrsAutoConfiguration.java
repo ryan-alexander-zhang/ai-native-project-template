@@ -100,7 +100,9 @@ public class AipersimmonDddCqrsAutoConfiguration {
       ObjectProvider<CommandPrecheck<?>> prechecks) {
     // A supplier for the same reason as the buses below: a precheck may take the bus in its
     // constructor, and resolving the provider here would instantiate it against a half-built one.
-    return new PrecheckCommandInterceptor(() -> prechecks.stream().toList());
+    // orderedStream(), not stream(): @Order decides which of two true refusals the client is told
+    // about, so it is part of the precheck contract — and stream() ignores it (issue-00173).
+    return new PrecheckCommandInterceptor(() -> prechecks.orderedStream().toList());
   }
 
   @Bean

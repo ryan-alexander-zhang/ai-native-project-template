@@ -22,7 +22,8 @@ package com.aipersimmon.ddd.cqrs;
  *
  * <p>Implementations are discovered as beans, matched to their command by the type parameter — the
  * same resolution the bus uses for handlers. Several prechecks may target one command; all of them
- * run, in bean order, and the first refusal wins.
+ * run, in ascending {@code @Order} (an unannotated one runs last), and the first refusal wins — so
+ * {@code @Order} decides which of two true refusals the caller is told about.
  *
  * @param <C> the command this precheck screens
  */
