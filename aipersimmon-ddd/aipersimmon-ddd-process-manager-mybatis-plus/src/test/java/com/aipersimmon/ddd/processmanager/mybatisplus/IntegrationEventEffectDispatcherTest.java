@@ -11,8 +11,10 @@ import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ProcessEffectKind;
 import com.aipersimmon.ddd.processmanager.engine.relay.DecodedProcessEffect;
 import com.aipersimmon.ddd.processmanager.engine.relay.IntegrationEventEffectDispatcher;
+import com.aipersimmon.ddd.processmanager.engine.runtime.ProcessUnitOfWork;
 import com.aipersimmon.ddd.processmanager.model.ProcessInstanceId;
 import com.aipersimmon.ddd.tenancy.Tenants;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -46,10 +48,24 @@ class IntegrationEventEffectDispatcherTest {
     }
   }
 
+  /** Runs the work inline; the transaction itself is covered by the relay test on a real DB. */
+  static final class InlineUnitOfWork implements ProcessUnitOfWork {
+    @Override
+    public <R> R execute(Supplier<R> work) {
+      return work.get();
+    }
+
+    @Override
+    public boolean inExistingTransaction() {
+      return false;
+    }
+  }
+
   @Test
   void dispatchesThroughPublishAsUnderTheEffectContextVerbatim() {
     RecordingIntegrationEvents events = new RecordingIntegrationEvents();
-    IntegrationEventEffectDispatcher dispatcher = new IntegrationEventEffectDispatcher(events);
+    IntegrationEventEffectDispatcher dispatcher =
+        new IntegrationEventEffectDispatcher(events, new InlineUnitOfWork());
     SampleEvent event = new SampleEvent("O-1");
     // messageId is the persisted effect id (transitionId#index); publishAs stamps it as the event
     // id.

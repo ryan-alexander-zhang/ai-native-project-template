@@ -3,15 +3,18 @@ package com.aipersimmon.ddd.processmanager.mybatisplus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.aipersimmon.ddd.application.IntegrationEvents;
 import com.aipersimmon.ddd.cqrs.Command;
 import com.aipersimmon.ddd.cqrs.CommandBus;
 import com.aipersimmon.ddd.cqrs.CommandContext;
+import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodecRegistry;
 import com.aipersimmon.ddd.processmanager.codec.ProcessStateCodecRegistry;
 import com.aipersimmon.ddd.processmanager.definition.ProcessDefinitionRegistry;
 import com.aipersimmon.ddd.processmanager.engine.lease.WorkerId;
 import com.aipersimmon.ddd.processmanager.engine.relay.CommandEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.engine.relay.EffectDispatcherRegistry;
+import com.aipersimmon.ddd.processmanager.engine.relay.IntegrationEventEffectDispatcher;
 import com.aipersimmon.ddd.processmanager.engine.relay.ProcessEffectRelay;
 import com.aipersimmon.ddd.processmanager.engine.retry.ProcessRetryPolicy;
 import com.aipersimmon.ddd.processmanager.engine.runtime.DefaultProcessRuntime;
@@ -38,6 +41,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Effect-relay contract against H2: delivery, per-instance ordering, retry/DEAD, fencing. */
 class MybatisProcessEffectRelayTest {
@@ -55,6 +59,7 @@ class MybatisProcessEffectRelayTest {
   private SpringTxProcessUnitOfWork unitOfWork;
   private String dialect;
   private RecordingCommandBus bus;
+  private TransactionalIntegrationEvents events;
   private final AtomicInteger ids = new AtomicInteger();
   private final AtomicInteger tokens = new AtomicInteger();
 
@@ -82,6 +87,7 @@ class MybatisProcessEffectRelayTest {
     unitOfWork = new SpringTxProcessUnitOfWork(new DataSourceTransactionManager(dataSource));
     dialect = "h2";
     bus = new RecordingCommandBus();
+    events = new TransactionalIntegrationEvents();
     runtime =
         new DefaultProcessRuntime(
             instanceStore,
@@ -104,7 +110,10 @@ class MybatisProcessEffectRelayTest {
         effectStore,
         instanceStore,
         new ProcessPayloadCodecRegistry(TestFulfilment.payloadCodecs()),
-        new EffectDispatcherRegistry(List.of(new CommandEffectDispatcher(bus))),
+        new EffectDispatcherRegistry(
+            List.of(
+                new CommandEffectDispatcher(bus),
+                new IntegrationEventEffectDispatcher(events, unitOfWork))),
         unitOfWork,
         policy,
         CLOCK,
@@ -389,6 +398,32 @@ class MybatisProcessEffectRelayTest {
   }
 
   @Test
+  void publishesAnIntegrationEventEffectInsideATransaction() {
+    // The default IntegrationEvents is the transactional outbox writer, which refuses a row
+    // outside a transaction. The relay dispatches outside the advance transaction, so the
+    // dispatcher must open one — or every PublishIntegrationEvent effect dies on the first attempt.
+    ProcessAdvanceResult started = start();
+    ProcessEffectRelay relay = relay(zeroBackoff(3));
+    relay.pollOnce(); // deliver the start's command effect first
+    runtime.handle(
+        started.processRef(),
+        new TestFulfilment.Announce(),
+        CommandContext.root(Tenants.ROOT, "msg-announce"));
+
+    assertEquals(1, relay.pollOnce(), "the integration-event effect is delivered");
+    assertEquals(1, events.published.size());
+    assertEquals(
+        new TestFulfilment.Announced("order-1"), events.published.get(0), "decoded payload");
+    assertEquals(
+        "msg-announce", events.contexts.get(0).correlationId(), "effect context passed verbatim");
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM aipersimmon_process_effect WHERE status <> 'DELIVERED'",
+            Integer.class));
+  }
+
+  @Test
   void aCleanlyDeliveredEffectIsNotRedelivered() {
     start();
     ProcessEffectRelay relay = relay(zeroBackoff(3));
@@ -418,6 +453,29 @@ class MybatisProcessEffectRelayTest {
         return maxAttempts;
       }
     };
+  }
+
+  /**
+   * An IntegrationEvents with the outbox writer's one precondition: an active transaction on the
+   * calling thread. Same check, same failure, without the outbox schema.
+   */
+  static final class TransactionalIntegrationEvents implements IntegrationEvents {
+    final List<IntegrationEvent> published = new ArrayList<>();
+    final List<CommandContext> contexts = new ArrayList<>();
+
+    @Override
+    public void publish(IntegrationEvent event, CommandContext context) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void publishAs(IntegrationEvent event, CommandContext context) {
+      if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+        throw new IllegalStateException("no active transaction while writing to the outbox");
+      }
+      published.add(event);
+      contexts.add(context);
+    }
   }
 
   /** A CommandBus that records sendAs dispatches and can fail the first N of them. */

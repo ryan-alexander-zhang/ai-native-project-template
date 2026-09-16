@@ -1,6 +1,8 @@
 package com.aipersimmon.ddd.processmanager.mybatisplus;
 
 import com.aipersimmon.ddd.cqrs.Command;
+import com.aipersimmon.ddd.integration.EventType;
+import com.aipersimmon.ddd.integration.IntegrationEvent;
 import com.aipersimmon.ddd.processmanager.codec.EncodedPayload;
 import com.aipersimmon.ddd.processmanager.codec.PayloadType;
 import com.aipersimmon.ddd.processmanager.codec.ProcessPayloadCodec;
@@ -12,6 +14,7 @@ import com.aipersimmon.ddd.processmanager.definition.ProcessDefinition;
 import com.aipersimmon.ddd.processmanager.definition.ProcessInput;
 import com.aipersimmon.ddd.processmanager.effect.CancelDeadline;
 import com.aipersimmon.ddd.processmanager.effect.DispatchCommand;
+import com.aipersimmon.ddd.processmanager.effect.PublishIntegrationEvent;
 import com.aipersimmon.ddd.processmanager.effect.ScheduleDeadline;
 import com.aipersimmon.ddd.processmanager.engine.runtime.MaxLifetimeExceededCodec;
 import com.aipersimmon.ddd.processmanager.exception.UnsupportedProcessInputException;
@@ -69,8 +72,15 @@ final class TestFulfilment {
   /** Ends the process and schedules a deadline in the same decision — an unreachable timer. */
   record FinishAndArmDeadline() implements ProcessInput {}
 
+  /** Stages a {@code PublishIntegrationEvent} — the cross-service effect kind. */
+  record Announce() implements ProcessInput {}
+
   // Command effect payload.
   record DoWork(String reference) implements Command<Void> {}
+
+  // Integration-event effect payload.
+  @EventType(name = "test.announced", version = 1)
+  record Announced(String orderId) implements IntegrationEvent {}
 
   static final class Definition implements ProcessDefinition<State> {
     @Override
@@ -189,6 +199,14 @@ final class TestFulfilment {
                 Optional.empty(),
                 new DecisionCode("review-cancelled"),
                 List.of(new CancelDeadline(new DeadlineName("REVIEW"))));
+        case Announce ignored ->
+            new ProcessDecision<>(
+                new State("ANNOUNCED", state.count()),
+                ProcessLifecycle.RUNNING,
+                new ProcessStep("ANNOUNCED"),
+                Optional.empty(),
+                new DecisionCode("announced"),
+                List.of(new PublishIntegrationEvent(new Announced("order-1"))));
         case FanOut ignored ->
             new ProcessDecision<>(
                 new State("FAN", state.count()),
@@ -266,6 +284,8 @@ final class TestFulfilment {
             "test.arm-poison", ArmPoisonDeadline.class, a -> "", s -> new ArmPoisonDeadline()),
         payloadCodec("test.cancel-review", CancelReview.class, c -> "", s -> new CancelReview()),
         payloadCodec("test.do-work", DoWork.class, DoWork::reference, DoWork::new),
+        payloadCodec("test.announce", Announce.class, a -> "", s -> new Announce()),
+        payloadCodec("test.announced", Announced.class, Announced::orderId, Announced::new),
         new MaxLifetimeExceededCodec());
   }
 

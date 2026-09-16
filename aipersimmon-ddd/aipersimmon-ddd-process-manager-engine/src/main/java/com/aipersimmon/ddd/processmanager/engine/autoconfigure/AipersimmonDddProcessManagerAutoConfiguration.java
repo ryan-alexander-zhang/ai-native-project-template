@@ -270,11 +270,11 @@ public class AipersimmonDddProcessManagerAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean(IntegrationEvents.class)
+  @ConditionalOnBean({IntegrationEvents.class, ProcessUnitOfWork.class})
   @ConditionalOnMissingBean
   public IntegrationEventEffectDispatcher integrationEventEffectDispatcher(
-      IntegrationEvents integrationEvents) {
-    return new IntegrationEventEffectDispatcher(integrationEvents);
+      IntegrationEvents integrationEvents, ProcessUnitOfWork unitOfWork) {
+    return new IntegrationEventEffectDispatcher(integrationEvents, unitOfWork);
   }
 
   @Bean
